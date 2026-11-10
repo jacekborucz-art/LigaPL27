@@ -1,0 +1,68 @@
+/* Tokeny designu: polski stadion w dzień meczowy (docs/PLAN.md, rozdz. 7). */
+:root {
+  --murawa: #1E6B3A;
+  --murawa-jasna: #25793F;
+  --kreda: #F3F6F1;
+  --beton: #D9DCD6;
+  --trybuna: #14211A;
+  --led: #FFB21A;
+  --kartka-zolta: #F5C518;
+  --kartka-czerwona: #D62839;
+
+  /* Role (tryb jasny) */
+  --bg: var(--beton);
+  --surface: #ECEEEA;
+  --surface-stripe: #E3E6E0;
+  --text: #17231C;
+  --text-muted: #55625A;
+  --line: #C3C8C0;
+  --accent: var(--murawa);
+  --accent-text: var(--kreda);
+  --focus: #0B57D0;
+
+  --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --font-body: 'Barlow', system-ui, sans-serif;
+  --font-led: 'Doto', 'Courier New', monospace;
+
+  --step--1: clamp(0.78rem, 0.75rem + 0.15vw, 0.86rem);
+  --step-0: clamp(0.94rem, 0.9rem + 0.2vw, 1.03rem);
+  --step-1: clamp(1.13rem, 1.06rem + 0.35vw, 1.3rem);
+  --step-2: clamp(1.35rem, 1.24rem + 0.55vw, 1.66rem);
+  --step-3: clamp(1.62rem, 1.44rem + 0.9vw, 2.15rem);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius-s: 4px;
+  --radius-m: 10px;
+  --tap: 44px;
+  --nav-h: 64px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: var(--trybuna);
+    --surface: #1B2B22;
+    --surface-stripe: #20332787;
+    --text: #E8EEE9;
+    --text-muted: #9FB0A5;
+    --line: #2F4438;
+    --accent: #2E8A4E;
+    --focus: #8AB4F8;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: var(--trybuna);
+  --surface: #1B2B22;
+  --surface-stripe: #20332787;
+  --text: #E8EEE9;
+  --text-muted: #9FB0A5;
+  --line: #2F4438;
+  --accent: #2E8A4E;
+  --focus: #8AB4F8;
+}

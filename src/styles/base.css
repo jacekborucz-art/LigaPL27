@@ -1,0 +1,56 @@
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.1;
+  margin: 0 0 var(--space-3);
+}
+h1 { font-size: var(--step-3); }
+h2 { font-size: var(--step-2); }
+h3 { font-size: var(--step-1); }
+
+button, input, select { font: inherit; color: inherit; }
+
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* Herb */
+.crest {
+  position: relative;
+  display: inline-flex;
+  width: var(--crest);
+  height: var(--crest);
+  flex: none;
+  align-items: center;
+  justify-content: center;
+}
+.crest img, .crest svg { width: 100%; height: 100%; object-fit: contain; display: block; }
+.crest__badge {
+  position: absolute;
+  right: -4px;
+  bottom: -2px;
+  padding: 0 3px;
+  border-radius: var(--radius-s);
+  background: var(--trybuna);
+  color: var(--kreda);
+  font: 700 10px/1.3 var(--font-display);
+}
+
+/* Tabela w pasy koszonej murawy */
+.stripes > :nth-child(even) { background: var(--surface-stripe); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

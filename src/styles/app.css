@@ -1,0 +1,202 @@
+/* Układ aplikacji: telefon najpierw, tablet i PC jako rozszerzenia (docs/PLAN.md, rozdz. 7). */
+
+.muted { color: var(--text-muted); }
+.plain { margin: 0; padding-left: 1.1em; }
+.plain li + li { margin-top: var(--space-1); }
+
+/* Tablica LED */
+.led {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: var(--radius-s);
+  background: #0E1511;
+  color: var(--led);
+  font: 800 var(--step-0)/1.3 var(--font-led);
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 6px rgba(255, 178, 26, 0.55);
+  white-space: nowrap;
+}
+
+/* Przyciski */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap);
+  padding: 0 var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-s);
+  background: none;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--step-1);
+  cursor: pointer;
+}
+.btn--primary { background: var(--accent); color: var(--accent-text); }
+.btn--primary:hover { filter: brightness(1.08); }
+.btn--quiet { color: var(--text); border-color: var(--line); }
+.btn--quiet:hover { background: var(--surface-stripe); }
+
+.notice {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-left: 4px solid var(--led);
+  background: var(--surface);
+}
+
+/* Start */
+.start { max-width: 640px; margin: 0 auto; padding: var(--space-5) var(--space-4) var(--space-6); }
+.start__head { margin-bottom: var(--space-5); }
+.start__head h1 { font-size: clamp(2.2rem, 1.6rem + 3vw, 3.4rem); margin: var(--space-3) 0 var(--space-2); }
+.start__head p { margin: 0; }
+.slots { list-style: none; margin: 0 0 var(--space-4); padding: 0; background: var(--surface); border-radius: var(--radius-m); overflow: hidden; }
+.slot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); }
+.slot__body { display: flex; flex-direction: column; flex: 1 1 140px; min-width: 0; }
+.slot__title { font-family: var(--font-display); font-weight: 700; font-size: var(--step-1); }
+.slot__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.import { cursor: pointer; }
+
+/* Pasek z tytułem */
+.bar { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); }
+.bar__title { margin: 0; font-size: var(--step-2); }
+
+/* Wybór klubu */
+.pick { max-width: 720px; margin: 0 auto; padding-bottom: var(--space-6); }
+.pick__hint { padding: 0 var(--space-4); margin: var(--space-3) 0; font-size: var(--step--1); }
+.seg { display: flex; margin: 0 var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-s); overflow: hidden; }
+.seg__btn {
+  flex: 1;
+  min-height: var(--tap);
+  border: 0;
+  background: none;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--step-1);
+  cursor: pointer;
+}
+.seg__btn[aria-selected="true"] { background: var(--accent); color: var(--accent-text); }
+.club-list { list-style: none; margin: 0; padding: 0; }
+.club-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 60px;
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.club-row:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.club-row__name { flex: 1; min-width: 0; font-family: var(--font-display); font-weight: 600; font-size: var(--step-1); line-height: 1.15; }
+.club-row__meta { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+.tag {
+  padding: 1px 6px;
+  border-radius: var(--radius-s);
+  background: #0E1511;
+  color: var(--led);
+  font: 700 var(--step--1)/1.4 var(--font-display);
+}
+.strength { font-size: var(--step--1); color: var(--text-muted); min-width: 72px; text-align: right; }
+.strength[data-level="Faworyt"] { color: var(--accent); font-weight: 600; }
+
+/* Główny ekran */
+.hub { min-height: 100dvh; display: grid; grid-template-rows: auto 1fr auto; }
+.hub__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  padding-top: max(var(--space-3), env(safe-area-inset-top));
+  background: var(--murawa);
+  background-image: repeating-linear-gradient(90deg, transparent 0 48px, rgba(255, 255, 255, 0.05) 48px 96px);
+  color: var(--kreda);
+}
+.hub__club { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.hub__club .muted { color: color-mix(in srgb, var(--kreda) 75%, transparent); font-size: var(--step--1); }
+.hub__name { font-family: var(--font-display); font-weight: 700; font-size: var(--step-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hub__date { font-size: var(--step--1); }
+.hub__main { padding: var(--space-4); padding-bottom: calc(var(--nav-h) + var(--space-5)); max-width: 960px; width: 100%; }
+
+.panel { padding: var(--space-4); margin-bottom: var(--space-4); background: var(--surface); border-radius: var(--radius-m); }
+.panel p { margin: 0 0 var(--space-2); }
+.panel__lead { font-family: var(--font-display); font-weight: 700; font-size: var(--step-2); line-height: 1.15; }
+
+/* Nawigacja: dolny pasek na telefonie */
+.nav {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  height: calc(var(--nav-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+.nav__btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font: 600 11px/1.1 var(--font-body);
+  text-align: center;
+  cursor: pointer;
+}
+.nav__btn .ico { width: 24px; height: 24px; }
+.nav__btn[aria-current="page"] { color: var(--accent); }
+.nav__btn[data-tab="mecz"] .ico {
+  width: 40px;
+  height: 40px;
+  padding: 7px;
+  margin-top: -14px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-text);
+  box-shadow: 0 0 0 4px var(--surface);
+}
+
+/* Tablet i telefon poziomo */
+@media (min-width: 600px) {
+  .hub__main { padding: var(--space-5); padding-bottom: calc(var(--nav-h) + var(--space-5)); }
+  .nav__btn { font-size: 12px; }
+}
+
+/* PC: boczny pasek nawigacji */
+@media (min-width: 1024px) {
+  .hub { grid-template-columns: 220px 1fr; grid-template-rows: auto 1fr; }
+  .hub__head { grid-column: 1 / -1; }
+  .nav {
+    position: sticky;
+    top: 0;
+    inset: auto;
+    height: auto;
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-4) var(--space-3);
+    background: none;
+    border-top: 0;
+    border-right: 1px solid var(--line);
+    min-height: calc(100dvh - 64px);
+  }
+  .nav__btn {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--space-3);
+    min-height: var(--tap);
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-s);
+    font: 600 var(--step-0)/1 var(--font-body);
+  }
+  .nav__btn:hover { background: var(--surface-stripe); }
+  .nav__btn[aria-current="page"] { background: var(--surface); color: var(--accent); }
+  .nav__btn[data-tab="mecz"] .ico { width: 24px; height: 24px; padding: 0; margin: 0; background: none; color: inherit; box-shadow: none; }
+  .hub__main { padding: var(--space-5) var(--space-6); }
+}
