@@ -1,0 +1,97 @@
+/* Ekran „Rozmowy kontraktowe” (src/ui/negotiationView.js). Telefon najpierw, tokeny z tokens.css. */
+
+.ng { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+.ng > * { min-width: 0; }
+.ng .panel { margin-bottom: 0; }
+.ng h2 { margin: 0; font-family: var(--font-display); font-size: var(--step-3); line-height: 1.05; overflow-wrap: anywhere; }
+.ng h3 { margin: 0 0 var(--space-3); font-family: var(--font-display); font-size: var(--step-1); }
+.ng h4 { margin: 0 0 var(--space-2); font-family: var(--font-display); font-size: var(--step-0); }
+.ng .notice { margin: 0; }
+
+/* Nagłówek: zawodnik i to, co o nim wiadomo */
+.ng-head { display: grid; gap: var(--space-3); }
+.ng-kicker { margin: 0 0 2px; color: var(--accent); font: 700 var(--step--1)/1.2 var(--font-display); letter-spacing: 0.06em; text-transform: uppercase; }
+.ng-who p { margin: 2px 0 0; }
+.ng-contract { font-size: var(--step--1); }
+.ng-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: 0; }
+.ng-fact { min-width: 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius-s); background: var(--surface-stripe); }
+.ng-fact dt { color: var(--text-muted); font-size: var(--step--1); }
+.ng-fact dd { margin: 0; font: 700 var(--step-0)/1.2 var(--font-display); overflow-wrap: anywhere; }
+.ng-fact dd[data-tone="ok"] { color: var(--accent); }
+.ng-fact dd[data-tone="mid"] { color: #B7791F; }
+.ng-fact dd[data-tone="bad"] { color: var(--kartka-czerwona); }
+
+.ng-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+.ng-body > * { min-width: 0; }
+
+/* Rozmowa: dymki (rozmówca po lewej, klub po prawej) */
+.ng-log { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.ng-msg {
+  max-width: 88%; padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-m); line-height: 1.4; overflow-wrap: anywhere;
+}
+.ng-msg p { margin: 0; }
+.ng-msg__who { display: block; margin-bottom: 2px; font: 700 var(--step--1)/1.2 var(--font-display); letter-spacing: 0.02em; }
+.ng-msg--them {
+  justify-self: start; border-bottom-left-radius: var(--radius-s);
+  background: var(--surface-stripe); border: 1px solid var(--line);
+}
+.ng-msg--them .ng-msg__who { color: var(--text-muted); }
+.ng-msg[data-who="player"] { border-left: 3px solid var(--led); }
+.ng-msg--me {
+  justify-self: end; border-bottom-right-radius: var(--radius-s);
+  background: var(--accent); color: var(--accent-text);
+}
+.ng-msg--me .ng-msg__who { color: color-mix(in srgb, var(--accent-text) 80%, transparent); text-align: right; }
+
+/* Kontroferta, żądanie, ultimatum */
+.ng-counter {
+  margin-top: var(--space-4); padding: var(--space-3);
+  border: 1px solid var(--line); border-left: 4px solid var(--led); border-radius: var(--radius-s);
+}
+.ng-counter[data-type="ultimatum"] { border-left-color: var(--kartka-czerwona); }
+.ng-counter p { margin: 0 0 var(--space-2); }
+
+/* Formularz oferty */
+.ng-limits { margin: 0 0 var(--space-3); color: var(--text-muted); font-size: var(--step--1); }
+.ng-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+.ng-field { display: grid; gap: 4px; min-width: 0; }
+.ng-field > label { font-weight: 600; font-size: var(--step--1); }
+.ng-field input[type="number"], .ng-field select {
+  width: 100%; min-height: var(--tap); padding: 0 var(--space-3);
+  border: 1px solid var(--line); border-radius: var(--radius-s);
+  background: var(--bg); color: var(--text); font-size: var(--step-0);
+}
+.ng-field input:focus-visible, .ng-field select:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
+.ng-field--wage input { font: 700 var(--step-2)/1 var(--font-display); }
+.ng-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.ng-step { padding: 0 4px; font-size: var(--step-0); }
+.ng-check { display: flex; align-items: center; gap: var(--space-2); min-height: var(--tap); font-size: var(--step--1); cursor: pointer; }
+.ng-check input { width: 20px; height: 20px; flex: none; accent-color: var(--murawa); }
+.ng-warn { margin-top: var(--space-3) !important; }
+
+.ng-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
+.ng-actions .btn { flex: 1 1 auto; }
+.ng .btn[disabled] { opacity: 0.45; cursor: not-allowed; filter: none; }
+.ng .btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* Wynik */
+.ng-result[data-result="ok"] { border-top: 4px solid var(--accent); }
+.ng-result[data-result="fail"] { border-top: 4px solid var(--kartka-czerwona); }
+.ng-dl { display: grid; gap: 0; margin: var(--space-3) 0 0; }
+.ng-dl div { display: flex; justify-content: space-between; gap: var(--space-3); padding: 6px 0; border-bottom: 1px solid var(--line); }
+.ng-dl dt { color: var(--text-muted); }
+.ng-dl dd { margin: 0; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+
+@media (min-width: 600px) {
+  .ng-facts { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .ng-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ng-field--wage { grid-column: 1 / -1; }
+  .ng-actions .btn { flex: 0 1 auto; }
+}
+
+@media (min-width: 1024px) {
+  .ng-head { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); align-items: start; }
+  .ng-body { grid-template-columns: minmax(0, 1.15fr) minmax(360px, 1fr); align-items: start; }
+  .ng-msg { max-width: 78%; }
+}

@@ -4,6 +4,7 @@
 // Sesja żyje w pamięci; wynik i jego skutki trafiają do gry dopiero po końcowym gwizdku.
 
 import { trainingMatchInput } from '../training/index.js';
+import { stadiumCapacity } from '../career/finance.js';
 import { Rng } from '../core/rng.js';
 import { CLUBS_PL, clubById } from '../data/clubs_pl.js';
 import { formationById } from '../data/formations.js';
@@ -94,6 +95,7 @@ export function startMatchday(game, f) {
     home: teamCtx(game, f.home, comp, table, userSide === 0 ? game.tactics : oppTactics),
     away: teamCtx(game, f.away, comp, table, userSide === 1 ? game.tactics : oppTactics),
     competition: compInfo(f), neutral: !!f.neutral, h2h, referee, weather, pitch, var: hasVar,
+    stadium: { capacity: f.neutral ? 58000 : stadiumCapacity(anyClub(f.home)) },
     board: { trust: game.board.trust }, fans: { mood: game.board.fansMood }, headlineHistory: game.headlineHistory ?? [],
     date: f.date, seed: `${game.seed}`, userClubId: game.clubId,
     table: table ? { roundsPlayed: Math.max(...table.map((r) => r.played)), roundsTotal: 34, size: table.length } : null,

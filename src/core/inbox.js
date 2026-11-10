@@ -36,6 +36,7 @@ export function createMessage(msg) {
     priority: msg.priority ?? 'info',
     actions: msg.actions ?? [],
     refs: msg.refs ?? null,
+    optional: !!msg.optional, // decyzja, która nie zatrzymuje upływu dni (np. oferta, która sama wygaśnie)
     read: false,
     resolved: msg.actions?.length ? false : true,
   };
@@ -80,5 +81,5 @@ export function filterInbox(inbox, category = null) {
 
 /** Nierozwiązane wiadomości wymagające decyzji (np. odpowiedź na prośbę zawodnika). */
 export function pendingDecisions(inbox) {
-  return inbox.filter((m) => !m.resolved && m.actions.length > 0);
+  return inbox.filter((m) => !m.resolved && m.actions.length > 0 && !m.optional);
 }

@@ -1,0 +1,40 @@
+/* Zakładka Transfery: rynek, karta zawodnika, oferty, kontrakty, finanse, zarząd */
+.tf-list { list-style: none; margin: 0 0 var(--space-4); padding: 0; background: var(--surface); border-radius: var(--radius-m); overflow: hidden; }
+.tf-list > li:nth-child(even) .tf-row { background: var(--surface-stripe); }
+.tf-list > li.hint { padding: var(--space-3); }
+.tf-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) 34px auto; gap: var(--space-2); align-items: center; width: 100%; min-height: 52px; padding: 6px var(--space-3); border: 0; background: none; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.tf-row:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.tf-row:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.tf-pos { font: 700 var(--step--1)/1 var(--font-display); color: var(--text-muted); }
+.tf-name { display: flex; flex-direction: column; min-width: 0; font-weight: 600; }
+.tf-name, .tf-name small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tf-name small { font-weight: 400; color: var(--text-muted); font-size: var(--step--1); display: flex; align-items: center; gap: 4px; }
+.tf-ovr { font: 700 var(--step-1)/1 var(--font-display); text-align: center; }
+.tf-extra { text-align: right; font-size: var(--step--1); font-weight: 600; display: flex; flex-direction: column; align-items: flex-end; }
+.tf-extra small { font-weight: 400; color: var(--text-muted); }
+.tf-card { margin-top: var(--space-3); }
+.tf-card__head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; margin-bottom: var(--space-3); }
+.tf-card__head h2 { margin: 0; }
+.tf-card__head p { margin: 2px 0 0; }
+.tf-big { font: 700 var(--step-3)/1 var(--font-display); }
+.tf-offer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-2); margin: var(--space-3) 0; }
+.tf-offer label, .tf-search label { display: flex; flex-direction: column; gap: 4px; font-size: var(--step--1); color: var(--text-muted); }
+.tf-offer input, .tf-offer select, .tf-search input, .tf-search select { min-height: 44px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--surface); color: var(--text); font-size: var(--step-0); min-width: 0; }
+.tf-offer input { width: 11rem; }
+.tf-actions { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); }
+.tf-actions .btn { align-self: flex-start; }
+.tf-search { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-2); align-items: end; margin-bottom: var(--space-3); }
+.tf-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin-bottom: var(--space-4); }
+.kpi { display: flex; flex-direction: column; gap: 2px; padding: var(--space-3); background: var(--surface); border-radius: var(--radius-m); min-width: 0; }
+.kpi small { color: var(--text-muted); font-size: var(--step--1); }
+.kpi b { font: 700 var(--step-2)/1.1 var(--font-display); }
+.kpi b.kpi__txt { font-size: var(--step-0); line-height: 1.25; }
+.neg { color: var(--kartka-czerwona); }
+.kpi .meter { display: block; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; margin: 4px 0; }
+.kpi .meter i { display: block; height: 100%; background: var(--accent); }
+.tf-incoming { flex-wrap: wrap; }
+.tf-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+@media (min-width: 1024px) {
+  .tf-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.tf-money li b, .tf-list + .stat-sec li b, .stat-sec .plain-list li > b:last-child { margin-left: auto; text-align: right; white-space: nowrap; }

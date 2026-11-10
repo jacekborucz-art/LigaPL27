@@ -6,7 +6,7 @@ import { crestHtml } from './ui/crest.js';
 import { esc, fmtDate, weekday, icon } from './ui/dom.js';
 import * as store from './core/store.js';
 import { hashString } from './core/rng.js';
-import { CATEGORIES, unreadCount, markRead, markAllRead, resolveMessage, filterInbox, pendingDecisions } from './core/inbox.js';
+import { CATEGORIES, unreadCount, markRead, markAllRead, resolveMessage, filterInbox, pendingDecisions, addMessages } from './core/inbox.js';
 import { processDay, primaryAction, continueUntilStop, finishMatch } from './core/gameLoop.js';
 import './season/dailySystems.js';
 import { createSeason, compLabel, applyResult, fromEngineResult, squadFor, anyClub, LEAGUE_COMPS } from './season/season.js';
@@ -26,6 +26,12 @@ import { ensureUefa } from './season/europe.js';
 import { ensureNational } from './season/nationalSystem.js';
 import { ensureTraining, trainingMatchInput } from './training/index.js';
 import { renderTraining, handleTrainingAction, isTrainingAction } from './ui/trainingView.js';
+import { renderTransfers, handleTransferAction, isTransferAction } from './ui/transfersView.js';
+import { ensureCareer } from './career/careerSystem.js';
+import { completeTransfer, fmtZl } from './career/transfers.js';
+import { trustLabel } from './career/board.js';
+import { runDecision } from './core/decisions.js';
+import { startNegotiation, renderNegotiation, handleNegotiationAction, isNegotiationAction, readNegotiationForm, refreshNegotiationHints } from './ui/negotiationView.js';
 
 const app = document.getElementById('app');
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
@@ -90,6 +96,7 @@ function ensureGameShape(g) {
   ensureUefa(g); // zapis sprzed etapu 8: puchary UEFA nadrobione w tle
   ensureNational(g);
   ensureTraining(g);
+  ensureCareer(g);
   if (!g.inbox.length) {
     g.inbox = [];
     const today = g.date;
@@ -216,6 +223,7 @@ function renderTab(tab, g, club) {
   if (tab === 'pulpit') return renderDashboard(g, club);
   if (tab === 'poczta') return renderMail(g);
   if (tab === 'trening') return renderTraining(g, state);
+  if (tab === 'transfery') return state.ng ? renderNegotiation(g, state.ng) : renderTransfers(g, state);
   if (tab === 'rozgrywki') return renderCompetitions(g, { comp: state.cComp ?? ['ekstraklasa', 'liga1', 'liga2'][club.tier - 1], view: state.cView, round: state.cRound, filter: state.uFilter, draw: state.uDraw });
   if (tab === 'kadra') {
     const sub = `<div class="subtabs" role="tablist"><button role="tab" data-act="tsub" data-s="players" aria-selected="${state.sqSub === 'players'}">Zawodnicy</button><button role="tab" data-act="tsub" data-s="tactics" aria-selected="${state.sqSub === 'tactics'}">Skład i taktyka</button></div>`;
@@ -258,8 +266,14 @@ function renderDashboard(g, club) {
       <p class="muted">${me.played} meczów: ${me.wins} zwycięstw, ${me.draws} remisów, ${me.losses} porażek, bramki ${me.gf}:${me.ga}</p>
     </section>
     <section class="panel">
+      <p class="muted">Zarząd i finanse</p>
+      <p class="panel__lead">${esc(trustLabel(g.board?.trust ?? 60))}, zaufanie ${g.board?.trust ?? 60}/100</p>
+      <p class="muted">Cel: ${esc(g.board?.goal?.text ?? '')}. Saldo: ${esc(fmtZl(g.finance?.clubs?.[g.clubId]?.balance ?? 0))}.</p>
+    </section>
+    <section class="panel">
       <p class="muted">Okno transferowe</p>
       <p class="panel__lead">${tw ? `Otwarte do ${esc(fmtDate(tw.to))}` : 'Zamknięte'}</p>
+      ${(() => { const n = (g.market?.offers ?? []).filter((o) => o.kind === 'incoming' && o.status === 'open').length; return n ? `<p class="muted">Oferty za twoich zawodników: ${n}. <button class="btn btn--quiet btn--sm" data-act="tab" data-tab="transfery">Zobacz</button></p>` : ''; })()}
     </section>
     <h3>Ostatnie wiadomości</h3>
     <ul class="mail-list stripes">${latest.map(mailRow).join('') || '<li class="mail-empty">Brak wiadomości.</li>'}</ul>`;
@@ -296,6 +310,13 @@ function renderMail(g) {
     ${pending ? `<p class="notice">Masz ${pending} ${pending === 1 ? 'wiadomość wymagającą' : 'wiadomości wymagające'} odpowiedzi.</p>` : ''}
     <div class="chips">${chips}</div>
     <ul class="mail-list stripes">${list.map(mailRow).join('') || '<li class="mail-empty">Brak wiadomości w tej kategorii.</li>'}</ul>`;
+}
+
+/** Po zmianie kadry (transfer, rozwiązanie, nowy klub): skład i trening dla nowych zawodników. */
+function afterSquadChange(g) {
+  g.tactics = refreshTactics(g.tactics, mySquad(g), { benchSize: benchSizeFor(g) }).tactics;
+  ensureTraining(g);
+  leagueOvrCache.clear?.();
 }
 
 // ---------- Dzień meczowy na żywo (etap 5) ----------
@@ -439,6 +460,10 @@ async function tacticsClick(g, act, el) {
   render();
 }
 
+app.addEventListener('input', (ev) => {
+  if (state.ng && ev.target.closest('[data-ng-form]')) refreshNegotiationHints(app, state.ng);
+});
+
 app.addEventListener('change', async (ev) => {
   const sel = ev.target.closest('select[data-act="trole"]');
   if (!sel) return;
@@ -459,6 +484,7 @@ async function newGame(slot, clubId) {
   game.world = generateWorld(seed);
   game.tactics = createTactics(squadOf(game.world, clubId), { benchSize: benchSizeFor(game) });
   ensureTraining(game);
+  ensureCareer(game);
   processDay(game);
   state.game = game;
   state.slot = slot;
@@ -472,6 +498,33 @@ app.addEventListener('click', async (ev) => {
   const el = ev.target.closest('[data-act]');
   if (!el || el.tagName === 'INPUT') return;
   const act = el.dataset.act;
+  if (isTransferAction(act) && state.game) {
+    const r = handleTransferAction(state.game, act, el.dataset, app);
+    Object.assign(state, r.ui ?? {});
+    if (r.resolveOffer) state.game.inbox = state.game.inbox.map((m) => (m.refs?.offerId === r.resolveOffer ? { ...m, read: true, resolved: true } : m));
+    if (r.negotiate) {
+      const s2 = startNegotiation(state.game, r.negotiate);
+      if (s2.ok) state.ng = s2.ng; else state.tfMsg = s2.text;
+    }
+    if (r.squadChanged) afterSquadChange(state.game);
+    if (r.save) await save();
+    render();
+    return;
+  }
+  if (isNegotiationAction(act) && state.game && state.ng) {
+    const r = handleNegotiationAction(state.game, state.ng, act, el.dataset, readNegotiationForm(app));
+    const d = r.done;
+    if (d?.accepted && d.kind === 'sign') {
+      const p = state.game.world.players[d.playerId];
+      completeTransfer(state.game, { playerId: d.playerId, to: state.game.clubId, fee: d.fee ?? 0, contract: d.contract, kind: d.fromClub ? 'transfer' : 'free' });
+      afterSquadChange(state.game);
+      state.tfMsg = `${p.name} podpisał kontrakt.`;
+    } else if (d?.accepted) state.tfMsg = 'Kontrakt przedłużony.';
+    state.ng = r.ng; // null = powrót do Transferów
+    if (r.save || d) await save();
+    render();
+    return;
+  }
   if (isTrainingAction(act) && state.game) {
     const r = handleTrainingAction(state.game, act, el.dataset);
     Object.assign(state, r.ui ?? {});
@@ -536,7 +589,14 @@ app.addEventListener('click', async (ev) => {
     if (act === 'tslot' || act === 'tpick') { await tacticsClick(g, act, el); }
     if (act === 'mailcat') { state.mailCat = el.dataset.cat || null; render(); }
     if (act === 'readall') { g.inbox = markAllRead(g.inbox); await save(); render(); }
-    if (act === 'mailaction') { g.inbox = resolveMessage(g.inbox, el.dataset.id, el.dataset.a); await save(); render(); }
+    if (act === 'mailaction') {
+      const m = g.inbox.find((x) => x.id === el.dataset.id);
+      g.inbox = resolveMessage(g.inbox, el.dataset.id, el.dataset.a);
+      const extra = runDecision(g, m, el.dataset.a);
+      if (extra.length) g.inbox = addMessages(g.inbox, extra).inbox;
+      if (m?.refs?.kind === 'incomingOffer' || m?.refs?.kind === 'jobOffer') afterSquadChange(g);
+      await save(); render();
+    }
     if (act === 'load') {
       const rec = await store.loadSlot(slot);
       if (!rec) throw new Error('Ten slot jest pusty.');

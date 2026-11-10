@@ -402,3 +402,4 @@ export { standings, GAME_START };
 
 import './europe.js';
 import './nationalSystem.js';
+import '../career/careerSystem.js';
