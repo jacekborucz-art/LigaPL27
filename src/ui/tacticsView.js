@@ -56,7 +56,8 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
 
   // ---------- Listy
   const infoBtn = (p) => `<button class="tp-row__i" data-act="tinfo" data-id="${esc(p.id)}" aria-label="Atrybuty: ${esc(p.name)}" aria-expanded="${info === p.id}">i</button>`;
-  const grip = '<span class="tp-grip" data-handle aria-hidden="true"></span>';
+  // Uchwyt (kropki i plakietka pozycji): za niego przeciąga się palcem, reszta wiersza przewija listę.
+  const handle = (pos, g) => `<span class="tp-handle" data-handle><span class="tp-grip" aria-hidden="true"></span><span class="pos" data-g="${g}">${esc(pos)}</span></span>`;
 
   const xiRows = f.slots.map((s, i) => {
     const loc = { zone: 'xi', idx: i };
@@ -66,8 +67,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
     if (!p) {
       return `<li class="tp-row tp-row--empty ${isSel ? 'is-sel' : ''}" data-drop="${key}">
         <button class="tp-row__main" data-act="tpick" data-loc="${key}" aria-pressed="${isSel}">
-          <span class="tp-grip tp-grip--none" aria-hidden="true"></span>
-          <span class="pos" data-g="${GROUP[s.pos]}">${esc(s.pos)}</span>
+          <span class="tp-handle tp-handle--none"><span class="tp-grip" aria-hidden="true"></span><span class="pos" data-g="${GROUP[s.pos]}">${esc(s.pos)}</span></span>
           <span class="tp-row__name">Puste miejsce</span><b></b>
         </button>
       </li>`;
@@ -77,8 +77,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
     const fit = prof < 100 ? `<small class="tp-fit" data-fit="${band(prof)}">${esc(posText(p))}, ${prof}% na tej pozycji</small>` : '';
     return `<li class="tp-row ${isSel ? 'is-sel' : ''} ${reason ? 'is-off' : ''}" data-drop="${key}">
       <button class="tp-row__main" data-act="tpick" data-loc="${key}" ${dragAttrs(loc, p)} aria-pressed="${isSel}">
-        ${grip}
-        <span class="pos" data-g="${GROUP[s.pos]}">${esc(s.pos)}</span>
+        ${handle(s.pos, GROUP[s.pos])}
         <span class="tp-row__name">${esc(p.name)}${tactics.captain === p.id ? ' <abbr class="tp-c" title="Kapitan">C</abbr>' : ''}${reason ? `<small class="tp-off">${esc(reason)}</small>` : fit}</span>
         <b>${p.ovr.toFixed(1)}</b>
       </button>
@@ -93,8 +92,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
     const where = loc.zone;
     return `<li class="tp-row ${isSel ? 'is-sel' : ''} ${reason ? 'is-off' : ''}" data-drop="${esc(key)}">
       <button class="tp-row__main" data-act="tpick" data-loc="${esc(key)}" ${dragAttrs(loc, p)} aria-pressed="${isSel}">
-        ${grip}
-        <span class="pos" data-g="${GROUP[p.pos]}">${esc(posText(p))}</span>
+        ${handle(posText(p), GROUP[p.pos])}
         <span class="tp-row__name">${esc(p.name)}${reason ? `<small class="tp-off">${esc(reason)}</small>` : ''}</span>
         <b>${p.ovr.toFixed(1)}</b>
       </button>

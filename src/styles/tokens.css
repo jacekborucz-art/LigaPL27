@@ -19,6 +19,13 @@
   --accent: var(--murawa);
   --accent-text: var(--kreda);
   --focus: #0B57D0;
+  /* Bramkarz: fiolet (inny strój niż reszta drużyny). Plakietka z białym tekstem 7.1:1,
+     kropka na boisku z ciemnym tekstem 7.8:1 i 3.1:1 względem murawy. */
+  --gk: #6B3FB0;
+  --gk-kit: #C2A3F7;
+  --gk-kit-text: #24124A;
+  --warn-text: #8A5A00;
+  --bad-text: #B3202F;
 
   --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
   --font-body: 'Barlow', system-ui, sans-serif;
@@ -53,6 +60,8 @@
     --line: #2F4438;
     --accent: #2E8A4E;
     --focus: #8AB4F8;
+    --warn-text: #F5C518;
+    --bad-text: #F28B95;
   }
 }
 
@@ -65,4 +74,6 @@
   --line: #2F4438;
   --accent: #2E8A4E;
   --focus: #8AB4F8;
+  --warn-text: #F5C518;
+  --bad-text: #F28B95;
 }

@@ -67,7 +67,7 @@ export function mountTacticsDrag(root, { resolve, onDrop, onReject }) {
     ghost.setAttribute('aria-hidden', 'true');
     ghost.innerHTML = `<span class="pos" data-g="${esc(el.dataset.gg)}">${esc(el.dataset.gpos)}</span><span class="tdrag__name">${esc(el.dataset.gname)}</span><small class="tdrag__why"></small>`;
     document.body.appendChild(ghost);
-    drag = { el, src, ghost, id: ev.pointerId, type, x: ev.clientX, y: ev.clientY, over: null, raf: 0 };
+    drag = { el, src, ghost, id: ev.pointerId, type, x: ev.clientX, y: ev.clientY, y0: ev.clientY, over: null, raf: 0 };
     window.getSelection?.()?.removeAllRanges();
     document.body.classList.add('is-tdragging');
     const tac = el.closest('.tac');
@@ -126,8 +126,9 @@ export function mountTacticsDrag(root, { resolve, onDrop, onReject }) {
     if (!drag) return;
     const lim = bottomLimit();
     let v = 0;
-    if (drag.y < EDGE) v = -Math.ceil((EDGE - drag.y) / 4);
-    else if (drag.y > lim - EDGE) v = Math.ceil((drag.y - (lim - EDGE)) / 4);
+    // Przewijamy dopiero, gdy palec albo kursor wyraźnie zmierza ku krawędzi (nie od samego chwytu przy dole ekranu).
+    if (drag.y < EDGE && drag.y < drag.y0 - 16) v = -Math.ceil((EDGE - drag.y) / 4);
+    else if (drag.y > lim - EDGE && drag.y > drag.y0 + 16) v = Math.ceil((drag.y - (lim - EDGE)) / 4);
     if (v) {
       window.scrollBy(0, Math.max(-24, Math.min(24, v)));
       hover();
@@ -144,7 +145,7 @@ export function mountTacticsDrag(root, { resolve, onDrop, onReject }) {
     const tac = d.el.closest('.tac') ?? root.querySelector('.tac');
     tac?.classList.remove('is-dragging');
     for (const t of root.querySelectorAll('.is-cand, .is-nodrop, .is-src, .is-over')) t.classList.remove('is-cand', 'is-nodrop', 'is-src', 'is-over', 'is-bad');
-    suppressClickUntil = performance.now() + 350;
+    suppressClickUntil = performance.now() + 150;
     if (!commit || !d.over) return;
     const dst = parseLoc(d.over.dataset.drop);
     if (sameLoc(dst, d.src)) return;

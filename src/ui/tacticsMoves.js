@@ -44,7 +44,7 @@ const fail = (reason) => ({ ok: false, reason });
 
 /**
  * Wynik przeniesienia zawodnika z miejsca src na miejsce dst.
- * Zwraca { ok: true, tactics, moved: [ids] } albo { ok: false, reason } (reason może być pusty,
+ * Zwraca { ok: true, tactics, moved: [ids], text } albo { ok: false, reason } (reason może być pusty,
  * gdy ruch po prostu nic nie zmienia). ctx: { byId: Map, benchSize }.
  */
 export function resolveMove(tactics, src, dst, { byId, benchSize = 12 } = {}) {
@@ -55,13 +55,14 @@ export function resolveMove(tactics, src, dst, { byId, benchSize = 12 } = {}) {
   const p = byId?.get(pid);
   if (!p) return fail('');
   const needAvailable = (pl) => (isAvailable(pl) ? null : fail(`${pl.name} nie może być w kadrze meczowej (${offReason(pl)}).`));
-  const ok = (t, moved) => ({ ok: true, tactics: t, moved });
+  const nameOf = (id) => byId.get(id)?.name ?? 'Zawodnik';
+  const ok = (t, moved, text) => ({ ok: true, tactics: t, moved, text: text ?? (moved.length === 2 ? `Zamiana: ${nameOf(moved[0])} i ${nameOf(moved[1])}.` : `${nameOf(moved[0])}: zmiana zapisana.`) });
 
   if (dst.zone === 'xi') {
     if (dst.idx < 0 || dst.idx >= tactics.xi.length) return fail('');
     const other = tactics.xi[dst.idx] ?? null;
     if (src.zone === 'out') { const e = needAvailable(p); if (e) return e; }
-    return ok(assign(tactics, { type: 'xi', idx: dst.idx }, pid), [pid, other].filter(Boolean));
+    return ok(assign(tactics, { type: 'xi', idx: dst.idx }, pid), [pid, other].filter(Boolean), other ? undefined : `${p.name} wchodzi na wolne miejsce w jedenastce.`);
   }
 
   if (dst.zone === 'bench') {
@@ -87,11 +88,11 @@ export function resolveMove(tactics, src, dst, { byId, benchSize = 12 } = {}) {
     if (src.zone === 'xi') return fail('Miejsce w jedenastce zostałoby puste. Upuść zawodnika na kogoś z ławki, żeby ich zamienić.');
     const e = needAvailable(p); if (e) return e;
     if (tactics.bench.length >= benchSize) return fail(`Ławka jest pełna (${benchSize}). Upuść zawodnika na kogoś z ławki, żeby ich zamienić.`);
-    return ok(assign(tactics, { type: 'bench', idx: tactics.bench.length }, pid), [pid]);
+    return ok(assign(tactics, { type: 'bench', idx: tactics.bench.length }, pid), [pid], `${p.name} dołącza do ławki.`);
   }
 
   if (dst.zone === 'outZone') {
-    if (src.zone === 'bench') return ok(removeFromBench(tactics, pid), [pid]);
+    if (src.zone === 'bench') return ok(removeFromBench(tactics, pid), [pid], `${p.name} poza kadrą meczową.`);
     if (src.zone === 'xi') return fail('Miejsce w jedenastce zostałoby puste. Upuść na wybranego zawodnika, żeby go wstawić.');
     return fail('');
   }
