@@ -7,7 +7,12 @@
 // Wartości balansowe oznaczone [SZAC]. Opis: docs/odprawy-studio.md.
 
 import { Rng, clamp } from '../core/rng.js';
-import { proficiency, posEff, assessLineup } from '../engine/positions.js';
+import { assessLineup } from '../engine/positions.js';
+import { expectedGoals, outcomeProbs, QS } from '../engine/quickSim.js';
+import { teamRating, pickXI } from '../engine/teamStrength.js';
+import { statsFromEvents } from '../engine/matchStats.js';
+import { createMessage } from '../core/inbox.js';
+import { GROUP } from '../career/squad.js';
 
 const r2 = (v) => Math.round(v * 100) / 100;
 const r3 = (v) => Math.round(v * 1000) / 1000;
@@ -144,25 +149,33 @@ export function absences(squad = [], comp = 'league') {
   return { injured, suspended };
 }
 
-/** Przewidywany skład: zachłannie, najpierw bramkarz, potem slot po slocie najlepszy dostępny (OVR x biegłość). */
-export function predictLineup(squad = [], formation = '4-4-2', comp = 'league') {
-  const slots = formationSlots(formation);
-  const pool = squad.filter((p) => isAvailable(p, comp));
-  const used = new Set();
-  const lineup = [];
-  for (const slot of slots) {
-    let best = null;
-    let bestV = -Infinity;
-    for (const p of pool) {
-      if (used.has(p.id)) continue;
-      const v = (p.ovr ?? 10) * posEff(proficiency(p, slot.pos, slot.side)) - (p.fresh != null && p.fresh < 70 ? 0.5 : 0);
-      if (v > bestV) { bestV = v; best = p; }
-    }
-    if (!best) break;
-    used.add(best.id);
-    lineup.push({ player: best, slot });
+/** Kształt formacji dla pickXI (teamStrength.js): liczba obrońców, pomocników i napastników. */
+export function formationShape(name) {
+  const shape = { GK: 1, DEF: 0, MID: 0, ATT: 0 };
+  for (const { pos } of formationSlots(name)) {
+    if (pos === 'BR') continue;
+    if (['ŚO', 'BO', 'WB'].includes(pos)) shape.DEF++;
+    else if (['SN', 'NAP'].includes(pos)) shape.ATT++;
+    else shape.MID++;
   }
-  return lineup;
+  return shape;
+}
+
+/**
+ * Przewidywany skład: pickXI z teamStrength.js (ta sama funkcja co szybka symulacja), z kształtem formacji.
+ * Zwraca [{ player, group, prof }].
+ */
+export function predictLineup(squad = [], formation = '4-4-2', comp = 'league') {
+  return pickXI(normSquad(squad, comp), formationShape(formation)).xi.map(({ player, group, prof }) => ({ player, group, prof }));
+}
+
+/** Ujednolica pola kadry dla teamStrength/squad.js (injuryDays, suspended) bez mutowania. */
+function normSquad(squad = [], comp = 'league') {
+  return squad.map((p) => {
+    const inj = injuryDaysOf(p) > 0 && !injuryPlayable(p) ? injuryDaysOf(p) : 0;
+    const sus = suspOf(p, comp);
+    return inj === (p.injuryDays ?? 0) && sus === (p.suspended ?? 0) ? p : { ...p, injuryDays: inj, suspended: sus };
+  });
 }
 
 /** Kluczowi zawodnicy: OVR + forma + liczby w sezonie. */
@@ -267,56 +280,51 @@ export function attendance(ctx) {
 
 // ================================================================ Szanse 1X2 (Poisson, ekspert 6.1 e)
 
-const POIS_MAX = 10;
-function poissonPmf(lambda) {
-  const out = [Math.exp(-lambda)];
-  for (let k = 1; k <= POIS_MAX; k++) out.push((out[k - 1] * lambda) / k);
-  return out;
+/** Siła drużyny na mecz: teamRating z teamStrength.js (gdy jest kadra), inaczej sztuczne strefy z ovr11/L. */
+export function matchStrength(team, comp = 'league') {
+  if (team.squad?.length) {
+    const r = teamRating(normSquad(team.squad, comp), { shape: team.formation ? formationShape(team.formation) : undefined, tableTerm: team.tableTerm });
+    return { zones: r.zones, gkMods: r.gkMods, breakdown: r.breakdown, missing: r.missing, qsMul: team.qsMul ?? 1 };
+  }
+  const L = team.ovr11 ?? team.L ?? 11;
+  return { zones: { GK: L, DEF: L, MID: L, ATT: L, FIN: L }, gkMods: { goalMul: 1 }, breakdown: null, missing: [], qsMul: team.qsMul ?? 1 };
+}
+
+function pmf(l, k) {
+  let p = Math.exp(-l);
+  for (let i = 1; i <= k; i++) p *= l / i;
+  return p;
 }
 
 /**
- * Szanse 1X2 z modelu Poissona z korektą Dixona-Colesa (rho -0.10).
- * home/away: { strength:{ATT, MID, DEF, GK, FIN}, qsMul } albo { ovr11 } (albo { L }).
+ * Szanse 1X2: średnie bramek z quickSim.expectedGoals, rozkład z quickSim.outcomeProbs (Poisson + Dixon-Coles).
+ * home/away: { squad, formation, qsMul } albo { ovr11 | L } (albo gotowe { zones, gkMods }).
  * Zwraca prawdopodobieństwa sumujące się do 1, procenty całkowite sumujące się do 100 i najbardziej prawdopodobny wynik.
  */
-export function odds1X2(home, away, { neutral = false, rho = -0.10 } = {}) {
-  const BETA = 0.225; const MU_H = 1.5; const MU_A = 1.19; const MU_N = 1.34;
-  let dH; let dA;
-  const sH = home.strength; const sA = away.strength;
-  if (sH && sA) {
-    const att = (T) => 0.55 * T.ATT + 0.45 * T.MID;
-    const def = (T) => 0.65 * T.DEF + 0.35 * T.MID;
-    dH = 0.75 * (att(sH) - def(sA)) + 0.15 * (sH.MID - sA.MID) + 0.1 * ((sH.FIN ?? sH.ATT) - (sA.GK ?? sA.DEF));
-    dA = 0.75 * (att(sA) - def(sH)) + 0.15 * (sA.MID - sH.MID) + 0.1 * ((sA.FIN ?? sA.ATT) - (sH.GK ?? sH.DEF));
-  } else {
-    const d = (home.ovr11 ?? home.L ?? 11) - (away.ovr11 ?? away.L ?? 11);
-    dH = d; dA = -d;
-  }
-  const lH = (neutral ? MU_N : MU_H) * Math.exp(BETA * dH) * (home.qsMul ?? 1);
-  const lA = (neutral ? MU_N : MU_A) * Math.exp(BETA * dA) * (away.qsMul ?? 1);
-  const pH = poissonPmf(lH); const pA = poissonPmf(lA);
-  let w = 0; let d = 0; let l = 0; let best = { p: -1 };
-  for (let i = 0; i <= POIS_MAX; i++) {
-    for (let j = 0; j <= POIS_MAX; j++) {
-      let tau = 1;
-      if (i === 0 && j === 0) tau = 1 - lH * lA * rho;
-      else if (i === 0 && j === 1) tau = 1 + lH * rho;
-      else if (i === 1 && j === 0) tau = 1 + lA * rho;
-      else if (i === 1 && j === 1) tau = 1 - rho;
-      const p = pH[i] * pA[j] * tau;
-      if (i > j) w += p; else if (i === j) d += p; else l += p;
+export function odds1X2(home, away, { neutral = false, comp = 'league' } = {}) {
+  const H = home.zones ? home : matchStrength(home, comp);
+  const A = away.zones ? away : matchStrength(away, comp);
+  const { lH, lA } = expectedGoals(H, A, { neutral });
+  const probs = outcomeProbs(lH, lA, QS.RHO);
+  let best = { p: -1 };
+  for (let i = 0; i <= 5; i++) {
+    for (let j = 0; j <= 5; j++) {
+      let p = pmf(lH, i) * pmf(lA, j);
+      if (i === 0 && j === 0) p *= 1 - lH * lA * QS.RHO;
+      else if (i === 1 && j === 1) p *= 1 - QS.RHO;
+      else if (i + j === 1) p *= 1 + (i ? lA : lH) * QS.RHO;
       if (p > best.p) best = { p, i, j };
     }
   }
-  const tot = w + d + l;
-  const probs = { home: w / tot, draw: d / tot, away: l / tot };
   // procenty metodą największych reszt (zawsze 100)
   const raw = [probs.home * 100, probs.draw * 100, probs.away * 100];
   const fl = raw.map(Math.floor);
   let rest = 100 - fl.reduce((s, v) => s + v, 0);
   raw.map((v, i) => ({ i, r: v - fl[i] })).sort((a, b) => b.r - a.r).forEach(({ i }) => { if (rest > 0) { fl[i]++; rest--; } });
   return {
-    ...probs,
+    home: probs.home,
+    draw: probs.draw,
+    away: probs.away,
     pct: { home: fl[0], draw: fl[1], away: fl[2] },
     lambdaHome: r3(lH),
     lambdaAway: r3(lA),
@@ -327,6 +335,8 @@ export function odds1X2(home, away, { neutral = false, rho = -0.10 } = {}) {
 
 // ================================================================ Raport asystenta
 
+const GROUP_LABEL = { GK: 'bramka', DEF: 'obrona', MID: 'pomoc', ATT: 'atak' };
+const fmt1 = (v) => (Math.round(v * 10) / 10).toFixed(1).replace('.', ',');
 const ATT_LABEL = { '-2': 'zamurowuje bramkę', '-1': 'gra ostrożnie', 0: 'gra w równowadze', 1: 'gra do przodu', 2: 'rzuca wszystko do ataku' };
 const COACH_LABEL = { O: 'ofensywny', S: 'ostrożny', P: 'pragmatyczny' };
 
@@ -334,7 +344,7 @@ const COACH_LABEL = { O: 'ofensywny', S: 'ostrożny', P: 'pragmatyczny' };
  * Raport asystenta. user/opp: { name, formation, tactics:{passing, pressing, line, attitude, counter, tempo, aggression},
  *   coach, avg:{TEC, SZY_att, SZY_def, GLO_cb, GLO_fw, DRY}, squad, lineup? }
  */
-export function assistantReport({ user, opp, comp = 'league', stage = 'main' }) {
+export function assistantReport({ user, opp, comp = 'league', stage = 'main', userStrength, oppStrength }) {
   const t = opp.tactics || {};
   const oppF = FORMATIONS[opp.formation] ? opp.formation : '4-4-2';
   const style = [];
@@ -374,15 +384,52 @@ export function assistantReport({ user, opp, comp = 'league', stage = 'main' }) 
 
   // Ostrzeżenia
   const warnings = [];
-  const lineup = user.lineup || predictLineup(user.squad || [], user.formation || '4-4-2', comp);
-  if (lineup.length) for (const w of assessLineup(lineup).warnings) warnings.push(w);
+  let lineup;
+  if (user.lineup?.length) {
+    lineup = user.lineup; // [{ player, slot:{pos, side} }] z ekranu składu
+    for (const w of assessLineup(lineup).warnings) warnings.push(w);
+  } else {
+    lineup = predictLineup(user.squad || [], user.formation || '4-4-2', comp);
+    // pickXI ocenia całą grupę jednym slotem (np. obrona = ŚO), więc "poza pozycją" = poza swoją grupą pozycji
+    for (const x of lineup) {
+      if (GROUP[x.player.pos] !== x.group) warnings.push(`${nameOf(x.player)} zagra poza swoją formacją (${GROUP_LABEL[x.group]}).`);
+    }
+  }
   for (const { player: p } of lineup) {
     if (p.fresh != null && p.fresh < 80) warnings.push(`${nameOf(p)} jest zmęczony (świeżość ${Math.round(p.fresh)} %).`);
     else if ((p.load14 ?? 0) > 810) warnings.push(`${nameOf(p)} dużo grał w ostatnich 14 dniach: rośnie ryzyko urazu.`);
     if (injuryDaysOf(p) > 0 && injuryPlayable(p)) warnings.push(`${nameOf(p)} gra z urazem: słabsza fizyczność i ryzyko pogłębienia kontuzji.`);
   }
   for (const r of suspensionRisk(user.squad || [], comp, stage)) warnings.push(r.text + '.');
-  return { style: style.join(' '), counters, formation, warnings };
+
+  // Porównanie sił w strefach (teamRating.breakdown) [SZAC: próg 0,3 punktu]
+  const us = userStrength || matchStrength(user, comp);
+  const them = oppStrength || matchStrength(opp, comp);
+  const ZONE = { GK: 'w bramce', DEF: 'w obronie', MID: 'w pomocy', ATT: 'w ataku' };
+  const strengthNotes = [];
+  for (const z of ['GK', 'DEF', 'MID', 'ATT']) {
+    const d = us.zones[z] - them.zones[z];
+    if (d >= 0.3) strengthNotes.push(`Mamy przewagę ${ZONE[z]} (${fmt1(d)}).`);
+    else if (d <= -0.3) strengthNotes.push(`Rywal jest mocniejszy ${ZONE[z]} (${fmt1(-d)}).`);
+  }
+  if (!strengthNotes.length) strengthNotes.push('Siły w strefach są wyrównane.');
+  const bd = us.breakdown;
+  if (bd) {
+    const outOfGroup = lineup.filter((x) => x.group && GROUP[x.player.pos] !== x.group).length;
+    if (outOfGroup >= 2) strengthNotes.push('Kilku zawodników gra poza swoją formacją, to nas osłabia.');
+    if ((bd.morale ?? 0) <= -0.1) strengthNotes.push('Niskie morale osłabia zespół.');
+    if ((bd.form ?? 0) >= 0.15) strengthNotes.push('Zawodnicy są w dobrej formie.');
+    if ((bd.form ?? 0) <= -0.15) strengthNotes.push('Forma zawodników jest słaba.');
+  }
+  const zonesView = (x) => Object.fromEntries(Object.entries(x.zones).map(([k, v]) => [k, r2(v)]));
+  const breakdownView = bd ? Object.fromEntries(Object.entries(bd).map(([k, v]) => [k, typeof v === 'number' ? r2(v) : v])) : null;
+  return {
+    style: style.join(' '),
+    counters,
+    formation,
+    warnings,
+    strength: { user: zonesView(us), opponent: zonesView(them), notes: strengthNotes, breakdown: breakdownView },
+  };
 }
 
 // ================================================================ Oczekiwania zarządu i kibiców
@@ -596,7 +643,9 @@ export function preMatchStudio(ctx) {
   const user = userIsHome ? home : away;
   const opp = userIsHome ? away : home;
   const rank = matchRank(ctx);
-  const odds = odds1X2(home, away, { neutral: !!ctx.neutral });
+  const strH = matchStrength(home, compType);
+  const strA = matchStrength(away, compType);
+  const odds = odds1X2(strH, strA, { neutral: !!ctx.neutral });
   const pWin = userIsHome ? odds.home : odds.away;
   const formH = formSummary(home.last5);
   const formA = formSummary(away.last5);
@@ -610,7 +659,9 @@ export function preMatchStudio(ctx) {
   const weather = weatherInfo(ctx.weather);
   const pitch = PITCH[ctx.pitch] || PITCH.dobra;
   const oppKey = keyPlayers(opp.squad, 3, compType);
-  const report = assistantReport({ user: { ...user, lineup: user.lineup }, opp, comp: compType, stage });
+  const report = assistantReport({
+    user, opp, comp: compType, stage, userStrength: userIsHome ? strH : strA, oppStrength: userIsHome ? strA : strH,
+  });
   const exp = expectations({
     pWin, pDraw: odds.draw, rank, board: ctx.board, fans: ctx.fans, userForm: userIsHome ? formH : formA, comp: compType,
   });
@@ -637,7 +688,7 @@ export function preMatchStudio(ctx) {
   };
   const headlines = pickHeadlines('pre', flags, vars, { history: ctx.headlineHistory || [], seed: `${ctx.seed ?? 'studio'}|${home.id}|${away.id}|${ctx.date}`, n: 2 });
 
-  const lineupView = (lu) => lu.map(({ player, slot }) => ({ id: player.id, name: nameOf(player), pos: slot.pos }));
+  const lineupView = (lu) => lu.map(({ player, group }) => ({ id: player.id, name: nameOf(player), pos: player.pos, group, outOfPosition: GROUP[player.pos] !== group }));
   return {
     date: formatDate(ctx.date),
     preview: {
@@ -664,46 +715,53 @@ export function preMatchStudio(ctx) {
 
 // ================================================================ STUDIO POMECZOWE
 
-/** Zdarzenie silnika w postaci znormalizowanej. Akceptuje side 'home'/'away' albo team = id klubu. */
-function normEvent(e, homeId) {
-  const side = e.side ?? (e.team === 'home' || e.team === 'away' ? e.team : e.team === homeId ? 'home' : 'away');
-  return { ...e, side, name: e.name ?? e.playerName ?? (e.player != null ? String(e.player) : '') };
+const SIDES = ['home', 'away'];
+
+/**
+ * Zdarzenie silnika (format src/engine/matchStats.js): { type, side: 0|1, min, added?, half?, player?, name?, ... }.
+ * Studio rozumie: goal {ownGoal?, penalty?, assistName?}, yellow, red {second?, reason?}, penalty {wrong?},
+ * shotOn/shotOff/shotBlocked/post {xg, penalty?}, varCheck, varOverturn {cancelGoal?, decision?, wrong?},
+ * injury {days, injuryType}. Pozostałe typy (podania, auty...) liczy tylko statsFromEvents.
+ */
+function normEvent(e) {
+  const side = typeof e.side === 'number' ? SIDES[e.side] : e.side === 'away' ? 'away' : 'home';
+  return { ...e, sideIdx: side === 'home' ? 0 : 1, side, name: e.name ?? e.playerName ?? (e.player != null ? String(e.player) : '') };
 }
 
 const VAR_TEXT = {
   goalDisallowed: 'VAR anuluje gola',
-  goalConfirmed: 'VAR potwierdza gola',
   penaltyAwarded: 'Po analizie VAR sędzia dyktuje rzut karny',
   penaltyCancelled: 'VAR odwołuje rzut karny',
   redCard: 'Po analizie VAR czerwona kartka',
   redCancelled: 'VAR zamienia czerwoną kartkę na żółtą',
 };
+const varText = (e) => VAR_TEXT[e.decision] || (e.cancelGoal ? VAR_TEXT.goalDisallowed : 'Sędzia zmienia decyzję po analizie VAR');
+const isShot = (t) => t === 'shotOn' || t === 'shotOff' || t === 'shotBlocked' || t === 'post';
+const minLabel = (e) => `${e.min}${e.added ? `+${e.added}` : ''}'`;
 
-/** Kluczowe momenty z listy zdarzeń: gole, czerwone, karne, VAR, wielkie okazje. Maks. 8, w kolejności minut. */
+/** Kluczowe momenty z listy zdarzeń: gole, czerwone, karne, VAR, wielkie okazje, urazy. Maks. 8, w kolejności minut. */
 export function keyMoments(events, names) {
   let h = 0; let a = 0;
   const out = [];
   for (const e of events) {
+    if (e.min == null) continue;
     const team = names[e.side];
-    const min = `${e.min}${e.added ? `+${e.added}` : ''}'`;
-    if (e.type === 'goal' || e.type === 'ownGoal') {
-      const scoring = e.type === 'ownGoal' ? (e.side === 'home' ? 'away' : 'home') : e.side;
-      if (scoring === 'home') h++; else a++;
-      const lead = h - a;
-      const imp = 3 + (lead === 0 || Math.abs(lead) === 1 ? 1 : 0);
-      const how = e.type === 'ownGoal' ? ' (samobójczy)' : e.penalty ? ' z rzutu karnego' : '';
+    const min = minLabel(e);
+    if (e.type === 'goal') {
+      if (e.side === 'home') h++; else a++;
+      const lead = Math.abs(h - a);
+      const how = e.ownGoal ? ' (samobójczy)' : e.penalty ? ' z rzutu karnego' : '';
       const assist = e.assistName ? `, asysta: ${e.assistName}` : '';
-      out.push({ min: e.min, imp, type: 'goal', side: scoring, text: `${min} GOL! ${e.name}${how} (${names[scoring]})${assist}. ${h}:${a}` });
-    } else if (e.type === 'red' || e.type === 'secondYellow') {
-      out.push({ min: e.min, imp: 3, type: 'red', side: e.side, text: `${min} Czerwona kartka: ${e.name} (${team})${e.type === 'secondYellow' ? ', druga żółta' : ''}` });
-    } else if (e.type === 'penMiss') {
+      out.push({ min: e.min, imp: 3 + (lead <= 1 ? 1 : 0), type: 'goal', side: e.side, text: `${min} GOL! ${e.name}${how} (${team})${assist}. ${h}:${a}` });
+    } else if (e.type === 'varOverturn') {
+      if (e.cancelGoal) { if (e.side === 'home') h--; else a--; }
+      out.push({ min: e.min, imp: 3.5, type: 'var', side: e.side, text: `${min} ${varText(e)} (${team}). ${h}:${a}` });
+    } else if (e.type === 'red') {
+      out.push({ min: e.min, imp: 3, type: 'red', side: e.side, text: `${min} Czerwona kartka: ${e.name} (${team})${e.second ? ', druga żółta' : ''}` });
+    } else if (isShot(e.type) && e.penalty) {
       out.push({ min: e.min, imp: 3, type: 'penMiss', side: e.side, text: `${min} ${e.name} (${team}) nie wykorzystuje rzutu karnego` });
-    } else if (e.type === 'var') {
-      out.push({ min: e.min, imp: 3, type: 'var', side: e.side, text: `${min} ${VAR_TEXT[e.decision] || 'Analiza VAR'} (${team})` });
-    } else if ((e.type === 'chance' || e.type === 'shot') && !e.goal && (e.xg ?? 0) >= 0.35) {
-      out.push({ min: e.min, imp: 1.5 + e.xg, type: 'chance', side: e.side, text: `${min} Wielka szansa: ${e.name} (${team}) nie trafia` });
-    } else if (e.type === 'post') {
-      out.push({ min: e.min, imp: 1.2, type: 'post', side: e.side, text: `${min} ${e.name} (${team}) trafia w słupek` });
+    } else if (isShot(e.type) && (e.xg ?? 0) >= 0.35) {
+      out.push({ min: e.min, imp: 1.5 + e.xg, type: 'chance', side: e.side, text: `${min} Wielka szansa: ${e.name} (${team}) nie trafia${e.type === 'post' ? ', piłka odbija się od słupka' : ''}` });
     } else if (e.type === 'injury' && (e.days ?? 0) >= 7) {
       out.push({ min: e.min, imp: 1.5, type: 'injury', side: e.side, text: `${min} ${e.name} (${team}) schodzi z urazem` });
     }
@@ -725,10 +783,10 @@ export function applyResultToTable(rows, homeId, awayId, gH, gA) {
 }
 
 /**
- * ctx: { date, competition, userClubId, home, away (z kadrami: yc przed meczem), score:{home, away}, events:[...],
- *   stats:{home:{xg, possession, shots, ...}, away:{...}}, ratings:[{id, name, side, rating, pos}],
- *   pre: wynik preMatchStudio(...).forPost, board:{trust}, fans:{mood}, tableBefore:[...], newInjuries:[{id,name,side,days,type}],
- *   referee, headlineHistory, seed }
+ * Studio pomeczowe. Statystyki i wynik WYŁĄCZNIE ze zdarzeń (matchStats.statsFromEvents).
+ * ctx: { date, competition, userClubId, home, away (z kadrami: yc przed meczem), events:[...],
+ *   ratings:[{id, name, side:0|1|'home'|'away', rating, pos}], pre: preMatchStudio(...).forPost,
+ *   board:{trust}, fans:{mood}, tableBefore:[...], referee, headlineHistory, seed }
  */
 export function postMatchStudio(ctx) {
   const { home, away } = ctx;
@@ -738,32 +796,39 @@ export function postMatchStudio(ctx) {
   const us = userIsHome ? 'home' : 'away';
   const them = userIsHome ? 'away' : 'home';
   const names = { home: home.name, away: away.name };
-  const gH = ctx.score?.home ?? 0; const gA = ctx.score?.away ?? 0;
+  const raw = ctx.events || [];
+  const stats = statsFromEvents(raw);
+  const events = raw.filter((e) => e.min != null).map(normEvent)
+    .sort((x, y) => x.min - y.min || (x.added ?? 0) - (y.added ?? 0));
+  const gH = stats[0].goals; const gA = stats[1].goals;
   const gU = userIsHome ? gH : gA; const gO = userIsHome ? gA : gH;
   const res = gU > gO ? 'W' : gU === gO ? 'R' : 'P';
-  const events = (ctx.events || []).map((e) => normEvent(e, home.id)).sort((x, y) => x.min - y.min || (x.added ?? 0) - (y.added ?? 0));
   const rank = ctx.pre?.rank || matchRank(ctx);
 
-  // przebieg wyniku: do przerwy, powrót, gol na wagę zwycięstwa
-  let h = 0; let a = 0; let ht = null; let userTrailed = false; let decisive = null; let lastLeadChange = null;
+  // przebieg wyniku: do przerwy, powrót, gol na wagę zwycięstwa, hat-trick
+  let h = 0; let a = 0; let ht = null; let userTrailed = false; let decisive = null;
   const goalsBy = {};
   for (const e of events) {
     if (ht === null && (e.half === 2 || (e.half == null && e.min > 45))) ht = `${h}:${a}`;
-    if (e.type !== 'goal' && e.type !== 'ownGoal') continue;
-    const scoring = e.type === 'ownGoal' ? (e.side === 'home' ? 'away' : 'home') : e.side;
-    if (scoring === 'home') h++; else a++;
-    if (e.type === 'goal') goalsBy[e.name] = (goalsBy[e.name] || 0) + 1;
-    const uLead = us === 'home' ? h - a : a - h;
-    if (uLead < 0) userTrailed = true;
-    if (Math.abs(h - a) === 1 && ((h > a && gH > gA) || (a > h && gA > gH))) { lastLeadChange = e; }
+    if (e.type === 'goal') {
+      if (e.side === 'home') h++; else a++;
+      if (!e.ownGoal) goalsBy[e.name] = (goalsBy[e.name] || 0) + 1;
+    } else if (e.type === 'varOverturn' && e.cancelGoal) {
+      if (e.side === 'home') h--; else a--;
+      // anulowany gol nie liczy się strzelcowi: zdejmij ostatni gol tej strony
+      const last = [...events].reverse().find((x) => x.type === 'goal' && x.side === e.side && x.min <= e.min && !x.ownGoal);
+      if (last && goalsBy[last.name]) goalsBy[last.name]--;
+    } else continue;
+    if ((us === 'home' ? h - a : a - h) < 0) userTrailed = true;
+    if (e.type === 'goal' && Math.abs(h - a) === 1 && ((h > a && gH > gA) || (a > h && gA > gH))) decisive = e;
   }
   if (ht === null) ht = `${h}:${a}`;
-  if (gH !== gA) decisive = lastLeadChange;
-  const scorerName = decisive?.type === 'goal' ? decisive.name : Object.entries(goalsBy).sort((x, y) => y[1] - x[1])[0]?.[0];
+  if (gH === gA) decisive = null;
+  const scorerName = decisive && !decisive.ownGoal ? decisive.name : Object.entries(goalsBy).sort((x, y) => y[1] - x[1])[0]?.[0];
   const hatTrick = Object.entries(goalsBy).find(([, n]) => n >= 3)?.[0] ?? null;
 
   // oceny i zawodnik meczu
-  const ratings = (ctx.ratings || []).map((r) => ({ ...r, side: r.side ?? (r.team === home.id ? 'home' : r.team === away.id ? 'away' : r.team) }));
+  const ratings = (ctx.ratings || []).map((r) => ({ ...r, side: typeof r.side === 'number' ? SIDES[r.side] : r.side ?? (r.team === away.id ? 'away' : 'home') }));
   const winnerSide = gH > gA ? 'home' : gA > gH ? 'away' : null;
   const motm = ratings.slice().sort((x, y) => y.rating - x.rating || (y.side === winnerSide) - (x.side === winnerSide))[0] || null;
   const ratingsView = {
@@ -771,30 +836,28 @@ export function postMatchStudio(ctx) {
     away: ratings.filter((r) => r.side === 'away').sort((x, y) => y.rating - x.rating),
   };
 
-  // statystyki i werdykt xG
-  const st = ctx.stats || {};
-  const xgU = st[us]?.xg ?? 0; const xgO = st[them]?.xg ?? 0;
+  // werdykt xG
+  const xgU = stats[userIsHome ? 0 : 1].xg; const xgO = stats[userIsHome ? 1 : 0].xg;
   const xgd = xgU - xgO;
   let verdict = 'Wynik oddaje przebieg meczu.';
   if (res === 'P' && xgd >= 0.7) verdict = 'Byliśmy lepsi, ale zabrakło skuteczności.';
   else if (res === 'W' && xgd <= -0.7) verdict = 'Zwycięstwo szczęśliwe: rywal stworzył więcej sytuacji.';
   else if (res === 'R' && Math.abs(xgd) >= 0.8) verdict = xgd > 0 ? 'Powinniśmy wygrać ten mecz.' : 'Remis to dla nas dobry wynik.';
 
-  // kontrowersje
+  // kontrowersje: VAR, czerwone, karne
   const controversies = [];
   for (const e of events) {
-    if (e.type === 'var') controversies.push({ min: e.min, kind: 'var', text: `${e.min}' ${VAR_TEXT[e.decision] || 'Analiza VAR'}${e.wrong ? '. Powtórki sugerują błąd' : ''}.` });
-    if (e.type === 'red' || e.type === 'secondYellow') controversies.push({ min: e.min, kind: 'red', text: `${e.min}' ${e.name} wyrzucony z boiska${e.reason === 'przemoc' ? ' za brutalny faul' : ''}.` });
-    if ((e.type === 'goal' && e.penalty) || e.type === 'penMiss' || e.type === 'penalty') {
-      controversies.push({ min: e.min, kind: 'penalty', text: `${e.min}' Rzut karny dla drużyny ${names[e.side]}${e.wrong ? ', decyzja mocno dyskusyjna' : ''}.` });
-    }
+    const doubt = e.wrong ? '. Powtórki sugerują błąd sędziego' : '';
+    if (e.type === 'varOverturn') controversies.push({ min: e.min, kind: 'var', text: `${minLabel(e)} ${varText(e)}${doubt}.` });
+    if (e.type === 'red') controversies.push({ min: e.min, kind: 'red', text: `${minLabel(e)} ${e.name} (${names[e.side]}) wyrzucony z boiska${e.reason === 'przemoc' ? ' za brutalny faul' : e.second ? ' po drugiej żółtej kartce' : ''}${doubt}.` });
+    if (e.type === 'penalty') controversies.push({ min: e.min, kind: 'penalty', text: `${minLabel(e)} Rzut karny dla drużyny ${names[e.side]}${e.wrong ? ', decyzja mocno dyskusyjna' : ''}.` });
   }
 
-  // reakcje zarządu, kibiców i mediów (ekspert 9.7) [SZAC]
+  // reakcje zarządu, kibiców i mediów (ekspert 9.7: +3*(pkt - pkt oczekiwane)) [SZAC]
   const pts = res === 'W' ? 3 : res === 'R' ? 1 : 0;
   const pWin = ctx.pre?.pWin ?? 0.4; const pDraw = ctx.pre?.pDraw ?? 0.27;
   const expPts = 3 * pWin + pDraw;
-  const derby = rank.tags?.includes('derby');
+  const derby = !!rank.tags?.includes('derby');
   let boardDelta = 3 * (pts - expPts);
   if (derby) boardDelta += res === 'W' ? 2 : res === 'P' ? -2 : 0;
   boardDelta = Math.round(clamp(boardDelta, -10, 10));
@@ -811,43 +874,42 @@ export function postMatchStudio(ctx) {
     krytyka: 'Media krytykują drużynę i trenera.', drwina: 'Media nie zostawiają na drużynie suchej nitki.',
   };
 
-  // tabela
+  // tabela po meczu
   let table = null;
   if (Array.isArray(ctx.tableBefore) && ctx.tableBefore.length) {
-    const before = ctx.tableBefore.slice().sort((x, y) => (x.pos ?? 99) - (y.pos ?? 99));
-    const posBefore = (id) => (before.find((r) => r.id === id)?.pos ?? before.findIndex((r) => r.id === id) + 1);
+    const rowsBefore = applyResultToTable(ctx.tableBefore, null, null, 0, 0);
     const rows = applyResultToTable(ctx.tableBefore, home.id, away.id, gH, gA);
-    const posAfter = (id) => rows.find((r) => r.id === id)?.pos;
     const uid = userIsHome ? home.id : away.id;
-    table = { rows, user: { before: posBefore(uid), after: posAfter(uid) } };
+    table = { rows, user: { before: rowsBefore.find((r) => r.id === uid)?.pos ?? null, after: rows.find((r) => r.id === uid)?.pos ?? null } };
   }
 
   // nowe kontuzje i pauzy
-  const injuries = (ctx.newInjuries || events.filter((e) => e.type === 'injury').map((e) => ({ id: e.player, name: e.name, side: e.side, days: e.days ?? null, type: e.injuryType ?? null })))
-    .map((x) => ({ ...x, team: names[x.side] ?? null, text: `${x.name}: ${x.type ? `${x.type}, ` : ''}${x.days ? `przerwa ok. ${Math.max(1, Math.round(x.days / 7))} tyg.` : 'czas przerwy nieznany'}` }));
+  const injuries = events.filter((e) => e.type === 'injury').map((e) => ({
+    id: e.player, name: e.name, team: names[e.side], days: e.days ?? null, type: e.injuryType ?? null,
+    text: `${e.name}: ${e.injuryType ? `${e.injuryType}, ` : ''}${e.days ? `przerwa ok. ${Math.max(1, Math.round(e.days / 7))} ${plural(Math.max(1, Math.round(e.days / 7)), 'tydzień', 'tygodnie', 'tygodni')}` : 'czas przerwy nieznany'}`,
+  }));
   const suspensions = [];
   const yellowsIn = {};
   for (const e of events) {
-    if (e.type === 'yellow') yellowsIn[e.player] = (yellowsIn[e.player] || 0) + 1;
-    if (e.type === 'red' || e.type === 'secondYellow') {
+    if (e.type === 'yellow' && e.player != null) yellowsIn[e.player] = (yellowsIn[e.player] || 0) + 1;
+    if (e.type === 'red') {
       const games = e.reason === 'przemoc' ? 3 : e.reason === 'rażący' ? 2 : 1; // [ZAŁOŻENIE ekspert_sedzia A2]
-      suspensions.push({ id: e.player, name: e.name, team: names[e.side], matches: games, reason: e.type === 'secondYellow' ? 'druga żółta kartka' : 'czerwona kartka' });
+      suspensions.push({ id: e.player, name: e.name, team: names[e.side], matches: games, reason: e.second ? 'druga żółta kartka' : 'czerwona kartka' });
     }
   }
-  for (const side of ['home', 'away']) {
+  for (const side of SIDES) {
     for (const p of (side === 'home' ? home.squad : away.squad) || []) {
       const y = yellowsIn[p.id];
-      if (!y || suspensions.some((s) => s.id === p.id)) continue;
+      if (!y || suspensions.some((x) => x.id === p.id)) continue;
       const before = ycOf(p, compType);
       let crossed = false;
       for (let k = 0; k < y; k++) if (nextYellowSuspends(before + k, compType, stage)) crossed = true;
-      if (crossed) suspensions.push({ id: p.id, name: nameOf(p), team: names[side], matches: (before + y) >= 12 && compType !== 'uefa' ? 2 : 1, reason: 'nadmiar żółtych kartek' });
+      if (crossed) suspensions.push({ id: p.id, name: nameOf(p), team: names[side], matches: before + y >= 12 && compType !== 'uefa' ? 2 : 1, reason: 'nadmiar żółtych kartek' });
     }
   }
 
   // nagłówki
-  const flags = [];
-  flags.push(res === 'W' ? 'userWin' : res === 'R' ? 'userDraw' : 'userLoss');
+  const flags = [res === 'W' ? 'userWin' : res === 'R' ? 'userDraw' : 'userLoss'];
   if (margin >= 3) flags.push('bigWin');
   if (margin <= -3) flags.push('heavyLoss');
   if (gH + gA === 0) flags.push('goalless');
@@ -866,16 +928,16 @@ export function postMatchStudio(ctx) {
   if (res === 'P' && xgd >= 0.7) flags.push('unluckyLoss');
   if (res === 'P' && (ctx.board?.trust ?? 60) + boardDelta < 30) flags.push('boardPressureLoss');
   if (motm && motm.rating >= 8) flags.push('motm');
-  const redE = events.find((e) => e.type === 'red' || e.type === 'secondYellow');
-  const comebackWinner = res === 'W' ? names[us] : null;
+  const redE = events.find((e) => e.type === 'red');
   const vars = {
     home: home.name, away: away.name, user: names[us], opp: names[them], score: `${gH}:${gA}`, uScore: `${gU}:${gO}`,
-    scorer: scorerName, motm: motm?.name, redPlayer: redE?.name, ref: ctx.referee?.name, hatTrick, winner: comebackWinner,
+    scorer: scorerName, motm: motm?.name, redPlayer: redE?.name, ref: ctx.referee?.name, hatTrick, winner: res === 'W' ? names[us] : null,
   };
   const headlines = pickHeadlines('post', flags, vars, {
     history: ctx.headlineHistory || [], exclude: ctx.pre?.headlineIds || [], seed: `${ctx.seed ?? 'studio'}|${home.id}|${away.id}|${ctx.date}`, n: 3,
   });
   const matchIds = [...(ctx.pre?.headlineIds || []), ...headlines.map((x) => x.id)];
+  const view = (t) => ({ ...t, xg: r2(t.xg) });
 
   return {
     date: formatDate(ctx.date),
@@ -883,7 +945,7 @@ export function postMatchStudio(ctx) {
     keyMoments: keyMoments(events, names),
     motm: motm ? { id: motm.id, name: motm.name, team: names[motm.side], rating: motm.rating } : null,
     ratings: ratingsView,
-    stats: { home: st.home || {}, away: st.away || {}, verdict },
+    stats: { home: view(stats[0]), away: view(stats[1]), verdict },
     controversies,
     reactions: {
       board: { delta: boardDelta, text: boardText },
@@ -896,14 +958,55 @@ export function postMatchStudio(ctx) {
     headline: headlines[0] || null,
     headlines,
     headlineHistory: pushHeadlineHistory(ctx.headlineHistory || [], matchIds),
-    // dane dla odprawy pomeczowej (briefings.js)
+    // dane dla odprawy pomeczowej i konferencji (briefings.js)
     forBriefing: {
       score: { for: gU, against: gO },
       xgFor: xgU,
       xgAgainst: xgO,
       rank: rank.level ?? 0,
+      clubId: userIsHome ? home.id : away.id,
+      date: ctx.date,
       ratings: Object.fromEntries(ratings.filter((r) => r.side === us).map((r) => [r.id, r.rating])),
       press: { score: { for: gU, against: gO }, derby, controversy: controversies.length > 0, star: motm?.side === us ? motm.name : null, boardTrust: (ctx.board?.trust ?? 60) + boardDelta },
     },
   };
+}
+
+// ================================================================ Poczta (src/core/inbox.js)
+
+const sentence = (t) => (/[.!?]$/.test(t) ? t : `${t}.`);
+
+/**
+ * Wiadomości do skrzynki po meczu: nagłówek dnia (Media), reakcja zarządu (Zarząd), kontuzje i pauzy (Sztab).
+ * Klucze zapobiegają dublom przy ponownym wczytaniu dnia.
+ */
+export function postMatchMessages(post, { date, matchId } = {}) {
+  const id = matchId ?? `${post.result.home}-${post.result.away}`;
+  const msgs = [];
+  if (post.headline) {
+    msgs.push(createMessage({
+      date, category: 'media', from: 'Przegląd prasy', key: `studio:${id}:media`,
+      subject: post.headline.text, body: [post.reactions.media.text, ...post.headlines.slice(1).map((x) => sentence(x.text))].join(' '),
+    }));
+  }
+  if (Math.abs(post.reactions.board.delta) >= 2) {
+    msgs.push(createMessage({
+      date, category: 'board', from: 'Zarząd', key: `studio:${id}:board`, priority: post.reactions.board.delta <= -5 ? 'important' : 'info',
+      subject: `Po meczu ${post.result.home} ${post.result.score} ${post.result.away}`, body: `${post.reactions.board.text} ${post.reactions.fans.text}`,
+    }));
+  }
+  if (post.injuries.length || post.suspensions.length) {
+    const lines = [...post.injuries.map((x) => `Kontuzja. ${x.text}.`), ...post.suspensions.map((x) => `${x.name} (${x.team}) pauzuje: ${x.reason}, ${x.matches} ${plural(x.matches, 'mecz', 'mecze', 'meczów')}.`)];
+    msgs.push(createMessage({ date, category: 'staff', from: 'Asystent trenera', key: `studio:${id}:staff`, priority: 'important', subject: 'Raport medyczny i kartki', body: lines.join(' ') }));
+  }
+  return msgs;
+}
+
+/** Wiadomość przedmeczowa: zapowiedź mediów i oczekiwania (kategoria Media). */
+export function preMatchMessages(pre, { date, matchId } = {}) {
+  if (!pre.headlines.length) return [];
+  return [createMessage({
+    date, category: 'media', from: 'Przegląd prasy', key: `studio:${matchId ?? pre.preview.home.id + '-' + pre.preview.away.id}:pre`,
+    subject: pre.headlines[0].text, body: [...pre.headlines.slice(1).map((h) => sentence(h.text)), pre.expectations.board, pre.expectations.fans].join(' '),
+  })];
 }

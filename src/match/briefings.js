@@ -10,6 +10,8 @@
 
 import { Rng, clamp } from '../core/rng.js';
 import { personalityOf } from '../career/personality.js';
+import { relationWith, currentGrudge } from '../career/negotiation.js';
+import { applyMorale, EVENT_DELTA, MORALE } from '../career/morale.js';
 
 const r1 = (v) => Math.round(v * 10) / 10;
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -45,20 +47,27 @@ export function traitsOf(p) {
 }
 
 /**
- * Zaufanie trener-zawodnik: JEDNO pole `player.trust` w zakresie -10..+10, wspólne z negocjacjami kontraktów.
- * `player.trustMem` to tylko pamięć zdarzeń (co i jak dawno), a nie drugie zaufanie.
+ * Zaufanie trener-zawodnik: JEDNO pole wspólne z negocjacjami, `player.relations[clubId].trust`
+ * (skala 0-100, 50 neutralnie, src/career/negotiation.js relationWith). Odprawy widzą je w skali -10..+10:
+ * trustOdpraw = (trust - 50) / 5. Zmiana o 1 w skali odpraw = 5 punktów zaufania relacji.
+ * W tej samej relacji odprawy dopisują `briefMem` (pamięć zdarzeń, nie drugie zaufanie) i, przy urazie,
+ * `grudge` (ta sama uraza, którą czytają negocjacje; wygasa o połowę co 90 dni).
  */
 export const TRUST_MIN = -10;
 export const TRUST_MAX = 10;
-export function getTrust(p) {
-  return clamp(Number(p.trust) || 0, TRUST_MIN, TRUST_MAX);
+export const TRUST_SCALE = 5; // [SZAC]
+const GRUDGE_PER_POINT = 2; // uraza (skala negocjacji) za 1 pkt utraconego zaufania przy urazie [SZAC]
+const clubOf = (p, clubId) => clubId ?? p.clubId ?? 'klub';
+export function getTrust(p, clubId) {
+  const rel = relationWith(p, clubOf(p, clubId));
+  return clamp((rel.trust - 50) / TRUST_SCALE, TRUST_MIN, TRUST_MAX);
 }
 
 function avgForm(p) {
   if (Array.isArray(p.form) && p.form.length) return p.form.reduce((s, v) => s + v, 0) / p.form.length;
   return typeof p.form === 'number' ? p.form : 6.6;
 }
-const moraleOf = (p) => p.morale ?? 12;
+const moraleOf = (p) => p.morale ?? MORALE.START;
 
 // ================================================================ Przemowy do drużyny (tabela 5.2)
 
@@ -135,7 +144,7 @@ export function preSituation(ctx = {}) {
   if ((lastTwo.length === 2 && lastTwo.every((x) => x === 'P')) || (last5.length >= 4 && pts <= 3)) flags.push('crisis');
   else if (last5.length >= 3 && pts >= 10) flags.push('goodRun');
   if (ctx.boardExpectation === 'win' || (ctx.boardTrust ?? 60) < 30) flags.push('highStakes');
-  return { phase: 'pre', stateIdx: 1, behindBy: 0, rank: ctx.rank ?? 0, flags, pWin };
+  return { phase: 'pre', stateIdx: 1, behindBy: 0, rank: ctx.rank ?? 0, flags, pWin, clubId: ctx.clubId };
 }
 
 /** Ocena sytuacji w przerwie. ctx: { score:{for, against}, xgFor, xgAgainst, possession, momentum (-100..100, z naszej strony), rank } */
@@ -162,6 +171,7 @@ export function halfSituation(ctx = {}) {
     rank: ctx.rank ?? 0,
     flags: [],
     pWin: ctx.pWin ?? 0.4,
+    clubId: ctx.clubId,
   };
 }
 
@@ -236,7 +246,7 @@ function speechParts(p, tone, sit, memory, rating) {
     else if (pos > 0) pos += RANK_BONUS[rank] + (rank >= 2 ? 0.1 * (tr.waz - 10) : 0);
   }
   // 5. zaufanie mnoży część pozytywną; niskie zaufanie buntuje przy krzyku i wymaganiach
-  const trust = getTrust(p);
+  const trust = getTrust(p, sit.clubId);
   pos *= 1 + 0.04 * trust;
   if (trust <= -4 && (tone === 'shout' || tone === 'demand')) neg -= 2;
   // 6. pamięć powtórzeń
@@ -323,7 +333,7 @@ function talkParts(p, kind, ctx) {
   const tr = traitsOf(p);
   const form = avgForm(p);
   const mor = moraleOf(p);
-  const trust = getTrust(p);
+  const trust = getTrust(p, ctx.clubId);
   const rating = ctx.rating;
   const goodGame = rating != null ? rating >= 6.8 : form >= 7.0;
   const badGame = rating != null ? rating <= 6.2 : form <= 6.3;
@@ -404,13 +414,13 @@ function validateTalks(talks, phase, players) {
 const rngFor = (seed, phase, id) => new Rng(`${seed}|${phase}|${id}`);
 
 /** Wspólna ścieżka odprawy przed meczem i w przerwie. */
-function runBriefing(phase, { players, tone, talks = [], memory, seed = 'odprawa', ratings = {}, sit, cardInfo = {} }) {
+function runBriefing(phase, { players, tone, talks = [], memory, seed = 'odprawa', ratings = {}, sit, cardInfo = {}, rel = {} }) {
   if (!TONES[tone]) throw new RangeError(`Nieznana przemowa: ${tone}`);
   validateTalks(talks, phase, players);
   const talkById = Object.fromEntries(talks.map((t) => [t.id, t.kind]));
   const out = [];
   const engine = { zStart: {}, cardRisk: {}, nerves: {}, defBonus: null };
-  const trust = {};
+  const relations = {};
   let backfire = false;
   for (const p of players) {
     const rng = rngFor(seed, phase, p.id);
@@ -429,7 +439,7 @@ function runBriefing(phase, { players, tone, talks = [], memory, seed = 'odprawa
     const kind = talkById[p.id];
     if (kind) {
       const tp = talkParts(p, kind, {
-        phase, rank: sit.rank, rating: ratings[p.id], atRisk: cardInfo.atRisk?.includes(p.id), onYellow: cardInfo.onYellow?.includes(p.id),
+        phase, rank: sit.rank, clubId: rel.clubId, rating: ratings[p.id], atRisk: cardInfo.atRisk?.includes(p.id), onYellow: cardInfo.onYellow?.includes(p.id),
       });
       const tz = tp.z + rng.gauss(0, 0.7);
       z += tz;
@@ -450,7 +460,7 @@ function runBriefing(phase, { players, tone, talks = [], memory, seed = 'odprawa
     engine.zStart[p.id] = z;
     if (cardMul !== 1) engine.cardRisk[p.id] = { mul: cardMul, untilMin: phase === 'pre' ? 60 : 75 };
     if (nerves > 0) engine.nerves[p.id] = nerves;
-    if (trustDelta !== 0) trust[p.id] = applyTrust(p, trustDelta, `${phase}:${kind || tone}`);
+    if (trustDelta !== 0) relations[p.id] = applyTrust(p, trustDelta, `${phase}:${kind || tone}`, rel);
   }
   if (tone === 'defend' && sit.stateIdx === 0) engine.defBonus = { D: 0.1, minutes: 15 };
   const counts = {};
@@ -463,7 +473,8 @@ function runBriefing(phase, { players, tone, talks = [], memory, seed = 'odprawa
     quote: TONES[tone].quote,
     players: out,
     team: { counts, summary: teamSummary(counts, out.length), backfire, backfireText: backfire ? BACKFIRE_TEXT : null },
-    trust,
+    relations,
+    clubId: rel.clubId ?? null,
     memory: remember(memory, tone),
     engine,
   };
@@ -490,7 +501,9 @@ function teamSummary(counts, n) {
  */
 export function preMatchBriefing({ players, tone, talks = [], memory, ctx = {}, seed }) {
   const sit = preSituation(ctx);
-  return runBriefing('pre', { players, tone, talks, memory, seed, sit, cardInfo: { atRisk: ctx.atRisk || [] } });
+  return runBriefing('pre', {
+    players, tone, talks, memory, seed, sit, cardInfo: { atRisk: ctx.atRisk || [] }, rel: { clubId: ctx.clubId, date: ctx.date },
+  });
 }
 
 // ================================================================ API: odprawa w przerwie
@@ -503,6 +516,7 @@ export function halftimeBriefing({ players, tone, talks = [], memory, ctx = {}, 
   const sit = halfSituation(ctx);
   const res = runBriefing('half', {
     players, tone, talks, memory, seed, sit, ratings: ctx.ratings || {}, cardInfo: { onYellow: ctx.onYellow || [], atRisk: ctx.atRisk || [] },
+    rel: { clubId: ctx.clubId, date: ctx.date },
   });
   res.situation = { key: sit.key, label: sit.label };
   return res;
@@ -603,9 +617,10 @@ const POST_PERSONA = {
 };
 
 /**
- * Odprawa pomeczowa. ctx: { score:{for, against}, xgFor, xgAgainst, ratings:{id}, rank }
+ * Odprawa pomeczowa. ctx: { score:{for, against}, xgFor, xgAgainst, ratings:{id}, rank, clubId, date }
  * talks: [{id, kind:'praise'|'criticize'}] maks. 3.
- * Zwraca reakcje, `morale` (zmiana na 7 dni), zaufanie po zmianie, konflikty.
+ * Zwraca reakcje, `morale` ({delta, value} przez morale.js applyMorale; działa na najbliższy tydzień, potem
+ * wraca dryfem weeklyDrift), nowe relacje (zaufanie wspólne z negocjacjami) i konflikty.
  */
 export function postMatchBriefing({ players, tone, talks = [], memory, ctx = {}, seed = 'po-meczu' }) {
   if (!POST_TONES[tone]) throw new RangeError(`Nieznana przemowa pomeczowa: ${tone}`);
@@ -624,7 +639,8 @@ export function postMatchBriefing({ players, tone, talks = [], memory, ctx = {},
   const talkById = Object.fromEntries(talks.map((t) => [t.id, t.kind]));
   const out = [];
   const morale = {};
-  const trust = {};
+  const relations = {};
+  const rel = { clubId: ctx.clubId, date: ctx.date };
   const conflicts = [];
   for (const p of players) {
     const tr = traitsOf(p);
@@ -648,7 +664,7 @@ export function postMatchBriefing({ players, tone, talks = [], memory, ctx = {},
     // rozmowa indywidualna
     const talk = talkById[p.id];
     if (talk) {
-      const ind = postTalk(p, talk, r);
+      const ind = postTalk(p, talk, r, ctx.clubId);
       m += ind.morale;
       td += ind.trust;
       const tk = classifyReaction(ind.morale * 2, ind.trust);
@@ -659,8 +675,8 @@ export function postMatchBriefing({ players, tone, talks = [], memory, ctx = {},
         row.talk.conflict = true;
       }
     }
-    morale[p.id] = { delta: r1(m), days: 7 };
-    if (td !== 0) trust[p.id] = applyTrust(p, td, `post:${talk || tone}`);
+    morale[p.id] = { delta: r1(m), value: applyMorale(moraleOf(p), r1(m)), days: 7 };
+    if (td !== 0) relations[p.id] = applyTrust(p, td, `post:${talk || tone}`, rel);
     out.push(row);
   }
   const counts = {};
@@ -675,21 +691,22 @@ export function postMatchBriefing({ players, tone, talks = [], memory, ctx = {},
     players: out,
     team: { counts, summary: teamSummary(counts, out.length), moraleTrend: avg > 0.3 ? 'up' : avg < -0.3 ? 'down' : 'flat' },
     morale,
-    trust,
+    relations,
+    clubId: ctx.clubId ?? null,
     conflicts,
     memory: remember(memory, memKey),
   };
 }
 
 /** Rozmowa indywidualna po meczu: pochwała albo krytyka konkretnego zawodnika. [SZAC] */
-function postTalk(p, kind, rating) {
+function postTalk(p, kind, rating, clubId) {
   const tr = traitsOf(p);
-  const trust = getTrust(p);
+  const trust = getTrust(p, clubId);
   const played = rating != null;
   if (kind === 'praise') {
     if (!played) return { morale: 0.5, trust: 0.3, conflictP: 0 };
     const mul = tr.persona === 'Wrażliwy' ? 1.3 : 1;
-    if (rating >= 7) return { morale: 1.5 * mul, trust: 1, conflictP: 0 };
+    if (rating >= 7) return { morale: (EVENT_DELTA.publicPraise + 0.5) * mul, trust: 1, conflictP: 0 };
     if (rating >= 6.2) return { morale: 0.8 * mul, trust: 0.5, conflictP: 0 };
     return { morale: tr.persona === 'Ambitny' ? 0 : 0.3, trust: 0, conflictP: 0 };
   }
@@ -699,7 +716,7 @@ function postTalk(p, kind, rating) {
     // krytyka po dobrym meczu: niesprawiedliwa
     const t = tr.persona === 'Wrażliwy' ? -3 : tr.ego >= 14 ? -2.5 : -2;
     const cp = clamp(0.25 + (sensitive ? 0.15 : 0) + 0.02 * Math.max(0, -trust) + 0.02 * (tr.ego - 10), 0, 0.8);
-    return { morale: -1.5, trust: t, conflictP: cp };
+    return { morale: EVENT_DELTA.publicCriticism, trust: t, conflictP: cp };
   }
   if (!played || rating > 6.2) return { morale: -0.8, trust: -0.5, conflictP: 0.05 };
   // krytyka po słabym meczu: zasłużona
@@ -771,9 +788,9 @@ const PRESS_BANK = [
     id: 'star', when: (c) => !!c.star,
     q: 'Jak ocenia pan występ {star}?',
     a: [
-      { text: 'Wybitny mecz, zasłużył na każdą pochwałę.', fans: 1, board: 0, morale: 0.2, starMorale: 1 },
+      { text: 'Wybitny mecz, zasłużył na każdą pochwałę.', fans: 1, board: 0, morale: 0.2, starMorale: EVENT_DELTA.publicPraise },
       { text: 'Dobrze, ale nie wyróżniam pojedynczych zawodników.', fans: 0, board: 0, morale: 0.2 },
-      { text: 'Może grać jeszcze lepiej.', fans: 0, board: 0, morale: 0, starMorale: -0.5 },
+      { text: 'Może grać jeszcze lepiej.', fans: 0, board: 0, morale: 0, starMorale: EVENT_DELTA.publicCriticism / 3 },
     ],
   },
   {
@@ -852,38 +869,67 @@ export function answerPressConference(questions, choices) {
 // ================================================================ Relacja trener-zawodnik
 
 /**
- * Zmiana zaufania z pamięcią. Ujemne zdarzenie z tym samym tagiem w pamięci działa x1.5 ("pamięta").
- * Ujemne zdarzenia pamiętane są dłużej (3 + 2*|d| tygodni; Wrażliwy x1.5, Spokojny x0.7). [SZAC]
- * Zwraca łatkę { trust, trustMem } do zapisania w zawodniku.
+ * Zmiana zaufania z pamięcią (czysta funkcja). delta w skali odpraw (-10..+10), zapis w relacji negocjacyjnej.
+ * - ujemne zdarzenie z tym samym tagiem, które jest jeszcze w pamięci, działa x1.5 ("pamięta");
+ * - ujemne zdarzenia pamiętane są dłużej (3 + 2*|d| tygodni; Wrażliwy x1.5, Spokojny x0.7);
+ * - uraza (d <= -1) dopisuje `grudge`, który wygasa o połowę co 90 dni i obniża nastrój w negocjacjach. [SZAC]
+ * opts: { clubId, date }. Zwraca NOWY obiekt relacji dla klubu (do zapisania w player.relations[clubId]).
  */
-export function applyTrust(p, delta, tag = 'inne') {
-  const t0 = getTrust(p);
-  const mem = Array.isArray(p.trustMem) ? p.trustMem : [];
+export function applyTrust(p, delta, tag = 'inne', opts = {}) {
+  const clubId = clubOf(p, opts.clubId);
+  const rel = relationWith(p, clubId);
+  const mem = Array.isArray(rel.briefMem) ? rel.briefMem : [];
   const tr = traitsOf(p);
   let d = delta;
   const baseTag = tag.split(':').pop();
   if (d < 0 && mem.some((m) => m.d < 0 && m.tag.split(':').pop() === baseTag)) d *= 1.5;
   const pMul = tr.persona === 'Wrażliwy' ? 1.5 : tr.persona === 'Spokojny' ? 0.7 : 1;
   const weeks = d < 0 ? Math.max(1, Math.round((3 + 2 * Math.abs(d)) * pMul)) : 2;
-  const trustMem = [...mem, { tag, d: r1(d), w: weeks }].slice(-6);
-  return { trust: r1(clamp(t0 + d, TRUST_MIN, TRUST_MAX)), trustMem };
+  const next = {
+    ...rel,
+    trust: r1(clamp(rel.trust + d * TRUST_SCALE, 0, 100)),
+    briefMem: [...mem, { tag, d: r1(d), w: weeks, date: opts.date ?? null }].slice(-6),
+  };
+  if (d <= -1) {
+    const now = opts.date ?? rel.grudgeDate;
+    next.grudge = r1((now ? currentGrudge(rel, now) : rel.grudge) + GRUDGE_PER_POINT * Math.abs(d) * pMul);
+    next.grudgeDate = now ?? null;
+  }
+  return next;
 }
 
 /**
- * Wygaszanie zaufania raz w tygodniu: dryf do 0 o 10 % (cierpliwi i profesjonalni 15 %).
- * Dopóki w pamięci jest świeża uraza (ujemny wpis), ujemne zaufanie nie maleje. [SZAC]
+ * Wygaszanie raz w tygodniu: zaufanie dryfuje do 50 o 10 % różnicy (cierpliwi i profesjonalni 15 %).
+ * Dopóki w pamięci odpraw jest świeży ujemny wpis albo uraza (grudge >= 5 na dzień `date`), niskie zaufanie nie rośnie.
+ * opts: { clubId, date, weeks }. Zwraca nowy obiekt relacji. [SZAC]
  */
-export function decayTrust(p, weeks = 1) {
-  let trust = getTrust(p);
-  let mem = Array.isArray(p.trustMem) ? p.trustMem.map((m) => ({ ...m })) : [];
+export function decayTrust(p, opts = {}) {
+  const clubId = clubOf(p, opts.clubId);
+  const rel = relationWith(p, clubId);
+  let trust = rel.trust;
+  let mem = Array.isArray(rel.briefMem) ? rel.briefMem.map((m) => ({ ...m })) : [];
   const tr = traitsOf(p);
   const rate = tr.patience >= 13 || tr.prf >= 14 ? 0.15 : 0.1;
-  for (let i = 0; i < weeks; i++) {
-    const grudge = mem.some((m) => m.d < 0);
-    if (trust > 0 || !grudge) trust -= rate * trust;
+  const grudgeNow = opts.date ? currentGrudge(rel, opts.date) : rel.grudge;
+  for (let i = 0; i < (opts.weeks ?? 1); i++) {
+    const holds = mem.some((m) => m.d < 0) || grudgeNow >= 5;
+    if (trust > 50 || !holds) trust -= rate * (trust - 50);
     mem = mem.map((m) => ({ ...m, w: m.w - 1 })).filter((m) => m.w > 0);
   }
-  return { trust: r1(trust), trustMem: mem };
+  return { ...rel, trust: r1(trust), briefMem: mem };
+}
+
+/**
+ * Zapisuje wynik odprawy w zawodniku (czysta funkcja: zwraca nowego zawodnika).
+ * Relacja trafia do player.relations[clubId] (wspólne z negocjacjami), morale (odprawa pomeczowa) przez applyMorale.
+ */
+export function applyBriefing(player, result) {
+  let out = player;
+  const rel = result.relations?.[player.id];
+  if (rel) out = { ...out, relations: { ...(out.relations || {}), [clubOf(player, result.clubId ?? undefined)]: rel } };
+  const m = result.morale?.[player.id];
+  if (m) out = { ...out, morale: applyMorale(moraleOf(player), m.delta) };
+  return out;
 }
 
 /** Opis relacji dla ekranu zawodnika (bez liczb). */

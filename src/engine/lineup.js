@@ -1,0 +1,192 @@
+// Skład na mecz: formacja, jedenastka (zawodnik na każdym slocie), ławka, instrukcje,
+// kapitan i wykonawcy stałych fragmentów. Gracz i AI używają tych samych funkcji.
+// Stan taktyki to czysty JSON zapisywany w grze (game.tactics).
+
+import { formationById, DEFAULT_FORMATION } from '../data/formations.js';
+import { defaultInstructions, INSTRUCTIONS } from '../data/instructions.js';
+import { proficiency, posEff, assessLineup, validateLineup } from './positions.js';
+import { conditionTerms, lineupRating } from './teamStrength.js';
+import { GROUP, isAvailable } from '../career/squad.js';
+
+/** Wartość zawodnika na danym slocie (OVR z karą pozycji + stan zawodnika). */
+export function slotValue(player, slot) {
+  if (!isAvailable(player)) return -Infinity;
+  return player.ovr * posEff(proficiency(player, slot.pos, slot.side)) + conditionTerms(player).total;
+}
+
+/**
+ * Automatyczny wybór jedenastki (asystent i AI): zachłannie po najlepszym dopasowaniu
+ * zawodnik-slot, bramkarz najpierw, potem poprawa przez zamiany par.
+ */
+export function autoPickXI(squad, formation) {
+  const slots = formation.slots;
+  const pool = squad.filter(isAvailable);
+  const xi = new Array(slots.length).fill(null);
+  const used = new Set();
+  const order = [0, ...slots.map((_, i) => i).filter((i) => i !== 0)]; // slot 0 = BR
+  const gkSlot = slots.findIndex((s) => s.pos === 'BR');
+  if (gkSlot >= 0) {
+    const gk = pool.filter((p) => p.pos === 'BR').sort((a, b) => slotValue(b, slots[gkSlot]) - slotValue(a, slots[gkSlot]))[0]
+      || pool.sort((a, b) => (b.attr?.SKO ?? 0) - (a.attr?.SKO ?? 0))[0];
+    if (gk) { xi[gkSlot] = gk.id; used.add(gk.id); }
+  }
+  // Pary zawodnik-slot od najlepszej wartości.
+  const pairs = [];
+  for (const i of order) {
+    if (i === gkSlot) continue;
+    for (const p of pool) if (p.pos !== 'BR') pairs.push([slotValue(p, slots[i]), p.id, i]);
+  }
+  pairs.sort((a, b) => b[0] - a[0]);
+  for (const [, id, i] of pairs) {
+    if (xi[i] || used.has(id)) continue;
+    xi[i] = id; used.add(id);
+  }
+  // Zamiany par, jeśli poprawiają sumę.
+  const byId = new Map(squad.map((p) => [p.id, p]));
+  const val = (id, i) => (id ? slotValue(byId.get(id), slots[i]) : 0);
+  for (let pass = 0; pass < 3; pass++) {
+    let improved = false;
+    for (let a = 0; a < xi.length; a++) {
+      for (let b = a + 1; b < xi.length; b++) {
+        if (a === gkSlot || b === gkSlot) continue;
+        const before = val(xi[a], a) + val(xi[b], b);
+        const after = val(xi[b], a) + val(xi[a], b);
+        if (after > before + 1e-9) { [xi[a], xi[b]] = [xi[b], xi[a]]; improved = true; }
+      }
+    }
+    if (!improved) break;
+  }
+  return xi;
+}
+
+/** Ławka: rezerwowy bramkarz, potem po jednym z każdej linii, reszta wg OVR. */
+export function autoPickBench(squad, xi, benchSize) {
+  const inXI = new Set(xi.filter(Boolean));
+  const rest = squad.filter((p) => isAvailable(p) && !inXI.has(p.id)).sort((a, b) => b.ovr - a.ovr);
+  const bench = [];
+  const take = (pred) => { const p = rest.find((x) => pred(x) && !bench.includes(x.id)); if (p) bench.push(p.id); };
+  take((p) => GROUP[p.pos] === 'GK');
+  for (const g of ['DEF', 'MID', 'ATT']) take((p) => GROUP[p.pos] === g);
+  for (const p of rest) { if (bench.length >= benchSize) break; if (!bench.includes(p.id)) bench.push(p.id); }
+  return bench.slice(0, benchSize);
+}
+
+const score = (p, keys) => keys.reduce((s, k) => s + (p.attr?.[k] ?? 0), 0);
+
+/** Kapitan i wykonawcy stałych fragmentów spośród jedenastki. */
+export function autoRoles(squad, xi) {
+  const players = xi.filter(Boolean).map((id) => squad.find((p) => p.id === id)).filter(Boolean);
+  const best = (keys, pred = () => true) => players.filter(pred).sort((a, b) => score(b, keys) - score(a, keys))[0]?.id ?? null;
+  return {
+    captain: players.sort((a, b) => (b.attr.LID + (b.persona === 'Lider' ? 3 : 0) + b.age * 0.1) - (a.attr.LID + (a.persona === 'Lider' ? 3 : 0) + a.age * 0.1))[0]?.id ?? null,
+    penalty: best(['WYK', 'OPA', 'SFR'], (p) => p.pos !== 'BR'),
+    freeKick: best(['SFR', 'DYS', 'TEC'], (p) => p.pos !== 'BR'),
+    corner: best(['SFR', 'DOS'], (p) => p.pos !== 'BR'),
+  };
+}
+
+export function createTactics(squad, { formation = DEFAULT_FORMATION, benchSize = 12, instructions } = {}) {
+  const f = formationById(formation);
+  const xi = autoPickXI(squad, f);
+  return {
+    formation: f.id,
+    xi,
+    bench: autoPickBench(squad, xi, benchSize),
+    instructions: { ...defaultInstructions(), ...(instructions || {}) },
+    ...autoRoles(squad, xi),
+  };
+}
+
+/** Zmiana formacji: zawodnicy zostają, asystent dopasowuje ich do nowych slotów. */
+export function changeFormation(tactics, squad, formationId) {
+  const f = formationById(formationId);
+  const chosen = new Set(tactics.xi.filter(Boolean));
+  const pool = squad.filter((p) => chosen.has(p.id));
+  const xi = autoPickXI(pool.length >= 11 ? pool : squad, f);
+  return { ...tactics, formation: f.id, xi, bench: tactics.bench.filter((id) => !xi.includes(id)) };
+}
+
+/**
+ * Przypisanie zawodnika do miejsca: target { type: 'xi'|'bench', idx }.
+ * Jeśli zawodnik był już w jedenastce albo na ławce, następuje zamiana miejsc.
+ */
+export function assign(tactics, target, playerId) {
+  const t = { ...tactics, xi: [...tactics.xi], bench: [...tactics.bench] };
+  const fromXI = t.xi.indexOf(playerId);
+  const fromBench = t.bench.indexOf(playerId);
+  const list = target.type === 'xi' ? t.xi : t.bench;
+  const displaced = list[target.idx] ?? null;
+  if (fromXI >= 0) t.xi[fromXI] = displaced;
+  if (fromBench >= 0) {
+    if (displaced) t.bench[fromBench] = displaced; else t.bench.splice(fromBench, 1);
+  }
+  if (target.type === 'bench' && target.idx >= t.bench.length) t.bench.push(playerId);
+  else list[target.idx] = playerId;
+  t.bench = t.bench.filter(Boolean);
+  for (const role of ['captain', 'penalty', 'freeKick', 'corner']) if (t[role] && !t.xi.includes(t[role])) t[role] = null;
+  return t;
+}
+
+export function removeFromBench(tactics, playerId) {
+  return { ...tactics, bench: tactics.bench.filter((id) => id !== playerId) };
+}
+
+export function setInstruction(tactics, id, value) {
+  const def = INSTRUCTIONS.find((i) => i.id === id);
+  if (!def || !def.options.some((o) => o.id === value)) throw new Error(`Nieznana instrukcja: ${id}=${value}`);
+  return { ...tactics, instructions: { ...tactics.instructions, [id]: value } };
+}
+
+/** Wpisy jedenastki z obiektami zawodników i slotów (do oceny i silnika). */
+export function lineupEntries(tactics, squadById) {
+  const f = formationById(tactics.formation);
+  return tactics.xi.map((id, i) => (id && squadById.get(id) ? { player: squadById.get(id), slot: f.slots[i] } : null)).filter(Boolean);
+}
+
+/** Błędy blokujące mecz (reguły twarde) i ostrzeżenia (kary w silniku). */
+export function checkTactics(tactics, squad, { benchSize = 12 } = {}) {
+  const byId = new Map(squad.map((p) => [p.id, p]));
+  const f = formationById(tactics.formation);
+  const entries = lineupEntries(tactics, byId);
+  const errors = validateLineup(entries, { bench: tactics.bench.map((id) => byId.get(id)).filter(Boolean), formationSlots: f.slots.length });
+  for (const e of entries) {
+    if (e.player.injuryDays > 0 && !e.player.playingInjured) errors.push(`${e.player.name} jest kontuzjowany`);
+    if (e.player.callUp) errors.push(`${e.player.name} jest na zgrupowaniu reprezentacji`);
+  }
+  for (const id of tactics.bench) {
+    const p = byId.get(id);
+    if (!p) errors.push('Na ławce jest zawodnik spoza kadry');
+    else if (p.suspended > 0) errors.push(`${p.name} jest zawieszony i nie może siedzieć na ławce`);
+  }
+  if (tactics.bench.length > benchSize) errors.push(`Na ławce może być najwyżej ${benchSize} zawodników`);
+  const report = assessLineup(entries);
+  return { errors: [...new Set(errors)], warnings: report.warnings, report, rating: lineupRating(entries, squad) };
+}
+
+/**
+ * Przed meczem i po wczytaniu: usuwa niedostępnych i uzupełnia puste miejsca (asystent).
+ * Zwraca nową taktykę i listę zmian do pokazania graczowi.
+ */
+export function refreshTactics(tactics, squad, { benchSize = 12 } = {}) {
+  const byId = new Map(squad.map((p) => [p.id, p]));
+  const changes = [];
+  const ok = (id) => id && byId.has(id) && isAvailable(byId.get(id));
+  let t = { ...tactics, xi: tactics.xi.map((id) => {
+    if (id && !ok(id)) changes.push(`${byId.get(id)?.name ?? 'Zawodnik'} wypada ze składu`);
+    return ok(id) ? id : null;
+  }), bench: tactics.bench.filter(ok) };
+  if (t.xi.some((id) => !id)) {
+    const f = formationById(t.formation);
+    const used = new Set([...t.xi.filter(Boolean)]);
+    for (let i = 0; i < t.xi.length; i++) {
+      if (t.xi[i]) continue;
+      const cand = squad.filter((p) => isAvailable(p) && !used.has(p.id))
+        .sort((a, b) => slotValue(b, f.slots[i]) - slotValue(a, f.slots[i]))[0];
+      if (cand) { t.xi[i] = cand.id; used.add(cand.id); t.bench = t.bench.filter((id) => id !== cand.id); changes.push(`${cand.name} wchodzi do składu (${f.slots[i].pos})`); }
+    }
+  }
+  if (t.bench.length < Math.min(benchSize, 7)) t = { ...t, bench: autoPickBench(squad, t.xi, benchSize) };
+  const roles = autoRoles(squad, t.xi);
+  for (const r of ['captain', 'penalty', 'freeKick', 'corner']) if (!t[r] || !t.xi.includes(t[r])) t[r] = roles[r];
+  return { tactics: t, changes };
+}

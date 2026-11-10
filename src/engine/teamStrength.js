@@ -57,6 +57,24 @@ export function pickXI(squad, shape = DEFAULT_SHAPE, ctx = {}) {
  */
 export function teamRating(squad, ctx = {}) {
   const { xi, missing } = pickXI(squad, ctx.shape || DEFAULT_SHAPE, ctx);
+  return ratingFromPicked(xi, missing, squad, ctx);
+}
+
+/**
+ * Siła konkretnego składu ustawionego przez gracza albo AI.
+ * entries: [{ player, slot: { pos, side } }] (jedenastka; mniej po czerwonych kartkach).
+ */
+export function lineupRating(entries, squad = [], ctx = {}) {
+  const xi = entries.map(({ player, slot }) => {
+    const prof = proficiency(player, slot.pos, slot.side);
+    const t = conditionTerms(player, ctx);
+    return { player, group: GROUP[slot.pos] ?? 'MID', value: player.ovr * posEff(prof) + t.total, prof, terms: t.parts, slot };
+  });
+  const missing = squad.filter((p) => !isAvailable(p)).map((p) => ({ player: p, reason: 'niedostępny' }));
+  return ratingFromPicked(xi, missing, squad, ctx);
+}
+
+function ratingFromPicked(xi, missing, squad, ctx) {
   const by = (g) => xi.filter((x) => x.group === g);
   const mean = (arr, f = (x) => x.value) => (arr.length ? arr.reduce((s, x) => s + f(x), 0) / arr.length : 0);
   const extra = ctx.tableTerm || 0;
@@ -64,9 +82,8 @@ export function teamRating(squad, ctx = {}) {
   const gkMods = gkEntry ? goalkeeperSlotModifiers(gkEntry.player) : goalkeeperSlotModifiers({ pos: 'NAP' });
   const shooters = [...by('ATT'), ...by('MID')];
   const FIN = mean(shooters, (x) => (x.player.attr?.WYK ?? x.player.ovr) * posEff(x.prof)) + extra;
-  // Niepełny skład (mniej niż 11 dostępnych) obniża strefy proporcjonalnie.
-  const shortBy = Math.max(0, 11 - xi.length);
-  const shortPenalty = shortBy * 0.9;
+  // Niepełny skład (mniej niż 11) obniża strefy proporcjonalnie.
+  const shortPenalty = Math.max(0, 11 - xi.length) * 0.9;
   const zones = {
     GK: (gkEntry ? gkEntry.value : 4) + extra,
     DEF: mean(by('DEF')) + extra - shortPenalty,
