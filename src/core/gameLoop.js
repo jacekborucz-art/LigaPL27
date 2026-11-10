@@ -1,0 +1,91 @@
+// Upływ czasu w grze: dzień po dniu. Każdy dzień uruchamia zarejestrowane systemy
+// (kalendarz, okna transferowe, później: zawodnicy, kontuzje, zarząd, finanse, media).
+// Systemy zwracają wiadomości do skrzynki i zdarzenia dnia. Pętla zatrzymuje się na
+// meczu klubu gracza i na ważnych wiadomościach; zwykłe dni mijają same.
+// Nowy system = registerDailySystem(), bez zmian w pętli (docs/PLAN.md 4.1).
+
+import { addMessages, PRIORITY, pendingDecisions } from './inbox.js';
+
+const systems = [];
+
+/** system: { id, order?, run(state, date) -> { messages?: [], events?: [], patch?: (state) => void } } */
+export function registerDailySystem(system) {
+  const i = systems.findIndex((s) => s.id === system.id);
+  if (i >= 0) systems[i] = system; else systems.push(system);
+  systems.sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
+}
+
+export function unregisterDailySystem(id) {
+  const i = systems.findIndex((s) => s.id === id);
+  if (i >= 0) systems.splice(i, 1);
+}
+
+export function addDays(iso, n) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + n));
+  return t.toISOString().slice(0, 10);
+}
+
+/** Mecz klubu gracza w danym dniu (z terminarza w stanie gry). */
+export function clubMatchOn(state, date) {
+  return (state.fixtures || []).find((f) => f.date === date && !f.played
+    && (f.home === state.clubId || f.away === state.clubId)) || null;
+}
+
+/** Główny przycisk: w dniu meczu „Zagraj mecz”, w pozostałe dni „Dalej”. */
+export function primaryAction(state) {
+  const match = clubMatchOn(state, state.date);
+  if (match) return { kind: 'play', label: 'Zagraj mecz', match };
+  const decisions = pendingDecisions(state.inbox || []);
+  if (decisions.length) return { kind: 'decide', label: 'Odpowiedz na wiadomości', count: decisions.length };
+  return { kind: 'continue', label: 'Dalej' };
+}
+
+/** Uruchamia systemy dla bieżącego dnia (bez zmiany daty). Wywoływane po przejściu na nowy dzień. */
+export function processDay(state, date = state.date) {
+  const messages = [];
+  const events = [];
+  for (const s of systems) {
+    const out = s.run(state, date) || {};
+    if (out.messages) messages.push(...out.messages);
+    if (out.events) events.push(...out.events);
+    if (out.patch) out.patch(state);
+  }
+  const { inbox, added } = addMessages(state.inbox || [], messages);
+  state.inbox = inbox;
+  state.processedDate = date;
+  return { date, added, events };
+}
+
+/** Przejście o jeden dzień. Nie pozwala ominąć nierozegranego meczu klubu gracza. */
+export function advanceDay(state) {
+  if (clubMatchOn(state, state.date)) throw new Error('Najpierw rozegraj dzisiejszy mecz.');
+  state.date = addDays(state.date, 1);
+  const day = processDay(state);
+  if (state.summary) state.summary.date = state.date;
+  return day;
+}
+
+/**
+ * „Dalej”: przewija dni do pierwszego przystanku.
+ * Przystanek: mecz klubu gracza, wiadomość ważna lub pilna, decyzja do podjęcia, limit dni.
+ * onDay(day) pozwala UI pokazać datę i wydarzenia każdego mijanego dnia.
+ */
+export function continueUntilStop(state, { maxDays = 60, onDay } = {}) {
+  const days = [];
+  if (pendingDecisions(state.inbox || []).length) return { reason: 'decision', days };
+  for (let i = 0; i < maxDays; i++) {
+    if (clubMatchOn(state, state.date)) return { reason: 'match', days };
+    const day = advanceDay(state);
+    days.push(day);
+    onDay?.(day);
+    if (clubMatchOn(state, state.date)) return { reason: 'match', days };
+    if (day.added.some((m) => PRIORITY[m.priority] >= PRIORITY.important)) return { reason: 'message', days };
+  }
+  return { reason: 'limit', days };
+}
+
+/** Oznacza mecz jako rozegrany (wynik zapisuje moduł meczu). */
+export function finishMatch(state, matchId, result = null) {
+  state.fixtures = (state.fixtures || []).map((f) => (f.id === matchId ? { ...f, played: true, result } : f));
+}

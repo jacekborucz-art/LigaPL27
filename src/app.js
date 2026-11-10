@@ -1,19 +1,24 @@
-// Szkielet aplikacji (etap 0): ekran startowy, sloty zapisu, wybór klubu, główny ekran z nawigacją.
+// Powłoka aplikacji: ekran startowy, sloty zapisu, wybór klubu, główny ekran z pocztą
+// i upływem dni („Dalej” albo „Zagraj mecz”).
 import { CLUBS_PL, LEAGUE_NAMES, clubById } from './data/clubs_pl.js';
-import { GAME_START, SEASON, DOMESTIC, POLISH_EUROPE_2026 } from './config/calendar2026.js';
+import { GAME_START, SEASON, POLISH_EUROPE_2026, DOMESTIC } from './config/calendar2026.js';
 import { crestHtml } from './ui/crest.js';
 import { esc, fmtDate, weekday, icon } from './ui/dom.js';
 import * as store from './core/store.js';
 import { hashString } from './core/rng.js';
+import { CATEGORIES, unreadCount, markRead, markAllRead, resolveMessage, filterInbox, pendingDecisions } from './core/inbox.js';
+import { processDay, primaryAction, continueUntilStop, finishMatch } from './core/gameLoop.js';
+import { provisionalFixtures } from './season/dailySystems.js';
 
 const app = document.getElementById('app');
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
-const state = { screen: 'start', slot: null, game: null, tab: 'mecz', tier: 1, notice: null };
+const state = { screen: 'start', slot: null, game: null, tab: 'pulpit', tier: 1, notice: null, mailCat: null, mailOpen: null, running: false };
 
 const TABS = [
+  { id: 'pulpit', label: 'Pulpit' },
   { id: 'kadra', label: 'Kadra' },
   { id: 'rozgrywki', label: 'Rozgrywki' },
-  { id: 'mecz', label: 'Następny mecz' },
+  { id: 'poczta', label: 'Poczta' },
   { id: 'transfery', label: 'Transfery' },
   { id: 'trening', label: 'Trening' },
 ];
@@ -21,7 +26,28 @@ const TABS = [
 function render() {
   if (state.screen === 'start') return renderStart();
   if (state.screen === 'pick') return renderPick();
+  if (state.screen === 'match') return renderMatchDay();
   return renderHub();
+}
+
+// ---------- Zapis ----------
+async function save() {
+  const g = state.game;
+  g.summary = { clubId: g.clubId, season: g.season, date: g.date };
+  await store.saveSlot(state.slot, g);
+}
+
+/** Uzupełnia zapisy sprzed poczty i pętli dni (migracja w miejscu). */
+function ensureGameShape(g) {
+  if (!Array.isArray(g.fixtures)) g.fixtures = provisionalFixtures(g.clubId);
+  if (!Array.isArray(g.inbox)) {
+    g.inbox = [];
+    const today = g.date;
+    g.date = GAME_START;
+    processDay(g);
+    g.date = today;
+  }
+  return g;
 }
 
 // ---------- Start ----------
@@ -101,10 +127,23 @@ function strength(L, tier) {
 }
 
 // ---------- Główny ekran ----------
+function goButton(g) {
+  if (state.running) return '<button class="go go--stop" data-act="stop">Zatrzymaj</button>';
+  const a = primaryAction(g);
+  const sub = a.kind === 'play' ? esc(a.match.comp) : a.kind === 'decide' ? `${a.count} do decyzji` : `Następny dzień: ${esc(fmtDate(nextDate(g.date)))}`;
+  return `<button class="go go--${a.kind}" data-act="go"><span class="go__label">${esc(a.label)}</span><span class="go__sub">${sub}</span></button>`;
+}
+
+function nextDate(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+}
+
 function renderHub() {
   const g = state.game;
   const club = clubById(g.clubId);
-  const nav = TABS.map((t) => `<button class="nav__btn" data-act="tab" data-tab="${t.id}" aria-current="${state.tab === t.id ? 'page' : 'false'}">${icon(t.id)}<span>${esc(t.label)}</span></button>`).join('');
+  const unread = unreadCount(g.inbox);
+  const nav = TABS.map((t) => `<button class="nav__btn" data-act="tab" data-tab="${t.id}" aria-current="${state.tab === t.id ? 'page' : 'false'}">${icon(t.id)}<span>${esc(t.label)}</span>${t.id === 'poczta' && unread ? `<span class="badge" aria-label="${unread} nieprzeczytanych">${unread > 99 ? '99+' : unread}</span>` : ''}</button>`).join('');
   app.innerHTML = `
   <div class="hub">
     <header class="hub__head">
@@ -113,28 +152,22 @@ function renderHub() {
         <span class="hub__name">${esc(club.name)}</span>
         <span class="muted">${esc(LEAGUE_NAMES[club.tier])}</span>
       </div>
-      <div class="led hub__date" aria-label="Data w grze: ${esc(fmtDate(g.date))}">${esc(fmtDate(g.date))}</div>
+      <div class="led hub__date" id="leddate" aria-label="Data w grze: ${esc(fmtDate(g.date))}">${esc(fmtDate(g.date))}</div>
+      <div class="go-wrap" id="gowrap">${goButton(g)}</div>
     </header>
     <nav class="nav" aria-label="Menu gry">${nav}</nav>
-    <main class="hub__main">${renderTab(state.tab, g, club)}</main>
+    <main class="hub__main" id="main">${renderTab(state.tab, g, club)}</main>
+    <div class="ticker" id="ticker" aria-live="polite"></div>
   </div>`;
 }
 
 function renderTab(tab, g, club) {
-  if (tab === 'mecz') {
-    const first = firstFixture(club);
-    return `<h2>Następny mecz</h2>
-      <section class="panel">
-        <p class="panel__lead">${esc(first.title)}</p>
-        <p class="muted">${esc(weekday(first.date))}, ${esc(fmtDate(first.date))}</p>
-        <p>${esc(first.note)}</p>
-      </section>
-      <button class="btn btn--quiet" data-act="menu">Menu główne</button>`;
-  }
+  if (tab === 'pulpit') return renderDashboard(g, club);
+  if (tab === 'poczta') return renderMail(g);
   const soon = {
     kadra: ['Kadra 22-26 zawodników z 27 atrybutami', 'Skład na mecz i ławka', '10 formacji i instrukcje'],
     rozgrywki: ['Tabele 3 lig i terminarze', 'Puchar Polski, LM, LE, LK, reprezentacje', 'Strzelcy, kartkowicze, kontuzjowani, forma'],
-    transfery: ['Lista zawodników i wolni agenci', 'Oferty, negocjacje pensji, wypożyczenia', 'Okna transferowe'],
+    transfery: ['Lista transferowa, wypożyczenia, wolni zawodnicy', 'Negocjacje kontraktów', 'Okna transferowe'],
     trening: ['Plan tygodnia: 5 akcentów, 3 intensywności', 'Rozwój młodych', 'Zmęczenie i świeżość'],
   }[tab];
   const label = TABS.find((t) => t.id === tab).label;
@@ -145,34 +178,116 @@ function renderTab(tab, g, club) {
     </section>`;
 }
 
-function firstFixture(club) {
-  const europe = POLISH_EUROPE_2026.find((e) => e.club === club.id);
-  if (club.id === 'lech' || club.id === 'gornik-zabrze') {
-    const rival = club.id === 'lech' ? 'Górnik Zabrze' : 'Lech Poznań';
-    return { title: `Superpuchar Polski: ${club.name} vs ${rival}`, date: DOMESTIC.superpuchar.date, note: 'Termin Superpucharu jest założeniem do potwierdzenia.' };
+function renderDashboard(g, club) {
+  const next = (g.fixtures || []).filter((f) => !f.played && (f.home === g.clubId || f.away === g.clubId)).sort((a, b) => a.date.localeCompare(b.date))[0];
+  const tw = DOMESTIC.transferWindows.find((w) => g.date >= w.from && g.date <= w.to);
+  const latest = g.inbox.slice(0, 4);
+  return `
+    <h2>Pulpit</h2>
+    <section class="panel">
+      <p class="muted">Następny mecz</p>
+      ${next ? `<p class="panel__lead">${esc(next.comp)}</p><p class="muted">${esc(weekday(next.date))}, ${esc(fmtDate(next.date))}${next.away ? '' : ', rywal z terminarza'}</p>` : '<p class="panel__lead">Brak zaplanowanych meczów</p>'}
+    </section>
+    <section class="panel">
+      <p class="muted">Okno transferowe</p>
+      <p class="panel__lead">${tw ? `Otwarte do ${esc(fmtDate(tw.to))}` : 'Zamknięte'}</p>
+    </section>
+    <h3>Ostatnie wiadomości</h3>
+    <ul class="mail-list stripes">${latest.map(mailRow).join('') || '<li class="mail-empty">Brak wiadomości.</li>'}</ul>`;
+}
+
+function mailRow(m) {
+  return `<li><button class="mail-row ${m.read ? '' : 'mail-row--unread'}" data-act="mail" data-id="${esc(m.id)}">
+    <span class="mail-row__dot" data-p="${esc(m.priority)}" aria-hidden="true"></span>
+    <span class="mail-row__body"><span class="mail-row__subj">${esc(m.subject)}</span><span class="mail-row__from">${esc(m.from)}, ${esc(CATEGORIES[m.category])}</span></span>
+    <span class="mail-row__date">${esc(fmtDate(m.date).replace(/, \d{4}$/, ''))}</span>
+  </button></li>`;
+}
+
+function renderMail(g) {
+  if (state.mailOpen) {
+    const m = g.inbox.find((x) => x.id === state.mailOpen);
+    if (m) {
+      return `<button class="btn btn--quiet" data-act="mailback">Wróć do skrzynki</button>
+      <article class="mail-view">
+        <p class="muted">${esc(m.from)}, ${esc(CATEGORIES[m.category])}, ${esc(fmtDate(m.date))}</p>
+        <h2>${esc(m.subject)}</h2>
+        <p>${esc(m.body)}</p>
+        ${m.actions.length && !m.resolved ? `<div class="mail-actions">${m.actions.map((a) => `<button class="btn btn--primary" data-act="mailaction" data-id="${esc(m.id)}" data-a="${esc(a.id)}">${esc(a.label)}</button>`).join('')}</div>` : ''}
+        ${m.chosen ? `<p class="muted">Twoja odpowiedź: ${esc(m.actions.find((a) => a.id === m.chosen)?.label ?? '')}</p>` : ''}
+      </article>`;
+    }
   }
-  if (europe) {
-    return { title: `${europe.comp}, ${europe.entry}: rywal z losowania`, date: europe.entry === 'Q2' ? '2026-07-22' : '2026-08-06', note: 'Losowanie i terminarz pucharów powstaną w etapie 8.' };
+  const cats = Object.entries(CATEGORIES).filter(([k]) => g.inbox.some((m) => m.category === k));
+  const chips = [['', 'Wszystkie', unreadCount(g.inbox)], ...cats.map(([k, v]) => [k, v, unreadCount(g.inbox, k)])]
+    .map(([k, v, n]) => `<button class="chip" data-act="mailcat" data-cat="${k}" aria-pressed="${(state.mailCat || '') === k}">${esc(v)}${n ? ` <b>${n}</b>` : ''}</button>`).join('');
+  const list = filterInbox(g.inbox, state.mailCat);
+  const pending = pendingDecisions(g.inbox).length;
+  return `<div class="mail-head"><h2>Poczta</h2><button class="btn btn--quiet" data-act="readall">Oznacz wszystkie jako przeczytane</button></div>
+    ${pending ? `<p class="notice">Masz ${pending} ${pending === 1 ? 'wiadomość wymagającą' : 'wiadomości wymagające'} odpowiedzi.</p>` : ''}
+    <div class="chips">${chips}</div>
+    <ul class="mail-list stripes">${list.map(mailRow).join('') || '<li class="mail-empty">Brak wiadomości w tej kategorii.</li>'}</ul>`;
+}
+
+// ---------- Dzień meczowy (tymczasowo, do etapu 5) ----------
+function renderMatchDay() {
+  const g = state.game;
+  const a = primaryAction(g);
+  const f = a.match;
+  const home = clubById(f.home);
+  const away = f.away ? clubById(f.away) : null;
+  app.innerHTML = `
+  <main class="start">
+    <div class="led">${esc(fmtDate(g.date))}</div>
+    <h1>Dzień meczowy</h1>
+    <p class="panel__lead">${esc(f.comp)}</p>
+    <p>${esc(home?.name ?? '')} ${away ? `vs ${esc(away.name)}` : 'vs rywal z terminarza'}</p>
+    <section class="panel">
+      <p>Pełny dzień meczowy (studio, odprawa, mecz na żywo, przerwa, studio pomeczowe) powstanie w etapie 5. Wygląd możesz już obejrzeć w prototypie.</p>
+      <p><a class="btn btn--quiet" href="design/dzien-meczowy.html" target="_blank" rel="noopener">Otwórz prototyp dnia meczowego</a></p>
+    </section>
+    <button class="btn btn--primary" data-act="endmatch">Zakończ mecz i wróć</button>
+    <p class="muted">Wynik pojawi się, gdy powstanie silnik meczu (etap 3). Teraz mecz zostanie tylko oznaczony jako rozegrany.</p>
+  </main>`;
+}
+
+// ---------- Upływ dni ----------
+async function runDays() {
+  const g = state.game;
+  state.running = true;
+  renderHub();
+  let reason = 'limit';
+  for (let i = 0; i < 120 && state.running; i++) {
+    const r = continueUntilStop(g, { maxDays: 1 });
+    const day = r.days[0];
+    if (day) {
+      const led = document.getElementById('leddate');
+      if (led) led.textContent = fmtDate(g.date);
+      const tick = document.getElementById('ticker');
+      if (tick && day.added.length) tick.textContent = `${fmtDate(day.date)}: ${day.added[0].subject}`;
+      await new Promise((res) => setTimeout(res, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 110));
+    }
+    if (r.reason !== 'limit') { reason = r.reason; break; }
   }
-  return { title: `${LEAGUE_NAMES[club.tier]}, 1. kolejka`, date: '2026-07-24', note: 'Pełny terminarz ligi powstanie w etapie 7.' };
+  state.running = false;
+  if (reason === 'message' || reason === 'decision') { state.tab = 'poczta'; state.mailOpen = null; state.mailCat = null; }
+  await save();
+  renderHub();
 }
 
 // ---------- Akcje ----------
 async function newGame(slot, clubId) {
   const seed = hashString(`${clubId}:${Date.now()}:${Math.random()}`);
   const game = {
-    seed,
-    clubId,
-    date: GAME_START,
-    season: SEASON,
-    createdAt: new Date().toISOString(),
-    summary: { clubId, season: SEASON, date: GAME_START },
+    seed, clubId, date: GAME_START, season: SEASON, createdAt: new Date().toISOString(),
+    inbox: [], fixtures: provisionalFixtures(clubId),
   };
-  await store.saveSlot(slot, game);
+  processDay(game);
   state.game = game;
   state.slot = slot;
+  await save();
   state.screen = 'hub';
-  state.tab = 'mecz';
+  state.tab = 'poczta';
   render();
 }
 
@@ -181,16 +296,37 @@ app.addEventListener('click', async (ev) => {
   if (!el || el.tagName === 'INPUT') return;
   const act = el.dataset.act;
   const slot = Number(el.dataset.slot);
+  const g = state.game;
   try {
     if (act === 'new') { state.slot = slot; state.screen = 'pick'; render(); }
     if (act === 'back' || act === 'menu') { state.screen = 'start'; render(); }
     if (act === 'tier') { state.tier = Number(el.dataset.tier); render(); }
     if (act === 'pick') await newGame(state.slot, el.dataset.club);
-    if (act === 'tab') { state.tab = el.dataset.tab; render(); }
+    if (act === 'tab') { state.tab = el.dataset.tab; state.mailOpen = null; render(); }
+    if (act === 'go') {
+      const a = primaryAction(g);
+      if (a.kind === 'play') { state.screen = 'match'; render(); }
+      else if (a.kind === 'decide') { state.tab = 'poczta'; state.mailOpen = pendingDecisions(g.inbox)[0].id; render(); }
+      else await runDays();
+    }
+    if (act === 'stop') state.running = false;
+    if (act === 'endmatch') {
+      finishMatch(g, primaryAction(g).match.id, null);
+      await save();
+      state.screen = 'hub'; render();
+    }
+    if (act === 'mail') {
+      state.tab = 'poczta'; state.mailOpen = el.dataset.id;
+      g.inbox = markRead(g.inbox, el.dataset.id); await save(); render();
+    }
+    if (act === 'mailback') { state.mailOpen = null; render(); }
+    if (act === 'mailcat') { state.mailCat = el.dataset.cat || null; render(); }
+    if (act === 'readall') { g.inbox = markAllRead(g.inbox); await save(); render(); }
+    if (act === 'mailaction') { g.inbox = resolveMessage(g.inbox, el.dataset.id, el.dataset.a); await save(); render(); }
     if (act === 'load') {
       const rec = await store.loadSlot(slot);
       if (!rec) throw new Error('Ten slot jest pusty.');
-      state.game = rec.game; state.slot = slot; state.screen = 'hub'; render();
+      state.game = ensureGameShape(rec.game); state.slot = slot; state.screen = 'hub'; state.tab = 'pulpit'; render();
     }
     if (act === 'delete') {
       if (confirm(`Usunąć zapis ze slotu ${slot}? Tego nie da się cofnąć.`)) {
@@ -227,9 +363,11 @@ app.addEventListener('change', async (ev) => {
   render();
 });
 
-// Klawiatura na PC: Escape wraca do menu głównego.
+// Klawiatura na PC: Enter = Dalej / Zagraj mecz, Escape = menu główne.
 document.addEventListener('keydown', (ev) => {
-  if (ev.key === 'Escape' && state.screen !== 'start') { state.screen = 'start'; render(); }
+  if (ev.target.closest('input, select, textarea')) return;
+  if (ev.key === 'Escape' && state.screen !== 'start') { state.running = false; state.screen = 'start'; render(); }
+  if (ev.key === 'Enter' && state.screen === 'hub' && !state.running && !ev.target.closest('button')) document.querySelector('[data-act="go"]')?.click();
 });
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {

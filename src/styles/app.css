@@ -200,3 +200,82 @@
   .nav__btn[data-tab="mecz"] .ico { width: 24px; height: 24px; padding: 0; margin: 0; background: none; color: inherit; box-shadow: none; }
   .hub__main { padding: var(--space-5) var(--space-6); }
 }
+
+/* ---------- Upływ dni: przycisk Dalej / Zagraj mecz ---------- */
+.nav { grid-template-columns: repeat(6, 1fr); }
+.nav__btn { position: relative; }
+.nav__btn[data-tab="mecz"] .ico { all: unset; }
+.go-wrap {
+  position: fixed; z-index: 11; left: 0; right: 0;
+  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom));
+  padding: var(--space-2) var(--space-3);
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  border-top: 1px solid var(--line);
+}
+.go {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  width: 100%; min-height: 52px; padding: 6px var(--space-4);
+  border: 0; border-radius: var(--radius-s); cursor: pointer;
+  background: var(--accent); color: var(--accent-text);
+}
+.go__label { font: 700 var(--step-1)/1.1 var(--font-display); }
+.go__sub { font-size: var(--step--1); opacity: .85; }
+.go--play { background: #0E1511; color: var(--led); box-shadow: 0 0 0 2px var(--led) inset; }
+.go--play .go__label { font-family: var(--font-led); font-weight: 800; letter-spacing: .04em; }
+.go--decide { background: var(--kartka-zolta); color: #14211A; }
+.go--stop { background: var(--surface); color: var(--text); border: 1px solid var(--line); }
+.hub__main { padding-bottom: calc(var(--nav-h) + 96px); }
+
+.badge {
+  position: absolute; top: 6px; left: 50%; margin-left: 6px;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: var(--kartka-czerwona); color: #fff; font: 700 11px/18px var(--font-body);
+}
+
+.ticker {
+  position: fixed; z-index: 11; left: 0; right: 0;
+  bottom: calc(var(--nav-h) + 70px + env(safe-area-inset-bottom));
+  padding: 0 var(--space-4); text-align: center;
+  font-size: var(--step--1); color: var(--text-muted); pointer-events: none;
+}
+
+/* ---------- Poczta ---------- */
+.mail-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-3); }
+.mail-head h2 { margin: 0; }
+.chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: var(--space-2); margin-bottom: var(--space-2); scrollbar-width: none; }
+.chip {
+  flex: none; min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface); font: 600 var(--step--1)/1 var(--font-body); cursor: pointer; white-space: nowrap;
+}
+.chip b { margin-left: 4px; color: var(--kartka-czerwona); }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.chip[aria-pressed="true"] b { color: var(--led); }
+.mail-list { list-style: none; margin: 0; padding: 0; background: var(--surface); border-radius: var(--radius-m); overflow: hidden; }
+.mail-row {
+  display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: var(--space-3);
+  width: 100%; min-height: 60px; padding: var(--space-2) var(--space-4);
+  border: 0; background: none; text-align: left; cursor: pointer;
+}
+.mail-row:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.mail-row__dot { width: 8px; height: 8px; border-radius: 50%; background: transparent; }
+.mail-row--unread .mail-row__dot { background: var(--accent); }
+.mail-row--unread .mail-row__dot[data-p="important"] { background: var(--led); }
+.mail-row--unread .mail-row__dot[data-p="urgent"] { background: var(--kartka-czerwona); }
+.mail-row__body { display: flex; flex-direction: column; min-width: 0; }
+.mail-row__subj { font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mail-row--unread .mail-row__subj { font-weight: 700; }
+.mail-row__from, .mail-row__date { font-size: var(--step--1); color: var(--text-muted); }
+.mail-row__date { white-space: nowrap; }
+.mail-empty { padding: var(--space-4); color: var(--text-muted); }
+.mail-view { margin-top: var(--space-4); padding: var(--space-4); background: var(--surface); border-radius: var(--radius-m); max-width: 68ch; }
+.mail-view h2 { margin: var(--space-2) 0 var(--space-3); }
+.mail-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
+
+@media (min-width: 1024px) {
+  .go-wrap { position: static; padding: 0; background: none; border: 0; margin-left: var(--space-4); }
+  .go { min-height: 48px; min-width: 220px; }
+  .go--play { box-shadow: 0 0 0 2px var(--led) inset; }
+  .hub__main { padding-bottom: var(--space-6); }
+  .ticker { bottom: var(--space-4); left: 220px; }
+  .badge { position: static; margin-left: auto; }
+}
