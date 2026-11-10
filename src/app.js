@@ -20,6 +20,7 @@ import { renderSquadList, renderPlayerProfile } from './ui/squadView.js';
 import { renderTactics } from './ui/tacticsView.js';
 import { createTactics, assign, changeFormation, setInstruction, refreshTactics, removeFromBench, checkTactics } from './engine/lineup.js';
 import { COMPETITIONS } from './config/competitions.js';
+import { mountMatchday } from './ui/matchdayView.js';
 
 const app = document.getElementById('app');
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
@@ -53,6 +54,7 @@ const TABS = [
 function render() {
   if (state.screen === 'start') return renderStart();
   if (state.screen === 'pick') return renderPick();
+  if (state.screen === 'matchday') return renderLiveMatchday();
   if (state.screen === 'match') return renderMatchDay();
   if (state.screen === 'matchResult') return renderMatchResult();
   return renderHub();
@@ -286,7 +288,18 @@ function renderMail(g) {
     <ul class="mail-list stripes">${list.map(mailRow).join('') || '<li class="mail-empty">Brak wiadomości w tej kategorii.</li>'}</ul>`;
 }
 
-// ---------- Dzień meczowy (tymczasowo do etapu 5: pełny silnik, wynik od razu) ----------
+// ---------- Dzień meczowy na żywo (etap 5) ----------
+function renderLiveMatchday() {
+  if (state.md) return;
+  const g = state.game;
+  const f = primaryAction(g).match;
+  state.md = mountMatchday(app, {
+    game: g, fixture: f, save,
+    onExit: () => { state.md = null; state.screen = 'hub'; state.tab = 'pulpit'; render(); },
+  });
+}
+
+// ---------- Mecz bez rywala (UEFA przed etapem 8): wynik od razu ----------
 function renderMatchDay() {
   const g = state.game;
   const f = primaryAction(g).match;
@@ -463,7 +476,7 @@ app.addEventListener('click', async (ev) => {
         if (check.errors.length) { state.tab = 'kadra'; state.sqSub = 'tactics'; render(); return; }
         state.matchNotes = changes;
         await save();
-        state.screen = 'match'; render();
+        state.screen = a.match.home && a.match.away ? 'matchday' : 'match'; render();
       }
       else if (a.kind === 'decide') { state.tab = 'poczta'; state.mailOpen = pendingDecisions(g.inbox)[0].id; render(); }
       else await runDays();
@@ -544,6 +557,7 @@ app.addEventListener('change', async (ev) => {
 // Klawiatura na PC: Enter = Dalej / Zagraj mecz, Escape = menu główne.
 document.addEventListener('keydown', (ev) => {
   if (ev.target.closest('input, select, textarea')) return;
+  if (state.screen === 'matchday') return;
   if (ev.key === 'Escape' && state.screen !== 'start') { state.running = false; state.screen = 'start'; render(); }
   if (ev.key === 'Enter' && state.screen === 'hub' && !state.running && !ev.target.closest('button')) document.querySelector('[data-act="go"]')?.click();
 });

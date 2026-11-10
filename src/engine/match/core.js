@@ -381,10 +381,12 @@ function goal(M, ai, s, assister, xg, how) {
   }
   for (const y of onPitch(A, M.minute)) y.Z += 1;
   for (const y of onPitch(D, M.minute)) y.Z += y.p.persona === 'Wrażliwy' ? -3 : y.p.persona === 'Lider' ? 0 : y.p.persona === 'Narwaniec' ? 1 : -1;
-  const text = how === 'OG' ? 'GOL! Samobójcze trafienie.'
+  // Samobój: pechowiec z obrony rywala (bez gola w statystykach strzelców)
+  const ogBy = how === 'OG' ? pickWeighted(M, onPitch(D, M.minute), (y) => ({ ŚO: 4, BO: 2.5, WB: 2, DP: 2, BR: 1 }[y.slot.pos] ?? 0.5)) : null;
+  const text = how === 'OG' ? `GOL! Samobójcze trafienie${ogBy ? `: ${last(ogBy)}` : ''}.`
     : how === 'PEN' ? `GOL! ${last(s)} pewnie z rzutu karnego.`
       : `GOL! ${last(s)}${how === 'HEAD' ? ' strzałem głową' : how === 'DYS' ? ' strzałem z dystansu' : how === 'FK' ? ' z rzutu wolnego' : ''}${assister ? `, asysta: ${last(assister)}` : ''}.`;
-  emit(M, 'goal', ai, s, { xg: round2(xg ?? 0), how, aid: assister?.id ?? null, ownGoal: how === 'OG', text, pause: 3, score: [...M.score] });
+  emit(M, 'goal', ai, s, { xg: round2(xg ?? 0), how, aid: assister?.id ?? null, ownGoal: how === 'OG', ogId: ogBy?.id ?? null, text, pause: 3, score: [...M.score] });
 }
 
 function phaseOwnGoal(M) {

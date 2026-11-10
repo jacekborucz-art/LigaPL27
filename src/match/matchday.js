@@ -1,0 +1,290 @@
+// Dzień meczowy gracza: studio przedmeczowe -> odprawa -> 1. połowa -> przerwa i odprawa ->
+// 2. połowa (ew. dogrywka, karne) -> studio pomeczowe -> odprawa pomeczowa -> konferencja.
+// Łączy studio i odprawy (src/match), pełny silnik (src/engine/match) i skutki sezonu (src/season).
+// Sesja żyje w pamięci; wynik i jego skutki trafiają do gry dopiero po końcowym gwizdku.
+
+import { Rng } from '../core/rng.js';
+import { CLUBS_PL, clubById } from '../data/clubs_pl.js';
+import { formationById } from '../data/formations.js';
+import { COMPETITIONS } from '../config/competitions.js';
+import { createMatch, step, resume, runToEnd, runToBreak, result as matchResult } from '../engine/match/match.js';
+import { onPitch } from '../engine/match/teams.js';
+import { statsFromEvents } from '../engine/matchStats.js';
+import { createTactics, refreshTactics } from '../engine/lineup.js';
+import { squadFor, anyClub, applyResult, fromEngineResult, LEAGUE_COMPS, compLabel } from '../season/season.js';
+import { standings } from '../season/standings.js';
+import { winnerOf } from '../season/cup.js';
+import { preMatchStudio, postMatchStudio, postMatchMessages, preMatchMessages } from './studio.js';
+import {
+  preMatchBriefing, halftimeBriefing, postMatchBriefing, assistantAdvice, aiBriefing, newSpeechMemory, closeMatchMemory,
+  applyBriefing, pressConference, answerPressConference,
+} from './briefings.js';
+import { addMessages } from '../core/inbox.js';
+import { applyMorale } from '../career/morale.js';
+
+const REFEREES = ['Marek Wierzbicki', 'Tomasz Kwiecień', 'Paweł Sokołowski', 'Krzysztof Malec', 'Bartosz Frankowski-Nowak', 'Damian Kos', 'Jarosław Przybył', 'Łukasz Szczepan', 'Piotr Lasyk-Kral', 'Szymon Marcinek', 'Wojciech Myć-Ostrowski', 'Karol Arys-Wolny', 'Daniel Stefański-Mróz', 'Sebastian Jarzębak', 'Mariusz Złotek-Bąk'];
+
+/** Pogoda zależna od miesiąca (prosto, deterministycznie z meczu). */
+export function weatherFor(date, rng) {
+  const m = Number(date.slice(5, 7));
+  const winter = [12, 1, 2].includes(m); const summer = [6, 7, 8].includes(m);
+  const type = rng.weighted(['slonce', 'pochmurno', 'deszcz', 'snieg', 'wiatr'], (t) => ({
+    slonce: summer ? 5 : winter ? 1 : 3, pochmurno: 4, deszcz: summer ? 1.5 : 2.5, snieg: winter ? 2 : 0, wiatr: 1,
+  })[t]);
+  const base = summer ? 24 : winter ? -1 : 12;
+  return { type, tempC: Math.round(base + rng.gauss(0, 5)) };
+}
+
+/** Wpływ pogody i murawy na silnik (ekspert 6.1 b). */
+export function engineWeather(w, pitch) {
+  const out = { conv: 1, foul: 1, inj: 1, fat: 1, act: 1, dys: 1 };
+  if (w.type === 'deszcz') Object.assign(out, { conv: 1.06, foul: 1.08, inj: 1.05, dys: 1.15 });
+  if (w.type === 'snieg') Object.assign(out, { act: 0.92, fat: 1.1, inj: 1.1 });
+  if (w.type === 'wiatr') out.dys = 0.85;
+  if (w.tempC > 28) out.fat *= 1.3;
+  if (w.tempC < -5) out.inj *= 1.15;
+  if (pitch === 'zla') { out.fat *= 1.15; out.inj *= 1.2; }
+  return out;
+}
+
+function compInfo(f) {
+  if (LEAGUE_COMPS.includes(f.comp)) return { type: 'league', name: COMPETITIONS[f.comp].name, stage: 'main' };
+  if (f.comp === 'pp') return { type: 'cup', name: 'Puchar Polski', stage: f.round === 'F' ? 'final' : 'main' };
+  if (f.comp === 'super') return { type: 'supercup', name: 'Superpuchar Polski', stage: 'final' };
+  return { type: 'cup', name: compLabel(f), stage: f.round === 'F' ? 'final' : 'main' };
+}
+
+function teamCtx(game, clubId, comp, table, tactics) {
+  const club = anyClub(clubId);
+  const row = table?.find((r) => r.id === clubId);
+  const last5 = (game.fixtures || []).filter((x) => x.played && x.result && (x.home === clubId || x.away === clubId))
+    .sort((a, b) => a.date.localeCompare(b.date)).slice(-5)
+    .map((x) => { const me = x.home === clubId ? 0 : 1; const [a, b] = x.result.score; return a === b ? 'R' : (me === 0 ? a > b : b > a) ? 'W' : 'P'; });
+  return {
+    id: clubId, name: club?.name ?? clubId, region: club?.region, prestige: club?.prestige ?? 3,
+    squad: squadFor(game, clubId, comp), formation: formationById(tactics?.formation ?? '4231').name,
+    last5, position: row?.pos ?? null, points: row?.points ?? null,
+  };
+}
+
+/** Zaczyna dzień meczowy dla meczu gracza. */
+export function startMatchday(game, f) {
+  const rng = new Rng(`dzien-meczowy:${game.seed}:${f.id}`);
+  const userSide = f.home === game.clubId ? 0 : 1;
+  const oppId = userSide === 0 ? f.away : f.home;
+  const comp = f.comp;
+  const tier = clubById(game.clubId)?.tier;
+  const table = LEAGUE_COMPS.includes(comp)
+    ? standings(game.fixtures.filter((x) => x.comp === comp), CLUBS_PL.filter((c) => c.tier === COMPETITIONS[comp].tier).map((c) => c.id)) : null;
+  const benchSize = (LEAGUE_COMPS.includes(comp) ? COMPETITIONS[comp].benchSize : 12);
+  const mySquad = squadFor(game, game.clubId, comp);
+  game.tactics = refreshTactics(game.tactics, mySquad, { benchSize }).tactics;
+  const oppSquad = squadFor(game, oppId, comp);
+  const oppTactics = createTactics(oppSquad, { benchSize });
+  const weather = weatherFor(f.date, rng);
+  const pitch = rng.weighted(['doskonala', 'dobra', 'zla', 'sztuczna'], (p) => ({ doskonala: 2, dobra: 6, zla: weather.type === 'deszcz' || weather.type === 'snieg' ? 2 : 0.5, sztuczna: 0.6 })[p]);
+  const referee = { name: rng.pick(REFEREES), strictness: Math.round(Math.max(0.7, Math.min(1.4, rng.gauss(1, 0.13))) * 100) / 100 };
+  const hasVar = comp === 'ekstraklasa' || comp === 'super' || (comp === 'pp' && ['SF', 'F'].includes(f.round));
+  const h2h = (game.fixtures || []).filter((x) => x.played && x.result && ((x.home === f.home && x.away === f.away) || (x.home === f.away && x.away === f.home)))
+    .map((x) => ({ date: x.date, home: x.home, away: x.away, score: x.result.score }));
+  game.board = game.board ?? { trust: 60, fansMood: 55 };
+  const preCtx = {
+    home: teamCtx(game, f.home, comp, table, userSide === 0 ? game.tactics : oppTactics),
+    away: teamCtx(game, f.away, comp, table, userSide === 1 ? game.tactics : oppTactics),
+    competition: compInfo(f), neutral: !!f.neutral, h2h, referee, weather, pitch, var: hasVar,
+    board: { trust: game.board.trust }, fans: { mood: game.board.fansMood }, headlineHistory: game.headlineHistory ?? [],
+    date: f.date, seed: `${game.seed}`, userClubId: game.clubId,
+    table: table ? { roundsPlayed: Math.max(...table.map((r) => r.played)), roundsTotal: 34, size: table.length } : null,
+  };
+  const pre = preMatchStudio(preCtx);
+  return {
+    fixtureId: f.id, f, userSide, oppId, comp, tier, step: 'studio', pre, preCtx, weather, pitch, referee, hasVar,
+    oppTactics, benchSize, memory: game.speechMemory ?? newSpeechMemory(), M: null, briefings: {}, post: null, press: null,
+  };
+}
+
+/** Zawodnicy kadry meczowej gracza (jedenastka + ławka) jako obiekty świata. */
+export function matchSquadPlayers(game, S) {
+  const squad = squadFor(game, game.clubId, S.comp);
+  const byId = new Map(squad.map((p) => [p.id, p]));
+  return [...game.tactics.xi, ...game.tactics.bench].map((id) => byId.get(id)).filter(Boolean);
+}
+
+export function preAdvice(game, S) {
+  return assistantAdvice('pre', matchSquadPlayers(game, S), { ...S.pre.forBriefing, clubId: game.clubId, date: S.f.date }, S.memory);
+}
+
+/** Odprawa przedmeczowa gracza; zwraca reakcje do pokazania (bez liczb). */
+export function doPreBriefing(game, S, tone, talks = []) {
+  const res = preMatchBriefing({ players: matchSquadPlayers(game, S), tone, talks, memory: S.memory, ctx: { ...S.pre.forBriefing, clubId: game.clubId, date: S.f.date }, seed: `${game.seed}:${S.f.id}:pre` });
+  S.memory = res.memory;
+  S.briefings.pre = res;
+  for (const p of matchSquadPlayers(game, S)) { const w = game.world.players[p.id]; if (w) Object.assign(w, applyBriefing(w, res)); }
+  return res;
+}
+
+function personaMix(squad) {
+  const mix = {};
+  for (const p of squad) mix[p.persona ?? 'Spokojny'] = (mix[p.persona ?? 'Spokojny'] ?? 0) + 1;
+  return mix;
+}
+
+/** Tworzy mecz w silniku (po odprawie). */
+export function kickOff(game, S) {
+  const mySquad = squadFor(game, game.clubId, S.comp);
+  const oppSquad = squadFor(game, S.oppId, S.comp);
+  const oppClub = anyClub(S.oppId);
+  const ai = aiBriefing({ coach: oppClub?.coach ?? 'P', personaMix: personaMix(oppSquad) }, { phase: 'pre', pWin: 1 - (S.pre.forBriefing.pWin ?? 0.4), rank: S.pre.forBriefing.rank }, `${game.seed}:${S.f.id}:ai`);
+  const zOpp = Object.fromEntries(oppSquad.map((p) => [p.id, ai.zByPersona[p.persona] ?? ai.teamZ]));
+  const mine = { club: anyClub(game.clubId), squad: mySquad, tactics: game.tactics, ai: false, coach: 'P', zStart: S.briefings.pre?.engine?.zStart ?? {} };
+  const theirs = { club: oppClub, squad: oppSquad, tactics: S.oppTactics, ai: true, coach: oppClub?.coach ?? 'P', zStart: zOpp };
+  S.M = createMatch({
+    seed: `${game.seed}:${S.f.id}`,
+    home: S.userSide === 0 ? mine : theirs,
+    away: S.userSide === 0 ? theirs : mine,
+    ctx: {
+      neutral: !!S.f.neutral, var: S.hasVar, rank: S.pre.preview.rank.level, refStrict: S.referee.strictness,
+      attendance: S.pre.conditions.attendance.fill, weather: engineWeather(S.weather, S.pitch),
+      knockout: S.f.knockout === 'single' ? 'single' : false,
+    },
+  });
+  S.step = 'live1';
+  return S.M;
+}
+
+/** Oceny w trakcie meczu (do przerwy): 6 + suma zdarzeń zawodnika. */
+export function liveRatings(S) {
+  const out = {};
+  for (const T of S.M.teams) for (const x of T.players) if (x.minOn !== null) out[x.id] = Math.round(Math.max(3, Math.min(10, 6 + x.ev)) * 10) / 10;
+  return out;
+}
+
+export function halfInfo(S) {
+  const M = S.M;
+  const stats = statsFromEvents(M.events);
+  const u = S.userSide;
+  const mom = M.momentum.slice(-15);
+  const momentum = mom.length ? Math.round(mom.reduce((s, v) => s + v, 0) / mom.length) * (u === 0 ? 1 : -1) : 0;
+  return {
+    stats, score: { for: M.score[u], against: M.score[1 - u] }, xgFor: stats[u].xg, xgAgainst: stats[1 - u].xg,
+    possession: stats[u].possession, momentum, ratings: liveRatings(S),
+    onYellow: M.teams[u].players.filter((x) => x.yc && !x.sentOff).map((x) => x.id),
+  };
+}
+
+export function halfAdvice(game, S) {
+  const h = halfInfo(S);
+  return assistantAdvice('half', onPitchPlayers(S), { ...h, clubId: game.clubId, rank: S.pre.forBriefing.rank, pWin: S.pre.forBriefing.pWin }, S.memory);
+}
+
+function onPitchPlayers(S) {
+  const T = S.M.teams[S.userSide];
+  return [...onPitch(T, S.M.minute), ...T.bench].map((x) => x.p);
+}
+
+/** Odprawa w przerwie: nowy poziom zaangażowania na 2. połowę. */
+export function doHalfBriefing(game, S, tone, talks = []) {
+  const h = halfInfo(S);
+  const res = halftimeBriefing({ players: onPitchPlayers(S), tone, talks, memory: S.memory, ctx: { ...h, clubId: game.clubId, rank: S.pre.forBriefing.rank, pWin: S.pre.forBriefing.pWin, date: S.f.date }, seed: `${game.seed}:${S.f.id}:half` });
+  S.memory = res.memory;
+  S.briefings.half = res;
+  const T = S.M.teams[S.userSide];
+  for (const x of [...T.players, ...T.bench]) if (res.engine.zStart[x.id] != null) x.Z = res.engine.zStart[x.id];
+  // AI rywala też ma odprawę
+  const O = S.M.teams[1 - S.userSide];
+  const ai = aiBriefing({ coach: O.coach, personaMix: personaMix(O.players.map((x) => x.p)) }, { phase: 'half', diff: -h.score.for + h.score.against, xgDiff: h.xgAgainst - h.xgFor, pWin: 1 - (S.pre.forBriefing.pWin ?? 0.4) }, `${game.seed}:${S.f.id}:aihalf`);
+  for (const x of O.players) x.Z = ai.zByPersona[x.p.persona] ?? ai.teamZ;
+  for (const p of onPitchPlayers(S)) { const w = game.world.players[p.id]; if (w) Object.assign(w, applyBriefing(w, res)); }
+  return res;
+}
+
+/** Jedna minuta meczu (UI). */
+export function tick(S) {
+  const r = step(S.M);
+  if (r.state === 'break' && S.step === 'live1') S.step = 'break';
+  else if (r.state === 'break') S.step = 'etbreak';
+  if (r.state === 'ended') S.step = 'fulltime';
+  return r;
+}
+
+export function continueAfterBreak(S) {
+  resume(S.M);
+  S.step = S.M.half === 2 ? 'live2' : 'live2';
+}
+
+/** „Pokaż wynik od razu”: do przerwy albo do końca (zmiany robi asystent gracza). */
+export function skip(S) {
+  if (S.step === 'live1') { runToBreak(S.M, { assistantFor: [S.userSide] }); if (S.M.phase === 'break') S.step = 'break'; if (S.M.ended) S.step = 'fulltime'; return; }
+  runToEnd(S.M, { assistantFor: [S.userSide] });
+  S.step = 'fulltime';
+}
+
+/** Koniec meczu: zapis wyniku i skutków, studio pomeczowe, wiadomości. */
+export function finishMatchday(game, S) {
+  if (S.post) return S.post;
+  const M = S.M;
+  if (M.phase === 'break' && !M.ended) runToEnd(M, { assistantFor: [S.userSide] });
+  const r = matchResult(M);
+  if (S.f.knockout === 'penaltiesOnly' && r.score[0] === r.score[1] && !r.shootout) {
+    const rng = new Rng(`karne:${S.f.id}`);
+    r.shootout = { goals: rng.chance(0.5) ? [4, 3] : [3, 4], kicks: [] };
+  }
+  const tableBefore = S.preCtx.table ? standings(game.fixtures.filter((x) => x.comp === S.comp), CLUBS_PL.filter((c) => c.tier === COMPETITIONS[S.comp].tier).map((c) => c.id)) : null;
+  const rng = new Rng(`wynik:${game.seed}:${S.f.id}`);
+  const msgs = applyResult(game, S.f, fromEngineResult(r), rng);
+  const names = new Map([...M.teams[0].players, ...M.teams[0].bench, ...M.teams[1].players, ...M.teams[1].bench].map((x) => [x.id, x.p.name]));
+  const events = M.events.map((e) => ({ ...e, name: e.pid ? names.get(e.pid) : e.ogId ? names.get(e.ogId) : undefined, assistName: e.aid ? names.get(e.aid) : undefined, minute: e.min }));
+  const post = postMatchStudio({
+    home: { id: S.f.home, name: anyClub(S.f.home).name }, away: { id: S.f.away, name: anyClub(S.f.away).name },
+    competition: S.preCtx.competition, events: events.map(toStudioEvent), ratings: r.ratings, pre: S.pre.forPost,
+    board: { trust: game.board.trust }, headlineHistory: game.headlineHistory ?? [], date: S.f.date, seed: `${game.seed}`,
+    userClubId: game.clubId, referee: S.referee, tableBefore,
+  });
+  game.board.trust = Math.max(0, Math.min(100, game.board.trust + post.reactions.board.delta));
+  game.board.fansMood = Math.max(0, Math.min(100, game.board.fansMood + post.reactions.fans.delta));
+  game.headlineHistory = post.headlineHistory;
+  const inbox = [...postMatchMessages(post, { date: S.f.date, matchId: S.f.id }), ...preMatchMessages(S.pre, { date: S.f.date, matchId: S.f.id })];
+  game.inbox = addMessages(game.inbox, inbox).inbox;
+  void msgs;
+  S.result = r;
+  S.post = post;
+  S.step = 'studio2';
+  return post;
+}
+
+/** Zdarzenia silnika w formacie studia (minuta jako liczba, strona jako 'home'/'away'). */
+function toStudioEvent(e) {
+  const m = /^(\d+)(?:\+(\d+))?'$/.exec(e.min ?? '');
+  return {
+    ...e, min: m ? Number(m[1]) : null, added: m?.[2] ? Number(m[2]) : 0, // strona zostaje liczbą (statsFromEvents)
+    penalty: e.how === 'PEN', second: /druga żółta/.test(e.text ?? ''), days: e.injury?.days, injuryType: e.injury?.name,
+  };
+}
+
+export function doPostBriefing(game, S, tone, talks = []) {
+  const ids = new Set(S.result.ratings.filter((x) => x.side === S.userSide).map((x) => x.id));
+  const players = squadFor(game, game.clubId, S.comp).filter((p) => ids.has(p.id));
+  const res = postMatchBriefing({ players, tone, talks, memory: S.memory, ctx: S.post.forBriefing, seed: `${game.seed}:${S.f.id}:post` });
+  S.memory = res.memory;
+  S.briefings.post = res;
+  for (const p of players) { const w = game.world.players[p.id]; if (w) Object.assign(w, applyBriefing(w, res)); }
+  S.press = pressConference(S.post.forBriefing.press, `${game.seed}:${S.f.id}`);
+  return res;
+}
+
+export function doPress(game, S, choices) {
+  const eff = answerPressConference(S.press, choices);
+  game.board.trust = Math.max(0, Math.min(100, game.board.trust + eff.board));
+  game.board.fansMood = Math.max(0, Math.min(100, game.board.fansMood + eff.fans));
+  if (eff.morale) for (const id of game.world.clubs[game.clubId].squad) { const p = game.world.players[id]; p.morale = applyMorale(p.morale ?? 12, eff.morale); }
+  S.pressResult = eff;
+  return eff;
+}
+
+/** Zamknięcie dnia meczowego: pamięć przemów na kolejne mecze. */
+export function closeMatchday(game, S) {
+  game.speechMemory = closeMatchMemory(S.memory);
+  S.step = 'done';
+}
+
+export { winnerOf };
