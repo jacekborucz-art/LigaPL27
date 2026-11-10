@@ -7,12 +7,12 @@ import { OFF, VARIANTS, OUTFIELD_ATTRS, GK_ATTRS, ovrAt, RELATED } from '../data
 import { randomName, EU } from '../data/names.js';
 import { generatePersonality } from '../career/personality.js';
 import { initialReputation } from '../career/reputation.js';
-import { marketWage } from '../career/negotiation.js';
+import { marketWage, VALUE_BASE_EUR, VALUE_SLOPE } from '../career/negotiation.js';
+import { payLevel, EUR_PLN } from '../data/finanse_klubow.js';
 
 const AGE_ADJ = { 17: -2.5, 18: -2.0, 19: -1.5, 20: -1.0, 21: -0.6, 22: -0.3, 30: -0.1, 31: -0.3, 32: -0.6, 33: -1.0, 34: -1.4, 35: -1.8 };
 const FOREIGN_BONUS = { 1: 0.3, 2: 0.5, 3: 0.3 };
-const LEAGUE_VALUE = { 1: 1.0, 2: 0.6, 3: 0.35 };
-const EUR_TO_PLN = 4.3; // [SZAC] przelicznik do zł w grze
+const LEAGUE_VALUE = { 1: 1.0, 2: 0.6, 3: 0.35, 4: 0.2 }; // [SZAC]
 
 function persona(h, age, rng) {
   if (h.LID >= 15 && h.PRF >= 11 && age >= 24) return 'Lider';
@@ -27,7 +27,11 @@ function footFor(side, rng) {
   return r < 0.74 ? 'P' : r < 0.94 ? 'L' : 'LP';
 }
 
-/** Wartość rynkowa w zł (ekspert 2.4). */
+/**
+ * Wartość rynkowa w zł (ekspert 2.4, skala z docs/finanse.md 3.2): OVR 10 w Ekstraklasie ok. 250 tys. EUR,
+ * OVR 12 ok. 1 mln EUR, OVR 14,5 ok. 7 mln EUR; młody talent do x2, weteran x0,3. Sprzedaże z Ekstraklasy to zwykle
+ * 0,5-5 mln EUR, rekord ok. 7-10 mln EUR. [SZAC]
+ */
 export function marketValue(p, { tier = 1, date = '2026-07-01' } = {}) {
   const potVis = p.hidden?.POT ?? p.ovr;
   const age = p.age;
@@ -39,7 +43,7 @@ export function marketValue(p, { tier = 1, date = '2026-07-01' } = {}) {
   const contractMul = months < 6 ? 0.4 : months < 12 ? 0.7 : months < 24 ? 0.9 : 1.0;
   const form = p.form?.length ? p.form.reduce((a, b) => a + b, 0) / p.form.length : 6.6;
   const formMul = clamp(1 + 0.1 * (form - 6.6), 0.85, 1.15);
-  const v = 25000 * Math.exp(0.6 * (p.ovr - 8)) * ageMul * contractMul * (LEAGUE_VALUE[tier] ?? 1) * formMul * EUR_TO_PLN;
+  const v = VALUE_BASE_EUR * Math.exp(VALUE_SLOPE * (p.ovr - 10)) * ageMul * contractMul * (LEAGUE_VALUE[tier] ?? 0.2) * formMul * EUR_PLN;
   return Math.max(10000, Math.round(v / 5000) * 5000);
 }
 
@@ -126,7 +130,7 @@ export function genPlayer(rng, opts) {
     clubId: club.id,
     squad: 'A',
   };
-  p.contract = { wage: marketWage(ovr, tier, foreign && tier === 1), until: `${startYear + years}-06-30`, clause: 0, signedOn: date };
+  p.contract = { wage: marketWage(ovr, tier, foreign && tier === 1, payLevel(club)), until: `${startYear + years}-06-30`, clause: 0, signedOn: date };
   p.wage = p.contract.wage;
   p.value = marketValue(p, { tier, date });
   if (rng.chance(0.4)) p.contract.clause = Math.round((p.value * r(2.5, 4)) / 10000) * 10000;

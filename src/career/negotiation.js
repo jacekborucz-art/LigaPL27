@@ -11,6 +11,11 @@ import { willingnessToJoin, clubReputation } from './reputation.js';
 import { GROUP } from './squad.js';
 import { personalityOf, computeMindset, elementPrefs, AGENT_TYPES } from './personality.js';
 import { pickLine } from './negotiationLines.js';
+import { payLevel, EUR_PLN } from '../data/finanse_klubow.js';
+
+/** Wartość rynkowa: EUR przy OVR 10 w Ekstraklasie i nachylenie po OVR (docs/finanse.md 3.2). [SZAC] */
+export const VALUE_BASE_EUR = 250000;
+export const VALUE_SLOPE = 0.75;
 
 // ---------------------------------------------------------------- Stałe
 export const MAX_YEARS = 5; // w Polsce kontrakt maks. 5 lat
@@ -34,7 +39,12 @@ const ROLE_EXP_SHARE = { kluczowy: 0.85, podstawowy: 0.7, rotacja: 0.45, perspek
 const RATES = { GK: { g: 0, a: 0.01, cs: 0.3 }, DEF: { g: 0.04, a: 0.06, cs: 0.3 }, MID: { g: 0.12, a: 0.15, cs: 0 }, ATT: { g: 0.35, a: 0.15, cs: 0 } };
 // Jak bardzo niska oferta obraża danego typu osobowości. [SZAC]
 const PERSONA_TOUCHY = { Ambitny: 1.15, Narwaniec: 1.25, Wrażliwy: 1.1, Spokojny: 0.75, Lider: 0.9 };
-const TIER_WAGE = { 1: 1, 2: 0.55, 3: 0.3 }; // ekspert_futbol.md 2.4 [SZAC]
+// Pensje (docs/finanse.md 3.1): tydzień w zł przy OVR 10 w Ekstraklasie dla klubu o płacowości 1, mnożnik ligi
+// i nachylenie po OVR. Kalibracja do płac I drużyn z raportu Grant Thornton 2025/26 [SZAC].
+export const WAGE_BASE = 9000;
+export const WAGE_SLOPE = 0.45;
+export const TIER_WAGE = { 1: 1, 2: 0.66, 3: 0.38, 4: 0.2 };
+export const WAGE_MAX = 140000; // ok. 600 tys. zł miesięcznie, poziom najlepiej opłacanych w Ekstraklasie [SZAC]
 
 // ---------------------------------------------------------------- Formatowanie i daty
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -78,15 +88,19 @@ const ceilTo = (x, step) => Math.ceil(x / step) * step;
 const roundTo = (x, step) => Math.round(x / step) * step;
 
 // ---------------------------------------------------------------- Rynek
-/** Rynkowa pensja tygodniowa w zł z OVR i ligi (ekspert 2.4, przeliczone na tydzień i zł, ok. 1:1). [SZAC] */
-export function marketWage(ovr, tier = 1, foreign = false) {
-  const mul = foreign ? 1.5 : (TIER_WAGE[tier] ?? 1);
-  return roundTo(1200 * Math.exp(0.45 * (ovr - 8)) * mul, 100);
+/**
+ * Rynkowa pensja tygodniowa w zł z OVR i ligi (docs/finanse.md 3.1). foreign: obcokrajowiec w Ekstraklasie
+ * albo oferta z zagranicy (x1,5 zamiast mnożnika ligi). level: płacowość klubu (payLevel z data/finanse_klubow.js),
+ * bo bogaci właściciele płacą ponad rynek. [SZAC]
+ */
+export function marketWage(ovr, tier = 1, foreign = false, level = 1) {
+  const mul = foreign ? 1.5 : (TIER_WAGE[tier] ?? TIER_WAGE[4]);
+  return clamp(roundTo(WAGE_BASE * Math.exp(WAGE_SLOPE * (ovr - 10)) * mul * level, 100), 500, WAGE_MAX);
 }
 
-/** Wartość rynkowa w zł (gdy zawodnik nie ma wyliczonej value). [SZAC] */
+/** Wartość rynkowa w zł (gdy zawodnik nie ma wyliczonej value), ten sam wzór co marketValue w playerGen. [SZAC] */
 export function estimateValue(player) {
-  return player.value ?? roundTo(25000 * Math.exp(0.6 * ((player.ovr ?? 10) - 8)) * 4.3, 1000);
+  return player.value ?? roundTo(VALUE_BASE_EUR * Math.exp(VALUE_SLOPE * ((player.ovr ?? 10) - 10)) * EUR_PLN, 1000);
 }
 
 const roleRank = (role, age) => (role === 'perspektywiczny' && age <= 21 ? 2 : ROLE_RANK[role] ?? 2);
@@ -314,7 +328,7 @@ export function openNegotiation(opts) {
   const rep = player.rep ?? 35;
   const clubRep = clubReputation(club);
   const curWage = player.contract?.wage || player.wage || 0; // wolny zawodnik: ostatnia pensja w player.wage
-  const mWage = marketWage(player.ovr ?? 10, club.tier ?? 1, !!club.foreign);
+  const mWage = marketWage(player.ovr ?? 10, club.tier ?? 1, !!club.foreign, club.foreign ? 1 : payLevel(club));
   const monthsLeft = monthsBetween(date, player.contract?.until);
   const homeClub = ctx.homeClub ?? (!!player.homeRegion && player.homeRegion === club.region);
   const mindset = computeMindset(player, t, { minutesShare: ctx.minutesShare, homeClub, clubForeign: !!club.foreign });

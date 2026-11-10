@@ -10,9 +10,10 @@ import { proficiency } from '../engine/positions.js';
 import { INJURY_TYPES } from '../engine/match/constants.js';
 import { squadOf } from '../world/worldGen.js';
 import { fmtDate } from '../ui/dom.js';
-import { SESSIONS, INTENSITY, GK_SESSION, GK_JOIN, LOAD, COH, staffMul, PROGRAMS } from './config.js';
-import { ageAt, defaultPlayerTraining, clubMatchDates, daysBetween } from './state.js';
-import { dayContext, planDay } from './plan.js';
+import { SESSIONS, INTENSITY, GK_SESSION, GK_JOIN, LOAD, COH, CAMP, FRIENDLY, staffMul, PROGRAMS } from './config.js';
+import { ageAt, defaultPlayerTraining, daysBetween } from './state.js';
+import { dayContext, planDay, matchSets } from './plan.js';
+import { campWindow, halfOf, baseFactor, baseTerm, HALF_NAMES } from './camps.js';
 import { staffQ } from './staff.js';
 import { shiftLog, addLoad, loadSummary, fatigueMul, regenMul, trainingInjuryChance } from './load.js';
 import { applySessionToClub, applyClubMatch, syncTacticsChange } from './cohesion.js';
@@ -65,6 +66,64 @@ function newMatchMinutes(squad, matchDate) {
   return out;
 }
 
+/** Sparing rozegrany wczoraj: połowa zgrania z meczu, obciążenie i rytm z jedenastki i ławki. */
+function applyFriendly(game, c, squad, md) {
+  const xi = new Set(game.tactics?.xi ?? []);
+  const bench = new Set(game.tactics?.bench ?? []);
+  const played = new Map();
+  for (const p of squad) {
+    const t = p.training;
+    if (!t || p.injuryDays > 0) continue;
+    const min = xi.has(p.id) ? FRIENDLY.xiMin : bench.has(p.id) ? FRIENDLY.benchMin : 0;
+    if (!min) continue;
+    played.set(p.id, min);
+    if ((p.season?.min ?? 0) === (t.minSeen ?? 0)) addLoad(t, md, LOAD.matchLoad * FRIENDLY.loadMul * min / 90);
+  }
+  const form = game.tactics?.formation ?? c.form;
+  const before = { fam: c.fam[form] ?? COH.famMin, instr: c.instr };
+  applyClubMatch(c, form, played, squad);
+  c.fam[form] = before.fam + (c.fam[form] - before.fam) * FRIENDLY.famWeight;
+  c.instr = before.instr + (c.instr - before.instr) * FRIENDLY.famWeight;
+}
+
+/**
+ * Okres przygotowawczy klubu gracza: punkty formy bazowej (obóz q za dzień, trening w klubie 0,45 latem i 0,3 zimą),
+ * forma bazowa na start rundy i jej skutki przez 6 tygodni (wolniejsza ostrość, więcej urazów treningowych).
+ */
+export function trackPreparation(game, date, official, ctx, day, messages) {
+  const T = game.training;
+  const c = T.clubs[game.clubId];
+  const half = halfOf(date);
+  const w = campWindow(game, half, game.clubId, official);
+  if (!c.prepPts || c.prepPts.key !== w.key) c.prepPts = { key: w.key, pts: 0, campDays: 0, homeDays: 0 };
+  if (date >= w.open && date < w.start) {
+    if (ctx.camp) { c.prepPts.pts += ctx.camp.q; c.prepPts.campDays++; }
+    else if (day.sessions.some((x) => SESSIONS[x.type].dev >= 0.5)) { c.prepPts.pts += CAMP.homeRate[half]; c.prepPts.homeDays++; }
+    c.prepPts.pts = Math.round(c.prepPts.pts * 100) / 100;
+  }
+  if (ctx.camp && ctx.camp.from === date) {
+    messages.push(msg(date, 'Asystent trenera', 'info', `Wyjazd na obóz: ${ctx.camp.place}`, `Drużyna zaczyna ${HALF_NAMES[ctx.camp.half].toLowerCase()} (${ctx.camp.days} dni, do ${fmtDate(ctx.camp.to)}). Na obozie zajęcia dają więcej, zgranie rośnie szybciej, a ryzyko urazu jest mniejsze.`, `campstart:${ctx.camp.key}`));
+  }
+  if (date === w.open && !(T.camps ?? []).some((x) => x.key === w.key && !x.cancelled) && w.length >= CAMP.minDays) {
+    messages.push(msg(date, 'Asystent trenera', 'info', `${HALF_NAMES[half]}: czas na decyzję`, `Okres przygotowawczy trwa do ${fmtDate(w.start)}. Obóz możemy zorganizować między ${fmtDate(w.from)} a ${fmtDate(w.to)} (ekran Trening, zakładka Obozy). Bez obozu drużyna zacznie rundę z niższą formą bazową.`, `campremind:${w.key}`));
+  }
+  // Forma bazowa liczona w dniu pierwszego meczu rundy
+  if (date >= w.start && c.cb?.key !== w.key) {
+    const late = T.createdAt > addDays(w.open, 3);
+    const base = late ? 1 : Math.max(CAMP.baseMin, Math.min(CAMP.baseMax, c.prepPts.pts / CAMP.target(w.prepDays)));
+    c.cb = { key: w.key, base: Math.round(base * 100) / 100, start: w.start, campDays: c.prepPts.campDays, homeDays: c.prepPts.homeDays };
+    if (!late) {
+      const pct = Math.round(base * 100);
+      messages.push(msg(date, 'Trener przygotowania fizycznego', 'info', `Forma bazowa na start rundy: ${pct} %`,
+        `Okres przygotowawczy: ${c.prepPts.campDays ? `${c.prepPts.campDays} dni obozu` : 'bez obozu'}, ${c.prepPts.homeDays} dni treningu w klubie. ${base >= 0.95 ? 'Drużyna jest dobrze przygotowana.' : `Brakuje przygotowania: przez 3 tygodnie siła zawodników ${baseTerm(base, 1).toFixed(2).replace('.', ',')} pkt, wolniej rośnie ostrość i częściej zdarzają się urazy na treningu, potem efekt wygasa.`}`,
+        `campbase:${w.key}`));
+    }
+  }
+  const f = c.cb && c.cb.key === w.key ? baseFactor(c.cb.start, date) : 0;
+  const lack = f ? Math.max(0, 1 - c.cb.base) * f : 0;
+  return { half, window: w, factor: f, sharpMul: 1 - 0.5 * lack, injuryMul: 1 + CAMP.injuryPenalty * lack };
+}
+
 /**
  * Dzień treningowy klubu gracza. Wywoływany przez system dnia po regeneracji z season.js.
  * Zwraca listę wiadomości do skrzynki.
@@ -74,10 +133,12 @@ export function processUserDay(game, date, rng) {
   const clubId = game.clubId;
   const c = T.clubs[clubId];
   const messages = [];
-  const dates = clubMatchDates(game);
-  const ctx = dayContext(game, date, dates);
+  const sets = matchSets(game);
+  const ctx = dayContext(game, date, sets);
   const day = planDay(game, date, ctx);
-  const camp = ctx.phase === 'oboz';
+  const camp = !!ctx.camp; // zarezerwowany obóz (bez rezerwacji okres przygotowawczy jest w klubie)
+  const campQ = ctx.camp?.q ?? 0;
+  const prep = trackPreparation(game, date, sets.official, ctx, day, messages);
   const fitQ = staffQ(game, clubId, 'fizyczny');
   const tac = staffMul.tac(staffQ(game, clubId, 'asystent'));
   const squad = squadOf(game.world, clubId);
@@ -89,14 +150,15 @@ export function processUserDay(game, date, rng) {
   } else {
     const played = (game.fixtures || []).filter((f) => f.played && f.date > T.lastClubMatch && f.date < date && (f.home === clubId || f.away === clubId)).map((f) => f.date).sort();
     for (const md of played) {
-      applyClubMatch(c, game.tactics?.formation ?? c.form, newMatchMinutes(squad, md), squad);
+      if (sets.friendly.has(md)) applyFriendly(game, c, squad, md);
+      else applyClubMatch(c, game.tactics?.formation ?? c.form, newMatchMinutes(squad, md), squad);
       T.lastClubMatch = md;
     }
   }
 
   const nextFix = ctx.next ? (game.fixtures || []).find((f) => f.date === ctx.next && (f.home === clubId || f.away === clubId)) : null;
   const nextMatch = nextFix ? { date: nextFix.date, opp: nextFix.home === clubId ? nextFix.away : nextFix.home } : null;
-  for (const s of day.sessions) applySessionToClub(game, clubId, s, date, nextMatch);
+  for (const s of day.sessions) applySessionToClub(game, clubId, s, date, nextMatch, campQ);
 
   const injuries = [];
   let freshSum = 0; let acwrSum = 0; let n = 0;
@@ -156,14 +218,14 @@ export function processUserDay(game, date, rng) {
         fresh += staffMul.recover(fitQ) * regenMul(p, age);
         t.legs = Math.max(0, t.legs + def.legs);
       } else {
-        fresh -= I.fat * def.fat * fatigueMul(p, age) * modeMul * (camp ? 0.9 : 1) * (gkSwap ? 0.7 : 1);
+        fresh -= I.fat * def.fat * fatigueMul(p, age) * modeMul * (1 - CAMP.inCamp.fatigue * campQ) * (gkSwap ? 0.7 : 1);
         t.legs += Math.max(0, I.legs * def.legs * modeMul * (gkSwap ? 0.6 : 1));
       }
       load += I.load * def.load * modeMul;
       const sharp = p.sharp ?? 70;
-      if (sharp < LOAD.sharpTrainCap) p.sharp = Math.min(LOAD.sharpTrainCap, sharp + I.sharp * def.sharp * modeMul);
+      if (sharp < LOAD.sharpTrainCap) p.sharp = Math.min(LOAD.sharpTrainCap, sharp + I.sharp * def.sharp * modeMul * prep.sharpMul);
       const attrs = gkSwap ? GK_SESSION.attrs : def.attrs;
-      const dp = I.dev * (gkSwap ? GK_SESSION.dev : def.dev) * modeMul * (camp && def.group === 'phys' ? 1.25 : 1);
+      const dp = I.dev * (gkSwap ? GK_SESSION.dev : def.dev) * modeMul * (1 + CAMP.inCamp.dev * campQ) * (camp && def.group === 'phys' ? 1.1 : 1);
       if (dp > 0 && attrs.length) {
         for (const a of attrs) stim[a] = r3((stim[a] ?? 0) + dp / attrs.length);
         if (def.dev >= 0.5) devDay = true;
@@ -197,6 +259,7 @@ export function processUserDay(game, date, rng) {
         } else t.pos = null;
       } else if (t.pos) t.pos = null;
     }
+    if (camp && sessions.length) { morale += CAMP.inCamp.morale * campQ; t.know = Math.min(100, (t.know ?? COH.knowNew) + CAMP.inCamp.know * campQ); }
     if (day.kind === 'rest') morale += 0.15;
     if (day.kind === 'off') load += LOAD.offDayLoad;
 
@@ -210,7 +273,7 @@ export function processUserDay(game, date, rng) {
     // Uraz na treningu
     if (sessions.length) {
       const chance = trainingInjuryChance(p, {
-        sessions, age, acwr: sum.acwr, fitQ, camp, rtp: t.rtp > 0, fresh: p.fresh, mode: t.mode,
+        sessions, age, acwr: sum.acwr, fitQ, campQ, baseMul: prep.injuryMul, rtp: t.rtp > 0, fresh: p.fresh, mode: t.mode,
         returning: t.returnedAt && daysBetween(t.returnedAt, date) <= 14,
       });
       if (chance > 0 && rng.next() < chance) {

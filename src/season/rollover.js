@@ -13,6 +13,7 @@ import { pickNationality } from '../data/names.js';
 import { setSeasonYear, SEASON, SEASON_YEAR, SEASON_END, SEASON_START } from '../config/calendar2026.js';
 import { GROUP, SQUAD_TARGETS, decideRetirement, squadDeficits } from '../career/squad.js';
 import { marketWage } from '../career/negotiation.js';
+import { payLevel } from '../data/finanse_klubow.js';
 import { createTactics } from '../engine/lineup.js';
 import { standings } from './standings.js';
 import { winnerOf } from './cup.js';
@@ -75,8 +76,8 @@ function polandNextSeason(game, res) {
 }
 
 // ------------------------------------------------------------ Zawodnicy
-function newContract(p, tier, years, date) {
-  return { wage: marketWage(p.ovr, tier, p.nat !== 'POL' && tier === 1), until: `${Number(date.slice(0, 4)) + years}-06-30`, clause: 0, signedOn: date };
+function newContract(p, tier, years, date, club = null) {
+  return { wage: marketWage(p.ovr, tier, p.nat !== 'POL' && tier === 1, payLevel(club)), until: `${Number(date.slice(0, 4)) + years}-06-30`, clause: 0, signedOn: date };
 }
 
 function ageOn(p, date) {
@@ -150,7 +151,7 @@ function processAcademy(game, newStart, rng, report) {
       if (!p || p.age < 19) continue;
       club.academy = club.academy.filter((x) => x !== id);
       if (p.ovr >= bar - 0.6 || squad.length < 22) {
-        club.squad.push(id); p.squad = 'A'; p.contract = newContract(p, c.tier, 3, newStart); p.wage = p.contract.wage;
+        club.squad.push(id); p.squad = 'A'; p.contract = newContract(p, c.tier, 3, newStart, c); p.wage = p.contract.wage;
         if (cid === game.clubId) report.promotedYouth.push(`${p.name} (${p.pos})`);
       } else delete W.players[id];
     }
@@ -187,7 +188,7 @@ export function fillSquad(game, cid, target, date, rng, report = null) {
       p = genPlayer(rng, { id: `${cid}-n${SEASON_YEAR}-${guard}-${rng.int(100, 999)}`, L: c.L, pos: pos[0], age: rng.int(19, 29), slotOffset: -0.2, nat: pickNationality(tier, rng), tier, side: pos[1] ?? null, club: c, date });
       W.players[p.id] = p;
     }
-    p.clubId = cid; p.squad = 'A'; p.contract = newContract(p, tier, rng.int(1, 3), date); p.wage = p.contract.wage; p.lastMove = date;
+    p.clubId = cid; p.squad = 'A'; p.contract = newContract(p, tier, rng.int(1, 3), date, c); p.wage = p.contract.wage; p.lastMove = date;
     W.clubs[cid].squad.push(p.id);
     if (report) report.signed.push(`${p.name} (${p.pos})`);
     squad = squadOf(W, cid);
@@ -260,20 +261,21 @@ export function rolloverSeason(game) {
     else fillSquad(game, cid, 23, newStart, rng.fork(`uzup:${cid}`));
   }
 
-  // Finanse: nowe budżety, przychód bazowy wg nowej ligi
+  // Finanse: plan sezonu z danych klubu dla nowej ligi (docs/finanse.md), saldo przechodzi, bogaty właściciel
+  // uzupełnia saldo do skarbca, budżet transferowy z wolnego salda
   const F = game.finance;
   for (const c of CLUBS_PL) {
     if (!game.world.clubs[c.id]) continue;
     const old = F.clubs[c.id];
-    const fresh = initClub(game.world, c);
-    if (old) {
-      const moved = (c.tier0 && old.tier && old.tier !== c.tier) ? (old.tier > c.tier ? 1.25 : 0.8) : 1;
-      fresh.base = Math.round((0.5 * old.base * moved + 0.5 * fresh.base) / 1000) * 1000;
-      fresh.balance = old.balance; fresh.start = old.balance;
-      fresh.transferBudget = Math.round(Math.max(0, old.balance * 0.45) / 10000) * 10000;
-      fresh.history = [...(old.history ?? []), { season: oldSeason, ...seasonSummary(old) }].slice(-10);
+    // Spadek: pensje obniżone o klauzulę spadkową z kontraktu (domyślnie 30 %) [SZAC]
+    if (old?.tier && c.tier > old.tier) {
+      for (const p of squadOf(game.world, c.id)) {
+        if (p.loan || !p.contract) continue;
+        p.contract.wage = Math.round(p.contract.wage * (1 - (p.contract.relegationCut || FIN.RELEGATION_WAGE_CUT)) / 100) * 100; p.wage = p.contract.wage;
+      }
     }
-    fresh.tier = c.tier;
+    const fresh = old ? initClub(game.world, c, { balance: old.balance, date: newStart, ai: c.id !== game.clubId }) : initClub(game.world, c);
+    if (old) fresh.history = [...(old.history ?? []), { season: oldSeason, ...seasonSummary(old) }].slice(-10);
     F.clubs[c.id] = fresh;
   }
   F.merit = {};

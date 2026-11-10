@@ -12,6 +12,7 @@ import { pickNationality } from '../data/names.js';
 import { GROUP, SQUAD_TARGETS, SQUAD_SIZE, transferListCandidates, squadDeficits } from './squad.js';
 import { askingPriceMultiplier, willingnessToJoin, clubReputation } from './reputation.js';
 import { aiNegotiate, marketWage } from './negotiation.js';
+import { payLevel } from '../data/finanse_klubow.js';
 import { book, spendable, wageRoom, wageBill } from './finance.js';
 
 export { SEASON_END };
@@ -87,7 +88,7 @@ export function playerWillingness(game, p, toClubId = game.clubId, offerWage = n
   const squad = squadOf(game.world, toClubId);
   const better = squad.filter((x) => groupOf(x) === groupOf(p) && x.ovr > p.ovr).length;
   return willingnessToJoin({
-    player: { rep: p.rep ?? 30, age: p.age, persona: p.persona, wage: p.contract?.wage ?? p.askWage ?? marketWage(p.ovr, clubTier(toClubId)), monthsLeft, unhappy: !!p.unhappy },
+    player: { rep: p.rep ?? 30, age: p.age, persona: p.persona, wage: p.contract?.wage ?? p.askWage ?? marketWage(p.ovr, clubTier(toClubId), false, payLevel(toClubId)), monthsLeft, unhappy: !!p.unhappy },
     from, to, offerWage, toTier: to.tier, fromTier: from.tier ?? 3, toEurope: inEurope(toClubId), fromEurope: p.clubId ? inEurope(p.clubId) : false,
     starter: better < ({ GK: 1, DEF: 4, MID: 4, ATT: 2 })[groupOf(p)],
   });
@@ -244,7 +245,7 @@ function aiBuy(game, club, date, rng, log) {
   for (const id of game.market.free) { const p = W.players[id]; if (p && groupOf(p) === g && p.ovr > bar) pool.push({ p, fee: 0 }); }
   for (const [id, l] of Object.entries(game.market.listed)) {
     const p = W.players[id];
-    if (!p || l.kind === 'loan' || p.clubId === club.id || p.clubId === game.clubId || groupOf(p) !== g || p.ovr <= bar) continue;
+    if (!p || l.kind === 'loan' || p.clubId === club.id || p.clubId === game.clubId || groupOf(p) !== g || p.ovr <= bar || (p.clubId && breaksMinimum(game, p))) continue;
     const fee = askingPrice(game, p);
     if (fee <= money) pool.push({ p, fee });
   }

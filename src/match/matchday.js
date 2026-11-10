@@ -5,6 +5,7 @@
 
 import { trainingMatchInput } from '../training/index.js';
 import { stadiumCapacity } from '../career/finance.js';
+import { attendanceModifier } from '../career/fans.js';
 import { Rng } from '../core/rng.js';
 import { CLUBS_PL, clubById } from '../data/clubs_pl.js';
 import { formationById } from '../data/formations.js';
@@ -102,6 +103,9 @@ export function startMatchday(game, f) {
     table: table ? { roundsPlayed: Math.max(...table.map((r) => r.played)), roundsTotal: 34, size: table.length } : null,
   };
   const pre = preMatchStudio(preCtx);
+  // Frekwencja: zamknięte sektory, bojkot, mecz bez publiczności
+  const fanMul = attendanceModifier(game, f.home, f);
+  if (pre.conditions?.attendance) pre.conditions.attendance.expected = Math.round(pre.conditions.attendance.expected * fanMul / 100) * 100;
   return {
     fixtureId: f.id, f, userSide, oppId, comp, tier, step: 'studio', pre, preCtx, weather, pitch, referee, hasVar,
     oppTactics, benchSize, memory: game.speechMemory ?? newSpeechMemory(), M: null, briefings: {}, post: null, press: null,

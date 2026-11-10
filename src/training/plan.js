@@ -7,43 +7,81 @@ import { addDays } from '../core/gameLoop.js';
 import { SESSIONS, INT_ORDER, ACCENTS, LOAD_LEVELS } from './config.js';
 import { clubMatchDates, daysBetween, weekdayIdx, mondayOf } from './state.js';
 import { staffQ } from './staff.js';
+import { campOn } from './camps.js';
 
 export const ROLE_LABELS = {
   MD: 'Dzień meczowy', 'MD+1': 'Dzień po meczu', 'MD+2': 'Drugi dzień po meczu', 'MD±1': 'Między meczami',
   'MD-1': 'Dzień przed meczem', 'MD-2': 'Dwa dni przed meczem', 'MD-3': 'Trzy dni przed meczem', 'MD-4': 'Cztery dni przed meczem',
   TR: 'Tydzień bez meczu', OBOZ: 'Obóz przygotowawczy', URLOP: 'Urlop',
 };
-export const PHASES = { sezon: 'Sezon', oboz: 'Obóz przygotowawczy', przerwa: 'Przerwa w rozgrywkach', urlop: 'Urlop' };
+export const PHASES = { sezon: 'Sezon', oboz: 'Okres przygotowawczy', przerwa: 'Przerwa w rozgrywkach', urlop: 'Urlop' };
 
 export const MAX_SESSIONS = 3;
 const s = (type, int = 'mid') => ({ type, int: SESSIONS[type]?.noIntensity ? 'low' : int });
 
-/** Kontekst dnia: dni od ostatniego meczu (a), do następnego (b), rola dnia i okres sezonu. */
-export function dayContext(game, date, dates = clubMatchDates(game)) {
+/** Daty meczów klubu: wszystkie, o punkty i sparingi (liczone raz na dzień albo tydzień). */
+export function matchSets(game, clubId = game.clubId) {
+  const all = new Set(); const off = new Set();
+  for (const f of game.fixtures || []) {
+    if (!f.date || (f.home !== clubId && f.away !== clubId)) continue;
+    all.add(f.date);
+    if (f.comp !== 'friendly') off.add(f.date);
+  }
+  const allS = [...all].sort();
+  return { all: allS, official: [...off].sort(), friendly: new Set(allS.filter((d) => !off.has(d))) };
+}
+
+function around(dates, date) {
   let prev = null; let next = null;
   for (const d of dates) {
     if (d < date) prev = d;
     else { next = d; break; }
   }
-  const a = prev ? daysBetween(prev, date) : Infinity;
-  const b = next ? daysBetween(date, next) : Infinity;
+  return { prev, next, a: prev ? daysBetween(prev, date) : Infinity, b: next ? daysBetween(date, next) : Infinity };
+}
+
+function roleFor(a, b) {
+  if (b === 0) return 'MD';
+  if (a === 1 && b === 1) return 'MD±1';
+  if (a === 1) return 'MD+1';
+  if (b === 1) return 'MD-1';
+  if (b === 2) return 'MD-2';
+  if (a === 2) return 'MD+2';
+  if (b === 3) return 'MD-3';
+  if (b === 4) return 'MD-4';
+  return 'TR';
+}
+const NEAR = new Set(['MD', 'MD±1', 'MD+1', 'MD-1']);
+
+/**
+ * Kontekst dnia: dni od ostatniego meczu (a) i do następnego (b), także sparingu; oa, ob: tylko mecze o punkty.
+ * Sparing jest dniem meczowym (z rozruchem dzień wcześniej i regeneracją dzień później), ale nie przerywa
+ * okresu przygotowawczego ani mikrocyklu przed meczem o punkty. Zarezerwowany obóz to zawsze okres „oboz”.
+ */
+export function dayContext(game, date, sets = matchSets(game)) {
+  if (Array.isArray(sets)) sets = { all: sets, official: sets, friendly: new Set() };
+  const all = around(sets.all, date);
+  const off = around(sets.official, date);
+  const { a, b } = all;
   const m = +date.slice(5, 7);
   const window = (m >= 6 && m <= 8) || m === 12 || m <= 2;
   let phase = 'sezon';
-  if (a >= 10 && b >= 10) phase = window ? (b <= 24 ? 'oboz' : 'urlop') : 'przerwa';
-  let role;
-  if (b === 0) role = 'MD';
-  else if (a === 1 && b === 1) role = 'MD±1';
-  else if (a === 1) role = 'MD+1';
-  else if (b === 1) role = 'MD-1';
-  else if (b === 2) role = 'MD-2';
-  else if (a === 2) role = 'MD+2';
-  else if (b === 3) role = 'MD-3';
-  else if (b === 4) role = 'MD-4';
-  else role = 'TR';
-  if (phase === 'oboz') role = 'OBOZ';
-  if (phase === 'urlop') role = 'URLOP';
-  return { date, a, b, prev, next, role, phase, matchesInWeek: dates.filter((d) => d >= mondayOf(date) && d <= addDays(mondayOf(date), 6)).length };
+  if (off.a >= 10 && off.b >= 10) phase = window ? (off.b <= 24 ? 'oboz' : 'urlop') : 'przerwa';
+  const camp = campOn(game, date);
+  if (camp) phase = 'oboz';
+  let role = roleFor(a, b);
+  const friendlyNear = (all.next && sets.friendly.has(all.next)) || (all.prev && sets.friendly.has(all.prev));
+  if (!NEAR.has(role) && friendlyNear) {
+    role = roleFor(off.a, off.b);
+    if (NEAR.has(role) && role !== 'MD+1' && role !== 'MD-1') role = 'TR';
+  }
+  if (!NEAR.has(role) && phase === 'oboz') role = 'OBOZ';
+  if (!NEAR.has(role) && phase === 'urlop') role = 'URLOP';
+  return {
+    date, a, b, oa: off.a, ob: off.b, prev: all.prev, next: all.next, role, phase, camp,
+    friendly: b === 0 && sets.friendly.has(date),
+    matchesInWeek: sets.all.filter((d) => d >= mondayOf(date) && d <= addDays(mondayOf(date), 6)).length,
+  };
 }
 
 // Tydzień bez meczu (np. przerwa na reprezentację): pełny mikrocykl rozwojowy
@@ -71,7 +109,7 @@ export function autoDay(game, date, ctx = dayContext(game, date)) {
     case 'MD': kind = 'match'; break;
     case 'URLOP': kind = 'off'; break;
     case 'OBOZ': {
-      const day = (ctx.b >= 17 ? CAMP_EARLY : CAMP_LATE)[wd];
+      const day = ((ctx.ob ?? ctx.b) >= 17 ? CAMP_EARLY : CAMP_LATE)[wd];
       if (day) sessions = day.map((x) => ({ ...x })); else kind = 'rest';
       break;
     }
@@ -113,7 +151,7 @@ export function planDay(game, date, ctx = dayContext(game, date)) {
 
 /** Siedem dni tygodnia od poniedziałku (do ekranu „Trening”). */
 export function weekPlan(game, monday = mondayOf(game.date)) {
-  const dates = clubMatchDates(game);
+  const dates = matchSets(game);
   const fixtures = (game.fixtures || []).filter((f) => f.home === game.clubId || f.away === game.clubId);
   return Array.from({ length: 7 }, (_, i) => {
     const date = addDays(monday, i);

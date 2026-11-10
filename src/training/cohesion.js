@@ -6,7 +6,7 @@
 // Stałe fragmenty i analiza rywala to osobne, małe składniki (modyfikatory i dane wejściowe meczu).
 
 import { clamp } from '../core/rng.js';
-import { COH, SESSIONS, INTENSITY, staffMul } from './config.js';
+import { COH, SESSIONS, INTENSITY, CAMP, staffMul } from './config.js';
 import { staffQ } from './staff.js';
 import { aiClubZ } from './state.js';
 
@@ -53,11 +53,11 @@ export function teamCohesion(game, clubId = game.clubId, tactics = clubId === ga
 }
 
 /** Efekt zajęć na zgranie klubu (raz na zajęcia, nie na zawodnika). */
-export function applySessionToClub(game, clubId, session, date, nextMatch) {
+export function applySessionToClub(game, clubId, session, date, nextMatch, campQ = 0) {
   const c = game.training.clubs[clubId];
   const def = SESSIONS[session.type];
   const tac = staffMul.tac(staffQ(game, clubId, 'asystent'));
-  const im = INTENSITY[session.int].fam;
+  const im = INTENSITY[session.int].fam * (1 + CAMP.inCamp.cohesion * campQ); // na obozie zgranie rośnie szybciej
   const form = clubId === game.clubId ? game.tactics?.formation ?? c.form : c.form;
   if (def.fam) c.fam[form] = Math.min(100, famOf(c, form) + def.fam * im * tac);
   if (def.instr) c.instr = Math.min(100, c.instr + def.instr * im * tac);

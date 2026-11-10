@@ -15,6 +15,7 @@ import {
 } from '../career/transfers.js';
 import { spendable, wageRoom, wageBill, monthSummary, seasonSummary, FIN_LABELS } from '../career/finance.js';
 import { trustLabel, tablePos } from '../career/board.js';
+import { fansSummary } from '../career/fans.js';
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size = 20) => (clubById(id) ? crestHtml(clubById(id), { size, clubsById }) : '');
@@ -185,7 +186,23 @@ function boardView(game) {
     </div>
     <p class="hint">Zarząd ocenia cię pierwszego dnia każdego miesiąca: miejsce w tabeli wobec celu, finanse i nastroje kibiców. Przy zaufaniu poniżej 18 (od października) grozi zwolnienie.</p>
     <section class="stat-sec"><h3>Oceny zarządu</h3><ul class="plain-list">${B.reviews.map((r) => `<li><span class="k">${esc(fmtDate(r.date).replace(/, \d{4}$/, ''))}</span><span>${esc(r.notes.join(' ') || 'Bez uwag.')}</span><b>${r.delta > 0 ? '+' : ''}${String(r.delta).replace('.', ',')}</b></li>`).join('') || '<li><span>Pierwsza ocena 1 sierpnia.</span></li>'}</ul></section>
+    ${fansPanel(game)}
     <section class="stat-sec"><h3>Kariera trenera</h3><ul class="plain-list">${M.history.map((h) => `<li>${crest(h.club)}<span>${esc(clubById(h.club)?.name ?? h.club)}</span><b>od ${esc(fmtDate(h.from))}${h.to ? ` do ${esc(fmtDate(h.to))}` : ''}</b></li>`).join('')}</ul></section>`;
+}
+
+function fansPanel(game) {
+  const F = fansSummary(game);
+  return `<section class="stat-sec"><h3>Kibice</h3>
+    <ul class="plain-list">
+      <li><span class="k">Liczba kibiców</span><span>${esc(F.profile.sizeLabel)}</span></li>
+      <li><span class="k">Ultrasi</span><span>${esc(F.profile.ultrasLabel)}${F.profile.stand ? ` (${esc(F.profile.stand)})` : ''}</span></li>
+      <li><span class="k">Nastroje</span><span>${esc(F.moodLabel)}${F.level ? `. Teraz: ${esc(F.levelLabel.toLowerCase())}` : ''}</span></li>
+      <li><span class="k">Napięcie</span><span>${esc(F.heatLabel)}${F.expectedPosition ? `. Kibice oczekują ok. ${F.expectedPosition}. miejsca` : ''}</span></li>
+      ${F.rivals.length ? `<li><span class="k">Rywale</span><span>${esc(F.rivals.slice(0, 4).map((r) => r.name).join(', '))}</span></li>` : ''}
+      ${F.sanctions.map((s) => `<li><span class="k">Kara</span><span>${esc(s.text)}</span></li>`).join('')}
+    </ul>
+    ${F.recent.length ? `<ul class="plain-list tf-money">${F.recent.slice(0, 6).map((e) => `<li><span class="k">${esc(fmtDate(e.date).replace(/, \d{4}$/, ''))}</span><span>${esc(e.text)}</span></li>`).join('')}</ul>` : ''}
+  </section>`;
 }
 
 // ------------------------------------------------------------ Wejście
