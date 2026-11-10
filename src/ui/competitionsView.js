@@ -3,7 +3,7 @@ import { CLUBS_PL } from '../data/clubs_pl.js';
 import { COMPETITIONS } from '../config/competitions.js';
 import { standings, zonesFor } from '../season/standings.js';
 import { anyClub, LEAGUE_COMPS } from '../season/season.js';
-import { PP_ROUNDS, PP_NAMES } from '../season/cup.js';
+import { PP_ROUNDS, PP_NAMES, winnerOf } from '../season/cup.js';
 import { crestHtml } from './crest.js';
 import { esc, fmtDate, weekday } from './dom.js';
 import { renderEurope, EUROPE_TABS } from './europeView.js';
@@ -46,11 +46,15 @@ function matchRow(f, game) {
   const mid = res ? `<b class="fx__score">${res.score[0]}:${res.score[1]}</b>` : `<span class="fx__time">${esc(f.time ?? '')}</span>`;
   const extra = res?.shootout ? `<small>k. ${res.shootout[0]}:${res.shootout[1]}</small>` : res?.extraTime ? '<small>po dogr.</small>' : f.postponed && !res ? '<small>przełożony</small>' : '';
   const mine = f.home === game.clubId || f.away === game.clubId;
+  // Mecz pucharowy: zwycięzca wyróżniony i oznaczony „awans” (w finale „zdobywca”)
+  const w = res && f.knockout ? winnerOf(f) : null;
+  const tag = w ? ` <span class="tag-up">${f.round === 'F' ? 'zdobywca' : 'awans'}: ${esc(name(w))}</span>` : '';
+  const cls = (id) => (w ? (w === id ? ' fx__team--win' : ' fx__team--out') : '');
   return `<li class="fx ${mine ? 'is-me' : ''}">
-    <span class="fx__date">${esc(shortDay(f.date))} ${esc(fmtDate(f.date).replace(/, \d{4}$/, ''))}</span>
-    <span class="fx__team fx__team--h">${esc(name(f.home))}${crest(f.home)}</span>
+    <span class="fx__date">${esc(shortDay(f.date))} ${esc(fmtDate(f.date).replace(/, \d{4}$/, ''))}${tag}</span>
+    <span class="fx__team fx__team--h${cls(f.home)}">${esc(name(f.home))}${crest(f.home)}</span>
     <span class="fx__mid">${mid}${extra}</span>
-    <span class="fx__team">${crest(f.away)}${esc(name(f.away))}</span>
+    <span class="fx__team${cls(f.away)}">${crest(f.away)}${esc(name(f.away))}</span>
   </li>`;
 }
 

@@ -3,28 +3,53 @@
 
 import { addDays } from '../core/gameLoop.js';
 
-/** Pary kolejek metodą „po kole” dla parzystej liczby drużyn; druga runda to lustro pierwszej. */
+/**
+ * Terminarz „każdy z każdym”, mecz i rewanż, z tablic Bergera: gospodarz zmienia się na przemian.
+ * Runda jesienna ma minimalną liczbę par „dwa mecze z rzędu w tym samym miejscu” (n-2 na ligę),
+ * a kolejność rewanży dobieramy tak, żeby nikt nie grał 3 razy z rzędu u siebie ani na wyjeździe
+ * i żeby rewanż nie wypadał w kolejce zaraz po pierwszym meczu tej pary.
+ */
 export function roundRobin(teams, rng) {
   const ids = rng ? rng.shuffle(teams) : teams.slice();
   const n = ids.length;
   if (n % 2) throw new Error('Liczba drużyn musi być parzysta');
-  const fixed = ids[0];
-  let rot = ids.slice(1);
+  const m = n - 1;
   const first = [];
-  for (let r = 0; r < n - 1; r++) {
-    const round = [];
-    const left = [fixed, ...rot.slice(0, n / 2 - 1)];
-    const right = rot.slice(n / 2 - 1).reverse();
-    for (let i = 0; i < n / 2; i++) {
-      const a = left[i]; const b = right[i];
-      // Naprzemiennie gospodarz/gość, żeby nie było długich serii u siebie albo na wyjeździe
-      round.push((r + i) % 2 === 0 ? [a, b] : [b, a]);
+  for (let r = 0; r < m; r++) {
+    const round = [r % 2 === 0 ? [ids[r], ids[m]] : [ids[m], ids[r]]];
+    for (let k = 1; k < n / 2; k++) {
+      const a = ids[(r + k) % m]; const b = ids[(r - k + m) % m];
+      round.push(k % 2 === 1 ? [a, b] : [b, a]);
     }
     first.push(round);
-    rot = [rot[rot.length - 1], ...rot.slice(0, -1)];
   }
-  const second = first.map((round) => round.map(([h, a]) => [a, h]));
-  return [...first, ...second];
+  const swapped = first.map((round) => round.map(([h, a]) => [a, h]));
+  const pair = ([h, a]) => (h < a ? `${h}|${a}` : `${a}|${h}`);
+  const lastPairs = new Set(first[m - 1].map(pair));
+  let best = null;
+  for (const rev of [false, true]) {
+    for (let s = 0; s < m; s++) {
+      let order = swapped.map((_, i) => swapped[(s + i) % m]);
+      if (rev) order = order.reverse();
+      if (order[0].some((x) => lastPairs.has(pair(x)))) continue; // bez rewanżu od razu
+      const q = venueBreaks([...first, ...order]);
+      if (!best || q.maxRun < best.q.maxRun || (q.maxRun === best.q.maxRun && q.total < best.q.total)) best = { order, q };
+    }
+  }
+  return [...first, ...best.order];
+}
+
+/** Ile razy drużyny grają dwa mecze z rzędu w tym samym miejscu i najdłuższa seria. */
+export function venueBreaks(rounds) {
+  const seq = new Map();
+  for (const round of rounds) for (const [h, a] of round) { if (!seq.has(h)) seq.set(h, []); if (!seq.has(a)) seq.set(a, []); seq.get(h).push(1); seq.get(a).push(0); }
+  let total = 0; let maxRun = 1; const perTeam = {};
+  for (const [t, s] of seq) {
+    let b = 0; let run = 1;
+    for (let i = 1; i < s.length; i++) { if (s[i] === s[i - 1]) { b++; run++; maxRun = Math.max(maxRun, run); } else run = 1; }
+    perTeam[t] = b; total += b;
+  }
+  return { total, maxRun, perTeam };
 }
 
 const dow = (iso) => new Date(`${iso}T12:00:00Z`).getUTCDay(); // 0 niedziela, 5 piątek
