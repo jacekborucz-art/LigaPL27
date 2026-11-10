@@ -6,6 +6,7 @@
   "description": "Prywatny manager piłkarski (PWA): Ekstraklasa, 1 Liga, 2 Liga, puchary europejskie.",
   "scripts": {
     "start": "python3 -m http.server 8080",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "sw": "node tools/sw-list.cjs"
   }
 }

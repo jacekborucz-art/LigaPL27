@@ -279,3 +279,60 @@
   .ticker { bottom: var(--space-4); left: 220px; }
   .badge { position: static; margin-left: auto; }
 }
+
+/* ---------- Kadra ---------- */
+.sq { background: var(--surface); border-radius: var(--radius-m); overflow: hidden; }
+.sq__row {
+  display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: var(--space-3);
+  width: 100%; min-height: 56px; padding: 6px var(--space-3); border: 0; background: none; text-align: left; cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.sq__row:nth-child(even) { background: var(--surface-stripe); }
+.sq__row:hover:not(.sq__head) { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.sq__row .w { display: none; }
+.sq__head { min-height: 36px; cursor: default; font-size: var(--step--1); color: var(--text-muted); font-weight: 600; }
+.sq__name { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.sq__name > span { display: flex; flex-direction: column; min-width: 0; }
+.sq__name b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sq__name small { font-size: var(--step--1); color: var(--text-muted); }
+.sq__ovr { display: flex; flex-direction: column; align-items: flex-end; }
+.sq__ovr b { font: 700 var(--step-1)/1 var(--font-display); }
+.pos { display: inline-grid; place-items: center; min-height: 26px; padding: 0 4px; border-radius: var(--radius-s); font: 700 12px/1 var(--font-display); color: #fff; white-space: nowrap; }
+.pos[data-g="GK"] { background: #B7791F; } .pos[data-g="DEF"] { background: #2D6A8F; }
+.pos[data-g="MID"] { background: var(--murawa); } .pos[data-g="ATT"] { background: #A8323E; }
+.stars { color: var(--led); font-size: 11px; letter-spacing: 1px; }
+.stars__off { color: var(--line); }
+.mdot { flex: none; width: 8px; height: 8px; border-radius: 50%; }
+.mdot[data-m="hi"] { background: #2E8A4E; } .mdot[data-m="mid"] { background: #9FB0A5; } .mdot[data-m="lo"] { background: var(--kartka-czerwona); }
+
+/* Profil zawodnika */
+.pp { display: flex; gap: var(--space-4); align-items: flex-start; margin: var(--space-4) 0; }
+.pp__ovr { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.pp__ovr .led { font-size: var(--step-3); padding: 6px 12px; }
+.pp__name { margin: 0 0 var(--space-1); font-size: var(--step-3); }
+.pp p { margin: 0 0 2px; font-size: var(--step--1); }
+.pp__cols h3 { margin: var(--space-4) 0 var(--space-2); }
+.attrs { list-style: none; margin: 0; padding: 0; }
+.attrs li { display: grid; grid-template-columns: 1fr 90px 28px; align-items: center; gap: var(--space-2); padding: 5px 0; border-bottom: 1px solid var(--line); font-size: var(--step--1); }
+.attrs b { text-align: right; font: 700 var(--step-0)/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.abar { height: 6px; border-radius: 3px; background: var(--surface-stripe); overflow: hidden; }
+.abar i { display: block; height: 100%; }
+[data-b="top"] { color: #1E7A43; } .abar i[data-b="top"] { background: #1E7A43; }
+[data-b="good"] { color: #2E8A4E; } .abar i[data-b="good"] { background: #4CA36B; }
+[data-b="mid"] { color: var(--text); } .abar i[data-b="mid"] { background: #9FB0A5; }
+[data-b="low"] { color: var(--kartka-czerwona); } .abar i[data-b="low"] { background: var(--kartka-czerwona); }
+
+@media (min-width: 760px) {
+  .sq__row { grid-template-columns: 56px minmax(0, 1fr) 50px 150px 110px 120px 80px; }
+  .sq__row .w { display: block; }
+  .sq__name small { display: none; }
+  .pp__cols { display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--space-6); }
+}
+
+/* Listy etykieta-wartość (profil, studio) */
+.plain-list { list-style: none; margin: 0; padding: 0; }
+.plain-list li { display: flex; gap: var(--space-3); align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.plain-list li:last-child { border-bottom: 0; }
+.plain-list .k { flex: none; min-width: 84px; color: var(--text-muted); font-size: var(--step--1); }
+.hub__main, .hub__head { min-width: 0; }
+.hub__club { overflow: hidden; }

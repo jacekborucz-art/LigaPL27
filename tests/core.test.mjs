@@ -95,3 +95,12 @@ test('Żaden mecz klubowy UEFA ani Puchar Polski nie wypada w oknie FIFA', () =>
   }
   for (const r of DOMESTIC.pucharPolski.rounds) assert.ok(!inFifaWindow(r.date), `PP ${r.id}`);
 });
+
+test('Tryb offline: każdy plik gry jest na liście sw.js (uruchom npm run sw po dodaniu pliku)', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
+  const sw = fs.readFileSync('sw.js', 'utf8');
+  const missing = walk('src').filter((f) => /\.(js|css|json)$/.test(f)).map((f) => `./${f.split(path.sep).join('/')}`).filter((f) => !sw.includes(`'${f}'`));
+  assert.deepEqual(missing, []);
+});

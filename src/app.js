@@ -9,10 +9,23 @@ import { hashString } from './core/rng.js';
 import { CATEGORIES, unreadCount, markRead, markAllRead, resolveMessage, filterInbox, pendingDecisions } from './core/inbox.js';
 import { processDay, primaryAction, continueUntilStop, finishMatch } from './core/gameLoop.js';
 import { provisionalFixtures } from './season/dailySystems.js';
+import { generateWorld, squadOf, academyOf } from './world/worldGen.js';
+import { renderSquadList, renderPlayerProfile } from './ui/squadView.js';
 
 const app = document.getElementById('app');
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
-const state = { screen: 'start', slot: null, game: null, tab: 'pulpit', tier: 1, notice: null, mailCat: null, mailOpen: null, running: false };
+const state = { screen: 'start', slot: null, game: null, tab: 'pulpit', tier: 1, notice: null, mailCat: null, mailOpen: null, running: false, sqFilter: 'all', playerOpen: null };
+const leagueOvrCache = new Map();
+
+/** Posortowane OVR zawodników ligi (do gwiazdek). */
+function leagueOvrs(g, tier) {
+  const key = `${g.seed}:${tier}`;
+  if (!leagueOvrCache.has(key)) {
+    const ovrs = CLUBS_PL.filter((c) => c.tier === tier).flatMap((c) => squadOf(g.world, c.id).map((p) => p.ovr)).sort((a, b) => a - b);
+    leagueOvrCache.set(key, ovrs);
+  }
+  return leagueOvrCache.get(key);
+}
 
 const TABS = [
   { id: 'pulpit', label: 'Pulpit' },
@@ -39,6 +52,7 @@ async function save() {
 
 /** Uzupełnia zapisy sprzed poczty i pętli dni (migracja w miejscu). */
 function ensureGameShape(g) {
+  if (!g.world) g.world = generateWorld(g.seed);
   if (!Array.isArray(g.fixtures)) g.fixtures = provisionalFixtures(g.clubId);
   if (!Array.isArray(g.inbox)) {
     g.inbox = [];
@@ -164,8 +178,13 @@ function renderHub() {
 function renderTab(tab, g, club) {
   if (tab === 'pulpit') return renderDashboard(g, club);
   if (tab === 'poczta') return renderMail(g);
+  if (tab === 'kadra') {
+    const ovrs = leagueOvrs(g, club.tier);
+    const p = state.playerOpen && g.world.players[state.playerOpen];
+    if (p) return renderPlayerProfile(p, { leagueOvrs: ovrs, clubName: club.name });
+    return renderSquadList(squadOf(g.world, g.clubId), { filter: state.sqFilter, leagueOvrs: ovrs, academy: academyOf(g.world, g.clubId) });
+  }
   const soon = {
-    kadra: ['Kadra 22-26 zawodników z 27 atrybutami', 'Skład na mecz i ławka', '10 formacji i instrukcje'],
     rozgrywki: ['Tabele 3 lig i terminarze', 'Puchar Polski, LM, LE, LK, reprezentacje', 'Strzelcy, kartkowicze, kontuzjowani, forma'],
     transfery: ['Lista transferowa, wypożyczenia, wolni zawodnicy', 'Negocjacje kontraktów', 'Okna transferowe'],
     trening: ['Plan tygodnia: 5 akcentów, 3 intensywności', 'Rozwój młodych', 'Zmęczenie i świeżość'],
@@ -282,6 +301,7 @@ async function newGame(slot, clubId) {
     seed, clubId, date: GAME_START, season: SEASON, createdAt: new Date().toISOString(),
     inbox: [], fixtures: provisionalFixtures(clubId),
   };
+  game.world = generateWorld(seed);
   processDay(game);
   state.game = game;
   state.slot = slot;
@@ -302,7 +322,7 @@ app.addEventListener('click', async (ev) => {
     if (act === 'back' || act === 'menu') { state.screen = 'start'; render(); }
     if (act === 'tier') { state.tier = Number(el.dataset.tier); render(); }
     if (act === 'pick') await newGame(state.slot, el.dataset.club);
-    if (act === 'tab') { state.tab = el.dataset.tab; state.mailOpen = null; render(); }
+    if (act === 'tab') { state.tab = el.dataset.tab; state.mailOpen = null; state.playerOpen = null; render(); }
     if (act === 'go') {
       const a = primaryAction(g);
       if (a.kind === 'play') { state.screen = 'match'; render(); }
@@ -320,6 +340,9 @@ app.addEventListener('click', async (ev) => {
       g.inbox = markRead(g.inbox, el.dataset.id); await save(); render();
     }
     if (act === 'mailback') { state.mailOpen = null; render(); }
+    if (act === 'sqfilter') { state.sqFilter = el.dataset.f; render(); }
+    if (act === 'player') { state.playerOpen = el.dataset.id; render(); window.scrollTo({ top: 0 }); }
+    if (act === 'squadback') { state.playerOpen = null; render(); }
     if (act === 'mailcat') { state.mailCat = el.dataset.cat || null; render(); }
     if (act === 'readall') { g.inbox = markAllRead(g.inbox); await save(); render(); }
     if (act === 'mailaction') { g.inbox = resolveMessage(g.inbox, el.dataset.id, el.dataset.a); await save(); render(); }
