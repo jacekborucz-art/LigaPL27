@@ -205,3 +205,53 @@
 .side-area h3 { font: 700 var(--step-0)/1.2 var(--font-display); margin: var(--space-3) 0 var(--space-1); }
 
 .players .sub-head { padding: var(--space-3) 0 var(--space-1); font: 700 var(--step-0)/1.2 var(--font-display); }
+
+/* Start / pauza meczu: główny przycisk sterowania, wyraźnie inny niż pozostałe */
+.controls .md-play { grid-column: 1 / -1; min-height: 52px; font: 700 var(--step-1)/1 var(--font-display); background: var(--led); color: #14211A; border: 2px solid #14211A; box-shadow: 0 3px 0 #14211A; }
+.controls .md-play:hover { filter: brightness(1.06); }
+.controls .md-play:active { transform: translateY(2px); box-shadow: 0 1px 0 #14211A; }
+.controls .md-play.is-running { background: var(--surface); color: var(--text); border-color: var(--line); box-shadow: none; }
+@media (prefers-reduced-motion: reduce) { .controls .md-play:active { transform: none; } }
+
+/* Panel zmian: listy na boisku i ławka, zaplanowane zmiany */
+.md-dlg--wide { width: min(860px, calc(100vw - 24px)); position: relative; }
+.subs-grid { display: grid; gap: var(--space-3); }
+@media (min-width: 640px) { .subs-grid { grid-template-columns: 1fr 1fr; } }
+.subs-grid h3, .subs-pending h3 { margin: 0 0 var(--space-2); font: 700 var(--step-0)/1.2 var(--font-display); }
+.sub-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-m); overflow: hidden; }
+.sub-row + .sub-row, .sub-pend + .sub-pend { border-top: 1px solid var(--line); }
+.sub-row__main { display: grid; grid-template-columns: 22px 40px minmax(0, 1fr) 54px 38px; gap: 8px; align-items: center; width: 100%; min-height: 48px; padding: 4px 10px 4px 4px; border: 0; background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: grab; }
+.sub-row__main:focus-visible { outline: 3px solid var(--led); outline-offset: -3px; }
+.sub-row__main:disabled { cursor: default; opacity: .45; }
+.sub-row.is-sel .sub-row__main { box-shadow: inset 4px 0 0 var(--led); background: color-mix(in srgb, var(--led) 14%, var(--surface)); }
+.sub-row.is-target .sub-row__main { outline: 3px dashed var(--led); outline-offset: -4px; }
+.sub-row.is-hurt .sub-name { color: var(--kartka-czerwona); }
+.sub-handle { width: 22px; height: 32px; touch-action: none; background: radial-gradient(circle, var(--text-muted) 1.4px, transparent 1.6px) 0 0 / 7px 7px; opacity: .7; }
+.sub-name { display: flex; flex-direction: column; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub-name small { font-weight: 400; color: var(--text-muted); font-size: var(--step--1); }
+.sub-cond { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.sub-cond i { display: block; height: 100%; background: var(--murawa, #2E8A4E); }
+.sub-cond i.mid { background: var(--led); } .sub-cond i.low { background: var(--kartka-czerwona); }
+.sub-row__main b { text-align: right; font-variant-numeric: tabular-nums; }
+.subs-pending { margin-top: var(--space-3); }
+.sub-pend { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: 8px 10px; background: color-mix(in srgb, var(--led) 12%, var(--surface)); }
+.sub-pend .out, .sub-pend .in { color: var(--text); }
+.sub-pend .out::before, .sub-pend .in::before { display: inline-block; width: 1.1em; font-weight: 800; }
+.sub-pend .out::before { content: '−'; color: var(--kartka-czerwona); }
+.sub-pend .in::before { content: '+'; color: var(--led); }
+.sub-pend small { display: block; color: var(--text-muted); }
+.sub-ghost { position: absolute; z-index: 5; pointer-events: none; transform: translate(-50%, -50%); padding: 8px 14px; border-radius: 999px; background: var(--led); color: #14211A; font-weight: 700; box-shadow: 0 6px 18px rgb(0 0 0 / .3); white-space: nowrap; }
+.md-dlg.is-dragging { user-select: none; }
+
+/* Telefon i tablet: sterowanie meczem (Start) zaraz pod tablicą wyniku, nad boiskiem */
+@media (max-width: 1023px) {
+  .live > .board { order: 0; }
+  .live .ctrl-area { order: 1; }
+  .live .mom-area { order: 2; }
+  .live .pitch-area { order: 3; }
+  .live .feed-area { order: 4; }
+  .live .side-area { order: 5; }
+}
+/* Zatwierdzanie zmian zawsze widoczne na dole panelu */
+.md-dlg--wide .tac__actions { position: sticky; bottom: calc(-1 * var(--space-4)); margin: var(--space-2) calc(-1 * var(--space-4)) calc(-1 * var(--space-4)); padding: var(--space-3) var(--space-4); background: var(--surface); border-top: 1px solid var(--line); justify-content: flex-end; }
+.md-dlg--wide #mdDlgMsg:empty { display: none; }

@@ -3,6 +3,7 @@
 // Logika: src/match/matchday.js; silnik: src/engine/match; wygląd: design/dzien-meczowy.html.
 
 import { esc } from './dom.js';
+import { GROUP } from '../career/squad.js';
 import { crestHtml } from './crest.js';
 import { CLUBS_PL } from '../data/clubs_pl.js';
 import { FORMATIONS } from '../data/formations.js';
@@ -150,8 +151,9 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
       }).join('')}</ul>
       ${phase === 'post' && done && S.press && !S.pressResult ? renderPressForm() : ''}
       ${S.pressResult ? `<p class="notice">${esc(S.pressResult.text)}</p>` : ''}`,
-      done ? (phase === 'pre' ? btn('kickoff', 'Wyjdź na boisko') : phase === 'half' ? btn('resume', 'Rozpocznij 2. połowę') : (S.pressResult ? btn('exit', 'Zakończ dzień meczowy') : btn('press', 'Odpowiedz na pytania') + btn('exit', 'Pomiń konferencję', false)))
-        : btn(`speech:${phase}`, 'Wygłoś odprawę'));
+      done ? (phase === 'pre' ? btn('kickoff', 'Wyjdź na boisko') : phase === 'half' ? btn('resume', 'Rozpocznij 2. połowę') + btn('dlg:subs', 'Zmiany', false) + btn('dlg:tactics', 'Taktyka', false) : (S.pressResult ? btn('exit', 'Zakończ dzień meczowy') : btn('press', 'Odpowiedz na pytania') + btn('exit', 'Pomiń konferencję', false)))
+        : btn(`speech:${phase}`, 'Wygłoś odprawę') + (phase === 'half' ? btn('dlg:subs', 'Zmiany', false) + btn('dlg:tactics', 'Taktyka', false) : ''));
+    if (phase === 'half' && !app.querySelector('#mdDlg')) app.insertAdjacentHTML('beforeend', '<dialog id="mdDlg" class="panel md-dlg"></dialog>');
     const selects = [...app.querySelectorAll('[data-md-talk]')];
     const sync = () => { const used = selects.filter((s) => s.value).length; selects.forEach((s) => { s.disabled = !s.value && used >= MAX_TALKS; }); };
     selects.forEach((s) => s.addEventListener('change', () => { ui.sel.talks = { ...(ui.sel.talks || {}), [s.dataset.mdTalk]: s.value }; sync(); }));
@@ -179,7 +181,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
         </div>
         <div class="pitch-area pitch-wrap"><canvas class="pitch" id="mdPitch" aria-label="Boisko"></canvas></div>
         <div class="ctrl-area"><div class="controls">
-          <button class="btn btn--quiet" data-md="pause" id="mdPause">${ui.running ? 'Pauza' : 'Start'}</button>
+          <button class="btn md-play ${ui.running ? 'is-running' : ''}" data-md="pause" id="mdPause" aria-live="polite">${ui.running ? 'Pauza' : M.minute > 0 ? 'Wznów mecz' : 'Start meczu'}</button>
           <button class="btn btn--quiet speed" data-md="speed:1" aria-pressed="${ui.speed === 1}">x1</button>
           <button class="btn btn--quiet speed" data-md="speed:4" aria-pressed="${ui.speed === 4}">x4</button>
           <button class="btn btn--quiet" data-md="dlg:subs">Zmiany</button>
@@ -298,8 +300,8 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const pause = (r.pause ?? 0) * 1000;
     ui.timer = setTimeout(loop, Math.max(pause, 1000 / ui.speed));
   }
-  function start() { ui.running = true; const b = app.querySelector('#mdPause'); if (b) b.textContent = 'Pauza'; ui.timer = setTimeout(loop, 1000 / ui.speed); }
-  function stop() { ui.running = false; clearTimeout(ui.timer); const b = app.querySelector('#mdPause'); if (b) b.textContent = 'Wznów'; }
+  function start() { ui.running = true; const b = app.querySelector('#mdPause'); if (b) { b.textContent = 'Pauza'; b.classList.add('is-running'); } ui.timer = setTimeout(loop, 1000 / ui.speed); }
+  function stop() { ui.running = false; clearTimeout(ui.timer); const b = app.querySelector('#mdPause'); if (b) { b.textContent = 'Wznów mecz'; b.classList.remove('is-running'); } }
 
   // ------------------------------------------------------------ Dialogi w meczu
   function openDialog(kind) {
@@ -307,11 +309,8 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const M = S.M; const T = M.teams[S.userSide];
     let html = '';
     if (kind === 'subs') {
-      const out = T.players.filter((x) => (x.on || x.injury) && !x.sentOff && !x.subbedOff);
-      html = `<h2>Zmiany</h2><p class="hint">Wykorzystano ${T.subsUsed} z ${T.subsLimit} zmian i ${T.windowsUsed} z ${T.windowsLimit} okien.${M.phase === 'break' ? ' Zmiany w przerwie nie zużywają okna.' : ''}</p>
-        <label class="role"><span>Schodzi</span><select id="mdOut">${out.map((x) => `<option value="${esc(x.id)}">${esc(x.slot?.pos ?? '')} ${esc(x.p.name)}, kondycja ${Math.round(x.cond)}%${x.injury ? ', uraz' : ''}${x.yc ? ', żółta kartka' : ''}</option>`).join('')}</select></label>
-        <label class="role"><span>Wchodzi</span><select id="mdIn">${T.bench.map((x) => `<option value="${esc(x.id)}">${esc(x.p.pos)} ${esc(x.p.name)}, OVR ${x.p.ovr.toFixed(1)}</option>`).join('')}</select></label>
-        <p id="mdDlgMsg" class="hint"></p><p class="tac__actions">${btn('doSub', 'Wykonaj zmianę')}${btn('closeDlg', 'Zamknij', false)}</p>`;
+      html = subsPanel(T, M);
+      dlg.classList.add('md-dlg--wide');
     } else if (kind === 'tactics') {
       const keys = ['mentality', 'pressing', 'tempo', 'passing', 'line', 'tackling', 'timewasting'];
       html = `<h2>Taktyka</h2><p class="hint">Zmiana działa w pełni po kilku minutach. Kolejna zmiana w ciągu 10 minut kosztuje podwójnie. Spójność: ${Math.round(T.S)} na 100.</p>
@@ -322,8 +321,149 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
       html = `<h2>Okrzyk z linii bocznej</h2><ul class="plain-list">${Object.entries(SHOUTS).map(([k, s]) => { const err = canShout(M, S.userSide, k); return `<li><button class="btn btn--quiet" data-md="doShout:${k}" ${err ? 'disabled' : ''}>${esc(s.label)}</button><span class="hint">${esc(err ?? '')}</span></li>`; }).join('')}</ul>
         <p id="mdDlgMsg" class="hint"></p><p>${btn('closeDlg', 'Zamknij', false)}</p>`;
     }
+    if (kind !== 'subs') dlg.classList.remove('md-dlg--wide');
     dlg.innerHTML = html;
     if (!dlg.open) dlg.showModal();
+    if (kind === 'subs') mountSubsDrag(dlg);
+  }
+
+  // ------------------------------------------------------------ Zmiany: listy, przeciąganie, zatwierdzanie
+  // Każda zmiana trafia najpierw do „Zaplanowanych” i wchodzi dopiero po „Zatwierdź zmiany”
+  // (wszystkie naraz, więc w trakcie gry zużywają jedno okno).
+  const onPitchNow = (T) => T.players.filter((x) => (x.on || x.injury) && !x.sentOff && !x.subbedOff);
+  function subsState(T, M) {
+    ui.pend = (ui.pend ?? []).filter((x) => onPitchNow(T).some((o) => o.id === x.out) && T.bench.some((b) => b.id === x.in));
+    const left = T.subsLimit - T.subsUsed;
+    const windowBlocked = M.phase !== 'break' && T.windowMinute !== M.tick && T.windowsUsed >= T.windowsLimit;
+    return { left, windowBlocked };
+  }
+  function subsPanel(T, M) {
+    const st = subsState(T, M);
+    const pend = ui.pend;
+    const outIds = new Set(pend.map((x) => x.out)); const inIds = new Set(pend.map((x) => x.in));
+    const sel = ui.subSel;
+    const row = (x, kind) => {
+      const planned = kind === 'on' ? outIds.has(x.id) : inIds.has(x.id);
+      const isSel = sel && sel.kind === kind && sel.id === x.id;
+      const pos = kind === 'on' ? x.slot?.pos ?? x.p.pos : x.p.pos;
+      const cond = Math.round(x.cond ?? 100);
+      const note = [x.injury ? 'uraz' : '', x.yc ? 'żółta kartka' : '', kind === 'bench' ? `OVR ${Math.round(x.p.ovr)}` : ''].filter(Boolean).join(', ');
+      return `<li class="sub-row ${planned ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${x.injury ? 'is-hurt' : ''}" data-sdrop="${kind}:${esc(x.id)}">
+        <button class="sub-row__main" data-md="subPick:${kind}|${esc(x.id)}" data-sdrag="${kind}:${esc(x.id)}" aria-pressed="${isSel}" ${planned ? 'disabled' : ''}>
+          <span class="sub-handle" data-shandle aria-hidden="true"></span>
+          <span class="pos" data-g="${GROUP[pos] ?? 'MID'}">${esc(pos)}</span>
+          <span class="sub-name">${esc(x.p.name)}${note ? `<small>${esc(note)}</small>` : ''}</span>
+          <span class="sub-cond" title="Kondycja"><i style="width:${cond}%" class="${cond < 60 ? 'low' : cond < 75 ? 'mid' : ''}"></i></span><b>${cond}%</b>
+        </button></li>`;
+    };
+    const pendRows = pend.map((x, i) => {
+      const o = T.players.find((y) => y.id === x.out); const n = T.bench.find((y) => y.id === x.in);
+      const gkWarn = o?.slot?.pos === 'BR' && n?.p.pos !== 'BR';
+      return `<li class="sub-pend"><span><b class="out">${esc(o?.p.name ?? '')}</b> schodzi, <b class="in">${esc(n?.p.name ?? '')}</b> wchodzi${gkWarn ? '<small> Uwaga: do bramki wejdzie zawodnik z pola.</small>' : ''}</span><button class="btn btn--quiet btn--sm" data-md="subDrop:${i}" aria-label="Usuń zaplanowaną zmianę">Usuń</button></li>`;
+    }).join('');
+    const info = st.windowBlocked ? 'Wykorzystano wszystkie okna zmian. Zmiany możliwe tylko w przerwie.'
+      : st.left <= 0 ? `Wykorzystano wszystkie zmiany (${T.subsLimit}).`
+        : `Zostało ${st.left} z ${T.subsLimit} zmian${M.phase === 'break' ? ' (w przerwie bez zużycia okna)' : `, okna: ${T.windowsUsed} z ${T.windowsLimit}`}.`;
+    return `<h2>Zmiany</h2>
+      <p class="hint">${esc(info)} Przeciągnij zawodnika z ławki na zawodnika na boisku (na telefonie za uchwyt z kropkami) albo dotknij kolejno obu. Zmiana wejdzie po zatwierdzeniu.</p>
+      <div class="subs-grid">
+        <section><h3>Na boisku</h3><ul class="sub-list">${onPitchNow(T).map((x) => row(x, 'on')).join('')}</ul></section>
+        <section><h3>Ławka</h3><ul class="sub-list">${T.bench.map((x) => row(x, 'bench')).join('') || '<li class="hint">Brak rezerwowych.</li>'}</ul></section>
+      </div>
+      <section class="subs-pending"><h3>Zaplanowane zmiany (${pend.length})</h3>${pend.length ? `<ul class="sub-list">${pendRows}</ul>` : '<p class="hint">Brak. Wybierz zawodnika z ławki i zawodnika na boisku.</p>'}</section>
+      <p id="mdDlgMsg" class="hint" role="status">${esc(ui.subMsg ?? '')}</p>
+      <p class="tac__actions">${pend.length ? btn('subConfirm', `Zatwierdź zmiany (${pend.length})`) : ''}${btn('subClose', 'Zamknij', false)}</p>`;
+  }
+  function planSub(outId, inId) {
+    const M = S.M; const T = M.teams[S.userSide];
+    const st = subsState(T, M);
+    if (st.windowBlocked) return 'Wykorzystano wszystkie okna zmian. Zmiany możliwe w przerwie.';
+    if (ui.pend.length >= st.left) return `Nie możesz zaplanować więcej zmian (zostało ${st.left}).`;
+    if (ui.pend.some((x) => x.out === outId)) return 'Ten zawodnik już schodzi w zaplanowanej zmianie.';
+    if (ui.pend.some((x) => x.in === inId)) return 'Ten rezerwowy już wchodzi w zaplanowanej zmianie.';
+    if (!onPitchNow(T).some((x) => x.id === outId)) return 'Tego zawodnika nie ma na boisku.';
+    if (!T.bench.some((x) => x.id === inId)) return 'Tego zawodnika nie ma na ławce.';
+    ui.pend.push({ out: outId, in: inId });
+    return null;
+  }
+  function pickSub(kind, id) {
+    const sel = ui.subSel;
+    if (!sel || sel.kind === kind) { ui.subSel = sel && sel.id === id ? null : { kind, id }; ui.subMsg = ui.subSel ? (kind === 'bench' ? 'Teraz wybierz zawodnika, który zejdzie.' : 'Teraz wybierz rezerwowego, który wejdzie.') : ''; return; }
+    const outId = kind === 'on' ? id : sel.id; const inId = kind === 'bench' ? id : sel.id;
+    const err = planSub(outId, inId);
+    ui.subSel = null; ui.subMsg = err ?? 'Zmiana zaplanowana. Zatwierdź, żeby weszła.';
+  }
+  function confirmSubs() {
+    const M = S.M; const T = M.teams[S.userSide];
+    const done = []; const errors = [];
+    for (const x of ui.pend) {
+      const r = substitute(M, S.userSide, x.out, x.in);
+      if (r.ok) done.push(x); else errors.push(r.error);
+    }
+    ui.pend = []; ui.subSel = null;
+    ui.subMsg = errors.length ? `Wykonano ${done.length} z ${done.length + errors.length} zmian: ${errors.join(' ')}` : `Wykonano ${done.length} ${done.length === 1 ? 'zmianę' : done.length < 5 ? 'zmiany' : 'zmian'}.`;
+    if (S.step.startsWith('live')) updateLive();
+    void T;
+  }
+  /** Przeciąganie w panelu zmian (Pointer Events): z ławki na boisko albo z boiska na ławkę. */
+  function mountSubsDrag(dlg) {
+    if (dlg.dataset.sdnd) return;
+    dlg.dataset.sdnd = '1';
+    // Escape nie gubi niezatwierdzonych zmian
+    dlg.addEventListener('cancel', (ev) => {
+      if (dlg.classList.contains('md-dlg--wide') && ui.pend?.length) { ev.preventDefault(); ui.subMsg = 'Masz niezatwierdzone zmiany. Zatwierdź je albo usuń przed zamknięciem.'; openDialog('subs'); }
+    });
+    let pending = null; let drag = null;
+    dlg.addEventListener('pointerdown', (ev) => {
+      const el = ev.target.closest('[data-sdrag]');
+      if (!el || el.disabled || !ev.isPrimary) return;
+      if (ev.pointerType === 'touch' && !ev.target.closest('[data-shandle]')) return;
+      pending = { el, src: el.dataset.sdrag, x: ev.clientX, y: ev.clientY, id: ev.pointerId };
+    });
+    dlg.addEventListener('pointermove', (ev) => {
+      if (pending && !drag && Math.hypot(ev.clientX - pending.x, ev.clientY - pending.y) > 6) {
+        drag = { ...pending, ghost: document.createElement('div') };
+        drag.ghost.className = 'sub-ghost';
+        drag.ghost.textContent = pending.el.querySelector('.sub-name')?.firstChild?.textContent ?? '';
+        dlg.appendChild(drag.ghost);
+        try { pending.el.setPointerCapture(ev.pointerId); } catch { /* bez przechwytu */ }
+        dlg.classList.add('is-dragging');
+      }
+      if (!drag) return;
+      ev.preventDefault();
+      // Autoprzewijanie okna przy górnej i dolnej krawędzi (na telefonie listy są jedna pod drugą)
+      const rr = dlg.getBoundingClientRect();
+      drag.edge = ev.clientY < rr.top + 70 ? -1 : ev.clientY > rr.bottom - 110 ? 1 : 0;
+      if (drag.edge && !drag.raf) {
+        const tick = () => { if (!drag || !drag.edge) { if (drag) drag.raf = 0; return; } dlg.scrollTop += drag.edge * 10; drag.raf = requestAnimationFrame(tick); };
+        drag.raf = requestAnimationFrame(tick);
+      }
+      const r = dlg.getBoundingClientRect();
+      drag.ghost.style.left = `${ev.clientX - r.left + dlg.scrollLeft}px`;
+      drag.ghost.style.top = `${ev.clientY - r.top + dlg.scrollTop - (ev.pointerType === 'touch' ? 40 : 0)}px`;
+      dlg.querySelectorAll('.is-target').forEach((x) => x.classList.remove('is-target'));
+      const over = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('[data-sdrop]');
+      if (over && over.dataset.sdrop.split(':')[0] !== drag.src.split(':')[0]) over.classList.add('is-target');
+    });
+    const end = (ev) => {
+      if (drag) {
+        const over = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('[data-sdrop]');
+        drag.ghost.remove(); dlg.classList.remove('is-dragging'); drag.edge = 0;
+        const [sk, sid] = drag.src.split(':');
+        if (over) {
+          const [dk, did] = over.dataset.sdrop.split(':');
+          if (dk !== sk) { const err = planSub(sk === 'on' ? sid : did, sk === 'bench' ? sid : did); ui.subMsg = err ?? 'Zmiana zaplanowana. Zatwierdź, żeby weszła.'; ui.subSel = null; }
+          else ui.subMsg = 'Upuść rezerwowego na zawodnika na boisku (albo odwrotnie).';
+        }
+        drag = null; pending = null;
+        ui.suppressClick = Date.now() + 400;
+        openDialog('subs');
+        return;
+      }
+      pending = null;
+    };
+    dlg.addEventListener('pointerup', end);
+    dlg.addEventListener('pointercancel', () => { if (drag) { drag.ghost.remove(); dlg.classList.remove('is-dragging'); } drag = null; pending = null; });
   }
 
   // ------------------------------------------------------------ Przerwa, dogrywka, studio pomeczowe
@@ -337,7 +477,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
         <section class="sec"><h2>Statystyki</h2><table class="vs"><tbody>${STAT_ROWS.map(([k, l]) => `<tr><td>${h.stats[0][k]}</td><td class="lbl">${esc(l)}</td><td>${h.stats[1][k]}</td></tr>`).join('')}</tbody></table></section>
         <section class="sec"><h2>Oceny</h2><ul class="ratings">${ratings.map(([x, r]) => `<li><span>${esc(x.p.last ?? x.p.name)}</span><b>${r.toFixed(1)}</b></li>`).join('')}</ul></section>
       </div>`,
-      S.step === 'etbreak' ? btn('resumeET', 'Rozpocznij dogrywkę') + btn('dlg:subs', 'Zmiany', false) : btn('toHalfTalk', 'Odprawa w przerwie') + btn('dlg:subs', 'Zmiany', false));
+      (S.step === 'etbreak' ? btn('resumeET', 'Rozpocznij dogrywkę') : btn('toHalfTalk', 'Odprawa w przerwie')) + btn('dlg:subs', 'Zmiany', false) + btn('dlg:tactics', 'Taktyka', false));
     if (!app.querySelector('#mdDlg')) app.insertAdjacentHTML('beforeend', '<dialog id="mdDlg" class="panel md-dlg"></dialog>');
   }
 
@@ -395,10 +535,12 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     if (act === 'skip') { stop(); MD.skip(S); route(); }
     if (act === 'dlg') { if (ui.running) stop(); openDialog(arg); }
     if (act === 'closeDlg') app.querySelector('#mdDlg')?.close();
-    if (act === 'doSub') {
-      const r = substitute(M, S.userSide, app.querySelector('#mdOut').value, app.querySelector('#mdIn').value);
-      if (!r.ok) app.querySelector('#mdDlgMsg').textContent = r.error;
-      else { openDialog('subs'); app.querySelector('#mdDlgMsg').textContent = 'Zmiana wykonana.'; if (S.step.startsWith('live')) updateLive(); }
+    if (act === 'subPick') { if (Date.now() < (ui.suppressClick ?? 0)) return; const [k, id] = arg.split('|'); pickSub(k, id); openDialog('subs'); }
+    if (act === 'subDrop') { ui.pend.splice(Number(arg), 1); ui.subMsg = 'Usunięto zaplanowaną zmianę.'; openDialog('subs'); }
+    if (act === 'subConfirm') { confirmSubs(); openDialog('subs'); }
+    if (act === 'subClose') {
+      if (ui.pend?.length) { ui.subMsg = 'Masz niezatwierdzone zmiany. Zatwierdź je albo usuń przed zamknięciem.'; openDialog('subs'); return; }
+      ui.subSel = null; ui.subMsg = ''; app.querySelector('#mdDlg')?.close();
     }
     if (act === 'doTactics') {
       const instructions = Object.fromEntries([...app.querySelectorAll('[data-ins]')].map((s) => [s.dataset.ins, s.value]));
