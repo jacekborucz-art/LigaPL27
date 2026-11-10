@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1E6B3A">
+<title>Dzień meczowy</title>
+<link rel="stylesheet" href="../src/styles/fonts.css">
+<link rel="stylesheet" href="../src/styles/tokens.css">
+<link rel="stylesheet" href="../src/styles/base.css">
+<link rel="stylesheet" href="../src/styles/app.css">
+<link rel="stylesheet" href="dzien-meczowy.css">
+<style>
+  :root { --home: #FFD100; --home-ink: #14211A; --away: #0055A5; --away-ink: #FFFFFF; }
+</style>
+</head>
+<body>
+<div class="md">
+  <ol class="rail" id="rail" aria-label="Przebieg dnia meczowego"></ol>
+  <p class="proto-note">Prototyp wyglądu z przykładowymi danymi. Logika odpraw i studiów powstaje osobno.</p>
+  <main class="md__main" id="screen" tabindex="-1"></main>
+  <div class="actionbar" id="actionbar"></div>
+</div>
+<script type="module" src="dzien-meczowy.js"></script>
+</body>
+</html>
