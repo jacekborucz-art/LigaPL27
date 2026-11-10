@@ -163,6 +163,8 @@ const SHELL = [
   './src/ui/nationalView.js',
   './src/ui/negotiationView.js',
   './src/ui/squadView.js',
+  './src/ui/tacticsDrag.js',
+  './src/ui/tacticsMoves.js',
   './src/ui/tacticsView.js',
   './src/ui/talksView.js',
   './src/ui/trainingView.js',

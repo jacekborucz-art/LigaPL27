@@ -18,6 +18,14 @@ const few = (n) => n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14);
 const freeText = (n) => (n === 1 ? 'Zostało 1 miejsce' : few(n) ? `Zostały ${n} miejsca` : `Zostało ${n} miejsc`);
 const matchesWord = (n) => (n === 1 ? 'mecz' : few(n) ? 'mecze' : 'meczów');
 const unavailableReason = (p) => (p.injuryDays > 0 ? `kontuzja, ${p.injuryDays} dni` : p.suspended > 0 ? 'zawieszony' : p.callUp ? 'reprezentacja' : '');
+const freshBand = (f) => (f >= 80 ? 'good' : f >= 65 ? 'mid' : 'low');
+/** Świeżość (pionowy pasek) i morale (kropka) obok nazwiska. */
+function condHtml(p) {
+  const f = Math.round(p.fresh ?? 95);
+  const m = p.morale ?? 12;
+  return `<span class="tp-cond" role="img" aria-label="Świeżość ${f}%, morale: ${esc(moraleLabel(m).toLowerCase())}" title="Świeżość ${f}%, morale: ${esc(moraleLabel(m).toLowerCase())}">
+    <i class="tp-fresh" data-b="${freshBand(f)}" style="--f:${f}%"></i><span class="mdot" data-m="${m >= 14 ? 'hi' : m >= 10 ? 'mid' : 'lo'}"></span></span>`;
+}
 const posText = (p) => `${p.pos}${p.side ? ` ${p.side}` : ''}`;
 
 /** Atrybuty wspólne dla elementów, które da się przeciągnąć (dane do „ducha” pod palcem). */
@@ -79,7 +87,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
       <button class="tp-row__main" data-act="tpick" data-loc="${key}" ${dragAttrs(loc, p)} aria-pressed="${isSel}">
         ${handle(s.pos, GROUP[s.pos])}
         <span class="tp-row__name">${esc(p.name)}${tactics.captain === p.id ? ' <abbr class="tp-c" title="Kapitan">C</abbr>' : ''}${reason ? `<small class="tp-off">${esc(reason)}</small>` : fit}</span>
-        <b>${p.ovr.toFixed(1)}</b>
+        ${condHtml(p)}<b>${p.ovr.toFixed(1)}</b>
       </button>
       ${infoBtn(p)}
     </li>`;
@@ -94,7 +102,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
       <button class="tp-row__main" data-act="tpick" data-loc="${esc(key)}" ${dragAttrs(loc, p)} aria-pressed="${isSel}">
         ${handle(posText(p), GROUP[p.pos])}
         <span class="tp-row__name">${esc(p.name)}${reason ? `<small class="tp-off">${esc(reason)}</small>` : ''}</span>
-        <b>${p.ovr.toFixed(1)}</b>
+        ${condHtml(p)}<b>${p.ovr.toFixed(1)}</b>
       </button>
       ${infoBtn(p)}
       ${where === 'bench' ? `<button class="tp-row__x" data-act="tunbench" data-id="${esc(p.id)}" aria-label="Usuń ${esc(p.name)} z ławki">×</button>` : ''}
@@ -197,16 +205,17 @@ function renderPlayerInfo(p, tactics, f) {
     <div class="tdet__in">
       <header class="tdet__head">
         <span class="led tdet__ovr" aria-label="OVR ${p.ovr.toFixed(1)}">${p.ovr.toFixed(1)}</span>
+        <span class="pos" data-g="${GROUP[p.pos]}">${esc(posText(p))}</span>
+        <button class="tdet__x" data-act="tinfoclose" aria-label="Zamknij atrybuty">×</button>
         <div class="tdet__title">
-          <h3 id="tdet-h"><span class="pos" data-g="${GROUP[p.pos]}">${esc(posText(p))}</span> ${esc(p.name)}</h3>
+          <h3 id="tdet-h">${esc(p.name)}</h3>
           <p>${esc(POS_NAMES[p.pos])}, ${p.age} lat, ${esc(NAT_NAMES[p.nat] ?? p.nat)}</p>
         </div>
-        <button class="tdet__x" data-act="tinfoclose" aria-label="Zamknij atrybuty">×</button>
       </header>
       <dl class="tdet__facts">
         ${fact('Gdzie', esc(where))}
         ${fact('Stan', esc(health), p.injuryDays > 0 || p.suspended > 0 || p.callUp ? ' class="is-bad"' : '')}
-        ${fact('Świeżość', `<span class="abar" aria-hidden="true"><i data-b="${fresh >= 85 ? 'good' : fresh >= 70 ? 'mid' : 'low'}" style="width:${fresh}%"></i></span>${fresh}%`)}
+        ${fact('Świeżość', `<span class="abar" aria-hidden="true"><i data-b="${freshBand(fresh)}" style="width:${fresh}%"></i></span>${fresh}%`)}
         ${fact('Ostrość', `${Math.round(p.sharp ?? 70)}%`)}
         ${fact('Morale', esc(moraleLabel(p.morale ?? 12)))}
       </dl>
