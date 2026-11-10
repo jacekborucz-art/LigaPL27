@@ -61,6 +61,7 @@ registerModifier({
 });
 registerModifier({
   id: 'fresh', scope: 'player', label: 'Świeżość',
+  enabled: (ctx) => !ctx.inMatch, // w meczu liczy się bieżąca kondycja (silnik), nie świeżość sprzed meczu
   apply: (p) => ((p.fresh ?? 95) < 85 ? -0.04 * (85 - p.fresh) : 0),
 });
 registerModifier({

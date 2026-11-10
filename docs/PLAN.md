@@ -547,6 +547,19 @@ Szczegóły i 14 przypadków brzegowych: `ekspert_sedzia.md`, sekcja D.
 
 Kolejność jest celowa. Po etapie 5 da się zagrać pojedynczy mecz, a po etapie 7 cały sezon ligowy.
 
+## 8.1 Stan etapów (Nov 10, 2026)
+
+| Etap | Stan | Uwagi |
+|---|---|---|
+| 0. Fundament | Gotowy | PWA offline, zapis 3 sloty, dane, poczta, upływ dni |
+| 1. Świat | Gotowy | 54 kluby + akademie, 27 atrybutów, charakter, reputacja |
+| 2. Kadra i taktyka | Gotowy | 10 formacji, 9 instrukcji, skład dwoma dotknięciami |
+| 3. Silnik meczowy | Gotowy (bez ekranu) | `src/engine/match/`: fazy minuty, zdarzenia, statystyki ze zdarzeń, zmiany 5/3, taktyka z bezwładnością, okrzyki, AI trenera, dogrywka, karne, oceny |
+| 4. Reguły meczu | Gotowy w silniku | Kartki, karne, VAR, kontuzje (1 minuta po opatrzeniu), doliczony czas z wydarzeń |
+| 5. Ekran meczu | Prototyp wyglądu | Następny krok: podłączenie silnika i odpraw do ekranu |
+
+Kalibracja silnika (3000 meczów Ekstraklasy na wygenerowanych kadrach): 2,72 gola, 25 strzałów, 8,9 celnych, 9,7 rożnego, 27 fauli, 4,4 żółtej, 0,19 czerwonej, 4,5 spalonego, 0,29 karnego, ok. 430 podań na drużynę (81 %), 44 auty, wygrane gospodarzy 44,6 %, remisy 25,3 %, 54 % goli w drugiej połowie, doliczony czas 2,5 i 7,1 min, 4,1 zmiany na drużynę, ok. 3 ms na mecz.
+
 ## 9. Otwarte kwestie
 
 1. Kluby UEFA: 156 klubów i 55 krajów w `src/data/kluby_uefa.json` (opis w `docs/kluby_uefa.md`). 134 współczynniki to szacunki, bo kassiesa.net jest zablokowane w sieci sesji. Mediana siły LM wynosi 14,6 zamiast ok. 14 (do dostrojenia w testach balansu).
