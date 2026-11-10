@@ -3,6 +3,7 @@
 // Łączy studio i odprawy (src/match), pełny silnik (src/engine/match) i skutki sezonu (src/season).
 // Sesja żyje w pamięci; wynik i jego skutki trafiają do gry dopiero po końcowym gwizdku.
 
+import { trainingMatchInput } from '../training/index.js';
 import { Rng } from '../core/rng.js';
 import { CLUBS_PL, clubById } from '../data/clubs_pl.js';
 import { formationById } from '../data/formations.js';
@@ -51,6 +52,7 @@ function compInfo(f) {
   if (LEAGUE_COMPS.includes(f.comp)) return { type: 'league', name: COMPETITIONS[f.comp].name, stage: 'main' };
   if (f.comp === 'pp') return { type: 'cup', name: 'Puchar Polski', stage: f.round === 'F' ? 'final' : 'main' };
   if (f.comp === 'super') return { type: 'supercup', name: 'Superpuchar Polski', stage: 'final' };
+  if (f.comp === 'uefa') return { type: 'uefa', name: compLabel(f), stage: f.round === 'F' ? 'final' : 'main' };
   return { type: 'cup', name: compLabel(f), stage: f.round === 'F' ? 'final' : 'main' };
 }
 
@@ -84,7 +86,7 @@ export function startMatchday(game, f) {
   const weather = weatherFor(f.date, rng);
   const pitch = rng.weighted(['doskonala', 'dobra', 'zla', 'sztuczna'], (p) => ({ doskonala: 2, dobra: 6, zla: weather.type === 'deszcz' || weather.type === 'snieg' ? 2 : 0.5, sztuczna: 0.6 })[p]);
   const referee = { name: rng.pick(REFEREES), strictness: Math.round(Math.max(0.7, Math.min(1.4, rng.gauss(1, 0.13))) * 100) / 100 };
-  const hasVar = comp === 'ekstraklasa' || comp === 'super' || (comp === 'pp' && ['SF', 'F'].includes(f.round));
+  const hasVar = comp === 'ekstraklasa' || comp === 'super' || comp === 'uefa' || (comp === 'pp' && ['SF', 'F'].includes(f.round));
   const h2h = (game.fixtures || []).filter((x) => x.played && x.result && ((x.home === f.home && x.away === f.away) || (x.home === f.away && x.away === f.home)))
     .map((x) => ({ date: x.date, home: x.home, away: x.away, score: x.result.score }));
   game.board = game.board ?? { trust: 60, fansMood: 55 };
@@ -138,6 +140,9 @@ export function kickOff(game, S) {
   const zOpp = Object.fromEntries(oppSquad.map((p) => [p.id, ai.zByPersona[p.persona] ?? ai.teamZ]));
   const mine = { club: anyClub(game.clubId), squad: mySquad, tactics: game.tactics, ai: false, coach: 'P', zStart: S.briefings.pre?.engine?.zStart ?? {} };
   const theirs = { club: oppClub, squad: oppSquad, tactics: S.oppTactics, ai: true, coach: oppClub?.coach ?? 'P', zStart: zOpp };
+  // Trening: spójność zespołu na start meczu i stałe fragmenty (src/training)
+  Object.assign(mine, trainingMatchInput(game, game.clubId, mine));
+  Object.assign(theirs, trainingMatchInput(game, S.oppId, theirs));
   S.M = createMatch({
     seed: `${game.seed}:${S.f.id}`,
     home: S.userSide === 0 ? mine : theirs,
@@ -145,7 +150,7 @@ export function kickOff(game, S) {
     ctx: {
       neutral: !!S.f.neutral, var: S.hasVar, rank: S.pre.preview.rank.level, refStrict: S.referee.strictness,
       attendance: S.pre.conditions.attendance.fill, weather: engineWeather(S.weather, S.pitch),
-      knockout: S.f.knockout === 'single' ? 'single' : false,
+      knockout: S.f.knockout === 'single' ? 'single' : S.f.knockout?.firstLeg ? { firstLeg: [...S.f.knockout.firstLeg] } : false,
     },
   });
   S.step = 'live1';

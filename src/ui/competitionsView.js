@@ -6,8 +6,10 @@ import { anyClub, LEAGUE_COMPS } from '../season/season.js';
 import { PP_ROUNDS, PP_NAMES } from '../season/cup.js';
 import { crestHtml } from './crest.js';
 import { esc, fmtDate, weekday } from './dom.js';
+import { renderEurope, EUROPE_TABS } from './europeView.js';
+import { renderNational } from './nationalView.js';
 
-export const COMP_TABS = [['ekstraklasa', 'Ekstraklasa'], ['liga1', '1 Liga'], ['liga2', '2 Liga'], ['pp', 'Puchar Polski']];
+export const COMP_TABS = [['ekstraklasa', 'Ekstraklasa'], ['liga1', '1 Liga'], ['liga2', '2 Liga'], ['pp', 'Puchar Polski'], ...EUROPE_TABS, ['NT', 'Reprezentacje']];
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size = 22) => { const c = anyClub(id); return c ? crestHtml(c, { size, clubsById }) : ''; };
 const name = (id) => anyClub(id)?.name ?? 'rywal z losowania';
@@ -95,8 +97,11 @@ function cupView(game) {
     ${next ? `<p class="hint">Kolejna runda: ${esc(PP_NAMES[next])}. Losowanie po zakończeniu bieżącej rundy.</p>` : ''}`;
 }
 
-export function renderCompetitions(game, { comp = 'ekstraklasa', view = 'table', round = null } = {}) {
+export function renderCompetitions(game, { comp = 'ekstraklasa', view = 'table', round = null, filter = 'pl', draw = null } = {}) {
   const tabs = COMP_TABS.map(([k, v]) => `<button class="chip" data-act="ccomp" data-c="${k}" aria-pressed="${comp === k}">${esc(v)}</button>`).join('');
+  if (comp === 'NT') return `<h2>Rozgrywki</h2><div class="chips">${tabs}</div>${renderNational(game, view)}`;
+  if (EUROPE_TABS.some(([k]) => k === comp)) return `<h2>Rozgrywki</h2><div class="chips">${tabs}</div>${renderEurope(game, comp, { view, round, filter, draw })}`;
+  if (!['table', 'fixtures', 'stats'].includes(view)) view = 'table';
   const views = comp === 'pp' ? '' : `<div class="subtabs" role="tablist">${[['table', 'Tabela'], ['fixtures', 'Terminarz'], ['stats', 'Statystyki']].map(([k, v]) => `<button role="tab" data-act="cview" data-v="${k}" aria-selected="${view === k}">${v}</button>`).join('')}</div>`;
   const body = comp === 'pp' ? cupView(game) : view === 'fixtures' ? fixturesView(game, comp, round) : view === 'stats' ? statsView(game, comp) : tableView(game, comp);
   return `<h2>Rozgrywki</h2><div class="chips">${tabs}</div>${views}${body}`;

@@ -5,7 +5,7 @@
 import { Rng } from '../core/rng.js';
 import { SQUAD_LAYOUT } from './worldGen.js';
 import { genPlayer } from './playerGen.js';
-import { pickNationality } from '../data/names.js';
+import { pickNationality, NATIONALITIES } from '../data/names.js';
 
 const cache = new Map();
 
@@ -13,14 +13,16 @@ export function ephemeralSquad(club, season, { nat = null, date = '2026-07-01' }
   const key = `${club.id}:${season}`;
   if (cache.has(key)) return cache.get(key);
   const rng = new Rng(`efemeryczna:${key}`);
-  const tier = club.tier >= 4 ? 3 : club.tier ?? 1;
+  const tier = club.tier >= 4 ? 3 : club.tier || 1;
+  // Klub zagraniczny: ok. 2/3 zawodników z kraju klubu, reszta z całego świata
+  const foreignNat = () => (rng.chance(0.66) ? club.country : rng.pick(NATIONALITIES));
   const players = SQUAD_LAYOUT.map(([pos, side], i) => {
     const role = i < 11 ? -0.1 : i < 18 ? -0.9 : -1.4;
     const age = rng.int(19, 32);
-    const n = nat ?? (club.tier >= 4 ? (rng.chance(0.95) ? 'POL' : pickNationality(3, rng)) : 'POL');
+    const n = nat ?? (club.foreign ? foreignNat() : club.tier >= 4 ? (rng.chance(0.95) ? 'POL' : pickNationality(3, rng)) : 'POL');
     return genPlayer(rng, { id: `${club.id}-e${i + 1}`, L: club.L, pos, age, slotOffset: role, nat: n, tier, side: side ?? null, club, date });
   });
-  if (cache.size > 200) cache.clear();
+  if (cache.size > 600) cache.clear();
   cache.set(key, players);
   return players;
 }

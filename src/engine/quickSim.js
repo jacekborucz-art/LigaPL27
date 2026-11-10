@@ -138,15 +138,18 @@ export function quickMatch(home, away, ctx, rng) {
  */
 export function quickKnockout(home, away, ctx, rng, mode = 'single') {
   const r = quickMatch(home, away, ctx, rng);
-  if (r.score[0] !== r.score[1]) return r;
+  // Rewanż dwumeczu: mode = { firstLeg: [gole obecnego gospodarza, gole gościa] }, liczy się suma bramek
+  const fl = mode?.firstLeg ?? [0, 0];
+  const level = () => r.score[0] + fl[0] === r.score[1] + fl[1];
+  if (!level()) return r;
   const { lH, lA, dH, dA } = r.model;
-  if (mode === 'single') {
+  if (mode === 'single' || mode?.firstLeg) {
     const eH = rng.poisson(lH / 3.3); const eA = rng.poisson(lA / 3.3);
     r.extraTime = true;
     r.score = [r.score[0] + eH, r.score[1] + eA];
     r.scorers[0].push(...pickScorers(r._teams[0], eH, rng));
     r.scorers[1].push(...pickScorers(r._teams[1], eA, rng));
-    if (eH !== eA) return r;
+    if (!level()) return r;
   }
   // Seria rzutów karnych: lepsza drużyna ma lekką przewagę
   const pH = Math.min(0.62, Math.max(0.38, 0.5 + 0.03 * (dH - dA)));

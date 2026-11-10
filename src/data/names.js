@@ -39,6 +39,33 @@ const POOLS = {
   DEN: { first: 'Frederik Jonas Magnus Mikkel Rasmus', last: 'Christensen Jensen Madsen Nielsen Poulsen' },
   FIN: { first: 'Aleksi Eetu Juho Mikko Onni', last: 'Heikkinen Korhonen Laine Mäkinen Virtanen' },
   ISL: { first: 'Arnór Gunnar Jón Sverrir', last: 'Gunnarsson Jónsson Magnússon Sigurðsson' },
+  ENG: { first: 'Harry Jack James Oliver George Charlie Jacob Thomas Ben Luke Callum Jordan Kieran Mason Reece Tyler Lewis Ryan', last: "Smith Jones Taylor Brown Walker Wright Robinson Thompson Hughes Edwards Green Hall Wood Clarke Turner Hill Cooper Ward Morris Bennett" },
+  SCO: { first: 'Callum Ross Ewan Fraser Lewis Calum Scott Craig Jamie Kyle Liam Euan', last: "Campbell Stewart MacDonald Murray Reid Robertson Fraser McLean Ferguson Ross Paterson Hamilton Kerr Grant" },
+  WAL: { first: 'Rhys Dylan Owen Gareth Aaron Ethan Iwan Joe Tom Morgan', last: "Jones Davies Williams Evans Thomas Roberts Lewis Hughes Morgan Griffiths Price Powell" },
+  NIR: { first: 'Conor Shane Niall Paddy Ciaran Gavin Jamie Liam Ryan Dale', last: "McAuley Doherty Kelly Murphy Quinn Gallagher McCann Boyle Devlin Lafferty Magennis Brown" },
+  IRL: { first: 'Seán Cian Darragh Conor Evan Aidan Jamie Shane Adam Killian', last: "Murphy Kelly Byrne Ryan O'Brien Walsh O'Sullivan Doyle McCarthy Kavanagh Brady Duffy" },
+  ITA: { first: 'Alessandro Andrea Davide Federico Francesco Giacomo Lorenzo Luca Marco Matteo Nicolò Riccardo Simone Stefano Tommaso', last: "Bianchi Colombo Conti Costa De Luca Esposito Ferrari Fontana Galli Greco Lombardi Marino Moretti Ricci Romano Rossi Russo Mancini Rizzo Bruno" },
+  TUR: { first: 'Ahmet Arda Burak Can Emre Enes Furkan Hakan Kerem Mert Oğuz Okan Ozan Yusuf', last: "Aydın Çelik Demir Doğan Kaya Kılıç Koç Kurt Öztürk Şahin Yıldız Yılmaz Arslan Aksoy" },
+  GRE: { first: 'Giorgos Dimitris Nikos Kostas Giannis Panagiotis Christos Vasilis Andreas Thanasis', last: "Papadopoulos Pappas Georgiou Nikolaidis Karagiannis Oikonomou Vlachos Konstantinidis Alexiou Makris Antoniou Dimitriou" },
+  AZE: { first: 'Elvin Rashad Orkhan Murad Ramil Emin Tural Anar Kamran Namik', last: "Aliyev Mammadov Huseynov Hasanov Ismayilov Guliyev Abdullayev Jafarov Rzayev Babayev" },
+  HUN: { first: 'Ádám Bence Dániel Dominik Gergő Kristóf Levente Márk Máté Milán Péter Zsolt', last: "Nagy Kovács Tóth Szabó Horváth Varga Kiss Molnár Németh Farkas Balogh Papp Takács Juhász" },
+  CYP: { first: 'Andreas Christos Giorgos Marios Nikolas Konstantinos Michalis Stelios Panagiotis Loizos', last: "Charalambous Georgiou Ioannou Christodoulou Constantinou Kyriakou Panayiotou Neofytou Efthymiou Savva" },
+  ISR: { first: 'Itay Omer Eran Dor Yonatan Liel Shon Ido Gadi Tomer Roy Eli', last: "Cohen Levi Mizrahi Peretz Biton Dahan Friedman Azoulay Katz Avraham Gabay Shalom" },
+  BUL: { first: 'Georgi Ivan Dimitar Nikolay Martin Petar Stoyan Kristiyan Aleksandar Todor', last: "Ivanov Georgiev Dimitrov Petrov Nikolov Hristov Stoyanov Todorov Iliev Atanasov Kolev Popov" },
+  ARM: { first: 'Aram Davit Gor Hovhannes Narek Tigran Artur Vahe Karen Edgar', last: "Hovhannisyan Harutyunyan Grigoryan Petrosyan Sargsyan Khachatryan Ghazaryan Avetisyan Karapetyan Mkrtchyan" },
+  SUI: { first: 'Luca Noah Nico Fabian Silvan Joel Remo Dario Yannick Cédric Michel Kevin', last: "Müller Meier Schmid Keller Weber Huber Steiner Fischer Gerber Brunner Baumann Frei Zürcher Moser" },
+  GIB: { first: 'Liam Kyle Jayce Ethan Tjay Lee Roy Aaron', last: "Santos Garcia Olivero Chipolina Lopez Bosio Torrilla Pons" },
+  KAZ: { first: 'Arman Askhat Daniyar Islam Nurbol Ruslan Timur Yerlan Bauyrzhan Abzal', last: "Abdrakhmanov Akhmetov Bekov Dzhumabekov Iskakov Kenzhebekov Nurlanov Sadykov Tulegenov Zhaksylykov" },
+  ROU: { first: 'Alexandru Andrei Bogdan Cristian Denis Florin Ionuț Mihai Răzvan Ștefan Vlad Darius', last: "Popescu Ionescu Dumitru Stan Stoica Gheorghe Matei Ciobanu Constantin Moldovan Rusu Marin Lazăr Munteanu" },
+  AND: { first: 'Marc Jordi Pau Albert Èric Joan Aleix Ricard', last: "Vilà Martínez Rebés Llovera Clemente Pujol García Cervós" },
+  ALB: { first: 'Arbër Elseid Ermir Kristjan Myrto Armando Endri Klaus Ledian Nedim', last: "Hoxha Shala Krasniqi Gashi Berisha Dervishi Kola Hysaj Leka Muçi" },
+  FRO: { first: 'Brandur Gunnar Jóannes Hallur Sølvi Rógvi Heini Árni', last: "Hansen Joensen Olsen Jacobsen Petersen Poulsen Danielsen Mortensen" },
+  MDA: { first: 'Ion Vadim Artur Victor Sergiu Mihail Nicolae Dan Andrei Alexandru', last: "Rusu Ceban Cebotari Ciobanu Roșca Lungu Munteanu Bodiu Postolachi Ionița" },
+  KOS: { first: 'Arbnor Bersant Edon Florent Leart Vedat Mërgim Amir Fidan Lirim', last: "Krasniqi Berisha Gashi Hasani Shala Muriqi Rashica Zeneli Bytyqi Hadergjonaj" },
+  EST: { first: 'Karl Martin Rasmus Markus Mattias Henri Joonas Kristjan Rauno Ragnar', last: "Tamm Saar Sepp Mägi Kask Kukk Rebane Ilves Pärn Koppel" },
+  LIE: { first: 'Marco Nicolas Jens Andreas Simon Livio Fabio Martin', last: "Frick Büchel Hasler Kaiser Wolfinger Marxer Ospelt Beck" },
+  MLT: { first: 'Luke Jean Kurt Zach Ryan Jake Matthew Paul', last: "Borg Camilleri Vella Farrugia Zammit Galea Micallef Grech Attard Mifsud" },
+  LUX: { first: 'Laurent Gerson Leandro Vincent Dirk Olivier Mathias Danel', last: "Schmit Muller Weber Hoffmann Wagner Thill Reuter Kremer Barreiro Jans" },
 };
 
 export const NATIONALITIES = Object.keys(POOLS);
@@ -89,6 +116,7 @@ export const NAT_NAMES = {
   LVA: 'Łotwa', GEO: 'Gruzja', NED: 'Holandia', BEL: 'Belgia', GER: 'Niemcy', AUT: 'Austria', FRA: 'Francja', NGA: 'Nigeria',
   GHA: 'Ghana', CMR: 'Kamerun', SEN: 'Senegal', CIV: 'Wybrzeże Kości Słoniowej', BRA: 'Brazylia', ARG: 'Argentyna',
   COL: 'Kolumbia', SWE: 'Szwecja', NOR: 'Norwegia', DEN: 'Dania', FIN: 'Finlandia', ISL: 'Islandia',
+  ENG: 'Anglia', SCO: 'Szkocja', WAL: 'Walia', NIR: 'Irlandia Północna', IRL: 'Irlandia', ITA: 'Włochy', TUR: 'Turcja', GRE: 'Grecja', AZE: 'Azerbejdżan', HUN: 'Węgry', CYP: 'Cypr', ISR: 'Izrael', BUL: 'Bułgaria', ARM: 'Armenia', SUI: 'Szwajcaria', GIB: 'Gibraltar', KAZ: 'Kazachstan', ROU: 'Rumunia', AND: 'Andora', ALB: 'Albania', FRO: 'Wyspy Owcze', MDA: 'Mołdawia', KOS: 'Kosowo', EST: 'Estonia', LIE: 'Liechtenstein', MLT: 'Malta', LUX: 'Luksemburg',
 };
 
 export const EU = new Set(['POL', 'ESP', 'POR', 'CRO', 'SVN', 'SVK', 'CZE', 'LTU', 'LVA', 'NED', 'BEL', 'GER', 'AUT', 'FRA', 'SWE', 'DEN', 'FIN']);

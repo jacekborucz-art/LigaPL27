@@ -465,3 +465,33 @@
 .form { display: inline-flex; gap: 3px; }
 .form b { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 3px; font: 700 11px/1 var(--font-display); color: #fff; }
 .form .W { background: #2E8A4E; } .form .R { background: #7C8780; } .form .P { background: var(--kartka-czerwona); }
+
+/* ---------- Puchary europejskie (etap 8) ---------- */
+.subtabs--5 button { font-size: var(--step--1); padding: 0 2px; }
+.chips--sm .chip { min-height: 36px; }
+.cc { font-size: 10px; font-weight: 600; color: var(--text-muted); letter-spacing: .02em; }
+.fx.is-pl, .tbl__row.is-pl { background: color-mix(in srgb, #1E5AA8 10%, transparent); }
+.tie--win { font-weight: 800; }
+.tie--out { color: var(--text-muted); font-weight: 500; }
+.sec-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.sec-head h3 { margin: 0; }
+.btn--sm { min-height: 36px; padding: 0 12px; font-size: var(--step--1); }
+.champ { display: flex; align-items: center; gap: var(--space-2); font-weight: 700; }
+.stat-list.rank li.is-me { background: color-mix(in srgb, var(--led) 22%, transparent); }
+.drawbox { background: #0E1511; color: var(--kreda, #F3F6F1); border-radius: var(--radius-m); padding: var(--space-3); margin-bottom: var(--space-4); scroll-margin-top: 120px; }
+.drawbox h3, .drawbox h4 { color: inherit; }
+.drawbox h4 { margin: var(--space-3) 0 var(--space-1); font: 700 var(--step-0)/1.2 var(--font-display); color: var(--led); }
+.drawbox .btn--quiet { color: inherit; border-color: rgb(255 255 255 / .3); background: transparent; }
+.drawbox .cc { color: rgb(255 255 255 / .6); }
+.pots { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-2) var(--space-3); margin-top: var(--space-2); }
+.pots > div { display: flex; flex-direction: column; gap: 2px; }
+.ball { display: inline-flex; align-items: center; gap: 6px; font-size: var(--step--1); min-width: 0; }
+.draw-items { margin-top: var(--space-3); border-top: 1px solid rgb(255 255 255 / .15); }
+.draw-item { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 0; border-bottom: 1px solid rgb(255 255 255 / .08); }
+.draw-item small { color: rgb(255 255 255 / .65); }
+.draw-item .vs { color: var(--led); font-weight: 700; }
+.draw-item.pop { animation: ball-pop .45s ease-out; }
+@keyframes ball-pop { from { opacity: 0; transform: translateY(-6px) scale(.96); } to { opacity: 1; transform: none; } }
+.draw-ctrl { display: flex; gap: var(--space-2); justify-content: flex-end; margin: var(--space-3) 0 0; }
+@media (prefers-reduced-motion: reduce) { .draw-item.pop { animation: none; } }
+.stat-list li.is-me { background: color-mix(in srgb, var(--led) 22%, transparent); }

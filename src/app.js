@@ -21,10 +21,15 @@ import { renderTactics } from './ui/tacticsView.js';
 import { createTactics, assign, changeFormation, setInstruction, refreshTactics, removeFromBench, checkTactics } from './engine/lineup.js';
 import { COMPETITIONS } from './config/competitions.js';
 import { mountMatchday } from './ui/matchdayView.js';
+import { mountDrawAnimation } from './ui/europeView.js';
+import { ensureUefa } from './season/europe.js';
+import { ensureNational } from './season/nationalSystem.js';
+import { ensureTraining, trainingMatchInput } from './training/index.js';
+import { renderTraining, handleTrainingAction, isTrainingAction } from './ui/trainingView.js';
 
 const app = document.getElementById('app');
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
-const state = { screen: 'start', slot: null, game: null, tab: 'pulpit', tier: 1, notice: null, mailCat: null, mailOpen: null, running: false, sqFilter: 'all', playerOpen: null, sqSub: 'players', tSel: null, matchNotes: [], cComp: null, cView: 'table', cRound: null, lastResult: null };
+const state = { screen: 'start', slot: null, game: null, tab: 'pulpit', tier: 1, notice: null, mailCat: null, mailOpen: null, running: false, sqFilter: 'all', playerOpen: null, sqSub: 'players', tSel: null, matchNotes: [], cComp: null, cView: 'table', cRound: null, lastResult: null, uFilter: 'pl', uDraw: null };
 
 const benchSizeFor = (g) => COMPETITIONS[['ekstraklasa', 'liga1', 'liga2'][clubById(g.clubId).tier - 1]].benchSize;
 const nextFixture = (g) => (g.fixtures || []).filter((f) => !f.played && (f.home === g.clubId || f.away === g.clubId)).sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? '')))[0];
@@ -81,6 +86,10 @@ function ensureGameShape(g) {
     for (let d = GAME_START; d < today; d = addDays(d, 1)) processDay(g, d);
     for (const f of g.fixtures) if (f.date < today && !f.played && (f.home === g.clubId || f.away === g.clubId)) { f.played = true; f.result = f.away ? { score: [0, 0], forfeit: true } : { score: [0, 0] }; }
   }
+  if (g.season?.fixtures && g.fixtures && g.season.fixtures !== g.fixtures) g.season.fixtures = g.fixtures; // po imporcie z pliku JSON
+  ensureUefa(g); // zapis sprzed etapu 8: puchary UEFA nadrobione w tle
+  ensureNational(g);
+  ensureTraining(g);
   if (!g.inbox.length) {
     g.inbox = [];
     const today = g.date;
@@ -200,12 +209,14 @@ function renderHub() {
     <main class="hub__main" id="main">${renderTab(state.tab, g, club)}</main>
     <div class="ticker" id="ticker" aria-live="polite"></div>
   </div>`;
+  mountDrawAnimation(app);
 }
 
 function renderTab(tab, g, club) {
   if (tab === 'pulpit') return renderDashboard(g, club);
   if (tab === 'poczta') return renderMail(g);
-  if (tab === 'rozgrywki') return renderCompetitions(g, { comp: state.cComp ?? ['ekstraklasa', 'liga1', 'liga2'][club.tier - 1], view: state.cView, round: state.cRound });
+  if (tab === 'trening') return renderTraining(g, state);
+  if (tab === 'rozgrywki') return renderCompetitions(g, { comp: state.cComp ?? ['ekstraklasa', 'liga1', 'liga2'][club.tier - 1], view: state.cView, round: state.cRound, filter: state.uFilter, draw: state.uDraw });
   if (tab === 'kadra') {
     const sub = `<div class="subtabs" role="tablist"><button role="tab" data-act="tsub" data-s="players" aria-selected="${state.sqSub === 'players'}">Zawodnicy</button><button role="tab" data-act="tsub" data-s="tactics" aria-selected="${state.sqSub === 'tactics'}">Skład i taktyka</button></div>`;
     if (state.sqSub === 'tactics') return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g) });
@@ -216,7 +227,6 @@ function renderTab(tab, g, club) {
   }
   const soon = {
     transfery: ['Lista transferowa, wypożyczenia, wolni zawodnicy', 'Negocjacje kontraktów', 'Okna transferowe'],
-    trening: ['Plan tygodnia: 5 akcentów, 3 intensywności', 'Rozwój młodych', 'Zmęczenie i świeżość'],
   }[tab];
   const label = TABS.find((t) => t.id === tab).label;
   return `<h2>${esc(label)}</h2>
@@ -358,6 +368,8 @@ async function playMyMatch() {
   const cfgFor = (id, squad, tactics, ai) => ({ club: anyClub(id), squad, tactics, ai, coach: anyClub(id)?.coach ?? 'P' });
   const mine = cfgFor(g.clubId, mySquad(g), g.tactics, false);
   const theirs = cfgFor(oppId, oppSquad, createTactics(oppSquad, { benchSize: bench }), true);
+  Object.assign(mine, trainingMatchInput(g, g.clubId, mine));
+  Object.assign(theirs, trainingMatchInput(g, oppId, theirs));
   const M = createMatch({
     seed: `${g.seed}:${f.id}`,
     home: mySide === 0 ? mine : theirs,
@@ -446,6 +458,7 @@ async function newGame(slot, clubId) {
   game.fixtures = game.season.fixtures;
   game.world = generateWorld(seed);
   game.tactics = createTactics(squadOf(game.world, clubId), { benchSize: benchSizeFor(game) });
+  ensureTraining(game);
   processDay(game);
   state.game = game;
   state.slot = slot;
@@ -459,6 +472,13 @@ app.addEventListener('click', async (ev) => {
   const el = ev.target.closest('[data-act]');
   if (!el || el.tagName === 'INPUT') return;
   const act = el.dataset.act;
+  if (isTrainingAction(act) && state.game) {
+    const r = handleTrainingAction(state.game, act, el.dataset);
+    Object.assign(state, r.ui ?? {});
+    if (r.save) await save();
+    render();
+    return;
+  }
   const slot = Number(el.dataset.slot);
   const g = state.game;
   try {
@@ -484,8 +504,11 @@ app.addEventListener('click', async (ev) => {
     if (act === 'stop') state.running = false;
     if (act === 'playnow') await playMyMatch();
     if (act === 'resultdone') { state.screen = 'hub'; state.tab = 'pulpit'; render(); }
-    if (act === 'ccomp') { state.cComp = el.dataset.c; state.cRound = null; render(); }
-    if (act === 'cview') { state.cView = el.dataset.v; render(); }
+    if (act === 'ccomp') { state.cComp = el.dataset.c; state.cRound = null; state.uDraw = null; render(); }
+    if (act === 'ufilter') { state.uFilter = el.dataset.f; render(); }
+    if (act === 'udraw') { state.uDraw = `${el.dataset.c}:${el.dataset.r}`; state.cView = 'path'; render(); }
+    if (act === 'udrawclose') { state.uDraw = null; render(); }
+    if (act === 'cview') { state.cView = el.dataset.v; state.cRound = null; state.uDraw = null; render(); }
     if (act === 'cround') { state.cRound = Number(el.dataset.r); render(); }
     if (act === 'endmatch') {
       finishMatch(g, primaryAction(g).match.id, null);

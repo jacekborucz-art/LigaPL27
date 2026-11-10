@@ -20,11 +20,13 @@ import { tableConfidence } from '../engine/teamStrength.js';
 import { afterMatchDelta, applyMorale, weeklyDrift } from '../career/morale.js';
 import { INJURY_TYPES } from '../engine/match/constants.js';
 import { fmtDate } from '../ui/dom.js';
+import { UEFA_CLUBS, createUefa } from './uefa.js';
 
 export const LEAGUE_COMPS = ['ekstraklasa', 'liga1', 'liga2'];
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
-const ALL_CLUBS = [...CLUBS_PL, ...CLUBS_L3, ...CLUBS_L4];
-export const anyClub = (id) => ALL_CLUBS.find((c) => c.id === id) ?? null;
+const ALL_CLUBS = [...CLUBS_PL, ...CLUBS_L3, ...CLUBS_L4, ...UEFA_CLUBS];
+const CLUB_INDEX = new Map(ALL_CLUBS.map((c) => [c.id, c]));
+export const anyClub = (id) => CLUB_INDEX.get(id) ?? null;
 export const suspKey = (comp) => (LEAGUE_COMPS.includes(comp) ? 'league' : comp === 'pp' ? 'cup' : comp);
 
 // ------------------------------------------------------------ Tworzenie sezonu
@@ -60,11 +62,10 @@ export function createSeason(seed, { playerClub = null } = {}) {
   fixtures.push(superCupFixture());
   const cup = createCup(CLUBS_PL, CLUBS_L3, CLUBS_L4, rng.fork('pp:uczestnicy'));
   fixtures.push(...drawRound(cup, 'PRE', tierOf, rng.fork('pp:PRE')));
-  // Tymczasowo do etapu 8: pierwszy mecz w pucharach UEFA klubu gracza (rywal z losowania w etapie 8)
-  const eu = POLISH_EUROPE_2026.find((e) => e.club === playerClub);
-  if (eu) fixtures.push({ id: `${eu.comp}-${eu.entry}-1`, comp: 'uefa', round: eu.entry, date: UEFA[eu.comp][eu.entry][0], time: '20:30', home: playerClub, away: null, played: false, label: `${{ LM: 'Liga Mistrzów', LE: 'Liga Europy', LK: 'Liga Konferencji' }[eu.comp]}, ${eu.entry}` });
+  void playerClub;
   fixtures.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-  return { fixtures, cup, playoffs: {}, seasonId: SEASON };
+  // Puchary UEFA: losowania i mecze dzień po dniu (src/season/europe.js)
+  return { fixtures, cup, playoffs: {}, seasonId: SEASON, uefa: createUefa(seed) };
 }
 
 /** Czy klub ma co najmniej 2 dni przerwy od innych meczów w danym dniu. */
@@ -192,6 +193,11 @@ export function fromEngineResult(r) {
 // ------------------------------------------------------------ Skutki meczu
 function yellowSuspension(comp, count) {
   const rules = COMPETITIONS[comp]?.yellowSuspension ?? (comp === 'pp' ? COMPETITIONS.pucharPolski.yellowSuspension : []);
+  if (!Array.isArray(rules)) {
+    // UEFA: pauza po 3. żółtej (uproszczenie: jeden próg na cały sezon), potem co 2 kartki
+    const { first, thenEvery } = rules.qualifying ?? { first: 3, thenEvery: 2 };
+    return count === first || (count > first && (count - first) % thenEvery === 0) ? 1 : 0;
+  }
   for (const r of rules) {
     if (r.at === count) return r.games;
     if (r.every && count > r.after && (count - r.after) % r.every === 0) return r.games;
@@ -207,7 +213,7 @@ export function applyResult(game, f, res, rng) {
   f.played = true;
   f.result = { score: res.score, scorers: res.scorers, shootout: res.shootout, extraTime: res.extraTime, stats: res.stats };
   const key = suspKey(f.comp);
-  const compRules = LEAGUE_COMPS.includes(f.comp) ? f.comp : f.comp === 'pp' ? 'pucharPolski' : null;
+  const compRules = LEAGUE_COMPS.includes(f.comp) ? f.comp : f.comp === 'pp' ? 'pucharPolski' : f.comp === 'uefa' ? 'uefa' : null;
   const msgs = [];
   [f.home, f.away].forEach((clubId, s) => {
     if (!game.world.clubs[clubId]) return; // kluby bez stałej kadry: bez zapisu
@@ -242,7 +248,7 @@ export function applyResult(game, f, res, rng) {
           const games = yellowSuspension(compRules, p.yc[key]);
           if (games) {
             p.susp[key] = (p.susp[key] ?? 0) + games;
-            if (mine) msgs.push(['important', `Pauza: ${p.name}`, `${p.name} otrzymał ${p.yc[key]}. żółtą kartkę i nie zagra w ${games === 1 ? 'kolejnym meczu' : `${games} kolejnych meczach`} (${key === 'league' ? 'liga' : 'Puchar Polski'}).`]);
+            if (mine) msgs.push(['important', `Pauza: ${p.name}`, `${p.name} otrzymał ${p.yc[key]}. żółtą kartkę i nie zagra w ${games === 1 ? 'kolejnym meczu' : `${games} kolejnych meczach`} (${key === 'league' ? 'liga' : key === 'uefa' ? 'puchary europejskie' : 'Puchar Polski'}).`]);
           }
         }
         if (x.rc) {
@@ -393,3 +399,6 @@ registerDailySystem({
 });
 
 export { standings, GAME_START };
+
+import './europe.js';
+import './nationalSystem.js';
