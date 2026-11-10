@@ -127,5 +127,32 @@ export function quickMatch(home, away, ctx, rng) {
     scorers: [pickScorers(H, gH, rng), pickScorers(A, gA, rng)],
     injuries: [rng.poisson(QS.INJ), rng.poisson(QS.INJ)],
     model: { lH, lA, dH, dA, home: H.breakdown, away: A.breakdown, missing: [H.missing.length, A.missing.length] },
+    xi: [H.xi.map((x) => x.player.id), A.xi.map((x) => x.player.id)],
+    _teams: [H, A],
   };
+}
+
+/**
+ * Mecz pucharowy w tle. mode: 'single' (remis -> dogrywka -> karne), 'penaltiesOnly' (remis -> karne).
+ * Dogrywka: 30 minut, średnie goli 1/3 meczu i lekko niższe (zmęczenie). Karne: szansa z różnicy sił.
+ */
+export function quickKnockout(home, away, ctx, rng, mode = 'single') {
+  const r = quickMatch(home, away, ctx, rng);
+  if (r.score[0] !== r.score[1]) return r;
+  const { lH, lA, dH, dA } = r.model;
+  if (mode === 'single') {
+    const eH = rng.poisson(lH / 3.3); const eA = rng.poisson(lA / 3.3);
+    r.extraTime = true;
+    r.score = [r.score[0] + eH, r.score[1] + eA];
+    r.scorers[0].push(...pickScorers(r._teams[0], eH, rng));
+    r.scorers[1].push(...pickScorers(r._teams[1], eA, rng));
+    if (eH !== eA) return r;
+  }
+  // Seria rzutów karnych: lepsza drużyna ma lekką przewagę
+  const pH = Math.min(0.62, Math.max(0.38, 0.5 + 0.03 * (dH - dA)));
+  const homeWins = rng.chance(pH);
+  const loser = rng.int(2, 4);
+  const winner = loser + 1;
+  r.shootout = homeWins ? [winner, loser] : [loser, winner];
+  return r;
 }

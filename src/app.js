@@ -8,7 +8,13 @@ import * as store from './core/store.js';
 import { hashString } from './core/rng.js';
 import { CATEGORIES, unreadCount, markRead, markAllRead, resolveMessage, filterInbox, pendingDecisions } from './core/inbox.js';
 import { processDay, primaryAction, continueUntilStop, finishMatch } from './core/gameLoop.js';
-import { provisionalFixtures } from './season/dailySystems.js';
+import './season/dailySystems.js';
+import { createSeason, compLabel, applyResult, fromEngineResult, squadFor, anyClub, LEAGUE_COMPS } from './season/season.js';
+import { standings } from './season/standings.js';
+import { renderCompetitions } from './ui/competitionsView.js';
+import { createMatch, runToEnd } from './engine/match/match.js';
+import { Rng } from './core/rng.js';
+import { addDays } from './core/gameLoop.js';
 import { generateWorld, squadOf, academyOf } from './world/worldGen.js';
 import { renderSquadList, renderPlayerProfile } from './ui/squadView.js';
 import { renderTactics } from './ui/tacticsView.js';
@@ -17,10 +23,12 @@ import { COMPETITIONS } from './config/competitions.js';
 
 const app = document.getElementById('app');
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
-const state = { screen: 'start', slot: null, game: null, tab: 'pulpit', tier: 1, notice: null, mailCat: null, mailOpen: null, running: false, sqFilter: 'all', playerOpen: null, sqSub: 'players', tSel: null, matchNotes: [] };
+const state = { screen: 'start', slot: null, game: null, tab: 'pulpit', tier: 1, notice: null, mailCat: null, mailOpen: null, running: false, sqFilter: 'all', playerOpen: null, sqSub: 'players', tSel: null, matchNotes: [], cComp: null, cView: 'table', cRound: null, lastResult: null };
 
 const benchSizeFor = (g) => COMPETITIONS[['ekstraklasa', 'liga1', 'liga2'][clubById(g.clubId).tier - 1]].benchSize;
-const mySquad = (g) => squadOf(g.world, g.clubId);
+const nextFixture = (g) => (g.fixtures || []).filter((f) => !f.played && (f.home === g.clubId || f.away === g.clubId)).sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? '')))[0];
+/** Kadra gracza z pauzami w rozgrywkach najbliższego meczu. */
+const mySquad = (g) => squadFor(g, g.clubId, nextFixture(g)?.comp ?? 'ekstraklasa');
 const leagueOvrCache = new Map();
 
 /** Posortowane OVR zawodników ligi (do gwiazdek). */
@@ -46,6 +54,7 @@ function render() {
   if (state.screen === 'start') return renderStart();
   if (state.screen === 'pick') return renderPick();
   if (state.screen === 'match') return renderMatchDay();
+  if (state.screen === 'matchResult') return renderMatchResult();
   return renderHub();
 }
 
@@ -61,8 +70,16 @@ function ensureGameShape(g) {
   if (!g.world) g.world = generateWorld(g.seed);
   if (!g.tactics) g.tactics = createTactics(mySquad(g), { benchSize: benchSizeFor(g) });
   else g.tactics = refreshTactics(g.tactics, mySquad(g), { benchSize: benchSizeFor(g) }).tactics;
-  if (!Array.isArray(g.fixtures)) g.fixtures = provisionalFixtures(g.clubId);
-  if (!Array.isArray(g.inbox)) {
+  if (!Array.isArray(g.inbox)) g.inbox = [];
+  if (!g.season) {
+    // Zapis sprzed etapu 7: tworzymy sezon i rozgrywamy w tle mecze z minionych dni
+    g.season = createSeason(g.seed, { playerClub: g.clubId });
+    g.fixtures = g.season.fixtures;
+    const today = g.date;
+    for (let d = GAME_START; d < today; d = addDays(d, 1)) processDay(g, d);
+    for (const f of g.fixtures) if (f.date < today && !f.played && (f.home === g.clubId || f.away === g.clubId)) { f.played = true; f.result = f.away ? { score: [0, 0], forfeit: true } : { score: [0, 0] }; }
+  }
+  if (!g.inbox.length) {
     g.inbox = [];
     const today = g.date;
     g.date = GAME_START;
@@ -152,7 +169,7 @@ function strength(L, tier) {
 function goButton(g) {
   if (state.running) return '<button class="go go--stop" data-act="stop">Zatrzymaj</button>';
   const a = primaryAction(g);
-  const sub = a.kind === 'play' ? esc(a.match.comp) : a.kind === 'decide' ? `${a.count} do decyzji` : `Następny dzień: ${esc(fmtDate(nextDate(g.date)))}`;
+  const sub = a.kind === 'play' ? esc(compLabel(a.match)) : a.kind === 'decide' ? `${a.count} do decyzji` : `Następny dzień: ${esc(fmtDate(nextDate(g.date)))}`;
   return `<button class="go go--${a.kind}" data-act="go"><span class="go__label">${esc(a.label)}</span><span class="go__sub">${sub}</span></button>`;
 }
 
@@ -186,6 +203,7 @@ function renderHub() {
 function renderTab(tab, g, club) {
   if (tab === 'pulpit') return renderDashboard(g, club);
   if (tab === 'poczta') return renderMail(g);
+  if (tab === 'rozgrywki') return renderCompetitions(g, { comp: state.cComp ?? ['ekstraklasa', 'liga1', 'liga2'][club.tier - 1], view: state.cView, round: state.cRound });
   if (tab === 'kadra') {
     const sub = `<div class="subtabs" role="tablist"><button role="tab" data-act="tsub" data-s="players" aria-selected="${state.sqSub === 'players'}">Zawodnicy</button><button role="tab" data-act="tsub" data-s="tactics" aria-selected="${state.sqSub === 'tactics'}">Skład i taktyka</button></div>`;
     if (state.sqSub === 'tactics') return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g) });
@@ -195,7 +213,6 @@ function renderTab(tab, g, club) {
     return sub + renderSquadList(squadOf(g.world, g.clubId), { filter: state.sqFilter, leagueOvrs: ovrs, academy: academyOf(g.world, g.clubId) });
   }
   const soon = {
-    rozgrywki: ['Tabele 3 lig i terminarze', 'Puchar Polski, LM, LE, LK, reprezentacje', 'Strzelcy, kartkowicze, kontuzjowani, forma'],
     transfery: ['Lista transferowa, wypożyczenia, wolni zawodnicy', 'Negocjacje kontraktów', 'Okna transferowe'],
     trening: ['Plan tygodnia: 5 akcentów, 3 intensywności', 'Rozwój młodych', 'Zmęczenie i świeżość'],
   }[tab];
@@ -208,14 +225,25 @@ function renderTab(tab, g, club) {
 }
 
 function renderDashboard(g, club) {
-  const next = (g.fixtures || []).filter((f) => !f.played && (f.home === g.clubId || f.away === g.clubId)).sort((a, b) => a.date.localeCompare(b.date))[0];
+  const next = nextFixture(g);
+  const comp = ['ekstraklasa', 'liga1', 'liga2'][club.tier - 1];
+  const table = standings(g.fixtures.filter((f) => f.comp === comp), CLUBS_PL.filter((c) => c.tier === club.tier).map((c) => c.id));
+  const me = table.find((r) => r.id === g.clubId);
+  const opp = next && (next.home === g.clubId ? next.away : next.home);
   const tw = DOMESTIC.transferWindows.find((w) => g.date >= w.from && g.date <= w.to);
   const latest = g.inbox.slice(0, 4);
   return `
     <h2>Pulpit</h2>
     <section class="panel">
       <p class="muted">Następny mecz</p>
-      ${next ? `<p class="panel__lead">${esc(next.comp)}</p><p class="muted">${esc(weekday(next.date))}, ${esc(fmtDate(next.date))}${next.away ? '' : ', rywal z terminarza'}</p>` : '<p class="panel__lead">Brak zaplanowanych meczów</p>'}
+      ${next ? `<p class="panel__lead">${opp && anyClub(opp) ? `${crestHtml(anyClub(opp), { size: 28, clubsById })} ${esc(anyClub(opp).name)}` : 'Rywal z losowania'}</p>
+        <p class="muted">${esc(compLabel(next))}, ${next.home === g.clubId ? 'u siebie' : 'na wyjeździe'}${next.neutral ? ' (teren neutralny)' : ''}</p>
+        <p class="muted">${esc(weekday(next.date))}, ${esc(fmtDate(next.date))}${next.time ? `, ${esc(next.time)}` : ''}</p>` : '<p class="panel__lead">Brak zaplanowanych meczów</p>'}
+    </section>
+    <section class="panel">
+      <p class="muted">${esc(LEAGUE_NAMES[club.tier])}</p>
+      <p class="panel__lead">${me.pos}. miejsce, ${me.points} pkt</p>
+      <p class="muted">${me.played} meczów: ${me.wins} zwycięstw, ${me.draws} remisów, ${me.losses} porażek, bramki ${me.gf}:${me.ga}</p>
     </section>
     <section class="panel">
       <p class="muted">Okno transferowe</p>
@@ -258,27 +286,83 @@ function renderMail(g) {
     <ul class="mail-list stripes">${list.map(mailRow).join('') || '<li class="mail-empty">Brak wiadomości w tej kategorii.</li>'}</ul>`;
 }
 
-// ---------- Dzień meczowy (tymczasowo, do etapu 5) ----------
+// ---------- Dzień meczowy (tymczasowo do etapu 5: pełny silnik, wynik od razu) ----------
 function renderMatchDay() {
   const g = state.game;
-  const a = primaryAction(g);
-  const f = a.match;
-  const home = clubById(f.home);
-  const away = f.away ? clubById(f.away) : null;
+  const f = primaryAction(g).match;
+  const side = (id) => (anyClub(id) ? `<div class="fixture__team">${crestHtml(anyClub(id), { size: 64, clubsById })}${esc(anyClub(id).name)}</div>` : '<div class="fixture__team">Rywal z losowania</div>');
   app.innerHTML = `
   <main class="start">
-    <div class="led">${esc(fmtDate(g.date))}</div>
+    <div class="led">${esc(fmtDate(g.date))}${f.time ? `, ${esc(f.time)}` : ''}</div>
     <h1>Dzień meczowy</h1>
-    <p class="panel__lead">${esc(f.comp)}</p>
-    <p>${esc(home?.name ?? '')} ${away ? `vs ${esc(away.name)}` : 'vs rywal z terminarza'}</p>
+    <p class="panel__lead">${esc(compLabel(f))}</p>
+    <div class="fixture">${side(f.home)}<div class="fixture__mid"><span class="led">vs</span></div>${side(f.away)}</div>
     ${state.matchNotes.length ? `<section class="panel"><p class="muted">Asystent poprawił skład:</p><ul class="plain">${state.matchNotes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul></section>` : ''}
-    <section class="panel">
-      <p>Pełny dzień meczowy (studio, odprawa, mecz na żywo, przerwa, studio pomeczowe) powstanie w etapie 5. Wygląd możesz już obejrzeć w prototypie.</p>
-      <p><a class="btn btn--quiet" href="design/dzien-meczowy.html" target="_blank" rel="noopener">Otwórz prototyp dnia meczowego</a></p>
-    </section>
-    <button class="btn btn--primary" data-act="endmatch">Zakończ mecz i wróć</button>
-    <p class="muted">Wynik pojawi się, gdy powstanie silnik meczu (etap 3). Teraz mecz zostanie tylko oznaczony jako rozegrany.</p>
+    ${f.away ? '<button class="btn btn--primary" data-act="playnow">Rozegraj mecz</button>' : '<button class="btn btn--primary" data-act="endmatch">Zakończ mecz (rywal UEFA w etapie 8)</button>'}
+    <p class="muted">Mecz rozgrywa pełny silnik minuta po minucie z Twoim składem i taktyką, a zmiany robi asystent. Oglądanie meczu na żywo, odprawy i studio dojdą w etapie 5.</p>
+    <p><a class="btn btn--quiet" href="design/dzien-meczowy.html" target="_blank" rel="noopener">Prototyp dnia meczowego</a></p>
   </main>`;
+}
+
+function renderMatchResult() {
+  const { f, r } = state.lastResult;
+  const g = state.game;
+  const s = r.stats;
+  const rows = [['Posiadanie %', 'possession'], ['Strzały', 'shots'], ['Celne', 'onTarget'], ['xG', 'xg'], ['Podania', 'passes'], ['Celność podań %', 'passAccuracy'], ['Rożne', 'corners'], ['Auty', 'throwIns'], ['Faule', 'fouls'], ['Spalone', 'offsides'], ['Żółte kartki', 'yellow'], ['Czerwone kartki', 'red'], ['Obrony', 'saves']];
+  const key = r.events.filter((e) => ['goal', 'red', 'penalty', 'varOverturn', 'injury', 'sub', 'shootoutKick'].includes(e.type) || (e.type === 'yellow'));
+  const mine = r.ratings.filter((x) => x.side === (f.home === g.clubId ? 0 : 1)).sort((a, b) => b.rating - a.rating);
+  const motm = r.ratings.find((x) => x.id === r.motm);
+  app.innerHTML = `
+  <main class="start">
+    <h1>Wynik meczu</h1>
+    <p class="muted">${esc(compLabel(f))}, ${esc(fmtDate(f.date))}</p>
+    <div class="board result-board">
+      <div class="board__t">${crestHtml(anyClub(f.home), { size: 30, clubsById })}<span>${esc(anyClub(f.home).short)}</span></div>
+      <div><div class="board__score">${r.score[0]}:${r.score[1]}</div><span class="board__min">${r.shootout ? `karne ${r.shootout.goals[0]}:${r.shootout.goals[1]}` : r.extraTime ? 'po dogrywce' : 'Koniec'}</span></div>
+      <div class="board__t"><span>${esc(anyClub(f.away).short)}</span>${crestHtml(anyClub(f.away), { size: 30, clubsById })}</div>
+    </div>
+    ${motm ? `<p class="panel__lead">Zawodnik meczu: ${esc(motm.name)} (${motm.rating.toFixed(1)})</p>` : ''}
+    <h2>Przebieg</h2>
+    <ul class="plain-list">${key.map((e) => `<li><span class="k">${esc(e.min)}</span>${e.side != null ? `<span class="tag">${esc(anyClub(e.side === 0 ? f.home : f.away).short)}</span>` : ''}<span>${esc(e.text ?? e.type)}</span></li>`).join('') || '<li>Spokojny mecz bez ważnych wydarzeń.</li>'}</ul>
+    <h2>Statystyki</h2>
+    <table class="vs-table"><tbody>${rows.map(([l, k]) => `<tr><td>${s[0][k]}</td><td class="lbl">${esc(l)}</td><td>${s[1][k]}</td></tr>`).join('')}</tbody></table>
+    <h2>Oceny Twoich zawodników</h2>
+    <ul class="plain-list">${mine.map((x) => `<li><span class="k">${esc(x.pos)}</span><span style="flex:1">${esc(x.name)}${x.g ? `, gole: ${x.g}` : ''}${x.a ? `, asysty: ${x.a}` : ''}${x.injury ? `, kontuzja: ${esc(x.injury.name)}` : ''}</span><b>${x.rating.toFixed(1)}</b></li>`).join('')}</ul>
+    <button class="btn btn--primary" data-act="resultdone">Wróć do gry</button>
+  </main>`;
+  window.scrollTo({ top: 0 });
+}
+
+async function playMyMatch() {
+  const g = state.game;
+  const f = primaryAction(g).match;
+  const mySide = f.home === g.clubId ? 0 : 1;
+  const oppId = mySide === 0 ? f.away : f.home;
+  const oppClub = anyClub(oppId);
+  const oppSquad = squadFor(g, oppId, f.comp);
+  const tierComp = LEAGUE_COMPS.includes(f.comp) ? f.comp : 'pucharPolski';
+  const bench = COMPETITIONS[tierComp]?.benchSize ?? 12;
+  const cfgFor = (id, squad, tactics, ai) => ({ club: anyClub(id), squad, tactics, ai, coach: anyClub(id)?.coach ?? 'P' });
+  const mine = cfgFor(g.clubId, mySquad(g), g.tactics, false);
+  const theirs = cfgFor(oppId, oppSquad, createTactics(oppSquad, { benchSize: bench }), true);
+  const M = createMatch({
+    seed: `${g.seed}:${f.id}`,
+    home: mySide === 0 ? mine : theirs,
+    away: mySide === 0 ? theirs : mine,
+    ctx: { neutral: !!f.neutral, var: f.comp === 'ekstraklasa' || f.comp === 'super' || f.round === 'SF' || f.round === 'F', rank: f.comp === 'pp' ? (f.round === 'F' ? 3 : 1) : f.comp === 'super' ? 2 : 0, refStrict: 0.85 + new Rng(f.id).next() * 0.35, knockout: f.knockout === 'single' ? 'single' : false },
+  });
+  const r = runToEnd(M, { assistantFor: [mySide] });
+  if (f.knockout === 'penaltiesOnly' && r.score[0] === r.score[1] && !r.shootout) {
+    const rng = new Rng(`karne:${f.id}`);
+    r.shootout = { goals: rng.chance(0.5) ? [4, 3] : [3, 4], kicks: [] };
+  }
+  const rng = new Rng(`wynik:${g.seed}:${f.id}`);
+  const msgs = applyResult(g, f, fromEngineResult(r), rng);
+  for (const [priority, subject, body] of msgs) g.inbox.unshift({ id: `m:${f.id}:${subject}`, key: `m:${f.id}:${subject}`, date: g.date, category: 'staff', from: 'Sztab', subject, body, priority, actions: [], read: false, resolved: true });
+  await save();
+  state.lastResult = { f, r };
+  state.screen = 'matchResult';
+  render();
 }
 
 // ---------- Upływ dni ----------
@@ -343,8 +427,10 @@ async function newGame(slot, clubId) {
   const seed = hashString(`${clubId}:${Date.now()}:${Math.random()}`);
   const game = {
     seed, clubId, date: GAME_START, season: SEASON, createdAt: new Date().toISOString(),
-    inbox: [], fixtures: provisionalFixtures(clubId),
+    inbox: [],
   };
+  game.season = createSeason(seed, { playerClub: clubId });
+  game.fixtures = game.season.fixtures;
   game.world = generateWorld(seed);
   game.tactics = createTactics(squadOf(game.world, clubId), { benchSize: benchSizeFor(game) });
   processDay(game);
@@ -383,6 +469,11 @@ app.addEventListener('click', async (ev) => {
       else await runDays();
     }
     if (act === 'stop') state.running = false;
+    if (act === 'playnow') await playMyMatch();
+    if (act === 'resultdone') { state.screen = 'hub'; state.tab = 'pulpit'; render(); }
+    if (act === 'ccomp') { state.cComp = el.dataset.c; state.cRound = null; render(); }
+    if (act === 'cview') { state.cView = el.dataset.v; render(); }
+    if (act === 'cround') { state.cRound = Number(el.dataset.r); render(); }
     if (act === 'endmatch') {
       finishMatch(g, primaryAction(g).match.id, null);
       await save();

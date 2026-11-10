@@ -556,7 +556,10 @@ Kolejność jest celowa. Po etapie 5 da się zagrać pojedynczy mecz, a po etapi
 | 2. Kadra i taktyka | Gotowy | 10 formacji, 9 instrukcji, skład dwoma dotknięciami |
 | 3. Silnik meczowy | Gotowy (bez ekranu) | `src/engine/match/`: fazy minuty, zdarzenia, statystyki ze zdarzeń, zmiany 5/3, taktyka z bezwładnością, okrzyki, AI trenera, dogrywka, karne, oceny |
 | 4. Reguły meczu | Gotowy w silniku | Kartki, karne, VAR, kontuzje (1 minuta po opatrzeniu), doliczony czas z wydarzeń |
-| 5. Ekran meczu | Prototyp wyglądu | Następny krok: podłączenie silnika i odpraw do ekranu |
+| 7. Sezon krajowy | Gotowy | Terminarz 3 lig (34 kolejki, weekendy, okna FIFA, ostatnie 2 kolejki jednocześnie), mecze w tle dzień po dniu, tabele z kryteriami, Superpuchar, Puchar Polski z losowaniami (III i IV liga), baraże, kartki i pauzy, kontuzje i regeneracja, przekładanie meczów ligi przy kolizji z pucharem |
+| 5. Ekran meczu | Prototyp wyglądu + mecz pełnym silnikiem (wynik od razu) | Następny krok: mecz na żywo, odprawy i studio |
+
+Niższe ligi (dane): III liga 72 drużyny w 4 grupach, IV liga 276 drużyn w 16 grupach (`src/data/clubs_l3.js`, `clubs_l4.js`, generowane z `tools/data/*.txt` przez `node tools/build-lower-leagues.mjs`). Kluby niższych lig nie mają stałych kadr: kadra jest losowana na mecz (`src/world/ephemeral.js`), stała w danym sezonie.
 
 Kalibracja silnika (3000 meczów Ekstraklasy na wygenerowanych kadrach): 2,72 gola, 25 strzałów, 8,9 celnych, 9,7 rożnego, 27 fauli, 4,4 żółtej, 0,19 czerwonej, 4,5 spalonego, 0,29 karnego, ok. 430 podań na drużynę (81 %), 44 auty, wygrane gospodarzy 44,6 %, remisy 25,3 %, 54 % goli w drugiej połowie, doliczony czas 2,5 i 7,1 min, 4,1 zmiany na drużynę, ok. 3 ms na mecz.
 
