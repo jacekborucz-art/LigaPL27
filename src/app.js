@@ -18,7 +18,9 @@ import { addDays } from './core/gameLoop.js';
 import { generateWorld, squadOf, academyOf } from './world/worldGen.js';
 import { renderSquadList, renderPlayerProfile } from './ui/squadView.js';
 import { renderTactics } from './ui/tacticsView.js';
-import { createTactics, assign, changeFormation, setInstruction, refreshTactics, removeFromBench, checkTactics } from './engine/lineup.js';
+import { resolveMove, resolveTap, parseLoc, locKey, playerAt, sameLoc } from './ui/tacticsMoves.js';
+import { mountTacticsDrag } from './ui/tacticsDrag.js';
+import { createTactics, changeFormation, setInstruction, refreshTactics, removeFromBench, checkTactics } from './engine/lineup.js';
 import { COMPETITIONS } from './config/competitions.js';
 import { mountMatchday } from './ui/matchdayView.js';
 import { mountDrawAnimation } from './ui/europeView.js';
@@ -232,7 +234,10 @@ function renderTab(tab, g, club) {
   if (tab === 'kadra') {
     const sub = `<div class="subtabs" role="tablist"><button role="tab" data-act="tsub" data-s="players" aria-selected="${state.sqSub === 'players'}">Zawodnicy</button><button role="tab" data-act="tsub" data-s="tactics" aria-selected="${state.sqSub === 'tactics'}">Skład i taktyka</button><button role="tab" data-act="tsub" data-s="talks" aria-selected="${state.sqSub === 'talks'}">Rozmowy</button></div>`;
     if (state.sqSub === 'talks') return sub + renderTalks(g, state);
-    if (state.sqSub === 'tactics') return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g) });
+    if (state.sqSub === 'tactics') {
+      queueMicrotask(mountTacticsScreen); // po wstawieniu HTML: okno atrybutów i fokus
+      return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), info: state.tInfo, msg: state.tMsg });
+    }
     const ovrs = leagueOvrs(g, club.tier);
     const p = state.playerOpen && g.world.players[state.playerOpen];
     if (p) return renderPlayerProfile(p, { leagueOvrs: ovrs, clubName: club.name, date: g.date });
@@ -443,29 +448,124 @@ async function runDays() {
 }
 
 
-// ---------- Skład: wybór dwoma dotknięciami ----------
-async function tacticsClick(g, act, el) {
-  const sel = state.tSel;
-  const t = g.tactics;
-  let next = null;
-  if (act === 'tslot') {
-    const idx = Number(el.dataset.idx);
-    if (sel?.type === 'player') next = assign(t, { type: 'xi', idx }, sel.id);
-    else if (sel?.type === 'xi' && sel.idx !== idx && t.xi[sel.idx]) next = assign(t, { type: 'xi', idx }, t.xi[sel.idx]);
-    else if (sel?.type === 'bench') next = assign(t, { type: 'xi', idx }, t.bench[sel.idx]);
-    else state.tSel = sel?.type === 'xi' && sel.idx === idx ? null : { type: 'xi', idx };
-  } else {
-    const id = el.dataset.id;
-    const where = el.dataset.where;
-    const idx = el.dataset.idx != null ? Number(el.dataset.idx) : null;
-    if (sel?.type === 'xi') next = assign(t, sel, id);
-    else if (sel?.type === 'bench' && where === 'out') next = assign(t, sel, id);
-    else if (sel?.type === 'player' && where === 'bench') next = assign(t, { type: 'bench', idx }, sel.id);
-    else state.tSel = where === 'bench' ? { type: 'bench', idx } : { type: 'player', id };
-  }
-  if (next) { g.tactics = next; state.tSel = null; await save(); }
+// ---------- Skład: przeciąganie, wybór dwoma dotknięciami, panel atrybutów ----------
+const WIDE_INFO = '(min-width: 1280px)'; // od tej szerokości panel atrybutów stoi obok listy
+const tUi = { focus: null, infoReturn: null, infoOpened: false, lastTap: null, ctx: null };
+
+/** Kadra i ławka do reguł ruchów (pamiętane dla bieżącej taktyki, bo przeciąganie pyta przy każdym ruchu). */
+function tCtx(g) {
+  if (tUi.ctx?.tactics !== g.tactics) tUi.ctx = { tactics: g.tactics, byId: new Map(mySquad(g).map((p) => [p.id, p])), benchSize: benchSizeFor(g) };
+  return tUi.ctx;
+}
+
+const tacticsOpen = () => state.screen === 'hub' && state.tab === 'kadra' && state.sqSub === 'tactics';
+
+/** Selektor elementu, na który wraca fokus po ponownym renderze (ten sam przycisk w nowym DOM). */
+function focusKeyOf(el) {
+  const a = el?.dataset?.act;
+  if (!a) return null;
+  for (const k of ['loc', 'id', 'f']) if (el.dataset[k] != null) return `[data-act="${a}"][data-${k}="${CSS.escape(el.dataset[k])}"]`;
+  return `[data-act="${a}"]`;
+}
+
+function renderTacticsAfter(focusSel) {
+  tUi.focus = focusSel ?? focusKeyOf(document.activeElement);
   render();
 }
+
+function mountTacticsScreen() {
+  const dlg = app.querySelector('dialog.tdet');
+  const opened = tUi.infoOpened;
+  tUi.infoOpened = false;
+  if (dlg && !matchMedia(WIDE_INFO).matches) {
+    dlg.close();
+    dlg.showModal(); // telefon i tablet: arkusz/okno modalne, fokus trafia do przycisku Zamknij
+  } else if (dlg && opened) dlg.querySelector('.tdet__x')?.focus({ preventScroll: true });
+  else if (tUi.focus) app.querySelector(tUi.focus)?.focus({ preventScroll: true });
+  tUi.focus = null;
+}
+
+function openInfo(pid, el) {
+  state.tInfo = pid;
+  tUi.infoReturn = focusKeyOf(el);
+  tUi.infoOpened = true;
+  renderTacticsAfter();
+}
+
+function closeInfo() {
+  const back = tUi.infoReturn;
+  state.tInfo = null;
+  tUi.infoReturn = null;
+  renderTacticsAfter(back);
+}
+
+async function tacticsClick(g, el) {
+  const loc = parseLoc(el.dataset.loc);
+  if (!loc) return;
+  const key = locKey(loc);
+  const now = performance.now();
+  const last = tUi.lastTap;
+  // Dwuklik (dwa dotknięcia tego samego miejsca): cofamy skutek pierwszego i pokazujemy atrybuty.
+  if (last && last.key === key && now - last.t < 450) {
+    tUi.lastTap = null;
+    const pid = playerAt(last.prev.tactics, loc);
+    if (pid) {
+      const changed = g.tactics !== last.prev.tactics;
+      g.tactics = last.prev.tactics;
+      state.tSel = last.prev.sel;
+      state.tMsg = '';
+      if (changed) await save();
+      openInfo(pid, el);
+      return;
+    }
+  }
+  tUi.lastTap = { key, t: now, prev: { tactics: g.tactics, sel: state.tSel } };
+  const sel = state.tSel;
+  const selectable = loc.zone === 'xi' || !!playerAt(g.tactics, loc);
+  state.tMsg = '';
+  if (sel && sameLoc(sel, loc)) state.tSel = null;
+  else if (sel) {
+    const r = resolveTap(g.tactics, sel, loc, tCtx(g));
+    if (r.ok) { g.tactics = r.tactics; state.tSel = null; state.tMsg = r.text; await save(); }
+    else if (r.reason) state.tMsg = r.reason;
+    else state.tSel = selectable ? loc : null;
+  } else if (selectable) state.tSel = loc;
+  else if (loc.zone === 'benchAdd') state.tMsg = 'Najpierw wybierz zawodnika spoza kadry meczowej, potem wolne miejsce na ławce.';
+  renderTacticsAfter();
+}
+
+mountTacticsDrag(app, {
+  resolve: (src, dst) => resolveMove(state.game.tactics, src, dst, tCtx(state.game)),
+  onDrop: async (src, dst) => {
+    const g = state.game;
+    const r = resolveMove(g.tactics, src, dst, tCtx(g));
+    if (!r.ok) return;
+    g.tactics = r.tactics;
+    state.tSel = null;
+    state.tMsg = r.text;
+    tUi.lastTap = null;
+    await save();
+    renderTacticsAfter();
+  },
+  onReject: (reason) => { state.tMsg = reason; renderTacticsAfter(); },
+});
+
+// Escape na ekranie składu: najpierw zamyka panel atrybutów albo anuluje wybór (nie wychodzi do menu).
+app.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'Escape' || !tacticsOpen() || ev.target.closest('select')) return;
+  if (state.tInfo) { ev.preventDefault(); ev.stopPropagation(); closeInfo(); }
+  else if (state.tSel) { ev.preventDefault(); ev.stopPropagation(); state.tSel = null; state.tMsg = ''; renderTacticsAfter(); }
+});
+// Zamknięcie okna modalnego przez przeglądarkę (Escape) i dotknięcie tła za arkuszem.
+app.addEventListener('cancel', (ev) => {
+  if (!ev.target.matches?.('dialog.tdet')) return;
+  ev.preventDefault();
+  closeInfo();
+}, true);
+app.addEventListener('click', (ev) => {
+  if (ev.target.matches?.('dialog.tdet') && ev.target.matches(':modal')) closeInfo();
+});
+matchMedia(WIDE_INFO).addEventListener?.('change', () => { if (state.tInfo && tacticsOpen()) render(); });
 
 app.addEventListener('input', (ev) => {
   if (state.ng && ev.target.closest('[data-ng-form]')) refreshNegotiationHints(app, state.ng);
@@ -591,17 +691,24 @@ app.addEventListener('click', async (ev) => {
     if (act === 'sqfilter') { state.sqFilter = el.dataset.f; render(); }
     if (act === 'player') { state.playerOpen = el.dataset.id; render(); window.scrollTo({ top: 0 }); }
     if (act === 'squadback') { state.playerOpen = null; render(); }
-    if (act === 'tsub') { state.sqSub = el.dataset.s; state.tSel = null; state.playerOpen = null; state.ttResult = null; state.ttMeeting = null; render(); }
-    if (act === 'tcancel') { state.tSel = null; render(); }
-    if (act === 'tform') { g.tactics = changeFormation(g.tactics, mySquad(g), el.dataset.f); state.tSel = null; await save(); render(); }
-    if (act === 'tauto') { g.tactics = createTactics(mySquad(g), { formation: g.tactics.formation, benchSize: benchSizeFor(g), instructions: g.tactics.instructions }); state.tSel = null; await save(); render(); }
-    if (act === 'tinstr') { g.tactics = setInstruction(g.tactics, el.dataset.i, el.dataset.v); await save(); render(); }
-    if (act === 'tunbench') { g.tactics = removeFromBench(g.tactics, el.dataset.id); state.tSel = null; await save(); render(); }
-    if (act === 'tbench') {
-      if (g.tactics.bench.length >= benchSizeFor(g)) { state.tSel = { type: 'player', id: el.dataset.id }; render(); return; }
-      g.tactics = assign(g.tactics, { type: 'bench', idx: g.tactics.bench.length }, el.dataset.id); state.tSel = null; await save(); render();
+    if (act === 'tsub') { state.sqSub = el.dataset.s; state.tSel = null; state.tInfo = null; state.tMsg = ''; state.playerOpen = null; state.ttResult = null; state.ttMeeting = null; render(); }
+    if (act === 'tcancel') { state.tSel = null; state.tMsg = ''; renderTacticsAfter('[data-act="tauto"]'); }
+    if (act === 'tform') { g.tactics = changeFormation(g.tactics, mySquad(g), el.dataset.f); state.tSel = null; state.tMsg = ''; await save(); renderTacticsAfter(); }
+    if (act === 'tauto') { g.tactics = createTactics(mySquad(g), { formation: g.tactics.formation, benchSize: benchSizeFor(g), instructions: g.tactics.instructions }); state.tSel = null; state.tMsg = 'Asystent ustawił skład.'; await save(); renderTacticsAfter(); }
+    if (act === 'tinstr') { g.tactics = setInstruction(g.tactics, el.dataset.i, el.dataset.v); await save(); renderTacticsAfter(); }
+    if (act === 'tunbench') {
+      const name = tCtx(g).byId.get(el.dataset.id)?.name ?? 'Zawodnik';
+      g.tactics = removeFromBench(g.tactics, el.dataset.id); state.tSel = null; state.tMsg = `${name} poza kadrą meczową.`; await save(); renderTacticsAfter();
     }
-    if (act === 'tslot' || act === 'tpick') { await tacticsClick(g, act, el); }
+    if (act === 'tbench') {
+      if (g.tactics.bench.length >= benchSizeFor(g)) { state.tSel = { zone: 'out', id: el.dataset.id }; state.tMsg = 'Ławka jest pełna. Wskaż zawodnika z ławki, którego zastąpi.'; renderTacticsAfter(); return; }
+      const r = resolveMove(g.tactics, { zone: 'out', id: el.dataset.id }, { zone: 'benchAdd' }, tCtx(g));
+      if (r.ok) { g.tactics = r.tactics; state.tMsg = r.text; await save(); } else state.tMsg = r.reason;
+      state.tSel = null; renderTacticsAfter();
+    }
+    if (act === 'tslot' || act === 'tpick') await tacticsClick(g, el);
+    if (act === 'tinfo') { if (state.tInfo === el.dataset.id) closeInfo(); else openInfo(el.dataset.id, el); }
+    if (act === 'tinfoclose') closeInfo();
     if (act === 'mailcat') { state.mailCat = el.dataset.cat || null; render(); }
     if (act === 'readall') { g.inbox = markAllRead(g.inbox); await save(); render(); }
     if (act === 'maildel') { const m = g.inbox.find((x) => x.id === el.dataset.id); if (m && canDelete(m)) forgetMessages(g, { inbox: g.inbox.filter((x) => x !== m), removed: m.key ? [m.key] : [] }); state.mailOpen = null; await save(); render(); }
