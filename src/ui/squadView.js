@@ -93,6 +93,7 @@ export function renderPlayerProfile(p, { leagueOvrs = [], clubName = '' } = {}) 
           <li><span class="k">Świeżość</span><span>${p.fresh}%</span></li>
           <li><span class="k">Ostrość</span><span>${p.sharp}%</span></li>
           <li><span class="k">Zdrowie</span><span>${p.injuryDays > 0 ? `Kontuzja, ok. ${p.injuryDays} dni` : 'Zdrowy'}</span></li>
+          ${p.history?.length ? `<li><span class="k">Kariera</span><span>${p.history.slice(-5).reverse().map((h) => `${esc(h.s)}: ${h.apps} mecze, ${h.g} goli`).join('; ')}</span></li>` : ''}
           ${p.callUp ? `<li><span class="k">Kadra</span><span>Na zgrupowaniu do ${esc(fmtDate(p.callUp.to))}</span></li>` : ''}
           ${p.intl?.caps || p.intlU21 ? `<li><span class="k">Reprezentacja</span><span>${p.intl?.caps ? `występy: ${p.intl.caps}, gole: ${p.intl.goals}` : ''}${p.intl?.caps && p.intlU21 ? '; ' : ''}${p.intlU21 ? `zgrupowania U21: ${p.intlU21}` : ''}</span></li>` : ''}
         </ul>

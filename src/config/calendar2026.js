@@ -2,12 +2,17 @@
 // sure: true = potwierdzone w kilku źródłach; false = pojedyncze źródło albo założenie.
 // Daty UEFA i finałów są stałe (priorytet 1-2), harmonogram ligi układa się wokół nich.
 
-export const SEASON = '2026/27';
-export const GAME_START = '2026-07-01';
+export const GAME_START = '2026-07-01'; // start kariery (pierwszy sezon)
+// Sezon bieżący: wartości „żywe” (ES modules), przestawiane przez setSeasonYear() na kolejne lata.
+export let SEASON = '2026/27';
+export let SEASON_YEAR = 2026;
+export let SEASON_START = '2026-07-01';
+export let SEASON_END = '2027-06-30';
 
 export const DOMESTIC = {
   superpuchar: { date: '2026-07-17', sure: false, note: 'mistrz 2025/26 vs zdobywca PP 2025/26' },
   ekstraklasa: { start: '2026-07-24', autumnEnd: '2026-12-14', springStart: '2027-01-29', end: '2027-05-22', sure: true },
+  lowerAutumnEnd: '2026-12-14',
   // 1L i 2L: start, koniec i baraże 1L ze źródeł; start wiosny i baraże 2L to założenia.
   liga1: { start: '2026-07-24', springStart: '2027-02-26', end: '2027-05-29', playoffSemis: '2027-06-03', playoffFinal: '2027-06-06', sure: false },
   liga2: { start: '2026-07-24', springStart: '2027-03-05', end: '2027-05-29', playoffSemis: '2027-06-02', playoffFinal: '2027-06-05', sure: false },
@@ -73,3 +78,34 @@ export const FIFA_WINDOWS = [
 ];
 
 export const inFifaWindow = (iso) => FIFA_WINDOWS.some((w) => iso >= w.from && iso <= w.to);
+
+// ------------------------------------------------------------ Kolejne sezony
+// Daty sezonu 2026/27 są wzorcem. Kolejny sezon to przesunięcie o pełne tygodnie (te same dni tygodnia),
+// okna FIFA z danych reprezentacji (docs/reprezentacje.md), polskie kluby w pucharach z europeAccess.
+const BASE = JSON.parse(JSON.stringify({ DOMESTIC, UEFA, POLISH_EUROPE_2026, FIFA_WINDOWS }));
+const shiftIso = (iso, days) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); };
+function shiftDeep(v, days) {
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) return shiftIso(v, days);
+  if (Array.isArray(v)) return v.map((x) => shiftDeep(x, days));
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, shiftDeep(x, days)]));
+  return v;
+}
+const replaceContents = (target, src) => { for (const k of Object.keys(target)) delete target[k]; Object.assign(target, src); };
+
+/**
+ * Ustawia kalendarz sezonu rozpoczynającego się w roku y. windows: okna FIFA z danych reprezentacji
+ * [{ from, to, matches }]; polishEurope: [{ club, comp, entry, path? }] (z kwalifikacji po poprzednim sezonie).
+ */
+export function setSeasonYear(y, { windows = null, polishEurope = null } = {}) {
+  const k = y - 2026;
+  const days = 7 * Math.round((365.2425 * k) / 7);
+  SEASON_YEAR = y;
+  SEASON = `${y}/${String(y + 1).slice(2)}`;
+  SEASON_START = `${y}-07-01`;
+  SEASON_END = `${y + 1}-06-30`;
+  replaceContents(DOMESTIC, shiftDeep(BASE.DOMESTIC, days));
+  replaceContents(UEFA, shiftDeep(BASE.UEFA, days));
+  const fifa = k === 0 ? BASE.FIFA_WINDOWS : (windows ?? shiftDeep(BASE.FIFA_WINDOWS, days)).filter((w) => w.from >= SEASON_START && w.to <= SEASON_END && w.matches);
+  FIFA_WINDOWS.length = 0; FIFA_WINDOWS.push(...fifa.map((w) => ({ sure: false, note: '', ...w })));
+  POLISH_EUROPE_2026.length = 0; POLISH_EUROPE_2026.push(...(k === 0 && !polishEurope ? BASE.POLISH_EUROPE_2026 : polishEurope ?? []));
+}

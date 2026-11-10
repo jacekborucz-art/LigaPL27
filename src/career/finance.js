@@ -41,7 +41,7 @@ const wageBill = (world, clubId) => (world.clubs[clubId]?.squad ?? []).reduce((s
 const monthKey = (iso) => iso.slice(0, 7);
 
 /** Finanse klubu na start sezonu. */
-function initClub(world, club) {
+export function initClub(world, club) {
   const wages = wageBill(world, club.id);
   const base = Math.round(wages * 52 * FIN.REVENUE_X_WAGES);
   const balance = Math.round(base * (0.08 + club.prestige * 0.015) / 10000) * 10000;

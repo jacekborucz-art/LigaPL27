@@ -31,7 +31,7 @@ function ageFor(role, rng) {
   return rng.weighted([19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34], (a) => (a <= 22 ? 1.5 : a >= 32 ? 0.6 : 1));
 }
 
-function generateClubSquad(club, rootRng, date) {
+export function generateClubSquad(club, rootRng, date) {
   const rng = rootRng.fork(`klub:${club.id}`);
   const used = {};
   const players = [];

@@ -24,6 +24,7 @@ import { mountMatchday } from './ui/matchdayView.js';
 import { mountDrawAnimation } from './ui/europeView.js';
 import { ensureUefa } from './season/europe.js';
 import { ensureNational } from './season/nationalSystem.js';
+import { applySeasonState } from './season/rollover.js';
 import { ensureTraining, trainingMatchInput } from './training/index.js';
 import { renderTraining, handleTrainingAction, isTrainingAction } from './ui/trainingView.js';
 import { renderTransfers, handleTransferAction, isTransferAction } from './ui/transfersView.js';
@@ -80,6 +81,7 @@ async function save() {
 
 /** Uzupełnia zapisy sprzed poczty i pętli dni (migracja w miejscu). */
 function ensureGameShape(g) {
+  applySeasonState(g); // kalendarz i ligi sezonu zapisanego w grze
   if (!g.world) g.world = generateWorld(g.seed);
   if (!g.tactics) g.tactics = createTactics(mySquad(g), { benchSize: benchSizeFor(g) });
   else g.tactics = refreshTactics(g.tactics, mySquad(g), { benchSize: benchSizeFor(g) }).tactics;
@@ -474,6 +476,7 @@ app.addEventListener('change', async (ev) => {
 
 // ---------- Akcje ----------
 async function newGame(slot, clubId) {
+  applySeasonState({});
   const seed = hashString(`${clubId}:${Date.now()}:${Math.random()}`);
   const game = {
     seed, clubId, date: GAME_START, season: SEASON, createdAt: new Date().toISOString(),

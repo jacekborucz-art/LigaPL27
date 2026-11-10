@@ -3,7 +3,7 @@
 
 import { registerDailySystem, addDays } from '../core/gameLoop.js';
 import { createMessage } from '../core/inbox.js';
-import { DOMESTIC, UEFA, FIFA_WINDOWS, POLISH_EUROPE_2026, GAME_START, SEASON } from '../config/calendar2026.js';
+import { DOMESTIC, UEFA, FIFA_WINDOWS, POLISH_EUROPE_2026, SEASON_START, SEASON } from '../config/calendar2026.js';
 import { CLUBS_PL, LEAGUE_NAMES, clubById } from '../data/clubs_pl.js';
 import { fmtDate } from '../ui/dom.js';
 
@@ -49,7 +49,7 @@ const msg = (date, m) => createMessage({ date, ...m });
 registerDailySystem({
   id: 'welcome', order: 10,
   run(state, date) {
-    if (date !== GAME_START) return {};
+    if (date !== SEASON_START || state.archive?.length) return {}; // powitanie tylko na start kariery
     const club = clubById(state.clubId);
     const goal = seasonGoal(club);
     const europe = POLISH_EUROPE_2026.find((e) => e.club === state.clubId);
@@ -76,7 +76,7 @@ registerDailySystem({
   run(state, date) {
     const out = [];
     for (const w of DOMESTIC.transferWindows) {
-      if (date === w.from && date !== GAME_START) {
+      if (date === w.from && date !== SEASON_START) {
         out.push(msg(date, { key: `tw-open:${w.from}`, category: 'transfers', from: 'Dyrektor sportowy', priority: 'important', subject: 'Okno transferowe otwarte', body: `Do ${fmtDate(w.to)} możemy kupować i sprzedawać zawodników.` }));
       }
       if (date === addDays(w.to, -3)) {
@@ -96,7 +96,8 @@ registerDailySystem({
   run(state, date) {
     const out = [];
     const club = clubById(state.clubId);
-    const leagueStart = DOMESTIC[['ekstraklasa', 'liga1', 'liga2'][club.tier - 1]].start;
+    const leagueStart = DOMESTIC[['ekstraklasa', 'liga1', 'liga2'][club.tier - 1]]?.start;
+    if (!leagueStart) return {};
     if (date === addDays(leagueStart, -1)) {
       out.push(msg(date, { key: `league-start:${SEASON}`, category: 'competitions', from: LEAGUE_NAMES[club.tier], priority: 'info', subject: `Jutro startuje ${LEAGUE_NAMES[club.tier]}`, body: `Sezon ${SEASON} rusza ${fmtDate(leagueStart)}. 34 kolejki, mecz i rewanż.` }));
     }

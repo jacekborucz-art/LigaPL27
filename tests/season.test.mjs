@@ -33,7 +33,7 @@ function playSeason(g, until = '2027-06-30') {
       continue;
     }
     if (a.kind === 'decide') { g.inbox = g.inbox.map((m) => ({ ...m, resolved: true })); continue; }
-    continueUntilStop(g, { maxDays: 400 });
+    continueUntilStop(g, { maxDays: Math.max(1, Math.round((new Date(until) - new Date(g.date)) / 864e5)) }); // bez wchodzenia w kolejny sezon
   }
 }
 

@@ -7,6 +7,7 @@ import { squadOf } from '../world/worldGen.js';
 import { createTactics } from '../engine/lineup.js';
 import { fmtDate } from '../ui/dom.js';
 import { anyClub } from '../season/season.js';
+import { SEASON_START, SEASON_YEAR } from '../config/calendar2026.js';
 import { winnerOf } from '../season/cup.js';
 import { standings } from '../season/standings.js';
 import { createFinance, financeDay, book, matchIncome, attendanceFill, uefaPrize, PP_PRIZE, stadiumCapacity } from './finance.js';
@@ -121,6 +122,16 @@ registerDailySystem({
     ensureCareer(game);
     const messages = [];
     financeDay(game.finance, game.world, date);
+    if (date.endsWith('-01')) {
+      // Długi klubów AI pokrywa właściciel (a rezerw pierwsza drużyna); budżet transferowy przepada
+      for (const [id, c] of Object.entries(game.finance.clubs)) {
+        if (id === game.clubId || c.balance >= 0) continue;
+        const parent = clubById(id)?.parent;
+        if (parent && game.finance.clubs[parent]) book(game.finance, parent, date, 'out', 'ops', -c.balance, `Dopłata do rezerw (${clubById(id).name})`);
+        book(game.finance, id, date, 'in', 'other', -c.balance, parent ? 'Dopłata pierwszej drużyny' : 'Dopłata właściciela');
+        c.transferBudget = 0;
+      }
+    }
     matchMoney(game, date);
     const dow = new Date(`${date}T12:00:00Z`).getUTCDay();
     const w = windowOf(date);
@@ -139,7 +150,7 @@ registerDailySystem({
     // Propozycje pracy wygasają po tygodniu
     game.inbox = game.inbox.map((m) => (m.refs?.kind === 'jobOffer' && m.optional && !m.resolved && m.date < addDaysIso(date, -7) ? { ...m, resolved: true } : m));
     // Co miesiąc: zarząd, reputacja trenera, przedłużenia AI (od stycznia), przypomnienie o kontraktach
-    if (date.endsWith('-01') && date > '2026-07-01') {
+    if (date.endsWith('-01') && date > SEASON_START) {
       const r = boardMonth(game, date);
       const fin = game.finance.clubs[game.clubId];
       messages.push(msg(date, { key: `zarzad:${date}`, priority: r.review.delta <= -5 ? 'important' : 'info', subject: `Ocena zarządu: ${trustLabel(game.board.trust).toLowerCase()}`, body: `${r.review.notes.join(' ')}\n\nZaufanie zarządu: ${game.board.trust} na 100. Saldo klubu: ${fmtZl(fin?.balance ?? 0)}.` }));
@@ -148,10 +159,10 @@ registerDailySystem({
       } else if (r.offers.length) {
         messages.push(createMessage({ date, key: `praca:${date}`, category: 'board', from: 'Agent trenera', priority: 'important', subject: 'Propozycja pracy', body: `Zapytania o twoje usługi: ${r.offers.map((o) => `${o.name} (${o.league})`).join(', ')}. Przyjęcie oznacza odejście z obecnego klubu od razu.`, actions: [...r.offers.map((o) => ({ id: o.clubId, label: `Przejdź: ${o.name}` })), { id: 'stay', label: 'Zostaję' }], refs: { kind: 'jobOffer' }, optional: true }));
       }
-      if (date >= '2027-01-01' && date <= '2027-06-01') aiRenewals(game, date);
-      if (date === '2027-01-01') {
+      if (date >= `${SEASON_YEAR + 1}-01-01` && date <= `${SEASON_YEAR + 1}-06-01`) aiRenewals(game, date);
+      if (date === `${SEASON_YEAR + 1}-01-01`) {
         const exp = squadOf(game.world, game.clubId).filter((p) => p.contract?.until === SEASON_END && !p.loan);
-        if (exp.length) messages.push(createMessage({ date, key: 'kontrakty:2027', category: 'transfers', from: 'Dyrektor sportowy', priority: 'important', subject: `Kontrakty kończące się w czerwcu (${exp.length})`, body: `${exp.map((p) => `${p.name} (${p.pos}, ${p.age} lat)`).join(', ')}.\n\nPrzedłuż ważnych zawodników w zakładce Transfery, Kontrakty. Od 1 stycznia mogą rozmawiać z innymi klubami.` }));
+        if (exp.length) messages.push(createMessage({ date, key: `kontrakty:${SEASON_YEAR + 1}`, category: 'transfers', from: 'Dyrektor sportowy', priority: 'important', subject: `Kontrakty kończące się w czerwcu (${exp.length})`, body: `${exp.map((p) => `${p.name} (${p.pos}, ${p.age} lat)`).join(', ')}.\n\nPrzedłuż ważnych zawodników w zakładce Transfery, Kontrakty. Od 1 stycznia mogą rozmawiać z innymi klubami.` }));
       }
     }
     if (w && date === w.to) messages.push(createMessage({ date, key: `okno-koniec:${date}`, category: 'transfers', from: 'Rynek transferowy', priority: 'info', subject: 'Dziś zamyka się okno transferowe', body: 'Po dzisiejszym dniu transfery będą możliwe dopiero w kolejnym oknie. Wolnych zawodników można podpisywać zawsze.' }));

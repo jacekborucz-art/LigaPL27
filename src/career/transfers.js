@@ -5,7 +5,7 @@
 
 import { Rng, clamp } from '../core/rng.js';
 import { CLUBS_PL, clubById } from '../data/clubs_pl.js';
-import { DOMESTIC } from '../config/calendar2026.js';
+import { DOMESTIC, SEASON_END, SEASON_YEAR } from '../config/calendar2026.js';
 import { genPlayer, marketValue } from '../world/playerGen.js';
 import { SQUAD_LAYOUT, squadOf, academyOf } from '../world/worldGen.js';
 import { pickNationality } from '../data/names.js';
@@ -14,7 +14,7 @@ import { askingPriceMultiplier, willingnessToJoin, clubReputation } from './repu
 import { aiNegotiate, marketWage } from './negotiation.js';
 import { book, spendable, wageRoom, wageBill } from './finance.js';
 
-export const SEASON_END = '2027-06-30';
+export { SEASON_END };
 const round = (x, step = 5000) => Math.round(x / step) * step;
 const groupOf = (p) => GROUP[p.pos] ?? 'MID';
 const isAi = (game, clubId) => clubId && clubId !== game.clubId && !!game.world.clubs[clubId];
@@ -26,20 +26,23 @@ export const inWindow = (date) => !!windowOf(date);
 export function createMarket(game) {
   const M = { listed: {}, free: [], offers: [], talks: {}, history: [], userListed: {}, lastRefresh: null };
   game.market = M;
-  addFreeAgents(game, 45, game.date ?? '2026-07-01', 'start');
+  addFreeAgents(game, 45, game.date ?? '2026-07-01', SEASON_YEAR === 2026 ? 'start' : `lato-${SEASON_YEAR}`);
   return M;
 }
 
 /** Wolni zawodnicy: bez klubu, oczekują tylko pensji i premii za podpis. */
-export function addFreeAgents(game, n, date, tag) {
+export function addFreeAgents(game, n, date, tag, { imports = false } = {}) {
   const rng = new Rng(`wolni:${game.seed}:${tag}`);
   for (let i = 0; i < n; i++) {
-    const tier = rng.weighted([1, 2, 3], (t) => [0.25, 0.4, 0.35][t - 1]);
-    const L = { 1: 10.6, 2: 9.4, 3: 8.2 }[tier] + rng.gauss(0, 0.7);
+    // imports: zawodnicy z zagranicy (koniec kontraktu w innej lidze), poziom czołówki Ekstraklasy [SZAC]
+    const tier = imports ? 1 : rng.weighted([1, 2, 3], (t) => [0.25, 0.4, 0.35][t - 1]);
+    const L = imports ? 12.3 + rng.gauss(0, 0.8) : { 1: 10.6, 2: 9.4, 3: 8.2 }[tier] + rng.gauss(0, 0.7);
     const [pos, side] = rng.pick(SQUAD_LAYOUT);
-    const age = rng.weighted([19, 21, 23, 25, 27, 29, 31, 33, 35], (a) => (a >= 29 ? 1.4 : 1));
+    const age = imports ? rng.int(22, 30) : rng.weighted([19, 21, 23, 25, 27, 29, 31, 33, 35], (a) => (a >= 29 ? 1.4 : 1));
     const club = { id: 'wolny', tier, prestige: 2, L };
-    const p = genPlayer(rng, { id: `wolny-${tag}-${i + 1}`, L, pos, age, slotOffset: -0.8, nat: pickNationality(tier, rng), tier, side: side ?? null, club, date });
+    let nat = pickNationality(tier, rng);
+    if (imports) while (nat === 'POL') nat = pickNationality(1, rng);
+    const p = genPlayer(rng, { id: `wolny-${tag}-${i + 1}`, L, pos, age, slotOffset: imports ? -0.3 : -0.4, nat, tier, side: side ?? null, club, date });
     p.clubId = null; p.free = true;
     p.askWage = p.contract.wage; p.contract = null; p.wage = 0;
     game.world.players[p.id] = p;

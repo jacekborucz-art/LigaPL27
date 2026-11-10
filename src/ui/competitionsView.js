@@ -9,7 +9,7 @@ import { esc, fmtDate, weekday } from './dom.js';
 import { renderEurope, EUROPE_TABS } from './europeView.js';
 import { renderNational } from './nationalView.js';
 
-export const COMP_TABS = [['ekstraklasa', 'Ekstraklasa'], ['liga1', '1 Liga'], ['liga2', '2 Liga'], ['pp', 'Puchar Polski'], ...EUROPE_TABS, ['NT', 'Reprezentacje']];
+export const COMP_TABS = [['ekstraklasa', 'Ekstraklasa'], ['liga1', '1 Liga'], ['liga2', '2 Liga'], ['pp', 'Puchar Polski'], ...EUROPE_TABS, ['NT', 'Reprezentacje'], ['HIST', 'Historia']];
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size = 22) => { const c = anyClub(id); return c ? crestHtml(c, { size, clubsById }) : ''; };
 const name = (id) => anyClub(id)?.name ?? 'rywal z losowania';
@@ -99,12 +99,28 @@ function cupView(game) {
 
 export function renderCompetitions(game, { comp = 'ekstraklasa', view = 'table', round = null, filter = 'pl', draw = null } = {}) {
   const tabs = COMP_TABS.map(([k, v]) => `<button class="chip" data-act="ccomp" data-c="${k}" aria-pressed="${comp === k}">${esc(v)}</button>`).join('');
+  if (comp === 'HIST') return `<h2>Rozgrywki</h2><div class="chips">${tabs}</div>${historyView(game)}`;
   if (comp === 'NT') return `<h2>Rozgrywki</h2><div class="chips">${tabs}</div>${renderNational(game, view)}`;
   if (EUROPE_TABS.some(([k]) => k === comp)) return `<h2>Rozgrywki</h2><div class="chips">${tabs}</div>${renderEurope(game, comp, { view, round, filter, draw })}`;
   if (!['table', 'fixtures', 'stats'].includes(view)) view = 'table';
   const views = comp === 'pp' ? '' : `<div class="subtabs" role="tablist">${[['table', 'Tabela'], ['fixtures', 'Terminarz'], ['stats', 'Statystyki']].map(([k, v]) => `<button role="tab" data-act="cview" data-v="${k}" aria-selected="${view === k}">${v}</button>`).join('')}</div>`;
   const body = comp === 'pp' ? cupView(game) : view === 'fixtures' ? fixturesView(game, comp, round) : view === 'stats' ? statsView(game, comp) : tableView(game, comp);
   return `<h2>Rozgrywki</h2><div class="chips">${tabs}</div>${views}${body}`;
+}
+
+function historyView(game) {
+  const A = [...(game.archive ?? [])].reverse();
+  if (!A.length) return '<p class="hint">Tu pojawią się wyniki zakończonych sezonów: mistrzowie, zdobywcy pucharów, awanse i spadki oraz miejsca twoich drużyn.</p>';
+  const uc = { LM: 'Liga Mistrzów', LE: 'Liga Europy', LK: 'Liga Konferencji' };
+  return A.map((a) => `<section class="stat-sec"><h3>Sezon ${esc(a.season)}</h3><ul class="plain-list">
+    <li><span class="k">Mistrz</span><span>${crest(a.champion)} ${esc(name(a.champion))}</span></li>
+    <li><span class="k">Puchar Polski</span><span>${a.cup ? `${crest(a.cup)} ${esc(name(a.cup))}` : 'brak'}</span></li>
+    ${Object.entries(a.uefa ?? {}).map(([k, v]) => `<li><span class="k">${uc[k]}</span><span>${esc(name(v))}</span></li>`).join('')}
+    <li><span class="k">Awans</span><span>${esc([...(a.promoted?.[1] ?? [])].map(name).join(', '))} (do Ekstraklasy)</span></li>
+    <li><span class="k">Spadek</span><span>${esc([...(a.relegated?.[2] ?? [])].map(name).join(', '))} (z Ekstraklasy)</span></li>
+    <li><span class="k">Twoja drużyna</span><span>${crest(a.user.club)} ${esc(name(a.user.club))}: ${a.user.pos}. miejsce (${esc(['', 'Ekstraklasa', '1 Liga', '2 Liga'][a.user.tier] ?? '')})</span></li>
+    <li><span class="k">Polska w UEFA</span><span>${a.polandRank}. miejsce w rankingu krajów</span></li>
+  </ul></section>`).join('');
 }
 
 export { LEAGUE_COMPS };

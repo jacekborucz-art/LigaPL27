@@ -31,41 +31,42 @@ export const suspKey = (comp) => (LEAGUE_COMPS.includes(comp) ? 'league' : comp 
 
 // ------------------------------------------------------------ Tworzenie sezonu
 /** Daty pucharowe klubów (Superpuchar, eliminacje UEFA), żeby liga nie wypadła dzień obok. */
-function busyFactory() {
+function busyFactory(superCup) {
   const busy = new Map();
   const add = (club, date) => { if (!busy.has(club)) busy.set(club, []); busy.get(club).push(date); };
-  add('lech', DOMESTIC.superpuchar.date); add('gornik-zabrze', DOMESTIC.superpuchar.date);
+  for (const id of superCup) add(id, DOMESTIC.superpuchar.date);
   for (const e of POLISH_EUROPE_2026) {
     const order = ['Q1', 'Q2', 'Q3', 'PO'];
+    if (!order.includes(e.entry)) continue;
     for (const r of order.slice(order.indexOf(e.entry))) for (const d of [].concat(UEFA[e.comp][r] ?? [])) add(e.club, d);
   }
   const near = (a, b) => Math.abs(new Date(`${a}T12:00:00Z`) - new Date(`${b}T12:00:00Z`)) < 2 * 86400000 + 1;
   return (club, date) => (busy.get(club) ?? []).some((d) => near(d, date));
 }
 
-export function createSeason(seed, { playerClub = null } = {}) {
+export function createSeason(seed, { playerClub = null, superCup = ['lech', 'gornik-zabrze'], holder } = {}) {
   const rng = new Rng(`sezon:${seed}`);
-  const busy = busyFactory();
+  const busy = busyFactory(superCup);
   const fixtures = [];
   for (const tier of [1, 2, 3]) {
     const comp = TIER_COMP[tier];
     const cfg = DOMESTIC[comp];
     const dates = roundDates({
       start: cfg.start,
-      autumnEnd: tier === 1 ? DOMESTIC.ekstraklasa.autumnEnd : '2026-12-14',
+      autumnEnd: tier === 1 ? DOMESTIC.ekstraklasa.autumnEnd : DOMESTIC.lowerAutumnEnd,
       springStart: cfg.springStart, end: cfg.end, rounds: 34,
       skip: tier === 1 ? FIFA_WINDOWS : [],
     });
     const clubs = CLUBS_PL.filter((c) => c.tier === tier).map((c) => c.id);
     fixtures.push(...buildLeague({ comp, tier, clubs, dates, rng: rng.fork(comp), busy, skip: tier === 1 ? FIFA_WINDOWS : [] }));
   }
-  fixtures.push(superCupFixture());
-  const cup = createCup(CLUBS_PL, CLUBS_L3, CLUBS_L4, rng.fork('pp:uczestnicy'));
+  fixtures.push(superCupFixture(...superCup));
+  const cup = createCup(CLUBS_PL.filter((c) => c.tier <= 3), lowerTierClubs(), CLUBS_L4, rng.fork('pp:uczestnicy'));
   fixtures.push(...drawRound(cup, 'PRE', tierOf, rng.fork('pp:PRE')));
   void playerClub;
   fixtures.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
   // Puchary UEFA: losowania i mecze dzień po dniu (src/season/europe.js)
-  return { fixtures, cup, playoffs: {}, seasonId: SEASON, uefa: createUefa(seed) };
+  return { fixtures, cup, playoffs: {}, seasonId: SEASON, superCup, uefa: createUefa(seed, holder ? { holder } : {}) };
 }
 
 /** Czy klub ma co najmniej 2 dni przerwy od innych meczów w danym dniu. */
@@ -103,6 +104,13 @@ export function rescheduleAround(fixtures, fixed) {
 }
 
 export function tierOf(id) { return anyClub(id)?.tier ?? 5; }
+
+/** Kluby III ligi w bieżącym sezonie: lista z danych bez beniaminków 2 Ligi, plus spadkowicze z 2 Ligi. */
+export function lowerTierClubs() {
+  const out = new Map();
+  for (const c of [...CLUBS_L3, ...CLUBS_PL]) if (c.tier === 4) out.set(c.id, c);
+  return [...out.values()];
+}
 
 export function compLabel(f) {
   if (f.label) return f.label;
@@ -380,6 +388,7 @@ registerDailySystem({
     const monday = new Date(`${date}T12:00:00Z`).getUTCDay() === 1;
     const leaders = new Set();
     if (monday) for (const [cid, c] of Object.entries(game.world.clubs)) if (c.squad.some((id) => game.world.players[id]?.persona === 'Lider')) leaders.add(cid);
+    const sharpCut = addDays(date, -4); // ostrość spada po 4 dniach bez meczu
     for (const p of Object.values(game.world.players)) {
       if (p.injuryDays > 0) {
         p.injuryDays--;
@@ -391,7 +400,7 @@ registerDailySystem({
       }
       const wyt = p.attr?.WYT ?? 10;
       p.fresh = Math.min(100, Math.round((p.fresh ?? 95) + 18 * (0.8 + 0.02 * wyt) * ((p.age ?? 25) >= 31 ? 0.85 : 1)));
-      if (!p.lastMatch || date > addDays(p.lastMatch, 4)) p.sharp = Math.max(40, (p.sharp ?? 70) - 1);
+      if (!p.lastMatch || p.lastMatch < sharpCut) p.sharp = Math.max(40, (p.sharp ?? 70) - 1);
       if (monday) p.morale = weeklyDrift(p.morale ?? 12, leaders.has(p.clubId));
     }
     return { messages };
@@ -403,3 +412,4 @@ export { standings, GAME_START };
 import './europe.js';
 import './nationalSystem.js';
 import '../career/careerSystem.js';
+import './rollover.js';

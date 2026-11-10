@@ -5,6 +5,7 @@ import { Rng, clamp } from '../core/rng.js';
 import { CLUBS_PL, clubById, LEAGUE_NAMES } from '../data/clubs_pl.js';
 import { COMPETITIONS } from '../config/competitions.js';
 import { standings } from '../season/standings.js';
+import { SEASON_YEAR } from '../config/calendar2026.js';
 import { clubReputation } from './reputation.js';
 
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
@@ -69,7 +70,7 @@ export function boardMonth(game, date) {
   B.reviews.unshift(review); B.reviews.length = Math.min(B.reviews.length, 12);
   const M = game.manager;
   M.rep = Math.round(clamp(M.rep + (B.trust - 55) * 0.02 + (pos && pos <= 3 && played >= 8 ? 0.4 : 0), 5, 95) * 10) / 10;
-  const fired = B.trust < 18 && date >= '2026-10-01' && played >= 8;
+  const fired = B.trust < 18 && date >= `${SEASON_YEAR}-10-01` && date <= `${SEASON_YEAR + 1}-04-30` && played >= 8;
   let offers = [];
   if (fired) { M.fired++; offers = jobOffers(game, date, true); }
   else if (new Rng(`praca:${game.seed}:${date}`).chance(0.12)) offers = jobOffers(game, date, false);
@@ -81,7 +82,7 @@ export function jobOffers(game, date, afterFiring) {
   const rng = new Rng(`oferty-pracy:${game.seed}:${date}`);
   const rep = game.manager.rep;
   const cur = clubReputation(clubById(game.clubId));
-  const cands = CLUBS_PL.filter((c) => !c.parent && c.id !== game.clubId && game.world.clubs[c.id]).map((c) => {
+  const cands = CLUBS_PL.filter((c) => !c.parent && c.tier <= 3 && c.id !== game.clubId && game.world.clubs[c.id]).map((c) => {
     const g = seasonGoalFor(c); const t = tablePos(game, c.id);
     return { c, rep: clubReputation(c), under: t.pos ? t.pos - g.target : 0 };
   });

@@ -25,7 +25,10 @@ export function createCup(clubsPl, clubsL3, clubsL4 = [], rng = null) {
   const groups4 = [...new Set(clubsL4.map((c) => c.group))];
   const pickedGroups = (rng ? rng.shuffle(groups4) : groups4).slice(0, 7);
   const l4 = pickedGroups.map((g) => clubsL4.find((c) => c.group === g && !c.parent)).filter(Boolean);
-  const pre = [...l3.slice(0, 14 - l4.length), ...l4].map((c) => c.id);
+  // Rozmiar rundy wstępnej tak, żeby w 1/16 finału grały 32 drużyny (zwycięzcy 1/32 + kluby z pucharów UEFA)
+  const preWinners = Math.max(0, (32 - europe.size) * 2 - (ek.length + l1.length + l2.length));
+  const nL4 = Math.min(l4.length, preWinners);
+  const pre = [...l3.slice(0, preWinners * 2 - nL4), ...l4.slice(0, nL4)].map((c) => c.id);
   return {
     entrants: { PRE: pre, R64: [...ek, ...l1, ...l2], R32: [...europe] },
     drawn: [],
@@ -72,7 +75,7 @@ export function winnerOf(f) {
 /** Superpuchar: mistrz vs zdobywca PP poprzedniego sezonu, u mistrza, przy remisie od razu karne. */
 export function superCupFixture(champion = 'lech', cupWinner = 'gornik-zabrze') {
   return {
-    id: 'SP-2026', comp: 'super', round: 'F', date: DOMESTIC.superpuchar.date, time: '20:15',
+    id: `SP-${DOMESTIC.superpuchar.date.slice(0, 4)}`, comp: 'super', round: 'F', date: DOMESTIC.superpuchar.date, time: '20:15',
     home: champion, away: cupWinner, played: false, knockout: 'penaltiesOnly',
   };
 }

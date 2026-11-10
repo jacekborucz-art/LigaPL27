@@ -38,6 +38,8 @@ export const UEFA_CLUBS = DATA.kluby.map((k) => ({
 const byId = new Map(UEFA_CLUBS.map((c) => [c.id, c]));
 const POLISH = new Map(DATA.polskieKlubyUEFA2026.map((k) => [k.id, k]));
 export const COUNTRY_NAMES = Object.fromEntries(DATA.kraje.map((k) => [k.kod, k.nazwa]));
+/** Współczynnik krajowy UEFA (suma 5 sezonów) na start gry. */
+export const COUNTRY_COEF_2026 = Object.fromEntries(DATA.kraje.map((k) => [k.kod, k.wspolczynnik ?? 0]));
 COUNTRY_NAMES.POL = COUNTRY_NAMES.POL ?? 'Polska';
 export const uefaClub = (id) => byId.get(id) ?? null;
 export const HOLDER_2026 = 'paris-sg';
@@ -57,24 +59,29 @@ const FEEDS = {
 const KO_FEEDS = { KPO: 'league', R16: 'KPO', QF: 'R16', SF: 'QF', F: 'SF' };
 export const LEAGUE_FORMAT = { LM: { pots: 4, perPot: 2 }, LE: { pots: 4, perPot: 2 }, LK: { pots: 6, perPot: 1 } };
 
-/** Przydział klubów do rund wejścia (wg etykiety z rzeczywistości 2026/27 i współczynnika). */
-export function allocateEntrants() {
+/** Przydział klubów do rund wejścia (wg etykiety z rzeczywistości 2026/27 i współczynnika). Polski klub
+ * zastępuje najsłabszy klub zagraniczny w swojej rundzie wejścia (entry 'LP' = faza ligowa). */
+export function allocateEntrants(polish = POLISH_EUROPE_2026) {
   const sorted = (label) => UEFA_CLUBS.filter((c) => c.label2026 === label).sort((a, b) => b.coef - a.coef).map((c) => c.id);
   const lm = sorted('LM'); const le = sorted('LE'); const lk = sorted('LK'); const elim = sorted('ELIM'); const spare = sorted('BRAK');
   const pool = [...elim, ...spare];
   const take = (n) => pool.splice(0, n);
-  const pol = (comp, entry) => POLISH_EUROPE_2026.filter((e) => e.comp === comp && e.entry === entry).map((e) => e.club);
   const e = { LM: {}, LE: {}, LK: {} };
   e.LM.league = lm.slice(0, 29); e.LM.PO = lm.slice(29, 36);
-  e.LM.Q3 = [...take(7 - pol('LM', 'Q3').length), ...pol('LM', 'Q3')];
-  e.LM.Q2 = [...take(7 - pol('LM', 'Q2').length), ...pol('LM', 'Q2')];
-  e.LM.Q1 = take(14);
-  e.LE.league = le.slice(0, 22);
-  e.LE.Q3 = [...le.slice(22, 22 + 7 - pol('LE', 'Q3').length), ...pol('LE', 'Q3')];
-  const leRest = le.slice(22 + 7 - pol('LE', 'Q3').length);
+  e.LM.Q3 = take(7); e.LM.Q2 = take(7); e.LM.Q1 = take(14);
+  e.LE.league = le.slice(0, 22); e.LE.Q3 = le.slice(22, 29);
+  const leRest = le.slice(29);
   e.LK.league = lk.slice(0, 22); e.LK.Q1 = lk.slice(22, 36);
-  const lkQ2 = 14 - pol('LK', 'Q2').length;
-  e.LK.Q2 = [...leRest.slice(0, lkQ2), ...take(Math.max(0, lkQ2 - leRest.length)), ...pol('LK', 'Q2')];
+  e.LK.Q2 = [...leRest.slice(0, 14), ...take(Math.max(0, 14 - leRest.length))];
+  for (const x of polish) {
+    let r = x.entry === 'LP' ? 'league' : x.entry;
+    if (x.comp === 'LE' && ['Q1', 'Q2'].includes(r)) r = 'Q3';
+    const list = e[x.comp]?.[r];
+    if (!list || list.includes(x.club)) continue;
+    const weakest = list.filter((id) => byId.has(id)).sort((a, b) => coefOf(a) - coefOf(b))[0];
+    if (weakest) list.splice(list.indexOf(weakest), 1);
+    list.push(x.club);
+  }
   return e;
 }
 
@@ -237,9 +244,9 @@ export function leagueTable(U, comp) {
 }
 
 // ------------------------------------------------------------ Tworzenie
-export function createUefa(seed) {
+export function createUefa(seed, { holder = HOLDER_2026 } = {}) {
   const entrants = allocateEntrants();
-  const U = { seed: String(seed), comps: {}, matches: {}, scorers: {}, draws: [], countryPts: {} };
+  const U = { seed: String(seed), holder, comps: {}, matches: {}, scorers: {}, draws: [], countryPts: {} };
   for (const comp of UCOMPS) {
     U.comps[comp] = { rounds: {}, league: null, champion: null };
     for (const r of ORDER[comp]) {
@@ -313,7 +320,7 @@ function doDraw(U, comp, r, date) {
   } else if (r === 'league') {
     const teams = teamsFor(U, comp, r);
     const { pots: nPots, perPot } = LEAGUE_FORMAT[comp];
-    const sorted = [...teams].sort((a, b) => (comp === 'LM' && a === HOLDER_2026 ? -1 : comp === 'LM' && b === HOLDER_2026 ? 1 : coefOf(b) - coefOf(a)));
+    const sorted = [...teams].sort((a, b) => (comp === 'LM' && a === U.holder ? -1 : comp === 'LM' && b === U.holder ? 1 : coefOf(b) - coefOf(a)));
     const size = teams.length / nPots;
     const pots = Array.from({ length: nPots }, (_, i) => sorted.slice(i * size, (i + 1) * size));
     const nMd = datesOf(comp, 'league').length;
