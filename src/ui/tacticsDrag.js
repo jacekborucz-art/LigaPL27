@@ -83,9 +83,15 @@ export function mountTacticsDrag(root, { resolve, onDrop, onReject }) {
   }
 
   function place() {
-    // Na dotyku duch jest nad palcem, żeby go nie zasłaniał.
-    const dy = drag.type === 'touch' ? -56 : 12;
-    drag.ghost.style.transform = `translate(${Math.round(drag.x + 12)}px, ${Math.round(drag.y + dy)}px)`;
+    // Na dotyku duch jest nad palcem, żeby go nie zasłaniał; zawsze mieści się w oknie.
+    const g = drag.ghost;
+    const w = g.offsetWidth; const h = g.offsetHeight;
+    const touch = drag.type === 'touch';
+    let x = touch ? drag.x - w / 2 : drag.x + 14;
+    let y = touch ? drag.y - h - 36 : drag.y + 14;
+    x = Math.max(8, Math.min(window.innerWidth - w - 8, x));
+    y = Math.max(8, Math.min(window.innerHeight - h - 8, y));
+    g.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
   }
 
   function targetAt(x, y) {

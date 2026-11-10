@@ -192,7 +192,7 @@ function renderPlayerInfo(p, tactics, f) {
     : p.suspended > 0 ? `Zawieszony, ${p.suspended} ${matchesWord(p.suspended)}`
       : p.callUp ? 'Na zgrupowaniu reprezentacji' : 'Do dyspozycji';
   const fact = (k, v, attr = '') => `<div${attr}><dt>${k}</dt><dd>${v}</dd></div>`;
-  const fresh = p.fresh ?? 95;
+  const fresh = Math.round(p.fresh ?? 95);
   return `<dialog class="tdet" open aria-labelledby="tdet-h">
     <div class="tdet__in">
       <header class="tdet__head">
@@ -207,7 +207,7 @@ function renderPlayerInfo(p, tactics, f) {
         ${fact('Gdzie', esc(where))}
         ${fact('Stan', esc(health), p.injuryDays > 0 || p.suspended > 0 || p.callUp ? ' class="is-bad"' : '')}
         ${fact('Świeżość', `<span class="abar" aria-hidden="true"><i data-b="${fresh >= 85 ? 'good' : fresh >= 70 ? 'mid' : 'low'}" style="width:${fresh}%"></i></span>${fresh}%`)}
-        ${fact('Ostrość', `${p.sharp ?? 70}%`)}
+        ${fact('Ostrość', `${Math.round(p.sharp ?? 70)}%`)}
         ${fact('Morale', esc(moraleLabel(p.morale ?? 12)))}
       </dl>
       <div class="tdet__groups">${attrGroupsHtml(p, { heading: 'h4' })}</div>
