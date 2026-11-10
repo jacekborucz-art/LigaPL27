@@ -17,10 +17,27 @@ import { LOAD, staffMul } from './config.js';
 import { ensureTraining, attachTraining, activeGame, weekdayIdx, daysBetween } from './state.js';
 import { staffQ, reportPrecision } from './staff.js';
 import { pruneOverrides } from './plan.js';
+import { aiCampBase, halfOf, halfKey, baseFactor, baseTerm } from './camps.js';
+import { addDays } from '../core/gameLoop.js';
 import { processUserDay } from './sessions.js';
 import { monthlyDevelopment } from './development.js';
 import { cohesionTerm, prepTerm, setPieceEdge, aiWeeklyCohesion, weeklyCohesionDecay } from './cohesion.js';
 import { legsTerm, overloadTerm } from './load.js';
+
+// Forma bazowa po okresie przygotowawczym: jedna liczba na klub i dzień (pamięć podręczna, tanio w meczu)
+const campCache = new Map();
+export function campTerm(game, p) {
+  const c = game?.training?.clubs?.[p.clubId];
+  const cb = c?.cb;
+  if (!cb) return 0;
+  const k = `${p.clubId}:${cb.key}`;
+  let e = campCache.get(k);
+  if (!e || e.date !== game.date) {
+    e = { date: game.date, v: baseTerm(cb.base, baseFactor(cb.start, game.date)) };
+    campCache.set(k, e);
+  }
+  return e.v;
+}
 
 const MONTHS_PL = ['styczeń', 'luty', 'marzec', 'kwiecień', 'maj', 'czerwiec', 'lipiec', 'sierpień', 'wrzesień', 'październik', 'listopad', 'grudzień'];
 const msg = (date, from, priority, subject, body, key) => createMessage({ date, key, category: 'staff', from, subject, body, priority });
@@ -36,9 +53,17 @@ export function weeklyStep(game, date, rng) {
     matches[f.home] = (matches[f.home] ?? 0) + 1;
     if (f.away) matches[f.away] = (matches[f.away] ?? 0) + 1;
   }
+  const half = halfOf(date);
+  const key = halfKey(half);
   for (const clubId of Object.keys(game.world.clubs)) {
     if (clubId === game.clubId) continue;
     aiWeeklyCohesion(game, clubId, matches[clubId] ?? 0);
+    // Obóz klubu AI: jedna decyzja na rundę, według prestiżu i ligi
+    const c = T.clubs[clubId];
+    if (c.cb?.key !== key) {
+      const cb = aiCampBase(game, clubId, half);
+      if (date >= addDays(cb.start, -10)) c.cb = cb;
+    }
     // Urazy na treningu w klubie AI: ta sama średnia co u gracza (0,15 % na zawodnika na dzień, 5 dni)
     const pool = squadOf(game.world, clubId).filter(isAvailable);
     const lambda = pool.length * 5 * LOAD.injBase * staffMul.inj(staffQ(game, clubId, 'fizyczny'));
@@ -117,6 +142,7 @@ export const MODIFIERS = [
   { id: 'trainingCohesion', scope: 'player', label: 'Zgranie drużyny', apply: (p) => cohesionTerm(activeGame(), p) },
   { id: 'trainingPrep', scope: 'player', label: 'Analiza rywala', apply: (p) => prepTerm(activeGame(), p) },
   { id: 'trainingLoad', scope: 'player', label: 'Obciążenie treningowe', apply: (p) => (p.training ? legsTerm(p.training) + overloadTerm(p.training) : 0) },
+  { id: 'trainingCamp', scope: 'player', label: 'Forma bazowa (obóz)', apply: (p) => campTerm(activeGame(), p) },
   {
     id: 'trainingSetPieces', scope: 'player', label: 'Stałe fragmenty (trening)',
     enabled: (ctx) => !ctx.inMatch, // w pełnym silniku działa przez dane wejściowe (trainingMatchInput)
@@ -146,3 +172,6 @@ export { developPlayer, monthlyDevelopment, focusAttrs } from './development.js'
 export { loadSummary, acwrLabel, trainingInjuryChance } from './load.js';
 export { staffOf, staffQ, staffLabel } from './staff.js';
 export { sessionPreview, processUserDay } from './sessions.js';
+export { campWindow, campCost, campPreview, campStarts, bookCamp, cancelCamp, bookingFor, campOn, estimateBase, aiCampChoice, aiCampBase, halfOf, halfKey, HALF_NAMES, officialDates } from './camps.js';
+export { friendlyPeriod, friendlyDates, friendlyOpponents, createFriendly, cancelFriendly, clubFriendlies, levelText } from './friendlies.js';
+export { matchSets } from './plan.js';

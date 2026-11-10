@@ -13,6 +13,7 @@ import { pickNationality } from '../data/names.js';
 import { setSeasonYear, SEASON, SEASON_YEAR, SEASON_END, SEASON_START } from '../config/calendar2026.js';
 import { GROUP, SQUAD_TARGETS, decideRetirement, squadDeficits } from '../career/squad.js';
 import { marketWage } from '../career/negotiation.js';
+import { payLevel } from '../data/finanse_klubow.js';
 import { createTactics } from '../engine/lineup.js';
 import { standings } from './standings.js';
 import { winnerOf } from './cup.js';
@@ -75,8 +76,8 @@ function polandNextSeason(game, res) {
 }
 
 // ------------------------------------------------------------ Zawodnicy
-function newContract(p, tier, years, date) {
-  return { wage: marketWage(p.ovr, tier, p.nat !== 'POL' && tier === 1), until: `${Number(date.slice(0, 4)) + years}-06-30`, clause: 0, signedOn: date };
+function newContract(p, tier, years, date, club = null) {
+  return { wage: marketWage(p.ovr, tier, p.nat !== 'POL' && tier === 1, payLevel(club)), until: `${Number(date.slice(0, 4)) + years}-06-30`, clause: 0, signedOn: date };
 }
 
 function ageOn(p, date) {
@@ -150,7 +151,7 @@ function processAcademy(game, newStart, rng, report) {
       if (!p || p.age < 19) continue;
       club.academy = club.academy.filter((x) => x !== id);
       if (p.ovr >= bar - 0.6 || squad.length < 22) {
-        club.squad.push(id); p.squad = 'A'; p.contract = newContract(p, c.tier, 3, newStart); p.wage = p.contract.wage;
+        club.squad.push(id); p.squad = 'A'; p.contract = newContract(p, c.tier, 3, newStart, c); p.wage = p.contract.wage;
         if (cid === game.clubId) report.promotedYouth.push(`${p.name} (${p.pos})`);
       } else delete W.players[id];
     }
@@ -187,7 +188,7 @@ export function fillSquad(game, cid, target, date, rng, report = null) {
       p = genPlayer(rng, { id: `${cid}-n${SEASON_YEAR}-${guard}-${rng.int(100, 999)}`, L: c.L, pos: pos[0], age: rng.int(19, 29), slotOffset: -0.2, nat: pickNationality(tier, rng), tier, side: pos[1] ?? null, club: c, date });
       W.players[p.id] = p;
     }
-    p.clubId = cid; p.squad = 'A'; p.contract = newContract(p, tier, rng.int(1, 3), date); p.wage = p.contract.wage; p.lastMove = date;
+    p.clubId = cid; p.squad = 'A'; p.contract = newContract(p, tier, rng.int(1, 3), date, c); p.wage = p.contract.wage; p.lastMove = date;
     W.clubs[cid].squad.push(p.id);
     if (report) report.signed.push(`${p.name} (${p.pos})`);
     squad = squadOf(W, cid);

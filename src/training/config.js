@@ -147,3 +147,37 @@ export const MODES = {
   light: { name: 'Lżejszy trening', mul: 0.5 },
   rest: { name: 'Odpoczynek', mul: 0 },
 };
+
+/**
+ * Obozy przygotowawcze (lato: lipiec przed ligą, zima: styczeń w przerwie zimowej). [SZAC]
+ * q: jakość warunków w danej porze (boiska, pogoda, spokój), rate: koszt dnia jako część rocznego przychodu bazowego klubu.
+ * Polskie kluby zimą jeżdżą głównie do Turcji (Belek, Antalya), część do Hiszpanii; latem do Austrii, Słowenii albo zostają w Polsce.
+ */
+export const CAMP = {
+  dests: {
+    polska: { name: 'Polska (ośrodek krajowy)', country: 'POL', rate: 0.0004, q: { summer: 0.85, winter: 0.55 }, text: 'Tanio i blisko. Zimą mróz, śnieg i sztuczne boiska.' },
+    slowenia: { name: 'Słowenia', country: 'SVN', rate: 0.0007, q: { summer: 0.95, winter: 0.6 }, text: 'Dobre boiska i chłodniejsze noce latem. Zimą bywa zimno.' },
+    austria: { name: 'Austria (Alpy)', country: 'AUT', rate: 0.0008, q: { summer: 1.0, winter: 0.5 }, text: 'Najlepsze warunki latem: wysokość, chłód, sparingpartnerzy z całej Europy. Zimą śnieg.' },
+    turcja: { name: 'Turcja (Belek, Antalya)', country: 'TUR', rate: 0.0009, q: { summer: 0.8, winter: 1.0 }, text: 'Typowy zimowy kierunek klubów Ekstraklasy: ciepło, dobre murawy, dużo sparingpartnerów. Latem upał.' },
+    hiszpania: { name: 'Hiszpania (Marbella)', country: 'ESP', rate: 0.0012, q: { summer: 0.75, winter: 1.05 }, text: 'Najdroższy, zimą najlepsza pogoda i boiska. Latem upał.' },
+  },
+  lengths: [7, 10, 14],
+  minDays: 5,
+  homeRate: { summer: 0.45, winter: 0.3 }, // punkty formy bazowej za dzień treningu w klubie (zimą zimno)
+  target: (prepDays) => Math.max(4, Math.min(12, 0.55 * prepDays)), // punkty potrzebne do formy bazowej 100 %
+  baseMin: 0.3, baseMax: 1.1,
+  effect: 0.4, // pkt atrybutu za każde 100 % formy bazowej poniżej lub powyżej normy
+  fullDays: 21, fadeDays: 21, // efekt pełny przez 3 tygodnie od startu rundy, potem wygasa przez 3 tygodnie
+  injuryPenalty: 0.8, // urazy treningowe x(1 + 0.8 * brak formy bazowej) w tym okresie
+  inCamp: { injury: 0.3, dev: 0.25, fatigue: 0.12, cohesion: 0.5, morale: 0.04, know: 0.3 }, // mnożone przez q obozu
+};
+
+/** Sparingi: limity w okresach i opis poziomu rywala. [SZAC] */
+export const FRIENDLY = {
+  limits: { lato: 6, zima: 4, fifa: 2 },
+  names: { lato: 'Okres przygotowawczy latem', zima: 'Przerwa zimowa', fifa: 'Przerwa na reprezentacje' },
+  time: '17:00',
+  famWeight: 0.5, // sparing daje połowę zgrania z meczu o punkty
+  loadMul: 0.85, xiMin: 70, benchMin: 25,
+  neighbours: ['CZE', 'SVK', 'AUT', 'HUN', 'GER', 'LTU', 'UKR'],
+};

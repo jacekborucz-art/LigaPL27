@@ -62,11 +62,11 @@ export function trainingInjuryChance(p, ctx) {
   const odp = p.hidden?.ODP ?? 10;
   const mODP = 1.5 - 0.05 * odp;
   const mAge = ctx.age >= 33 ? 1.3 : ctx.age >= 30 ? 1.15 : 1;
-  const mAcwr = LOAD.acwrMul(ctx.acwr ?? 1) * (ctx.camp ? 0.75 : 1);
+  const mAcwr = LOAD.acwrMul(ctx.acwr ?? 1) * (1 - 0.3 * (ctx.campQ ?? 0)); // obóz: lepsze warunki i opieka
   const mFresh = (ctx.fresh ?? 100) < 70 ? 1.4 : 1;
   const mRtp = ctx.rtp ? 0.7 : ctx.returning ? 1.3 : 1;
   const mMode = ctx.mode === 'light' ? 0.6 : 1;
-  return LOAD.injBase * sessionMul * mODP * mAge * mAcwr * mFresh * mRtp * mMode * staffMul.inj(ctx.fitQ ?? 10);
+  return LOAD.injBase * sessionMul * mODP * mAge * mAcwr * mFresh * mRtp * mMode * (ctx.baseMul ?? 1) * staffMul.inj(ctx.fitQ ?? 10);
 }
 
 /** Kara „ciężkich nóg” w punktach atrybutu (modyfikator silnika). */

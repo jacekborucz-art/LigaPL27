@@ -10,7 +10,7 @@ import { anyClub } from '../season/season.js';
 import { SEASON_START, SEASON_YEAR } from '../config/calendar2026.js';
 import { winnerOf } from '../season/cup.js';
 import { standings } from '../season/standings.js';
-import { createFinance, financeDay, book, matchIncome, attendanceFill, uefaPrize, PP_PRIZE, stadiumCapacity } from './finance.js';
+import { createFinance, financeDay, book, matchIncome, attendanceFill, uefaPrize, PP_PRIZE, stadiumCapacity, meritTv, FIN } from './finance.js';
 import { createMarket, marketWeek, answerIncoming, aiRenewals, inWindow, windowOf, fmtZl, SEASON_END } from './transfers.js';
 import { ensureBoard, boardMonth, seasonGoalFor, trustLabel } from './board.js';
 
@@ -36,8 +36,8 @@ function matchMoney(game, date) {
   for (const f of game.fixtures) {
     if (!f.played || f.fin || !(F.clubs[f.home] || F.clubs[f.away])) continue;
     f.fin = true;
-    const fill = attendanceFill(f, rowOf(f.home), anyClub(f.away));
-    f.attendance = Math.round(stadiumCapacity(clubById(f.home) ?? anyClub(f.home)) * fill / 100) * 100;
+    const fill = attendanceFill(f, rowOf(f.home), anyClub(f.away), f.neutral ? null : F.clubs[f.home]);
+    f.attendance = Math.round((f.neutral ? 58000 : stadiumCapacity(clubById(f.home) ?? anyClub(f.home))) * fill / 100) * 100;
     const [h0, a0] = matchIncome(F, f, fill);
     const mul = f.comp === 'friendly' ? 0.12 : 1; // sparing: bilety symboliczne
     const h = h0 * mul; const a = a0 * mul;
@@ -59,7 +59,8 @@ function matchMoney(game, date) {
       }
     }
   }
-  // Premia za miejsce w lidze po ostatniej kolejce [SZAC]: od 12 % przychodu bazowego dla mistrza do 2 % dla ostatniego
+  // Premia za miejsce z centralnego podziału ligi po ostatniej kolejce (Ekstraklasa SA 2025/26: mistrz 22,6 mln zł,
+  // dalej coraz mniej; spadkowicze z Ekstraklasy dostają rekompensatę). 1 i 2 Liga [SZAC]. Model: docs/finanse.md.
   for (const comp of Object.values(TIER_COMP)) {
     F.merit = F.merit ?? {};
     if (F.merit[comp]) continue;
@@ -69,7 +70,8 @@ function matchMoney(game, date) {
     const tier = Number(Object.keys(TIER_COMP).find((k) => TIER_COMP[k] === comp));
     for (const r of standings(lf, CLUBS_PL.filter((c) => c.tier === tier).map((c) => c.id))) {
       const c = F.clubs[r.id]; if (!c) continue;
-      book(F, r.id, date, 'in', 'prize', c.base * (0.12 - 0.1 * (r.pos - 1) / 17), `Premia za ${r.pos}. miejsce w lidze`);
+      book(F, r.id, date, 'in', 'tv', meritTv(tier, r.pos), `Podział środków ligi: premia za ${r.pos}. miejsce`);
+      if (tier === 1 && r.pos >= 16) book(F, r.id, date, 'in', 'tv', FIN.RELEGATION_COMP, 'Rekompensata za spadek z Ekstraklasy');
     }
   }
 }
@@ -130,7 +132,7 @@ registerDailySystem({
         if (id === game.clubId || c.balance >= 0) continue;
         const parent = clubById(id)?.parent;
         if (parent && game.finance.clubs[parent]) book(game.finance, parent, date, 'out', 'ops', -c.balance, `Dopłata do rezerw (${clubById(id).name})`);
-        book(game.finance, id, date, 'in', 'other', -c.balance, parent ? 'Dopłata pierwszej drużyny' : 'Dopłata właściciela');
+        book(game.finance, id, date, 'in', 'owner', -c.balance, parent ? 'Dopłata pierwszej drużyny' : 'Dopłata właściciela do długów');
         c.transferBudget = 0;
       }
     }
