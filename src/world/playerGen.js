@@ -28,8 +28,8 @@ function footFor(side, rng) {
 }
 
 /**
- * Wartość rynkowa w zł (ekspert 2.4, skala z docs/finanse.md 3.2): OVR 10 w Ekstraklasie ok. 120 tys. EUR,
- * OVR 13 ok. 1,1 mln EUR, OVR 14,5 ok. 3,5 mln EUR; młody talent do x2. Sprzedaże z Ekstraklasy to zwykle
+ * Wartość rynkowa w zł (ekspert 2.4, skala z docs/finanse.md 3.2): OVR 10 w Ekstraklasie ok. 250 tys. EUR,
+ * OVR 12 ok. 1 mln EUR, OVR 14,5 ok. 7 mln EUR; młody talent do x2, weteran x0,3. Sprzedaże z Ekstraklasy to zwykle
  * 0,5-5 mln EUR, rekord ok. 7-10 mln EUR. [SZAC]
  */
 export function marketValue(p, { tier = 1, date = '2026-07-01' } = {}) {

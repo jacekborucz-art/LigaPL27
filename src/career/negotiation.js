@@ -14,7 +14,7 @@ import { pickLine } from './negotiationLines.js';
 import { payLevel, EUR_PLN } from '../data/finanse_klubow.js';
 
 /** Wartość rynkowa: EUR przy OVR 10 w Ekstraklasie i nachylenie po OVR (docs/finanse.md 3.2). [SZAC] */
-export const VALUE_BASE_EUR = 120000;
+export const VALUE_BASE_EUR = 250000;
 export const VALUE_SLOPE = 0.75;
 
 // ---------------------------------------------------------------- Stałe
