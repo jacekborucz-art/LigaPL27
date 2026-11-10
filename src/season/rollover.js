@@ -261,20 +261,21 @@ export function rolloverSeason(game) {
     else fillSquad(game, cid, 23, newStart, rng.fork(`uzup:${cid}`));
   }
 
-  // Finanse: nowe budżety, przychód bazowy wg nowej ligi
+  // Finanse: plan sezonu z danych klubu dla nowej ligi (docs/finanse.md), saldo przechodzi, bogaty właściciel
+  // uzupełnia saldo do skarbca, budżet transferowy z wolnego salda
   const F = game.finance;
   for (const c of CLUBS_PL) {
     if (!game.world.clubs[c.id]) continue;
     const old = F.clubs[c.id];
-    const fresh = initClub(game.world, c);
-    if (old) {
-      const moved = (c.tier0 && old.tier && old.tier !== c.tier) ? (old.tier > c.tier ? 1.25 : 0.8) : 1;
-      fresh.base = Math.round((0.5 * old.base * moved + 0.5 * fresh.base) / 1000) * 1000;
-      fresh.balance = old.balance; fresh.start = old.balance;
-      fresh.transferBudget = Math.round(Math.max(0, old.balance * 0.45) / 10000) * 10000;
-      fresh.history = [...(old.history ?? []), { season: oldSeason, ...seasonSummary(old) }].slice(-10);
+    // Spadek: pensje obniżone o klauzulę spadkową z kontraktu (domyślnie 30 %) [SZAC]
+    if (old?.tier && c.tier > old.tier) {
+      for (const p of squadOf(game.world, c.id)) {
+        if (p.loan || !p.contract) continue;
+        p.contract.wage = Math.round(p.contract.wage * (1 - (p.contract.relegationCut || FIN.RELEGATION_WAGE_CUT)) / 100) * 100; p.wage = p.contract.wage;
+      }
     }
-    fresh.tier = c.tier;
+    const fresh = old ? initClub(game.world, c, { balance: old.balance, date: newStart, ai: c.id !== game.clubId }) : initClub(game.world, c);
+    if (old) fresh.history = [...(old.history ?? []), { season: oldSeason, ...seasonSummary(old) }].slice(-10);
     F.clubs[c.id] = fresh;
   }
   F.merit = {};

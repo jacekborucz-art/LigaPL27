@@ -30,7 +30,7 @@ export function campTerm(game, p) {
   const c = game?.training?.clubs?.[p.clubId];
   const cb = c?.cb;
   if (!cb) return 0;
-  const k = `${p.clubId}:${cb.key}`;
+  const k = `${p.clubId}:${cb.key}:${cb.base}:${cb.start}`;
   let e = campCache.get(k);
   if (!e || e.date !== game.date) {
     e = { date: game.date, v: baseTerm(cb.base, baseFactor(cb.start, game.date)) };

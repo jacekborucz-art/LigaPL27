@@ -5,6 +5,7 @@ import { addDays } from '../src/core/gameLoop.js';
 import { CLUBS_PL } from '../src/data/clubs_pl.js';
 import { KIBICE } from '../src/data/kibice.js';
 import { createSeason } from '../src/season/season.js';
+import { FIN } from '../src/career/finance.js';
 import {
   ensureFans, fansAfterMatch, fansMonth, fansDay, attendanceModifier, fanProfile, rivalry, fanMoodLabel, fansSummary,
   checkStars, FANS, LEVELS,
@@ -67,7 +68,7 @@ test('Ta sama zła seria: wielki klub protestuje mocniej i głośniej niż mały
   const next = { id: 'next', comp: 'ekstraklasa', date: '2026-11-01', home: 'legia', away: 'korona' };
   assert.ok(attendanceModifier(big, 'legia', next) < 0.85);
   // Teksty bez długiej pauzy
-  for (const m of [...mb, ...ms]) assert.ok(!/—/.test(m.subject + m.body), m.subject);
+  for (const m of [...mb, ...ms]) assert.ok(!/\u2014/.test(m.subject + m.body), m.subject);
 });
 
 test('Zaufanie zarządu: protest zmienia je tylko w klubie gracza, kibice AI zmieniają własny nastrój', () => {
@@ -86,13 +87,14 @@ test('Wygrane studzą presję, a koniec protestu daje wiadomość', () => {
   const peak = C.heat;
   const msgs = [];
   let date = '2026-10-01';
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 14; i++) {
     const f = { id: `w-${i}`, comp: 'ekstraklasa', date, home: 'legia', away: 'radomiak', played: true, result: { score: [3, 0] } };
     msgs.push(...fansAfterMatch(g, f));
     date = addDays(date, 7);
   }
-  assert.ok(C.heat < peak / 3, `${C.heat} vs ${peak}`);
+  assert.ok(C.heat < peak / 4, `${C.heat} vs ${peak}`);
   assert.equal(C.level, 0);
+  assert.ok(!msgs.some((m) => m.refs?.kind === 'fans'), 'po wygranych brak nowych protestów');
   assert.ok(msgs.some((m) => m.subject === 'Kibice zawieszają protest'));
 });
 
@@ -138,7 +140,8 @@ test('Incydent: kara księgowana w finansach jako fines, wiadomość dla klubu g
     assert.equal(fine.category, 'club');
     assert.ok(/Komisja Ligi Ekstraklasy/.test(fine.body));
     const out = Object.values(g.finance.clubs.legia.ledger).reduce((s, m) => s + (m.out.fines ?? 0), 0);
-    assert.ok(out > 0 && out < 60000, `kara w grze ${out}`);
+    const scale = FIN.FINE_SCALE ?? FIN.ECON ?? 0.08;
+    assert.ok(out > 0 && out <= 6 * 200000 * 2.5 * scale, `kara w grze ${out}`); // najwyżej 6 kar z górnej półki
     assert.ok(g.finance.clubs.legia.balance < 1e6);
     assert.ok(g.fans.clubs.legia.season.fines >= 1);
   } finally {

@@ -131,7 +131,7 @@ w = willingnessToJoin({ player:{rep, age, persona, wage, monthsLeft, unhappy}, f
 T = w.wageDemand x (1 + 0,35 x (0,55 - w.score))     chęć obniża cenę, niechęć podnosi
 ```
 
-Wolny zawodnik: `from` to wirtualny klub o reputacji zawodnika - 5, `monthsLeft = 0`; pensja bazowa to ostatnia pensja (`player.wage`) albo rynkowa `marketWage(OVR, liga) = 1200 x e^(0,45 x (OVR - 8)) x mnożnik_ligi`.
+Wolny zawodnik: `from` to wirtualny klub o reputacji zawodnika - 5, `monthsLeft = 0`; pensja bazowa to ostatnia pensja (`player.wage`) albo rynkowa `marketWage(OVR, liga, obcokrajowiec, płacowość) = 9000 x e^(0,45 x (OVR - 10)) x mnożnik_ligi x płacowość_klubu` (mnożnik ligi 1 / 0,66 / 0,38, obcokrajowiec w Ekstraklasie i oferta z zagranicy x1,5, najwyżej 140 000 zł tygodniowo; płacowość z `src/data/finanse_klubow.js`, np. Legia 1,75, Widzew 2,2, Korona 0,95). Kalibracja i źródła: docs/finanse.md.
 
 **Przedłużenie:**
 

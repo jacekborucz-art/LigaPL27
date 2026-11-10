@@ -127,13 +127,16 @@ registerDailySystem({
     const messages = [];
     financeDay(game.finance, game.world, date);
     if (date.endsWith('-01')) {
-      // Długi klubów AI pokrywa właściciel (a rezerw pierwsza drużyna); budżet transferowy przepada
+      // Długi klubów AI pokrywa właściciel (a rezerw pierwsza drużyna) z zapasem na miesiąc pensji, żeby saldo
+      // nie spadło pod zero przed kolejną wpłatą; przy długu budżet transferowy przepada
       for (const [id, c] of Object.entries(game.finance.clubs)) {
-        if (id === game.clubId || c.balance >= 0) continue;
+        const cushion = Math.round((c.plan?.wages ?? 0) / 12 / 1000) * 1000;
+        if (id === game.clubId || c.balance >= cushion) continue;
+        const need = cushion - c.balance;
         const parent = clubById(id)?.parent;
-        if (parent && game.finance.clubs[parent]) book(game.finance, parent, date, 'out', 'ops', -c.balance, `Dopłata do rezerw (${clubById(id).name})`);
-        book(game.finance, id, date, 'in', 'owner', -c.balance, parent ? 'Dopłata pierwszej drużyny' : 'Dopłata właściciela do długów');
-        c.transferBudget = 0;
+        if (parent && game.finance.clubs[parent]) book(game.finance, parent, date, 'out', 'ops', need, `Dopłata do rezerw (${clubById(id).name})`);
+        book(game.finance, id, date, 'in', 'owner', need, parent ? 'Dopłata pierwszej drużyny' : 'Dopłata właściciela do długów');
+        if (c.balance - need < 0) c.transferBudget = 0;
       }
     }
     matchMoney(game, date);

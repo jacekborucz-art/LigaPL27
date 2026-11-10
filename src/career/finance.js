@@ -14,6 +14,7 @@ import { clubFinanceData, EUR_PLN } from '../data/finanse_klubow.js';
 const M = 1e6;
 export const FIN = {
   EUR: EUR_PLN,
+  REVENUE_X_WAGES: 1.35, // tylko awaryjnie (klub bez finansów): przychód do rocznych płac [SZAC]
   ECON: 1, // nagrody UEFA w pełnych kwotach (gospodarka gry w realnej skali)
   HOME_GAMES: 17,
   PLAYERS_SHARE: 0.85, // zawodnicy w płacach I drużyny (reszta to sztab) [SZAC]
@@ -33,9 +34,13 @@ export const FIN = {
   START_BALANCE: 0.15, // saldo na start gry jako część rocznych przychodów krajowych [SZAC]
   TRANSFER_SHARE: 0.6, // część wolnego salda na transfery [SZAC]
   TRANSFER_SHARE_RICH: 0.85, // klub z bogatym właścicielem (skarbiec) [SZAC]
+  TRANSFER_CAP: 0.25, // budżet transferowy najwyżej 1/4 rocznych przychodów krajowych plus skarbiec właściciela [SZAC]
+  RELEGATION_WAGE_CUT: 0.3, // obniżka pensji po spadku, gdy kontrakt nie ma własnej klauzuli [SZAC]
   WAGE_BUDGET_X: 1.05, // budżet płac do docelowych płac [SZAC]
+  SURPLUS_CAP: 0.5, // klub AI trzyma najwyżej pół rocznych przychodów krajowych (plus skarbiec właściciela) [SZAC]
+  SURPLUS_SPEND: 0.5, // z nadwyżki ponad ten próg połowa idzie co sezon na długi i inwestycje [SZAC]
   ATT_RANK: { uefa: 1.35, super: 1.1 }, // frekwencja meczu względem średniej ligowej [SZAC]
-  PRICE_RANK: { uefa: 1.6, pp: 0.6, ppF: 1.2, super: 1 }, // cena biletu względem ligowej [SZAC]
+  PRICE_RANK: { uefa: 1.4, pp: 0.6, ppF: 1.2, super: 1 }, // cena biletu względem ligowej [SZAC]
 };
 
 // Nagrody UEFA w mln EUR. Faza ligowa i premie za mecz: cykl 2024-27 (LM 18,62 + 2,1 za wygraną i 0,7 za remis,
@@ -106,11 +111,12 @@ export function clubPlan(club) {
   return plan;
 }
 
-/** Budżet transferowy z salda: część nadwyżki ponad miesięczne koszty. */
+/** Budżet transferowy z salda: część nadwyżki ponad miesięczne koszty, z limitem zależnym od klasy klubu. */
 function transferBudgetOf(c, balance) {
   const reserve = (c.plan.wages + c.plan.ops) / 12;
   const share = c.plan.skarbiec > 0 ? FIN.TRANSFER_SHARE_RICH : FIN.TRANSFER_SHARE;
-  return Math.round(Math.max(0, balance - reserve) * share / 10000) * 10000;
+  const cap = c.plan.domestic * FIN.TRANSFER_CAP + c.plan.skarbiec;
+  return Math.round(Math.min(cap, Math.max(0, balance - reserve) * share) / 10000) * 10000;
 }
 
 /**
@@ -122,8 +128,7 @@ export function initClub(world, club, opts = {}) {
   const wages = wageBill(world, club.id);
   const c = {
     base: plan.domestic, plan, tier: plan.tier,
-    balance: 0, start: 0, transferBudget: 0,
-    wageBudget: Math.round(Math.max(wages, plan.wages / 52) * FIN.WAGE_BUDGET_X / 100) * 100,
+    balance: 0, start: 0, transferBudget: 0, wageBudget: 0,
     ledger: {}, // { '2026-08': { in: { tickets, tv, ... }, out: { wages, ops, ... } } }
     log: [],
   };
@@ -133,11 +138,18 @@ export function initClub(world, club, opts = {}) {
       const add = plan.skarbiec - c.balance;
       bookOne(c, opts.date, 'in', 'owner', add, `${plan.ownerName || 'Właściciel'}: pieniądze na nowy sezon`);
     }
+    // Klub AI z dużą nadwyżką spłaca zadłużenie i inwestuje (stadion, baza, akademia), zamiast trzymać gotówkę [SZAC]
+    const cap = plan.domestic * FIN.SURPLUS_CAP + plan.skarbiec;
+    if (opts.ai && opts.date && c.balance > cap) bookOne(c, opts.date, 'out', 'invest', (c.balance - cap) * FIN.SURPLUS_SPEND, 'Spłata zadłużenia i inwestycje w infrastrukturę');
   } else {
     c.balance = Math.max(Math.round(plan.domestic * FIN.START_BALANCE / 10000) * 10000, plan.skarbiec);
   }
   c.start = c.balance;
   c.transferBudget = transferBudgetOf(c, c.balance);
+  // Budżet płac: docelowe płace z danych, a przy wolnej gotówce do +25 % (klub inwestuje w kadrę) [SZAC]
+  const free = Math.max(0, c.balance - (plan.wages + plan.ops) / 12);
+  const extra = clamp(free / Math.max(1, plan.wages) * 0.25, 0, 0.25);
+  c.wageBudget = Math.round(Math.max(wages, plan.wages / 52 * (1 + extra)) * FIN.WAGE_BUDGET_X / 100) * 100;
   return c;
 }
 
@@ -171,9 +183,9 @@ export function attendanceFill(f, homeRow, awayClub, homeFin = null) {
   if (f.comp === 'uefa') mul = FIN.ATT_RANK.uefa;
   else if (f.comp === 'pp') mul = f.round === 'F' ? 3 : 0.7 + (['QF', 'SF'].includes(f.round) ? 0.35 : 0);
   else if (f.comp === 'super') mul = FIN.ATT_RANK.super;
-  if (homeRow) mul += clamp((homeRow.form?.filter((x) => x === 'W').length ?? 0) * 0.04 - (homeRow.pos > 12 ? 0.1 : 0), -0.15, 0.2);
-  if (awayClub?.prestige >= 8) mul += 0.15;
-  if (f.derby) mul += 0.25;
+  if (homeRow) mul += clamp((homeRow.form?.filter((x) => x === 'W').length ?? 0) * 0.03 - 0.05 - (homeRow.pos > 12 ? 0.08 : 0), -0.15, 0.12);
+  if (awayClub?.prestige >= 8) mul += 0.12;
+  if (f.derby) mul += 0.2;
   return clamp(base * mul, 0.08, 1);
 }
 
@@ -223,6 +235,7 @@ export const FIN_LABELS = {
   tickets: 'Dzień meczowy', tv: 'Prawa TV i podział ligi', sponsor: 'Sponsorzy', other: 'Koszulki, catering, inne', owner: 'Właściciel i dotacje',
   prize: 'Nagrody', sales: 'Sprzedaż zawodników', loans: 'Wypożyczenia',
   wages: 'Pensje', ops: 'Koszty klubu', transfers: 'Transfery', signOn: 'Premie za podpis', agents: 'Prowizje agentów', release: 'Rozwiązania kontraktów',
+  invest: 'Spłata długów i inwestycje', camps: 'Obozy przygotowawcze', fines: 'Kary PZPN',
 };
 
 /** Ile klub może dziś wydać (budżet transferowy ograniczony saldem). */

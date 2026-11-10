@@ -16,10 +16,8 @@ import { campWindow, campOn, officialDates } from './camps.js';
 export function friendlyPeriod(game, date, official = officialDates(game)) {
   const summer = campWindow(game, 'summer', game.clubId, official);
   if (date > SEASON_START && date < summer.start) return { id: 'lato', kind: 'lato', limit: FRIENDLY.limits.lato, name: FRIENDLY.names.lato };
-  const ny = `${summer.key.slice(0, 4) * 1 + 1}-01-01`;
-  const lastAutumn = [...official].reverse().find((d) => d < ny);
-  const spring = official.find((d) => d >= ny);
-  if (lastAutumn && spring && date > lastAutumn && date < spring) return { id: 'zima', kind: 'zima', limit: FRIENDLY.limits.zima, name: FRIENDLY.names.zima };
+  const winter = campWindow(game, 'winter', game.clubId, official); // po urlopie świątecznym, przed pierwszym meczem wiosny
+  if (date > winter.open && date < winter.start) return { id: 'zima', kind: 'zima', limit: FRIENDLY.limits.zima, name: FRIENDLY.names.zima };
   const w = FIFA_WINDOWS.find((x) => date >= x.from && date <= x.to);
   if (w) return { id: `fifa:${w.from}`, kind: 'fifa', limit: FRIENDLY.limits.fifa, name: FRIENDLY.names.fifa };
   return null;

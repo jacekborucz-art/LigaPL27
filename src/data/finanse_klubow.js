@@ -45,32 +45,32 @@ export const FINANSE_KLUBOW = {
   // Lech: dzień meczowy 61,9 mln zł, 78 zł na kibica, płace I drużyny 57,3; komercja oszacowana z różnicy
   lech: k(1, 72, 57.3, 42837, 31065, 78, 5, own('prywatny', 'rodzina Rutkowskich', 0, 10), ['komercja'], 1.25),
   // Raków: płace I drużyny 58,6; mały stadion, klub żyje z transferów i pieniędzy właściciela (x-kom)
-  rakow: k(1, 38, 58.6, 5500, 5000, 60, 4, own('miliarder', 'Michał Świerczewski (x-kom)', 22, 25), ['komercja', 'pojemnosc', 'frekwencja', 'naKibica', 'doplata'], 1.5),
+  rakow: k(1, 38, 58.6, 5500, 5000, 60, 4, own('miliarder', 'Michał Świerczewski (x-kom)', 32, 25), ['komercja', 'pojemnosc', 'frekwencja', 'naKibica', 'doplata'], 1.5),
   jagiellonia: k(1, 26, 35.4, 22372, 16000, 50, 3, own('miasto', 'Miasto Białystok', 4, 0), ['komercja', 'frekwencja', 'naKibica', 'doplata'], 1),
   // Widzew: przychody 67,3, płace I drużyny 68,3, 143,6 mln zł dokapitalizowania od Roberta Dobrzyckiego w 2025/26
   widzew: k(1, 24, 68.3, 18018, 17243, 71, 4, own('miliarder', 'Robert Dobrzycki (Panattoni)', 50, 45), ['komercja', 'doplata', 'skarbiec'], 2.2),
   // Pogoń: płace I drużyny 30,7, dokapitalizowanie 13,1 mln zł (Alex Haditaghi), dzień meczowy netto 16,2
   'pogon-szczecin': k(1, 22, 30.7, 21163, 15000, 55, 3, own('miliarder', 'Alex Haditaghi', 13.1, 15), ['komercja', 'frekwencja', 'naKibica', 'skarbiec'], 1.05),
   // Wieczysta: 49,1 mln zł przychodu w 1 Lidze 2025/26; właściciel Wojciech Kwiecień
-  wieczysta: k(1, 30, 32, 5000, 3500, 45, 4, own('miliarder', 'Wojciech Kwiecień', 22, 20), [...ALL, 'pojemnosc', 'doplata', 'skarbiec'], 1.1),
+  wieczysta: k(1, 30, 32, 5000, 3500, 45, 4, own('miliarder', 'Wojciech Kwiecień', 10, 20), [...ALL, 'pojemnosc', 'doplata', 'skarbiec'], 1.1),
   // Górnik: przychody 111 mln zł (35,6 z transferów), płace I drużyny 32,4, średnio 23 888 widzów
   'gornik-zabrze': k(1, 22, 32.4, 26500, 23888, 50, 3, own('miasto', 'Miasto Zabrze', 4, 0), ['komercja', 'naKibica', 'doplata'], 1.1),
   // Wisła Kraków: 56 mln zł przychodu w 1 Lidze 2025/26 przy wskaźniku płac 37 %, awans do Ekstraklasy
-  'wisla-krakow': k(1, 28, 26, 33130, 22000, 50, 4, own('prywatny', 'Jarosław Królewski i wspólnicy', 3, 5), ALL, 0.95),
+  'wisla-krakow': k(1, 24, 26, 33130, 22000, 50, 4, own('prywatny', 'Jarosław Królewski i wspólnicy', 0, 5), ALL, 0.95),
   // Cracovia: płace I drużyny 25,2; od sierpnia 2025 większość ma Robert Platek (szacunek majątku 7,4 mld zł)
-  cracovia: k(1, 20, 25.2, 15016, 9500, 45, 3, own('miliarder', 'Robert Platek', 10, 20), ['komercja', 'frekwencja', 'naKibica', 'doplata', 'skarbiec'], 1),
+  cracovia: k(1, 20, 25.2, 15016, 9500, 45, 3, own('miliarder', 'Robert Platek', 5, 20), ['komercja', 'frekwencja', 'naKibica', 'doplata', 'skarbiec'], 1),
   piast: k(1, 14, 22.7, 9913, 5500, 35, 2, own('miasto', 'Miasto Gliwice', 6, 0), ['komercja', 'frekwencja', 'naKibica', 'doplata'], 0.9),
   // Śląsk: w 1 Lidze 2025/26 przychody 34,4, wskaźnik płac 119 % (72 % po podwyższeniu kapitału przez miasto)
-  slask: k(1, 24, 28, 42771, 13000, 45, 3, own('miasto', 'Miasto Wrocław', 20, 0), [...ALL, 'doplata'], 1.15),
+  slask: k(1, 24, 28, 42771, 13000, 45, 3, own('miasto', 'Miasto Wrocław', 8, 0), [...ALL, 'doplata'], 1.15),
   // Zagłębie: płace I drużyny 35,4, właścicielem jest KGHM
-  'zaglebie-lubin': k(1, 34, 35.4, 16068, 6500, 35, 5, own('spolka', 'KGHM Polska Miedź', 6, 5), ['komercja', 'frekwencja', 'naKibica', 'doplata'], 1.55),
+  'zaglebie-lubin': k(1, 34, 35.4, 16068, 6500, 35, 5, own('spolka', 'KGHM Polska Miedź', 8, 5), ['komercja', 'frekwencja', 'naKibica', 'doplata'], 1.55),
   // Motor: płace I drużyny 20,8; Zbigniew Jakubas (szacunek majątku 5,94 mld zł, ok. 72 mln zł włożone w klub)
-  motor: k(1, 18, 20.8, 15247, 12000, 45, 3, own('miliarder', 'Zbigniew Jakubas', 12, 15), ['komercja', 'frekwencja', 'naKibica', 'doplata', 'skarbiec'], 0.9),
+  motor: k(1, 18, 20.8, 15247, 12000, 45, 3, own('miliarder', 'Zbigniew Jakubas', 4, 15), ['komercja', 'frekwencja', 'naKibica', 'doplata', 'skarbiec'], 0.9),
   korona: k(1, 14, 21.1, 15550, 9000, 40, 2, own('miasto', 'Miasto Kielce', 5, 0), ['komercja', 'frekwencja', 'naKibica', 'doplata'], 0.95),
   // GKS Katowice: nowa Arena Katowice (komplet 14 279 widzów w 21. kolejce 2025/26)
-  'gks-katowice': k(1, 12, 28.4, 15000, 11500, 45, 2, own('miasto', 'Miasto Katowice', 8, 0), ['komercja', 'pojemnosc', 'frekwencja', 'naKibica', 'doplata'], 1.35),
+  'gks-katowice': k(1, 12, 28.4, 15000, 11500, 45, 2, own('miasto', 'Miasto Katowice', 10, 0), ['komercja', 'pojemnosc', 'frekwencja', 'naKibica', 'doplata'], 1.35),
   // Radomiak: płace I drużyny 23,4, wskaźnik płac 93 % w 2024/25
-  radomiak: k(1, 10, 23.4, 8840, 5000, 35, 2, own('prywatny', 'właściciel prywatny', 3, 0), ['komercja', 'pojemnosc', 'frekwencja', 'naKibica', 'doplata'], 1.05),
+  radomiak: k(1, 10, 23.4, 8840, 5000, 35, 2, own('prywatny', 'właściciel prywatny', 7, 0), ['komercja', 'pojemnosc', 'frekwencja', 'naKibica', 'doplata'], 1.05),
   'wisla-plock': k(1, 16, 20, 15004, 7500, 35, 4, own('miasto', 'Miasto Płock (sponsor Orlen)', 5, 0), [...ALL, 'doplata'], 1),
 
   // ------------------------------------------------------------ 1 Liga
@@ -86,7 +86,7 @@ export const FINANSE_KLUBOW = {
   lks: k(2, 10, 10, 18008, 6000, 30, 2, own('prywatny', 'Tomasz Salski', 2, 0), [...ALL, 'doplata'], 1.25),
   miedz: k(2, 8, 8, 6244, 2500, 25, 2, own('prywatny', 'właściciel prywatny', 2, 0), [...ALL, 'pojemnosc', 'doplata'], 1),
   // Polonia Warszawa: 11,5 mln zł przychodu i wskaźnik płac 164 % w 2025/26
-  'polonia-warszawa': k(2, 6, 13, 7150, 3000, 30, 2, own('prywatny', 'właściciel prywatny', 6, 0), ['komercja', 'pojemnosc', 'frekwencja', 'naKibica', 'doplata'], 1.6),
+  'polonia-warszawa': k(2, 6, 13, 7150, 3000, 30, 2, own('prywatny', 'właściciel prywatny', 9, 0), ['komercja', 'pojemnosc', 'frekwencja', 'naKibica', 'doplata'], 1.6),
   'stal-rzeszow': k(2, 7, 6, 11547, 3000, 20, 2, own('miasto', 'Miasto Rzeszów', 2, 0), [...ALL, 'pojemnosc', 'doplata'], 0.95),
   podbeskidzie: k(2, 6, 6, 15316, 3000, 20, 2, own('miasto', 'Miasto Bielsko-Biała', 2, 0), [...ALL, 'doplata'], 0.9),
   'odra-opole': k(2, 6, 6, 11600, 4500, 20, 2, own('miasto', 'Miasto Opole', 2.5, 0), [...ALL, 'pojemnosc', 'doplata'], 0.9),

@@ -7,7 +7,7 @@ import { addDays } from '../core/gameLoop.js';
 import { SESSIONS, INT_ORDER, ACCENTS, LOAD_LEVELS } from './config.js';
 import { clubMatchDates, daysBetween, weekdayIdx, mondayOf } from './state.js';
 import { staffQ } from './staff.js';
-import { officialDates, campOn } from './camps.js';
+import { campOn } from './camps.js';
 
 export const ROLE_LABELS = {
   MD: 'Dzień meczowy', 'MD+1': 'Dzień po meczu', 'MD+2': 'Drugi dzień po meczu', 'MD±1': 'Między meczami',
@@ -20,11 +20,15 @@ export const MAX_SESSIONS = 3;
 const s = (type, int = 'mid') => ({ type, int: SESSIONS[type]?.noIntensity ? 'low' : int });
 
 /** Daty meczów klubu: wszystkie, o punkty i sparingi (liczone raz na dzień albo tydzień). */
-export function matchSets(game) {
-  const all = clubMatchDates(game);
-  const official = officialDates(game);
-  const off = new Set(official);
-  return { all, official, friendly: new Set(all.filter((d) => !off.has(d))) };
+export function matchSets(game, clubId = game.clubId) {
+  const all = new Set(); const off = new Set();
+  for (const f of game.fixtures || []) {
+    if (!f.date || (f.home !== clubId && f.away !== clubId)) continue;
+    all.add(f.date);
+    if (f.comp !== 'friendly') off.add(f.date);
+  }
+  const allS = [...all].sort();
+  return { all: allS, official: [...off].sort(), friendly: new Set(allS.filter((d) => !off.has(d))) };
 }
 
 function around(dates, date) {

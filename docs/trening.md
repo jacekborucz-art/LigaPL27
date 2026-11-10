@@ -163,6 +163,68 @@ Jakość na start: `3 + 1,3*prestiż + premia ligi (EK +1, 2L -1) + N(0; 1,8)`, 
 - Modyfikatory: kilka odczytów pól na zawodnika.
 - Pomiar: pół sezonu 600-800 ms bez treningu, 700-930 ms z treningiem (ok. +15-20 %). Test wydajności pilnuje progu 30 %.
 
-## 11. Integracja (do zrobienia przez koordynatora)
+## 11. Obozy przygotowawcze
+
+Kod: `src/training/camps.js`, testy: `tests/camps.test.mjs`.
+
+**Co robią polskie kluby.** Zimą najpopularniejszym kierunkiem klubów Ekstraklasy jest Turcja (Belek, Antalya, Side, Lara): przed wiosną 2025 w Turcji było m.in. Pogoń, Lechia, Zagłębie, Cracovia, Widzew, Motor, Korona, GKS Katowice i Górnik, a Raków pojechał do Marbelli. Według Górnika Zabrze w Turcji trenuje 14 drużyn Ekstraklasy, choć coraz więcej wybiera inne kierunki. Do Turcji jeżdżą też kluby 1 Ligi (Wisła Kraków, Wieczysta). Latem kluby trenują głównie w Polsce (Opalenica, Arłamów, Gniewino) i w Austrii, rzadziej w Słowenii, zwykle przez 10-14 dni z 3-4 sparingami. Źródła są na końcu rozdziału. Liczby w grze to założenia [SZAC].
+
+| Kierunek | Warunki latem | Warunki zimą | Koszt dnia (część rocznego przychodu bazowego) |
+|---|---|---|---|
+| Polska (ośrodek krajowy) | 85 % | 55 % | 0,04 % |
+| Słowenia | 95 % | 60 % | 0,07 % |
+| Austria (Alpy) | 100 % | 50 % | 0,08 % |
+| Turcja (Belek, Antalya) | 80 % | 100 % | 0,09 % |
+| Hiszpania (Marbella) | 75 % | 105 % | 0,12 % |
+
+Przykład: Widzew, 10 dni w Austrii: ok. 0,5 mln zł; Legia płaci więcej, mały klub 2 Ligi kilka razy mniej. Koszt trafia do finansów jako `camps` przy rezerwacji, odwołanie przed wyjazdem zwraca pieniądze.
+
+**Termin.** Lato: od Jul 2 do 2 dni przed pierwszym meczem o punkty. Zima: po urlopie świątecznym (najwcześniej Jan 2 i 12 dni po ostatnim meczu jesieni) do 2 dni przed pierwszym meczem wiosny. Długość 7, 10 albo 14 dni (5, gdy przerwa jest krótka). Obóz nigdy nie koliduje z meczem o punkty.
+
+**Forma bazowa.**
+
+```text
+punkty: dzień obozu = q kierunku; dzień treningu w klubie = 0,45 latem, 0,3 zimą (mróz, sztuczne boiska)
+cel = clamp(0,55 * dni okresu przygotowawczego, 4, 12)
+forma bazowa = clamp(punkty / cel, 0,3, 1,1), liczona w dniu pierwszego meczu rundy
+wpływ w meczach = 0,4 * (forma - 1) pkt atrybutu: pełny przez 21 dni, potem wygasa przez 21 dni (modyfikator 'trainingCamp')
+brak formy = 1 - forma: urazy treningowe x(1 + 0,8 * brak), przyrost ostrości x(1 - 0,5 * brak)
+```
+
+| Przygotowanie (zima, 24 dni) | Forma bazowa | Siła w 3 pierwszych tygodniach |
+|---|---|---|
+| Bez obozu | ok. 0,45 | ok. -0,22 pkt |
+| Polska, 7 dni | ok. 0,63 | ok. -0,15 pkt |
+| Turcja, 12 dni | ok. 1,1 | +0,04 pkt |
+
+**Na obozie** (mnożone przez q): rozwój x(1 + 0,25 q) i zajęcia fizyczne dodatkowo x1,1, zgranie z zajęć x(1 + 0,5 q), ryzyko urazu x(1 - 0,3 q), zmęczenie x(1 - 0,12 q), morale +0,04 q dziennie, znajomość systemu +0,3 q dziennie. Plan asystenta w dniach obozu to szablon obozowy (dwa treningi w wybrane dni).
+
+**Kluby AI** wybierają obóz raz na rundę z prestiżu i ligi: najbogatsze zimą Turcja (75 %) albo Hiszpania na 10-14 dni, średnie Turcja na 8-12 dni, słabsze Turcja albo Polska, najmniejsze Polska albo bez obozu; latem Austria, Słowenia albo Polska. Forma bazowa AI liczy się tym samym wzorem (szacunek) w kroku tygodniowym. Koszt: 54 losowania na rundę.
+
+**Wiadomości.** Na początku okna przypomnienie o obozie, w dniu wyjazdu informacja, w dniu pierwszego meczu rundy raport formy bazowej od trenera przygotowania fizycznego.
+
+## 12. Sparingi
+
+Kod: `src/training/friendlies.js`.
+
+- Terminy: okres przygotowawczy latem (do pierwszego meczu o punkty), przerwa zimowa po urlopie, okna FIFA. Zawsze 2 dni przerwy od innych meczów obu drużyn (`restOk`).
+- Limity: 6 latem, 4 zimą, 2 na okno FIFA.
+- Rywale: polskie kluby z tej samej albo niższej ligi z wolnym terminem (najbliższe poziomem) i kluby zagraniczne z poziomem od -1,5 do +3 (na obozie z kraju obozu, mecz na neutralnym boisku; poza obozem z krajów sąsiednich). Opis poziomu: od „Dużo słabszy” do „Dużo silniejszy”.
+- Wpis w terminarzu: `{ id: SP-data-rywal, comp: 'friendly', round: 'F', date, time: '17:00', home, away, played: false, neutral, label: 'Sparing: nazwa' }`.
+- W planie tygodnia sparing to dzień meczowy z rozruchem dzień wcześniej i regeneracją dzień później, ale nie przerywa okresu przygotowawczego ani mikrocyklu przed meczem o punkty.
+- Skutki: połowa zgrania z meczu o punkty, obciążenie 85 % meczu (jedenastka 70 minut, ławka 25 minut), rytm. Zmęczenie, dług meczowy i ostrość daje rozegranie meczu w aplikacji.
+
+**Źródła (obozy):**
+
+- [Radio Kielce: Turcja i Hiszpania to najpopularniejsze kierunki](https://radiokielce.pl/1262111/turcja-i-hiszpania-to-najpopularniejsze-kierunki)
+- [Górnik Zabrze: Turkey number one destination for winter manoeuvres of league players](https://www.gornikzabrze.pl/en/news/events/turkey-number-one-destination-winter-maneuvers-league-players)
+- [Meczyki.pl: Jagiellonia, Wisła Kraków i czwartoligowiec, obóz w Turcji](https://www.meczyki.pl/newsy/pilka-nozna/jagiellonia-wisla-krakow-i-czwartoligowiec-nieoczywisty-uczestnik-obozu-w-turcji/290216)
+- [Wisła Kraków: informacje o zgrupowaniu w Turcji](https://shop.wislakrakow.com/en/blogs/news/wi-wislawlarze-informacje-dotyczace-zgrupowania-w-turcji-2025-01-16)
+- [Łódzki Sport: piłkarze Ekstraklasy ładują akumulatory głównie w Polsce i Austrii](https://lodzkisport.pl/pilkarze-pko-ekstraklasy-laduja-akumulatory-glownie-w-polsce-i-austrii)
+- [Wroclaw.pl: Śląsk Wrocław rozpoczął obóz w Austrii](https://www.wroclaw.pl/sport/slask-wroclaw-rozpoczal-oboz-przygotowawczy-w-austrii-plan-sparingow)
+- [Radio Kraków: plan letnich przygotowań Cracovii](https://www.radiokrakow.pl/aktualnosci/sport/znamy-plan-letnich-przygotowan-cracovii/)
+- [Lech Poznań: zgrupowanie w Opalenicy](https://www.lechpoznan.pl/aktualnosci,2,kadra-na-zgrupowanie-w-opalenicy,27545.html)
+
+## 13. Integracja (do zrobienia przez koordynatora)
 
 Patrz raport modułu: import `src/training/index.js` w app.js, `ensureTraining` w `ensureGameShape`, ekran w zakładce „trening”, `training.css` w index.html, `trainingMatchInput` w `kickOff` (matchday.js), `npm run sw`.

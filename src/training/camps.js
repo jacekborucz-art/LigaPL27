@@ -80,7 +80,7 @@ export function baseFactor(start, date) {
   if (d <= CAMP.fullDays) return 1;
   return Math.max(0, 1 - (d - CAMP.fullDays) / CAMP.fadeDays);
 }
-export const baseTerm = (base, factor) => CAMP.effect * (base - 1) * factor;
+export const baseTerm = (base, factor) => (factor ? CAMP.effect * (base - 1) * factor : 0);
 
 /** Rezerwacja obozu klubu gracza na daną rundę (lub null). */
 export function bookingFor(game, key) {

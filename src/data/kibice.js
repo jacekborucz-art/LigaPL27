@@ -9,7 +9,7 @@ const k = (size, ultras, temper, extra = {}) => ({ size, ultras, temper, ...extr
 
 export const KIBICE = {
   // Ekstraklasa
-  legia: k(5, 5, 5, { stand: 'Żyleta' }), // Żyleta: decyzje UEFA i Komisji Ligi (docs/kibice.md, źródła 3, 6)
+  legia: k(5, 5, 5, { stand: 'Żyleta' }), // Żyleta: decyzje UEFA i Komisji Ligi, bojkot 2025 (docs/kibice.md, źródła 3, 6, 14, 17)
   lech: k(5, 5, 4),
   rakow: k(3, 2, 2),
   jagiellonia: k(4, 4, 3),
@@ -18,7 +18,7 @@ export const KIBICE = {
   wieczysta: k(1, 1, 1),
   'gornik-zabrze': k(4, 4, 4),
   'wisla-krakow': k(5, 5, 5, { stand: 'sektor C' }), // sektor C: decyzje Komisji Ligi i KD PZPN (źródła 1, 2)
-  cracovia: k(3, 4, 5), // kary za rasizm, burdy, zakazy wyjazdów (źródła 7, 12)
+  cracovia: k(3, 4, 5), // kary za rasizm, burdy, zakazy wyjazdów (źródła 7, 8)
   piast: k(2, 2, 3),
   slask: k(4, 4, 4), // kary 40-50 tys. zł i zakazy wyjazdów (źródła 9, 11)
   'zaglebie-lubin': k(2, 3, 3),

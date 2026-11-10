@@ -92,7 +92,8 @@ export function fanProfile(clubId) {
   else { size = clamp(Math.round(pr / 2.2), 1, 4); ultras = clamp(Math.round(pr / 2.5), 1, 4); temper = 2; } // [SZAC]
   const p = {
     id: clubId, size, ultras, temper,
-    sens: 0.25 + 0.085 * (size + ultras), // wrażliwość na złe wyniki: 0,42 (mały klub) do 1,1 (Legia) [SZAC]
+    sens: 0.4 + 0.07 * (size + ultras), // wrażliwość na złe wyniki: 0,54 (mały klub) do 1,1 (Legia) [SZAC]
+    tScale: clamp(0.55 + 0.05 * (size + ultras), 0.65, 1), // niższe progi pierwszych szczebli w małych klubach [SZAC]
     maxLevel: club?.parent ? 1 : clamp(Math.round(0.5 + 0.75 * (size + ultras)), 1, 8),
     expBias: (pr - 6) * 0.05, // renoma podnosi oczekiwania ponad siłę kadry (punkty na mecz) [SZAC]
     tolerance: size >= 4 ? 1 : size >= 2 ? 2 : 3, // ile miejsc poniżej oczekiwań kibice „wybaczą”
@@ -127,7 +128,7 @@ export const heatLabel = (h) => (h >= 72 ? 'Otwarty konflikt' : h >= 54 ? 'Prote
 // ------------------------------------------------------------ Stan
 
 function newClubState() {
-  return { mood: 55, heat: 0, level: 0, crisisFrom: null, lastAt: {}, form: [], sanctions: [], stars: null, season: newSeasonStats(), history: [] };
+  return { mood: 55, heat: 0, level: 0, crisisPeak: 0, crisisFrom: null, lastAt: {}, form: [], sanctions: [], stars: null, season: newSeasonStats(), history: [] };
 }
 function newSeasonStats() {
   return { incidents: 0, fines: 0, amount: 0, closures: 0, noFans: 0, awayBans: 0, protests: 0, maxLevel: 0, coachChanges: 0, byKind: {} };
@@ -138,7 +139,7 @@ export function ensureFans(game) {
   const seasonId = game.season?.seasonId ?? null;
   if (!game.fans) {
     game.fans = { v: 1, seasonId, userClub: game.clubId, clubs: {}, log: [] };
-    for (const f of game.fixtures ?? []) if (f.played) f.fans = true;
+    for (const f of game.fixtures ?? []) if (f.played && f.date < (game.date ?? '0000')) f.fans = true;
   }
   const S = game.fans;
   for (const c of CLUBS_PL) if (!S.clubs[c.id]) S.clubs[c.id] = newClubState();
@@ -148,7 +149,7 @@ export function ensureFans(game) {
       C.history = [{ season: S.seasonId, ...C.season }, ...(C.history ?? [])].slice(0, 5);
       C.season = newSeasonStats();
       C.heat = Math.round(C.heat * 0.5 * 10) / 10;
-      C.level = levelFor(C.heat, fanProfile(id).maxLevel);
+      C.level = levelFor(C.heat, fanProfile(id));
       C.mood = Math.round(C.mood + (55 - C.mood) * 0.3);
       C.sanctions = C.sanctions.filter((s) => s.scope !== 'uefa');
     }
@@ -159,14 +160,16 @@ export function ensureFans(game) {
     for (const id of [S.userClub, game.clubId]) {
       const C = S.clubs[id];
       if (!C) continue;
-      C.heat = Math.round(C.heat * 0.4); C.level = 0; C.crisisFrom = null; C.stars = null;
+      C.heat = Math.round(C.heat * 0.4); C.level = 0; C.crisisPeak = 0; C.crisisFrom = null; C.stars = null;
     }
     S.userClub = game.clubId;
   }
   return S;
 }
 
-const levelFor = (heat, max) => { let l = 0; while (l < max && heat >= FANS.T[l + 1]) l++; return l; };
+/** Próg heat dla szczebla: pierwsze dwa szczeble w małych klubach niżej (narzekanie przychodzi szybciej, ale cicho). */
+export const threshold = (level, P) => (level <= 2 ? FANS.T[level] * P.tScale : FANS.T[level]);
+const levelFor = (heat, P) => { let l = 0; while (l < P.maxLevel && heat >= threshold(l + 1, P)) l++; return l; };
 const daysBetween = (a, b) => Math.round((new Date(`${b}T12:00:00Z`) - new Date(`${a}T12:00:00Z`)) / 86400000);
 const fineScale = () => FIN.FINE_SCALE ?? FIN.ECON ?? 0.08; // realne zł -> gospodarka gry (jak nagrody UEFA)
 const tierOfClub = (id) => anyClub(id)?.tier ?? 5;
@@ -327,30 +330,32 @@ function protestEvent(game, C, clubId, levelIdx, date, rng, msgs) {
   }));
 }
 
-/** Aktualizacja szczebla protestu po zmianie heat (najwyżej jeden szczebel w górę naraz). */
-function escalate(game, C, clubId, date, rng, msgs) {
+/** Aktualizacja szczebla protestu po zmianie heat (najwyżej jeden szczebel w górę naraz; po wygranej bez eskalacji). */
+function escalate(game, C, clubId, date, rng, msgs, rise = true) {
   const P = fanProfile(clubId);
-  const before = C.level;
-  while (C.level > 0 && C.heat < FANS.T[C.level] - FANS.HYST) C.level--;
+  while (C.level > 0 && C.heat < threshold(C.level, P) - FANS.HYST * (C.level <= 2 ? P.tScale : 1)) C.level--;
   if (C.level === 0) {
-    if (before >= 3 && clubId === game.clubId) {
+    if ((C.crisisPeak ?? 0) >= 3 && clubId === game.clubId) {
       addMood(game, C, clubId, 3);
       msgs.push(createMessage({ date, key: `kibice:${clubId}:koniec:${date}`, category: 'club', from: 'Rzecznik klubu', priority: 'info', subject: 'Kibice zawieszają protest', body: 'Po lepszych wynikach grupy kibicowskie zawieszają protest. Doping wraca na trybuny, ale kibice zapowiadają, że będą uważnie patrzeć na kolejne mecze.' }));
     }
-    if (C.heat < FANS.T[1] - FANS.HYST) C.crisisFrom = null;
+    C.crisisPeak = 0;
+    if (C.heat < threshold(1, P) - FANS.HYST * P.tScale) C.crisisFrom = null;
   }
   const next = C.level + 1;
-  if (next > P.maxLevel || C.heat < FANS.T[next]) return;
+  if (!rise) return;
+  if (next > P.maxLevel || C.heat < threshold(next, P)) return;
   if (!C.crisisFrom) C.crisisFrom = date;
   if (LEVELS[next].id === 'boardProtest' && daysBetween(C.crisisFrom, date) < FANS.BOARD_PROTEST_DAYS) return;
   C.level = next;
+  C.crisisPeak = Math.max(C.crisisPeak ?? 0, next);
   const last = C.lastAt[next];
   if (last && daysBetween(last, date) < FANS.COOLDOWN_DAYS) return;
   C.lastAt[next] = date;
   protestEvent(game, C, clubId, next, date, rng, msgs);
   // Klub AI: przy żądaniu zwolnienia zarząd często zmienia trenera i presja spada [SZAC]
   if (clubId !== game.clubId && next >= 7 && rng.chance(0.45)) {
-    C.heat = Math.round(C.heat * 0.3); C.level = levelFor(C.heat, P.maxLevel); C.season.coachChanges++;
+    C.heat = Math.round(C.heat * 0.3); C.level = levelFor(C.heat, P); C.season.coachChanges++;
     log(game, { date, club: clubId, kind: 'coachChange', text: `${anyClub(clubId)?.name ?? clubId}: zmiana trenera po presji kibiców` });
   }
 }
@@ -475,7 +480,7 @@ function reaction(game, C, f, side, riv, rng, date, msgs) {
   C.heat = s < 0 ? C.heat - s * FANS.LOSS_K * P.sens : C.heat - Math.max(s * FANS.WIN_K, res === 'W' ? 3 : 0); // każda wygrana trochę uspokaja
   C.heat = Math.round(clamp(C.heat * FANS.DECAY, 0, 100) * 10) / 10;
   C.form = [...C.form, res].slice(-6);
-  escalate(game, C, me, date, rng, msgs);
+  escalate(game, C, me, date, rng, msgs, s < 0);
 }
 
 /**
@@ -487,6 +492,7 @@ export function fansAfterMatch(game, f, date = f.date) {
   const msgs = [];
   if (!f.played || !f.result || f.fans) return msgs;
   f.fans = true;
+  if (f.comp === 'friendly') return msgs; // sparingi nie budzą emocji kibiców ani kar
   const S = game.fans;
   const rng = new Rng(`kibice:${game.seed}:${f.id}:${f.date}`);
   const riv = rivalry(f.home, f.away);
@@ -589,7 +595,7 @@ export function fansDay(game, date) {
  */
 export function attendanceModifier(game, clubId, f) {
   const S = game.fans;
-  if (!S || !f) return 1;
+  if (!S || !f || f.comp === 'friendly') return 1;
   const C = S.clubs[clubId];
   if (!C) return 1;
   let m = 1 + clamp((moodOf(game, clubId) - 58) * 0.004, -0.1, 0.08);
