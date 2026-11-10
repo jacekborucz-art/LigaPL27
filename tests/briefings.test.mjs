@@ -144,7 +144,7 @@ test('Gracz widzi reakcje bez liczb: ikona, etykieta i krótki tekst', () => {
       assert.ok(allowed.has(r.reaction));
       for (const t of [r.text, r.label, r.talk?.text, r.talk?.quote].filter(Boolean)) {
         assert.ok(!/\d/.test(t), t);
-        assert.ok(!t.includes('—'), t);
+        assert.ok(!t.includes('\u2014'), t);
       }
     }
     assert.ok(!/\d/.test(res.team.summary));
@@ -313,7 +313,7 @@ test('Studio przedmeczowe: ranga, absencje, sędzia, frekwencja, data MMM D, YYY
 
 test('Nagłówki: co najmniej 40 szablonów i brak powtórzeń w kolejnych 5 meczach', () => {
   assert.ok(HEADLINE_TEMPLATES.length >= 40);
-  assert.ok(HEADLINE_TEMPLATES.every((h) => !h.text.includes('—') && !h.text.includes(' - ')));
+  assert.ok(HEADLINE_TEMPLATES.every((h) => !h.text.includes('\u2014') && !h.text.includes(' - ')));
   assert.equal(new Set(HEADLINE_TEMPLATES.map((h) => h.id)).size, HEADLINE_TEMPLATES.length);
   let history = [];
   const perMatch = [];
