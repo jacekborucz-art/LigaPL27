@@ -159,6 +159,23 @@ Dokładność atrybutów na wszystkich listach zależy od poziomu skautingu (roz
 - Klub gracza dostaje ostrzeżenie o brakach i przycisk „Uzupełnij z akademii”. Jeśli przed meczem nadal brakuje zawodników, asystent uzupełnia skład automatycznie, żeby mecz się odbył.
 - Test wielosezonowy (etap 10): żaden klub w 10 sezonach nie gra meczu bez 2 dostępnych bramkarzy ani z mniej niż 16 zawodnikami.
 
+### 2.6 Negocjacje kontraktów (decyzja użytkownika)
+
+Pełna specyfikacja: `docs/negocjacje.md`. Kod: `src/career/personality.js`, `src/career/negotiation.js`, `src/career/negotiationLines.js`, testy: `tests/negotiation.test.mjs`.
+
+- **Charakter zawodnika:** 11 cech 1-20 (m.in. chciwość, ambicja, lojalność, ego, cierpliwość, temperament, przywiązanie do miasta i rodziny, potrzeba gry), powiązanych z osobowością i ukrytymi atrybutami.
+- **Agent:** 4 typy (twardy rekin, rozsądny, agent z rodziny, bez agenta).
+- **Nastawienie:** 7 mindsetów (np. budowanie kariery, ostatni duży kontrakt, chce wrócić do domu) z własnymi wagami elementów oferty.
+- **Rozmowy w rundach:**
+  - zawodnik ma ukryte oczekiwania i minimum;
+  - nastrój zmienia się w każdej rundzie;
+  - odpowiedzi to akceptacja, kontroferta z liczbami, żądanie, ultimatum albo zerwanie;
+  - agent czasem blefuje, a gracz może sprawdzić blef kosztem nastroju;
+  - 128 kwestii po polsku dobieranych do charakteru i nastroju.
+- **Fiasko:** blokada rozmów na 2-12 tygodni, a przy skrajnym obrażeniu do końca okna albo sezonu. Pamięć urazy wygasa o połowę co 90 dni. Przy przedłużeniu dochodzi spadek morale i możliwa prośba o transfer.
+- **Obietnice roli:** zapisywane w kontrakcie i sprawdzane co miesiąc. Złamana obietnica obniża zaufanie i morale i podraża kolejne rozmowy.
+- **AI:** ta sama logika, maks. 2 rundy.
+
 ## 3. Silnik meczowy w skrócie
 
 Pełne wzory są w `ekspert_futbol.md`, rozdział 6. Kolejność obliczeń:
@@ -267,10 +284,61 @@ manager-pilkarski/
   tests/           kalibracja, niezmienniki kalendarza, reguły
 ```
 
-- Vanilla JS z modułami ES, Vite do budowania, bez frameworka. Canvas 2D tylko dla boiska.
+- Vanilla JS z modułami ES, bez frameworka i bez kroku budowania (pliki serwowane wprost). Canvas 2D tylko dla boiska.
 - Deterministyczny RNG z ziarnem (mulberry32). Restart nie zmienia wyniku.
 - Web Worker dla symulacji kolejek i generowania świata.
 - Budżet wydajności: minuta meczu poniżej 1 ms, kolejka 3 lig poniżej 50 ms, zapis poniżej 2 MB po sezonie.
+
+### 4.1 Rozbudowa bez przebudowy silnika (decyzja użytkownika)
+
+Każdy nowy atrybut, cecha albo logika ma się dać dodać w jednym miejscu. Zasady obowiązują wszystkie moduły:
+
+| Mechanizm | Jak działa | Jak dodać coś nowego |
+|---|---|---|
+| **Rejestr modyfikatorów** (`src/engine/modifiers.js`, działa) | Silnik nie zna poszczególnych cech. Pyta rejestr o sumę wpływów na zawodnika (`player`), drużynę (`team`) i mecz (`match`). Każdy wpis trafia do rozbicia siły, więc studio i raport asystenta pokażą jego wpływ | Jeden wpis `registerModifier({ id, scope, apply })`. Test sprawdza, że nowa cecha „chemia” działa bez zmiany silnika |
+| **Atrybuty jako słownik** | Zawodnik ma `attr: { POD: 12, ... }`, a nie stałe pola. Generator czyta listę atrybutów i profile pozycji z danych | Dopisanie atrybutu do listy i profili pozycji. Opcjonalnie modyfikator |
+| **Dziennik zdarzeń meczu** (`src/engine/matchStats.js`, działa) | Silnik zapisuje zdarzenia. Statystyki, oceny, relacja, momentum i studio liczą się wyłącznie z dziennika | Nowy typ zdarzenia i jedna gałąź w funkcji liczącej. Silnik i UI bez zmian |
+| **Fazy minuty jako lista** | Pętla minuty to lista faz (posiadanie, spalony, faul, akcja, zdarzenia tła). Każda faza to osobna funkcja `(stan, rng) => zdarzenia` | Nowa faza (np. pogoda zmieniająca się w trakcie) to nowy element listy |
+| **Hooki kariery** | Zdarzenia dnia (`onMatchEnd`, `onWeek`, `onMonth`, `onSeasonEnd`, `onWindowClose`) wywołują zarejestrowane systemy: morale, reputacja, obietnice, emerytury, rozwój, finanse | Nowy system rejestruje się na hook; kalendarz go nie zna |
+| **Balans w konfiguracji** | Wszystkie liczby (stałe silnika, progi, kary) w `src/config/` i stałych modułów z oznaczeniem [SZAC] | Zmiana liczby, bez zmiany logiki. Testy kalibracji pilnują wyników |
+| **Wersje zapisu i migracje** | `SAVE_VERSION` + lista funkcji migracji `v1 -> v2 -> ...` | Nowe pole dostaje wartość domyślną w migracji, więc stare zapisy dalej działają |
+| **Testy kalibracji** | Każda zmiana musi przejść testy średnich (gole, 1X2, kartki, strzały) | Gdy test pęka, widać od razu, która zmiana rozjechała balans |
+
+### 4.2 Wyniki i statystyki: zawsze z wyliczenia (decyzja użytkownika)
+
+**Mecz gracza (pełny silnik):** każda statystyka ma swoje źródło w zdarzeniu, które naprawdę zaszło w symulacji. Wynik to liczba zdarzeń „gol” minus gole anulowane przez VAR. Posiadanie to średnia z posiadania w każdej minucie. Podania, auty, wolne i rożne są liczone ze zdarzeń. Test w etapie 3 sprawdza dla 10 000 meczów, że statystyki pokazane graczowi są równe przeliczeniu dziennika zdarzeń (`checkStatsInvariants`).
+
+**Mecze w tle (szybka symulacja, `src/engine/quickSim.js`, działa):**
+1. Z kadry wybierana jest najlepsza **dostępna** jedenastka. Kontuzjowani, zawieszeni i powołani wypadają, luki zapełniają zawodnicy poza pozycją z karą, a bez bramkarza działa kara bramkarska.
+2. Siła stref (bramkarz, obrona, pomoc, atak, wykończenie) to OVR na pozycji plus modyfikatory: forma, **morale**, ostrość, świeżość, gra z urazem.
+3. Dochodzi pewność siebie z tabeli: punkty ponad albo poniżej oczekiwań, od 4. kolejki, maks. ±0,15 punktu, żeby nie liczyć siły dwa razy.
+4. Miejsce spotkania: średnia goli gospodarza 1,50, gościa 1,19, na neutralnym terenie 1,34.
+5. Średnie bramek liczone ze wzoru eksperta, dopasowanego do pełnego silnika. Wynik losowany z rozkładu Poissona z korektą remisów (Dixon-Coles). Lepsza drużyna wygrywa częściej, ale nie zawsze, jak w prawdziwej piłce, a ziarno losowania jest stałe.
+6. Statystyki wynikają z modelu: xG to wyliczona średnia, strzały wynikają z xG, celne z goli i strzałów, rożne ze strzałów, posiadanie z różnicy w pomocy, kartki z surowości sędziego i agresji, strzelcy ważeni wykończeniem i pozycją.
+
+Wynik pomiaru na 20 000 meczów na każdą różnicę siły:
+
+| Różnica siły | 1 / X / 2 | Gole | Strzały | Celne | Rożne |
+|---|---|---|---|---|---|
+| 0 | 43 / 27 / 30 % | 2,78 | 25,8 | 9,2 | 10,4 |
+| +1 dla gospodarza | 59 / 24 / 17 % | 2,93 | 27,3 | 9,8 | 10,9 |
+| +2 dla gospodarza | 73 / 17 / 9 % | 3,23 | 29,9 | 10,7 | 11,9 |
+
+Żółte kartki po korekcie wynoszą ok. 4,3 na mecz. Czas: ok. 0,09 ms na mecz, więc cały sezon trzech lig, pucharów i reprezentacji w tle to poniżej 0,2 s.
+
+### 4.3 Morale (`src/career/morale.js`, działa)
+
+- Każdy zawodnik ma morale 1-20 (start 12). Wpływ na siłę w meczu: `0.04*(morale-10)` punktu atrybutu, czyli od -0,36 do +0,4.
+- **Zmiany po meczu:**
+  - wynik: wygrana +1,5, porażka -1,5;
+  - sensacja (wygrana słabszego): +2,5, a porażka faworyta: -2,5;
+  - derby: łącznie ±3;
+  - seria 3 porażek: -2 dodatkowo;
+  - własna ocena w meczu: do ±0,6;
+  - ważny zawodnik 3 mecze bez gry: -1 za mecz.
+- **Zdarzenia:** nowy kontrakt +3, odrzucona prośba o transfer -3, złamana obietnica -2,5, powołanie +1, gol w reprezentacji +1, publiczna pochwała +1, publiczna krytyka -1,5. Dochodzą odprawy i negocjacje.
+- Co tydzień morale wraca w stronę 12 o 0,3, a z liderem w drużynie o 0,5.
+- Morale drużyny to średnia 18 zawodników z największą liczbą minut. Opisy na ekranie: od „Bardzo słabe” do „Znakomite”.
 
 ## 5. Kalendarz i rozwiązywanie konfliktów
 
