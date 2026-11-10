@@ -75,6 +75,27 @@ export function deleteMessage(inbox, id) {
   return inbox.filter((m) => m.id !== id);
 }
 
+/** Czy wiadomość można usunąć: nierozstrzygnięta decyzja i pilne nieprzeczytane zostają. */
+export const canDelete = (m) => !(m.actions?.length && !m.resolved) && !(m.priority === 'urgent' && !m.read);
+
+/**
+ * Porządki w poczcie. mode: 'read' (przeczytane), 'old' (starsze niż days), 'auto' (automatycznie:
+ * przeczytane informacyjne po 45 dniach, pozostałe przeczytane po 90, nieprzeczytane informacyjne po 120).
+ * Zwraca { inbox, removed: [klucze usuniętych] }.
+ */
+export function pruneInbox(inbox, date, mode = 'auto', days = 30) {
+  const age = (m) => (new Date(`${date}T12:00:00Z`) - new Date(`${m.date}T12:00:00Z`)) / 86400000;
+  const drop = (m) => {
+    if (!canDelete(m)) return false;
+    if (mode === 'read') return m.read;
+    if (mode === 'old') return age(m) > days;
+    if (m.read) return age(m) > (m.priority === 'info' ? 45 : 90);
+    return m.priority === 'info' && age(m) > 120;
+  };
+  const removed = inbox.filter(drop).map((m) => m.key).filter(Boolean);
+  return { inbox: inbox.filter((m) => !drop(m)), removed };
+}
+
 export function filterInbox(inbox, category = null) {
   return category ? inbox.filter((m) => m.category === category) : inbox;
 }

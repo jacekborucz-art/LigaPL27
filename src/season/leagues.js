@@ -49,7 +49,8 @@ export function computeMoves(tables, playoffWinners, l3, rng) {
   const upFrom = (t, n) => {
     const eligible = tables[t].filter((id) => !parentOf(id));
     const direct = eligible.slice(0, n);
-    const po = playoffWinners[t] && !direct.includes(playoffWinners[t]) ? playoffWinners[t] : eligible[n];
+    // Zwycięzca baraży liczy się tylko, gdy grał w barażach (miejsca 3-6 wśród uprawnionych)
+    const po = playoffWinners[t] && eligible.slice(n, n + 4).includes(playoffWinners[t]) ? playoffWinners[t] : eligible[n];
     return [...direct, po].filter(Boolean);
   };
   // Ekstraklasa <-> 1 Liga

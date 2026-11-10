@@ -38,7 +38,9 @@ function matchMoney(game, date) {
     f.fin = true;
     const fill = attendanceFill(f, rowOf(f.home), anyClub(f.away));
     f.attendance = Math.round(stadiumCapacity(clubById(f.home) ?? anyClub(f.home)) * fill / 100) * 100;
-    const [h, a] = matchIncome(F, f, fill);
+    const [h0, a0] = matchIncome(F, f, fill);
+    const mul = f.comp === 'friendly' ? 0.12 : 1; // sparing: bilety symboliczne
+    const h = h0 * mul; const a = a0 * mul;
     book(F, f.home, f.date, 'in', 'tickets', h);
     if (a) book(F, f.away, f.date, 'in', 'tickets', a);
     if (f.comp === 'pp') {

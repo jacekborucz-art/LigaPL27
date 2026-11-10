@@ -54,6 +54,7 @@ function compInfo(f) {
   if (f.comp === 'pp') return { type: 'cup', name: 'Puchar Polski', stage: f.round === 'F' ? 'final' : 'main' };
   if (f.comp === 'super') return { type: 'supercup', name: 'Superpuchar Polski', stage: 'final' };
   if (f.comp === 'uefa') return { type: 'uefa', name: compLabel(f), stage: f.round === 'F' ? 'final' : 'main' };
+  if (f.comp === 'friendly') return { type: 'friendly', name: 'Sparing', stage: 'main' };
   return { type: 'cup', name: compLabel(f), stage: f.round === 'F' ? 'final' : 'main' };
 }
 
@@ -247,8 +248,10 @@ export function finishMatchday(game, S) {
     board: { trust: game.board.trust }, headlineHistory: game.headlineHistory ?? [], date: S.f.date, seed: `${game.seed}`,
     userClubId: game.clubId, referee: S.referee, tableBefore,
   });
-  game.board.trust = Math.max(0, Math.min(100, game.board.trust + post.reactions.board.delta));
-  game.board.fansMood = Math.max(0, Math.min(100, game.board.fansMood + post.reactions.fans.delta));
+  if (S.f.comp !== 'friendly') { // sparing nie zmienia ocen zarządu i kibiców
+    game.board.trust = Math.max(0, Math.min(100, game.board.trust + post.reactions.board.delta));
+    game.board.fansMood = Math.max(0, Math.min(100, game.board.fansMood + post.reactions.fans.delta));
+  }
   game.headlineHistory = post.headlineHistory;
   const inbox = [...postMatchMessages(post, { date: S.f.date, matchId: S.f.id }), ...preMatchMessages(S.pre, { date: S.f.date, matchId: S.f.id })];
   game.inbox = addMessages(game.inbox, inbox).inbox;

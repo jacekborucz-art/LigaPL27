@@ -1,4 +1,5 @@
 // Ekran kadry: lista zawodników (filtry pozycji, akademia) i profil zawodnika.
+import { acclimEta } from '../career/acclimatization.js';
 import { ATTRS, ATTR_GROUPS, POS_NAMES } from '../data/attributes.js';
 import { NAT_NAMES } from '../data/names.js';
 import { GROUP } from '../career/squad.js';
@@ -64,7 +65,8 @@ function traitPhrases(traits) {
   return entries.map(([k, v]) => `${v >= 14 ? 'Wysoka' : v <= 7 ? 'Niska' : 'Przeciętna'} cecha: ${TRAIT_LABELS[k].toLowerCase()}`);
 }
 
-export function renderPlayerProfile(p, { leagueOvrs = [], clubName = '' } = {}) {
+export function renderPlayerProfile(p, opts = {}) {
+  const { leagueOvrs = [], clubName = '' } = opts;
   const groups = p.pos === 'BR' ? ['gk', 'mental', 'phys', 'tech'] : ['tech', 'mental', 'phys'];
   const alt = Object.entries(p.alt || {}).filter(([, v]) => v >= 70).map(([k]) => k);
   return `
@@ -93,6 +95,7 @@ export function renderPlayerProfile(p, { leagueOvrs = [], clubName = '' } = {}) 
           <li><span class="k">Świeżość</span><span>${p.fresh}%</span></li>
           <li><span class="k">Ostrość</span><span>${p.sharp}%</span></li>
           <li><span class="k">Zdrowie</span><span>${p.injuryDays > 0 ? `Kontuzja, ok. ${p.injuryDays} dni` : 'Zdrowy'}</span></li>
+          ${p.acclim ? `<li><span class="k">Aklimatyzacja</span><span>${Math.round(p.acclim.level)} %, pełna ok. ${esc(fmtDate(acclimEta(p, opts.date ?? p.acclim.since)))}. ${esc(p.acclim.reasons.join(', '))}</span></li>` : ''}
           ${p.history?.length ? `<li><span class="k">Kariera</span><span>${p.history.slice(-5).reverse().map((h) => `${esc(h.s)}: ${h.apps} mecze, ${h.g} goli`).join('; ')}</span></li>` : ''}
           ${p.callUp ? `<li><span class="k">Kadra</span><span>Na zgrupowaniu do ${esc(fmtDate(p.callUp.to))}</span></li>` : ''}
           ${p.intl?.caps || p.intlU21 ? `<li><span class="k">Reprezentacja</span><span>${p.intl?.caps ? `występy: ${p.intl.caps}, gole: ${p.intl.goals}` : ''}${p.intl?.caps && p.intlU21 ? '; ' : ''}${p.intlU21 ? `zgrupowania U21: ${p.intlU21}` : ''}</span></li>` : ''}

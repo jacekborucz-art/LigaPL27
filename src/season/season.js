@@ -237,14 +237,27 @@ export function applyResult(game, f, res, rng) {
         if (mine && p.susp[key] === 0) msgs.push(['info', `${p.name} odbył pauzę`, `${p.name} może już zagrać w kolejnym meczu.`]);
       }
       const x = played.get(p.id);
-      p.morale = applyMorale(p.morale ?? 12, afterMatchDelta({ result, strengthDiff: diff, derby: f.derby, played: !!x, rating: x?.rating, isRegular: (p.season?.apps ?? 0) >= 5 }));
+      const friendly = f.comp === 'friendly'; // sparing: bez statystyk sezonu, formy, kartek i pauz
+      if (!friendly) p.morale = applyMorale(p.morale ?? 12, afterMatchDelta({ result, strengthDiff: diff, derby: f.derby, played: !!x, rating: x?.rating, isRegular: (p.season?.apps ?? 0) >= 5 }));
       if (!x) continue;
+      if (friendly) {
+        p.fresh = clamp(Math.round((p.fresh ?? 95) - 24 * (x.minutes / 90)), 35, 100);
+        p.matchDebt = Math.max(p.matchDebt ?? 0, Math.round(24 * (x.minutes / 90)));
+        p.sharp = clamp(Math.round((p.sharp ?? 70) + 12 * (x.minutes / 90)), 0, 100);
+        p.lastMatch = f.date;
+        if (x.injury && !(p.injuryDays > 0)) {
+          p.injuryDays = x.injury.days; p.injury = { ...x.injury, since: f.date };
+          if (mine) msgs.push(['important', `Kontuzja w sparingu: ${p.name}`, `${p.name}: ${x.injury.name}. Przerwa potrwa ok. ${x.injury.days} dni.`]);
+        }
+        continue;
+      }
       const ss = p.season ?? (p.season = { apps: 0, subs: 0, min: 0, g: 0, a: 0, yc: 0, rc: 0, rating: 0, motm: 0, cs: 0 });
       ss.apps++; ss.min += x.minutes; ss.g += x.g; ss.a += x.a; ss.yc += x.yc ? 1 : 0; ss.rc += x.rc;
       ss.ratingSum = (ss.ratingSum ?? 0) + x.rating; ss.rating = Math.round((ss.ratingSum / ss.apps) * 100) / 100;
       if (x.motm) ss.motm++;
       p.form = [...(p.form ?? []), x.rating].slice(-5);
       p.fresh = clamp(Math.round((p.fresh ?? 95) - 28 * (x.minutes / 90)), 35, 100);
+      p.matchDebt = Math.max(p.matchDebt ?? 0, Math.round(30 * (x.minutes / 90)));
       p.sharp = clamp(Math.round((p.sharp ?? 70) + 15 * (x.minutes / 90)), 0, 100);
       p.lastMatch = f.date;
       // Kartki i pauzy
@@ -399,7 +412,11 @@ registerDailySystem({
         }
       }
       const wyt = p.attr?.WYT ?? 10;
-      p.fresh = Math.min(100, Math.round((p.fresh ?? 95) + 18 * (0.8 + 0.02 * wyt) * ((p.age ?? 25) >= 31 ? 0.85 : 1)));
+      // Regeneracja dzienna; po meczu „dług meczowy” (mikrourazy mięśni, glikogen) maleje o połowę na dobę,
+      // więc pełna świeżość wraca po ok. 48-72 godzinach, a nie następnego dnia [SZAC]
+      const debt = Math.round((p.matchDebt ?? 0) * ((p.age ?? 25) >= 31 ? 0.55 : 0.5));
+      if (debt > 0) p.matchDebt = debt; else delete p.matchDebt;
+      p.fresh = Math.min(100 - debt, Math.round((p.fresh ?? 95) + 18 * (0.8 + 0.02 * wyt) * ((p.age ?? 25) >= 31 ? 0.85 : 1)));
       if (!p.lastMatch || p.lastMatch < sharpCut) p.sharp = Math.max(40, (p.sharp ?? 70) - 1);
       if (monday) p.morale = weeklyDrift(p.morale ?? 12, leaders.has(p.clubId));
     }
@@ -413,3 +430,4 @@ import './europe.js';
 import './nationalSystem.js';
 import '../career/careerSystem.js';
 import './rollover.js';
+import '../career/acclimatization.js';

@@ -6,8 +6,8 @@ import { crestHtml } from './ui/crest.js';
 import { esc, fmtDate, weekday, icon } from './ui/dom.js';
 import * as store from './core/store.js';
 import { hashString } from './core/rng.js';
-import { CATEGORIES, unreadCount, markRead, markAllRead, resolveMessage, filterInbox, pendingDecisions, addMessages } from './core/inbox.js';
-import { processDay, primaryAction, continueUntilStop, finishMatch } from './core/gameLoop.js';
+import { CATEGORIES, unreadCount, markRead, markAllRead, resolveMessage, filterInbox, pendingDecisions, addMessages, pruneInbox, canDelete } from './core/inbox.js';
+import { processDay, primaryAction, continueUntilStop, finishMatch, forgetMessages } from './core/gameLoop.js';
 import './season/dailySystems.js';
 import { createSeason, compLabel, applyResult, fromEngineResult, squadFor, anyClub, LEAGUE_COMPS } from './season/season.js';
 import { standings } from './season/standings.js';
@@ -28,6 +28,7 @@ import { applySeasonState } from './season/rollover.js';
 import { ensureTraining, trainingMatchInput } from './training/index.js';
 import { renderTraining, handleTrainingAction, isTrainingAction } from './ui/trainingView.js';
 import { renderTransfers, handleTransferAction, isTransferAction } from './ui/transfersView.js';
+import { renderTalks, handleTalkAction, isTalkAction } from './ui/talksView.js';
 import { ensureCareer } from './career/careerSystem.js';
 import { completeTransfer, fmtZl } from './career/transfers.js';
 import { trustLabel } from './career/board.js';
@@ -125,6 +126,7 @@ async function renderStart() {
       <div class="slot__body">
         <span class="slot__title">${esc(club?.name ?? 'Nieznany klub')}</span>
         <span class="muted">${esc(s.summary?.season ?? '')}, ${esc(fmtDate(s.summary?.date ?? GAME_START))}</span>
+        ${s.savedAt ? `<span class="muted">Zapisano: ${esc(new Date(s.savedAt).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' }))}</span>` : ''}
       </div>
       <div class="slot__actions">
         <button class="btn btn--primary" data-act="load" data-slot="${s.slot}">Graj</button>
@@ -228,11 +230,12 @@ function renderTab(tab, g, club) {
   if (tab === 'transfery') return state.ng ? renderNegotiation(g, state.ng) : renderTransfers(g, state);
   if (tab === 'rozgrywki') return renderCompetitions(g, { comp: state.cComp ?? ['ekstraklasa', 'liga1', 'liga2'][club.tier - 1], view: state.cView, round: state.cRound, filter: state.uFilter, draw: state.uDraw });
   if (tab === 'kadra') {
-    const sub = `<div class="subtabs" role="tablist"><button role="tab" data-act="tsub" data-s="players" aria-selected="${state.sqSub === 'players'}">Zawodnicy</button><button role="tab" data-act="tsub" data-s="tactics" aria-selected="${state.sqSub === 'tactics'}">Skład i taktyka</button></div>`;
+    const sub = `<div class="subtabs" role="tablist"><button role="tab" data-act="tsub" data-s="players" aria-selected="${state.sqSub === 'players'}">Zawodnicy</button><button role="tab" data-act="tsub" data-s="tactics" aria-selected="${state.sqSub === 'tactics'}">Skład i taktyka</button><button role="tab" data-act="tsub" data-s="talks" aria-selected="${state.sqSub === 'talks'}">Rozmowy</button></div>`;
+    if (state.sqSub === 'talks') return sub + renderTalks(g, state);
     if (state.sqSub === 'tactics') return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g) });
     const ovrs = leagueOvrs(g, club.tier);
     const p = state.playerOpen && g.world.players[state.playerOpen];
-    if (p) return renderPlayerProfile(p, { leagueOvrs: ovrs, clubName: club.name });
+    if (p) return renderPlayerProfile(p, { leagueOvrs: ovrs, clubName: club.name, date: g.date });
     return sub + renderSquadList(squadOf(g.world, g.clubId), { filter: state.sqFilter, leagueOvrs: ovrs, academy: academyOf(g.world, g.clubId) });
   }
   const soon = {
@@ -300,6 +303,7 @@ function renderMail(g) {
         <p>${esc(m.body)}</p>
         ${m.actions.length && !m.resolved ? `<div class="mail-actions">${m.actions.map((a) => `<button class="btn btn--primary" data-act="mailaction" data-id="${esc(m.id)}" data-a="${esc(a.id)}">${esc(a.label)}</button>`).join('')}</div>` : ''}
         ${m.chosen ? `<p class="muted">Twoja odpowiedź: ${esc(m.actions.find((a) => a.id === m.chosen)?.label ?? '')}</p>` : ''}
+        ${canDelete(m) ? `<p><button class="btn btn--quiet btn--sm" data-act="maildel" data-id="${esc(m.id)}">Usuń wiadomość</button></p>` : ''}
       </article>`;
     }
   }
@@ -308,7 +312,8 @@ function renderMail(g) {
     .map(([k, v, n]) => `<button class="chip" data-act="mailcat" data-cat="${k}" aria-pressed="${(state.mailCat || '') === k}">${esc(v)}${n ? ` <b>${n}</b>` : ''}</button>`).join('');
   const list = filterInbox(g.inbox, state.mailCat);
   const pending = pendingDecisions(g.inbox).length;
-  return `<div class="mail-head"><h2>Poczta</h2><button class="btn btn--quiet" data-act="readall">Oznacz wszystkie jako przeczytane</button></div>
+  return `<div class="mail-head"><h2>Poczta</h2><span class="mail-tools"><button class="btn btn--quiet btn--sm" data-act="readall">Oznacz jako przeczytane</button><button class="btn btn--quiet btn--sm" data-act="mailprune" data-m="read">Usuń przeczytane</button><button class="btn btn--quiet btn--sm" data-act="mailprune" data-m="old">Usuń starsze niż 30 dni</button></span></div>
+    <p class="hint">${g.inbox.length} wiadomości. Stare przeczytane wiadomości gra usuwa sama co tydzień. Wiadomości z decyzją do podjęcia zostają.</p>
     ${pending ? `<p class="notice">Masz ${pending} ${pending === 1 ? 'wiadomość wymagającą' : 'wiadomości wymagające'} odpowiedzi.</p>` : ''}
     <div class="chips">${chips}</div>
     <ul class="mail-list stripes">${list.map(mailRow).join('') || '<li class="mail-empty">Brak wiadomości w tej kategorii.</li>'}</ul>`;
@@ -501,6 +506,13 @@ app.addEventListener('click', async (ev) => {
   const el = ev.target.closest('[data-act]');
   if (!el || el.tagName === 'INPUT') return;
   const act = el.dataset.act;
+  if (isTalkAction(act) && state.game) {
+    const r = handleTalkAction(state.game, act, el.dataset, app);
+    Object.assign(state, r.ui ?? {});
+    if (r.save) await save();
+    render();
+    return;
+  }
   if (isTransferAction(act) && state.game) {
     const r = handleTransferAction(state.game, act, el.dataset, app);
     Object.assign(state, r.ui ?? {});
@@ -579,7 +591,7 @@ app.addEventListener('click', async (ev) => {
     if (act === 'sqfilter') { state.sqFilter = el.dataset.f; render(); }
     if (act === 'player') { state.playerOpen = el.dataset.id; render(); window.scrollTo({ top: 0 }); }
     if (act === 'squadback') { state.playerOpen = null; render(); }
-    if (act === 'tsub') { state.sqSub = el.dataset.s; state.tSel = null; state.playerOpen = null; render(); }
+    if (act === 'tsub') { state.sqSub = el.dataset.s; state.tSel = null; state.playerOpen = null; state.ttResult = null; state.ttMeeting = null; render(); }
     if (act === 'tcancel') { state.tSel = null; render(); }
     if (act === 'tform') { g.tactics = changeFormation(g.tactics, mySquad(g), el.dataset.f); state.tSel = null; await save(); render(); }
     if (act === 'tauto') { g.tactics = createTactics(mySquad(g), { formation: g.tactics.formation, benchSize: benchSizeFor(g), instructions: g.tactics.instructions }); state.tSel = null; await save(); render(); }
@@ -592,6 +604,8 @@ app.addEventListener('click', async (ev) => {
     if (act === 'tslot' || act === 'tpick') { await tacticsClick(g, act, el); }
     if (act === 'mailcat') { state.mailCat = el.dataset.cat || null; render(); }
     if (act === 'readall') { g.inbox = markAllRead(g.inbox); await save(); render(); }
+    if (act === 'maildel') { const m = g.inbox.find((x) => x.id === el.dataset.id); if (m && canDelete(m)) forgetMessages(g, { inbox: g.inbox.filter((x) => x !== m), removed: m.key ? [m.key] : [] }); state.mailOpen = null; await save(); render(); }
+    if (act === 'mailprune') { forgetMessages(g, pruneInbox(g.inbox, g.date, el.dataset.m, 30)); await save(); render(); }
     if (act === 'mailaction') {
       const m = g.inbox.find((x) => x.id === el.dataset.id);
       g.inbox = resolveMessage(g.inbox, el.dataset.id, el.dataset.a);
@@ -647,6 +661,9 @@ document.addEventListener('keydown', (ev) => {
   if (ev.key === 'Escape' && state.screen !== 'start') { state.running = false; state.screen = 'start'; render(); }
   if (ev.key === 'Enter' && state.screen === 'hub' && !state.running && !ev.target.closest('button')) document.querySelector('[data-act="go"]')?.click();
 });
+
+// Prośba o trwałe miejsce na zapis: przeglądarka nie usunie zapisów gry przy braku miejsca na dysku
+if (navigator.storage?.persist) navigator.storage.persisted?.().then((p) => (p ? null : navigator.storage.persist())).catch(() => {});
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('./sw.js').catch(() => { /* gra działa także bez trybu offline */ });

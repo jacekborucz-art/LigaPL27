@@ -4,7 +4,7 @@
 // meczu klubu gracza i na ważnych wiadomościach; zwykłe dni mijają same.
 // Nowy system = registerDailySystem(), bez zmian w pętli (docs/PLAN.md 4.1).
 
-import { addMessages, PRIORITY, pendingDecisions } from './inbox.js';
+import { addMessages, PRIORITY, pendingDecisions, pruneInbox } from './inbox.js';
 
 const systems = [];
 
@@ -51,8 +51,11 @@ export function processDay(state, date = state.date) {
     if (out.events) events.push(...out.events);
     if (out.patch) out.patch(state);
   }
-  const { inbox, added } = addMessages(state.inbox || [], messages);
+  // Wiadomości usunięte przez gracza (i przez porządki) nie wracają, nawet gdy system wyśle je ponownie
+  const gone = new Set(state.inboxGone ?? []);
+  const { inbox, added } = addMessages(state.inbox || [], messages.filter((m) => !m.key || !gone.has(m.key)));
   state.inbox = inbox;
+  if (new Date(`${date}T12:00:00Z`).getUTCDay() === 1) forgetMessages(state, pruneInbox(state.inbox, date, 'auto'));
   state.processedDate = date;
   return { date, added, events };
 }
@@ -88,4 +91,10 @@ export function continueUntilStop(state, { maxDays = 60, onDay } = {}) {
 /** Oznacza mecz jako rozegrany (wynik zapisuje moduł meczu). */
 export function finishMatch(state, matchId, result = null) {
   state.fixtures = (state.fixtures || []).map((f) => (f.id === matchId ? { ...f, played: true, result } : f));
+}
+
+/** Zapisuje wynik porządków: nowa skrzynka i klucze usuniętych wiadomości (ostatnie 600). */
+export function forgetMessages(state, { inbox, removed }) {
+  state.inbox = inbox;
+  if (removed.length) state.inboxGone = [...(state.inboxGone ?? []), ...removed].slice(-600);
 }

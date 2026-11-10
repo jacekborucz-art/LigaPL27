@@ -200,7 +200,7 @@ export function processUserDay(game, date, rng) {
     if (day.kind === 'rest') morale += 0.15;
     if (day.kind === 'off') load += LOAD.offDayLoad;
 
-    p.fresh = Math.round(clamp(fresh, 20, 100));
+    p.fresh = Math.round(clamp(fresh, 20, 100 - (p.matchDebt ?? 0))); // dług meczowy: pełna świeżość dopiero po 48-72 h
     t.log[27] = r1(t.log[27] + load);
     const sum = loadSummary(t);
     t.acwr = sum.acwr;

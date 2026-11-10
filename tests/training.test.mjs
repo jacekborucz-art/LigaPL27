@@ -234,7 +234,7 @@ test('Regeneracja po meczu przywraca świeżość szybciej niż trening', () => 
   advanceDay(alt);
   const fr = (game) => played.reduce((s, p) => s + game.world.players[p.id].fresh, 0) / played.length;
   assert.ok(fr(g) > fr(alt) + 15, `${fr(g)} vs ${fr(alt)}`);
-  assert.ok(fr(g) >= 85);
+  assert.ok(fr(g) >= 78); // dzień po meczu: dług meczowy ogranicza świeżość do ok. 85 (pełnia po 48-72 h)
   assert.equal(g.training.hist[addDays(md, 1)].s[0].type, 'regeneracja');
 });
 
