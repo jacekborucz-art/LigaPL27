@@ -429,5 +429,6 @@ export { standings, GAME_START };
 import './europe.js';
 import './nationalSystem.js';
 import '../career/careerSystem.js';
+import '../career/fansSystem.js';
 import './rollover.js';
 import '../career/acclimatization.js';

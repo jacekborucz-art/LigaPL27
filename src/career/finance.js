@@ -31,7 +31,7 @@ export const FIN = {
   K_ATT: { 1: 1, 2: 0.75, 3: 0.55, 4: 0.4 },
   K_PRICE: { 1: 1, 2: 0.7, 3: 0.5, 4: 0.4 },
   K_WAGE: { 1: 1, 2: 0.4, 3: 0.15, 4: 0.08 },
-  START_BALANCE: 0.15, // saldo na start gry jako część rocznych przychodów krajowych [SZAC]
+  START_BALANCE: 0.25, // saldo na start gry jako część rocznych przychodów krajowych [SZAC]
   TRANSFER_SHARE: 0.6, // część wolnego salda na transfery [SZAC]
   TRANSFER_SHARE_RICH: 0.85, // klub z bogatym właścicielem (skarbiec) [SZAC]
   TRANSFER_CAP: 0.25, // budżet transferowy najwyżej 1/4 rocznych przychodów krajowych plus skarbiec właściciela [SZAC]

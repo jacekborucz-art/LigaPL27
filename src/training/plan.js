@@ -20,9 +20,22 @@ export const MAX_SESSIONS = 3;
 const s = (type, int = 'mid') => ({ type, int: SESSIONS[type]?.noIntensity ? 'low' : int });
 
 /** Daty meczów klubu: wszystkie, o punkty i sparingi (liczone raz na dzień albo tydzień). */
+const setsCache = new WeakMap();
 export function matchSets(game, clubId = game.clubId) {
+  // Liczone raz na dzień i klub (lista meczów zmienia się rzadko; długość listy wykrywa nowe sparingi)
+  const fx = game.fixtures || [];
+  const byFx = setsCache.get(fx) ?? new Map();
+  setsCache.set(fx, byFx);
+  const key = `${clubId}|${game.date}|${fx.length}`;
+  if (byFx.has(key)) return byFx.get(key);
+  if (byFx.size > 64) byFx.clear();
+  const res = computeSets(fx, clubId);
+  byFx.set(key, res);
+  return res;
+}
+function computeSets(fixtures, clubId) {
   const all = new Set(); const off = new Set();
-  for (const f of game.fixtures || []) {
+  for (const f of fixtures) {
     if (!f.date || (f.home !== clubId && f.away !== clubId)) continue;
     all.add(f.date);
     if (f.comp !== 'friendly') off.add(f.date);

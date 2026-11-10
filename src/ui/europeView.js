@@ -38,9 +38,10 @@ function tieRow(t, U, game) {
   const mine = t.a === game.clubId || t.b === game.clubId;
   const pol = isPolish(t.a) || isPolish(t.b);
   const legTxt = ms.map((m) => (m.played ? `${m.home === t.a ? m.result.score[0] : m.result.score[1]}:${m.home === t.a ? m.result.score[1] : m.result.score[0]}` : '-:-')).join(', ');
-  const win = (id) => (t.winner === id ? ' tie--win' : t.winner ? ' tie--out' : '');
+  const win = (id) => (t.winner === id ? ' tie--win fx__team--win' : t.winner ? ' tie--out fx__team--out' : '');
+  const tag = t.winner ? ` <span class="tag-up">${t.round === 'F' ? 'zdobywca' : 'awans'}: ${esc(name(t.winner))}</span>` : '';
   return `<li class="fx tie ${mine ? 'is-me' : pol ? 'is-pl' : ''}">
-    <span class="fx__date">${esc(ms.map((m) => shortDay(m.date)).join(' i '))}</span>
+    <span class="fx__date">${esc(ms.map((m) => shortDay(m.date)).join(' i '))}${tag}</span>
     <span class="fx__team fx__team--h${win(t.a)}">${flag(t.a)}${esc(name(t.a))}${crest(t.a)}</span>
     <span class="fx__mid">${t.agg ? `<b class="fx__score">${t.agg[0]}:${t.agg[1]}</b>` : '<span class="fx__time">vs</span>'}<small>${esc(ms.length > 1 ? legTxt : '')}${t.shootout ? ` k. ${t.shootout[0]}:${t.shootout[1]}` : ''}</small></span>
     <span class="fx__team${win(t.b)}">${crest(t.b)}${esc(name(t.b))}${flag(t.b)}</span>

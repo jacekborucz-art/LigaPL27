@@ -154,12 +154,14 @@ export const MODES = {
  * Polskie kluby zimą jeżdżą głównie do Turcji (Belek, Antalya), część do Hiszpanii; latem do Austrii, Słowenii albo zostają w Polsce.
  */
 export const CAMP = {
+  // perDay: koszt dnia obozu drużyny Ekstraklasy (ok. 35 osób: hotel, boiska, przeloty, sparingi) w zł [SZAC];
+  // 1 Liga x0,65, 2 Liga x0,45, bogatszy klub wyższy standard (x do 1,3)
   dests: {
-    polska: { name: 'Polska (ośrodek krajowy)', country: 'POL', rate: 0.0004, q: { summer: 0.85, winter: 0.55 }, text: 'Tanio i blisko. Zimą mróz, śnieg i sztuczne boiska.' },
-    slowenia: { name: 'Słowenia', country: 'SVN', rate: 0.0007, q: { summer: 0.95, winter: 0.6 }, text: 'Dobre boiska i chłodniejsze noce latem. Zimą bywa zimno.' },
-    austria: { name: 'Austria (Alpy)', country: 'AUT', rate: 0.0008, q: { summer: 1.0, winter: 0.5 }, text: 'Najlepsze warunki latem: wysokość, chłód, sparingpartnerzy z całej Europy. Zimą śnieg.' },
-    turcja: { name: 'Turcja (Belek, Antalya)', country: 'TUR', rate: 0.0009, q: { summer: 0.8, winter: 1.0 }, text: 'Typowy zimowy kierunek klubów Ekstraklasy: ciepło, dobre murawy, dużo sparingpartnerów. Latem upał.' },
-    hiszpania: { name: 'Hiszpania (Marbella)', country: 'ESP', rate: 0.0012, q: { summer: 0.75, winter: 1.05 }, text: 'Najdroższy, zimą najlepsza pogoda i boiska. Latem upał.' },
+    polska: { name: 'Polska (ośrodek krajowy)', country: 'POL', rate: 0, perDay: 12000, q: { summer: 0.85, winter: 0.55 }, text: 'Tanio i blisko. Zimą mróz, śnieg i sztuczne boiska.' },
+    slowenia: { name: 'Słowenia', country: 'SVN', rate: 0, perDay: 26000, q: { summer: 0.95, winter: 0.6 }, text: 'Dobre boiska i chłodniejsze noce latem. Zimą bywa zimno.' },
+    austria: { name: 'Austria (Alpy)', country: 'AUT', rate: 0, perDay: 32000, q: { summer: 1.0, winter: 0.5 }, text: 'Najlepsze warunki latem: wysokość, chłód, sparingpartnerzy z całej Europy. Zimą śnieg.' },
+    turcja: { name: 'Turcja (Belek, Antalya)', country: 'TUR', rate: 0, perDay: 42000, q: { summer: 0.8, winter: 1.0 }, text: 'Typowy zimowy kierunek klubów Ekstraklasy: ciepło, dobre murawy, dużo sparingpartnerów. Latem upał.' },
+    hiszpania: { name: 'Hiszpania (Marbella)', country: 'ESP', rate: 0, perDay: 58000, q: { summer: 0.75, winter: 1.05 }, text: 'Najdroższy, zimą najlepsza pogoda i boiska. Latem upał.' },
   },
   lengths: [7, 10, 14],
   minDays: 5,

@@ -25,18 +25,17 @@ import { cohesionTerm, prepTerm, setPieceEdge, aiWeeklyCohesion, weeklyCohesionD
 import { legsTerm, overloadTerm } from './load.js';
 
 // Forma bazowa po okresie przygotowawczym: jedna liczba na klub i dzień (pamięć podręczna, tanio w meczu)
-const campCache = new Map();
+const campCache = new WeakMap();
 export function campTerm(game, p) {
   const c = game?.training?.clubs?.[p.clubId];
   const cb = c?.cb;
   if (!cb) return 0;
-  const k = `${p.clubId}:${cb.key}:${cb.base}:${cb.start}`;
-  let e = campCache.get(k);
-  if (!e || e.date !== game.date) {
-    e = { date: game.date, v: baseTerm(cb.base, baseFactor(cb.start, game.date)) };
-    campCache.set(k, e);
-  }
-  return e.v;
+  // Pamięć podręczna wprost w stanie klubu (bez składania klucza tekstowego przy każdym zawodniku)
+  const e = campCache.get(cb);
+  if (e && e.date === game.date && e.base === cb.base && e.start === cb.start) return e.v;
+  const v = baseTerm(cb.base, baseFactor(cb.start, game.date));
+  campCache.set(cb, { date: game.date, base: cb.base, start: cb.start, v });
+  return v;
 }
 
 const MONTHS_PL = ['styczeń', 'luty', 'marzec', 'kwiecień', 'maj', 'czerwiec', 'lipiec', 'sierpień', 'wrzesień', 'październik', 'listopad', 'grudzień'];

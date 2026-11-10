@@ -45,8 +45,11 @@ export function primaryAction(state) {
 export function processDay(state, date = state.date) {
   const messages = [];
   const events = [];
+  const prof = globalThis.__systemTimes; // pomiar czasu systemów (narzędzia wydajności), domyślnie wyłączony
   for (const s of systems) {
+    const t0 = prof ? performance.now() : 0;
     const out = s.run(state, date) || {};
+    if (prof) prof[s.id] = (prof[s.id] ?? 0) + performance.now() - t0;
     if (out.messages) messages.push(...out.messages);
     if (out.events) events.push(...out.events);
     if (out.patch) out.patch(state);

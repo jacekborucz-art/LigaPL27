@@ -55,8 +55,18 @@ export function renderSquadList(players, { filter = 'all', leagueOvrs = [], acad
     </div>`;
 }
 
-function attrBand(v) {
+export function attrBand(v) {
   return v >= 16 ? 'top' : v >= 13 ? 'good' : v >= 8 ? 'mid' : 'low';
+}
+
+/** Grupy atrybutów z paskami (profil zawodnika i panel atrybutów na ekranie składu). */
+export function attrGroupsHtml(p, { heading = 'h3' } = {}) {
+  const groups = p.pos === 'BR' ? ['gk', 'mental', 'phys', 'tech'] : ['tech', 'mental', 'phys'];
+  return groups.map((g) => `
+          <${heading}>${esc(ATTR_GROUPS[g])}</${heading}>
+          <ul class="attrs">${Object.keys(ATTRS).filter((a) => ATTRS[a].group === g).map((a) => `
+            <li><span>${esc(ATTRS[a].name)}</span><span class="abar" aria-hidden="true"><i data-b="${attrBand(p.attr[a])}" style="width:${p.attr[a] * 5}%"></i></span><b data-b="${attrBand(p.attr[a])}">${p.attr[a]}</b></li>`).join('')}
+          </ul>`).join('');
 }
 
 function traitPhrases(traits) {
@@ -67,7 +77,6 @@ function traitPhrases(traits) {
 
 export function renderPlayerProfile(p, opts = {}) {
   const { leagueOvrs = [], clubName = '' } = opts;
-  const groups = p.pos === 'BR' ? ['gk', 'mental', 'phys', 'tech'] : ['tech', 'mental', 'phys'];
   const alt = Object.entries(p.alt || {}).filter(([, v]) => v >= 70).map(([k]) => k);
   return `
     <button class="btn btn--quiet" data-act="squadback">Wróć do kadry</button>
@@ -81,11 +90,7 @@ export function renderPlayerProfile(p, opts = {}) {
     </header>
     <div class="pp__cols">
       <section>
-        ${groups.map((g) => `
-          <h3>${esc(ATTR_GROUPS[g])}</h3>
-          <ul class="attrs">${Object.keys(ATTRS).filter((a) => ATTRS[a].group === g).map((a) => `
-            <li><span>${esc(ATTRS[a].name)}</span><span class="abar" aria-hidden="true"><i data-b="${attrBand(p.attr[a])}" style="width:${p.attr[a] * 5}%"></i></span><b data-b="${attrBand(p.attr[a])}">${p.attr[a]}</b></li>`).join('')}
-          </ul>`).join('')}
+        ${attrGroupsHtml(p)}
       </section>
       <section>
         <h3>Stan</h3>

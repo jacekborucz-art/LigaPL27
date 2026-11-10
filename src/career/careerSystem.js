@@ -1,4 +1,5 @@
 // Kariera w pętli dni (etap 9): finanse, rynek transferowy, oferty, zarząd, praca trenera.
+import { attendanceModifier } from './fans.js';
 import { registerDailySystem } from '../core/gameLoop.js';
 import { createMessage } from '../core/inbox.js';
 import { registerDecision } from '../core/decisions.js';
@@ -10,7 +11,7 @@ import { anyClub } from '../season/season.js';
 import { SEASON_START, SEASON_YEAR } from '../config/calendar2026.js';
 import { winnerOf } from '../season/cup.js';
 import { standings } from '../season/standings.js';
-import { createFinance, financeDay, book, matchIncome, attendanceFill, uefaPrize, PP_PRIZE, stadiumCapacity, meritTv, FIN } from './finance.js';
+import { createFinance, financeDay, book, matchIncome, attendanceFill, uefaPrize, PP_PRIZE, stadiumCapacity, meritTv, clubPlan, FIN } from './finance.js';
 import { createMarket, marketWeek, answerIncoming, aiRenewals, inWindow, windowOf, fmtZl, SEASON_END } from './transfers.js';
 import { ensureBoard, boardMonth, seasonGoalFor, trustLabel } from './board.js';
 
@@ -19,6 +20,8 @@ const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
 export function ensureCareer(game) {
   if (!game.world) return;
   if (!game.finance) game.finance = createFinance(game.world);
+  // Zapis sprzed kalibracji finansów (docs/finanse.md): plan sezonu z danych klubu
+  for (const [id, c] of Object.entries(game.finance.clubs)) if (!c.plan && clubById(id)) { c.plan = clubPlan(clubById(id)); c.tier = c.plan.tier; }
   if (!game.market) createMarket(game);
   ensureBoard(game);
 }
@@ -36,7 +39,8 @@ function matchMoney(game, date) {
   for (const f of game.fixtures) {
     if (!f.played || f.fin || !(F.clubs[f.home] || F.clubs[f.away])) continue;
     f.fin = true;
-    const fill = attendanceFill(f, rowOf(f.home), anyClub(f.away), f.neutral ? null : F.clubs[f.home]);
+    // Kibice: nastroje, bojkoty, zamknięte sektory i mecze bez publiczności (src/career/fans.js)
+    const fill = attendanceFill(f, rowOf(f.home), anyClub(f.away), f.neutral ? null : F.clubs[f.home]) * attendanceModifier(game, f.home, f);
     f.attendance = Math.round((f.neutral ? 58000 : stadiumCapacity(clubById(f.home) ?? anyClub(f.home))) * fill / 100) * 100;
     const [h0, a0] = matchIncome(F, f, fill);
     const mul = f.comp === 'friendly' ? 0.12 : 1; // sparing: bilety symboliczne
@@ -132,11 +136,11 @@ registerDailySystem({
       for (const [id, c] of Object.entries(game.finance.clubs)) {
         const cushion = Math.round((c.plan?.wages ?? 0) / 12 / 1000) * 1000;
         if (id === game.clubId || c.balance >= cushion) continue;
-        const need = cushion - c.balance;
+        const need = cushion - c.balance; const inDebt = c.balance < 0;
         const parent = clubById(id)?.parent;
         if (parent && game.finance.clubs[parent]) book(game.finance, parent, date, 'out', 'ops', need, `Dopłata do rezerw (${clubById(id).name})`);
         book(game.finance, id, date, 'in', 'owner', need, parent ? 'Dopłata pierwszej drużyny' : 'Dopłata właściciela do długów');
-        if (c.balance - need < 0) c.transferBudget = 0;
+        if (inDebt) c.transferBudget = 0;
       }
     }
     matchMoney(game, date);

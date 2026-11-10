@@ -60,9 +60,14 @@ export function clubBudgetBase(game, clubId) {
   return game.finance?.clubs?.[clubId]?.base ?? Math.round(wageBill(game.world, clubId) * 52 * FIN.REVENUE_X_WAGES);
 }
 
+const clubTierOf = (id) => clubById(id)?.tier;
 export function campCost(game, clubId, dest, days) {
   const d = CAMP.dests[dest];
-  return d ? Math.max(5000, r1000(clubBudgetBase(game, clubId) * d.rate * days)) : 0;
+  if (!d) return 0;
+  const tier = game.world?.clubs?.[clubId] ? (clubTierOf(clubId) ?? 1) : 1;
+  const standard = Math.min(1.3, Math.max(0.8, clubBudgetBase(game, clubId) / 60e6)); // budżet ok. 60 mln zł = standard 1,0
+  const mul = ({ 1: 1, 2: 0.65, 3: 0.45 }[tier] ?? 0.45) * (tier === 1 ? standard : 1);
+  return Math.max(5000, r1000(d.perDay * days * mul));
 }
 
 /** Szacowana forma bazowa (0,3-1,1) dla obozu: punkty z obozu i z treningu w klubie przez resztę okresu. */
