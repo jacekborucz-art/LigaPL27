@@ -1,0 +1,120 @@
+/* Menu kontekstowe zawodnika (src/ui/contextMenu.js): panel z nagłówkiem w kolorze formacji zawodnika,
+   jak panele pulpitu. Tryb jasny i ciemny z tokenów (tokens.css). */
+.cmenu {
+  --pa: var(--accent);
+  position: fixed;
+  z-index: 120;
+  left: 0;
+  top: 0;
+  width: min(300px, calc(100vw - 16px));
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: var(--radius-m);
+  box-shadow: 0 14px 34px rgb(0 0 0 / .28), 0 2px 6px rgb(0 0 0 / .16);
+  font: 500 var(--step-0)/1.25 var(--font-body);
+}
+.cmenu:has(.cmenu__head .pos[data-g="GK"]) { --pa: var(--gk); }
+.cmenu:has(.cmenu__head .pos[data-g="DEF"]) { --pa: #2D6A8F; }
+.cmenu:has(.cmenu__head .pos[data-g="ATT"]) { --pa: #A8323E; }
+.cmenu--anim { animation: cmenu-in 110ms ease-out; transform-origin: top left; }
+@keyframes cmenu-in { from { opacity: 0; transform: scale(.97); } }
+
+.cmenu__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 2px var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: color-mix(in srgb, var(--pa) 12%, var(--surface));
+  border-bottom: 2px solid color-mix(in srgb, var(--pa) 55%, transparent);
+}
+.cmenu__head .pos { min-width: 38px; min-height: 28px; font-size: 13px; }
+.cmenu__who { display: flex; flex-direction: column; min-width: 0; }
+.cmenu__title { font: 700 var(--step-1)/1.1 var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmenu__meta { font-size: var(--step--1); color: var(--text-muted); }
+.cmenu__note { grid-column: 1 / -1; font-size: var(--step--1); color: var(--text-muted); }
+
+.cmenu__list { padding: var(--space-1) 0; outline: none; }
+.cmenu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 40px;
+  padding: 6px var(--space-3);
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cmenu__item:focus { outline: none; background: var(--surface-stripe); }
+.cmenu__item:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.cmenu__text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.cmenu__hint { font-size: var(--step--1); font-weight: 400; color: var(--text-muted); }
+.cmenu__hint--why { color: var(--warn-text); }
+.cmenu__item.is-primary .cmenu__label { font-weight: 700; }
+.cmenu__item.is-danger .cmenu__label { color: var(--bad-text); }
+.cmenu__item.is-off { cursor: default; }
+.cmenu__item.is-off .cmenu__label { color: var(--text-muted); }
+.cmenu__chev { flex: none; font: 700 20px/1 var(--font-display); color: var(--text-muted); }
+.cmenu__back { background: color-mix(in srgb, var(--pa) 6%, transparent); }
+.cmenu__back .cmenu__label { font-weight: 700; }
+.cmenu__radio {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--text-muted);
+  border-radius: 50%;
+}
+.cmenu__item[aria-checked="true"] .cmenu__radio { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 0 3.5px, transparent 4.5px); }
+.cmenu__item[aria-checked="true"] .cmenu__label { font-weight: 700; }
+.cmenu__sep { height: 1px; margin: var(--space-1) var(--space-3); background: var(--line); }
+
+/* Palec: większe pola dotyku */
+@media (pointer: coarse) {
+  .cmenu__item { min-height: var(--tap); }
+}
+
+/* Wiersze z menu: bez systemowego dymka iOS przy przytrzymaniu */
+[data-pid] { -webkit-touch-callout: none; }
+@media (pointer: coarse) {
+  [data-pid] { -webkit-user-select: none; user-select: none; }
+}
+
+/* Komunikat po akcji z menu (nad paskiem nawigacji na telefonie) */
+.cm-toast {
+  position: fixed;
+  z-index: 119; /* pod otwartym menu */
+  left: 50%;
+  bottom: calc(var(--nav-h) + 84px + env(safe-area-inset-bottom));
+  max-width: min(520px, calc(100vw - 24px));
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-s);
+  border-left: 4px solid var(--led);
+  background: var(--trybuna);
+  color: var(--kreda);
+  box-shadow: 0 8px 22px rgb(0 0 0 / .3);
+  font-size: var(--step--1);
+  transform: translate(-50%, 12px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease-out, transform 160ms ease-out;
+}
+.cm-toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+:root[data-theme="dark"] .cm-toast { background: #0E1511; border: 1px solid var(--line); border-left: 4px solid var(--led); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .cm-toast { background: #0E1511; border: 1px solid var(--line); border-left: 4px solid var(--led); }
+}
+@media (min-width: 1024px) {
+  .cm-toast { bottom: var(--space-5); left: calc(50% + 110px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cmenu--anim { animation: none; }
+  .cm-toast { transition: opacity 1ms; transform: translate(-50%, 0); }
+}

@@ -46,7 +46,7 @@ export function renderTalks(game, ui = {}) {
       <ul class="players">${sq.map((p) => {
         const rs = reasonsOf.get(p.id) ?? [];
         const suggested = rs[0]?.[0] ?? 'encourage';
-        return `<li class="prow tt-row">
+        return `<li class="prow tt-row" data-pid="${esc(p.id)}">
           <span class="num">${esc(p.pos)}</span>
           <span class="pname">${esc(p.name)}<small>Morale: ${esc(moraleLabel(p.morale ?? 12).toLowerCase())}${p.acclim ? `, aklimatyzacja ${esc(acclimLabel(p.acclim.level))}` : ''}${rs.length ? `. ${esc(rs.map((r) => r[1]).join(', '))}` : ''}</small></span>
           <span class="tt-act"><select class="pick-select" id="tt-${esc(p.id)}" aria-label="Temat rozmowy z: ${esc(p.name)}">${Object.entries(PLAYER_TALKS).map(([k, t]) => `<option value="${k}" ${k === suggested ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select>

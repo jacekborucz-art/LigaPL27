@@ -54,7 +54,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
     const prof = p ? proficiency(p, s.pos, s.side) : 0;
     const isSel = selKey === key;
     const cls = ['slot-btn', p ? `slot-btn--${band(prof)}` : 'slot-btn--empty', s.pos === 'BR' ? 'slot-btn--gk' : '', isSel ? 'is-sel' : ''].filter(Boolean).join(' ');
-    return `<button class="${cls}" style="left:${s.x}%;top:${100 - s.y}%" data-act="tslot" data-loc="${key}" data-drop="${key}" data-handle ${p ? dragAttrs(loc, p) : ''}
+    return `<button class="${cls}" style="left:${s.x}%;top:${100 - s.y}%" data-act="tslot" data-loc="${key}" data-drop="${key}" data-handle ${p ? `${dragAttrs(loc, p)} data-pid="${esc(p.id)}"` : ''}
       aria-pressed="${isSel}" aria-label="${esc(s.pos)}: ${p ? esc(p.name) : 'puste miejsce'}${p && prof < 85 ? `, poza pozycją (${prof}%)` : ''}">
       <span class="slot-btn__dot">${p ? (numbers?.get(p.id) ?? Math.round(p.ovr)) : '+'}</span>
       <span class="slot-btn__name">${p ? esc(p.last) : esc(s.pos)}</span>
@@ -83,7 +83,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
     const prof = proficiency(p, s.pos, s.side);
     const reason = unavailableReason(p);
     const fit = prof < 100 ? `<small class="tp-fit" data-fit="${band(prof)}">${esc(posText(p))}, ${prof}% na tej pozycji</small>` : '';
-    return `<li class="tp-row ${isSel ? 'is-sel' : ''} ${reason ? 'is-off' : ''}" data-drop="${key}">
+    return `<li class="tp-row ${isSel ? 'is-sel' : ''} ${reason ? 'is-off' : ''}" data-drop="${key}" data-pid="${esc(p.id)}">
       <button class="tp-row__main" data-act="tpick" data-loc="${key}" ${dragAttrs(loc, p)} aria-pressed="${isSel}">
         ${handle(s.pos, GROUP[s.pos])}
         <span class="tp-row__name">${esc(p.name)}${tactics.captain === p.id ? ' <abbr class="tp-c" title="Kapitan">C</abbr>' : ''}${reason ? `<small class="tp-off">${esc(reason)}</small>` : fit}</span>
@@ -98,7 +98,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
     const reason = unavailableReason(p);
     const isSel = selKey === key;
     const where = loc.zone;
-    return `<li class="tp-row ${isSel ? 'is-sel' : ''} ${reason ? 'is-off' : ''}" data-drop="${esc(key)}">
+    return `<li class="tp-row ${isSel ? 'is-sel' : ''} ${reason ? 'is-off' : ''}" data-drop="${esc(key)}" data-pid="${esc(p.id)}">
       <button class="tp-row__main" data-act="tpick" data-loc="${esc(key)}" ${dragAttrs(loc, p)} aria-pressed="${isSel}">
         ${handle(posText(p), GROUP[p.pos])}
         <span class="tp-row__name">${esc(p.name)}${reason ? `<small class="tp-off">${esc(reason)}</small>` : ''}</span>
@@ -123,7 +123,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
   const status = msg || (selPlayer
     ? `Wybrano: ${selPlayer.name}. Wskaż miejsce, na które ma przejść, albo zawodnika do zamiany.`
     : sel?.zone === 'xi' ? `Wybrano puste miejsce (${f.slots[sel.idx]?.pos}). Wskaż zawodnika z listy.`
-      : 'Przeciągnij zawodnika na inne miejsce albo dotknij dwóch miejsc po kolei. Dwuklik na nazwisku pokazuje atrybuty.');
+      : 'Przeciągnij zawodnika na inne miejsce albo dotknij dwóch miejsc po kolei. Dwuklik na nazwisku pokazuje atrybuty, prawy przycisk albo przytrzymanie nazwiska: więcej opcji.');
 
   // ---------- Siła składu
   const z = check.rating.zones;
