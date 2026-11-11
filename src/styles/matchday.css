@@ -1124,3 +1124,5 @@
 .coachbar__shout small { font: 600 12px/1 var(--font-body); opacity: .85; }
 @media (max-width: 560px) { .sh-grid { grid-template-columns: 1fr; } .sh-card { min-height: 0; } }
 @media (prefers-reduced-motion: reduce) { .sh-card { transition: none; } .sh-card:hover:not([disabled]) { transform: none; } }
+/* Zawodnicy, którzy zeszli: bez nagłówka, oddzieleni cienką linią pod ławką (nazwiska są wyszarzone) */
+.ros__list--out { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--line); }

@@ -623,7 +623,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       <ol class="ros__list" aria-label="Na boisku">${rows(on)}</ol>
       <h3 class="ros__sub">Ławka rezerwowych <small>${esc(subsCountText(T, M))}</small></h3>
       <ul class="ros__list ros__list--bench">${rows(bench) || '<li class="hint">Brak rezerwowych.</li>'}</ul>
-      ${out.length ? `<h3 class="ros__sub">Poza grą</h3><ul class="ros__list ros__list--out">${rows(out)}</ul>` : ''}`;
+      ${out.length ? `<ul class="ros__list ros__list--out" aria-label="Zawodnicy, którzy zeszli z boiska">${rows(out)}</ul>` : ''}`;
   }
   /** Licznik zmian: w sparingu bez limitu tylko liczba wykonanych. */
   const unlimited = (M) => !!M.rules && M.rules.subs !== 'standard';
