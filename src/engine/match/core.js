@@ -431,6 +431,7 @@ function finishing(x, type, header) {
   return 0.6 * main + 0.25 * attr(x, 'OPA') + 0.15 * attr(x, 'TEC') + x.base + 0.035 * x.Z + condPen;
 }
 
+// kind w zdarzeniach strzałów: typ akcji (POZ, SKR, KON, DYS, SP, FK, PEN), widoczny dla trenera na ławce (coach.js)
 function shot(M, ai, xg, type, header, forced = null) {
   const A = M.teams[ai]; const D = M.teams[1 - ai];
   const field = onPitch(A, M.minute).filter((y) => y.slot.pos !== 'BR');
@@ -457,17 +458,17 @@ function shot(M, ai, xg, type, header, forced = null) {
   if (r < 0.28 && gk) {
     s.sot++; rateEv(s, 0.1);
     gk.saves++; rateEv(gk, 0.1 + 0.6 * xg);
-    emit(M, 'shotOn', ai, s, { xg: round2(xg), text: `${last(s)} strzela${header ? ' głową' : ''}, ${last(gk)} broni.` });
+    emit(M, 'shotOn', ai, s, { xg: round2(xg), kind: type, text: `${last(s)} strzela${header ? ' głową' : ''}, ${last(gk)} broni.` });
     emit(M, 'save', 1 - ai, gk);
     if (M.rng.next() < K.saveCorner * (1.3 - attr(gk, 'CHW') / 20)) corner(M, ai);
   } else if (r < 0.55 && !header) {
-    emit(M, 'shotBlocked', ai, s, { xg: round2(xg), text: `Strzał zablokowany, uderzał ${last(s)}.` });
+    emit(M, 'shotBlocked', ai, s, { xg: round2(xg), kind: type, text: `Strzał zablokowany, uderzał ${last(s)}.` });
     if (M.rng.next() < K.blockCorner) corner(M, ai);
   } else if (xg >= 0.12 && M.rng.next() < K.postShare * 4) {
-    emit(M, 'post', ai, s, { xg: round2(xg), text: `${M.rng.chance(0.5) ? 'Słupek' : 'Poprzeczka'}! ${last(s)} był bardzo blisko.` });
+    emit(M, 'post', ai, s, { xg: round2(xg), kind: type, text: `${M.rng.chance(0.5) ? 'Słupek' : 'Poprzeczka'}! ${last(s)} był bardzo blisko.` });
     emit(M, 'goalKick', 1 - ai, null);
   } else {
-    emit(M, 'shotOff', ai, s, { xg: round2(xg), text: `${last(s)} strzela${header ? ' głową' : ''} obok bramki.` });
+    emit(M, 'shotOff', ai, s, { xg: round2(xg), kind: type, text: `${last(s)} strzela${header ? ' głową' : ''} obok bramki.` });
     if (M.rng.next() < K.goalKickPerMiss) emit(M, 'goalKick', 1 - ai, null);
   }
 }

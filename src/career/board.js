@@ -53,7 +53,11 @@ export function ensureBoard(game) {
   game.board = { trust: 60, fansMood: 55, ...(game.board ?? {}) };
   if (!game.board.goal || game.board.goalClub !== game.clubId) { game.board.goal = seasonGoalFor(club); game.board.goalClub = game.clubId; }
   game.board.reviews = game.board.reviews ?? [];
-  game.manager = game.manager ?? { rep: Math.round(clubReputation(club) * 0.6), history: [{ club: game.clubId, from: game.date }], fired: 0 };
+  // Nowa gra może mieć już manager.profile (imię, nazwisko, narodowość, wiek z kreatora): uzupełniamy brakujące pola
+  const M = game.manager ?? {};
+  if (M.rep == null || !M.history || M.fired == null) {
+    game.manager = { rep: Math.round(clubReputation(club) * 0.6), history: [{ club: game.clubId, from: game.date }], fired: 0, ...M };
+  }
   return game.board;
 }
 

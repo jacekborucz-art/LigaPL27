@@ -1,24 +1,39 @@
-// AI trenera w meczu (docs/ekspert_futbol.md 7.2, docs/sytuacje-meczowe.md). Ta sama logika prowadzi
-// rywala, asystenta gracza („Pokaż wynik”) i podpowiedzi asystenta w trakcie meczu (assistantSuggest).
+// AI trenera w meczu (docs/ekspert_futbol.md 7.2, docs/sytuacje-meczowe.md, docs/ai-trener.md). Ta sama logika
+// prowadzi rywala, asystenta gracza („Pokaż wynik”) i podpowiedzi asystenta w trakcie meczu (assistantSuggest).
 // Trener widzi tylko to, co widzi trener na ławce: wynik (w dwumeczu sumę), minutę, liczebność, kartki,
-// kondycję, urazy i ławkę. Zmienia tylko swoją drużynę i tylko przez substitute/changeTactics.
-// Wartości balansowe [SZAC].
+// kondycję, urazy, ławkę, przebieg gry (strzały, groźne sytuacje, posiadanie, skąd biorą się okazje)
+// i sposób gry rywala (z opóźnieniem rozpoznania). Zmienia tylko swoją drużynę i tylko przez
+// substitute/changeTactics/shout, na tych samych zasadach co gracz. Wartości balansowe [SZAC].
 
-import { substitute, changeTactics, subsAvailable, isConcussionSub } from './control.js';
+import { substitute, changeTactics, subsAvailable, isConcussionSub, shout, canShout } from './control.js';
 import { setCoachHooks } from './core.js';
-import { goalkeeper, fieldPlayers, slotFit, reslot } from './teams.js';
+import { goalkeeper, fieldPlayers, slotFit, reslot, assignSlots, shapeSlots } from './teams.js';
 import { proficiency } from '../positions.js';
+import { formationById } from '../../data/formations.js';
+import { K } from './constants.js';
 
 const CHECKPOINTS = new Set([46, 55, 60, 65, 70, 75, 80, 85, 88, 95, 100, 105, 110, 115, 119]);
+// Przegląd planu w 1. połowie: trener reaguje, gdy plan wyraźnie nie działa (nie tylko w przerwie) [SZAC]
+const REVIEW_H1 = new Set([25, 35]);
 const ATT = new Set(['NAP', 'SN', 'OP', 'SP']);
 const DEF_ROLE = new Set(['ŚO', 'BO', 'WB', 'DP']);
 const BACK = new Set(['ŚO', 'BO', 'WB']);
 const BACK3 = new Set(['352', '343', '532', '541']);
-const MANAGED = ['mentality', 'tempo', 'pressing', 'line', 'passing', 'timewasting'];
+const CENTRAL = new Set(['DP', 'ŚP', 'OP']);
+const MANAGED = ['mentality', 'tempo', 'pressing', 'line', 'passing', 'timewasting', 'tackling', 'marking', 'counter'];
 // Ustawienia przy pogoni za wynikiem (1: umiarkowanie, 2: trójka z tyłu) i przy obronie wyniku [SZAC]
 const ATTACK1 = { 4141: '4231', 4231: '442', 442: '442', '442d': '442', 4321: '4231', 433: '433', 352: '352', 343: '343', 532: '352', 541: '442' };
 const ATTACK2 = { 4141: '343', 4231: '343', 442: '343', '442d': '343', 4321: '343', 433: '343', 352: '343', 343: '343', 532: '352', 541: '352' };
 const DEFEND_MID = { 4231: '4141', 433: '4141', 442: '4141', '442d': '4141', 4321: '4141', 4141: '4141', 352: '532', 343: '532', 532: '532', 541: '541' };
+// Dodatkowy środkowy pomocnik, gdy przegrywamy środek pola (tylko w przerwie, tylko gdy zawodnicy pasują) [SZAC]
+const MID_PLUS = { 442: '4231', 343: '352', 541: '532', 4231: '4321', 433: '4321', 4141: '4321' };
+
+// Osobowość trenera (T.coach: O ofensywny, S ostrożny, P pragmatyczny). alert: szansa, że w punkcie oceny
+// trener zareaguje na sposób gry rywala (style) albo na przebieg meczu (flow); upór losowany raz na mecz [SZAC].
+const ALERT = { P: { style: 0.7, flow: 0.65 }, O: { style: 0.45, flow: 0.6 }, S: { style: 0.45, flow: 0.55 } };
+const STUBBORN = { P: 0.1, O: 0.2, S: 0.3 };
+const MAX_ADJ = 4; // korekty planu z przebiegu meczu na mecz (uparty trener: 2)
+const KEY_COOLDOWN = 15; // ta sama instrukcja zmieniana z przebiegu meczu najwcześniej po 15 min (bez przestawiania tam i z powrotem)
 
 const attr = (x, k) => x.p.attr?.[k] ?? x.p.ovr ?? 10;
 const condAdj = (x) => (x.cond < 85 ? -0.04 * (85 - x.cond) : 0);
@@ -45,14 +60,26 @@ export function matchState(M, side) {
   };
 }
 
-/** Docelowe instrukcje dla stanu meczu (od ustawień wyjściowych trenera). */
-export function desiredInstructions(T, st) {
-  const b = T.baseInstr ?? T.tactics.instructions;
+/**
+ * Plan trenera na mecz: ustawienia wyjściowe (u gracza bieżące) z korektami z przebiegu meczu (T.adj).
+ * Korekty znikają, gdy asystent przejmuje drużynę od gracza (nowe ustawienia wyjściowe).
+ */
+export function planInstr(T) {
+  const base = T.ai ? (T.baseInstr ?? T.tactics.instructions) : T.tactics.instructions;
+  const out = { ...base };
+  if (T.ai && T.adj && T.adjBase === T.baseInstr) for (const [k, a] of Object.entries(T.adj)) out[k] = a.v;
+  return out;
+}
+
+/** Docelowe instrukcje dla stanu meczu (od planu trenera; extra: nowe korekty planu z tego punktu oceny). */
+export function desiredInstructions(T, st, extra = null) {
+  const b = extra ? { ...planInstr(T), ...extra } : planInstr(T);
   const m = Number(b.mentality ?? 0);
   const w = {};
   let reason = null;
   if (st.diff < 0) {
-    if (st.minute >= chaseAt(T, st.diff <= -2 ? 60 : 65) || (st.men > 0 && st.minute >= 30) || (st.halftime && st.diff <= -2)) {
+    if (st.minute >= chaseAt(T, st.diff <= -2 ? 60 : 65) || (st.men > 0 && st.minute >= 30) || (st.halftime && st.diff <= -2)
+      || (st.diff <= -2 && st.minute >= chaseAt(T, 40))) {
       reason = 'gonimy wynik';
       w.mentality = String(Math.max(m, 1)); w.timewasting = 'off';
       if ((st.diff <= -2 && st.minute >= 60) || st.minute >= 80 || st.et) { w.mentality = '2'; w.tempo = 'fast'; w.pressing = st.men < 0 ? 'mid' : 'high'; }
@@ -105,6 +132,221 @@ export function shortShape(T, st, k = 11 - fieldPlayers(T).length) {
   const back3 = BACK3.has(T.tactics.formation);
   if (st.diff < 0 && st.minute >= 55) return back3 ? { formation: '352', drop: ['DP', 'ŚP', 'ŚP'].slice(0, k) } : { formation: '442d', drop: ['OP', 'ŚP', 'DP'].slice(0, k) };
   return back3 ? { formation: '532', drop: ['NAP', 'ŚP', 'NAP'].slice(0, k) } : { formation: '442', drop: ['NAP', 'SP', 'ŚP'].slice(0, k) };
+}
+
+// ------------------------------------------------------------ Obraz meczu z ławki
+// Liczniki na minutę z dziennika zdarzeń (tylko to, co widać: strzały, groźne sytuacje, skąd się biorą,
+// podania). Czytane leniwie w punktach oceny, każde zdarzenie raz na mecz.
+const XG = 0; const SH = 1; const BIG = 2; const KON = 3; const DYS = 4; const SP = 5; const PS = 6; const PSOK = 7;
+const SHOT_EV = new Set(['shotOn', 'shotOff', 'shotBlocked', 'post', 'goal']);
+const BIG_XG = 0.25; // groźna sytuacja [SZAC]
+
+function observe(M) {
+  const o = M.obs ?? (M.obs = { i: 0, rows: [] });
+  const ev = M.events;
+  for (; o.i < ev.length; o.i++) {
+    const e = ev[o.i];
+    const t = e.type;
+    if (e.side == null || (t !== 'pass' && t !== 'passFail' && !SHOT_EV.has(t)) || e.ownGoal) continue;
+    const row = o.rows[e.t] ?? (o.rows[e.t] = new Float64Array(16));
+    const b = e.side * 8;
+    const n = e.count ?? 1;
+    if (t === 'pass') { row[b + PS] += n; row[b + PSOK] += n; continue; }
+    if (t === 'passFail') { row[b + PS] += n; continue; }
+    const xg = e.xg ?? 0;
+    row[b + XG] += xg; row[b + SH]++;
+    if (xg >= BIG_XG) row[b + BIG]++;
+    const kind = e.kind ?? (e.how === 'HEAD' ? 'SKR' : e.how);
+    if (kind === 'KON') row[b + KON]++;
+    else if (kind === 'DYS') row[b + DYS]++;
+    else if (kind === 'SP' || kind === 'FK') row[b + SP]++;
+  }
+  return o;
+}
+
+/**
+ * Przebieg meczu oczami trenera strony side w ostatnich `span` minutach: xG, strzały i groźne sytuacje
+ * (F: nasze, A: rywala), strzały rywala z kontr, z dystansu i ze stałych fragmentów, podania, posiadanie, momentum.
+ */
+export function flowView(M, side, span = 20) {
+  const o = observe(M);
+  const to = M.tick; const from = Math.max(1, to - span + 1);
+  const f = side * 8; const a = (1 - side) * 8;
+  const v = { span: to - from + 1, xgF: 0, xgA: 0, shF: 0, shA: 0, bigF: 0, bigA: 0, konA: 0, dysA: 0, spA: 0, psF: 0, okF: 0, psA: 0, okA: 0, poss: 0.5, mom: 0 };
+  let pn = 0; let poss = 0; let mom = 0;
+  for (let t = from; t <= to; t++) {
+    const r = o.rows[t];
+    if (r) {
+      v.xgF += r[f + XG]; v.xgA += r[a + XG]; v.shF += r[f + SH]; v.shA += r[a + SH]; v.bigF += r[f + BIG]; v.bigA += r[a + BIG];
+      v.konA += r[a + KON]; v.dysA += r[a + DYS]; v.spA += r[a + SP];
+      v.psF += r[f + PS]; v.okF += r[f + PSOK]; v.psA += r[a + PS]; v.okA += r[a + PSOK];
+    }
+    const ph = M.possession[t - 1];
+    if (ph != null) { poss += side === 0 ? ph : 1 - ph; pn++; }
+    const mv = M.momentum[t - 1];
+    if (mv != null) mom += (side === 0 ? mv : -mv) / 100;
+  }
+  if (pn) { v.poss = poss / pn; v.mom = mom / pn; }
+  return v;
+}
+
+/** Ustawienie rywala tak, jak widzi je ławka: zmiana jest rozpoznana dopiero po `lag` minutach. */
+export function seenTactics(M, O, lag = 8) {
+  const log = O.tacLog ?? [{ min: -99, formation: O.tactics.formation, instr: O.tactics.instructions }];
+  let r = log[0];
+  for (const e of log) if (e.min <= M.minute - lag) r = e;
+  return r;
+}
+
+/** Osobowość trenera w tym meczu (upór, czas rozpoznania), losowana raz z RNG meczu. Podpowiedź: bez losowania. */
+function mindOf(T, rng, advice) {
+  if (advice) return { stubborn: false, lag: 5, used: 0 };
+  if (!T.mind) T.mind = { stubborn: rng.chance(STUBBORN[T.coach] ?? 0.15), lag: rng.int(6, 10), used: 0 };
+  return T.mind;
+}
+
+/** Punkt przeglądu planu poza punktami kontrolnymi: 25. i 35. minuta, przerwa na schłodzenie w upale. */
+function reviewPoint(M) {
+  if (M.half === 1 && REVIEW_H1.has(M.elapsed)) return true;
+  const w = M.ctx.weather ?? {};
+  return M.half <= 2 && M.elapsed === 30 && !!(w.cooling || (w.tempC ?? 0) >= K.coolingTempC);
+}
+
+const stepDown = { high: 'mid', mid: 'low', low: 'low' };
+const boldness = (val) => ({ low: -1, mid: 0, high: 1 }[val] ?? Number(val ?? 0));
+const avgOf = (xs, f) => (xs.length ? xs.reduce((s, x) => s + f(x), 0) / xs.length : 0);
+
+/**
+ * Korekty planu z przebiegu meczu (nie z wyniku): siły zawodników, kartki, sposób gry rywala, obraz gry,
+ * walka o środek pola. Nic nie zmienia; zwraca { set, reason, keys, formation, formationReason } albo null.
+ * Każda korekta ma efekt w silniku (tacticParams, counterBonus): docs/ai-trener.md.
+ */
+function reviewAdjust(M, T, st, rng, advice, mind) {
+  if (M.ended || st.et) return null;
+  const O = M.teams[1 - T.side];
+  const plan = planInstr(T);
+  const min = st.minute;
+  const adj = T.ai && T.adjBase === T.baseInstr ? (T.adj ?? {}) : {};
+  const cands = [];
+  let v = null; let seen = null;
+  const add = (key, val, reason, kind) => {
+    if (plan[key] === val || cands.some((c) => c.key === key)) return;
+    if (!advice && adj[key] && min - adj[key].min < KEY_COOLDOWN) return;
+    cands.push({ key, v: val, reason, kind });
+  };
+  const xs = fieldPlayers(T).filter((x) => x.slot && x.slot.pos !== 'BR');
+  const legs = avgOf(xs, (x) => x.cond);
+  const fit = (st.heat ? 3 : 0);
+  const lateChase = st.diff < 0 && min >= 70;
+  const mentality = Number(plan.mentality ?? 0);
+
+  // 1. Siły: wysoki pressing i szybkie tempo kosztują kondycję (fatMul); poniżej ok. 70 rośnie ryzyko urazu
+  if (!lateChase && (min >= 50 || (st.halftime && st.heat))) {
+    if (plan.pressing === 'high' && legs < 76 + fit) add('pressing', 'mid', 'zmęczenie: niższy pressing', 'legs');
+    if (plan.tempo === 'fast' && legs < 74 + fit) add('tempo', 'normal', 'zmęczenie: wolniejsze tempo', 'legs');
+  }
+  // 2. Kartki: kilku ukaranych obrońców lub pomocników, łagodniej w odbiorze (mniej fauli i drugich żółtych)
+  const booked = xs.filter((x) => x.yc);
+  const bookedDef = booked.filter((x) => DEF_ROLE.has(x.slot.pos)).length;
+  if (min < 78 && !lateChase) {
+    if (plan.tackling !== 'soft' && (bookedDef >= 2 || booked.length >= 3)) add('tackling', 'soft', 'kilku zawodników z kartkami: ostrożniej w odbiorze', 'cards');
+    else if (plan.tackling === 'hard' && bookedDef >= 1) add('tackling', 'normal', 'obrońca z kartką: bez twardych wejść', 'cards');
+  }
+  if (fieldPlayers(T).length < 11 && st.men < 0) return finish(); // w osłabieniu plan ustala reorganizacja
+  // 3. Sposób gry rywala (widoczny z ławki, rozpoznany z opóźnieniem)
+  seen = seenTactics(M, O, mind.lag);
+  const so = seen.instr ?? {};
+  const tec = T.avg?.('TEC') ?? 11;
+  if (min >= 15 || st.atBreak) {
+    if (so.pressing === 'high' && plan.passing === 'short' && tec < 12) add('passing', 'mixed', 'rywal pressuje wysoko: grajmy prościej', 'style');
+    else if (so.pressing === 'high' && plan.passing !== 'short' && tec >= 12.3) add('passing', 'short', 'rywal pressuje wysoko: rozgrywamy krótko przez pressing', 'style');
+    if ((Number(so.mentality ?? 0) >= 1 || so.line === 'high') && plan.counter === 'no') add('counter', 'yes', 'rywal gra wysoko: szybkie kontry za plecy', 'style');
+    if ((so.passing === 'long' || Number(so.mentality ?? 0) >= 2) && plan.line === 'high') add('line', 'mid', so.passing === 'long' ? 'rywal gra długimi piłkami: niżej linia obrony' : 'rywal rzuca się do ataku: niżej linia obrony', 'style');
+    const deep = Number(so.mentality ?? 0) <= -1 || so.line === 'low' || seen.formation === '541' || seen.formation === '532';
+    if (deep && st.diff === 0 && min >= 25 && min <= 80 && st.str > -1) {
+      if (plan.passing !== 'short' && tec >= 11.5) add('passing', 'short', 'rywal się cofnął: cierpliwie, krótkimi podaniami', 'style');
+      else if (plan.pressing !== 'high' && legs >= 80) add('pressing', 'high', 'rywal się cofnął: odbieramy piłkę wysoko', 'style');
+    }
+    if (so.passing === 'short' && plan.pressing !== 'high' && legs >= 80 && min < 70) {
+      const all = flowView(M, T.side, M.tick);
+      if (all.psA >= 80 && all.okA / all.psA < 0.79) add('pressing', 'high', 'rywal myli się w rozegraniu: wysoki pressing', 'style');
+    }
+  }
+  // 4. Obraz gry: rywal przeważa, my bez sytuacji, odzyskana kontrola
+  if ((min >= 20 && min <= 78) || st.halftime) {
+    v = flowView(M, T.side, st.halftime ? M.tick : 20);
+    const k = v.span / 20;
+    const pinned = (v.xgA - v.xgF >= 0.35 + 0.15 * k && v.shA >= v.shF + 2 + k) || (v.bigA >= 1 + k && v.xgA >= v.xgF + 0.3) || v.mom <= -0.3;
+    if (pinned && st.diff >= 0 && st.diff <= 1) {
+      if (v.konA >= 2 && v.konA >= 0.4 * v.shA && plan.line !== 'low') add('line', stepDown[plan.line ?? 'mid'], 'dostajemy kontry: cofamy linię obrony', 'flow');
+      else if (v.dysA >= 3 && v.dysA >= 0.5 * v.shA && plan.line === 'low') add('line', 'mid', 'rywal strzela z dystansu: wyżej linia obrony', 'flow');
+      else if (v.spA >= 3 && plan.marking === 'man') add('marking', 'zone', 'groźne stałe fragmenty: krycie strefowe', 'flow');
+      else if (T.coach === 'S') {
+        if (mentality > -1) add('mentality', String(mentality - 1), 'rywal przeważa: cofamy się i zagęszczamy środek', 'flow');
+        else if (st.diff > 0 && plan.line !== 'low') add('line', 'low', 'rywal przeważa: niski blok', 'flow');
+      } else if (plan.pressing !== 'high' && legs >= 78 && (T.coach === 'O' || v.poss < 0.47)) {
+        add('pressing', 'high', T.coach === 'O' ? 'rywal przeważa: wyżej pressing, odbieramy inicjatywę' : 'rywal ma piłkę: wyżej pressing', 'flow');
+      } else if (T.coach === 'P' && st.diff > 0 && mentality > -1) {
+        add('mentality', String(mentality - 1), 'rywal przeważa: zabezpieczamy prowadzenie', 'flow');
+      } else if (plan.tempo === 'fast') add('tempo', 'normal', 'rywal przeważa: uspokajamy grę', 'flow');
+    }
+    const toothless = v.poss >= 0.56 && v.xgF < 0.12 + 0.12 * k && v.shF <= 2 + 2 * k;
+    if (toothless && st.diff === 0 && min >= 25 && min <= 75) {
+      if (T.coach !== 'S' && mentality <= 0) add('mentality', String(mentality + 1), 'dużo piłki, mało sytuacji: więcej ludzi w ataku', 'flow');
+      else if (plan.passing !== 'short' && tec >= 12) add('passing', 'short', 'dużo piłki, mało sytuacji: cierpliwie rozgrywamy', 'flow');
+    }
+    // Zagrożenie minęło, a remis nas nie urządza: ostrożne korekty wracają do planu wyjściowego
+    if (!pinned && st.diff === 0 && v.xgF >= v.xgA + 0.3 && v.mom >= 0.1) {
+      const base = T.baseInstr ?? {};
+      for (const key of ['mentality', 'line']) {
+        const a = adj[key];
+        if (a?.kind === 'flow' && min - a.min >= 20 && base[key] != null && boldness(a.v) < boldness(base[key])) {
+          add(key, base[key], 'opanowaliśmy mecz: wracamy do planu', 'revert');
+        }
+      }
+    }
+  }
+  return finish();
+
+  function finish() {
+    // Szansa reakcji wg osobowości; uparty trener reaguje rzadziej i wcześniej kończy korekty
+    const limit = (mind.stubborn ? 2 : MAX_ADJ) - mind.used;
+    const out = [];
+    for (const c of cands) {
+      if (out.length >= 2 || (!advice && out.length >= limit)) break;
+      const a = ALERT[T.coach] ?? ALERT.P;
+      const p = c.kind === 'style' ? a.style : c.kind === 'legs' ? 0.8 : c.kind === 'cards' ? 0.6 : c.kind === 'revert' ? 0.5 : a.flow;
+      if (!advice && !rng.chance(mind.stubborn ? p * 0.5 : p)) continue;
+      out.push(c);
+    }
+    // Przegrany środek pola w przerwie: dodatkowy środkowy pomocnik (za darmo w przerwie), gdy zawodnicy pasują
+    let formation = null;
+    if (st.halftime && fieldPlayers(T).length >= 11 && v && v.poss < 0.42 && v.xgA >= v.xgF && (advice || mind.used + out.length < (mind.stubborn ? 2 : MAX_ADJ))) {
+      const target = MID_PLUS[T.tactics.formation];
+      const oppCentral = formationById(seen.formation).slots.filter((x) => CENTRAL.has(x.pos)).length;
+      if (target && oppCentral > T.central && (advice || rng.chance((ALERT[T.coach] ?? ALERT.P).flow)) && shapeFit(T, target) >= 0.97 * currentFit(T)) formation = target;
+    }
+    if (!out.length && !formation) return null;
+    const set = Object.fromEntries(out.map((c) => [c.key, c.v]));
+    return { set, cands: out, reason: out.map((c) => c.reason).join('; ') || null, formation, formationReason: 'przegrywamy środek pola: dodatkowy środkowy pomocnik' };
+  }
+}
+
+function currentFit(T) { return fieldPlayers(T).reduce((s, x) => s + (x.slot ? slotFit(x, x.slot) : 0), 0); }
+/** Suma dopasowania zawodników z boiska do slotów innej formacji (bez zmiany stanu). */
+function shapeFit(T, fid) {
+  const xs = fieldPlayers(T);
+  const { slots } = shapeSlots(formationById(fid), [], xs.length);
+  let sum = 0;
+  for (const [x, i] of assignSlots(xs, slots)) sum += slotFit(x, slots[i]);
+  return sum;
+}
+
+/** Zapis korekt planu (po wykonaniu zmiany): pamięć dla histerezy i limitu korekt. */
+function commitAdj(T, adjust, minute) {
+  if (T.adjBase !== T.baseInstr || !T.adj) { T.adj = {}; T.adjBase = T.baseInstr; }
+  for (const c of adjust.cands) T.adj[c.key] = { v: c.v, min: minute, kind: c.kind, reason: c.reason };
+  if (T.mind) T.mind.used += adjust.cands.length + (adjust.formation ? 1 : 0);
 }
 
 // ------------------------------------------------------------ Wybór zawodników
@@ -234,16 +476,27 @@ function plan(M, side, rng, advice) {
     mergeTactic({ instructions: instrPatch(T, d.w) }, d.reason ?? 'rywal w osłabieniu', true);
   }
 
-  // 3. Punkty kontrolne: instrukcje, zmiany taktyczne, rotacja
+  // 3. Punkty kontrolne i przeglądy planu: instrukcje (wynik, przebieg meczu, rywal), zmiany taktyczne, rotacja
   const addedCheck = M.half % 2 === 0 && M.elapsed === M.length + 1;
   const goalReact = reacts.some((r) => r.kind === 'goal') && st.minute >= 60;
   const checkpoint = advice || st.atBreak || (CHECKPOINTS.has(M.minute) && M.elapsed <= M.length) || addedCheck;
-  if (checkpoint || goalReact) {
-    const d = desiredInstructions(T, st);
+  const review = checkpoint || (reviewPoint(M) && M.elapsed <= M.length);
+  if (review || goalReact) {
+    // Bez nerwowego przestawiania: korekty z przebiegu meczu najwcześniej 10 min po poprzedniej zmianie (koszt x2)
+    const calm = advice || st.atBreak || M.minute - T.lastTacChange >= 10;
+    const adjust = review && calm ? reviewAdjust(M, T, st, rng, advice, mindOf(T, rng, advice)) : null;
+    const d = desiredInstructions(T, st, adjust?.set);
     const patch = instrPatch(T, d.w);
     if (patch.timewasting === 'on' && !rng.chance(T.coach === 'O' ? 0.3 : 0.6)) delete patch.timewasting;
-    if (Object.keys(patch).length && (advice || st.atBreak || M.minute - T.lastTacChange >= 10) && rng.chance(0.75)) {
-      mergeTactic({ instructions: patch }, d.reason ?? 'powrót do planu');
+    const fromAdj = !!adjust && Object.keys(patch).some((k) => k in adjust.set && d.w[k] === adjust.set[k]);
+    if (Object.keys(patch).length && calm && (fromAdj || rng.chance(0.75))) {
+      if (fromAdj && !advice) commitAdj(T, adjust, M.minute);
+      const why = fromAdj && d.reason ? `${d.reason}; ${adjust.reason}` : fromAdj ? adjust.reason : d.reason;
+      mergeTactic({ instructions: patch }, why ?? 'powrót do planu');
+    }
+    if (adjust?.formation && fieldPlayers(T).length >= 11 && !tactic.patch?.formation) {
+      if (!advice && !fromAdj) commitAdj(T, { cands: [], formation: adjust.formation }, M.minute);
+      mergeTactic({ formation: adjust.formation }, adjust.formationReason);
     }
     // W osłabieniu kształt dopasowany do wyniku (np. 4-4-1 -> 4-3-2 przy pogoni)
     if (fieldPlayers(T).length < 11 && !tactic.patch?.formation) {
@@ -405,16 +658,35 @@ function execute(M, side, actions, by) {
   else if ((shuffle || (T.dropIdx.length && fieldPlayers(T).length >= 11)) && by !== 'user') reslot(T); // przestawienie bez kosztu
 }
 
+/**
+ * Okrzyk z linii bocznej (te same okrzyki, limity i przerwy co u gracza): po golu, w pogoni, przy obronie
+ * prowadzenia pod presją, w słabszym momencie po przerwie [SZAC].
+ */
+function aiShout(M, T, st, rng) {
+  if (T.coachBanned || M.phase !== 'play') return;
+  const scored = M.score[T.side] > (T.seenGoals ?? 0);
+  T.seenGoals = M.score[T.side];
+  const ok = (id) => !canShout(M, T.side, id);
+  let id = null; let p = 0;
+  if (scored && ok('brawo')) { id = 'brawo'; p = 0.35; }
+  else if (st.diff < 0 && st.minute >= 75 && ok('naprzod')) { id = 'naprzod'; p = T.coach === 'S' ? 0.2 : 0.3; }
+  else if (st.diff === 1 && st.minute >= 80 && st.mom < -0.15 && ok('uwaga')) { id = 'uwaga'; p = T.coach === 'O' ? 0.3 : 0.5; }
+  else if (st.diff < 0 && st.minute >= 50 && st.minute < 75 && st.mom < -0.2 && ok('walka')) { id = 'walka'; p = 0.2; }
+  if (id && rng.chance(p)) shout(M, T.side, id);
+}
+
 /** Decyzje AI (rywal albo asystent gracza) w danej minucie. Zmienia tylko swoją drużynę i tylko zgodnie z regułami. */
 export function aiDecide(M, side) {
   const T = M.teams[side];
-  // Szybkie wyjście: trener myśli tylko w punktach kontrolnych, w przerwie i po zdarzeniach (kartka, gol, uraz)
+  // Szybkie wyjście: trener myśli tylko w punktach kontrolnych i przeglądach planu, w przerwie
+  // i po zdarzeniach (kartka, gol, uraz)
   const busy = T.react.length || T.injuredOff.length || M.phase === 'break'
     || (CHECKPOINTS.has(M.minute) && M.elapsed <= M.length) || (M.half % 2 === 0 && M.elapsed === M.length + 1)
-    || goalkeeper(T)?.p.pos !== 'BR';
+    || (M.elapsed <= M.length && reviewPoint(M)) || goalkeeper(T)?.p.pos !== 'BR';
   if (!busy) return;
   const actions = plan(M, side, M.rng, false);
   if (actions.length) execute(M, side, actions, T.assistant ? 'assistant' : 'ai');
+  if (!M.ended) aiShout(M, T, matchState(M, side), M.rng);
   T.react.length = 0;
   if (T.injuredOff.length) T.injuredOff = T.injuredOff.filter((x) => !x.subbedOff);
 }

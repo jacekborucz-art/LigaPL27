@@ -63,9 +63,9 @@ Co z tego wynika:
 | Gole gospodarz : gość | 1,46 : 1,30 | 1,51 : 1,35 |
 | Nachylenie punktów gospodarza względem różnicy sił | 0,453 | 0,408 |
 
-Silnik i szybka symulacja zgadzają się w poziomie, przewadze własnego boiska i liczbie goli. Silnik jest ok. 11 %
-bardziej „stromy” (lepszy wygrywa trochę częściej); przy typowych różnicach sił to poniżej 1 pkt na sezon, więc nie
-jest przyczyną zgłoszenia.
+Silnik i szybka symulacja zgadzają się w średnim poziomie, przewadze własnego boiska i liczbie goli. Silnik jest
+ok. 11 % bardziej „stromy” (lepszy wygrywa częściej), a dla pojedynczych kadr różnice są większe (przyczyna 5 niżej).
+Z perspektywy gracza liczy się to, bo jego mecze zawsze idą pełnym silnikiem, a reszta ligi szybką symulacją.
 
 Średnia ocena meczowa: pełny silnik 6,16 (6,23 przy 60+ minutach), szybka symulacja ok. 6,49.
 
@@ -121,7 +121,7 @@ Zasada: kluby AI dostają te same mechanizmy co gracz, narzędzia gracza zostaj�
 - Rywal AI przygotowuje się do meczu z groźną drużyną staranniej: analiza wideo x(1 + threat), czyli do x2
   (do ok. +0,1 pkt atrybutu na zawodnika więcej przy dobrym analityku). Ten sam mechanizm, który ma gracz,
   skalowany jakością analityka klubu AI.
-- Zarząd po sezonie ponad stan podnosi cel (np. Widzew mistrz przy celu „puchary” dostaje cel 3-4 miejsce),
+- Zarząd po sezonie ponad stan podnosi cel (np. Widzew mistrz przy celu 6. miejsce dostaje cel 4. miejsce, Legia mistrz przy celu 3. miejsce dostaje „obronę mistrzostwa” z celem 2. miejsce),
   a ocena miesięczna i letnia liczą się od nowego celu, więc cierpliwość maleje bez osobnej reguły.
 
 Trener klubu ze środka tabeli, który gra na miarę kadry, ma threat = 0 i zwykły cel; nic go nie karze.
@@ -156,7 +156,22 @@ Migawka: silnik z HEAD sprzed zmian agenta silnika plus wszystkie zmiany z tego 
   Widzew +2,2, Polonia +1,9, Resovia 0,0, GKS -1,4 pkt na sezon). Mecze gracza zawsze idą silnikiem, więc to przenosi się
   na wynik gracza. Propozycja niżej.
 
-AKTUALNY_SILNIK
+### Kontrola na silniku po commicie 1d73c01 (sytuacje, nowy trener AI)
+
+Te same zmiany balansu, silnik z main (stan 11 lis 2026). Tryb AI nie używa pełnego silnika, więc baza AI jest ta sama.
+
+| Klub | AI | ui (pasywny) | różnica pkt | silnik wobec szybkiej symulacji (ten sam klub, pkt na sezon) |
+|---|---|---|---|---|
+| Legia | 3,8 / 62,4 | 3,1 / 64,0 | +1,6 | +3,0 |
+| Lechia Gdańsk | 4,0 / 59,7 | 2,5 / 64,1 | +4,4 | +2,7 |
+| Widzew | 7,0 / 51,5 | 7,3 / 50,8 | -0,7 | +0,1 |
+| GKS Katowice | 13,2 / 38,0 | 14,7 / 33,9 | -4,1 | +1,8 |
+| Polonia Warszawa | 8,7 / 47,9 | 8,6 / 47,9 | 0,0 | +0,5 |
+| Resovia | 8,5 / 48,9 | 8,0 / 49,5 | +0,6 | +0,4 |
+
+Średnia różnica +0,3 pkt, różnica miejsca najwyżej 1,5 (Lechia, GKS). Średnia ocena w nowym silniku nadal 6,16, więc
+`engineRatingShift` dalej działa. Pojedyncze kluby odchylają się o 3-4 pkt; przy 30 sezonach błąd różnicy to ok. 2,2 pkt,
+więc to na granicy szumu, a powtarzalnie dodatnia Lechia wynika z wyceny kadry (propozycja 2 niżej).
 
 ## Proponowane zmiany w silniku (dla agenta silnika)
 
@@ -183,6 +198,8 @@ AKTUALNY_SILNIK
   analiza rywala AI po tytule gracza rośnie; zarząd podnosi cel tylko po sezonie wyraźnie ponad celem.
 - Skład: zastępca kontuzjowanego wraca na ławkę po powrocie zawodnika, ręczna zmiana gracza zostaje,
   `tactics.assistant` wybiera skład jak AI.
+- Odprawa pomeczowa AI: po meczu klubów AI ich trenerzy wybierają ton (po wygranej Pochwała albo Skupienie na kolejnym
+  meczu), pamięć powtórzeń zapisuje się w `game.aiSpeech`, morale zwycięzców rośnie.
 
 `tests/matchday.test.mjs`: temperatura w danych dla silnika, kara za czerwoną z powodu, walkower, `concussionSubs`
 i zawodnik w pauzach studia po pełnym dniu meczowym.
