@@ -11,6 +11,62 @@ import { restOk } from '../season/season.js';
 import { UEFA_CLUBS, COUNTRY_NAMES } from '../season/uefa.js';
 import { FRIENDLY, CAMP } from './config.js';
 import { campWindow, campOn, officialDates } from './camps.js';
+import { DECIDERS, SUB_RULES, ROTATIONS, FRIENDLY_DEFAULTS } from '../engine/match/rules.js';
+
+/**
+ * Opisy zasad sparingu dla UI (docs/sparingi-i-karne.md, rozdz. 4): krótka nazwa (znacznik w terminarzu),
+ * pełna nazwa (przełącznik) i jedno zdanie wyjaśnienia.
+ */
+export const FRIENDLY_RULE_TEXT = {
+  decider: {
+    none: { tag: 'Remis zostaje', name: 'Bez rozstrzygnięcia', note: 'Typowy sparing: remis to remis, bez dodatkowego obciążenia.' },
+    penalties: { tag: 'Remis: karne', name: 'Od razu karne', note: 'Przy remisie po 90 minutach seria rzutów karnych. Dobra okazja, żeby ją przećwiczyć.' },
+    et_penalties: { tag: 'Remis: dogrywka', name: 'Dogrywka i karne', note: 'Jak w pucharze: 2 x 15 minut, potem karne. Dokłada 30 minut obciążenia.' },
+  },
+  subs: {
+    standard: { tag: '5 zmian', name: 'Standardowe 5', note: '5 zmian w 3 oknach, jak w meczu o punkty.' },
+    unlimited: { tag: 'Zmiany bez limitu', name: 'Bez limitu', note: 'Każdy rezerwowy może wejść, także po kontuzji. Zmieniony nie wraca.' },
+    rolling: { tag: 'Zmiany powrotne', name: 'Powrotne', note: 'Mecz kontrolny za porozumieniem klubów: zmieniony zawodnik może wrócić na boisko.' },
+  },
+  rotation: {
+    auto: { tag: 'Rotacja: asystent', name: 'Automatycznie', note: 'Asystent dobiera plan do okresu i liczby rezerwowych.' },
+    two_xi: { tag: 'Dwie jedenastki', name: 'Dwie jedenastki', note: 'Po 45 minut dla każdej grupy: w przerwie wymiana całej drużyny.' },
+    staggered: { tag: 'Zmiany stopniowe', name: 'Zmiany stopniowe', note: 'Część składu w przerwie, reszta między 60. a 75. minutą.' },
+    match: { tag: 'Jak w lidze', name: 'Jak w meczu o punkty', note: 'Podstawowi grają dłużej, zmiany jak w lidze. Generalka przed sezonem.' },
+  },
+};
+
+/**
+ * Sprawdza i uzupełnia zasady sparingu: { decider, subs, rotation } z wartościami z DECIDERS, SUB_RULES, ROTATIONS,
+ * brakujące z FRIENDLY_DEFAULTS. Zwraca { ok, rules } albo { ok: false, error }.
+ */
+export function normalizeFriendlyRules(opts = {}, base = FRIENDLY_DEFAULTS) {
+  const o = opts ?? {};
+  const rules = {
+    decider: o.decider ?? base.decider ?? FRIENDLY_DEFAULTS.decider,
+    subs: o.subs ?? base.subs ?? FRIENDLY_DEFAULTS.subs,
+    rotation: o.rotation ?? base.rotation ?? FRIENDLY_DEFAULTS.rotation,
+  };
+  if (!DECIDERS.includes(rules.decider)) return { ok: false, error: 'Nieznany sposób rozstrzygnięcia remisu.' };
+  if (!SUB_RULES.includes(rules.subs)) return { ok: false, error: 'Nieznana reguła zmian.' };
+  if (!ROTATIONS.includes(rules.rotation)) return { ok: false, error: 'Nieznany plan rotacji.' };
+  return { ok: true, rules };
+}
+
+/** Zasady sparingu z wpisu terminarza (stare zapisy bez friendlyRules: wartości domyślne). */
+export function friendlyRulesOf(f) {
+  return { ...FRIENDLY_DEFAULTS, period: null, ...(f?.friendlyRules ?? {}) };
+}
+
+/** Znaczniki zasad sparingu do terminarza i listy (tylko to, co odbiega od zwykłego sparingu, plus zmiany). */
+export function friendlyRuleTags(f) {
+  const r = friendlyRulesOf(f);
+  const T = FRIENDLY_RULE_TEXT;
+  const tags = [T.subs[r.subs]?.tag];
+  if (r.decider !== 'none') tags.push(T.decider[r.decider]?.tag);
+  if (r.rotation !== 'auto') tags.push(T.rotation[r.rotation]?.tag);
+  return tags.filter(Boolean);
+}
 
 /** Okres sparingowy, do którego należy dzień (albo null). */
 export function friendlyPeriod(game, date, official = officialDates(game)) {
@@ -70,8 +126,13 @@ export function friendlyOpponents(game, date) {
   return [...polish, ...foreign];
 }
 
-/** Dodaje sparing do terminarza. Zwraca { ok, error?, fixture? }. */
-export function createFriendly(game, date, oppId) {
+/**
+ * Dodaje sparing do terminarza. opts: { decider, subs, rotation } (umowa klubów, domyślnie FRIENDLY_DEFAULTS),
+ * zapisane w fixture.friendlyRules razem z okresem. Zwraca { ok, error?, fixture? }.
+ */
+export function createFriendly(game, date, oppId, opts = {}) {
+  const nr = normalizeFriendlyRules(opts);
+  if (!nr.ok) return nr;
   if (!date || date <= game.date) return { ok: false, error: 'Sparing można zaplanować tylko w przyszłości.' };
   const official = officialDates(game);
   const period = friendlyPeriod(game, date, official);
@@ -83,10 +144,26 @@ export function createFriendly(game, date, oppId) {
   const fixture = {
     id: `SP-${date}-${opp.id}`, comp: 'friendly', round: 'F', date, time: FRIENDLY.time,
     home: game.clubId, away: opp.id, played: false, neutral: opp.neutral, label: `Sparing: ${opp.name}`,
+    friendlyRules: { ...nr.rules, period: period.kind },
   };
   game.fixtures.push(fixture);
   game.fixtures.sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? '')));
   return { ok: true, fixture };
+}
+
+/**
+ * Zmiana zasad zaplanowanego sparingu (te same warunki co odwołanie: przyszły, nierozegrany). opts: część pól
+ * { decider, subs, rotation }, reszta zostaje. Zwraca { ok, error?, fixture? }.
+ */
+export function setFriendlyRules(game, id, opts = {}) {
+  const f = (game.fixtures || []).find((x) => x.id === id && x.comp === 'friendly');
+  if (!f) return { ok: false, error: 'Nie ma takiego sparingu.' };
+  if (f.played || f.date <= game.date) return { ok: false, error: 'Zasad tego sparingu nie da się już zmienić.' };
+  const cur = friendlyRulesOf(f);
+  const nr = normalizeFriendlyRules(opts, cur);
+  if (!nr.ok) return nr;
+  f.friendlyRules = { ...nr.rules, period: cur.period ?? friendlyPeriod(game, f.date)?.kind ?? null };
+  return { ok: true, fixture: f };
 }
 
 /** Odwołanie zaplanowanego sparingu (przed dniem meczu). */

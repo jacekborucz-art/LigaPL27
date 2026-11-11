@@ -181,3 +181,39 @@ Silnik nie zmienia nic w meczach, dopóki te pola nie zostaną przekazane.
 - `docs/ekspert_sedzia.md` (A1, A6, B), `docs/trening.md` (rozdz. 11-12), `docs/sytuacje-meczowe.md` (G).
 
 Strona theifab.com nie była dostępna z tej sesji; tekst Law 3 i Law 10 2025/26 podano za źródłami wtórnymi i `docs/ekspert_sedzia.md`.
+
+## 9. Wdrożenie UI
+
+Wdrożone wg rozdz. 6 (Nov 11, 2026). Testy: `tests/friendlyUi.test.mjs` (7 testów, bez DOM).
+
+### Planowanie sparingu (`src/training/friendlies.js`, `src/ui/trainingView.js`)
+
+- `createFriendly(game, date, oppId, { decider, subs, rotation })`: wartości sprawdzane z `DECIDERS`, `SUB_RULES`, `ROTATIONS`, brakujące z `FRIENDLY_DEFAULTS`; zapis w `fixture.friendlyRules = { decider, subs, rotation, period }`. Błędna wartość: `{ ok: false, error }`, nic nie trafia do terminarza.
+- `setFriendlyRules(game, id, opts)`: zmiana części zasad przyszłego, nierozegranego sparingu (reszta i okres zostają).
+- Pomocnicze: `normalizeFriendlyRules`, `friendlyRulesOf` (stare zapisy bez zasad: wartości domyślne), `friendlyRuleTags` (znaczniki), `FRIENDLY_RULE_TEXT` (nazwy i jedno zdanie wyjaśnienia).
+- Trening, zakładka Sparingi: po wyborze terminu trzy przełączniki („Remis”, „Zmiany”, „Plan rotacji”) z wyjaśnieniem pod każdym; „Umów” zapisuje wybrane zasady. Na liście zaplanowanych znaczniki zasad i przycisk „Zasady” (te same przełączniki, zmiana od razu). Na kalendarzu tygodnia dzień sparingu ma podpis „Sparing” i znaczniki. Wynik serii na liście: „2:2 (k. 4:3)”.
+- Studio przedmeczowe sparingu: wiersz „Umowa klubów” ze znacznikami.
+
+### Dzień meczowy (`src/match/matchday.js`)
+
+- Sparing: ławka 14 u obu drużyn (`FRIENDLY_BENCH`). Ustawienia gracza (`game.tactics`) bez zmian: `matchTacticsFor(game, S)` dopełnia ławkę na ten mecz dostępnymi zawodnikami (najpierw ławka gracza w jego kolejności).
+- `kickOff`: `knockout: knockoutCtx(f)` ('single', 'penaltiesOnly', dwumecz), `friendlyRules` z terminarza (+ `plannedSubs`, gdy `S.plannedSubs`), `shootoutPrep: true` w każdym meczu gracza. To samo rozstrzygnięcie i zasady w `playMyMatch` (`src/app.js`).
+- `tick`: `S.step = 'shootoutPrep'` w pauzie przed serią. `skip` („Pokaż wynik”) też staje przed serią (asystent przejmuje drużynę jak w `runToEnd`).
+- Seria: `shootoutSetup(S)` (kandydaci obu drużyn, bramkarze do wyboru z REF i JNJ), `previewShootoutOrder(ids, keeperId, n)` (ta sama reguła co silnik: bramkarz serii zawsze strzela), `confirmShootout(S, ids, keeperId)` (`setShootoutOrder` + `startShootout`, `S.step = 'shootout'`), `endShootout(S)` (`'fulltime'`).
+- `finishMatchday`: `if (!M.ended) runToEnd(...)`, więc wyjście w pauzie przed serią kończy mecz serią z kolejnością automatyczną.
+- `liveRatings(S)` = `liveRatings(M)` z silnika (także zmienieni na ławce przy zmianach powrotnych).
+- `keeperReminder(S)`: raz na mecz, w 118' dogrywki albo w 88' przy „od razu karne”, przy remisie, gdy można zmienić i na ławce jest bramkarz lepszy o co najmniej 1,5 (średnia REF i JNJ). Ekran meczu zatrzymuje grę i pokazuje tekst z podpowiedziami asystenta.
+- `secondEleven(S)`, `applySecondEleven(S, actions)`: w przerwie po 1. połowie sparingu zmiany z `assistantSuggest` (plan rotacji), wykonanie wybranych przez `applySuggestion`.
+
+### Ekran meczu (`src/ui/matchdayView.js`, `src/styles/matchday.css`)
+
+- „Seria rzutów karnych” (krok `shootoutPrep`): wszyscy uprawnieni w kolejności strzałów, numer 1..n dla strzelających po wyrównaniu liczebności, separator „Nagła śmierć” po piątce i „Nie strzelają” przy wyrównaniu. Wiersz: pozycja, nazwisko, kondycja, opanowanie, gra z bólem, szansa gola w % (pasek), strzałki w górę i w dół, uchwyt do przeciągania (Pointer Events, także dotyk). Obok: wybór bramkarza serii (lista z oceną bramkarską), rywal (liczba strzelających, bramkarz), „Propozycja asystenta” (kolejność automatyczna i bramkarz z boiska), „Rozpocznij serię”.
+- Seria strzał po strzale (krok `shootout`): tablica LED z kółkami serii (gol: kreda, nietrafiony: czerwony krzyżyk, nagła śmierć: dodatkowe kółka), bramka z bramkarzem, zawodnik przy piłce, wynik po ok. 0,9 s, kolejny strzał po 0,7 s. `prefers-reduced-motion`: bez animacji, ten sam rytm. „Pokaż wynik serii” od razu kończy serię, „Dalej” prowadzi do studia pomeczowego. Działa dla sparingów, Pucharu Polski, Superpucharu i dwumeczów UEFA (to samo okno, zasady z silnika).
+- Zmiany bez limitu (`M.rules.subs !== 'standard'`): „Zmiany: bez limitu” zamiast licznika zmian i okien (okno „Zmiany i taktyka”, nagłówek ławki, plakietka na przycisku). Zmiany powrotne: zmieniony wraca na listę ławki z oznaczeniem „↺ minuty” i notą „może wrócić, grał N min”; oceny na żywo obejmują ławkę.
+- „Druga jedenastka” (przy rotacji auto lub dwie jedenastki i zmianach bez limitu; inaczej „Rotacja w przerwie”): w przerwie po 1. połowie sparingu, na ekranie przerwy i w odprawie w przerwie. Okno z parami schodzi/wchodzi (kondycja schodzącego), odznaczenie zostawia zawodnika na boisku, „Wprowadź zmiany (n)”.
+- Układ meczu na żywo: przebieg (posiadanie, nacisk, momentum) nad boiskiem, pod boiskiem pasek tempa (Start, x1, x2,5, x5, „Pokaż wynik”) i przyciski trenera („Zmiany i taktyka” na zielono, „Okrzyk” na pomarańczowo). Środkowa kolumna przyklejona, wysokość boiska z wysokości okna, więc oba paski są widoczne bez przewijania. Telefon: tablica, przebieg, boisko, tempo, trener, zakładki Relacja/Statystyki/Składy. 1024-1279: Relacja | środek | Statystyki/Składy. 1280-1759: skład | Relacja/Statystyki | środek | skład. Od 1760: skład | Relacja | środek | Statystyki | skład.
+
+### Poza zakresem tego wdrożenia
+
+- Plan drugiej jedenastki przed meczem (`S.plannedSubs`, rozdz. 6 pkt 9): przekazywany do silnika, ale bez ekranu w odprawie. Przerwa z „Drugą jedenastką” pokrywa ten przypadek.
+- Ustawienie kolejności przed końcem dogrywki (np. w przerwie przed dogrywką): silnik to umie, UI pyta dopiero w pauzie przed serią.

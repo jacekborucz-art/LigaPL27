@@ -666,7 +666,10 @@ async function playMyMatch() {
     seed: `${g.seed}:${f.id}`,
     home: mySide === 0 ? mine : theirs,
     away: mySide === 0 ? theirs : mine,
-    ctx: { neutral: !!f.neutral, var: f.comp === 'ekstraklasa' || f.comp === 'super' || f.round === 'SF' || f.round === 'F', rank: f.comp === 'pp' ? (f.round === 'F' ? 3 : 1) : f.comp === 'super' ? 2 : 0, refStrict: 0.85 + new Rng(f.id).next() * 0.35, knockout: f.knockout === 'single' ? 'single' : false },
+    ctx: { neutral: !!f.neutral, var: f.comp === 'ekstraklasa' || f.comp === 'super' || f.round === 'SF' || f.round === 'F', rank: f.comp === 'pp' ? (f.round === 'F' ? 3 : 1) : f.comp === 'super' ? 2 : 0, refStrict: 0.85 + new Rng(f.id).next() * 0.35,
+      // Superpuchar od razu na karne, dwumecz z wynikiem 1. meczu, sparing wg zasad z terminarza (docs/sparingi-i-karne.md)
+      knockout: ['single', 'penaltiesOnly'].includes(f.knockout) ? f.knockout : f.knockout?.firstLeg ? { firstLeg: [...f.knockout.firstLeg] } : false,
+      friendlyRules: f.comp === 'friendly' ? { ...(f.friendlyRules ?? {}) } : undefined },
   });
   const r = runToEnd(M, { assistantFor: [mySide] });
   if (f.knockout === 'penaltiesOnly' && r.score[0] === r.score[1] && !r.shootout) {

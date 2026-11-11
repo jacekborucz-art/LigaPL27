@@ -22,11 +22,12 @@ import { SHOUTS } from '../engine/match/constants.js';
 import { TONES, TALKS, POST_TONES, MAX_TALKS } from '../match/briefings.js';
 import * as MD from '../match/matchday.js';
 import { CLIMATES, currentQuestion, progress, effectWords } from '../match/press.js';
+import { friendlyRuleTags, friendlyRulesOf } from '../training/friendlies.js';
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size) => (anyClub(id) ? crestHtml(anyClub(id), { size, clubsById }) : '');
 const STEPS = [['studio', 'Studio'], ['odprawa', 'Odprawa'], ['live1', '1. połowa'], ['break', 'Przerwa'], ['odprawa2', 'Odprawa w przerwie'], ['live2', '2. połowa'], ['studio2', 'Studio pomeczowe'], ['odprawa3', 'Odprawa pomeczowa']];
-const STEP_INDEX = { studio: 0, odprawa: 1, live1: 2, break: 3, odprawa2: 4, live2: 5, etbreak: 5, fulltime: 5, studio2: 6, odprawa3: 7, press: 7 };
+const STEP_INDEX = { studio: 0, odprawa: 1, live1: 2, break: 3, odprawa2: 4, live2: 5, etbreak: 5, shootoutPrep: 5, shootout: 5, fulltime: 5, studio2: 6, odprawa3: 7, press: 7 };
 const STAT_ROWS = [['possession', 'Posiadanie %'], ['shots', 'Strzały'], ['onTarget', 'Celne'], ['xg', 'xG'], ['passes', 'Podania'], ['passAccuracy', 'Celność podań %'], ['corners', 'Rożne'], ['throwIns', 'Auty'], ['fouls', 'Faule'], ['offsides', 'Spalone'], ['yellow', 'Żółte kartki'], ['red', 'Czerwone kartki'], ['saves', 'Obrony']];
 
 function luminance(hex) {
@@ -114,7 +115,7 @@ function teamColors(f) {
  */
 export function mountMatchday(app, { game, fixture, save, onExit }) {
   const S = MD.startMatchday(game, fixture);
-  const ui = { speed: 1, running: false, timer: null, sel: {}, tab: matchMedia('(min-width: 1280px)').matches ? 'feed' : 'stats', overlay: null, adv: null, dialog: null, raf: null, dots: [] };
+  const ui = { speed: 1, running: false, timer: null, sel: {}, tab: 'feed', overlay: null, adv: null, dialog: null, raf: null, dots: [] };
   const colors = teamColors(fixture);
   app.style.setProperty('--home', colors.home); app.style.setProperty('--home-ink', colors.homeInk);
   app.style.setProperty('--away', colors.away); app.style.setProperty('--away-ink', colors.awayInk);
@@ -168,6 +169,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
         <div class="fixture__team">${crest(fixture.away, 64)}${esc(p.preview.away.name)}</div>
       </div>
       <p class="fixture__meta">${esc(compLabel(fixture))}, ${esc(p.date)}. ${esc(p.preview.rank.label)}.</p>
+      ${fixture.comp === 'friendly' ? `<p class="fixture__meta md-rules">Umowa klubów: ${friendlyRuleTags(fixture).map((t) => `<span class="tag">${esc(t)}</span>`).join(' ')}</p>` : ''}
       <div class="studio-cols">
       <section class="sec"><h2>Szanse</h2>
         <div class="odds" role="img" aria-label="Szanse: gospodarze ${Math.round(p.odds.home * 100)}, remis ${Math.round(p.odds.draw * 100)}, goście ${Math.round(p.odds.away * 100)} procent">
@@ -249,8 +251,8 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
         }).join('')}</ul>
       </section>
       </div>`,
-      done ? (phase === 'pre' ? btn('kickoff', 'Wyjdź na boisko') : phase === 'half' ? btn('resume', 'Rozpocznij 2. połowę') + btn('dlg:manage', 'Zmiany i taktyka', false) : postActions())
-        : btn(`speech:${phase}`, 'Wygłoś odprawę') + (phase === 'half' ? btn('dlg:manage', 'Zmiany i taktyka', false) : ''));
+      done ? (phase === 'pre' ? btn('kickoff', 'Wyjdź na boisko') : phase === 'half' ? btn('resume', 'Rozpocznij 2. połowę') + secondBtn() + btn('dlg:manage', 'Zmiany i taktyka', false) : postActions())
+        : btn(`speech:${phase}`, 'Wygłoś odprawę') + (phase === 'half' ? secondBtn() + btn('dlg:manage', 'Zmiany i taktyka', false) : ''));
     if (phase === 'half' && !app.querySelector('#mdDlg')) app.insertAdjacentHTML('beforeend', '<dialog id="mdDlg" class="panel md-dlg"></dialog>');
     const selects = [...app.querySelectorAll('[data-md-talk]')];
     const sync = () => { const used = selects.filter((s) => s.value).length; selects.forEach((s) => { s.disabled = !s.value && used >= MAX_TALKS; }); };
@@ -408,39 +410,43 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
       <div class="live" data-tab="${ui.tab}">
         <div class="live__head" id="mdHead">
           ${boardHtml(M.score, M.events[M.events.length - 1]?.min ?? "0'", { live: true })}
-          <div class="transport" role="toolbar" aria-label="Przebieg meczu">
-            <button class="md-play ${ui.running ? 'is-running' : ''}" data-md="pause" id="mdPause">${ui.running ? 'Pauza' : M.minute > 0 ? 'Wznów mecz' : 'Start meczu'}</button>
-            <div class="speedset" role="group" aria-label="Tempo meczu">${SPEEDS.map(([v, l]) => `<button class="speed" data-md="speed:${v}" aria-pressed="${ui.speed === v}">${l}</button>`).join('')}</div>
-            <button class="tp-skip" data-md="skip" title="${S.step === 'live1' ? 'Pokaż wynik do przerwy' : 'Pokaż wynik końcowy'}">${skipLabel}</button>
-          </div>
         </div>
-        <div class="pitch-area">
-          <div class="pitch-wrap"><canvas class="pitch" id="mdPitch" aria-label="Boisko. Prawy przycisk albo przytrzymanie na zawodniku otwiera menu."></canvas>
-            <div class="goal" id="mdGoal" role="status"><div class="goal__in"><b id="mdGoalTitle">GOL</b><small id="mdGoalWho"></small></div></div>
-            <div class="md-toasts" id="mdToasts" aria-live="polite"></div>
-            <div class="md-halt" id="mdHalt" hidden role="alertdialog" aria-labelledby="mdHaltTitle">
-              <b id="mdHaltTitle">Gra wstrzymana</b><p id="mdHaltText"></p>
-              <div class="md-halt__sugg" id="mdHaltSugg"></div>
-              <div class="md-halt__btns"><button class="btn btn--quiet btn--sm" data-md="dlg:manage">Zmiany i taktyka</button><button class="btn btn--primary btn--sm" data-md="haltGo">Graj dalej</button></div>
+        <div class="live__centre">
+          <div class="mom-area">
+            <div class="poss"><span id="mdPh">50%</span><div class="bar2"><i class="bh" id="mdPbh" style="width:50%"></i><i class="ba" id="mdPba" style="width:50%"></i></div><span id="mdPa">50%</span></div>
+            <div class="press" aria-live="off">
+              <div class="press__track"><i class="press__knob" id="mdPressKnob" style="left:50%"></i></div>
+              <span class="press__lbl" id="mdPressLbl">Gra wyrównana</span>
+            </div>
+            <svg class="momentum" id="mdMom" viewBox="0 0 90 60" preserveAspectRatio="none" role="img" aria-label="Przewaga w kolejnych minutach"></svg>
+          </div>
+          <div class="pitch-area">
+            <div class="pitch-wrap"><canvas class="pitch" id="mdPitch" aria-label="Boisko. Prawy przycisk albo przytrzymanie na zawodniku otwiera menu."></canvas>
+              <div class="goal" id="mdGoal" role="status"><div class="goal__in"><b id="mdGoalTitle">GOL</b><small id="mdGoalWho"></small></div></div>
+              <div class="md-toasts" id="mdToasts" aria-live="polite"></div>
+              <div class="md-halt" id="mdHalt" hidden role="alertdialog" aria-labelledby="mdHaltTitle">
+                <b id="mdHaltTitle">Gra wstrzymana</b><p id="mdHaltText"></p>
+                <div class="md-halt__sugg" id="mdHaltSugg"></div>
+                <div class="md-halt__btns"><button class="btn btn--quiet btn--sm" data-md="dlg:manage">Zmiany i taktyka</button><button class="btn btn--primary btn--sm" data-md="haltGo">Graj dalej</button></div>
+              </div>
             </div>
           </div>
-          <div class="coachbar" role="toolbar" aria-label="Decyzje trenera">
-            <button data-md="dlg:manage">Zmiany i taktyka</button><button data-md="dlg:shout">Okrzyk</button>
+          <div class="live__ctrl">
+            <div class="transport" role="toolbar" aria-label="Przebieg meczu">
+              <button class="md-play ${ui.running ? 'is-running' : ''}" data-md="pause" id="mdPause">${ui.running ? 'Pauza' : M.minute > 0 ? 'Wznów mecz' : 'Start meczu'}</button>
+              <div class="speedset" role="group" aria-label="Tempo meczu">${SPEEDS.map(([v, l]) => `<button class="speed" data-md="speed:${v}" aria-pressed="${ui.speed === v}">${l}</button>`).join('')}</div>
+              <button class="tp-skip" data-md="skip" title="${S.step === 'live1' ? 'Pokaż wynik do przerwy' : 'Pokaż wynik końcowy'}">${skipLabel}</button>
+            </div>
+            <div class="coachbar" role="toolbar" aria-label="Decyzje trenera">
+              <button class="coachbar__manage" data-md="dlg:manage">Zmiany i taktyka${M.rules?.friendly && unlimited(M) ? '<small>bez limitu</small>' : ''}</button><button class="coachbar__shout" data-md="dlg:shout">Okrzyk</button>
+            </div>
           </div>
-        </div>
-        <div class="mom-area">
-          <div class="poss"><span id="mdPh">50%</span><div class="bar2"><i class="bh" id="mdPbh" style="width:50%"></i><i class="ba" id="mdPba" style="width:50%"></i></div><span id="mdPa">50%</span></div>
-          <div class="press" aria-live="off">
-            <div class="press__track"><i class="press__knob" id="mdPressKnob" style="left:50%"></i></div>
-            <span class="press__lbl" id="mdPressLbl">Gra wyrównana</span>
-          </div>
-          <svg class="momentum" id="mdMom" viewBox="0 0 90 60" preserveAspectRatio="none" role="img" aria-label="Przewaga w kolejnych minutach"></svg>
         </div>
         <div class="tabs2 live__tabs" role="tablist" aria-label="Widok">
           ${[['feed', 'Relacja'], ['stats', 'Statystyki'], ['lineups', 'Składy']].map(([k, l]) => `<button role="tab" data-md="tab:${k}" aria-selected="${ui.tab === k}">${l}</button>`).join('')}
         </div>
         <section class="feed-area" aria-labelledby="mdFeedH"><h2 id="mdFeedH">Relacja</h2><ul class="feed" id="mdFeed"></ul></section>
-        <section class="stats-area" aria-label="Statystyki meczu"><div id="mdStats"></div></section>
+        <section class="stats-area" aria-labelledby="mdStatsH"><h2 id="mdStatsH">Statystyki</h2><div id="mdStats"></div></section>
         <div class="rosters">
           <section class="ros" data-side="0" id="mdRos0" aria-label="Skład: ${esc(sideName(0))}"></section>
           <section class="ros" data-side="1" id="mdRos1" aria-label="Skład: ${esc(sideName(1))}"></section>
@@ -456,7 +462,8 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
   // Relacja/Statystyki, bardzo szeroki ekran bez zakładek.
   const mqWide = matchMedia('(min-width: 1280px)');
   const mqHuge = matchMedia('(min-width: 1760px)');
-  function tabSet() { return mqHuge.matches ? [] : mqWide.matches ? ['feed', 'stats'] : ['stats', 'lineups']; }
+  const mqLaptop = matchMedia('(min-width: 1024px)');
+  function tabSet() { return mqHuge.matches ? [] : mqWide.matches ? ['feed', 'stats'] : mqLaptop.matches ? ['stats', 'lineups'] : ['feed', 'stats', 'lineups']; }
   function normTab() {
     const set = tabSet();
     if (set.length && !set.includes(ui.tab)) ui.tab = set[0];
@@ -470,7 +477,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     });
   }
   const onMq = () => { if (S.step.startsWith('live')) { normTab(); updateLive(); } };
-  mqWide.addEventListener('change', onMq); mqHuge.addEventListener('change', onMq);
+  mqWide.addEventListener('change', onMq); mqHuge.addEventListener('change', onMq); mqLaptop.addEventListener('change', onMq);
   let headRo = null;
   function setupLiveLayout() {
     normTab();
@@ -582,6 +589,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     if (live && r.treated) m.push('<small class="ros__note">opatrywany</small>');
     if (x?.minOn > 0 && !r.bench) m.push(`<small class="ros__in" title="Wszedł w ${x.minOn}. minucie">↑${x.minOn}'</small>`);
     if (r.subbedOff) m.push(`<small class="ros__out" title="Zszedł w ${x?.minOff}. minucie">↓${x?.minOff ?? ''}'</small>`);
+    if (r.bench && r.rolledOff > 0) m.push(`<small class="ros__back" title="${esc(`Zszedł w ${x?.minOff ?? ''}. minucie po ${r.minutes} min gry. Może wrócić (zmiany powrotne).`)}">↺ ${r.minutes}'</small>`);
     return m.join('');
   }
   function rosterRow(side, r, x) {
@@ -614,9 +622,15 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const rows = (list) => list.map((r) => rosterRow(side, r, byId.get(r.id))).join('');
     return `<header class="ros__head"><span class="ros__team">${crest(side === 0 ? fixture.home : fixture.away, 22)}<b>${esc(sideName(side))}</b></span><span class="ros__shape">${esc(shape)}${on.length < 11 ? `, ${on.length} na boisku` : ''}</span></header>
       <ol class="ros__list" aria-label="Na boisku">${rows(on)}</ol>
-      <h3 class="ros__sub">Ławka rezerwowych <small>zmiany ${T.subsUsed} z ${T.subsLimit}</small></h3>
+      <h3 class="ros__sub">Ławka rezerwowych <small>${esc(subsCountText(T, M))}</small></h3>
       <ul class="ros__list ros__list--bench">${rows(bench) || '<li class="hint">Brak rezerwowych.</li>'}</ul>
       ${out.length ? `<h3 class="ros__sub">Poza grą</h3><ul class="ros__list ros__list--out">${rows(out)}</ul>` : ''}`;
+  }
+  /** Licznik zmian: w sparingu bez limitu tylko liczba wykonanych. */
+  const unlimited = (M) => !!M.rules && M.rules.subs !== 'standard';
+  function subsCountText(T, M) {
+    if (!unlimited(M)) return `zmiany ${T.subsUsed} z ${T.subsLimit}`;
+    return `zmiany: ${T.subsUsed}, bez limitu`;
   }
   function renderRosters() {
     const focus = document.activeElement?.closest?.('[data-mdp]')?.dataset.mdp;
@@ -725,7 +739,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const r = MD.tick(S);
     updateLive(r.events);
     if (S.step !== 'live1' && S.step !== 'live2') { stop(); return route(); }
-    const halt = haltReason(r.events);
+    const halt = haltReason(r.events) ?? MD.keeperReminder(S);
     if (halt) { stop(); showHalt(halt); return; }
     const pause = (r.pause ?? 0) * 1000;
     ui.timer = setTimeout(loop, Math.max(pause, 1000 / ui.speed));
@@ -799,6 +813,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const dlg = app.querySelector('#mdDlg');
     const M = S.M; const T = M.teams[S.userSide];
     if (kind === 'subs' || kind === 'tactics') kind = 'manage';
+    if (kind === 'second') { renderSecondEleven(dlg, fresh); return; }
     if (kind === 'manage') {
       if (fresh || !dlg.open) { ui.tac = null; ui.subMsg = ''; ui.subSel = null; }
       if (ui.preSel) {
@@ -913,8 +928,9 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
       const band = fitBand(prof);
       const cond = Math.round(x.cond ?? 100);
       const k = x.knock && !x.knock.aggravated;
-      const note = [kind === 'on' && pos !== x.p.pos ? `nominalnie ${x.p.pos}${band !== 'ok' ? `, ${prof}% na tej pozycji` : ''}` : '', x.injury && !x.injury.playable ? 'uraz' : k ? `gra z bólem (${x.knock.name})` : '', x.yc ? 'żółta kartka' : '', kind === 'bench' ? `OVR ${Math.round(x.p.ovr)}` : ''].filter(Boolean).join(', ');
-      return `<li class="sub-row ${planned ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${x.injury && !x.injury.playable ? 'is-hurt' : ''} ${band !== 'ok' ? `is-off is-off--${band}` : ''}" data-sdrop="${kind}:${esc(x.id)}">
+      const back = kind === 'bench' && x.rolledOff > 0 ? `może wrócić, grał ${x.prevMins ?? 0} min` : '';
+      const note = [kind === 'on' && pos !== x.p.pos ? `nominalnie ${x.p.pos}${band !== 'ok' ? `, ${prof}% na tej pozycji` : ''}` : '', x.injury && !x.injury.playable ? 'uraz' : k ? `gra z bólem (${x.knock.name})` : '', x.yc ? 'żółta kartka' : '', back, kind === 'bench' ? `OVR ${Math.round(x.p.ovr)}` : ''].filter(Boolean).join(', ');
+      return `<li class="sub-row ${planned ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${back ? 'is-back' : ''} ${x.injury && !x.injury.playable ? 'is-hurt' : ''} ${band !== 'ok' ? `is-off is-off--${band}` : ''}" data-sdrop="${kind}:${esc(x.id)}">
         <button class="sub-row__main" data-md="subPick:${kind}|${esc(x.id)}" data-sdrag="${kind}:${esc(x.id)}" data-name="${esc(x.p.name)}" aria-pressed="${isSel}" ${planned ? 'disabled' : ''}>
           <span class="sub-handle" data-shandle aria-hidden="true"></span>
           <span class="pos" data-g="${GROUP[pos] ?? 'MID'}">${esc(pos)}</span>
@@ -960,9 +976,10 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const nAll = pend.length + diff.n;
     const live = M.phase !== 'break' && M.minute > 0;
     const costWarn = diff.n && live && M.minute - (T.lastTacChange ?? -99) < 10 ? 'Kolejna zmiana taktyki w ciągu 10 minut kosztuje podwójnie.' : '';
-    const info = st.windowBlocked ? 'Okna zmian wykorzystane, zmiany zawodników tylko w przerwie.'
-      : st.left <= 0 ? `Wykorzystano wszystkie zmiany (${T.subsLimit}).`
-        : `Zmiany: ${st.left} z ${T.subsLimit}${M.phase === 'break' ? ', w przerwie bez zużycia okna' : `, okna ${T.windowsUsed} z ${T.windowsLimit}`}.`;
+    const info = unlimited(M) ? `Zmiany: bez limitu${M.rules.subs === 'rolling' ? ', zmieniony może wrócić' : ''} (wykonano ${T.subsUsed}).`
+      : st.windowBlocked ? 'Okna zmian wykorzystane, zmiany zawodników tylko w przerwie.'
+        : st.left <= 0 ? `Wykorzystano wszystkie zmiany (${T.subsLimit}).`
+          : `Zmiany: ${st.left} z ${T.subsLimit}${M.phase === 'break' ? ', w przerwie bez zużycia okna' : `, okna ${T.windowsUsed} z ${T.windowsLimit}`}.`;
     const tab = ui.mmTab ?? 'bench';
     const short = pv.ok && pv.need > 0
       ? `<p class="mm-short" role="note"><b>Gracie w ${11 - pv.need}.</b> ${pv.need === 1 ? 'Jedno miejsce zostaje puste' : `${pv.need} miejsca zostają puste`}, ustawienie ${esc(pv.shape)}. Wybierz dowolną formację, a potem przeciągnij zawodnika na puste miejsce albo dotknij zawodnika i miejsce.</p>` : '';
@@ -997,7 +1014,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const M = S.M; const T = M.teams[S.userSide];
     const st = subsState(T, M);
     if (st.windowBlocked) return 'Wykorzystano wszystkie okna zmian. Zmiany możliwe w przerwie.';
-    if (ui.pend.length >= st.left) return `Nie możesz zaplanować więcej zmian (zostało ${st.left}).`;
+    if (!unlimited(M) && ui.pend.length >= st.left) return `Nie możesz zaplanować więcej zmian (zostało ${st.left}).`;
     if (ui.pend.some((x) => x.out === outId)) return 'Ten zawodnik już schodzi w zaplanowanej zmianie.';
     if (ui.pend.some((x) => x.in === inId)) return 'Ten rezerwowy już wchodzi w zaplanowanej zmianie.';
     if (!onPitchNow(T).some((x) => x.id === outId)) return 'Tego zawodnika nie ma na boisku.';
@@ -1185,7 +1202,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const M = S.M; const x = findX(side, id); const dlg = app.querySelector('#mdDlg');
     if (!x || !dlg) return;
     const r = playerStates(M, side).find((q) => q.id === id);
-    const mins = x.minOn === null ? 0 : Math.max(0, (x.minOff ?? M.minute) - x.minOn);
+    const mins = r?.minutes ?? (x.minOn === null ? 0 : Math.max(0, (x.minOff ?? M.minute) - x.minOn));
     const gk = (r?.pos ?? x.p.pos) === 'BR';
     const rows = [['Minuty', mins], ['Gole', x.g ?? 0], ['Asysty', x.ast ?? 0], ['Strzały (celne)', `${x.sh ?? 0} (${x.sot ?? 0})`], ['Kluczowe podania', x.kp ?? 0], ['Odbiory', x.tk ?? 0], ...(gk ? [['Obrony', x.saves ?? 0]] : []), ['Faule', x.fouls ?? 0], ['Kondycja', `${Math.round(x.cond)}%`]];
     const status = [r?.card === 'yellow' ? 'żółta kartka' : r?.card === 'secondYellow' ? 'druga żółta, czerwona kartka' : r?.card === 'red' ? 'czerwona kartka' : '', r?.knock && r.on ? `gra z bólem (${r.knock.name}, od ${r.knock.since}. min)` : '', r?.injured ? `uraz: ${x.injury?.name ?? ''}` : '', x.subbedOff ? `zszedł w ${x.minOff}. min` : '', x.minOn > 0 ? `wszedł w ${x.minOn}. min` : ''].filter(Boolean);
@@ -1226,7 +1243,8 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
   // ------------------------------------------------------------ Przerwa, dogrywka, studio pomeczowe
   function renderBreak() {
     const h = MD.halfInfo(S);
-    const ratings = Object.entries(h.ratings).map(([id, r]) => [S.M.teams[S.userSide].players.find((x) => x.id === id), r]).filter(([x]) => x).sort((a, b) => b[1] - a[1]);
+    const TU = S.M.teams[S.userSide];
+    const ratings = Object.entries(h.ratings).map(([id, r]) => [TU.players.find((x) => x.id === id) ?? TU.bench.find((x) => x.id === id), r]).filter(([x]) => x).sort((a, b) => b[1] - a[1]);
     shell(`
       <h1>${S.step === 'etbreak' ? 'Przerwa przed dogrywką' : 'Przerwa'}</h1>
       <div class="brk-board">${boardHtml(S.M.score, S.step === 'etbreak' ? 'Dogrywka' : 'Przerwa')}</div>
@@ -1234,8 +1252,222 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
         <section class="sec"><h2>Statystyki</h2><table class="vs"><tbody>${STAT_ROWS.map(([k, l]) => `<tr><td>${h.stats[0][k]}</td><td class="lbl">${esc(l)}</td><td>${h.stats[1][k]}</td></tr>`).join('')}</tbody></table></section>
         <section class="sec"><h2>Oceny</h2><ul class="ratings">${ratings.map(([x, r]) => `<li><span>${esc(x.p.last ?? x.p.name)}</span><b>${r.toFixed(1)}</b></li>`).join('')}</ul></section>
       </div>`,
-      (S.step === 'etbreak' ? btn('resumeET', 'Rozpocznij dogrywkę') : btn('toHalfTalk', 'Odprawa w przerwie')) + btn('dlg:manage', 'Zmiany i taktyka', false));
+      (S.step === 'etbreak' ? btn('resumeET', 'Rozpocznij dogrywkę') : btn('toHalfTalk', 'Odprawa w przerwie')) + secondBtn() + btn('dlg:manage', 'Zmiany i taktyka', false));
     if (!app.querySelector('#mdDlg')) app.insertAdjacentHTML('beforeend', '<dialog id="mdDlg" class="panel md-dlg"></dialog>');
+  }
+
+  // ------------------------------------------------------------ Sparing: druga jedenastka w przerwie
+  // Asystent proponuje masową wymianę wg planu rotacji (assistantSuggest); gracz odznacza, kogo zostawić, i zatwierdza.
+  const secondTitle = () => (['auto', 'two_xi'].includes(S.M?.rules?.rotation) && unlimited(S.M) ? 'Druga jedenastka' : 'Rotacja w przerwie');
+  const secondBtn = () => (S.M?.rules?.friendly && S.M.phase === 'break' && S.M.half === 1 && MD.secondEleven(S).length ? btn('dlg:second', secondTitle(), false) : '');
+  function renderSecondEleven(dlg, fresh) {
+    const list = MD.secondEleven(S);
+    if (fresh) { ui.second = new Set(list.map((_, i) => i)); ui.secondMsg = ''; }
+    ui.second ??= new Set(list.map((_, i) => i));
+    const T = S.M.teams[S.userSide];
+    const cond = (id) => Math.round([...T.players, ...T.bench].find((x) => x.id === id)?.cond ?? 100);
+    const n = list.filter((_, i) => ui.second.has(i)).length;
+    dlg.className = 'panel md-dlg md-dlg--wide sxi-dlg';
+    dlg.innerHTML = `<header class="sxi__head"><h2>${esc(secondTitle())}</h2>
+        <p class="hint">${esc(friendlyRulesOf({ friendlyRules: S.f.friendlyRules }).rotation === 'match' ? 'Plan rotacji: jak w meczu o punkty. Asystent zmienia tylko tych, którym to potrzebne.' : 'Propozycja asystenta według planu rotacji. Odznacz zawodników, którzy mają zostać na boisku.')}</p></header>
+      ${list.length ? `<ul class="sxi">${list.map((a, i) => `<li class="sxi__i"><label>
+          <input type="checkbox" data-sxi="${i}" ${ui.second.has(i) ? 'checked' : ''}>
+          <span class="sxi__out"><span class="pos" data-g="${GROUP[a.outPos] ?? 'MID'}">${esc(a.outPos ?? '')}</span><span>${esc(a.outName)}<small>kondycja ${cond(a.outId)}%</small></span></span>
+          <span class="sxi__arrow" aria-hidden="true"></span>
+          <span class="sxi__in"><span class="pos" data-g="${GROUP[a.inPos] ?? 'MID'}">${esc(a.inPos ?? '')}</span><span>${esc(a.inName)}<small>${esc(a.text ?? '')}</small></span></span>
+        </label></li>`).join('')}</ul>` : '<p class="hint">Asystent nie proponuje już zmian.</p>'}
+      <p class="hint" role="status" id="mdDlgMsg">${esc(ui.secondMsg ?? '')}</p>
+      <div class="sxi__btns">${btn('closeDlg', 'Zamknij', false)}<button class="btn btn--primary" data-md="secondGo" ${n ? '' : 'disabled'}>Wprowadź zmiany (${n})</button></div>`;
+    if (!dlg.open) dlg.showModal();
+    if (!dlg.dataset.sxi) {
+      dlg.dataset.sxi = '1';
+      dlg.addEventListener('change', (ev) => {
+        const i = ev.target.dataset?.sxi;
+        if (i == null || !dlg.classList.contains('sxi-dlg')) return;
+        if (ev.target.checked) ui.second.add(Number(i)); else ui.second.delete(Number(i));
+        renderSecondEleven(dlg, false);
+        dlg.querySelector(`[data-sxi="${i}"]`)?.focus();
+      });
+    }
+  }
+  function applySecond() {
+    const list = MD.secondEleven(S);
+    const pick = list.filter((_, i) => ui.second?.has(i));
+    const r = MD.applySecondEleven(S, pick);
+    ui.secondMsg = r.errors.length ? `Wykonano ${r.done} z ${pick.length}: ${r.errors.join(' ')}` : `Wykonano ${r.done} ${r.done === 1 ? 'zmianę' : r.done % 10 >= 2 && r.done % 10 <= 4 && (r.done < 10 || r.done > 20) ? 'zmiany' : 'zmian'}.`;
+    ui.second = null;
+    const msg = ui.secondMsg;
+    app.querySelector('#mdDlg')?.close();
+    if (S.step === 'break' || S.step === 'etbreak') renderBreak(); else if (S.step === 'odprawa2') renderTalk('half');
+    const live = app.querySelector('.md__main');
+    live?.insertAdjacentHTML('afterbegin', `<p class="notice" role="status">${esc(msg)}</p>`);
+  }
+
+  // ------------------------------------------------------------ Seria rzutów karnych
+  // Okno kolejności (pauza silnika 'shootoutPrep'): wszyscy uprawnieni w kolejności strzałów, numer dla
+  // strzelających po wyrównaniu liczebności, bramkarz serii, propozycja asystenta. Potem strzał po strzale.
+  const pct1 = (v) => String(v).replace('.', ',');
+  function soDraft(setup, reset = false) {
+    if (!ui.so || reset) {
+      const order = setup.mine.order ?? setup.mine.final;
+      const ids = [...order, ...setup.mine.players.map((x) => x.id).filter((id) => !order.includes(id))];
+      ui.so = { ids, keeperId: setup.mine.keeperId, msg: reset ? 'Kolejność asystenta: najpewniejsi strzelcy najpierw, bramkarz na końcu.' : '' };
+      if (reset) ui.so.ids = setup.mine.players.map((x) => x.id);
+      if (reset) ui.so.keeperId = setup.naturalKeeperId;
+    }
+    return ui.so;
+  }
+  function renderShootoutPrep() {
+    const setup = MD.shootoutSetup(S);
+    if (!setup) { S.step = S.M?.ended ? 'fulltime' : S.step; return route(); }
+    const d = soDraft(setup);
+    const pv = MD.previewShootoutOrder(d.ids, d.keeperId, setup.n);
+    const byId = new Map(setup.mine.players.map((x) => [x.id, x]));
+    const rank = new Map(pv.order.map((id, i) => [id, i + 1]));
+    const listIds = [...pv.order, ...pv.out];
+    const row = (id, i) => {
+      const x = byId.get(id); if (!x) return '';
+      const k = rank.get(id);
+      const gk = id === d.keeperId;
+      const meta = [`kondycja ${x.cond}%`, `opanowanie ${x.opa}`, x.knock ? 'gra z bólem' : ''].filter(Boolean).join(', ');
+      const band = x.pct >= 76 ? 'top' : x.pct >= 71 ? 'good' : x.pct >= 66 ? 'mid' : 'low';
+      const sep = i === 5 && setup.n > 5 ? '<li class="so-sep" aria-hidden="true"><span>Nagła śmierć, ta sama kolejność</span></li>' : i === pv.order.length && pv.out.length ? '<li class="so-sep so-sep--out" aria-hidden="true"><span>Nie strzelają: wyrównanie liczebności</span></li>' : '';
+      return `${sep}<li class="so-row${k ? '' : ' is-out'}${gk ? ' is-gk' : ''}" data-so="${esc(id)}">
+        <span class="so-n" aria-hidden="true">${k ?? '–'}</span>
+        <span class="so-grip" data-sograb aria-hidden="true"></span>
+        <span class="pos" data-g="${gk ? 'GK' : GROUP[x.pos] ?? 'MID'}">${esc(x.pos)}</span>
+        <span class="so-nm"><b>${esc(x.name)}</b><small>${esc(meta)}</small></span>
+        <span class="so-pct" title="Szansa gola przeciw bramkarzowi rywala"><i class="so-pct__bar"><i data-b="${band}" style="width:${Math.max(0, Math.min(100, (x.pct - 45) / 50 * 100))}%"></i></i><b>${x.pct}%</b></span>
+        <span class="so-mv"><button class="so-btn" data-md="soMove:${esc(id)}|-1" ${i === 0 ? 'disabled' : ''} aria-label="${esc(`${x.name} wyżej`)}">▲</button><button class="so-btn" data-md="soMove:${esc(id)}|1" ${i === listIds.length - 1 ? 'disabled' : ''} aria-label="${esc(`${x.name} niżej`)}">▼</button></span>
+        <span class="sr-only">${k ? `strzela jako ${k}.` : 'nie strzela'}, szansa ${x.pct} procent, ${esc(meta)}</span>
+      </li>`;
+    };
+    const oppGk = setup.opp.players.find((x) => x.keeper);
+    const kp = setup.keepers.find((x) => x.id === d.keeperId) ?? setup.keepers[0];
+    const changed = d.ids.join() !== setup.mine.players.map((x) => x.id).join() || d.keeperId !== setup.naturalKeeperId;
+    shell(`
+      <h1 class="so-title">Seria rzutów karnych</h1>
+      <div class="brk-board">${boardHtml(S.M.score, S.M.extraTime ? 'po dogrywce' : 'Rzuty karne')}</div>
+      <div class="so">
+        <section class="so-order" aria-labelledby="soOrderH">
+          <h2 id="soOrderH">Kolejność strzelców</h2>
+          <p class="hint">Strzela ${setup.n} zawodników${setup.n > 5 ? '; pierwsza piątka w pięciu seriach, dalej nagła śmierć' : ''}. Przeciągnij za uchwyt albo użyj strzałek. Strzelać mogą tylko ci, którzy skończyli mecz na boisku.</p>
+          <ol class="so-list" id="soList">${listIds.map(row).join('')}</ol>
+        </section>
+        <aside class="so-side">
+          <section class="so-card"><h2><label for="soKeeper">Bramkarz w serii</label></h2>
+            <select id="soKeeper" class="pick-select">${setup.keepers.map((x) => `<option value="${esc(x.id)}" ${x.id === d.keeperId ? 'selected' : ''}>${esc(x.name)} (${esc(x.pos)}), bramkarz ${pct1(x.gk)}</option>`).join('')}</select>
+            <p class="hint">Liczą się refleks i gra jeden na jeden. ${kp ? `${esc(kp.name)}: ${pct1(kp.gk)} na 20.` : ''} Bramkarz serii zawsze strzela.</p>
+          </section>
+          <section class="so-card"><h2>Rywal</h2>
+            <p>${esc(sideName(1 - S.userSide))}: ${setup.opp.n} strzelających${oppGk ? `, w bramce ${esc(oppGk.name)}` : ''}.</p>
+            <p class="hint">Procent przy zawodniku to szansa gola przeciw temu bramkarzowi. W nagłej śmierci więcej znaczy opanowanie.</p>
+          </section>
+          <p class="hint" role="status" id="soMsg">${esc(d.msg ?? '')}</p>
+        </aside>
+      </div>`,
+      `<button class="btn btn--quiet" data-md="soSuggest" ${changed ? '' : 'disabled'}>Propozycja asystenta</button>${btn('soGo', 'Rozpocznij serię')}`);
+    app.querySelector('#soKeeper')?.addEventListener('change', (ev) => { ui.so.keeperId = ev.target.value; ui.so.msg = ''; renderShootoutPrep(); app.querySelector('#soKeeper')?.focus(); });
+    mountShootoutDrag();
+  }
+  function soMove(id, dir) {
+    const setup = MD.shootoutSetup(S); const d = soDraft(setup);
+    const pv = MD.previewShootoutOrder(d.ids, d.keeperId, setup.n);
+    const list = [...pv.order, ...pv.out];
+    const i = list.indexOf(id); const j = i + dir;
+    if (i < 0 || j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]];
+    d.ids = list; d.msg = '';
+    renderShootoutPrep();
+    const b = app.querySelector(`[data-md="soMove:${CSS.escape(id)}|${dir}"]`) ?? app.querySelector(`[data-md="soMove:${CSS.escape(id)}|${-dir}"]`);
+    b?.focus();
+  }
+  /** Przeciąganie wierszy kolejności (Pointer Events): wiersz idzie za palcem, upuszczenie zapisuje kolejność. */
+  function mountShootoutDrag() {
+    const list = app.querySelector('#soList');
+    if (!list) return;
+    let drag = null;
+    list.addEventListener('pointerdown', (ev) => {
+      const grip = ev.target.closest('[data-sograb]');
+      const li = grip?.closest('.so-row');
+      if (!li || !ev.isPrimary) return;
+      ev.preventDefault();
+      drag = { li, id: li.dataset.so };
+      li.classList.add('is-drag'); list.classList.add('is-dragging');
+      try { grip.setPointerCapture(ev.pointerId); } catch { /* bez przechwytu */ }
+    });
+    list.addEventListener('pointermove', (ev) => {
+      if (!drag) return;
+      ev.preventDefault();
+      const rows = [...list.querySelectorAll('.so-row')].filter((r) => r !== drag.li);
+      const after = rows.find((r) => { const b = r.getBoundingClientRect(); return ev.clientY < b.top + b.height / 2; });
+      if (after) list.insertBefore(drag.li, after.previousElementSibling?.classList.contains('so-sep') ? after.previousElementSibling : after);
+      else list.appendChild(drag.li);
+    });
+    const end = () => {
+      if (!drag) return;
+      const ids = [...list.querySelectorAll('.so-row')].map((r) => r.dataset.so);
+      drag = null;
+      ui.so.ids = ids; ui.so.msg = '';
+      renderShootoutPrep();
+    };
+    list.addEventListener('pointerup', end);
+    list.addEventListener('pointercancel', end);
+  }
+
+  // Seria strzał po strzale: tablica LED z kółkami serii, zawodnik przy piłce, wynik. Pomiń: od razu cała seria.
+  const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function soKicks() { return S.M.events.filter((e) => e.type === 'shootoutKick'); }
+  function renderShootoutReveal() {
+    const kicks = soKicks();
+    ui.soShown ??= 0;
+    const shown = Math.min(ui.soShown, kicks.length);
+    const done = shown >= kicks.length;
+    const tally = [0, 0];
+    kicks.slice(0, shown).forEach((e) => { if (e.scored) tally[e.side]++; });
+    const rounds = Math.max(5, ...kicks.map((e) => e.round));
+    const dots = (sd) => Array.from({ length: rounds }, (_, r) => {
+      const e = kicks.slice(0, shown).find((k) => k.side === sd && k.round === r + 1);
+      const st = !e ? 'wait' : e.scored ? 'goal' : 'miss';
+      return `<span class="so-dot so-dot--${st}${r >= 5 ? ' is-sd' : ''}${e && e === kicks[shown - 1] ? ' is-new' : ''}"><span class="sr-only">${r + 1}. seria: ${st === 'wait' ? 'jeszcze nie strzelał' : st === 'goal' ? 'gol' : 'nie strzelił'}</span></span>`;
+    }).join('');
+    const cur = done ? null : kicks[shown];
+    const who = (id) => shortPlayerName(whoById(id));
+    const res = (e) => (e.scored ? 'Gol' : e.outcome === 'saved' ? 'Obronił' : 'Pudło');
+    const winner = done ? (S.M.shootout.goals[0] > S.M.shootout.goals[1] ? 0 : 1) : null;
+    const last = shown > 0 ? kicks[shown - 1] : null;
+    shell(`
+      <h1 class="so-title">Seria rzutów karnych</h1>
+      <div class="brk-board">${boardHtml(S.M.score, `karne ${tally[0]}:${tally[1]}`)}</div>
+      <section class="so-led so-reveal" aria-label="Przebieg serii">
+        ${[0, 1].map((sd) => `<div class="so-led__row" data-side="${sd}"><span class="so-led__t">${crest(sd === 0 ? fixture.home : fixture.away, 22)}<b>${esc(shortName(sd))}</b></span><span class="so-dots">${dots(sd)}</span><b class="so-led__n">${tally[sd]}</b></div>`).join('')}
+      </section>
+      <div class="so-reveal">
+      <div class="so-spot${cur ? ' is-runup' : ''}${done ? ' is-done' : ''}" id="soSpot" data-side="${cur?.side ?? last?.side ?? ''}">
+        ${cur ? `<div class="so-goal" id="soGoal"><span class="so-goal__gk">${esc(who(cur.gkId) || 'zawodnik z pola')}</span></div>
+          <small>${cur.round > 5 ? `Nagła śmierć, ${cur.round}. seria` : `${cur.round}. seria`}, strzela ${esc(sideName(cur.side))}</small>
+          <span class="so-spot__ball" aria-hidden="true">${ICON.ball}</span>
+          <b class="so-spot__nm">${esc(who(cur.pid))}</b>`
+        : `<small>Koniec serii</small><b class="so-spot__nm">${esc(sideName(winner))}</b><span class="so-spot__vs">wygrywa ${S.M.shootout.goals[winner]}:${S.M.shootout.goals[1 - winner]} w rzutach karnych</span>`}
+      </div>
+      <p class="sr-only" aria-live="polite" id="soLive">${last ? esc(last.text) : ''}</p>
+      <ol class="so-log">${kicks.slice(0, shown).map((e) => `<li data-side="${e.side}" class="${e.scored ? 'is-goal' : 'is-miss'}"><span class="so-log__r">${e.round}.</span><b>${esc(shortName(e.side))}</b><span>${esc(who(e.pid))}</span><em>${res(e)}</em></li>`).reverse().join('')}</ol>
+      </div>`,
+      done ? btn('soEnd', 'Dalej') : btn('soSkip', 'Pokaż wynik serii', false));
+    clearTimeout(ui.soTimer);
+    if (!done) {
+      const fast = reduceMotion();
+      // Podbieg ok. 0,9 s, wynik 0,7 s; przy ograniczonym ruchu bez animacji, ten sam rytm
+      ui.soTimer = setTimeout(() => {
+        const spot = app.querySelector('#soSpot');
+        if (spot && cur) {
+          spot.classList.remove('is-runup');
+          spot.classList.add(cur.scored ? 'is-goal' : 'is-miss');
+          (spot.querySelector('#soGoal') ?? spot).insertAdjacentHTML('beforeend', `<b class="so-spot__res">${res(cur)}</b>`);
+        }
+        ui.soTimer = setTimeout(() => { ui.soShown = shown + 1; if (S.step === 'shootout') renderShootoutReveal(); }, fast ? 600 : 700);
+      }, fast ? 700 : 900);
+    }
   }
 
   // Studio pomeczowe: każda sekcja ma własną formę (oś czasu, paski, cytaty, oceny), żeby nic się nie zlewało
@@ -1278,6 +1510,8 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     if (S.step === 'odprawa') return renderTalk('pre');
     if (S.step === 'live1' || S.step === 'live2') return renderLive();
     if (S.step === 'break' || S.step === 'etbreak') return renderBreak();
+    if (S.step === 'shootoutPrep') return renderShootoutPrep();
+    if (S.step === 'shootout') return renderShootoutReveal();
     if (S.step === 'odprawa2') return renderTalk('half');
     if (S.step === 'fulltime') { MD.finishMatchday(game, S); save(); return renderPost(); }
     if (S.step === 'studio2') return renderPost();
@@ -1342,6 +1576,18 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     if (act === 'doShout') { const r = shout(M, S.userSide, arg); app.querySelector('#mdDlgMsg').textContent = r.ok ? 'Drużyna usłyszała okrzyk.' : r.error; updateLive(); }
     if (act === 'toHalfTalk') { S.step = 'odprawa2'; ui.adv = null; ui.sel = {}; route(); }
     if (act === 'resume' || act === 'resumeET') { MD.continueAfterBreak(S); route(); }
+    if (act === 'secondGo') applySecond();
+    if (act === 'soMove') { const [id, dir] = arg.split('|'); soMove(id, Number(dir)); }
+    if (act === 'soSuggest') { const setup = MD.shootoutSetup(S); if (setup) { soDraft(setup, true); renderShootoutPrep(); app.querySelector('[data-md="soGo"]')?.focus(); } }
+    if (act === 'soGo') {
+      const setup = MD.shootoutSetup(S);
+      const d = setup && soDraft(setup);
+      const r = d ? MD.confirmShootout(S, MD.previewShootoutOrder(d.ids, d.keeperId, setup.n).order, d.keeperId === setup.naturalKeeperId ? null : d.keeperId) : { ok: false, error: 'Seria rzutów karnych nie czeka na rozpoczęcie.' };
+      if (!r.ok) { ui.so.msg = r.error; renderShootoutPrep(); return; }
+      ui.so = null; ui.soShown = 0; route();
+    }
+    if (act === 'soSkip') { clearTimeout(ui.soTimer); ui.soShown = soKicks().length; renderShootoutReveal(); app.querySelector('[data-md="soEnd"]')?.focus(); }
+    if (act === 'soEnd') { clearTimeout(ui.soTimer); MD.endShootout(S); route(); }
     if (act === 'toPostTalk') { S.step = 'odprawa3'; ui.sel = {}; ui.adv = null; route(); }
     if (act === 'pressOpen' || act === 'pressView') { ui.prsPhase = arg === 'pre' ? 'pre' : 'post'; MD.pressOpen(game, S, ui.prsPhase); ui.prsConfirm = false; renderPressDialog(); }
     if (act === 'pressAns') { MD.pressAnswer(game, S, Number(arg), ui.prsPhase); if (slotOf(ui.prsPhase).settled) await save(); renderPressDialog(); }
@@ -1355,8 +1601,8 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
   function onKey(ev) { if (ev.key === ' ' && S.step.startsWith('live') && !ev.target.closest('input,select,button,dialog')) { ev.preventDefault(); ui.running ? stop() : start(); } }
   function cleanup() {
     app.removeEventListener('click', onClick); document.removeEventListener('keydown', onKey);
-    ro?.disconnect(); headRo?.disconnect(); cancelAnimationFrame(ui.raf);
-    mqWide.removeEventListener('change', onMq); mqHuge.removeEventListener('change', onMq);
+    ro?.disconnect(); headRo?.disconnect(); cancelAnimationFrame(ui.raf); clearTimeout(ui.soTimer);
+    mqWide.removeEventListener('change', onMq); mqHuge.removeEventListener('change', onMq); mqLaptop.removeEventListener('change', onMq);
     closeMenu({ restoreFocus: false });
     app.mdMenuOpen = null; delete app.mdSession;
     for (const k of ['--home', '--home-ink', '--away', '--away-ink']) app.style.removeProperty(k);
