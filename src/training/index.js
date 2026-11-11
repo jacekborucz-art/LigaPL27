@@ -117,7 +117,7 @@ export const DAILY_SYSTEM = {
     const rng = new Rng(`trening:${game.seed}:${date}`);
     const messages = [];
     if (game.world.clubs[game.clubId]) messages.push(...processUserDay(game, date, rng));
-    if (!globalThis.__noAiTrain) processAiDay(game, date);
+    processAiDay(game, date);
     if (weekdayIdx(date) === 0 && T.lastWeek !== date) { messages.push(...weeklyStep(game, date)); T.lastWeek = date; }
     if (date.slice(0, 7) !== T.lastMonth) { messages.push(...monthlyStep(game, date)); T.lastMonth = date.slice(0, 7); }
     return { messages };

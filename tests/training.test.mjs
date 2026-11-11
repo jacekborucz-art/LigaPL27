@@ -419,7 +419,7 @@ test('Katalog zajęć: każde zajęcie ma liczby i opis, sesje regeneracyjne nie
   assert.ok(TR.sessionPreview(g, 'wytrzymalosc', 'high').fresh < TR.sessionPreview(g, 'wytrzymalosc', 'low').fresh);
 });
 
-test('Wydajność: sezon z treningiem jest wolniejszy najwyżej o ok. 30 %', () => {
+test('Wydajność: narzut treningu (klub gracza i kluby AI) w rozsądnych granicach', () => {
   const half = (seed) => {
     const g = newGame('widzew', seed);
     const t0 = process.cpuUsage(); // czas procesora tego procesu: odporny na równoległe pliki testów
@@ -437,8 +437,9 @@ test('Wydajność: sezon z treningiem jest wolniejszy najwyżej o ok. 30 %', () 
   const ratio = Math.min(...train) / Math.min(...base);
   const extra = Math.min(...train) - Math.min(...base);
   // Narzut względny albo bezwzględny (pół sezonu): reszta gry przyspiesza, więc sam stosunek bywa mylący
-  // Obozy (także klubów AI), forma bazowa i sparingi zwiększyły zakres treningu; pilnujemy narzutu bezwzględnego
-  assert.ok(ratio < 1.4 || extra < 600, `trening x${ratio.toFixed(2)} (${Math.min(...base).toFixed(0)} ms -> ${Math.min(...train).toFixed(0)} ms)`);
+  // Obozy (także klubów AI), forma bazowa i sparingi zwiększyły zakres treningu; pilnujemy narzutu bezwzględnego.
+  // Od docs/trening-ai.md codzienny plan realizują też 53 kluby AI (ok. 1300 zawodników, ok. 1-2 ms na dzień).
+  assert.ok(ratio < 1.6 || extra < 1000, `trening x${ratio.toFixed(2)} (${Math.min(...base).toFixed(0)} ms -> ${Math.min(...train).toFixed(0)} ms)`);
 });
 
 test('Modyfikatory: zawodnicy bez stanu treningu (kluby zagraniczne) dostają 0', () => {

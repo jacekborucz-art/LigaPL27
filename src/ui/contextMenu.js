@@ -143,7 +143,11 @@ function onOutside(ev) {
   if (cur && !cur.root.contains(ev.target)) closeMenu({ restoreFocus: false });
 }
 function onScroll(ev) {
-  if (cur && !(ev.target instanceof Node && cur.root.contains(ev.target))) closeMenu({ restoreFocus: false });
+  if (!cur || (ev.target instanceof Node && cur.root.contains(ev.target))) return;
+  // Zdarzenie spóźnione po przewinięciu sprzed otwarcia (np. wyrównanie wiersza) nie zamyka menu
+  if (performance.now() - cur.opened < 150) return;
+  if ((ev.target === document || ev.target === window) && window.scrollX === cur.sx && window.scrollY === cur.sy) return;
+  closeMenu({ restoreFocus: false });
 }
 function onResize() { if (cur) closeMenu({ restoreFocus: false }); }
 function onFocusOut(ev) {
@@ -160,7 +164,7 @@ export function openMenu({ x, y, model, anchor = null, keyboard = false, onSelec
   const root = document.createElement('div');
   root.className = `cmenu${reduced() ? '' : ' cmenu--anim'}`;
   document.body.appendChild(root);
-  cur = { root, model, stack: [{ items: model.items, label: model.title, from: 0 }], x, y, onSelect, onClose, anchor };
+  cur = { root, model, stack: [{ items: model.items, label: model.title, from: 0 }], x, y, onSelect, onClose, anchor, opened: performance.now(), sx: window.scrollX, sy: window.scrollY };
   render();
   place();
   root.addEventListener('keydown', onKey);
@@ -264,6 +268,8 @@ export function bindContextTrigger(root, { selector, open, noTouch = '' }) {
 
   root.addEventListener('pointerdown', (ev) => {
     cancel();
+    kbUntil = 0; // nowe wskazanie: kolejne contextmenu pochodzi już od myszy albo palca
+    if (ev.pointerType !== 'touch') suppressUntil = 0;
     if (ev.pointerType !== 'touch' || !ev.isPrimary) return;
     if (skip(ev.target) || (noTouch && ev.target.closest(noTouch))) return;
     const el = target(ev.target);
