@@ -56,7 +56,7 @@ test('Każda opcja w każdym widoku uruchamia istniejącą akcję; wyłączone o
       assert.ok(m && m.items.length, `${view}/${id}: menu niepuste`);
       assert.ok(m.title && m.pos, 'nagłówek: nazwisko i pozycja');
       for (const it of flat(m)) {
-        assert.ok(it.label && !/—/.test(it.label + (it.hint ?? '') + (it.disabled ?? '')), 'etykieta bez pauzy');
+        assert.ok(it.label && !/\u2014/.test(it.label + (it.hint ?? '') + (it.disabled ?? '')), 'etykieta bez pauzy');
         if (it.disabled) assert.equal(typeof it.disabled, 'string', `${it.label}: powód wyłączenia`);
         if (it.items) { assert.ok(!it.run, 'podmenu nie ma własnej akcji'); continue; }
         if (it.disabled && !it.run) continue;

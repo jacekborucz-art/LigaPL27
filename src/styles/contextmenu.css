@@ -89,7 +89,7 @@
 /* Komunikat po akcji z menu (nad paskiem nawigacji na telefonie) */
 .cm-toast {
   position: fixed;
-  z-index: 121;
+  z-index: 119; /* pod otwartym menu */
   left: 50%;
   bottom: calc(var(--nav-h) + 84px + env(safe-area-inset-bottom));
   max-width: min(520px, calc(100vw - 24px));
