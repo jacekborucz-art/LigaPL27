@@ -118,13 +118,15 @@ export const COH = {
  * Trening klubów AI (aiClubs.js, docs/trening-ai.md): kluby AI codziennie realizują plan asystenta z tymi samymi
  * zajęciami i wzorami co klub gracza (zmęczenie, regeneracja, ostrość, morale, urazy, bodziec rozwojowy, stałe
  * fragmenty, obóz). Trener AI wybiera akcent tygodnia według swojego typu (O ofensywny, S ostrożny, P pragmatyczny)
- * i normalny poziom obciążeń, jak domyślny plan gracza. Młodym (do focusMaxAge lat) daje akcent indywidualny
+ * i normalny poziom obciążeń, jak domyślny plan gracza. Młodym (do focusMaxAge lat), tylko w klubach z trenerem
+ * młodzieży o jakości co najmniej focusMinYouthQ, daje akcent indywidualny
  * na najsłabszy kluczowy atrybut pozycji (te same 20-30 minut po zajęciach i ten sam koszt świeżości co u gracza).
  */
 export const AI_PLAN = {
   accent: { O: 'techniczny', S: 'taktyczny', P: 'zrownowazony' },
   load: 'normalna',
   focusMaxAge: 21,
+  focusMinYouthQ: 11, // akcent indywidualny dla młodych tylko przy dobrym trenerze młodzieży (jakość 11+, etykieta „Dobry”)
   focusStim: 0.4, focusFresh: 2, // jak akcent indywidualny gracza (sessions.js)
 };
 
