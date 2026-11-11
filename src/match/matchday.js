@@ -24,6 +24,7 @@ import {
 } from './briefings.js';
 import { addMessages } from '../core/inbox.js';
 import { applyMorale } from '../career/morale.js';
+import { isAvailable } from '../career/squad.js';
 
 const REFEREES = ['Marek Wierzbicki', 'Tomasz Kwiecień', 'Paweł Sokołowski', 'Krzysztof Malec', 'Bartosz Frankowski-Nowak', 'Damian Kos', 'Jarosław Przybył', 'Łukasz Szczepan', 'Piotr Lasyk-Kral', 'Szymon Marcinek', 'Wojciech Myć-Ostrowski', 'Karol Arys-Wolny', 'Daniel Stefański-Mróz', 'Sebastian Jarzębak', 'Mariusz Złotek-Bąk'];
 
@@ -72,6 +73,49 @@ function teamCtx(game, clubId, comp, table, tactics) {
   };
 }
 
+/**
+ * Skład gracza na mecz (docs/balans.md). Asystent zastępuje niedostępnych (refreshTactics), a gdy zastąpiony
+ * zawodnik znów jest zdrowy i gracz nie ruszał tego miejsca, wraca do jedenastki. Wcześniej zastępstwo zostawało
+ * na stałe, więc pasywny gracz po kilku kontuzjach grał rezerwowymi do końca sezonu.
+ * tactics.assistant === true: skład przed każdym meczem wybiera asystent, tak jak w klubach AI (formacja i instrukcje gracza).
+ */
+export function matchTactics(game, squad, benchSize) {
+  const prev = game.tactics;
+  if (prev.assistant) return { ...createTactics(squad, { formation: prev.formation, instructions: prev.instructions, benchSize }), assistant: true };
+  const subs = { ...(game.tacticsSubs ?? {}) }; // miejsce w jedenastce -> { orig: zastąpiony, sub: zastępca }
+  const byId = new Map(squad.map((p) => [p.id, p]));
+  const out = (id) => { const p = byId.get(id); return !p || !isAvailable(p); };
+  const xi = [...prev.xi];
+  let bench = [...prev.bench];
+  // Zastępstwa zrobione przed dniem meczowym (ekran gry odświeża skład): miejsce zmienione, poprzedni zawodnik niedostępny
+  const last = game.tacticsLast;
+  if (last) {
+    xi.forEach((id, i) => {
+      const was = last[i];
+      if (!was || id === was || !byId.has(was) || !out(was)) return;
+      if (subs[i] && subs[i].sub === was) subs[i] = { ...subs[i], sub: id }; // zastępca też wypadł
+      else if (!subs[i]) subs[i] = { orig: was, sub: id };
+    });
+  }
+  for (const [i, s] of Object.entries(subs)) {
+    const o = byId.get(s.orig);
+    if (xi[i] !== s.sub || !o || xi.includes(s.orig)) { delete subs[i]; continue; } // gracz sam zmienił to miejsce
+    if (!isAvailable(o)) continue;
+    xi[i] = s.orig;
+    bench = bench.filter((id) => id !== s.orig);
+    if (!bench.includes(s.sub) && byId.has(s.sub)) bench = [...bench.slice(0, Math.max(0, benchSize - 1)), s.sub];
+    delete subs[i];
+  }
+  const { tactics } = refreshTactics({ ...prev, xi, bench }, squad, { benchSize });
+  tactics.xi.forEach((id, i) => {
+    if (!xi[i] || id === xi[i]) return;
+    subs[i] = subs[i] ? { ...subs[i], sub: id } : { orig: xi[i], sub: id };
+  });
+  game.tacticsSubs = subs;
+  game.tacticsLast = [...tactics.xi];
+  return tactics;
+}
+
 /** Zaczyna dzień meczowy dla meczu gracza. */
 export function startMatchday(game, f) {
   const rng = new Rng(`dzien-meczowy:${game.seed}:${f.id}`);
@@ -83,7 +127,7 @@ export function startMatchday(game, f) {
     ? standings(game.fixtures.filter((x) => x.comp === comp), CLUBS_PL.filter((c) => c.tier === COMPETITIONS[comp].tier).map((c) => c.id)) : null;
   const benchSize = (LEAGUE_COMPS.includes(comp) ? COMPETITIONS[comp].benchSize : 12);
   const mySquad = squadFor(game, game.clubId, comp);
-  game.tactics = refreshTactics(game.tactics, mySquad, { benchSize }).tactics;
+  game.tactics = matchTactics(game, mySquad, benchSize);
   const oppSquad = squadFor(game, oppId, comp);
   const oppTactics = createTactics(oppSquad, { benchSize });
   const weather = weatherFor(f.date, rng);

@@ -6,6 +6,9 @@ export const EVENT_TYPES = [
   'pass', 'passFail', 'keyPass', 'tackle', 'interception', 'clearance', 'throwIn', 'goalKick',
   'freeKick', 'corner', 'shotOff', 'shotBlocked', 'shotOn', 'save', 'goal', 'post', 'offside',
   'foul', 'yellow', 'red', 'penalty', 'varCheck', 'varOverturn', 'sub', 'injury', 'possessionMinute',
+  // Zdarzenia sytuacyjne bez wpływu na liczniki statystyk (relacja, popupy UI, studio): docs/sytuacje-meczowe.md
+  'gkSwitch', 'gkUp', 'tactic', 'shout', 'penaltyRetake', 'staffCard', 'coolingBreak', 'abandoned', 'shootoutKick',
+  'addedTime', 'kickoff', 'half', 'end',
 ];
 
 const empty = () => ({

@@ -10,7 +10,7 @@ import { CATEGORIES, unreadCount, markRead, markAllRead, resolveMessage, filterI
 import { processDay, primaryAction, continueUntilStop, finishMatch, forgetMessages } from './core/gameLoop.js';
 import './season/dailySystems.js';
 import { createSeason, compLabel, applyResult, fromEngineResult, squadFor, anyClub, LEAGUE_COMPS } from './season/season.js';
-import { standings } from './season/standings.js';
+import { standings, zonesFor } from './season/standings.js';
 import { renderCompetitions } from './ui/competitionsView.js';
 import { createMatch, runToEnd } from './engine/match/match.js';
 import { Rng } from './core/rng.js';
@@ -27,13 +27,17 @@ import { mountDrawAnimation } from './ui/europeView.js';
 import { ensureUefa } from './season/europe.js';
 import { ensureNational } from './season/nationalSystem.js';
 import { applySeasonState } from './season/rollover.js';
-import { ensureTraining, trainingMatchInput } from './training/index.js';
+import { ensureTraining, trainingMatchInput, teamCohesion } from './training/index.js';
 import { renderTraining, handleTrainingAction, isTrainingAction } from './ui/trainingView.js';
 import { renderTransfers, handleTransferAction, isTransferAction } from './ui/transfersView.js';
 import { renderTalks, handleTalkAction, isTalkAction } from './ui/talksView.js';
 import { ensureCareer } from './career/careerSystem.js';
 import { completeTransfer, fmtZl } from './career/transfers.js';
 import { trustLabel } from './career/board.js';
+import { spendable, wageBill, monthSummary } from './career/finance.js';
+import { teamMorale, moraleLabel } from './career/morale.js';
+import { fanMoodLabel } from './career/fans.js';
+import { GROUP } from './career/squad.js';
 import { runDecision } from './core/decisions.js';
 import { startNegotiation, renderNegotiation, handleNegotiationAction, isNegotiationAction, readNegotiationForm, refreshNegotiationHints } from './ui/negotiationView.js';
 
@@ -254,39 +258,264 @@ function renderTab(tab, g, club) {
     </section>`;
 }
 
-function renderDashboard(g, club) {
-  const next = nextFixture(g);
-  const comp = ['ekstraklasa', 'liga1', 'liga2'][club.tier - 1];
-  const table = standings(g.fixtures.filter((f) => f.comp === comp), CLUBS_PL.filter((c) => c.tier === club.tier).map((c) => c.id));
+// ---------- Pulpit ----------
+// Tablica meczowa (najbliższy mecz) i panele z danymi gry. Każdy panel ma własny kolor i formę danych:
+// tabela wokół klubu, wskaźnik zaufania zarządu, paski budżetów, oś okna transferowego, absencje, poczta.
+// Układ: siatka od jednej kolumny (telefon) do czterech (szeroki PC), zob. src/styles/dashboard.css.
+const LEAGUE_COMP_OF_TIER = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
+const dayNo = (iso) => Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) / 864e5;
+const daysBetween = (a, b) => Math.round(dayNo(b) - dayNo(a));
+const shortDate = (iso) => fmtDate(iso).replace(/, \d{4}$/, '');
+const fewPl = (n) => n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14);
+const plural = (n, one, few, many) => (n === 1 ? one : fewPl(n) ? few : many);
+const daysWord = (n) => (n === 1 ? 'dzień' : 'dni');
+const signedZl = (n) => `${n > 0 ? '+' : ''}${fmtZl(n)}`;
+const DASH_ICONS = {
+  table: '<path d="M4 5h16v14H4zM4 10h16M4 14.5h16M9 5v14"/>',
+  board: '<path d="M4 20V9l8-5 8 5v11M9 20v-6h6v6M3 20h18"/>',
+  fin: '<ellipse cx="12" cy="6.5" rx="7" ry="2.8"/><path d="M5 6.5v5.5c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V6.5M5 12v5.5c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V12"/>',
+  squad: '<path d="M9.5 4h5v5.5H20v5h-5.5V20h-5v-5.5H4v-5h5.5z"/>',
+};
+const dashIcon = (k) => (DASH_ICONS[k] ? `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${DASH_ICONS[k]}</svg>` : icon(k));
+const dashLink = (tab, label) => `<button class="dash-link" data-act="tab" data-tab="${tab}">${esc(label)}</button>`;
+const dashPanel = (key, ico, title, body, link = '') => `
+  <section class="dash-p dash-p--${key}" aria-labelledby="dp-${key}">
+    <header class="dash-p__head"><span class="dash-p__ico">${dashIcon(ico)}</span><h3 id="dp-${key}">${title}</h3>${link}</header>
+    <div class="dash-p__body">${body}</div>
+  </section>`;
+
+/** Ostatnie wyniki klubu we wszystkich rozgrywkach (najstarszy pierwszy). */
+function dashForm(g, clubId, n = 5) {
+  return (g.fixtures || []).filter((f) => f.played && f.result?.score && (f.home === clubId || f.away === clubId))
+    .sort((a, b) => a.date.localeCompare(b.date)).slice(-n)
+    .map((f) => {
+      const home = f.home === clubId;
+      const [a, b] = f.result.score;
+      const me = home ? a : b; const op = home ? b : a;
+      return { r: me > op ? 'W' : me < op ? 'P' : 'R', score: `${me}:${op}`, opp: anyClub(home ? f.away : f.home)?.name ?? '', home };
+    });
+}
+
+function formHtml(list) {
+  if (!list.length) return '<span class="dash-form dash-form--none">Bez meczów w tym sezonie</span>';
+  const word = { W: 'Wygrana', R: 'Remis', P: 'Porażka' };
+  return `<ol class="dash-form" aria-label="Ostatnie mecze, od najstarszego">${list.map((x) => {
+    const t = `${word[x.r]} ${x.score}${x.opp ? ` z ${x.opp}` : ''} (${x.home ? 'u siebie' : 'na wyjeździe'})`;
+    return `<li data-r="${x.r}" title="${esc(t)}"><span aria-hidden="true">${x.r}</span><span class="sr">${esc(t)}</span></li>`;
+  }).join('')}</ol>`;
+}
+
+/** Tabela ligowa poziomu (1-3), liczona raz na render pulpitu. */
+function dashTables(g) {
+  const cache = new Map();
+  return (tier) => {
+    if (!cache.has(tier)) cache.set(tier, standings(g.fixtures.filter((f) => f.comp === LEAGUE_COMP_OF_TIER[tier]), CLUBS_PL.filter((c) => c.tier === tier).map((c) => c.id)));
+    return cache.get(tier);
+  };
+}
+
+function dashHero(g, club, next, tableOf) {
+  if (!next) {
+    return `<section class="dash-hero dash-hero--empty" aria-labelledby="dh-t">
+      <h3 id="dh-t" class="dash-hero__comp">Następny mecz</h3>
+      <p class="dash-hero__none">Brak zaplanowanych meczów. Terminarz pojawi się po losowaniu lub w nowym sezonie.</p>
+    </section>`;
+  }
+  const days = Math.max(0, daysBetween(g.date, next.date));
+  const team = (id) => {
+    const c = id ? anyClub(id) : null;
+    const pl = id ? clubById(id) : null; // polski klub ligowy: miejsce w tabeli
+    const row = pl && pl.tier >= 1 && pl.tier <= 3 ? tableOf(pl.tier).find((r) => r.id === id) : null;
+    const meta = row ? (row.played ? `${row.pos}. miejsce${pl.tier !== club.tier ? `, ${LEAGUE_NAMES[pl.tier]}` : ''}, ${row.points} pkt` : LEAGUE_NAMES[pl.tier]) : '';
+    return `<div class="dash-team${id === g.clubId ? ' is-me' : ''}">
+      ${c ? crestHtml(c, { size: 72, clubsById }) : '<span class="dash-team__tbd" aria-hidden="true">?</span>'}
+      <b class="dash-team__name">${c ? esc(c.name) : 'Rywal z losowania'}</b>
+      ${meta ? `<span class="dash-team__meta">${esc(meta)}</span>` : ''}
+      ${c ? formHtml(dashForm(g, id)) : ''}
+    </div>`;
+  };
+  const venue = next.neutral ? 'teren neutralny' : next.home === g.clubId ? 'u siebie' : 'na wyjeździe';
+  const led = days === 0 ? (next.time ?? '0') : String(days);
+  const ledLabel = days === 0 ? 'mecz dziś' : days === 1 ? 'dzień do meczu' : 'dni do meczu';
+  const upcoming = (g.fixtures || []).filter((f) => !f.played && f !== next && (f.home === g.clubId || f.away === g.clubId))
+    .sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? ''))).slice(0, 3);
+  const upRow = (f) => {
+    const oppId = f.home === g.clubId ? f.away : f.home;
+    const o = oppId ? anyClub(oppId) : null;
+    return `<li>
+      <span class="dash-up__date">${esc(shortDate(f.date))}</span>
+      ${o ? crestHtml(o, { size: 22, clubsById }) : '<span class="dash-up__tbd" aria-hidden="true"></span>'}
+      <span class="dash-up__opp"><b>${o ? esc(o.name) : 'Rywal z losowania'}</b><small>${esc(compLabel(f))}, ${f.neutral ? 'teren neutralny' : f.home === g.clubId ? 'u siebie' : 'na wyjeździe'}</small></span>
+    </li>`;
+  };
+  return `<section class="dash-hero" aria-labelledby="dh-t">
+    <header class="dash-hero__top">
+      <h3 id="dh-t" class="dash-hero__comp">${esc(compLabel(next))}</h3>
+      <p class="dash-hero__when">${esc(weekday(next.date))}, ${esc(fmtDate(next.date))}${next.time ? `, ${esc(next.time)}` : ''}, ${venue}</p>
+    </header>
+    <div class="dash-hero__match">
+      ${team(next.home)}
+      <div class="dash-kick" role="img" aria-label="${days === 0 ? `Mecz dziś${next.time ? ` o ${esc(next.time)}` : ''}` : `${days} ${daysWord(days)} do meczu`}">
+        <span class="dash-kick__led" aria-hidden="true">${esc(led)}</span>
+        <span class="dash-kick__lbl" aria-hidden="true">${ledLabel}</span>
+      </div>
+      ${team(next.away)}
+    </div>
+    ${upcoming.length ? `<footer class="dash-up"><h4 class="dash-up__title">Kolejne mecze</h4><ol class="dash-up__list">${upcoming.map(upRow).join('')}</ol></footer>` : ''}
+  </section>`;
+}
+
+function dashTable(g, club, table) {
+  const zones = zonesFor(club.tier);
+  const zoneOf = (pos) => zones.find((z) => pos >= z.from && pos <= z.to);
+  const n = table.length;
+  const i = Math.max(0, table.findIndex((r) => r.id === g.clubId));
+  // Najmniejsze okno tabeli wokół klubu, w którym wiersz się mieści: CSS pokazuje 7, 11 albo wszystkie wiersze
+  const kOf = (j) => { for (let k = 1; k <= n; k++) { const s = Math.min(Math.max(0, i - Math.floor((k - 1) / 2)), n - k); if (j >= s && j < s + k) return k; } return n; };
+  const tierCls = (k) => (k <= 7 ? '' : k <= 11 ? 'dash-row--11' : 'dash-row--all');
+  const rows = table.map((r, j) => {
+    const c = clubById(r.id);
+    const z = zoneOf(r.pos);
+    const me = r.id === g.clubId;
+    return `<tr class="${[me ? 'is-me' : '', tierCls(kOf(j))].filter(Boolean).join(' ')}"${z ? ` data-z="${z.kind}"` : ''}${me ? ' aria-current="true"' : ''}>
+      <td class="dash-t__pos">${r.pos}</td>
+      <td class="dash-t__club">${crestHtml(c, { size: 20, clubsById })}<span>${esc(c.name)}</span></td>
+      <td>${r.played}</td><td>${r.goalDiff > 0 ? '+' : ''}${r.goalDiff}</td><td class="dash-t__pts">${r.points}</td>
+    </tr>`;
+  }).join('');
+  const me = table[i];
+  const legend = zones.map((z) => `<li data-z="${z.kind}">${esc(z.label)}</li>`).join('');
+  const body = `<table class="dash-t">
+      <caption class="sr">${esc(LEAGUE_NAMES[club.tier])}: tabela wokół twojego klubu</caption>
+      <thead><tr><th scope="col"><span class="sr">Miejsce</span></th><th scope="col">Klub</th><th scope="col"><abbr title="Mecze">M</abbr></th><th scope="col"><abbr title="Bilans bramek">+/-</abbr></th><th scope="col">Pkt</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <p class="dash-note">${me.played ? `${me.played} ${plural(me.played, 'mecz', 'mecze', 'meczów')}: ${me.wins} ${plural(me.wins, 'wygrana', 'wygrane', 'wygranych')}, ${me.draws} ${plural(me.draws, 'remis', 'remisy', 'remisów')}, ${me.losses} ${plural(me.losses, 'porażka', 'porażki', 'porażek')}, bramki ${me.gf}:${me.ga}.` : 'Liga jeszcze nie wystartowała. Kolejność w tabeli jest umowna.'}</p>
+    <ul class="dash-zones">${legend}</ul>`;
+  return dashPanel('table', 'table', esc(LEAGUE_NAMES[club.tier]), body, dashLink('rozgrywki', 'Pełna tabela'));
+}
+
+function dashBoard(g, table) {
+  const B = g.board ?? {};
+  const t = Math.round(B.trust ?? 60);
+  const band = t >= 55 ? 'good' : t >= 40 ? 'mid' : t >= 25 ? 'warn' : 'bad';
   const me = table.find((r) => r.id === g.clubId);
-  const opp = next && (next.home === g.clubId ? next.away : next.home);
-  const tw = DOMESTIC.transferWindows.find((w) => g.date >= w.from && g.date <= w.to);
-  const latest = g.inbox.slice(0, 4);
-  return `
-    <h2>Pulpit</h2>
-    <section class="panel">
-      <p class="muted">Następny mecz</p>
-      ${next ? `<p class="panel__lead">${opp && anyClub(opp) ? `${crestHtml(anyClub(opp), { size: 28, clubsById })} ${esc(anyClub(opp).name)}` : 'Rywal z losowania'}</p>
-        <p class="muted">${esc(compLabel(next))}, ${next.home === g.clubId ? 'u siebie' : 'na wyjeździe'}${next.neutral ? ' (teren neutralny)' : ''}</p>
-        <p class="muted">${esc(weekday(next.date))}, ${esc(fmtDate(next.date))}${next.time ? `, ${esc(next.time)}` : ''}</p>` : '<p class="panel__lead">Brak zaplanowanych meczów</p>'}
-    </section>
-    <section class="panel">
-      <p class="muted">${esc(LEAGUE_NAMES[club.tier])}</p>
-      <p class="panel__lead">${me.pos}. miejsce, ${me.points} pkt</p>
-      <p class="muted">${me.played} meczów: ${me.wins} zwycięstw, ${me.draws} remisów, ${me.losses} porażek, bramki ${me.gf}:${me.ga}</p>
-    </section>
-    <section class="panel">
-      <p class="muted">Zarząd i finanse</p>
-      <p class="panel__lead">${esc(trustLabel(g.board?.trust ?? 60))}, zaufanie ${g.board?.trust ?? 60}/100</p>
-      <p class="muted">Cel: ${esc(g.board?.goal?.text ?? '')}. Saldo: ${esc(fmtZl(g.finance?.clubs?.[g.clubId]?.balance ?? 0))}.</p>
-    </section>
-    <section class="panel">
-      <p class="muted">Okno transferowe</p>
-      <p class="panel__lead">${tw ? `Otwarte do ${esc(fmtDate(tw.to))}` : 'Zamknięte'}</p>
-      ${(() => { const n = (g.market?.offers ?? []).filter((o) => o.kind === 'incoming' && o.status === 'open').length; return n ? `<p class="muted">Oferty za twoich zawodników: ${n}. <button class="btn btn--quiet btn--sm" data-act="tab" data-tab="transfery">Zobacz</button></p>` : ''; })()}
-    </section>
-    <h3>Ostatnie wiadomości</h3>
-    <ul class="mail-list stripes">${latest.map(mailRow).join('') || '<li class="mail-empty">Brak wiadomości.</li>'}</ul>`;
+  const target = B.goal?.target;
+  const ladder = target ? `<ol class="dash-ladder" aria-hidden="true">${table.map((r) => `<li class="${[r.pos <= target ? 'in' : '', r.id === g.clubId ? 'me' : ''].filter(Boolean).join(' ')}"></li>`).join('')}</ol>
+      <p class="dash-ladder__cap"><span>1.</span><span>${me?.played ? `teraz ${me.pos}., cel: ${target === 1 ? '1. miejsce' : `1-${target}. miejsce`}` : `cel: ${target === 1 ? '1. miejsce' : `1-${target}. miejsce`}`}</span><span>${table.length}.</span></p>` : '';
+  const rev = B.reviews?.[0];
+  const fans = B.fansMood != null ? fanMoodLabel(B.fansMood) : null;
+  const body = `<div class="dash-gauge" data-b="${band}">
+      <svg viewBox="0 0 120 66" role="img" aria-label="Zaufanie zarządu: ${t} na 100, ${esc(trustLabel(t).toLowerCase())}">
+        <path class="dash-gauge__track" d="M10 60 A50 50 0 0 1 110 60" pathLength="100"/>
+        <path class="dash-gauge__fill" d="M10 60 A50 50 0 0 1 110 60" pathLength="100" stroke-dasharray="${t} 100"/>
+      </svg>
+      <div class="dash-gauge__val" aria-hidden="true"><b>${t}</b><span>${esc(trustLabel(t))}</span></div>
+    </div>
+    ${B.goal?.text ? `<p class="dash-goal">Cel sezonu: <b>${esc(B.goal.text)}</b></p>` : ''}
+    ${ladder}
+    <ul class="dash-facts">
+      ${rev ? `<li><span>Ostatnia ocena, ${esc(shortDate(rev.date))}</span><b data-sign="${rev.delta > 0 ? 'up' : rev.delta < 0 ? 'down' : ''}">${rev.delta > 0 ? '+' : ''}${esc(String(rev.delta).replace('.', ','))}</b></li>` : '<li><span>Pierwsza ocena zarządu</span><b>1. dnia miesiąca</b></li>'}
+      ${fans ? `<li><span>Kibice</span><b>${esc(fans)}</b></li>` : ''}
+    </ul>`;
+  return dashPanel('board', 'board', 'Zarząd', body, dashLink('transfery', 'Szczegóły'));
+}
+
+function dashFinance(g) {
+  const c = g.finance?.clubs?.[g.clubId];
+  if (!c) return dashPanel('fin', 'fin', 'Finanse', '<p class="dash-note">Brak danych o finansach klubu.</p>');
+  const diff = c.balance - c.start;
+  const spend = spendable(g.finance, g.clubId);
+  const bill = wageBill(g.world, g.clubId);
+  const pct = (a, b) => (b > 0 ? Math.max(0, Math.min(100, Math.round((a / b) * 100))) : 0);
+  const month = monthSummary(c, g.date.slice(0, 7));
+  const body = `<p class="dash-money"><b class="${c.balance < 0 ? 'neg' : ''}">${esc(fmtZl(c.balance))}</b><span>saldo klubu, <span data-sign="${diff > 0 ? 'up' : diff < 0 ? 'down' : ''}">${esc(signedZl(diff))}</span> od startu sezonu</span></p>
+    <div class="dash-meter">
+      <p><span>Do wydania na transfery</span><b>${esc(fmtZl(spend))}</b></p>
+      <span class="dash-bar" role="img" aria-label="Wolne ${pct(spend, c.transferBudget)}% budżetu transferowego"><i style="width:${pct(spend, c.transferBudget)}%"></i></span>
+      <small>z budżetu ${esc(fmtZl(c.transferBudget))}</small>
+    </div>
+    <div class="dash-meter${bill > c.wageBudget ? ' is-over' : ''}">
+      <p><span>Płace tygodniowo</span><b>${esc(fmtZl(bill))}</b></p>
+      <span class="dash-bar" role="img" aria-label="Płace to ${pct(bill, c.wageBudget)}% budżetu płac"><i style="width:${pct(bill, c.wageBudget)}%"></i></span>
+      <small>${bill > c.wageBudget ? `ponad budżet ${esc(fmtZl(c.wageBudget))}` : `z budżetu ${esc(fmtZl(c.wageBudget))}`}</small>
+    </div>
+    <p class="dash-note">Bilans miesiąca: <span data-sign="${month.net > 0 ? 'up' : month.net < 0 ? 'down' : ''}">${esc(signedZl(month.net))}</span></p>`;
+  return dashPanel('fin', 'fin', 'Finanse', body, dashLink('transfery', 'Szczegóły'));
+}
+
+function dashWindow(g) {
+  const ws = DOMESTIC.transferWindows;
+  const tw = ws.find((w) => g.date >= w.from && g.date <= w.to);
+  const offers = (g.market?.offers ?? []).filter((o) => o.kind === 'incoming' && o.status === 'open').length;
+  let body;
+  if (tw) {
+    const left = daysBetween(g.date, tw.to);
+    const pct = Math.round((daysBetween(tw.from, g.date) / Math.max(1, daysBetween(tw.from, tw.to))) * 100);
+    body = `<p class="dash-count"><b>${left}</b><span>${left === 0 ? 'ostatni dzień okna' : `${daysWord(left)} do zamknięcia okna`}</span></p>
+      <div class="dash-tl" role="img" aria-label="Okno otwarte od ${esc(fmtDate(tw.from))} do ${esc(fmtDate(tw.to))}">
+        <span class="dash-tl__bar"><i style="width:${pct}%"></i><b style="left:${pct}%"></b></span>
+        <span class="dash-tl__ends"><span>${esc(shortDate(tw.from))}</span><span>${esc(fmtDate(tw.to))}</span></span>
+      </div>`;
+  } else {
+    const nx = ws.filter((w) => w.from > g.date).sort((a, b) => a.from.localeCompare(b.from))[0];
+    const inDays = nx ? daysBetween(g.date, nx.from) : null;
+    body = `<p class="dash-count dash-count--closed"><b>Zamknięte</b></p>
+      <p class="dash-note">${nx ? `Następne okno od ${esc(fmtDate(nx.from))}, za ${inDays} ${daysWord(inDays)}. Do tego czasu możesz podpisywać wolnych zawodników i przedłużać kontrakty.` : 'Terminy kolejnego okna pojawią się w nowym sezonie.'}</p>`;
+  }
+  body += offers ? `<p class="dash-alert">${offers} ${plural(offers, 'oferta', 'oferty', 'ofert')} za twoich zawodników czeka na odpowiedź.</p>` : '';
+  return dashPanel('window', 'transfery', 'Okno transferowe', body, dashLink('transfery', offers ? 'Zobacz oferty' : 'Rynek'));
+}
+
+function dashSquad(g) {
+  const squad = mySquad(g);
+  const xi = (g.tactics?.xi ?? []).map((id) => g.world.players[id]).filter(Boolean);
+  const fresh = xi.length ? Math.round(xi.reduce((s, p) => s + (p.fresh ?? 95), 0) / xi.length) : null;
+  const morale = teamMorale(squadOf(g.world, g.clubId));
+  const coh = teamCohesion(g);
+  const out = squad.filter((p) => p.injuryDays > 0 || p.suspended > 0 || p.callUp)
+    .sort((a, b) => (b.injuryDays ?? 0) - (a.injuryDays ?? 0));
+  const why = (p) => (p.injuryDays > 0 ? ['inj', `uraz, ${p.injuryDays} ${daysWord(p.injuryDays)}`]
+    : p.suspended > 0 ? ['susp', `pauza, ${p.suspended} ${plural(p.suspended, 'mecz', 'mecze', 'meczów')}`] : ['call', 'reprezentacja']);
+  const list = out.slice(0, 5).map((p) => {
+    const [k, txt] = why(p);
+    return `<li><span class="pos" data-g="${GROUP[p.pos] ?? 'MID'}">${esc(p.pos)}</span><span class="dash-abs__name">${esc(p.name)}</span><span class="dash-abs__why" data-k="${k}">${esc(txt)}</span></li>`;
+  }).join('');
+  const freshBand = fresh == null ? '' : fresh >= 80 ? 'good' : fresh >= 65 ? 'mid' : 'low';
+  const body = `<ul class="dash-stats">
+      <li><span>Morale</span><b>${esc(moraleLabel(morale))}</b></li>
+      <li><span>Świeżość składu</span><b data-b="${freshBand}">${fresh == null ? 'brak składu' : `${fresh}%`}</b></li>
+      <li><span>Zgranie</span><b>${esc(coh.label)}</b></li>
+    </ul>
+    <h4 class="dash-sub">Niedostępni${out.length ? ` (${out.length})` : ''}</h4>
+    ${out.length ? `<ul class="dash-abs">${list}</ul>${out.length > 5 ? `<p class="dash-note">i jeszcze ${out.length - 5}</p>` : ''}` : '<p class="dash-note dash-note--ok">Wszyscy zawodnicy są do dyspozycji.</p>'}`;
+  return dashPanel('squad', 'squad', 'Stan kadry', body, dashLink('kadra', 'Kadra'));
+}
+
+function dashMail(g) {
+  const unread = unreadCount(g.inbox);
+  const pend = pendingDecisions(g.inbox);
+  const latest = g.inbox.slice(0, 5);
+  const body = `${pend.length ? `<button class="dash-decide" data-act="mail" data-id="${esc(pend[0].id)}"><span class="dash-decide__card" aria-hidden="true"></span>${pend.length} ${plural(pend.length, 'wiadomość czeka', 'wiadomości czekają', 'wiadomości czeka')} na twoją decyzję</button>` : ''}
+    <ul class="mail-list stripes dash-mail">${latest.map(mailRow).join('') || '<li class="mail-empty">Brak wiadomości.</li>'}</ul>`;
+  return dashPanel('mail', 'poczta', `Poczta${unread ? ` <span class="dash-p__count">${unread} ${plural(unread, 'nowa', 'nowe', 'nowych')}</span>` : ''}`, body, dashLink('poczta', 'Cała poczta'));
+}
+
+function renderDashboard(g, club) {
+  const tableOf = dashTables(g);
+  const table = tableOf(club.tier);
+  return `<div class="dash">
+    <h2 class="dash__title">Pulpit</h2>
+    <div class="dash__grid">
+      ${dashHero(g, club, nextFixture(g), tableOf)}
+      ${dashTable(g, club, table)}
+      ${dashSquad(g)}
+      ${dashMail(g)}
+      ${dashBoard(g, table)}
+      ${dashFinance(g)}
+      ${dashWindow(g)}
+    </div>
+  </div>`;
 }
 
 function mailRow(m) {

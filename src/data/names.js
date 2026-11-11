@@ -21,7 +21,7 @@ const POOLS = {
   LTU: { first: 'Domantas Ignas Justas Lukas Mantas Rokas Tomas', last: 'Kazlauskas Petrauskas Stankevičius Vaitkus Žukauskas' },
   LVA: { first: 'Artūrs Dāvis Kristaps Mārtiņš Roberts', last: 'Bērziņš Kalniņš Ozols Liepiņš Zariņš' },
   GEO: { first: 'Davit Giorgi Irakli Levan Luka Nika Saba Zurab', last: 'Beridze Chikhladze Gelashvili Kapanadze Lomidze Maisuradze Tsiklauri' },
-  NED: { first: 'Bram Daan Jesse Lars Milan Niels Ruben Sem Thijs', last: 'Bakker de Boer de Vries Janssen Meijer Smit van Dijk Visser' },
+  NED: { first: 'Bram Daan Jesse Lars Milan Niels Ruben Sem Thijs', last: 'Bakker de_Boer de_Vries Janssen Meijer Smit van_Dijk Visser' },
   BEL: { first: 'Arne Jonas Lucas Maxime Robbe Wout', last: 'Claes Goossens Lambert Mertens Peeters Wouters' },
   GER: { first: 'Felix Jonas Leon Lukas Maximilian Niklas Paul Tim', last: 'Becker Fischer Hoffmann Koch Richter Schäfer Wagner Weber' },
   AUT: { first: 'Dominik Florian Julian Matthias Stefan', last: 'Gruber Huber Pichler Steiner Wimmer' },
@@ -74,7 +74,9 @@ const cache = {};
 function pool(code) {
   if (!cache[code]) {
     const p = POOLS[code] || POOLS.POL;
-    cache[code] = { first: p.first.split(' '), last: p.last.split(' ') };
+    // Nazwiska wielowyrazowe zapisane z podkreśleniem (np. van_Dijk), żeby nie rozpadły się przy podziale
+    const words = (str) => str.split(' ').map((w) => w.replace(/_/g, ' '));
+    cache[code] = { first: words(p.first), last: words(p.last) };
   }
   return cache[code];
 }

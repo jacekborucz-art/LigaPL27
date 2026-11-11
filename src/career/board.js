@@ -26,6 +26,28 @@ export function seasonGoalFor(club) {
   return { rank, target: 15, text: 'utrzymanie w lidze' };
 }
 
+const GOAL_TEXT = {
+  1: [[1, 'obrona mistrzostwa Polski'], [3, 'walka o mistrzostwo Polski'], [6, 'miejsce dające grę w europejskich pucharach'], [12, 'spokojne miejsce w środku tabeli'], [99, 'utrzymanie w Ekstraklasie']],
+};
+function goalText(tier, target, base) {
+  if (tier !== 1) return target <= 2 ? (tier === 2 ? 'awans do Ekstraklasy' : 'awans do 1 Ligi') : target <= 6 ? 'miejsce w strefie baraży o awans' : base.text;
+  return GOAL_TEXT[1].find(([t]) => target <= t)[1];
+}
+
+/**
+ * Cel sezonu z historią trenera w klubie (organiczna trudność, docs/balans.md): po sezonie wyraźnie ponad stan
+ * zarząd i kibice oczekują więcej. Cel przesuwa się w połowie drogi do miejsca z poprzedniego sezonu w tej samej lidze.
+ * Trener, który kończy w okolicy celu, dostaje zwykły cel z siły kadry.
+ */
+export function boardGoal(game, club) {
+  const base = seasonGoalFor(club);
+  const last = (game.manager?.seasons ?? []).filter((x) => x.club === club.id && x.tier === club.tier).at(-1);
+  if (!last?.pos || last.pos >= base.target - 1) return base;
+  const target = Math.max(1, Math.round((base.target + last.pos) / 2));
+  const lastTitle = club.tier === 1 && last.pos === 1;
+  return { ...base, target, raised: true, text: lastTitle && target <= 2 ? 'obrona mistrzostwa Polski' : goalText(club.tier, Math.max(2, target), base) };
+}
+
 export function ensureBoard(game) {
   const club = clubById(game.clubId);
   game.board = { trust: 60, fansMood: 55, ...(game.board ?? {}) };

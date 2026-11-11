@@ -2,13 +2,14 @@
 // oceny zawodników i wynik. Interfejs dla UI: createMatch, step, resume, runToEnd, result.
 
 import { createMatch, emit, runPhases, minuteLabel } from './core.js';
-import { aiDecide, substitute, changeTactics, shout, canSubstitute, canShout } from './control.js';
-import { onPitch, goalkeeper } from './teams.js';
+import { substitute, changeTactics, shout, canSubstitute, canShout, subsAvailable } from './control.js';
+import { aiDecide, assistantSuggest, applySuggestion, matchState } from './coach.js';
+import { goalkeeper, fieldPlayers } from './teams.js';
 import { statsFromEvents } from '../matchStats.js';
-import { RATING } from './constants.js';
+import { RATING, K } from './constants.js';
 import { clamp } from '../../core/rng.js';
 
-export { createMatch, substitute, changeTactics, shout, canSubstitute, canShout, minuteLabel };
+export { createMatch, substitute, changeTactics, shout, canSubstitute, canShout, minuteLabel, subsAvailable, assistantSuggest, applySuggestion, matchState };
 
 const HALVES = { 1: 45, 2: 45, 3: 15, 4: 15 };
 
@@ -43,17 +44,34 @@ export function step(M) {
   M.tick++; M.elapsed++;
   const base = { 1: 0, 2: 45, 3: 90, 4: 105 }[M.half];
   M.minute = base + Math.min(M.elapsed, M.length);
+  const prevEvents = M.events.length;
   runPhases(M);
+  coolingBreak(M);
   for (const T of M.teams) if (T.ai) aiDecide(M, T.side);
+  if (M.abandoned) { finish(M); const ev = M.events.slice(from); return { events: ev, pause: 0, state: 'ended' }; }
+  // Zdarzenia w doliczonym czasie (gol, VAR, poważna kontuzja) wydłużają go o minutę, najwyżej o K.addedExtraMax
+  if (M.added !== null && M.elapsed > M.length && (M.addedExtra ?? 0) < K.addedExtraMax
+    && M.events.slice(prevEvents).some((e) => (e.type === 'goal' && !e.provisional) || e.type === 'varOverturn' || (e.type === 'injury' && !e.canContinue))) {
+    M.added++; M.addedExtra = (M.addedExtra ?? 0) + 1;
+  }
   if (M.elapsed === M.length) {
     M.added = addedTime(M);
     M.addedTimes.push(M.added);
     if (M.added > 0) emit(M, 'addedTime', null, null, { added: M.added, text: `Sędzia dolicza ${M.added} min.` });
   }
-  if (M.added !== null && M.elapsed >= M.length + M.added) endHalf(M);
+  if (M.added !== null && M.elapsed >= M.length + M.added) { M.addedExtra = 0; endHalf(M); }
   const events = M.events.slice(from);
   const pause = Math.max(0, ...events.map((e) => e.pause ?? 0));
   return { events, pause, state: M.ended ? 'ended' : M.phase };
+}
+
+/** Przerwa na schłodzenie w upale (ok. 30. min każdej połowy) [SZAC: próg ctx.weather.tempC >= 32 albo cooling]. */
+function coolingBreak(M) {
+  const w = M.ctx.weather ?? {};
+  if (!(w.cooling || (w.tempC ?? 0) >= K.coolingTempC) || M.half > 2 || M.elapsed !== 30) return;
+  M.halfCounts.tw += K.coolingAdded;
+  for (const T of M.teams) for (const x of fieldPlayers(T)) x.cond = Math.min(100, x.cond + 2);
+  emit(M, 'coolingBreak', null, null, { text: 'Przerwa na schłodzenie: zawodnicy piją, trenerzy przekazują uwagi.', pause: 2 });
 }
 
 function endHalf(M) {
@@ -89,7 +107,8 @@ export function resume(M) {
  * Drużyna gracza przechodzi pod asystenta (te same reguły co AI).
  */
 export function runToEnd(M, { assistantFor = [] } = {}) {
-  for (const s of assistantFor) M.teams[s].ai = true;
+  for (const s of assistantFor) handOver(M.teams[s]);
+  for (const s of assistantFor) if (M.phase !== 'break' && !M.ended) aiDecide(M, s);
   let guard = 0;
   while (!M.ended && guard++ < 400) {
     if (M.phase === 'break') resume(M);
@@ -100,19 +119,31 @@ export function runToEnd(M, { assistantFor = [] } = {}) {
 
 /** Do końca bieżącej połowy (pomija minuty, zatrzymuje się w przerwie). */
 export function runToBreak(M, { assistantFor = [] } = {}) {
-  const prev = assistantFor.map((s) => M.teams[s].ai);
-  for (const s of assistantFor) M.teams[s].ai = true;
+  const prev = assistantFor.map((s) => [M.teams[s].ai, M.teams[s].assistant]);
+  for (const s of assistantFor) handOver(M.teams[s]);
+  // Zaległe reakcje (np. czerwona kartka obejrzana na żywo, na którą gracz nie zareagował) asystent obsługuje od razu
+  for (const s of assistantFor) if (M.phase !== 'break' && !M.ended) aiDecide(M, s);
   let guard = 0;
   while (!M.ended && M.phase !== 'break' && guard++ < 200) step(M);
-  assistantFor.forEach((s, i) => { M.teams[s].ai = prev[i]; });
+  assistantFor.forEach((s, i) => { [M.teams[s].ai, M.teams[s].assistant] = prev[i]; });
+}
+
+/** Drużyna gracza przechodzi pod asystenta: jego punktem wyjścia są obecne instrukcje gracza. */
+function handOver(T) {
+  if (!T.ai) { T.ai = true; T.assistant = true; T.baseInstr = { ...T.tactics.instructions }; }
 }
 
 // ------------------------------------------------------------ Rzuty karne po dogrywce (A6)
 function shootout(M) {
-  const takers = M.teams.map((T) => onPitch(T, M.minute).slice()
-    .sort((a, b) => ((b.p.attr?.WYK ?? 10) + (b.p.attr?.OPA ?? 10) + (b.p.attr?.SFR ?? 10)) - ((a.p.attr?.WYK ?? 10) + (a.p.attr?.OPA ?? 10) + (a.p.attr?.SFR ?? 10))));
+  // Uprawnieni: zawodnicy na boisku na koniec dogrywki, także chwilowo opatrywani (Law 10). Kolejność wg umiejętności,
+  // bramkarz strzela na końcu i nie jest wyłączany przy wyrównaniu liczebności.
+  const kickSkill = (x) => (x.p.attr?.WYK ?? 10) + (x.p.attr?.OPA ?? 10) + (x.p.attr?.SFR ?? 10);
+  const takers = M.teams.map((T) => {
+    const gk = goalkeeper(T);
+    return fieldPlayers(T).filter((x) => x !== gk).sort((a, b) => kickSkill(b) - kickSkill(a)).concat(gk ? [gk] : []);
+  });
   const n = Math.min(takers[0].length, takers[1].length); // wyrównanie liczebności
-  for (const t of takers) t.length = n;
+  for (const t of takers) { const gk = t[t.length - 1]; if (t.length > n) { t.length = n - 1; t.push(gk); } }
   const goals = [0, 0];
   const kicks = [];
   let round = 0;
@@ -125,8 +156,10 @@ function shootout(M) {
     const p = clamp(0.72 * Math.exp(0.03 * (skill - keep)) + pressure, 0.4, 0.95);
     const scored = M.rng.next() < p;
     if (scored) goals[side]++;
-    kicks.push({ side, pid: x.id, scored });
-    emit(M, 'shootoutKick', side, x, { scored, text: `${x.p.last ?? x.p.name}: ${scored ? 'gol' : 'pudło'} (${goals[0]}:${goals[1]}).` });
+    const outcome = scored ? 'goal' : G && M.rng.next() < 0.65 ? 'saved' : 'missed';
+    kicks.push({ side, pid: x.id, scored, outcome, gkId: G?.id ?? null, round: round + 1, suddenDeath: round >= 5 });
+    const how = scored ? 'gol' : outcome === 'saved' ? `obronił ${G.p.last ?? G.p.name}` : 'pudło';
+    emit(M, 'shootoutKick', side, x, { scored, outcome, gkId: G?.id ?? null, round: round + 1, suddenDeath: round >= 5, text: `${x.p.last ?? x.p.name}: ${how} (${goals[0]}:${goals[1]}).` });
     void T;
   };
   // 5 serii ABAB z wcześniejszym rozstrzygnięciem, potem nagła śmierć
@@ -143,7 +176,7 @@ function shootout(M) {
       if (goals[0] !== goals[1]) break;
     }
   }
-  M.shootout = { goals, kicks };
+  M.shootout = { goals, kicks, suddenDeath: kicks.length > 10 };
 }
 
 // ------------------------------------------------------------ Koniec i oceny
@@ -184,6 +217,7 @@ export function result(M) {
     extraTime: M.extraTime,
     shootout: M.shootout ? { goals: [...M.shootout.goals], kicks: M.shootout.kicks } : null,
     winner,
+    abandoned: M.abandoned ? { ...M.abandoned } : null,
     addedTimes: M.addedTimes,
     stats,
     ratings,

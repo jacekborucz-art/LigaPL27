@@ -3,8 +3,13 @@
 // wynik, statystyki, oceny, relacja i momentum liczą się tylko z dziennika.
 
 import { Rng, clamp } from '../../core/rng.js';
-import { K, SHOOT_W, FOUL_W, INJURY_TYPES } from './constants.js';
-import { buildTeam, updateZones, updateCondition, onPitch, goalkeeper } from './teams.js';
+import { K, SHOOT_W, FOUL_W, INJURY_TYPES, RED_REASONS } from './constants.js';
+import { buildTeam, updateZones, updateCondition, onPitch, goalkeeper, fieldPlayers, slotFit } from './teams.js';
+
+// Haki trenera (src/engine/match/coach.js rejestruje się przy imporcie). Silnik nie zna AI,
+// ale gdy drużyna prowadzona przez AI lub asystenta traci bramkarza, trener decyduje od razu.
+const HOOKS = {};
+export function setCoachHooks(h) { Object.assign(HOOKS, h); }
 
 const sig = (x) => 1 / (1 + Math.exp(-x));
 const attr = (x, k) => x.p.attr?.[k] ?? x.p.ovr ?? 10;
@@ -23,10 +28,17 @@ export function createMatch(cfg) {
     ctx, rng, tick: 0, half: 1, phase: 'play', minute: 0, elapsed: 0, length: 45, added: null,
     score: [0, 0], events: [], momentum: [], possession: [], halfTimeScore: null,
     halfCounts: freshCounts(), addedTimes: [], extraTime: false, shootout: null, ended: false,
+    ai: 0, emptyNet: false, addedExtra: 0, abandoned: null,
     hfa: ctx.neutral ? 0 : 0.7 + 0.3 * ctx.attendance,
   };
   M.teams = [buildTeam(0, cfg.home, rng, ctx), buildTeam(1, cfg.away, rng, ctx)];
-  for (const T of M.teams) { updateZones(T, M); ensureGoalkeeper(M, T); }
+  for (const T of M.teams) {
+    updateZones(T, M); ensureGoalkeeper(M, T);
+    T.str0 = (T.zones.ATT + T.zones.MID + T.zones.DEF) / 3 + 0.15 * T.zones.GK;
+    T.baseInstr = { ...T.tactics.instructions };
+    T.plannedSubs = rng.weighted([3, 4, 5], (n) => ({ 3: 0.25, 4: 0.4, 5: 0.35 })[n]);
+  }
+  for (const T of M.teams) T.strDiff = T.str0 - M.teams[1 - T.side].str0 + (ctx.neutral ? 0 : T.side === 0 ? 0.3 : -0.3);
   emit(M, 'kickoff', null, null, { text: 'Sędzia rozpoczyna mecz.' });
   return M;
 }
@@ -121,13 +133,23 @@ function phaseFoul(M) {
     const sm = shoutMods(ft, M);
     const cm = (fi === 0 ? K.homeCardMul : K.awayCardMul) ** (M.hfa ? 1 : 0) * r * (0.7 + 0.03 * (x.p.hidden?.TMP ?? 10))
       * (M.ctx.rank >= 2 ? 1.15 : 1) * (M.minute > 80 ? 1.15 : 1) * (sm.yellowMul ?? 1) * (1 + 0.03 * Math.max(0, x.Z));
-    if (M.rng.next() < K.redPerFoul * cm * Math.sqrt(r) * ft.P.redPerFoul * ft.P.redMul) sendOff(M, ft, x, 'czerwona kartka za brutalny faul');
-    else if (M.rng.next() < K.yellowPerFoul * cm * ft.P.yellowPerFoul * (x.yc ? K.bookedYellowMul : 1)) card(M, ft, x);
-    // Ofiara faulu: ryzyko kontuzji kontaktowej
+    let carded = false;
+    if (M.rng.next() < K.redPerFoul * cm * Math.sqrt(r) * ft.P.redPerFoul * ft.P.redMul) {
+      straightRed(M, ft, x, M.rng.weighted(['sfp', 'violent', 'dogso'], (k) => ({ sfp: 0.6, violent: 0.15, dogso: 0.25 })[k]));
+      carded = true;
+    } else if (M.rng.next() < K.yellowPerFoul * cm * ft.P.yellowPerFoul * (x.yc ? K.bookedYellowMul : 1)) {
+      // VAR: rażący faul przeoczony przez sędziego (tylko przy żółtej, analiza przy monitorze)
+      if (M.ctx.var && !x.yc && M.rng.next() < K.varRedAdd) {
+        varReview(M, fi, x, 'redCard', 'Po analizie VAR sędzia zmienia żółtą kartkę na czerwoną.');
+        sendOff(M, ft, x, 'sfp');
+      } else card(M, ft, x);
+      carded = true;
+    }
+    // Ofiara faulu: ryzyko kontuzji kontaktowej; po faulu z kartką opatrywany nie musi schodzić (Law 5)
     const victimTeam = M.teams[1 - fi];
     if (M.rng.next() < K.injContact * ft.P.oppInjuryMul) {
       const vs = onPitch(victimTeam, M.minute);
-      if (vs.length) injure(M, victimTeam, M.rng.pick(vs), true);
+      if (vs.length) injure(M, victimTeam, M.rng.pick(vs), true, { cardedFoul: carded });
     }
     if (fi !== ai && M.rng.next() < K.dangerFK) { at(M).threat += 2; setPiece(M, ai); }
   }
@@ -140,39 +162,142 @@ function phaseFoul(M) {
         card(M, T, x, tw[T.side] ? 'gra na czas' : 'niesportowe zachowanie');
       }
     }
+    // Rezerwowi i zmienieni zawodnicy też mogą dostać kartkę (Law 12); drużyna nie traci zawodnika na boisku
+    if (M.rng.next() < K.benchCardTick) benchCard(M, T);
+    // Trener i sztab (Law 5): częściej przy niekorzystnym wyniku pod koniec meczu
+    const trailing = M.score[T.side] < M.score[1 - T.side] && M.minute >= 70;
+    if (M.rng.next() < K.staffCardTick * (trailing ? 2 : 1)) staffCard(M, T);
+  }
+}
+
+function benchCard(M, T) {
+  const xs = [...T.bench, ...T.players.filter((y) => y.subbedOff)].filter((y) => !y.sentOff);
+  if (!xs.length) return;
+  const x = M.rng.pick(xs);
+  const where = x.subbedOff ? 'zmieniony zawodnik' : 'rezerwowy';
+  M.halfCounts.cards++;
+  if (x.yc || M.rng.next() < K.benchRedShare) {
+    x.sentOff = true;
+    const second = !!x.yc;
+    emit(M, 'red', T.side, x, { reason: second ? 'druga żółta' : 'przemoc', reasonCode: second ? 'second' : 'violent', reasonText: second ? 'druga żółta kartka' : 'niesportowe zachowanie poza boiskiem', second, bench: true, text: `Czerwona kartka: ${last(x)} (${where}, ${second ? 'druga żółta' : 'niesportowe zachowanie'}). Drużyna nadal gra w ${fieldPlayers(T).length}.` });
+    return;
+  }
+  x.yc = 1;
+  emit(M, 'yellow', T.side, x, { bench: true, reason: 'protest z ławki', text: `Żółta kartka: ${last(x)} (${where}, protest).` });
+}
+
+function staffCard(M, T) {
+  if (T.coachBanned) return;
+  const red = (T.staffYellow && M.rng.next() < 0.3) || M.rng.next() < K.staffRedShare;
+  if (red) {
+    T.coachBanned = true;
+    emit(M, 'staffCard', T.side, null, { card: 'red', text: 'Trener odesłany na trybuny. Drużynę prowadzi asystent, okrzyki z linii bocznej niemożliwe.' });
+  } else {
+    T.staffYellow = (T.staffYellow ?? 0) + 1;
+    emit(M, 'staffCard', T.side, null, { card: 'yellow', text: 'Żółta kartka dla trenera za protesty.' });
   }
 }
 
 const at = (M) => M.teams[M.ai];
 function avgFoulMul(M) { return (M.teams[0].P.foulMul + M.teams[1].P.foulMul) / 2 * ((shoutMods(M.teams[0], M).foulMul ?? 1) + (shoutMods(M.teams[1], M).foulMul ?? 1)) / 2; }
 
-function card(M, T, x, reason = 'faul') {
-  M.halfCounts.cards++;
-  if (x.yc) { sendOff(M, T, x, 'druga żółta kartka'); return; }
-  x.yc = 1;
-  rateEv(x, -0.3);
-  emit(M, 'yellow', T.side, x, { text: `Żółta kartka: ${last(x)} (${reason}).` });
+/** Widoczna analiza VAR zakończona zmianą decyzji (decision: kod dla studia, src/match/studio.js). */
+function varReview(M, side, x, decision, text, extra = {}) {
+  M.halfCounts.var++;
+  emit(M, 'varCheck', side, x, { decision, text: 'VAR sprawdza sytuację, sędzia podchodzi do monitora.', pause: 2 });
+  return emit(M, 'varOverturn', side, x, { decision, text, ...extra });
 }
 
-function sendOff(M, T, x, reason) {
+export function card(M, T, x, reason = 'faul') {
   M.halfCounts.cards++;
+  if (x.yc) {
+    // IFAB 2026/27: VAR może cofnąć ewidentnie błędną drugą żółtą
+    if (M.ctx.var && M.rng.next() < K.varSecondYellowCancel) {
+      varReview(M, T.side, x, 'secondYellowCancelled', `VAR cofa drugą żółtą kartkę dla ${last(x)}: błąd sędziego.`);
+      return;
+    }
+    sendOff(M, T, x, 'second', reason);
+    return;
+  }
+  x.yc = 1;
+  rateEv(x, -0.3);
+  emit(M, 'yellow', T.side, x, { reason, gk: x.slot?.pos === 'BR', text: `Żółta kartka: ${last(x)} (${reason}).` });
+}
+
+/** Bezpośrednia czerwona po faulu, z możliwą korektą VAR na żółtą. */
+function straightRed(M, T, x, code) {
+  if (M.ctx.var && M.rng.next() < K.varRedCancel) {
+    varReview(M, T.side, x, 'redCancelled', `VAR: czerwona kartka dla ${last(x)} zamieniona na żółtą.`);
+    card(M, T, x, 'faul, kartka zmieniona po VAR');
+    return;
+  }
+  sendOff(M, T, x, code);
+}
+
+/**
+ * Wykluczenie zawodnika. code: second | dogso | handball | sfp | violent (RED_REASONS).
+ * Zdarzenie 'red': { reason (kod studia: długość kary), reasonCode, reasonText, second, gk, playersLeft }.
+ */
+export function sendOff(M, T, x, code = 'sfp', detail = '') {
+  M.halfCounts.cards++;
+  const wasGk = x.on && x.slot?.pos === 'BR';
   x.sentOff = true;
   rateEv(x, -1.5);
-  emit(M, 'red', T.side, x, { text: `Czerwona kartka: ${last(x)} (${reason}).` });
+  const [reason, reasonText] = RED_REASONS[code] ?? RED_REASONS.sfp;
+  const left = fieldPlayers(T).length;
+  const why = code === 'second' ? `druga żółta kartka${detail ? `, ${detail}` : ''}` : reasonText;
+  emit(M, 'red', T.side, x, {
+    reason, reasonCode: code, reasonText: why, second: code === 'second', gk: wasGk, playersLeft: left,
+    text: `Czerwona kartka: ${last(x)} (${why}).${wasGk ? ' Drużyna bez bramkarza!' : ''}`,
+  });
   // Reakcja drużyny: lider tłumi, bez lidera spadek zaangażowania
   const leader = onPitch(T, M.minute).some((y) => y.p.persona === 'Lider');
   for (const y of onPitch(T, M.minute)) y.Z += leader ? 2 : -1;
-  ensureGoalkeeper(M, T);
+  // Trenerzy obu drużyn reagują jeszcze w tej samej przerwie w grze (coach.js)
+  T.react.push({ kind: 'ownRed', tick: M.tick, pos: x.slot?.pos ?? null, gk: wasGk });
+  M.teams[1 - T.side].react.push({ kind: 'oppRed', tick: M.tick });
+  if (wasGk) goalkeeperLost(M, T, 'red');
+  checkMinPlayers(M, T);
 }
 
-/** Bez bramkarza na boisku do bramki idzie zawodnik z pola (najlepszy w bramce). */
-export function ensureGoalkeeper(M, T) {
+/** Drużyna straciła bramkarza (czerwona, kontuzja): AI zmienia od razu, w innym razie zawodnik z pola do bramki. */
+function goalkeeperLost(M, T, cause) {
   if (goalkeeper(T)) return;
-  const xs = onPitch(T, M.minute);
-  if (!xs.length) return;
-  const x = xs.slice().sort((p, q) => (q.R.GK + attr(q, 'SKO') * 0.1) - (p.R.GK + attr(p, 'SKO') * 0.1))[0];
+  if (T.ai && HOOKS.onGoalkeeperLost && HOOKS.onGoalkeeperLost(M, T, cause)) return;
+  ensureGoalkeeper(M, T, cause);
+}
+
+/**
+ * Najlepszy kandydat do bramki z pola: atrybuty bramkarskie, skoczność i opanowanie, z karą za wartość
+ * zawodnika w polu (najlepszy zawodnik z pola idzie do bramki tylko wtedy, gdy nie ma innego wyjścia).
+ */
+export function emergencyKeeper(T, xs = fieldPlayers(T).filter((y) => y.slot?.pos !== 'BR')) {
+  if (!xs.length) return null;
+  const val = (y) => (y.slot ? slotFit(y, y.slot) : y.p.ovr ?? 10);
+  const best = xs.length > 1 ? xs.reduce((b, y) => (val(y) > val(b) ? y : b)) : null;
+  const score = (y) => y.R.GK + 0.15 * attr(y, 'SKO') + 0.1 * attr(y, 'OPA') - 0.25 * val(y) - (y === best ? 100 : 0) - (y.injury ? 2 : 0);
+  return xs.reduce((b, y) => (score(y) > score(b) ? y : b));
+}
+
+/** Bez bramkarza na boisku do bramki idzie zawodnik z pola (emergencyKeeper). */
+export function ensureGoalkeeper(M, T, cause = null) {
+  if (goalkeeper(T)) return null;
+  const x = emergencyKeeper(T);
+  if (!x) return null;
+  x.prevSlot = x.slot;
   x.slot = { pos: 'BR', side: null, x: 50, y: 5 };
-  emit(M, 'gkSwitch', T.side, x, { text: `${last(x)} staje w bramce.` });
+  emit(M, 'gkSwitch', T.side, x, {
+    emergency: true, cause, fromPos: x.prevSlot?.pos ?? null,
+    text: `${last(x)} staje w bramce${cause === 'red' ? ' po czerwonej kartce bramkarza' : cause === 'injury' ? ' po kontuzji bramkarza' : ''}.`,
+  });
+  return x;
+}
+
+/** Poniżej 7 zawodników mecz zostaje przerwany (Law 3); skutek regulaminowy ustala organizator. */
+function checkMinPlayers(M, T) {
+  if (M.abandoned || fieldPlayers(T).length >= K.minPlayers) return;
+  M.abandoned = { side: T.side, minute: M.minute };
+  emit(M, 'abandoned', T.side, null, { text: `Mecz przerwany: drużyna ma mniej niż ${K.minPlayers} zawodników.` });
 }
 
 function phaseAction(M) {
@@ -191,23 +316,17 @@ function phaseAction(M) {
   const type = pickType(M, A, D);
   // Rzut karny
   if (M.rng.next() < K.penPerAction * D.P.penMul * (0.85 + 0.15 * M.ctx.refStrict) * dribblePen(A)) {
-    const fouler = pickWeighted(M, onPitch(D, M.minute).filter((y) => y.slot.pos !== 'BR'), (y) => FOUL_W[y.slot.pos] ?? 1);
-    const fouled = pickWeighted(M, onPitch(A, M.minute), (y) => SHOOT_W[y.slot.pos] ?? 1);
     if (M.ctx.var && M.rng.next() < K.varPenCancel) {
-      M.halfCounts.var++;
-      emit(M, 'varCheck', ai, fouled, { text: 'VAR sprawdza rzut karny.', pause: 2 });
-      emit(M, 'varOverturn', ai, fouled, { text: 'Po analizie VAR sędzia odwołuje rzut karny.' });
+      const fouled = pickWeighted(M, onPitch(A, M.minute), (y) => SHOOT_W[y.slot.pos] ?? 1);
+      varReview(M, ai, fouled, 'penaltyCancelled', `Sędzia wskazał na wapno (padał ${last(fouled)}), ale po analizie VAR odwołuje rzut karny.`, { cancelPenalty: true });
       return;
     }
-    rateEv(fouler, -0.6); rateEv(fouled, 0.3);
-    emit(M, 'foul', 1 - ai, fouler);
-    emit(M, 'penalty', ai, fouled, { text: `Rzut karny! Faul: ${last(fouler)}, poszkodowany: ${last(fouled)}.` });
-    if (M.rng.next() < 0.1 * M.ctx.refStrict) card(M, D, fouler, 'faul w polu karnym');
-    penaltyKick(M, ai);
+    awardPenalty(M, ai);
     return;
   }
   const brk = K.brkBase[type] + K.kBreak * delta + A.P.brk + counterBonus(M, A, D, type);
   if (M.rng.next() < sig(brk)) {
+    if (type === 'KON' && tacticalFoul(M, A, D)) return;
     A.threat += 3;
     const header = type === 'SKR' && M.rng.next() < 0.45;
     shot(M, ai, drawXg(M, K.xg[type]) * (type === 'DYS' ? (M.ctx.weather.dys ?? 1) : 1), type, header);
@@ -221,8 +340,49 @@ function phaseAction(M) {
     x.tk++; rateEv(x, 0.08);
     const kind = type === 'SKR' && M.rng.next() < 0.5 ? 'clearance' : M.rng.next() < 0.55 ? 'tackle' : 'interception';
     emit(M, kind, 1 - ai, x);
+    // VAR: przeoczony faul lub ręka w polu karnym, karny podyktowany po analizie
+    if (M.ctx.var && type !== 'DYS' && M.rng.next() < K.varPenAdd) {
+      const fouled = pickWeighted(M, onPitch(A, M.minute), (y) => SHOOT_W[y.slot.pos] ?? 1);
+      varReview(M, ai, fouled, 'penaltyAwarded', 'Po analizie VAR sędzia dyktuje rzut karny.');
+      awardPenalty(M, ai, { culprit: x, fouled, byVar: true });
+      return;
+    }
     if (M.rng.next() < K.goalKickOnFail) emit(M, 'goalKick', 1 - ai, null);
   }
+}
+
+/** Rzut karny: faul obrońcy (czasem z kartką), wykonanie (z powtórką i dobitką). */
+function awardPenalty(M, ai, { culprit = null, fouled = null, byVar = false } = {}) {
+  const A = M.teams[ai]; const D = M.teams[1 - ai];
+  const fouler = culprit ?? pickWeighted(M, onPitch(D, M.minute).filter((y) => y.slot.pos !== 'BR'), (y) => FOUL_W[y.slot.pos] ?? 1);
+  const victim = fouled ?? pickWeighted(M, onPitch(A, M.minute), (y) => SHOOT_W[y.slot.pos] ?? 1);
+  rateEv(fouler, -0.6); rateEv(victim, 0.3);
+  fouler.fouls++;
+  emit(M, 'foul', 1 - ai, fouler);
+  emit(M, 'penalty', ai, victim, { byVar, foulerId: fouler.id, text: `Rzut karny! Faul: ${last(fouler)}, poszkodowany: ${last(victim)}.` });
+  if (M.rng.next() < 0.1 * M.ctx.refStrict) card(M, D, fouler, 'faul w polu karnym');
+  penaltyKick(M, ai);
+}
+
+/**
+ * Faul taktyczny przy groźnej kontrze (przerwanie korzystnego ataku, Law 12: żółta; ostatni obrońca: czerwona).
+ * Te same reguły dla obu drużyn: częściej przy twardej grze i przy prowadzeniu pod koniec, rzadko przez ukaranych.
+ */
+function tacticalFoul(M, A, D) {
+  const xs = onPitch(D, M.minute).filter((y) => ['ŚO', 'DP', 'ŚP', 'BO', 'WB'].includes(y.slot.pos));
+  if (!xs.length) return false;
+  const clean = xs.filter((y) => !y.yc);
+  const pool = clean.length ? clean : xs;
+  const leadingLate = M.score[D.side] > M.score[A.side] && M.minute >= 70;
+  const p = K.tacFoul * (D.P.tackling === 'hard' ? 1.3 : D.P.tackling === 'soft' ? 0.5 : 1) * (leadingLate ? 1.5 : 1) * (clean.length ? 1 : 0.25);
+  if (M.rng.next() >= p) return false;
+  const x = pickWeighted(M, pool, (y) => attr(y, 'AGR') * (y.slot.pos === 'DP' ? 1.5 : 1));
+  x.fouls++;
+  emit(M, 'foul', D.side, x, { tactical: true });
+  emit(M, 'freeKick', A.side, null);
+  if (M.rng.next() < K.tacFoulDogso) straightRed(M, D, x, 'dogso');
+  else if (M.rng.next() < K.tacFoulYellow * Math.sqrt(M.ctx.refStrict)) card(M, D, x, 'faul taktyczny, przerwanie kontry');
+  return true;
 }
 
 function dribblePen(A) { return 1 + 0.04 * (A.avg('DRY') - 11); }
@@ -286,9 +446,10 @@ function shot(M, ai, xg, type, header, forced = null) {
   }
   s.sh++;
   A.threat += 6 * xg;
-  const gk = goalkeeper(D);
+  const gk = M.emptyNet ? null : goalkeeper(D);
   const F = finishing(s, type, header);
-  const pg = Math.min(0.95, xg * Math.exp(K.kFin * (F - D.zones.GK + K.finOffset)) * (M.ctx.weather.conv ?? 1) * D.gkMods.goalMul);
+  const pg = M.emptyNet ? Math.min(0.95, xg * 1.25)
+    : Math.min(0.95, xg * Math.exp(K.kFin * (F - D.zones.GK + K.finOffset)) * (M.ctx.weather.conv ?? 1) * D.gkMods.goalMul);
   if (assister) { assister.kp++; rateEv(assister, 0.15); emit(M, 'keyPass', ai, assister); }
   if (M.rng.next() < pg) { goal(M, ai, s, assister, xg, type === 'PEN' ? 'PEN' : header ? 'HEAD' : type); return; }
   if (xg >= 0.3) rateEv(s, -0.3);
@@ -317,9 +478,26 @@ function corner(M, ai) {
   const A = M.teams[ai]; const D = M.teams[1 - ai];
   A.threat += 2;
   emit(M, 'corner', ai, null);
-  if (M.rng.next() < K.cornerShot * Math.exp(0.08 * (A.zones.SPA - D.zones.SPD))) {
+  const gkUp = desperate(M, A);
+  if (gkUp) emit(M, 'gkUp', ai, goalkeeper(A), { text: `${last(goalkeeper(A))} biegnie w pole karne rywala!` });
+  if (M.rng.next() < K.cornerShot * Math.exp(0.08 * (A.zones.SPA - D.zones.SPD)) * (gkUp ? K.gkUp.shotMul : 1)) {
     shot(M, ai, K.cornerXg[0] + M.rng.next() * (K.cornerXg[1] - K.cornerXg[0]), 'SP', true);
+  } else if (gkUp && M.rng.next() < K.gkUp.counter) {
+    // Kontra na pustą bramkę
+    M.emptyNet = true;
+    shot(M, 1 - ai, K.gkUp.counterXg[0] + M.rng.next() * (K.gkUp.counterXg[1] - K.gkUp.counterXg[0]), 'KON', false);
+    M.emptyNet = false;
   }
+}
+
+/** Ostatnie sekundy, przegrana jednym golem (w dwumeczu: suma), naturalny bramkarz idzie na rożny. */
+function desperate(M, A) {
+  if (M.half < 2 || M.elapsed <= M.length || (M.extraTime && M.half === 2)) return false;
+  const gk = goalkeeper(A);
+  if (!gk || gk.p.pos !== 'BR') return false;
+  const fl = M.ctx.knockout?.firstLeg;
+  const diff = M.score[A.side] - M.score[1 - A.side] + (fl ? fl[A.side] - fl[1 - A.side] : 0);
+  return diff === -1 && M.elapsed >= M.length + (M.added ?? 0) - 1;
 }
 
 function setPiece(M, ai) {
@@ -333,24 +511,44 @@ function setPiece(M, ai) {
   }
 }
 
-function penaltyKick(M, ai) {
+function penaltyKick(M, ai, retake = false) {
   const A = M.teams[ai]; const D = M.teams[1 - ai];
   const xs = onPitch(A, M.minute).filter((y) => y.slot.pos !== 'BR');
-  const t = xs.find((y) => y.id === A.takers.penalty) ?? xs.sort((p, q) => (attr(q, 'WYK') + attr(q, 'OPA')) - (attr(p, 'WYK') + attr(p, 'OPA')))[0];
+  if (!xs.length) return;
+  // Wyznaczony strzelec; po pudle w tym meczu do piłki podchodzi następny w kolejce
+  const ranked = xs.slice().sort((p, q) => (attr(q, 'WYK') + attr(q, 'OPA')) - (attr(p, 'WYK') + attr(p, 'OPA')));
+  const desig = xs.find((y) => y.id === A.takers.penalty);
+  const t = desig && !A.penMissed?.includes(desig.id) ? desig : ranked.find((y) => !A.penMissed?.includes(y.id)) ?? ranked[0];
   const gk = goalkeeper(D);
   const skill = (attr(t, 'WYK') + attr(t, 'OPA') + attr(t, 'SFR')) / 3;
   const keep = gk ? (attr(gk, 'REF') + attr(gk, 'JNJ')) / 2 : 3;
   const p = Math.min(0.97, K.penConv * Math.exp(0.03 * (skill - keep)) * D.gkMods.goalMul ** 0.3);
   t.sh++;
   if (M.rng.next() < p) { goal(M, ai, t, null, 0.78, 'PEN'); return; }
-  if (gk && M.rng.next() < 0.6) {
+  const saved = gk && M.rng.next() < 0.6;
+  // Law 14: bramkarz zszedł z linii przed strzałem, karny niestrzelony -> powtórka (raz)
+  if (!retake && gk && M.rng.next() < K.penRetake) {
+    emit(M, 'penaltyRetake', ai, t, { reason: 'bramkarz przed linią', text: `Powtórka rzutu karnego: ${last(gk)} wyszedł przed linię bramkową.` });
+    penaltyKick(M, ai, true);
+    return;
+  }
+  if (saved) {
     t.sot++; gk.saves++; rateEv(gk, 0.6);
-    emit(M, 'shotOn', ai, t, { xg: 0.78, text: `${last(gk)} broni rzut karny! Strzelał ${last(t)}.` });
+    emit(M, 'shotOn', ai, t, { xg: 0.78, penalty: true, text: `${last(gk)} broni rzut karny! Strzelał ${last(t)}.` });
     emit(M, 'save', 1 - ai, gk);
   } else {
-    emit(M, 'shotOff', ai, t, { xg: 0.78, text: `${last(t)} nie trafia z rzutu karnego!` });
+    emit(M, 'shotOff', ai, t, { xg: 0.78, penalty: true, text: `${last(t)} nie trafia z rzutu karnego!` });
   }
+  A.penMissed = [...(A.penMissed ?? []), t.id];
   rateEv(t, -0.5);
+  // Dobitka po obronie (strzelający nie może dotknąć piłki drugi raz)
+  if (saved && M.rng.next() < K.penRebound) {
+    const others = xs.filter((y) => y !== t);
+    if (others.length) {
+      const r = pickWeighted(M, others, (y) => (SHOOT_W[y.slot.pos] ?? 1) * attr(y, 'RUC'));
+      shot(M, ai, K.penReboundXg[0] + M.rng.next() * (K.penReboundXg[1] - K.penReboundXg[0]), 'POZ', false, r);
+    }
+  }
 }
 
 function goal(M, ai, s, assister, xg, how) {
@@ -358,9 +556,12 @@ function goal(M, ai, s, assister, xg, how) {
   // VAR może anulować gola (spalony, faul, ręka)
   if (M.ctx.var && how !== 'OG' && M.rng.next() < K.varGoalCancel) {
     M.halfCounts.var++;
+    const varReason = how === 'PEN' ? 'wejście w pole karne przed strzałem'
+      : M.rng.weighted(['spalony', 'faul w ataku', 'ręka'], (k) => ({ spalony: 0.6, 'faul w ataku': 0.25, ręka: 0.15 })[k]);
     emit(M, 'goal', ai, s, { xg: round2(xg ?? 0), how, aid: assister?.id ?? null, text: `GOL! ${s ? last(s) : ''}`, provisional: true, pause: 3 });
-    emit(M, 'varCheck', ai, s, { text: 'VAR sprawdza bramkę.', pause: 2 });
-    emit(M, 'varOverturn', ai, s, { cancelGoal: true, xg: round2(xg ?? 0), text: 'Gol nieuznany po analizie VAR.' });
+    emit(M, 'varCheck', ai, s, { decision: 'goalDisallowed', text: 'VAR sprawdza bramkę.', pause: 2 });
+    emit(M, 'varOverturn', ai, s, { cancelGoal: true, decision: 'goalDisallowed', varReason, xg: round2(xg ?? 0), text: `Gol nieuznany po analizie VAR (${varReason}).` });
+    if (varReason === 'spalony' && s) s.offs++;
     return;
   }
   M.score[ai]++;
@@ -387,6 +588,11 @@ function goal(M, ai, s, assister, xg, how) {
     : how === 'PEN' ? `GOL! ${last(s)} pewnie z rzutu karnego.`
       : `GOL! ${last(s)}${how === 'HEAD' ? ' strzałem głową' : how === 'DYS' ? ' strzałem z dystansu' : how === 'FK' ? ' z rzutu wolnego' : ''}${assister ? `, asysta: ${last(assister)}` : ''}.`;
   emit(M, 'goal', ai, s, { xg: round2(xg ?? 0), how, aid: assister?.id ?? null, ownGoal: how === 'OG', ogId: ogBy?.id ?? null, text, pause: 3, score: [...M.score] });
+  if (M.ctx.var && M.rng.next() < K.varGoalConfirm) {
+    M.halfCounts.var += 0.3;
+    emit(M, 'varCheck', ai, s, { confirmed: true, decision: 'goalConfirmed', text: 'VAR sprawdzał bramkę: gol uznany.', pause: 2 });
+  }
+  for (const T of M.teams) T.react.push({ kind: 'goal', tick: M.tick });
 }
 
 function phaseOwnGoal(M) {
@@ -407,20 +613,32 @@ function pickInjury(M, x) {
   return { cat, name, days: M.rng.int(lo, hi), playable };
 }
 
-export function injure(M, T, x, contact = false) {
+/**
+ * Uraz w meczu. Zdarzenie 'injury': { injury, severity, canContinue, days, gk, treated, concussion, contact }.
+ * opts.cardedFoul: rywal ukarany kartką za ten faul, więc opatrywany nie musi schodzić (Law 5).
+ * opts.injury: wymuszony uraz { cat, name, days, playable } (scenariusze testowe, przyszłe zdarzenia).
+ */
+export function injure(M, T, x, contact = false, opts = {}) {
   if (x.injury) return;
-  const inj = pickInjury(M, x);
+  const inj = opts.injury ?? pickInjury(M, x);
   x.injury = inj;
   M.halfCounts.injuries++;
+  const gk = x.slot?.pos === 'BR';
   // IFAB 2026/27: opatrywany zawodnik schodzi na 1 minutę (bez bramkarza i faulu ukaranego kartką)
-  if (x.slot?.pos !== 'BR') x.treatedUntil = M.minute + 1;
+  const treated = !gk && !opts.cardedFoul;
+  if (treated) x.treatedUntil = M.minute + 1;
   if (inj.playable) x.base -= 0.045 * x.p.ovr;
-  else x.on = false; // musi zejść; drużyna gra w osłabieniu do zmiany
+  else { x.on = false; if (!gk) T.injuredOff.push(x); } // musi zejść; drużyna gra w osłabieniu do zmiany
+  const concussion = /wstrząśnienie/.test(inj.name);
   emit(M, 'injury', T.side, x, {
-    injury: inj, contact,
+    injury: inj, severity: inj.cat, canContinue: inj.playable, days: inj.days, gk, treated, concussion, contact,
     text: inj.playable ? `${last(x)} jest opatrywany (${inj.name}), może grać dalej.` : `${last(x)} doznaje kontuzji (${inj.name}) i nie może kontynuować gry.`,
   });
-  if (!inj.playable) ensureGoalkeeper(M, T);
+  if (!inj.playable) {
+    T.react.push({ kind: 'injury', tick: M.tick, pos: x.slot?.pos ?? null, gk });
+    if (gk) { T.injuredGk = x; goalkeeperLost(M, T, 'injury'); }
+    checkMinPlayers(M, T);
+  }
 }
 
 function phaseInjuries(M) {

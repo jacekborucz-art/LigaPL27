@@ -108,6 +108,7 @@ export function switchClub(game, clubId, date) {
   game.manager.history = [...(game.manager.history ?? []).map((h) => (h.club === old && !h.to ? { ...h, to: date } : h)), { club: clubId, from: date }];
   game.clubId = clubId;
   game.tactics = createTactics(squadOf(game.world, clubId), { benchSize: 12 });
+  delete game.tacticsSubs; delete game.tacticsLast; // zastępstwa asystenta (match/matchday.js) dotyczyły starej kadry
   game.board = { trust: 55, fansMood: 55, reviews: [], goal: seasonGoalFor(clubById(clubId)), goalClub: clubId };
   game.market.userListed = {};
   game.market.offers = game.market.offers.filter((o) => o.kind !== 'incoming');

@@ -114,6 +114,13 @@ export const COH = {
   aiFamWeek: 2.5, aiInstr: 80,
 };
 
+/**
+ * Trening klubów AI w kroku tygodniowym: to, co domyślny plan asystenta daje drużynie gracza (docs/balans.md).
+ * Średnio na tydzień sezonu plan daje ok. +0,25 morale i ok. +14 pkt ostrości (do progu LOAD.sharpTrainCap);
+ * bez tego zawodnicy AI tracili ostrość między meczami, a gracz miał premię tylko za to, że jego klub trenuje.
+ */
+export const AI_TRAINING = { moraleWeek: 0.25, sharpWeek: 14 };
+
 /** Sztab szkoleniowy: role i wpływ jakości 1-20. [SZAC] */
 export const STAFF_ROLES = {
   asystent: { name: 'Asystent trenera', effect: 'Taktyka i zgranie x(0.8 + 0.02 q), nauka pozycji, plan tygodnia, dokładność raportu rozwoju' },
