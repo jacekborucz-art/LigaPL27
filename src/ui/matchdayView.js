@@ -919,7 +919,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
         <button class="sub-row__main" data-md="subPick:${kind}|${esc(x.id)}" data-sdrag="${kind}:${esc(x.id)}" data-name="${esc(x.p.name)}" aria-pressed="${isSel}" ${planned ? 'disabled' : ''}>
           <span class="sub-handle" data-shandle aria-hidden="true"></span>
           <span class="pos" data-g="${GROUP[pos] ?? 'MID'}">${esc(pos)}</span>
-          <span class="sub-name">${esc(x.p.name)}${x.yc ? ICON.yellow : ''}${k ? ICON.knock : ''}${note ? `<small>${esc(note)}</small>` : ''}</span>
+          <span class="sub-name"><span class="sub-name__l"><span class="sub-name__t">${esc(x.p.name)}</span>${x.yc ? ICON.yellow : ''}${k ? ICON.knock : ''}</span>${note ? `<small>${esc(note)}</small>` : ''}</span>
           <span class="sub-cond" title="Kondycja"><i style="width:${cond}%" class="${condCls(cond)}"></i></span><b>${cond}%</b>
         </button></li>`;
     };

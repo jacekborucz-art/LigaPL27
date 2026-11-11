@@ -871,7 +871,7 @@ async function newGame(slot, clubId, profile = null) {
   state.nc = null;
   await save();
   state.screen = 'hub';
-  state.tab = 'poczta';
+  state.tab = 'pulpit'; // po podpisaniu kontraktu start na Pulpicie
   render();
 }
 
