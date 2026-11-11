@@ -139,6 +139,7 @@ const SHELL = [
   './src/season/uefa.js',
   './src/styles/app.css',
   './src/styles/base.css',
+  './src/styles/dashboard.css',
   './src/styles/fonts.css',
   './src/styles/matchday.css',
   './src/styles/negotiation.css',
