@@ -166,42 +166,47 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
   }
 
   // ------------------------------------------------------------ Mecz na żywo
+  const SPEEDS = [[1, 'x1'], [2.5, 'x2,5'], [5, 'x5']];
   function renderLive() {
     const M = S.M;
+    const skipLabel = `Pokaż wynik${S.step === 'live1' ? '<span class="tp-skip__x"> do przerwy</span>' : ''}`;
     shell(`
       <div class="live">
-        <div class="board" aria-live="off">
-          <div class="board__t">${crest(fixture.home, 30)}<span>${esc(shortName(0))}</span></div>
-          <div><div class="board__score" id="mdScore">${M.score[0]}:${M.score[1]}</div><span class="board__min" id="mdMin">${esc(M.events[M.events.length - 1]?.min ?? "0'")}</span></div>
-          <div class="board__t"><span>${esc(shortName(1))}</span>${crest(fixture.away, 30)}</div>
-        </div>
-        <div class="mom-area">
-          <svg class="momentum" id="mdMom" viewBox="0 0 96 56" preserveAspectRatio="none" role="img" aria-label="Momentum meczu"></svg>
-          <div class="poss" style="margin-top:8px"><span id="mdPh">50%</span><div class="bar2"><i class="bh" id="mdPbh" style="width:50%"></i><i class="ba" id="mdPba" style="width:50%"></i></div><span id="mdPa">50%</span></div>
-        </div>
-        <div class="pitch-area pitch-wrap"><canvas class="pitch" id="mdPitch" aria-label="Boisko"></canvas>
-          <div class="md-toasts" id="mdToasts" aria-live="polite"></div>
-          <div class="md-halt" id="mdHalt" hidden role="alertdialog" aria-labelledby="mdHaltTitle">
-            <b id="mdHaltTitle">Gra wstrzymana</b><p id="mdHaltText"></p>
-            <div class="md-halt__btns"><button class="btn btn--quiet btn--sm" data-md="dlg:subs">Zmiany</button><button class="btn btn--quiet btn--sm" data-md="dlg:tactics">Taktyka</button><button class="btn btn--primary btn--sm" data-md="haltGo">Graj dalej</button></div>
+        <div class="live__head">
+          <div class="board" aria-live="off">
+            <div class="board__t">${crest(fixture.home, 30)}<span>${esc(shortName(0))}</span></div>
+            <div><div class="board__score" id="mdScore">${M.score[0]}:${M.score[1]}</div><span class="board__min" id="mdMin">${esc(M.events[M.events.length - 1]?.min ?? "0'")}</span></div>
+            <div class="board__t"><span>${esc(shortName(1))}</span>${crest(fixture.away, 30)}</div>
+          </div>
+          <div class="transport" role="toolbar" aria-label="Przebieg meczu">
+            <button class="md-play ${ui.running ? 'is-running' : ''}" data-md="pause" id="mdPause">${ui.running ? 'Pauza' : M.minute > 0 ? 'Wznów mecz' : 'Start meczu'}</button>
+            <div class="speedset" role="group" aria-label="Tempo meczu">${SPEEDS.map(([v, l]) => `<button class="speed" data-md="speed:${v}" aria-pressed="${ui.speed === v}">${l}</button>`).join('')}</div>
+            <button class="tp-skip" data-md="skip" title="${S.step === 'live1' ? 'Pokaż wynik do przerwy' : 'Pokaż wynik końcowy'}">${skipLabel}</button>
           </div>
         </div>
-        <div class="ctrl-area"><div class="controls">
-          <button class="btn md-play ${ui.running ? 'is-running' : ''}" data-md="pause" id="mdPause" aria-live="polite">${ui.running ? 'Pauza' : M.minute > 0 ? 'Wznów mecz' : 'Start meczu'}</button>
-          <button class="btn btn--quiet speed" data-md="speed:1" aria-pressed="${ui.speed === 1}">x1</button>
-          <button class="btn btn--quiet speed" data-md="speed:4" aria-pressed="${ui.speed === 4}">x4</button>
-          <button class="btn btn--quiet" data-md="dlg:subs">Zmiany</button>
-          <button class="btn btn--quiet" data-md="dlg:tactics">Taktyka</button>
-          <button class="btn btn--quiet" data-md="dlg:shout">Okrzyk</button>
-        </div></div>
+        <div class="pitch-area">
+          <div class="pitch-wrap"><canvas class="pitch" id="mdPitch" aria-label="Boisko"></canvas>
+            <div class="md-toasts" id="mdToasts" aria-live="polite"></div>
+            <div class="md-halt" id="mdHalt" hidden role="alertdialog" aria-labelledby="mdHaltTitle">
+              <b id="mdHaltTitle">Gra wstrzymana</b><p id="mdHaltText"></p>
+              <div class="md-halt__btns"><button class="btn btn--quiet btn--sm" data-md="dlg:subs">Zmiany</button><button class="btn btn--quiet btn--sm" data-md="dlg:tactics">Taktyka</button><button class="btn btn--primary btn--sm" data-md="haltGo">Graj dalej</button></div>
+            </div>
+          </div>
+          <div class="coachbar" role="toolbar" aria-label="Decyzje trenera">
+            <button data-md="dlg:subs">Zmiany</button><button data-md="dlg:tactics">Taktyka</button><button data-md="dlg:shout">Okrzyk</button>
+          </div>
+        </div>
+        <div class="mom-area">
+          <div class="poss"><span id="mdPh">50%</span><div class="bar2"><i class="bh" id="mdPbh" style="width:50%"></i><i class="ba" id="mdPba" style="width:50%"></i></div><span id="mdPa">50%</span></div>
+          <svg class="momentum" id="mdMom" viewBox="0 0 96 56" preserveAspectRatio="none" role="img" aria-label="Przewaga w kolejnych minutach"></svg>
+        </div>
         <div class="feed-area"><h2>Relacja</h2><ul class="feed" id="mdFeed"></ul></div>
         <div class="side-area"><div class="tabs2" role="tablist">
           <button role="tab" data-md="tab:stats" aria-selected="${ui.tab === 'stats'}">Statystyki</button>
           <button role="tab" data-md="tab:lineups" aria-selected="${ui.tab === 'lineups'}">Składy</button></div><div id="mdSide"></div></div>
       </div>
       <div class="goal" id="mdGoal" role="status"><div><b id="mdGoalTitle">GOL</b><small id="mdGoalWho"></small></div></div>
-      <dialog id="mdDlg" class="panel md-dlg"></dialog>`,
-      btn('skip', S.step === 'live1' ? 'Pokaż wynik do przerwy' : 'Pokaż wynik od razu', false));
+      <dialog id="mdDlg" class="panel md-dlg"></dialog>`, '');
     setupCanvas();
     updateLive();
   }

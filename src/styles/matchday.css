@@ -179,15 +179,6 @@
 /* PC: mecz w trzech kolumnach */
 @media (min-width: 1024px) {
   .md__main { max-width: 1200px; padding-left: var(--space-6); padding-right: var(--space-6); }
-  .live { grid-template-columns: 300px minmax(300px, 380px) 1fr; grid-template-areas: "board board board" "mom mom mom" "feed pitch ctrl" "feed pitch side"; align-items: start; }
-  .live > .board { top: 52px; }
-  .live .ctrl-area { grid-area: ctrl; }
-  .live .board { grid-area: board; }
-  .live .mom-area { grid-area: mom; }
-  .live .feed-area { grid-area: feed; }
-  .live .pitch-area { grid-area: pitch; }
-  .live .side-area { grid-area: side; }
-  .feed { max-height: 560px; }
   .actionbar { justify-content: flex-end; padding-right: var(--space-6); }
   .studio-cols { display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--space-6); }
 }
@@ -275,3 +266,62 @@
 .md-halt p { margin: 4px 0 var(--space-2); font-size: var(--step--1); }
 .md-halt__btns { display: flex; flex-wrap: wrap; gap: 6px; }
 @media (prefers-reduced-motion: reduce) { .md-toast { animation: none; } }
+
+/* ================= Mecz na żywo: układ v2 =================
+   Nagłówek (tablica + pasek tempa) przyklejony u góry. Tempo osobno od decyzji trenera:
+   pasek tempa pod tablicą, pasek trenera pod boiskiem. */
+.actionbar:empty { display: none; }
+.live { display: grid; gap: var(--space-3); grid-template-columns: minmax(0, 1fr); }
+.live__head { position: sticky; top: 52px; z-index: 15; display: grid; gap: 6px; background: var(--bg); padding-bottom: 6px; }
+.live__head > .board { position: static; box-shadow: none; }
+.live .ctrl-area, .live .controls { display: none; }
+
+.transport { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; padding: 6px; border-radius: var(--radius-m); background: #0E1511; color: var(--kreda, #F3F6F1); }
+.md-play { flex: none; min-height: 40px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--led); color: #14211A; font: 700 var(--step-0)/1 var(--font-display); cursor: pointer; }
+.md-play:hover { filter: brightness(1.06); }
+.md-play.is-running { background: transparent; color: var(--led); box-shadow: inset 0 0 0 2px var(--led); }
+.md-play:focus-visible, .speed:focus-visible, .tp-skip:focus-visible, .coachbar button:focus-visible { outline: 3px solid var(--led); outline-offset: 2px; }
+.speedset { display: inline-flex; flex: none; padding: 3px; gap: 2px; border-radius: 999px; background: rgb(255 255 255 / .08); }
+.speed { min-height: 34px; min-width: 44px; padding: 0 10px; border: 0; border-radius: 999px; background: transparent; color: rgb(243 246 241 / .8); font: 700 var(--step--1)/1 var(--font-display); font-variant-numeric: tabular-nums; cursor: pointer; }
+.speed[aria-pressed="true"] { background: var(--kreda, #F3F6F1); color: #14211A; border-color: transparent; }
+.tp-skip { margin-left: auto; flex: none; min-height: 40px; padding: 0 14px; border: 1px solid rgb(255 255 255 / .25); border-radius: 999px; background: transparent; color: inherit; font: 600 var(--step--1)/1 var(--font-body, inherit); cursor: pointer; white-space: nowrap; }
+.tp-skip:hover { background: rgb(255 255 255 / .08); }
+
+.pitch-area { position: relative; display: grid; gap: 8px; }
+.pitch-wrap { position: relative; }
+.coachbar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.coachbar button { min-height: 40px; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--surface); color: var(--text); font: 700 var(--step--1)/1 var(--font-display); cursor: pointer; }
+.coachbar button:hover { border-color: var(--murawa); }
+
+.mom-area { display: grid; gap: 6px; padding: 10px 12px; border-radius: var(--radius-m); background: var(--surface); }
+.mom-area .momentum { height: 56px; background: transparent; }
+.mom-area .poss { margin: 0; }
+
+/* Telefon: wąski pasek tempa w jednym rzędzie */
+@media (max-width: 479px) {
+  .transport { gap: 6px; padding: 5px; }
+  .md-play { padding: 0 12px; font-size: var(--step--1); }
+  .speed { min-width: 38px; padding: 0 6px; }
+  .tp-skip { padding: 0 12px; }
+  .tp-skip__x { display: none; }
+}
+@media (max-width: 1023px) {
+  .live > .live__head { order: 0; }
+  .live .pitch-area { order: 1; }
+  .live .mom-area { order: 2; }
+  .live .feed-area { order: 3; }
+  .live .side-area { order: 4; }
+  .live .pitch { width: min(100%, calc(56dvh * 0.68)); }
+}
+
+/* PC: relacja | boisko z paskiem trenera | przebieg i statystyki */
+@media (min-width: 1024px) {
+  .live { grid-template-columns: minmax(240px, 1fr) auto minmax(280px, 1fr); grid-template-areas: "head head head" "feed pitch mom" "feed pitch side"; column-gap: var(--space-4); align-items: start; }
+  .live > .live__head { grid-area: head; }
+  .live .pitch-area { grid-area: pitch; position: sticky; top: 236px; justify-self: center; width: clamp(260px, calc((100dvh - 310px) * 0.68), 400px); }
+  .live .mom-area { grid-area: mom; }
+  .live .feed-area { grid-area: feed; }
+  .live .side-area { grid-area: side; }
+  .live .feed { max-height: calc(100dvh - 300px); overflow: auto; }
+  .live .pitch { width: 100%; }
+}
