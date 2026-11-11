@@ -280,10 +280,45 @@ to już nie pogoń).
 ## 9. Otwarte pytania
 
 1. Wybór wariantu 4-4-2 przed meczem przez AI (`src/match/matchday.js`, inne zadanie): np. słabszy wyjazdowo
-   niski blok, faworyt u siebie ofensywne.
+   niski blok, faworyt u siebie ofensywne. Zrobione: rozdz. 10.
 2. Zgranie formacji w treningu (`src/training/cohesion.js`) liczy się osobno dla każdej formacji; rodzina 4-4-2
    mogłaby dzielić zgranie.
-3. Studio i raport asystenta (`src/match/studio.js`) nie znają nazw „4-4-2 defensywne/ofensywne” i traktują je jak 4-4-2.
+3. Studio i raport asystenta (`src/match/studio.js`) nie znają nazw „4-4-2 defensywne/ofensywne” i traktują je jak 4-4-2. Zrobione: rozdz. 10.
 4. UI: ustawianie `p.playingInjured` na ekranie składu, przeciąganie zawodników na sloty w oknie „Zmiany i taktyka”
-   (`previewShape` + `changeTactics` z `assign`), biały krzyżyk i oceny na żywo (`playerStates`).
+   (`previewShape` + `changeTactics` z `assign`), biały krzyżyk i oceny na żywo (`playerStates`). Zrobione w oknie meczu
+   (rozdz. 10); `p.playingInjured` na ekranie składu zostaje otwarte.
 5. Szybka symulacja meczów w tle nie modeluje gry z bólem; urazy z niej działają jak wcześniej.
+
+## 10. Ekran meczu na żywo (widok, Nov 11, 2026)
+
+Prośby użytkownika: pełne nazwy drużyn na PC, kartki „przyklejone” do ikon zawodników, biały krzyżyk przy lekkim
+urazie, strzelcy i czerwone kartki pod nazwami drużyn, składy po bokach z ocenami na żywo, dowolne ustawienie
+w osłabieniu, czytelny wybór ustawienia w oknie „Zmiany i taktyka”, sortowanie składu i podświetlenie gry poza pozycją.
+
+Panel (ekspert silnika, projektant): w trakcie meczu decyzje trenera zależą od kondycji (kiedy zmieniać), kartek
+(ryzyko drugiej żółtej), lekkich urazów (ryzyko pogłębienia, rozdz. 2), oceny na żywo i gry poza pozycją. Te same dane
+pokazujemy dla rywala, bo widać, kto u niego słabnie albo gra z żółtą kartką.
+
+| Element | Zachowanie | Kod |
+|---|---|---|
+| Tablica wyniku | pełne nazwy od 700 px, skróty na telefonie; pod nazwą „I. Nazwisko” i znaki z minutą: piłka (gol, „k.” karny, „(sam.)” samobój pod drużyną, której zaliczono gola), przekreślona piłka (niestrzelony karny), czerwona kartka, żółta i czerwona (druga żółta), gol nieuznany: przygaszona piłka, znak VAR i przekreślona minuta; czerwona po VAR ma znak VAR. Jeden wpis na zawodnika. Ta sama tablica w przerwie i w studiu pomeczowym | `scoreboardLines`, `boardHtml` w `src/ui/matchdayView.js` |
+| Boisko (canvas) | numery z `kitNo`, żółta kartka w prawym górnym rogu kropki (lekko obrócona), wykluczony zostaje w tej minucie półprzezroczysty z czerwoną kartką, biały krzyżyk na ciemnym kółku przy lekkim urazie (`x.knock`), opatrywani półprzezroczyści | `layoutDots`, `drawPitch` |
+| Składy | numer w barwach klubu, pozycja na slocie (obwódka żółta 60-84 %, czerwona poniżej 60 % biegłości), nazwisko, znaki kartek i urazów, wejście „↑63'”, zejście „↓63'”, pasek kondycji, ocena na żywo w kolorach studia pomeczowego; ławka z licznikiem zmian; „Poza grą” | `rosterHtml` (dane: `playerStates`) |
+| Układ | od 1760 px: skład, boisko, przebieg, relacja i statystyki obok siebie, skład; 1280-1759: zakładki Relacja/Statystyki w środku; 1024-1279: relacja, boisko, Statystyki/Składy; telefon: jedna kolumna, składy w zakładce | `normTab`, `matchday.css` (sekcja v3) |
+| Menu zawodnika | prawy przycisk, przytrzymanie palcem, klawisz menu albo kliknięcie wiersza (także kropka na boisku): Zmień zawodnika / Wprowadź na boisko (okno zmian z nim wybranym), Statystyki meczu, Stałe fragmenty (karne, wolne, rożne: `T.takers`, silnik czyta przy każdym wykonaniu) | `playerMenuModel`, `src/ui/contextMenu.js` (bez zmian) |
+| Zmiany i taktyka | ustawienie przyciskami (ciemnozielone, pogrubione, czytelne w obu motywach; kropka przy obecnym), wszystkie sloty formacji na boisku, puste miejsca w osłabieniu jako przerywane kółka; dotknięcie dwóch zawodników na boisku albo przeciągnięcie zamienia pozycje, zawodnik na puste miejsce zostawia puste swoje; podgląd `previewShape`, Zatwierdź wysyła `changeTactics({ formation, assign })` (zmiennik przejmuje slot schodzącego); błąd silnika po polsku blokuje Zatwierdź; „Pierwszy skład” w kolejności slotów, z pozycją na slocie i „nominalnie …”; gra poza pozycją: obwódka i podświetlone nazwisko na boisku, pasek i obwódka na liście, legenda | `managePanel`, `tacDraft`, `confirmAll` |
+
+Logika dnia meczowego (`src/match`):
+
+- `aiPreMatchFormation`: rywal AI zaczyna 4-2-3-1 (najlepszy bilans na cały mecz, rozdz. 6). Wyraźnie słabszy
+  (szansa na wygraną poniżej 22 %, na porażkę powyżej 52 %) na wyjeździe albo z ostrożnym trenerem: 4-4-2 defensywne
+  z szansą 80 % (trener ostrożny), 50 % (pragmatyczny), 15 % (ofensywny). Faworyt u siebie (powyżej 60 %) z trenerem
+  ofensywnym: 4-4-2 ofensywne z szansą 35 %. Osobne ziarno [SZAC: progi i szanse]. W meczu AI dalej przełącza się
+  w rodzinie 4-4-2 (`variant442`).
+- `studio.js` zna pełne nazwy „4-4-2 defensywne”, „4-4-2 ofensywne” i „4-4-2 romb” (wcześniej romb też trafiał do 4-4-2),
+  raport asystenta opisuje niski blok i wysokie skrzydła rywala.
+- `postAdvice`: przemowa pomeczowa zaznaczona na start to zalecenie asystenta (ten sam model co odprawa, najlepsza
+  średnia zmiana morale), z dopiskiem „(zalecana)”. Wcześniej zawsze Pochwała, która po porażce obniża morale.
+
+Testy: `tests/matchLiveUi.test.mjs`. Otwarte: zmiana bramkarza z pola przy pustej bramce pokazuje tylko błąd silnika
+(„Ktoś musi stanąć w bramce.”); zawodnik z urazem, który musi zejść, nie ma kropki na boisku w oknie zmian (jest na liście).

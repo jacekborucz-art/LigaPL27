@@ -882,3 +882,8 @@
 .pstat dt { color: var(--text-muted); }
 .pstat dd { margin: 0; font: 700 var(--step-0)/1.2 var(--font-display); font-variant-numeric: tabular-nums; }
 @media (max-width: 479px) { .pstat { grid-template-columns: 1fr; } }
+/* Wybrany zawodnik (dotknięcie) innym kolorem niż gra poza pozycją (żółta/czerwona obwódka) */
+.mm-tok.is-sel .mm-tok__dot, .mm-tok.is-target .mm-tok__dot { outline: 3px solid #fff; outline-offset: 3px; transform: scale(1.12); }
+.mm-tok.is-sel .mm-tok__name { background: #fff; color: #14211A; }
+.sub-row.is-sel .sub-row__main { box-shadow: inset 4px 0 0 var(--focus); background: color-mix(in srgb, var(--focus) 14%, var(--surface)); }
+.sub-row.is-target .sub-row__main { outline-color: var(--focus); }

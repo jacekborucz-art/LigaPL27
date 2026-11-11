@@ -22,6 +22,7 @@ import { INJURY_TYPES } from '../engine/match/constants.js';
 import { fmtDate } from '../ui/dom.js';
 import { UEFA_CLUBS, createUefa } from './uefa.js';
 import { aiChooseSpeech, postMatchBriefing, closeMatchMemory } from '../match/briefings.js';
+import { statGroup, addPlayerMatch, syncSpell, recordTeamMatch, CLUB_GROUPS } from './history.js';
 
 export const LEAGUE_COMPS = ['ekstraklasa', 'liga1', 'liga2'];
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
@@ -300,6 +301,10 @@ export function applyResult(game, f, res, rng) {
       const friendly = f.comp === 'friendly'; // sparing: bez statystyk sezonu, formy, kartek i pauz
       if (!friendly) p.morale = applyMorale(p.morale ?? 12, afterMatchDelta({ result, strengthDiff: diff, derby: f.derby, played: !!x, rating: x?.rating, isRegular: (p.season?.apps ?? 0) >= 5 }));
       if (!x) continue;
+      // Statystyki w podziale na rozgrywki (także sparingi) i historia klubowa (mecze o punkty), src/season/history.js
+      const grp = statGroup(f.comp);
+      addPlayerMatch(p, grp, x);
+      if (CLUB_GROUPS.includes(grp)) { const sp = syncSpell(p, f.date); if (sp) { sp.m++; sp.g += x.g; } }
       if (friendly) {
         p.fresh = clamp(Math.round((p.fresh ?? 95) - 24 * (x.minutes / 90)), 35, 100);
         p.matchDebt = Math.max(p.matchDebt ?? 0, Math.round(24 * (x.minutes / 90)));
@@ -354,6 +359,7 @@ export function applyResult(game, f, res, rng) {
     }
     if (f.comp.startsWith('playoff')) (game.season.playoffs.winners ??= {})[f.id] = w;
   }
+  recordTeamMatch(game, f); // historia meczów drużyny gracza (tylko jej mecze)
   return msgs;
 }
 

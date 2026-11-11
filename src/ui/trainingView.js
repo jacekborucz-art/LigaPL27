@@ -25,6 +25,8 @@ import {
   friendlyDates, friendlyOpponents, createFriendly, cancelFriendly, clubFriendlies, friendlyPeriod,
 } from '../training/index.js';
 import { baseFactor, baseTerm } from '../training/camps.js';
+import { setFriendlyRules, friendlyRulesOf, friendlyRuleTags, FRIENDLY_RULE_TEXT } from '../training/friendlies.js';
+import { FRIENDLY_DEFAULTS } from '../engine/match/rules.js';
 import { legsTerm, overloadTerm } from '../training/load.js';
 
 const WD = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
@@ -75,7 +77,8 @@ function dayCard(d, game, sel) {
   if (d.kind === 'match') {
     const f = d.match;
     const opp = f && anyClub(f.home === game.clubId ? f.away : f.home);
-    body = `<span class="tr-day__match">Mecz</span><small>${esc(opp?.short ?? opp?.name ?? 'rywal z losowania')}${f ? `, ${f.home === game.clubId ? 'dom' : 'wyjazd'}` : ''}</small>`;
+    const fr = f?.comp === 'friendly';
+    body = `<span class="tr-day__match">${fr ? 'Sparing' : 'Mecz'}</span><small>${esc(opp?.short ?? opp?.name ?? 'rywal z losowania')}${f ? `, ${f.neutral ? 'obóz' : f.home === game.clubId ? 'dom' : 'wyjazd'}` : ''}</small>${fr ? `<small class="tr-day__rules">${esc(friendlyRuleTags(f).join(', '))}</small>` : ''}`;
   } else if (d.kind === 'rest' || d.kind === 'off') {
     body = `<span class="tr-day__rest">${d.kind === 'off' ? 'Urlop' : 'Wolne'}</span>`;
   } else {
@@ -415,14 +418,44 @@ function campsTab(game, ui) {
 }
 
 // ------------------------------------------------------------ Sparingi
+const RULE_GROUPS = [['decider', 'Remis'], ['subs', 'Zmiany'], ['rotation', 'Plan rotacji']];
+const RULE_UI_KEY = { decider: 'trFrDecider', subs: 'trFrSubs', rotation: 'trFrRot' };
+
+/** Zasady nowego sparingu z wyborów gracza na ekranie (domyślnie FRIENDLY_DEFAULTS). */
+function draftRules(ui) {
+  return Object.fromEntries(RULE_GROUPS.map(([k]) => [k, ui[RULE_UI_KEY[k]] ?? FRIENDLY_DEFAULTS[k]]));
+}
+
+/**
+ * Trzy przełączniki zasad sparingu z jednym zdaniem wyjaśnienia pod każdym. act: akcja przycisku
+ * ('tr-fr-rule' dla nowego sparingu, 'tr-fr-set' dla zaplanowanego), id: sparing do zmiany.
+ */
+function rulesEditor(rules, act, id = '') {
+  return `<div class="tr-frrules">${RULE_GROUPS.map(([k, label]) => {
+    const opts = FRIENDLY_RULE_TEXT[k];
+    const cur = opts[rules[k]] ?? opts[FRIENDLY_DEFAULTS[k]];
+    const extra = k === 'subs' && rules.subs === 'rolling' ? ' Zmiany powrotne nie obowiązują w oficjalnych meczach seniorów.' : k === 'rotation' && rules.subs === 'standard' && rules.rotation === 'two_xi' ? ' Przy 5 zmianach asystent wymieni część składu stopniowo.' : '';
+    return `<fieldset class="tr-slot tr-frrule"><legend>${esc(label)}</legend>
+      <div class="seg2" role="group" aria-label="${esc(label)}">${Object.entries(opts).map(([v, o]) => `<button data-act="${act}" data-k="${k}" data-v="${v}"${id ? ` data-id="${esc(id)}"` : ''} aria-pressed="${rules[k] === v}">${esc(o.name)}</button>`).join('')}</div>
+      <p class="muted">${esc(cur.note + extra)}</p></fieldset>`;
+  }).join('')}</div>`;
+}
+
+const ruleTagsHtml = (f) => `<span class="tr-frtags">${friendlyRuleTags(f).map((t) => `<span class="tag">${esc(t)}</span>`).join('')}</span>`;
+
 function friendliesTab(game, ui) {
   const list = clubFriendlies(game).sort((a, b) => a.date.localeCompare(b.date));
   const nameOf = (id) => anyClub(id)?.name ?? id;
   const planned = list.map((f) => {
     const opp = f.home === game.clubId ? f.away : f.home;
-    const res = f.played && f.result?.score ? `${f.result.score[0]}:${f.result.score[1]}` : '';
-    return `<li class="tr-fr"><span><b>${esc(nameOf(opp))}</b><small>${esc(weekday(f.date))}, ${esc(fmtDate(f.date))}, ${f.neutral ? 'na obozie' : f.home === game.clubId ? 'u siebie' : 'na wyjeździe'}</small></span>
-      ${res ? `<b>${esc(res)}</b>` : f.date > game.date ? `<button class="btn btn--quiet tr-mini" data-act="tr-fr-cancel" data-id="${esc(f.id)}">Odwołaj</button>` : '<span class="muted">dziś</span>'}</li>`;
+    const res = f.played && f.result?.score ? `${f.result.score[0]}:${f.result.score[1]}${f.result.shootout ? ` (k. ${f.result.shootout.goals[0]}:${f.result.shootout.goals[1]})` : ''}` : '';
+    const future = !f.played && f.date > game.date;
+    const open = future && ui.trFrEdit === f.id;
+    const btns = res ? `<b>${esc(res)}</b>` : future
+      ? `<span class="tr-frbtns"><button class="btn btn--quiet tr-mini" data-act="tr-fr-edit" data-id="${esc(f.id)}" data-open="${open}" aria-expanded="${open}">${open ? 'Gotowe' : 'Zasady'}</button><button class="btn btn--quiet tr-mini" data-act="tr-fr-cancel" data-id="${esc(f.id)}">Odwołaj</button></span>`
+      : '<span class="muted">dziś</span>';
+    return `<li class="tr-fr${open ? ' is-open' : ''}"><span><b>${esc(nameOf(opp))}</b><small>${esc(weekday(f.date))}, ${esc(fmtDate(f.date))}, ${f.neutral ? 'na obozie' : f.home === game.clubId ? 'u siebie' : 'na wyjeździe'}</small>${ruleTagsHtml(f)}</span>
+      ${btns}${open ? `<div class="tr-fredit">${rulesEditor(friendlyRulesOf(f), 'tr-fr-set', f.id)}</div>` : ''}</li>`;
   }).join('');
   const dates = friendlyDates(game, { days: 200, limit: 60 });
   const groups = new Map();
@@ -436,9 +469,14 @@ function friendliesTab(game, ui) {
   let opps = '';
   if (sel) {
     const list2 = friendlyOpponents(game, sel);
-    opps = `<section class="panel"><h4>Rywale na ${esc(fmtDate(sel))}</h4>
+    const rules = draftRules(ui);
+    const rd = `data-decider="${rules.decider}" data-subs="${rules.subs}" data-rotation="${rules.rotation}"`;
+    opps = `<section class="panel"><h4>Zasady sparingu</h4>
+      <p class="muted">Kluby uzgadniają je z sędzią przed meczem. Zmienisz je do dnia meczu.</p>
+      ${rulesEditor(rules, 'tr-fr-rule')}
+      <h4>Rywale na ${esc(fmtDate(sel))}</h4>
       <ul class="tr-frlist">${list2.map((o) => `<li class="tr-fr"><span><b>${esc(o.name)}</b><small>${esc(o.where)}, ${esc(o.level.toLowerCase())}${o.neutral ? ', mecz na obozie' : ''}</small></span>
-        <button class="btn btn--primary tr-mini" data-act="tr-fr-add" data-date="${esc(sel)}" data-opp="${esc(o.id)}">Umów</button></li>`).join('') || '<li class="muted">Nikt nie ma wolnego terminu.</li>'}</ul></section>`;
+        <button class="btn btn--primary tr-mini" data-act="tr-fr-add" data-date="${esc(sel)}" data-opp="${esc(o.id)}" ${rd}>Umów</button></li>`).join('') || '<li class="muted">Nikt nie ma wolnego terminu.</li>'}</ul></section>`;
   }
   return `<section class="panel">
       <p>Sparing to mecz bez punktów: buduje ostrość i zgranie (połowę tego co mecz o punkty), ale męczy. Limity: ${FRIENDLY.limits.lato} latem, ${FRIENDLY.limits.zima} zimą i ${FRIENDLY.limits.fifa} na przerwę reprezentacyjną. Między meczami muszą być 2 dni przerwy.</p>
@@ -529,9 +567,18 @@ export function handleTrainingAction(game, act, ds = {}) {
       return { ui: { trNotice: r.ok ? 'Obóz odwołany, koszt wrócił na konto klubu.' : r.error }, save: r.ok };
     }
     case 'tr-fr-date': return { ui: { trFrDate: ds.date, trNotice: null }, save: false };
+    case 'tr-fr-rule': {
+      if (!RULE_UI_KEY[ds.k] || !FRIENDLY_RULE_TEXT[ds.k]?.[ds.v]) return { ui: {}, save: false };
+      return { ui: { [RULE_UI_KEY[ds.k]]: ds.v, trNotice: null }, save: false };
+    }
     case 'tr-fr-add': {
-      const r = createFriendly(game, ds.date, ds.opp);
-      return { ui: { trNotice: r.ok ? `${r.fixture.label}, ${fmtDate(r.fixture.date)}.` : r.error, trFrDate: r.ok ? null : ds.date }, save: r.ok };
+      const r = createFriendly(game, ds.date, ds.opp, { decider: ds.decider, subs: ds.subs, rotation: ds.rotation });
+      return { ui: { trNotice: r.ok ? `${r.fixture.label}, ${fmtDate(r.fixture.date)}. ${friendlyRuleTags(r.fixture).join(', ')}.` : r.error, trFrDate: r.ok ? null : ds.date }, save: r.ok };
+    }
+    case 'tr-fr-edit': return { ui: { trFrEdit: ds.open === 'true' ? null : ds.id, trNotice: null }, save: false };
+    case 'tr-fr-set': {
+      const r = setFriendlyRules(game, ds.id, { [ds.k]: ds.v });
+      return { ui: { trNotice: r.ok ? null : r.error, trFrEdit: ds.id }, save: r.ok };
     }
     case 'tr-fr-cancel': {
       const r = cancelFriendly(game, ds.id);

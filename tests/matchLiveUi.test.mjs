@@ -48,7 +48,7 @@ test('Tablica: strzelcy, karny, samobój, niestrzelony karny, czerwone kartki i 
 });
 
 test('Studio zna pełne nazwy wariantów 4-4-2 i romb', () => {
-  for (const f of FORMATIONS) assert.ok(STUDIO_F[f.name] || ['4-4-2', '4-3-3', '4-2-3-1', '4-1-4-1', '3-5-2', '3-4-3', '5-3-2', '5-4-1', '4-3-2-1'].includes(f.name), `brak ${f.name}`);
+  for (const f of FORMATIONS) assert.ok(STUDIO_F[f.name], `studio nie zna nazwy ${f.name}`);
   assert.deepEqual(formationShape('4-4-2 defensywne'), formationShape('4-4-2'));
   assert.deepEqual(formationShape('4-4-2 romb'), formationShape('4-4-2D'));
   const r = assistantReport({ user: { name: 'My', formation: '4-2-3-1', squad: [] }, opp: { name: 'Oni', formation: '4-4-2 defensywne', tactics: {} } });

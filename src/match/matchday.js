@@ -10,8 +10,13 @@ import { Rng } from '../core/rng.js';
 import { CLUBS_PL, clubById } from '../data/clubs_pl.js';
 import { formationById } from '../data/formations.js';
 import { COMPETITIONS } from '../config/competitions.js';
-import { createMatch, step, resume, runToEnd, runToBreak, result as matchResult } from '../engine/match/match.js';
-import { onPitch } from '../engine/match/teams.js';
+import {
+  createMatch, step, resume, runToEnd, runToBreak, result as matchResult, liveRatings as engineLiveRatings,
+  shootoutCandidates, setShootoutOrder, startShootout, assistantSuggest, applySuggestion, subsAvailable,
+} from '../engine/match/match.js';
+import { aiDecide } from '../engine/match/coach.js';
+import { onPitch, goalkeeper, fieldPlayers } from '../engine/match/teams.js';
+import { autoPickBench } from '../engine/lineup.js';
 import { statsFromEvents } from '../engine/matchStats.js';
 import { createTactics, refreshTactics } from '../engine/lineup.js';
 import { squadFor, anyClub, applyResult, fromEngineResult, walkoverScore, LEAGUE_COMPS, compLabel } from '../season/season.js';
@@ -134,7 +139,10 @@ export function startMatchday(game, f) {
   const mySquad = squadFor(game, game.clubId, comp);
   game.tactics = matchTactics(game, mySquad, benchSize);
   const oppSquad = squadFor(game, oppId, comp);
-  const oppTactics = createTactics(oppSquad, { benchSize, formation: aiPreMatchFormation(game, f, { userSide, mySquad, oppSquad, comp }) });
+  // Sparing: na ławce cała dostępna kadra do 14 zawodników u obu drużyn (docs/sparingi-i-karne.md, rozdz. 4).
+  // Ustawienia gracza (game.tactics) się nie zmieniają: dodatkowi rezerwowi dochodzą tylko na ten mecz.
+  const matchBench = comp === 'friendly' ? FRIENDLY_BENCH : benchSize;
+  const oppTactics = createTactics(oppSquad, { benchSize: matchBench, formation: aiPreMatchFormation(game, f, { userSide, mySquad, oppSquad, comp }) });
   const weather = weatherFor(f.date, rng);
   const pitch = rng.weighted(['doskonala', 'dobra', 'zla', 'sztuczna'], (p) => ({ doskonala: 2, dobra: 6, zla: weather.type === 'deszcz' || weather.type === 'snieg' ? 2 : 0.5, sztuczna: 0.6 })[p]);
   const referee = { name: rng.pick(REFEREES), strictness: Math.round(Math.max(0.7, Math.min(1.4, rng.gauss(1, 0.13))) * 100) / 100 };
@@ -157,7 +165,7 @@ export function startMatchday(game, f) {
   if (pre.conditions?.attendance) pre.conditions.attendance.expected = Math.round(pre.conditions.attendance.expected * fanMul / 100) * 100;
   return {
     fixtureId: f.id, f, userSide, oppId, comp, tier, step: 'studio', pre, preCtx, weather, pitch, referee, hasVar,
-    oppTactics, benchSize, memory: game.speechMemory ?? newSpeechMemory(), M: null, briefings: {}, post: null, pr: { pre: null, post: null },
+    oppTactics, benchSize: matchBench, memory: game.speechMemory ?? newSpeechMemory(), M: null, briefings: {}, post: null, pr: { pre: null, post: null },
   };
 }
 
@@ -195,11 +203,28 @@ export function aiPreMatchFormation(game, f, { userSide, mySquad, oppSquad, comp
   return base;
 }
 
+/** Ławka w sparingu: cała dostępna kadra do 14 zawodników (docs/sparingi-i-karne.md). */
+export const FRIENDLY_BENCH = 14;
+
+/**
+ * Ustawienia gracza na ten mecz: game.tactics, w sparingu z ławką dopełnioną do FRIENDLY_BENCH dostępnymi
+ * zawodnikami (najpierw ławka gracza w jego kolejności, potem wybór automatyczny). game.tactics bez zmian.
+ */
+export function matchTacticsFor(game, S) {
+  const t = game.tactics;
+  if (S.comp !== 'friendly') return t;
+  const squad = squadFor(game, game.clubId, S.comp);
+  const bench = t.bench.filter((id) => !t.xi.includes(id));
+  const extra = autoPickBench(squad, t.xi, FRIENDLY_BENCH).filter((id) => !bench.includes(id));
+  return { ...t, bench: [...bench, ...extra].slice(0, Math.max(FRIENDLY_BENCH, bench.length)) };
+}
+
 /** Zawodnicy kadry meczowej gracza (jedenastka + ławka) jako obiekty świata. */
 export function matchSquadPlayers(game, S) {
   const squad = squadFor(game, game.clubId, S.comp);
   const byId = new Map(squad.map((p) => [p.id, p]));
-  return [...game.tactics.xi, ...game.tactics.bench].map((id) => byId.get(id)).filter(Boolean);
+  const t = matchTacticsFor(game, S);
+  return [...t.xi, ...t.bench].map((id) => byId.get(id)).filter(Boolean);
 }
 
 export function preAdvice(game, S) {
@@ -228,7 +253,7 @@ export function kickOff(game, S) {
   const oppClub = anyClub(S.oppId);
   const ai = aiBriefing({ coach: oppClub?.coach ?? 'P', personaMix: personaMix(oppSquad) }, { phase: 'pre', pWin: 1 - (S.pre.forBriefing.pWin ?? 0.4), rank: S.pre.forBriefing.rank }, `${game.seed}:${S.f.id}:ai`);
   const zOpp = Object.fromEntries(oppSquad.map((p) => [p.id, ai.zByPersona[p.persona] ?? ai.teamZ]));
-  const mine = { club: anyClub(game.clubId), squad: mySquad, tactics: game.tactics, ai: false, coach: 'P', zStart: S.briefings.pre?.engine?.zStart ?? {} };
+  const mine = { club: anyClub(game.clubId), squad: mySquad, tactics: matchTacticsFor(game, S), ai: false, coach: 'P', zStart: S.briefings.pre?.engine?.zStart ?? {} };
   const theirs = { club: oppClub, squad: oppSquad, tactics: S.oppTactics, ai: true, coach: oppClub?.coach ?? 'P', zStart: zOpp };
   // Trening: spójność zespołu na start meczu i stałe fragmenty (src/training)
   Object.assign(mine, trainingMatchInput(game, game.clubId, mine));
@@ -241,18 +266,29 @@ export function kickOff(game, S) {
       neutral: !!S.f.neutral, var: S.hasVar, rank: S.pre.preview.rank.level, refStrict: S.referee.strictness,
       concussionSubs: false, // zmiany po wstrząśnieniu mózgu: flaga rozgrywek (UEFA ich nie stosuje, brak potwierdzenia dla Ekstraklasy)
       attendance: S.pre.conditions.attendance.fill, weather: engineWeather(S.weather, S.pitch),
-      knockout: S.f.knockout === 'single' ? 'single' : S.f.knockout?.firstLeg ? { firstLeg: [...S.f.knockout.firstLeg] } : false,
+      knockout: knockoutCtx(S.f),
+      // Sparing: zasady uzgodnione przy planowaniu (fixture.friendlyRules), zmiany zaplanowane przed meczem
+      friendlyRules: S.f.comp === 'friendly' ? { ...(S.f.friendlyRules ?? {}), plannedSubs: S.plannedSubs?.length ? { [S.userSide]: S.plannedSubs } : null } : undefined,
+      shootoutPrep: true, // pauza przed serią rzutów karnych: gracz ustala kolejność strzelców
     },
   });
   S.step = 'live1';
   return S.M;
 }
 
-/** Oceny w trakcie meczu (do przerwy): 6 + suma zdarzeń zawodnika. */
+/**
+ * Rozstrzygnięcie remisu dla silnika z wpisu terminarza: 'single' (dogrywka i karne), 'penaltiesOnly'
+ * (Superpuchar: od razu karne), dwumecz { firstLeg } albo false.
+ */
+export function knockoutCtx(f) {
+  if (['single', 'penaltiesOnly'].includes(f.knockout)) return f.knockout;
+  if (f.knockout?.firstLeg) return { firstLeg: [...f.knockout.firstLeg] };
+  return false;
+}
+
+/** Oceny na żywo (silnik): wszyscy, którzy grali, także zmienieni wracający na ławkę przy zmianach powrotnych. */
 export function liveRatings(S) {
-  const out = {};
-  for (const T of S.M.teams) for (const x of T.players) if (x.minOn !== null) out[x.id] = Math.round(Math.max(3, Math.min(10, 6 + x.ev)) * 10) / 10;
-  return out;
+  return engineLiveRatings(S.M);
 }
 
 export function halfInfo(S) {
@@ -299,6 +335,7 @@ export function tick(S) {
   const r = step(S.M);
   if (r.state === 'break' && S.step === 'live1') S.step = 'break';
   else if (r.state === 'break') S.step = 'etbreak';
+  if (r.state === 'shootoutPrep') S.step = 'shootoutPrep';
   if (r.state === 'ended') S.step = 'fulltime';
   return r;
 }
@@ -308,18 +345,124 @@ export function continueAfterBreak(S) {
   S.step = S.M.half === 2 ? 'live2' : 'live2';
 }
 
-/** „Pokaż wynik od razu”: do przerwy albo do końca (zmiany robi asystent gracza). */
+/**
+ * „Pokaż wynik od razu”: do przerwy albo do końca (zmiany robi asystent gracza). Przed serią rzutów karnych
+ * mecz staje (S.step 'shootoutPrep'): kolejność strzelców ustala gracz, jak przy oglądaniu na żywo.
+ */
 export function skip(S) {
-  if (S.step === 'live1') { runToBreak(S.M, { assistantFor: [S.userSide] }); if (S.M.phase === 'break') S.step = 'break'; if (S.M.ended) S.step = 'fulltime'; return; }
-  runToEnd(S.M, { assistantFor: [S.userSide] });
-  S.step = 'fulltime';
+  const M = S.M;
+  if (S.step === 'live1') { runToBreak(M, { assistantFor: [S.userSide] }); if (M.phase === 'break') S.step = 'break'; if (M.ended) S.step = 'fulltime'; return; }
+  // Jak runToEnd w silniku (asystent przejmuje drużynę), ale z zatrzymaniem w pauzie przed serią
+  const T = M.teams[S.userSide];
+  if (!T.ai) { T.ai = true; T.assistant = true; T.baseInstr = { ...T.tactics.instructions }; }
+  if (M.phase !== 'break' && !M.ended) aiDecide(M, S.userSide);
+  let guard = 0;
+  while (!M.ended && M.phase !== 'shootoutPrep' && guard++ < 400) {
+    if (M.phase === 'break') resume(M); else step(M);
+  }
+  S.step = M.phase === 'shootoutPrep' ? 'shootoutPrep' : 'fulltime';
+}
+
+// ------------------------------------------------------------ Seria rzutów karnych (docs/sparingi-i-karne.md)
+/**
+ * Okno kolejności strzelców: kandydaci obu drużyn (shootoutCandidates) i propozycja asystenta.
+ * Zwraca { mine, opp, n, keepers: [{ id, name, pos, gk (REF i JNJ, 1-20) }] } albo null, gdy seria nie czeka.
+ */
+export function shootoutSetup(S) {
+  const M = S.M;
+  if (!M || M.phase !== 'shootoutPrep') return null;
+  const mine = shootoutCandidates(M, S.userSide);
+  const opp = shootoutCandidates(M, 1 - S.userSide);
+  const T = M.teams[S.userSide];
+  const keepers = fieldPlayers(T).map((x) => ({
+    id: x.id, name: x.p.name, pos: x.slot?.pos ?? x.p.pos, natural: x === goalkeeper(T),
+    gk: Math.round((((x.p.attr?.REF ?? 4) + (x.p.attr?.JNJ ?? 4)) / 2) * 10) / 10,
+  })).sort((a, b) => b.natural - a.natural || b.gk - a.gk);
+  return { mine, opp, n: mine.n, keepers, naturalKeeperId: goalkeeper(T)?.id ?? null };
+}
+
+/**
+ * Kolejność strzałów po wyrównaniu liczebności (to samo co silnik, bez zmiany meczu): ids w kolejności gracza
+ * (wszyscy uprawnieni), n strzelających, bramkarz serii zawsze strzela (gdy nie mieści się w n, wypada ostatni
+ * z pola, a bramkarz strzela ostatni). Zwraca { order: ids n strzelających, out: ids wypadających }.
+ */
+export function previewShootoutOrder(ids, keeperId, n) {
+  const full = [...ids];
+  const order = keeperId == null || full.indexOf(keeperId) < n || !full.includes(keeperId)
+    ? full.slice(0, n) : full.filter((id) => id !== keeperId).slice(0, n - 1).concat(keeperId);
+  return { order, out: full.filter((id) => !order.includes(id)) };
+}
+
+/**
+ * Zatwierdzenie kolejności i seria: setShootoutOrder (gracz) i startShootout. S.step 'shootout' (UI pokazuje
+ * strzały po kolei), potem endShootout. keeperId: bramkarz w serii (null: ten z boiska).
+ * Zwraca { ok, kicks, goals } albo { ok: false, error } (nic się nie zmienia).
+ */
+export function confirmShootout(S, ids, keeperId = null) {
+  const M = S.M;
+  if (!M || M.phase !== 'shootoutPrep') return { ok: false, error: 'Seria rzutów karnych nie czeka na rozpoczęcie.' };
+  const r = setShootoutOrder(M, S.userSide, ids, { keeperId });
+  if (!r.ok) return r;
+  const st = startShootout(M);
+  if (!st.ok) return st;
+  S.step = 'shootout';
+  return { ok: true, kicks: M.shootout.kicks, goals: [...M.shootout.goals], order: M.shootout.order, keepers: M.shootout.keepers };
+}
+
+/** Po pokazaniu serii: koniec meczu (studio pomeczowe). */
+export function endShootout(S) {
+  if (S.M?.ended) S.step = 'fulltime';
+}
+
+/**
+ * Przypomnienie asystenta o bramkarzu od karnych (raz na mecz): seria jest blisko (118' dogrywki albo 88'
+ * przy „od razu karne”), jest remis, można zmienić, a na ławce jest bramkarz lepszy w REF i JNJ o co najmniej 1,5.
+ * Zwraca tekst albo null.
+ */
+export function keeperReminder(S) {
+  const M = S.M;
+  if (!M || M.ended || S.gkReminded || M.phase !== 'play' || M.rules.decider === 'none') return null;
+  const near = (M.half === 4 && M.minute >= 118) || (M.half === 2 && M.rules.decider === 'penalties' && M.minute >= 88);
+  if (!near) return null;
+  const fl = M.ctx.knockout?.firstLeg;
+  const level = fl ? M.score[0] + fl[0] === M.score[1] + fl[1] : M.score[0] === M.score[1];
+  const T = M.teams[S.userSide];
+  if (!level || subsAvailable(M, T) <= 0) return null;
+  const gkv = (x) => ((x.p.attr?.REF ?? 4) + (x.p.attr?.JNJ ?? 4)) / 2;
+  const cur = goalkeeper(T);
+  const best = T.bench.filter((b) => b.p.pos === 'BR' && !b.sentOff && !(b.injury && !b.injury.playable)).sort((a, b) => gkv(b) - gkv(a))[0];
+  if (!cur || !best || gkv(best) < gkv(cur) + 1.5) return null;
+  S.gkReminded = true;
+  const r1 = (v) => String(Math.round(v * 10) / 10).replace('.', ',');
+  return `Za chwilę rzuty karne. Na ławce siedzi ${best.p.name}: refleks i gra jeden na jeden ${r1(gkv(best))}, u ${cur.p.name} ${r1(gkv(cur))}. Bramkarza od karnych trzeba wpuścić przed końcowym gwizdkiem.`;
+}
+
+// ------------------------------------------------------------ Sparing: druga jedenastka w przerwie
+/**
+ * Propozycja asystenta na przerwę sparingu (assistantSuggest wg planu rotacji, bez losowania): tylko zmiany
+ * zawodników. Pusta lista poza przerwą po 1. połowie sparingu.
+ */
+export function secondEleven(S) {
+  const M = S.M;
+  if (!M || !M.rules.friendly || M.phase !== 'break' || M.half !== 1) return [];
+  return assistantSuggest(M, S.userSide).filter((a) => a.type === 'sub');
+}
+
+/** Wykonuje wybrane zmiany z secondEleven (decyzja gracza). Zwraca { done, errors: [tekst] }. */
+export function applySecondEleven(S, actions) {
+  let done = 0; const errors = [];
+  for (const a of actions) {
+    const r = applySuggestion(S.M, S.userSide, a);
+    if (r?.ok === false) errors.push(`${a.inName}: ${r.error}`); else done++;
+  }
+  return { done, errors };
 }
 
 /** Koniec meczu: zapis wyniku i skutków, studio pomeczowe, wiadomości. */
 export function finishMatchday(game, S) {
   if (S.post) return S.post;
   const M = S.M;
-  if (M.phase === 'break' && !M.ended) runToEnd(M, { assistantFor: [S.userSide] });
+  if (!M.ended) runToEnd(M, { assistantFor: [S.userSide] }); // także wyjście w pauzie przed serią rzutów karnych
   const r = matchResult(M);
   r.score = walkoverScore(r); // mecz przerwany (za mało zawodników): walkower 0:3, chyba że wynik był wyższy
   if (S.f.knockout === 'penaltiesOnly' && r.score[0] === r.score[1] && !r.shootout) {
