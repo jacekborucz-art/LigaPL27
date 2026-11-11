@@ -419,7 +419,7 @@ function dashBoard(g, table) {
       ${rev ? `<li><span>Ostatnia ocena, ${esc(shortDate(rev.date))}</span><b data-sign="${rev.delta > 0 ? 'up' : rev.delta < 0 ? 'down' : ''}">${rev.delta > 0 ? '+' : ''}${esc(String(rev.delta).replace('.', ','))}</b></li>` : '<li><span>Pierwsza ocena zarządu</span><b>1. dnia miesiąca</b></li>'}
       ${fans ? `<li><span>Kibice</span><b>${esc(fans)}</b></li>` : ''}
     </ul>`;
-  return dashPanel('board', 'board', 'Zarząd', body, dashLink('transfery', 'Transfery', 'zarzad'));
+  return dashPanel('board', 'board', 'Zarząd', body, dashLink('transfery', 'Zarząd', 'zarzad'));
 }
 
 function dashFinance(g) {
@@ -442,7 +442,7 @@ function dashFinance(g) {
       <small>${bill > c.wageBudget ? `ponad budżet ${esc(fmtZl(c.wageBudget))}` : `z budżetu ${esc(fmtZl(c.wageBudget))}`}</small>
     </div>
     <p class="dash-note">Bilans miesiąca: <span data-sign="${month.net > 0 ? 'up' : month.net < 0 ? 'down' : ''}">${esc(signedZl(month.net))}</span></p>`;
-  return dashPanel('fin', 'fin', 'Finanse', body, dashLink('transfery', 'Transfery', 'finanse'));
+  return dashPanel('fin', 'fin', 'Finanse', body, dashLink('transfery', 'Finanse', 'finanse'));
 }
 
 function dashWindow(g) {
@@ -904,7 +904,7 @@ app.addEventListener('click', async (ev) => {
     if (act === 'back' || act === 'menu') { state.screen = 'start'; render(); }
     if (act === 'tier') { state.tier = Number(el.dataset.tier); render(); }
     if (act === 'pick') await newGame(state.slot, el.dataset.club);
-    if (act === 'tab') { state.tab = el.dataset.tab; state.mailOpen = null; state.playerOpen = null; render(); }
+    if (act === 'tab') { state.tab = el.dataset.tab; state.mailOpen = null; state.playerOpen = null; if (el.dataset.sub) state.tfTab = el.dataset.sub; render(); }
     if (act === 'go') {
       const a = primaryAction(g);
       if (a.kind === 'play') {

@@ -14,7 +14,7 @@ import { createMatch, step, resume, runToEnd, runToBreak, result as matchResult 
 import { onPitch } from '../engine/match/teams.js';
 import { statsFromEvents } from '../engine/matchStats.js';
 import { createTactics, refreshTactics } from '../engine/lineup.js';
-import { squadFor, anyClub, applyResult, fromEngineResult, LEAGUE_COMPS, compLabel } from '../season/season.js';
+import { squadFor, anyClub, applyResult, fromEngineResult, walkoverScore, LEAGUE_COMPS, compLabel } from '../season/season.js';
 import { standings } from '../season/standings.js';
 import { winnerOf } from '../season/cup.js';
 import { preMatchStudio, postMatchStudio, postMatchMessages, preMatchMessages } from './studio.js';
@@ -41,7 +41,7 @@ export function weatherFor(date, rng) {
 
 /** Wpływ pogody i murawy na silnik (ekspert 6.1 b). */
 export function engineWeather(w, pitch) {
-  const out = { conv: 1, foul: 1, inj: 1, fat: 1, act: 1, dys: 1 };
+  const out = { conv: 1, foul: 1, inj: 1, fat: 1, act: 1, dys: 1, tempC: w.tempC }; // tempC: przerwa na schłodzenie w silniku (>= 32 st.)
   if (w.type === 'deszcz') Object.assign(out, { conv: 1.06, foul: 1.08, inj: 1.05, dys: 1.15 });
   if (w.type === 'snieg') Object.assign(out, { act: 0.92, fat: 1.1, inj: 1.1 });
   if (w.type === 'wiatr') out.dys = 0.85;
@@ -200,6 +200,7 @@ export function kickOff(game, S) {
     away: S.userSide === 0 ? theirs : mine,
     ctx: {
       neutral: !!S.f.neutral, var: S.hasVar, rank: S.pre.preview.rank.level, refStrict: S.referee.strictness,
+      concussionSubs: false, // zmiany po wstrząśnieniu mózgu: flaga rozgrywek (UEFA ich nie stosuje, brak potwierdzenia dla Ekstraklasy)
       attendance: S.pre.conditions.attendance.fill, weather: engineWeather(S.weather, S.pitch),
       knockout: S.f.knockout === 'single' ? 'single' : S.f.knockout?.firstLeg ? { firstLeg: [...S.f.knockout.firstLeg] } : false,
     },
@@ -281,6 +282,7 @@ export function finishMatchday(game, S) {
   const M = S.M;
   if (M.phase === 'break' && !M.ended) runToEnd(M, { assistantFor: [S.userSide] });
   const r = matchResult(M);
+  r.score = walkoverScore(r); // mecz przerwany (za mało zawodników): walkower 0:3, chyba że wynik był wyższy
   if (S.f.knockout === 'penaltiesOnly' && r.score[0] === r.score[1] && !r.shootout) {
     const rng = new Rng(`karne:${S.f.id}`);
     r.shootout = { goals: rng.chance(0.5) ? [4, 3] : [3, 4], kicks: [] };
@@ -315,6 +317,7 @@ function toStudioEvent(e) {
   const m = /^(\d+)(?:\+(\d+))?'$/.exec(e.min ?? '');
   return {
     ...e, min: m ? Number(m[1]) : null, added: m?.[2] ? Number(m[2]) : 0, // strona zostaje liczbą (statsFromEvents)
+    player: e.player ?? e.pid, // studio (pauzy, kontuzje) czyta zawodnika z `player`, silnik podaje `pid`
     penalty: e.how === 'PEN', second: /druga żółta/.test(e.text ?? ''), days: e.injury?.days, injuryType: e.injury?.name,
   };
 }

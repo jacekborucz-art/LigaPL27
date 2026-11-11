@@ -107,6 +107,7 @@ Zasada: kluby AI dostają te same mechanizmy co gracz, narzędzia gracza zostaj�
 | `src/career/threat.js` (nowy) | Organiczna trudność, patrz niżej. |
 | `src/career/board.js`, `src/season/rollover.js` | `boardGoal`: po sezonie wyraźnie ponad cel zarząd podnosi cel na kolejny sezon (w połowie drogi do zajętego miejsca). `manager.seasons` zapisuje też cel (`target`). |
 | `src/career/careerSystem.js` | Zmiana klubu czyści pamięć zastępstw asystenta. |
+| `src/match/matchday.js`, `src/season/season.js` (przekazanie z silnika 1d73c01) | `engineWeather` przekazuje `tempC` (przerwa na schłodzenie od 32 st.), `kickOff` ustawia `concussionSubs: false`, zdarzenia studia mają `player` (pauzy po czerwonych kartkach), kara za czerwoną z powodu z silnika (`RED_BAN`: druga żółta, DOGSO, ręka 1 mecz, rażący faul 2, gwałtowne zachowanie 3), mecz przerwany (`abandoned`) kończy się walkowerem 0:3, chyba że rywal wygrywał wyżej (`walkoverScore`). |
 | `tests/balance.test.mjs` (nowy) | Tani strażnik balansu (patrz Testy). |
 | `tests/multiseason.test.mjs` | Test spadku do III ligi ustawia zaufanie zarządu na 100, żeby trener nie został zwolniony w trakcie sezonu (po zmianach balansu Chojniczanka z ziarnem 32 grała gorzej i zarząd zwalniał trenera w kwietniu, więc test sprawdzał inny klub). |
 
@@ -131,18 +132,44 @@ zwartą taktykę przeciw faworytowi (wymaga zmian w logice AI silnika, właścic
 
 ## Pomiary po zmianach
 
-POMIARY_PO
+Migawka: silnik z HEAD sprzed zmian agenta silnika plus wszystkie zmiany z tego dokumentu. 30 sezonów na klub
+(AI: 40). „ui” to pasywny gracz z UI (skład z 1 lipca, asystent tylko zastępuje i przywraca kontuzjowanych).
+
+| Klub (rankL) | AI | ui (pasywny) | różnica pkt | ui + asystent składu | aktywny (asystent składu + obozy) |
+|---|---|---|---|---|---|
+| Legia (1) | 3,8 / 62,4 | 2,4 / 66,3 | +3,9 | 2,7 / 65,2 | 2,2 / 68,0 |
+| Lechia Gdańsk (1 w 1 Lidze) | 4,0 / 59,7 | 2,6 / 63,5 | +3,8 | | |
+| Widzew (5) | 7,0 / 51,5 | 7,2 / 51,2 | -0,3 | 7,8 / 50,2 | 6,6 / 53,4 |
+| GKS Katowice (16) | 13,2 / 38,0 | 14,1 / 35,8 | -2,2 | 12,7 / 38,9 | 12,9 / 38,1 |
+| Polonia Warszawa (9 w 1 Lidze) | 8,7 / 47,9 | 8,4 / 48,5 | +0,6 | | |
+| Resovia (8 w 2 Lidze) | 8,5 / 48,9 | 9,3 / 47,9 | -1,0 | | |
+
+- Średnia przewaga pasywnego gracza nad tym samym klubem pod AI: +0,8 pkt na sezon (przed zmianami w wariancie
+  z asystentem składu ok. +4,5 pkt, w wariancie całkiem pasywnym -2 pkt, ale z rozrzutem od -8 do +4 zależnie od klubu).
+- Różnica średniego miejsca we wszystkich klubach mieści się w 1,5 miejsca (największa: Legia i Lechia, 1,4).
+- Widzew: średnio 7. miejsce, mistrzostwo 0 razy na 30, Puchar Polski 3 razy, 6 razy w pierwszej trójce.
+- Aktywny trener (skład od asystenta, obozy w Austrii i Turcji) zyskuje wobec pasywnego ok. +2 pkt
+  (Widzew +3,2, Legia +2,8, GKS -0,8 w szumie). Przewaga jest, ale ograniczona; dalsze dźwignie (taktyka pod rywala,
+  rozmowy, zmiany w meczu) nie były symulowane.
+- Pozostała różnica Legii i Lechii pochodzi z kalibracji silnika wobec szybkiej symulacji (przyczyna 5): po zmianie
+  nachylenia te same kluby zdobywają w pełnym silniku więcej niż w szybkiej symulacji (Lechia +4,8, Legia +2,3,
+  Widzew +2,2, Polonia +1,9, Resovia 0,0, GKS -1,4 pkt na sezon). Mecze gracza zawsze idą silnikiem, więc to przenosi się
+  na wynik gracza. Propozycja niżej.
+
+AKTUALNY_SILNIK
 
 ## Proponowane zmiany w silniku (dla agenta silnika)
 
-1. Skala ocen: `result()` w `src/engine/match/match.js` liczy `rating = 6 + ev`; średnia 6,16. Propozycja: stała
-   bazowa w `RATING` (np. `base: 6.35`) zamiast 6, tak by średnia z 60+ minutami wynosiła ok. 6,5-6,6 jak w meczach
-   w tle. Po tej zmianie `engineRatingShift` w `season.js` sam zejdzie do ok. 0 (nic nie trzeba usuwać).
-2. Nachylenie: silnik daje ok. 11 % większą przewagę lepszej drużynie niż szybka symulacja (0,453 wobec 0,408 pkt
-   na punkt różnicy sił). Do wyrównania np. lekkim obniżeniem `kCreate` albo podniesieniem `QS.BETA` w
-   `quickSim.js` z 0,225 do ok. 0,25 (ten plik mogę zmienić sam, jeśli agent silnika uzna nachylenie silnika za docelowe).
-3. Trener AI wobec faworyta: bardziej defensywna mentalność i niski blok przy pWin rywala >= 0,6 (organiczna reakcja
-   na mocną drużynę gracza), do zmierzenia tym samym skryptem.
+1. Skala ocen: `result()` w `src/engine/match/match.js` liczy ocenę jako 6 + suma zdarzeń; średnia 6,16 (po commicie
+   1d73c01 nadal 6,16). Propozycja: stała bazowa w `RATING` (np. 6,35 zamiast 6), tak by średnia przy 60+ minutach
+   wynosiła ok. 6,5 jak w meczach w tle. `engineRatingShift` w `season.js` sam zejdzie wtedy do ok. 0.
+2. Wycena kadr: silnik liczy strefy z atrybutów (`zoneRatings`, `ROLE_SHARE`), szybka symulacja z OVR. Dla części kadr
+   daje to różne siły (Lechia: pomoc +0,26 i atak +0,19 wyżej w silniku niż w szybkiej symulacji, GKS: bramkarz -0,42
+   i atak -0,36 niżej). Najprostsza droga: szybka symulacja (`teamStrength.js`, mój obszar) liczy strefy tymi samymi
+   wzorami co silnik (`zoneRatings` z `teams.js` jako funkcja czysta), potem ponowne dopasowanie `MU_*` i `BETA_CLUB`.
+   Do tego potrzebna jest zgoda na import z `src/engine/match/teams.js` i stałość tych wzorów.
+3. Trener AI wobec faworyta: bardziej zwarta taktyka przy pWin rywala >= 0,6 (organiczna reakcja na mocną drużynę
+   gracza), do zmierzenia tym samym skryptem.
 
 ## Testy
 
@@ -156,3 +183,6 @@ POMIARY_PO
   analiza rywala AI po tytule gracza rośnie; zarząd podnosi cel tylko po sezonie wyraźnie ponad celem.
 - Skład: zastępca kontuzjowanego wraca na ławkę po powrocie zawodnika, ręczna zmiana gracza zostaje,
   `tactics.assistant` wybiera skład jak AI.
+
+`tests/matchday.test.mjs`: temperatura w danych dla silnika, kara za czerwoną z powodu, walkower, `concussionSubs`
+i zawodnik w pauzach studia po pełnym dniu meczowym.

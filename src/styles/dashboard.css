@@ -166,9 +166,9 @@
   background: radial-gradient(circle, rgba(14, 21, 17, 0.95) 58%, rgba(14, 21, 17, 0.6));
 }
 .dash-kick__led {
-  font: 800 2.4rem/1 var(--font-led);
+  font: 700 2.6rem/1 var(--font-display);
   color: var(--led);
-  text-shadow: 0 0 10px rgba(255, 178, 26, 0.55);
+  text-shadow: 0 0 14px rgba(255, 178, 26, 0.3);
   font-variant-numeric: tabular-nums;
 }
 .dash-kick.is-today .dash-kick__led { font-size: 1.35rem; letter-spacing: -0.02em; }
@@ -252,7 +252,7 @@
 }
 .dash-link {
   flex: none;
-  min-height: 40px;
+  min-height: var(--tap);
   padding: 0 var(--space-3);
   border: 0;
   border-radius: var(--radius-s);

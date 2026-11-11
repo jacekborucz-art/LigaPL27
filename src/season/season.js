@@ -209,16 +209,30 @@ export function engineRatingShift(r) {
   return clamp(qMean - eMean, -1, 1);
 }
 
+/** Mecz przerwany (drużyna ma za mało zawodników, result.abandoned): walkower 0:3, chyba że rywal wygrywał wyżej. */
+export function walkoverScore(r) {
+  const ab = r.abandoned;
+  if (!ab) return r.score;
+  const s = ab.side; const o = 1 - s;
+  if (r.score[o] - r.score[s] >= 3) return r.score;
+  return s === 0 ? [0, 3] : [3, 0];
+}
+
+/** Długość kary za czerwoną kartkę z powodu z silnika (reasonCode); bez powodu losujemy jak w meczach w tle. */
+export const RED_BAN = { second: 1, dogso: 1, handball: 1, sfp: 2, violent: 3 };
+
 /** Wynik z pełnego silnika zamieniony na ten sam format co z szybkiej symulacji. */
 export function fromEngineResult(r) {
   const shift = engineRatingShift(r);
+  const redWhy = new Map(r.events.filter((e) => e.type === 'red' && e.pid).map((e) => [e.pid, e.reasonCode ?? (e.second ? 'second' : null)]));
   const players = [0, 1].map((s) => r.ratings.filter((x) => x.side === s && x.minutes > 0).map((x) => ({
     id: x.id, minutes: x.minutes, g: x.g, a: x.a, yc: x.yc, rc: x.rc, rating: Math.round(clamp(x.rating + shift, 3, 10) * 10) / 10,
     injury: x.injury ? { name: x.injury.name, days: x.injury.days, cat: x.injury.cat } : null, motm: x.id === r.motm,
+    ...(x.rc && redWhy.get(x.id) ? { redReason: redWhy.get(x.id) } : {}),
   })));
   const scorers = [0, 1].map((s) => r.events.filter((e) => e.type === 'goal' && !e.provisional && e.side === s && e.pid).map((e) => e.pid));
   return {
-    score: r.score, scorers, shootout: r.shootout?.goals ?? null, extraTime: r.extraTime,
+    score: walkoverScore(r), scorers, shootout: r.shootout?.goals ?? null, extraTime: r.extraTime,
     stats: { shots: [r.stats[0].shots, r.stats[1].shots], onTarget: [r.stats[0].onTarget, r.stats[1].onTarget], possession: [r.stats[0].possession, r.stats[1].possession], xg: [r.stats[0].xg, r.stats[1].xg] },
     players, strengthDiff: 0, quick: false,
   };
@@ -319,7 +333,7 @@ export function applyResult(game, f, res, rng) {
           }
         }
         if (x.rc) {
-          const games = rng.weighted([1, 2, 3], (g) => ({ 1: 0.6, 2: 0.3, 3: 0.1 })[g]);
+          const games = RED_BAN[x.redReason] ?? rng.weighted([1, 2, 3], (g) => ({ 1: 0.6, 2: 0.3, 3: 0.1 })[g]);
           p.susp[key] = (p.susp[key] ?? 0) + games;
           if (mine) msgs.push(['important', `Czerwona kartka: ${p.name}`, `${p.name} został ukarany ${games === 1 ? '1 meczem' : `${games} meczami`} zawieszenia.`]);
         }
