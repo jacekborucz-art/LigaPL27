@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   preMatchBriefing, halftimeBriefing, postMatchBriefing, assistantAdvice, expectedTeamZ, halfSituation, preSituation,
   newSpeechMemory, closeMatchMemory, applyTrust, decayTrust, applyBriefing, getTrust, aiChooseSpeech, aiBriefing,
-  pressConference, answerPressConference, MAX_TALKS, PERSONAS,
+  MAX_TALKS, PERSONAS,
 } from '../src/match/briefings.js';
 import {
   preMatchStudio, postMatchStudio, odds1X2, suspensionRisk, nextYellowSuspends, HEADLINE_TEMPLATES, formatDate,
@@ -211,18 +211,7 @@ test('Odprawa pomeczowa: pochwała po wygranej podnosi morale, krytyka po poraż
   assert.ok(derby.morale.Lider.delta > win.morale.Lider.delta);
 });
 
-test('Konferencja prasowa: 2-3 pytania z 3 odpowiedziami i skutkami dla kibiców, zarządu i morale', () => {
-  const qs = pressConference({ score: { for: 1, against: 2 }, controversy: true, derby: true, boardTrust: 30 }, 'k1');
-  assert.ok(qs.length >= 2 && qs.length <= 3);
-  for (const q of qs) assert.equal(q.answers.length, 3);
-  const choices = Object.fromEntries(qs.map((q) => [q.id, 0]));
-  const eff = answerPressConference(qs, choices);
-  for (const k of ['fans', 'board', 'morale']) assert.equal(typeof eff[k], 'number');
-  assert.ok(eff.text.length > 0);
-  const ref = [{ id: 'referee' }];
-  assert.equal(answerPressConference(ref, { referee: 1 }).fine, true);
-  assert.ok(answerPressConference(ref, { referee: 1 }).board < 0);
-});
+// Konferencja prasowa: tests/press.test.mjs
 
 // ---------------------------------------------------------------- AI
 

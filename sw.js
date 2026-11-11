@@ -128,6 +128,7 @@ const SHELL = [
   './src/engine/teamStrength.js',
   './src/match/briefings.js',
   './src/match/matchday.js',
+  './src/match/press.js',
   './src/match/studio.js',
   './src/season/cup.js',
   './src/season/dailySystems.js',
