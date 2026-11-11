@@ -14,7 +14,6 @@ import { applyMorale } from '../career/morale.js';
 import { clubById } from '../data/clubs_pl.js';
 import { squadOf } from '../world/worldGen.js';
 import { SESSIONS, INTENSITY, GK_SESSION, GK_JOIN, LOAD, CAMP, staffMul, AI_PLAN } from './config.js';
-import { ageAt } from './state.js';
 import { staffQ } from './staff.js';
 import { dayContext, autoDay } from './plan.js';
 import { campWindow, halfOf, halfKey, baseFactor, aiCampChoice } from './camps.js';
@@ -32,29 +31,48 @@ export function aiPlanFor(clubId) {
   return { clubId, accent: AI_PLAN.accent[coach] ?? 'zrownowazony', load: AI_PLAN.load };
 }
 
-/** Daty meczów wszystkich klubów (jeden przebieg po terminarzu na dzień): clubId -> { all, official, friendly }. */
+/** Daty meczów klubów ze stałą kadrą (jeden przebieg po terminarzu na dzień): clubId -> { all, official, friendly }. */
 const setsCache = new WeakMap();
+const uniqSorted = (xs) => {
+  xs.sort();
+  let n = 0;
+  for (let i = 0; i < xs.length; i++) if (!n || xs[i] !== xs[n - 1]) xs[n++] = xs[i];
+  xs.length = n;
+  return xs;
+};
+/** Suma kontrolna dat terminarza (przełożone mecze zmieniają datę bez zmiany długości listy). */
+function datesSig(fx) {
+  let h = fx.length;
+  for (let i = 0; i < fx.length; i++) {
+    const d = fx[i].date;
+    if (d) h = (h * 31 + d.charCodeAt(3) * 1000 + d.charCodeAt(6) * 100 + d.charCodeAt(8) * 10 + d.charCodeAt(9)) | 0;
+  }
+  return h;
+}
 export function allClubSets(game) {
   const fx = game.fixtures || [];
   const hit = setsCache.get(fx);
-  if (hit && hit.date === game.date && hit.n === fx.length) return hit.map;
+  const sig = datesSig(fx);
+  if (hit && hit.sig === sig && hit.n === fx.length && hit.world === game.world) return hit.map;
   const raw = new Map();
+  for (const id of Object.keys(game.world.clubs)) raw.set(id, { all: [], off: [] });
   for (const f of fx) {
     if (!f.date) continue;
-    for (const id of [f.home, f.away]) {
-      if (!id) continue;
-      let r = raw.get(id);
-      if (!r) raw.set(id, (r = { all: new Set(), off: new Set() }));
-      r.all.add(f.date);
-      if (f.comp !== 'friendly') r.off.add(f.date);
-    }
+    const h = raw.get(f.home); const a = raw.get(f.away);
+    if (!h && !a) continue;
+    const official = f.comp !== 'friendly';
+    if (h) { h.all.push(f.date); if (official) h.off.push(f.date); }
+    if (a) { a.all.push(f.date); if (official) a.off.push(f.date); }
   }
   const map = new Map();
   for (const [id, r] of raw) {
-    const all = [...r.all].sort();
-    map.set(id, { all, official: [...r.off].sort(), friendly: new Set(all.filter((d) => !r.off.has(d))) });
+    const all = uniqSorted(r.all);
+    const official = uniqSorted(r.off);
+    const friendly = new Set();
+    if (official.length < all.length) { const off = new Set(official); for (const d of all) if (!off.has(d)) friendly.add(d); }
+    map.set(id, { all, official, friendly });
   }
-  setsCache.set(fx, { date: game.date, n: fx.length, map });
+  setsCache.set(fx, { sig, n: fx.length, world: game.world, map });
   return map;
 }
 
@@ -126,6 +144,8 @@ export function processAiDay(game, date) {
   const rng = new Rng(`trening-ai:${game.seed}:${date}`);
   const setsMap = allClubSets(game);
   const yesterday = addDays(date, -1);
+  const dY = +date.slice(0, 4); const dMD = date.slice(5);
+  const ageOf = (p) => (p.birthDate ? dY - +p.birthDate.slice(0, 4) - (dMD >= p.birthDate.slice(5) ? 0 : 1) : p.age ?? 25);
   const half = halfOf(date);
   const key = halfKey(half);
   for (const clubId of Object.keys(game.world.clubs)) {
@@ -169,7 +189,7 @@ export function processAiDay(game, date) {
       if (list && subs && p.lastMatch !== yesterday) { list = [subs, ...team.slice(1)]; sess = [{ type: 'gierki', int: 'mid' }, ...day.sessions.slice(1)]; }
       let morale = restDay ? 0.15 : 0;
       if (list && list.length) {
-        const age = ageAt(p, date);
+        const age = ageOf(p); // jak ageAt (state.js), bez ponownego cięcia daty dnia
         const gk = p.pos === 'BR';
         let fresh = p.fresh ?? 95;
         let dp = 0; let dev = false;

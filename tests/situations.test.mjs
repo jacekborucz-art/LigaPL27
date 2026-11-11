@@ -128,7 +128,9 @@ test('Czerwona po wykorzystaniu wszystkich zmian i kontuzja bez zmian: gra w 10 
     assert.ok(!M.events.slice(from).some((e) => e.type === 'sub' && e.side === 0));
     const t = M.events.slice(from).find((e) => e.type === 'tactic' && e.side === 0);
     assert.ok(t, 'reorganizacja');
-    assert.equal(fieldPlayers(T).filter((x) => x.slot.pos === 'ŚO').length, 2, 'dwóch środkowych obrońców po przesunięciu');
+    // Obrona prowadzenia w 80. min: niski blok 4-4-1 albo piątka obrońców 5-3-1 (shortShape), luka po obrońcy zapełniona
+    assert.ok(fieldPlayers(T).filter((x) => x.slot.pos === 'ŚO').length >= 2, 'co najmniej dwóch środkowych obrońców po przesunięciu');
+    assert.ok(['442def', '541'].includes(T.formation.id), `ustawienie ${T.formation.id}`);
     assert.equal(M.events.slice(from).find((e) => e.type === 'red').second, true);
   }
   {

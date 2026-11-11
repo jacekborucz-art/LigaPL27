@@ -124,6 +124,7 @@ test('Zmęczenie: przy słabej kondycji AI zdejmuje wysoki pressing (nie w końc
       if (!chase) { M.score = [0, 0]; tired(M); until(M, 60); }
       const ev = tactics(M, 0, from);
       if (!chase) { n++; if (ev.some((e) => e.patch.instructions?.pressing === 'mid' && /zmęczenie/.test(e.reason))) dropped++; }
+      if (chase && M.score[0] >= M.score[1]) continue; // wyrównanie w tej minucie: to już nie pogoń
       if (chase) { nc++; if (M.teams[0].tactics.instructions.pressing === 'high') chaseKept++; }
     }
   }
