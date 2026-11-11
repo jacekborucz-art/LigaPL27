@@ -250,6 +250,7 @@ function otherItems(game, p, { view, ui = {} } = {}) {
   const card = NAV.card(p.id, false);
   const items = [];
   if (!cardOpen) items.push(item('Karta zawodnika', card, { primary: true, hint: 'Cena, kontrakt, nastawienie' }));
+  items.push(item('Profil i statystyki', { steps: [{ act: 'extplayer', id: p.id }], focus: '[data-act="extback"]' }, { hint: 'Atrybuty, mecze, gole, oceny, historia klubowa' }));
   const cap = canSign(game);
   const capTxt = cap.ok ? null : `Limit kadry ${cap.count.counted}/${cap.count.hard}`;
   const refuse = playerWillingness(game, p).verdict === 'odmowa' ? 'Nie chce przejść do twojego klubu' : null;

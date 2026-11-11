@@ -77,10 +77,11 @@ function traitPhrases(traits) {
 }
 
 export function renderPlayerProfile(p, opts = {}) {
-  const { leagueOvrs = [], clubName = '' } = opts;
+  const { leagueOvrs = [], clubName = '', foreign = false, back = { act: 'squadback', label: 'Wróć do kadry' } } = opts;
   const alt = Object.entries(p.alt || {}).filter(([, v]) => v >= 70).map(([k]) => k);
   return `
-    <button class="btn btn--quiet" data-act="squadback">Wróć do kadry</button>
+    <button class="btn btn--quiet" data-act="${esc(back.act)}">${esc(back.label)}</button>
+    ${foreign ? '<p class="hint">Zawodnik innego klubu: morale, świeżość, pensja i agent są znane tylko jego klubowi.</p>' : ''}
     <header class="pp" data-pid="${esc(p.id)}">
       <div class="pp__ovr"><span class="pp__ovrn" title="Ocena ogólna w skali 1-20">${Math.round(p.ovr)}</span>${stars(starsFor(p.ovr, leagueOvrs))}</div>
       <div>
@@ -96,10 +97,10 @@ export function renderPlayerProfile(p, opts = {}) {
       <section>
         <h3>Stan</h3>
         <ul class="plain-list">
-          <li><span class="k">Morale</span><span>${esc(moraleLabel(p.morale))}</span></li>
+          ${foreign ? '' : `<li><span class="k">Morale</span><span>${esc(moraleLabel(p.morale))}</span></li>`}
           <li><span class="k">Forma</span><span>${p.form.length ? esc(p.form.join(', ')) : 'Brak meczów w sezonie'}</span></li>
-          <li><span class="k">Świeżość</span><span>${p.fresh}%</span></li>
-          <li><span class="k">Ostrość</span><span>${p.sharp}%</span></li>
+          ${foreign ? '' : `<li><span class="k">Świeżość</span><span>${p.fresh}%</span></li>
+          <li><span class="k">Ostrość</span><span>${p.sharp}%</span></li>`}
           <li><span class="k">Zdrowie</span><span>${p.injuryDays > 0 ? `Kontuzja, ok. ${p.injuryDays} dni` : 'Zdrowy'}</span></li>
           ${p.acclim ? `<li><span class="k">Aklimatyzacja</span><span>${Math.round(p.acclim.level)} %, pełna ok. ${esc(fmtDate(acclimEta(p, opts.date ?? p.acclim.since)))}. ${esc(p.acclim.reasons.join(', '))}</span></li>` : ''}
           ${p.callUp ? `<li><span class="k">Kadra</span><span>Na zgrupowaniu do ${esc(fmtDate(p.callUp.to))}</span></li>` : ''}
@@ -107,11 +108,11 @@ export function renderPlayerProfile(p, opts = {}) {
         </ul>
         <h3>Kontrakt</h3>
         <ul class="plain-list">
-          <li><span class="k">Pensja</span><span>${esc(formatZl(p.contract.wage))} tygodniowo</span></li>
+          ${foreign ? '' : `<li><span class="k">Pensja</span><span>${esc(formatZl(p.contract.wage))} tygodniowo</span></li>`}
           <li><span class="k">Do</span><span>${esc(fmtDate(p.contract.until))}</span></li>
           <li><span class="k">Klauzula</span><span>${p.contract.clause ? esc(formatZl(p.contract.clause)) : 'Brak'}</span></li>
           <li><span class="k">Wartość</span><span>${esc(formatZl(p.value))}</span></li>
-          <li><span class="k">Agent</span><span>${esc(AGENT_TYPES[p.agent]?.label ?? 'Brak danych')}</span></li>
+          ${foreign ? '' : `<li><span class="k">Agent</span><span>${esc(AGENT_TYPES[p.agent]?.label ?? 'Brak danych')}</span></li>`}
         </ul>
         <h3>Charakter</h3>
         <ul class="plain-list">
