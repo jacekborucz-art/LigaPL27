@@ -103,6 +103,8 @@ export function buildTeam(side, cfg, rng, ctx) {
     react: [], injuredOff: [], dropPos: [], dropIdx: [], shape: formation.name, concussionUsed: 0,
     str0: 0, strDiff: 0, baseInstr: null, plannedSubs: 4, chaseSubs: 0, protectSubs: 0, lastUserTick: -1,
     assistant: false, injuredGk: null, staffYellow: 0, coachBanned: false, penMissed: [], central: 0, avg: null,
+    // Historia ustawień widoczna z ławki rywala (coach.js czyta ją z opóźnieniem rozpoznania)
+    tacLog: [{ min: -99, formation: cfg.tactics.formation, instr: { ...cfg.tactics.instructions } }],
   };
 }
 
@@ -312,5 +314,6 @@ export function applyTacticChange(T, M, patch) {
   T.tactics = newTactics;
   if (patch.drop) T.dropPos = patch.drop.slice();
   if (patch.formation || patch.drop) reslot(T);
+  T.tacLog?.push({ min: M.minute, formation: newTactics.formation, instr: newTactics.instructions });
   return { cost, adapt: atBreak ? 0 : adapt };
 }

@@ -4,6 +4,8 @@ Stan na Nov 11, 2026. Burza mózgów panelu: trener pierwszej ligi (decyzje z ł
 
 Kod: `src/engine/match/core.js` (zdarzenia), `control.js` (reguły zmian i taktyki), `coach.js` (AI trenera i asystent gracza, nowy plik), `teams.js` (sloty, kształty w osłabieniu), `match.js` (przebieg meczu, dogrywka, karne). Testy: `tests/situations.test.mjs` (14 scenariuszy), `tests/matchEngine.test.mjs` (kalibracja).
 
+Decyzje trenera z przebiegu meczu (kto przeważa, sposób gry rywala, zmęczenie, kartki, osobowość, okrzyki AI) opisuje osobny katalog: `docs/ai-trener.md` (Nov 11, 2026).
+
 Oznaczenia statusu: **OK** silnik robi to realistycznie, **CZĘŚCIOWO** robi to w uproszczeniu albo z błędem, **BRAK** nie robi. Liczby balansowe w kodzie mają oznaczenie [SZAC].
 
 ## Podsumowanie
@@ -159,7 +161,7 @@ Najważniejsze błędy znalezione przed zmianą:
 | 93 | Dwumecz: liczy się suma bramek | Prowadzący w dwumeczu broni, mimo przegrywania meczu | Silnik liczył dogrywkę z sumy, ale AI patrzyło na wynik meczu | BRAK | `matchState.diff` z pierwszym meczem | OK |
 | 94 | Puchar, remis w końcówce | Bez ryzyka, dogrywka przed nami | Brak | BRAK | Słabszy: nastawienie nie wyższe niż 0 od 85' | OK |
 | 95 | Reakcja na gola | Nowa ocena po golu | Tylko w punktach kontrolnych | BRAK | Ocena instrukcji po golu od 60' | OK |
-| 96 | Osobowość trenera | Ofensywny goni wcześniej i broni później; ostrożny broni od 65' | Ten sam próg dla obu kierunków | CZĘŚCIOWO | Osobne progi gonienia i obrony wyniku | OK |
+| 96 | Osobowość trenera | Ofensywny goni wcześniej i broni później; ostrożny broni od 65' | Ten sam próg dla obu kierunków | CZĘŚCIOWO | Osobne progi gonienia i obrony wyniku; reakcje na przebieg gry, upór i czas rozpoznania: `docs/ai-trener.md` | OK |
 
 ## J. Taktyka
 
@@ -222,6 +224,7 @@ Typy `goal`, `yellow`, `red`, `varCheck`, `varOverturn`, `injury`, `sub`, `tacti
 | `sub` | `pid` = `inId`, `outId, why` (`injury`, `gk`, `tired`, `booked`, `form`, `chase`, `protect`, `rotation`, `timewasting`, `redReshape`, `penaltyGk`, `concussion`), `by` (`user`, `ai`, `assistant`), `pos, gk, concussion, moveId, atBreak, text` |
 | `tactic` | `patch { formation?, drop?, instructions? }, by, reason, formation, shape` (np. `4-4-1`), `cost, atBreak, text` |
 | `penalty` | `pid, byVar?, foulerId, text` |
+| `shotOn`, `shotOff`, `shotBlocked`, `post` | dodatkowo `kind`: typ akcji (`POZ`, `SKR`, `KON`, `DYS`, `SP`, `FK`), z którego trener na ławce widzi, skąd biorą się sytuacje rywala |
 | Nowe | `staffCard { card }`, `penaltyRetake { reason }`, `gkUp`, `coolingBreak`, `abandoned`, `shootoutKick { outcome, round, suddenDeath, gkId }` |
 
 API silnika dla ekranu meczu (`src/engine/match/match.js`): `assistantSuggest(M, side)` zwraca listę propozycji (`{ type: 'sub', outId, inId, moveId, why, text, outName, inName }` albo `{ type: 'tactic', patch, reason }`) bez zmiany stanu meczu; `applySuggestion(M, side, action)` wykonuje propozycję jako decyzję gracza; `subsAvailable(M, T)`, `matchState(M, side)`.
