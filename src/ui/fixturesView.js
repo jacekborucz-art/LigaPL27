@@ -64,36 +64,46 @@ const resChip = (r) => `<span class="rchip" data-r="${r}" title="${RES_WORD[r]}"
 
 function endCell(r) {
   if (!r.played) {
-    return `<span class="fxr__end fxr__end--plan">${r.t ? `<span class="fxr__time">${esc(r.t)}</span>` : ''}${r.post ? '<small>przełożony</small>' : ''}</span>`;
+    return `<span class="fxr__end fxr__end--plan">${r.t ? `<span class="fxr__time">${esc(r.t)}</span>` : ''}${r.post ? '<small>przełożony</small>' : ''}</span><span class="rchip" data-r="" aria-hidden="true"></span>`;
   }
   const dec = r.decider ? `<small class="fxr__dec" data-won="${r.decider.won ? 1 : 0}">${esc(r.decider.text)}</small>` : '';
   return `<span class="fxr__end"><span class="fxr__score" aria-label="Wynik ${r.gf}:${r.ga}">${r.gf}:${r.ga}</span>${dec}</span>${resChip(r.res)}`;
 }
 
-function rowHtml(r, { wide = false, today = '' } = {}) {
+function rowHtml(r, { wide = false, today = '', extra = false } = {}) {
   const isToday = r.d === today;
-  return `<li class="fxr${r.played ? ' is-played' : ''}${isToday ? ' is-today' : ''}" data-venue="${r.venue}">
-    <span class="fxr__day" aria-label="${esc(`${weekday(r.d)}, ${fmtDate(r.d)}`)}"><b>${dayNum(r.d)}</b><small>${esc(mon(r.d))}${wide ? `, ${esc(wd(r.d))}` : ''}</small></span>
-    ${wide ? `<span class="fxr__comp">${compTag(r)}<small>${esc(roundText(r))}</small></span>` : ''}
+  const meta = wide
+    ? `<span class="fxr__meta">${compTag(r)}<small>${esc(roundText(r))}</small>${venueTag(r.venue)}</span>`
+    : '';
+  return `<li class="fxr${wide ? ' fxr--wide' : ''}${r.played ? ' is-played' : ''}${isToday ? ' is-today' : ''}${extra ? ' fxr--x' : ''}" data-venue="${r.venue}">
+    <span class="fxr__day" aria-label="${esc(`${weekday(r.d)}, ${fmtDate(r.d)}`)}"><b>${dayNum(r.d)}</b><small>${esc(mon(r.d))}${wide ? `<span class="fxr__wd"> ${esc(wd(r.d))}</span>` : ''}</small></span>
+    ${meta}
     <span class="fxr__opp">${crest(r.opp, wide ? 26 : 22)}<span class="fxr__who"><b>${esc(name(r.opp))}</b>${wide ? '' : `<span class="fxr__tags">${compTag(r)}${venueTag(r.venue)}</span>`}</span></span>
-    ${wide ? `<span class="fxr__venue">${venueTag(r.venue)}</span>` : ''}
     ${endCell(r)}
   </li>`;
 }
 const todayLine = (today) => `<li class="fxr-now" aria-label="Dziś, ${esc(fmtDate(today))}"><span aria-hidden="true">Dziś, ${esc(mon(today))} ${dayNum(today)}</span></li>`;
 
 // ------------------------------------------------------------ Panel na Pulpicie
-/** Treść panelu „Terminarz”: 3 ostatnie wyniki, kreska „dziś”, 5 najbliższych meczów. */
-export function fixturesPanelBody(game, { past = 3, next = 5 } = {}) {
+/**
+ * Treść panelu „Terminarz”: 3 ostatnie wyniki, kreska „dziś”, 5 najbliższych meczów. Dodatkowe wiersze
+ * (do 5 wyników i 8 meczów, klasa fxr--x) pokazuje CSS, gdy panel zajmuje na Pulpicie dwa rzędy siatki.
+ */
+export function fixturesPanelBody(game, { past = 3, next = 5, morePast = 2, moreNext = 3 } = {}) {
   ensureHistory(game);
   const rows = teamFixtures(game);
   const played = rows.filter((r) => r.played);
   const plan = rows.filter((r) => !r.played);
-  const head = played.slice(-past);
-  const tail = plan.slice(0, next);
+  const head = played.slice(-(past + morePast));
+  const tail = plan.slice(0, next + moreNext);
+  const xPast = Math.max(0, head.length - past);
   if (!head.length && !tail.length) return '<p class="dash-note">Brak meczów w tym sezonie. Terminarz pojawi się po losowaniu albo w nowym sezonie.</p>';
   const rec = recordOf(played);
-  const list = [...head.map((r) => rowHtml(r, { today: game.date })), todayLine(game.date), ...tail.map((r) => rowHtml(r, { today: game.date }))].join('');
+  const list = [
+    ...head.map((r, i) => rowHtml(r, { today: game.date, extra: i < xPast })),
+    todayLine(game.date),
+    ...tail.map((r, i) => rowHtml(r, { today: game.date, extra: i >= next })),
+  ].join('');
   const sum = rec.n
     ? `${rec.n} ${rec.n === 1 ? 'mecz' : rec.n % 10 >= 2 && rec.n % 10 <= 4 && (rec.n % 100 < 12 || rec.n % 100 > 14) ? 'mecze' : 'meczów'} w sezonie: ${rec.w} W, ${rec.d} R, ${rec.l} P, bramki ${rec.gf}:${rec.ga}. ${plan.length ? `Do rozegrania: ${plan.length}.` : ''}`
     : `Sezon przed pierwszym meczem. W terminarzu: ${plan.length}.`;
@@ -117,7 +127,7 @@ function splitTable(rows) {
   return `<table class="fxs-split">
     <caption class="sr">Bilans według miejsca meczu</caption>
     <thead><tr><th scope="col"><span class="sr">Miejsce</span></th><th scope="col"><abbr title="Mecze rozegrane">M</abbr></th><th scope="col"><abbr title="Wygrane">W</abbr></th><th scope="col"><abbr title="Remisy">R</abbr></th><th scope="col"><abbr title="Porażki">P</abbr></th><th scope="col">Bramki</th><th scope="col" class="w">Do gry</th></tr></thead>
-    <tbody>${VENUES.map(([k]) => line('', rows.filter((r) => r.venue === k), k)).join('')}</tbody>
+    <tbody>${VENUES.filter(([k]) => k !== 'N' || rows.some((r) => r.venue === k)).map(([k]) => line('', rows.filter((r) => r.venue === k), k)).join('')}</tbody>
     <tfoot>${line('Razem', rows, null)}</tfoot>
   </table>`;
 }
@@ -164,9 +174,9 @@ export function renderFixtures(game, ui = {}) {
     </div>
     <div class="fxs__bar">
       <div class="fxs__filters">
-        <div class="chips chips--sm" role="group" aria-label="Sezon">${seasonChips}</div>
-        <div class="chips chips--sm" role="group" aria-label="Rozgrywki">${compChips}</div>
-        <div class="chips chips--sm" role="group" aria-label="Miejsce meczu">${venueChips}</div>
+        <div class="chips chips--sm chips--wrap" role="group" aria-label="Sezon">${seasonChips}</div>
+        <div class="chips chips--sm chips--wrap" role="group" aria-label="Rozgrywki">${compChips}</div>
+        <div class="chips chips--sm chips--wrap" role="group" aria-label="Miejsce meczu">${venueChips}</div>
       </div>
       <section class="fxs__sum" aria-label="Bilans">${splitTable(byComp)}</section>
     </div>

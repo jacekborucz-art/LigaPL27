@@ -146,13 +146,20 @@ export function ensureHistory(game) {
   return H;
 }
 
+/** Od kiedy trener prowadzi obecny klub (zmiana pracy w trakcie sezonu): wcześniejsze mecze klubu to nie jego mecze. */
+export function joinedOn(game) {
+  const h = (game.manager?.history ?? []).filter((x) => x.club === game.clubId && !x.to).pop();
+  return h?.from ?? '';
+}
+
 function backfillSeason(game, key) {
   const H = game.history;
   const list = (H.m[key] ??= []);
   const have = new Set(list.map((x) => x.id));
+  const since = joinedOn(game);
   let added = false;
   for (const f of game.fixtures) {
-    if (!f.played || !f.result?.score || have.has(f.id)) continue;
+    if (!f.played || !f.result?.score || have.has(f.id) || f.date < since) continue;
     if (f.home !== game.clubId && f.away !== game.clubId) continue;
     list.push(matchRow(f, game.clubId)); added = true;
   }
@@ -196,8 +203,9 @@ export function teamFixtures(game, key = seasonKey(game)) {
   const rows = [...(game.history?.m?.[key] ?? [])];
   if (cur && game.fixtures) {
     const have = new Set(rows.map((x) => x.id));
+    const since = joinedOn(game);
     for (const f of game.fixtures) {
-      if (have.has(f.id) || (f.home !== game.clubId && f.away !== game.clubId)) continue;
+      if (have.has(f.id) || (f.home !== game.clubId && f.away !== game.clubId) || (f.played && f.date < since)) continue;
       rows.push(f.played && f.result?.score ? matchRow(f, game.clubId) : { ...matchRow(f, game.clubId), s: null, plan: 1, post: f.postponed ? 1 : 0 });
     }
   }

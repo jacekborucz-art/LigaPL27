@@ -209,8 +209,10 @@
 .tr-frrule p { margin: var(--space-2) 0 0; font-size: var(--step--1); }
 .tr-frtags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .tr-frtags .tag { font-size: 12px; }
-.tr-frbtns { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.tr-frbtns { display: flex; flex: none; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .tr-fr.is-open { flex-wrap: wrap; }
 .tr-fredit { flex: 1 0 100%; padding-top: var(--space-2); }
 .tr-day__rules { display: block; color: var(--text-muted); font-size: 11px; line-height: 1.2; }
 @media (min-width: 900px) { .tr-frrules { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.tr-frrule .seg2 { flex-direction: column; }
+.tr-frrule .seg2 button { flex: none; text-align: left; padding: 0 12px; }

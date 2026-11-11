@@ -1,0 +1,220 @@
+/* Terminarz drużyny gracza (panel na Pulpicie i ekran „Terminarz i wyniki”) oraz statystyki zawodnika w profilu.
+   Kod: src/ui/fixturesView.js, src/ui/playerStatsView.js, docs/historia-i-statystyki.md.
+   Kartka z terminarza: data jak z kalendarza ściennego (duży numer dnia, miesiąc pod spodem), znacznik rozgrywek
+   (kolor = rodzaj rozgrywek), znacznik miejsca (kształt: pełny = u siebie, obrys = wyjazd, przerywany = neutralny)
+   i kartonik wyniku W/R/P. Jedno mocne miejsce: bursztynowa kreska „Dziś” jak linia LED na stadionie. */
+
+:root {
+  --pa-fix: #7B3F6E;
+  --ct-liga: #1E6B3A;
+  --ct-bar: #8A5A00;
+  --ct-pp: #B3202F;
+  --ct-uefa: #1F4E9A;
+  --ct-friendly: #56645B;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --pa-fix: #E39BD0; }
+}
+:root[data-theme="dark"] { --pa-fix: #E39BD0; }
+
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- Panel na Pulpicie: miejsce w siatce (zob. dashboard.css) ---------- */
+.dash-p--fix { --pa: var(--pa-fix); grid-area: fix; }
+.dash-p--fix .dash-p__body { padding: var(--space-2) 0 var(--space-4); gap: var(--space-2); }
+.dash-p--fix .fxc__sum { padding: 0 var(--space-4); margin-top: auto; }
+/* Dodatkowe wiersze: gdy panel stoi obok dwóch innych (od dwóch kolumn siatki) */
+.dash .fxr--x { display: none; }
+/* Pierwszy widoczny wiersz po ukrytych: bez kreski u góry */
+.dash .fxc .fxr--x + .fxr:not(.fxr--x) { border-top: 0; }
+@container dash (min-width: 640px) {
+  .dash .fxr--x { display: grid; }
+  .dash .fxc .fxr--x + .fxr:not(.fxr--x) { border-top: 1px solid var(--line); }
+}
+
+/* ---------- Znaczniki ---------- */
+.ctag {
+  display: inline-grid; place-items: center;
+  min-width: 34px; height: 20px; padding: 0 6px;
+  border-radius: 3px;
+  font: 700 12px/1 var(--font-display); letter-spacing: 0.02em; white-space: nowrap;
+  color: #fff; background: var(--ct-friendly);
+}
+.ctag[data-k="liga"] { background: var(--ct-liga); }
+.ctag[data-k="baraze"] { background: var(--ct-bar); }
+.ctag[data-k="pp"] { background: var(--ct-pp); }
+.ctag[data-k="super"] { background: transparent; color: var(--bad-text); box-shadow: inset 0 0 0 1.5px currentColor; }
+.ctag[data-k="uefa"] { background: var(--ct-uefa); }
+.ctag[data-k="friendly"] { background: var(--ct-friendly); }
+
+.vtag {
+  display: inline-grid; place-items: center;
+  height: 20px; padding: 0 7px;
+  border-radius: 999px;
+  font: 600 11px/1 var(--font-body); white-space: nowrap;
+  color: var(--text);
+  box-shadow: inset 0 0 0 1.5px var(--text-muted);
+}
+.vtag[data-v="H"] { background: var(--text); color: var(--surface); box-shadow: none; }
+.vtag[data-v="N"] { box-shadow: none; outline: 1.5px dashed var(--text-muted); outline-offset: -1.5px; }
+
+.rchip {
+  display: grid; place-items: center; width: 22px; height: 22px; border-radius: 3px;
+  font: 700 12px/1 var(--font-display); color: #fff;
+}
+.rchip[data-r="W"] { background: #2E8A4E; }
+.rchip[data-r="R"] { background: #56645B; }
+.rchip[data-r="P"] { background: #C42536; }
+.rchip[data-r=""] { box-shadow: inset 0 0 0 1.5px var(--line); }
+
+.fx-tbd { display: inline-block; flex: none; width: var(--s); height: var(--s); border-radius: 50%; border: 1.5px dashed var(--text-muted); box-sizing: border-box; }
+
+/* ---------- Wiersz meczu ---------- */
+.fxc, .fxs__list { list-style: none; margin: 0; padding: 0; }
+.fxr {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto 22px;
+  grid-template-areas: "day opp end chip";
+  align-items: center;
+  gap: 2px var(--space-3);
+  min-height: 52px;
+  padding: 6px var(--space-4);
+}
+.fxr + .fxr { border-top: 1px solid var(--line); }
+.fxr__day { grid-area: day; display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.fxr__day b { font: 700 var(--step-2)/0.95 var(--font-display); font-variant-numeric: tabular-nums; }
+.fxr__day small { margin-top: 2px; font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.fxr__opp { grid-area: opp; display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.fxr__who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.fxr__who b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fxr__tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.fxr__end { grid-area: end; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; }
+.fxr .rchip { grid-area: chip; }
+.fxr__score { font: 700 var(--step-2)/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.fxr__time { font: 600 var(--step-0)/1 var(--font-display); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.fxr__end small { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.fxr__dec[data-won="1"] { color: var(--up, #1E7A43); }
+.fxr__dec[data-won="0"] { color: var(--bad-text); }
+/* Mecze przed nami: numer dnia w kolorze panelu; rozegrane spokojniej */
+.fxr:not(.is-played) .fxr__day b { color: var(--pa-fix); }
+.fxr.is-today { background: color-mix(in srgb, var(--led) 16%, transparent); }
+
+/* Kreska „Dziś” między rozegranymi a najbliższymi meczami */
+.fxr-now { position: relative; display: flex; align-items: center; gap: var(--space-2); padding: 2px var(--space-4); }
+.fxr-now::before, .fxr-now::after { content: ""; height: 2px; background: var(--led); box-shadow: 0 0 8px color-mix(in srgb, var(--led) 60%, transparent); }
+.fxr-now::before { width: 12px; }
+.fxr-now::after { flex: 1; }
+.fxr-now span { font: 700 var(--step--1)/1 var(--font-display); color: var(--warn-text); white-space: nowrap; }
+.fxr-now + .fxr { border-top: 0; }
+
+/* ---------- Ekran „Terminarz i wyniki” ---------- */
+.fxs { container: fxs / inline-size; }
+.fxs__head { margin: var(--space-3) 0; }
+.fxs__head h2 { margin: 0; }
+.fxs__head h2:focus { outline: none; }
+.fxs__head p { margin: 2px 0 0; }
+.fxs__bar { display: grid; gap: var(--space-3); margin-bottom: var(--space-4); }
+.fxs__filters { display: grid; gap: 2px; min-width: 0; }
+.fxs__filters .chips { margin-bottom: 0; }
+.fxs .chip small { margin-left: 4px; font-weight: 700; opacity: 0.75; }
+.fxs__sum { min-width: 0; background: var(--surface); border-radius: var(--radius-m); padding: var(--space-2) var(--space-3); }
+.fxs-split { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: var(--step--1); }
+.fxs-split th, .fxs-split td { padding: 5px 6px; text-align: right; }
+.fxs-split thead th { font-weight: 600; font-size: 12px; color: var(--text-muted); }
+.fxs-split abbr { text-decoration: none; }
+.fxs-split tbody th, .fxs-split tfoot th { text-align: left; }
+.fxs-split tfoot th, .fxs-split tfoot td { border-top: 1px solid var(--line); font-weight: 700; }
+.fxs-split .w { color: var(--text-muted); }
+
+.fxs__list { background: var(--surface); border-radius: var(--radius-m); overflow: hidden; }
+.fxs-month { padding: var(--space-3) var(--space-4) var(--space-1); border-top: 1px solid var(--line); background: var(--surface-stripe); }
+.fxs-month:first-child { border-top: 0; }
+.fxs-month h3 { margin: 0; font: 700 var(--step-0)/1 var(--font-display); color: var(--text-muted); }
+.fxs-month + .fxr { border-top: 0; }
+
+.fxr--wide { grid-template-columns: 44px minmax(0, 1fr) auto 22px; grid-template-areas: "day opp end chip" "day meta meta meta"; padding-block: 8px; }
+.fxr__meta { grid-area: meta; display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--space-2); min-width: 0; }
+.fxr__meta small { flex: 1 1 auto; order: 2; font-size: 12px; color: var(--text-muted); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fxr__wd { display: none; }
+
+@container fxs (min-width: 720px) {
+  .fxs__bar { grid-template-columns: minmax(0, 1fr) minmax(300px, 360px); align-items: start; }
+  .fxr--wide {
+    grid-template-columns: 76px minmax(200px, 1.1fr) minmax(0, 1fr) auto 24px;
+    grid-template-areas: "day meta opp end chip";
+    gap: var(--space-4);
+    min-height: 56px;
+  }
+  .fxr--wide .fxr__day { flex-direction: row; align-items: baseline; gap: 6px; justify-content: flex-start; }
+  .fxr--wide .fxr__meta { display: grid; grid-template-columns: 52px minmax(0, 1fr) 84px; flex-wrap: nowrap; }
+  .fxr--wide .fxr__meta small { order: 0; }
+  .fxr__wd { display: inline; }
+  .fxr--wide .vtag { justify-self: start; }
+  .fxr--wide .fxr__who b { font-size: var(--step-0); }
+}
+
+/* ---------- Profil zawodnika: statystyki ---------- */
+.phst { margin-top: var(--space-5); padding-top: var(--space-2); border-top: 2px solid var(--line); container: phst / inline-size; }
+.phst h3 { margin: var(--space-4) 0 var(--space-2); }
+.phst__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); }
+.phst__head h3 { margin: var(--space-3) 0; }
+.phst__head h3:focus { outline: none; }
+.phst__seg { position: relative; display: inline-flex; padding: 3px; border-radius: 999px; background: var(--surface-stripe); box-shadow: inset 0 0 0 1px var(--line); }
+.phst__seg label { display: grid; place-items: center; min-height: 38px; padding: 0 var(--space-4); border-radius: 999px; font: 600 var(--step--1)/1 var(--font-body); color: var(--text-muted); cursor: pointer; }
+.phst__in:checked + label { background: var(--accent); color: var(--accent-text); }
+.phst__in:focus-visible + label { outline: 2px solid var(--focus); outline-offset: 2px; }
+.phst:has(.phst__rc:checked) .phst__season, .phst:not(:has(.phst__rc:checked)) .phst__career { display: none; }
+
+.phst__t { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; background: var(--surface); border-radius: var(--radius-m); overflow: hidden; }
+.phst__t caption { caption-side: top; }
+.phst__t th, .phst__t td { padding: 7px 8px; text-align: right; }
+.phst__t thead th { font: 600 12px/1.1 var(--font-body); color: var(--text-muted); border-bottom: 1px solid var(--line); }
+.phst__t thead th:first-child, .phst__t tbody th, .phst__t tfoot th { text-align: left; }
+.phst__t abbr { text-decoration: none; }
+.phst__t tbody th { font-weight: 600; }
+.phst__t th small { display: block; font-weight: 400; font-size: 11px; color: var(--text-muted); }
+.phst__t tbody tr:nth-child(even) { background: var(--surface-stripe); }
+.phst__t tr.is-zero td, .phst__t tr.is-zero th { color: var(--text-muted); }
+.phst__t tr.is-zero th { font-weight: 400; }
+.phst__t tfoot th, .phst__t tfoot td { border-top: 1px solid var(--line); font-weight: 700; }
+.phst__t tfoot tr:last-child th, .phst__t tfoot tr:last-child td { border-top: 2px solid var(--text-muted); }
+.phst__t .w { display: none; }
+.phst__avg { font-weight: 700; }
+.phst__avg[data-b="hi"] { color: var(--up, #1E7A43); }
+.phst__avg[data-b="lo"] { color: var(--bad-text); }
+.phst__na { color: var(--text-muted); font-weight: 400; }
+.phst__old th, .phst__old td { font-style: italic; color: var(--text-muted); }
+.phst__note { margin: var(--space-2) 0 0; font-size: var(--step--1); color: var(--text-muted); }
+.phst__t td.phst__club { text-align: left; }
+.phst__cl { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.phst__cn { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.phst__t tr.is-live th, .phst__t tr.is-live td { background: color-mix(in srgb, var(--led) 14%, transparent); }
+.phst__period { white-space: nowrap; color: var(--text-muted); font-size: var(--step--1); }
+.loan-tag {
+  flex: none; padding: 2px 6px; border-radius: 999px;
+  font: 600 11px/1.2 var(--font-body); color: var(--text);
+  box-shadow: inset 0 0 0 1.5px var(--pa-fix);
+}
+.phst__cols { display: grid; gap: 0 var(--space-5); }
+.phst__t--seasons td, .phst__t--clubs td { vertical-align: middle; }
+/* Sezony i kluby: stałe szerokości kolumn liczb, nazwa klubu skracana wielokropkiem */
+.phst__t--seasons, .phst__t--clubs { table-layout: fixed; }
+.phst__t--seasons th:first-child { width: auto; }
+.phst__t--seasons .phst__per-in--club { margin-left: 0; }
+.phst__t .phst__sub { display: none; }
+.phst__t--seasons th:nth-child(n+3) { width: 34px; }
+.phst__t--seasons th:last-child { width: 60px; }
+.phst__t--seasons thead th:nth-child(2), .phst__t--clubs thead th:first-child { text-align: left; }
+.phst__t--clubs th:nth-child(n+3) { width: 40px; }
+.phst__t--clubs th:nth-child(2) { width: 132px; }
+.phst__per-in { display: block; margin: 2px 0 0 26px; font-size: 12px; color: var(--text-muted); }
+
+@container phst (min-width: 560px) {
+  .phst__t .w { display: table-cell; }
+  .phst__t .phst__per-in { display: none; }
+  .phst__t .phst__sub { display: block; }
+  .phst__t--seasons th:first-child { width: 84px; }
+}
+@container phst (min-width: 860px) {
+  .phst__cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}

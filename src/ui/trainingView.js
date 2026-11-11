@@ -441,6 +441,8 @@ function rulesEditor(rules, act, id = '') {
   }).join('')}</div>`;
 }
 
+/** Wynik serii karnych w terminarzu (fromEngineResult zapisuje same gole: [a, b]). */
+const pens = (so) => { const g = Array.isArray(so) ? so : so?.goals; return g ? ` (k. ${g[0]}:${g[1]})` : ''; };
 const ruleTagsHtml = (f) => `<span class="tr-frtags">${friendlyRuleTags(f).map((t) => `<span class="tag">${esc(t)}</span>`).join('')}</span>`;
 
 function friendliesTab(game, ui) {
@@ -448,7 +450,7 @@ function friendliesTab(game, ui) {
   const nameOf = (id) => anyClub(id)?.name ?? id;
   const planned = list.map((f) => {
     const opp = f.home === game.clubId ? f.away : f.home;
-    const res = f.played && f.result?.score ? `${f.result.score[0]}:${f.result.score[1]}${f.result.shootout ? ` (k. ${f.result.shootout.goals[0]}:${f.result.shootout.goals[1]})` : ''}` : '';
+    const res = f.played && f.result?.score ? `${f.result.score[0]}:${f.result.score[1]}${pens(f.result.shootout)}` : '';
     const future = !f.played && f.date > game.date;
     const open = future && ui.trFrEdit === f.id;
     const btns = res ? `<b>${esc(res)}</b>` : future

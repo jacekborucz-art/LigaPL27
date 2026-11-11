@@ -115,7 +115,7 @@ function teamColors(f) {
  */
 export function mountMatchday(app, { game, fixture, save, onExit }) {
   const S = MD.startMatchday(game, fixture);
-  const ui = { speed: 1, running: false, timer: null, sel: {}, tab: matchMedia('(min-width: 1280px)').matches ? 'feed' : 'stats', overlay: null, adv: null, dialog: null, raf: null, dots: [] };
+  const ui = { speed: 1, running: false, timer: null, sel: {}, tab: 'feed', overlay: null, adv: null, dialog: null, raf: null, dots: [] };
   const colors = teamColors(fixture);
   app.style.setProperty('--home', colors.home); app.style.setProperty('--home-ink', colors.homeInk);
   app.style.setProperty('--away', colors.away); app.style.setProperty('--away-ink', colors.awayInk);
@@ -410,39 +410,43 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
       <div class="live" data-tab="${ui.tab}">
         <div class="live__head" id="mdHead">
           ${boardHtml(M.score, M.events[M.events.length - 1]?.min ?? "0'", { live: true })}
-          <div class="transport" role="toolbar" aria-label="Przebieg meczu">
-            <button class="md-play ${ui.running ? 'is-running' : ''}" data-md="pause" id="mdPause">${ui.running ? 'Pauza' : M.minute > 0 ? 'Wznów mecz' : 'Start meczu'}</button>
-            <div class="speedset" role="group" aria-label="Tempo meczu">${SPEEDS.map(([v, l]) => `<button class="speed" data-md="speed:${v}" aria-pressed="${ui.speed === v}">${l}</button>`).join('')}</div>
-            <button class="tp-skip" data-md="skip" title="${S.step === 'live1' ? 'Pokaż wynik do przerwy' : 'Pokaż wynik końcowy'}">${skipLabel}</button>
-          </div>
         </div>
-        <div class="pitch-area">
-          <div class="pitch-wrap"><canvas class="pitch" id="mdPitch" aria-label="Boisko. Prawy przycisk albo przytrzymanie na zawodniku otwiera menu."></canvas>
-            <div class="goal" id="mdGoal" role="status"><div class="goal__in"><b id="mdGoalTitle">GOL</b><small id="mdGoalWho"></small></div></div>
-            <div class="md-toasts" id="mdToasts" aria-live="polite"></div>
-            <div class="md-halt" id="mdHalt" hidden role="alertdialog" aria-labelledby="mdHaltTitle">
-              <b id="mdHaltTitle">Gra wstrzymana</b><p id="mdHaltText"></p>
-              <div class="md-halt__sugg" id="mdHaltSugg"></div>
-              <div class="md-halt__btns"><button class="btn btn--quiet btn--sm" data-md="dlg:manage">Zmiany i taktyka</button><button class="btn btn--primary btn--sm" data-md="haltGo">Graj dalej</button></div>
+        <div class="live__centre">
+          <div class="mom-area">
+            <div class="poss"><span id="mdPh">50%</span><div class="bar2"><i class="bh" id="mdPbh" style="width:50%"></i><i class="ba" id="mdPba" style="width:50%"></i></div><span id="mdPa">50%</span></div>
+            <div class="press" aria-live="off">
+              <div class="press__track"><i class="press__knob" id="mdPressKnob" style="left:50%"></i></div>
+              <span class="press__lbl" id="mdPressLbl">Gra wyrównana</span>
+            </div>
+            <svg class="momentum" id="mdMom" viewBox="0 0 90 60" preserveAspectRatio="none" role="img" aria-label="Przewaga w kolejnych minutach"></svg>
+          </div>
+          <div class="pitch-area">
+            <div class="pitch-wrap"><canvas class="pitch" id="mdPitch" aria-label="Boisko. Prawy przycisk albo przytrzymanie na zawodniku otwiera menu."></canvas>
+              <div class="goal" id="mdGoal" role="status"><div class="goal__in"><b id="mdGoalTitle">GOL</b><small id="mdGoalWho"></small></div></div>
+              <div class="md-toasts" id="mdToasts" aria-live="polite"></div>
+              <div class="md-halt" id="mdHalt" hidden role="alertdialog" aria-labelledby="mdHaltTitle">
+                <b id="mdHaltTitle">Gra wstrzymana</b><p id="mdHaltText"></p>
+                <div class="md-halt__sugg" id="mdHaltSugg"></div>
+                <div class="md-halt__btns"><button class="btn btn--quiet btn--sm" data-md="dlg:manage">Zmiany i taktyka</button><button class="btn btn--primary btn--sm" data-md="haltGo">Graj dalej</button></div>
+              </div>
             </div>
           </div>
-          <div class="coachbar" role="toolbar" aria-label="Decyzje trenera">
-            <button data-md="dlg:manage">Zmiany i taktyka</button><button data-md="dlg:shout">Okrzyk</button>
+          <div class="live__ctrl">
+            <div class="transport" role="toolbar" aria-label="Przebieg meczu">
+              <button class="md-play ${ui.running ? 'is-running' : ''}" data-md="pause" id="mdPause">${ui.running ? 'Pauza' : M.minute > 0 ? 'Wznów mecz' : 'Start meczu'}</button>
+              <div class="speedset" role="group" aria-label="Tempo meczu">${SPEEDS.map(([v, l]) => `<button class="speed" data-md="speed:${v}" aria-pressed="${ui.speed === v}">${l}</button>`).join('')}</div>
+              <button class="tp-skip" data-md="skip" title="${S.step === 'live1' ? 'Pokaż wynik do przerwy' : 'Pokaż wynik końcowy'}">${skipLabel}</button>
+            </div>
+            <div class="coachbar" role="toolbar" aria-label="Decyzje trenera">
+              <button class="coachbar__manage" data-md="dlg:manage">Zmiany i taktyka${M.rules?.friendly && unlimited(M) ? '<small>bez limitu</small>' : ''}</button><button class="coachbar__shout" data-md="dlg:shout">Okrzyk</button>
+            </div>
           </div>
-        </div>
-        <div class="mom-area">
-          <div class="poss"><span id="mdPh">50%</span><div class="bar2"><i class="bh" id="mdPbh" style="width:50%"></i><i class="ba" id="mdPba" style="width:50%"></i></div><span id="mdPa">50%</span></div>
-          <div class="press" aria-live="off">
-            <div class="press__track"><i class="press__knob" id="mdPressKnob" style="left:50%"></i></div>
-            <span class="press__lbl" id="mdPressLbl">Gra wyrównana</span>
-          </div>
-          <svg class="momentum" id="mdMom" viewBox="0 0 90 60" preserveAspectRatio="none" role="img" aria-label="Przewaga w kolejnych minutach"></svg>
         </div>
         <div class="tabs2 live__tabs" role="tablist" aria-label="Widok">
           ${[['feed', 'Relacja'], ['stats', 'Statystyki'], ['lineups', 'Składy']].map(([k, l]) => `<button role="tab" data-md="tab:${k}" aria-selected="${ui.tab === k}">${l}</button>`).join('')}
         </div>
         <section class="feed-area" aria-labelledby="mdFeedH"><h2 id="mdFeedH">Relacja</h2><ul class="feed" id="mdFeed"></ul></section>
-        <section class="stats-area" aria-label="Statystyki meczu"><div id="mdStats"></div></section>
+        <section class="stats-area" aria-labelledby="mdStatsH"><h2 id="mdStatsH">Statystyki</h2><div id="mdStats"></div></section>
         <div class="rosters">
           <section class="ros" data-side="0" id="mdRos0" aria-label="Skład: ${esc(sideName(0))}"></section>
           <section class="ros" data-side="1" id="mdRos1" aria-label="Skład: ${esc(sideName(1))}"></section>
@@ -458,7 +462,8 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
   // Relacja/Statystyki, bardzo szeroki ekran bez zakładek.
   const mqWide = matchMedia('(min-width: 1280px)');
   const mqHuge = matchMedia('(min-width: 1760px)');
-  function tabSet() { return mqHuge.matches ? [] : mqWide.matches ? ['feed', 'stats'] : ['stats', 'lineups']; }
+  const mqLaptop = matchMedia('(min-width: 1024px)');
+  function tabSet() { return mqHuge.matches ? [] : mqWide.matches ? ['feed', 'stats'] : mqLaptop.matches ? ['stats', 'lineups'] : ['feed', 'stats', 'lineups']; }
   function normTab() {
     const set = tabSet();
     if (set.length && !set.includes(ui.tab)) ui.tab = set[0];
@@ -472,7 +477,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     });
   }
   const onMq = () => { if (S.step.startsWith('live')) { normTab(); updateLive(); } };
-  mqWide.addEventListener('change', onMq); mqHuge.addEventListener('change', onMq);
+  mqWide.addEventListener('change', onMq); mqHuge.addEventListener('change', onMq); mqLaptop.addEventListener('change', onMq);
   let headRo = null;
   function setupLiveLayout() {
     normTab();
@@ -625,7 +630,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
   const unlimited = (M) => !!M.rules && M.rules.subs !== 'standard';
   function subsCountText(T, M) {
     if (!unlimited(M)) return `zmiany ${T.subsUsed} z ${T.subsLimit}`;
-    return `zmiany: ${T.subsUsed}, bez limitu${M.rules.subs === 'rolling' ? ', powrotne' : ''}`;
+    return `zmiany: ${T.subsUsed}, bez limitu`;
   }
   function renderRosters() {
     const focus = document.activeElement?.closest?.('[data-mdp]')?.dataset.mdp;
@@ -1324,15 +1329,15 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
       const x = byId.get(id); if (!x) return '';
       const k = rank.get(id);
       const gk = id === d.keeperId;
-      const meta = [`kondycja ${x.cond}%`, `opanowanie ${x.opa}`, x.knock ? 'gra z bólem' : '', gk ? 'bramkarz serii' : ''].filter(Boolean).join(', ');
-      const band = x.pct >= 80 ? 'top' : x.pct >= 74 ? 'good' : x.pct >= 68 ? 'mid' : 'low';
+      const meta = [`kondycja ${x.cond}%`, `opanowanie ${x.opa}`, x.knock ? 'gra z bólem' : ''].filter(Boolean).join(', ');
+      const band = x.pct >= 76 ? 'top' : x.pct >= 71 ? 'good' : x.pct >= 66 ? 'mid' : 'low';
       const sep = i === 5 && setup.n > 5 ? '<li class="so-sep" aria-hidden="true"><span>Nagła śmierć, ta sama kolejność</span></li>' : i === pv.order.length && pv.out.length ? '<li class="so-sep so-sep--out" aria-hidden="true"><span>Nie strzelają: wyrównanie liczebności</span></li>' : '';
       return `${sep}<li class="so-row${k ? '' : ' is-out'}${gk ? ' is-gk' : ''}" data-so="${esc(id)}">
         <span class="so-n" aria-hidden="true">${k ?? '–'}</span>
         <span class="so-grip" data-sograb aria-hidden="true"></span>
         <span class="pos" data-g="${gk ? 'GK' : GROUP[x.pos] ?? 'MID'}">${esc(x.pos)}</span>
         <span class="so-nm"><b>${esc(x.name)}</b><small>${esc(meta)}</small></span>
-        <span class="so-pct" title="Szansa gola przeciw bramkarzowi rywala"><i class="so-pct__bar"><i data-b="${band}" style="width:${Math.max(0, Math.min(100, (x.pct - 40) / 55 * 100))}%"></i></i><b>${x.pct}%</b></span>
+        <span class="so-pct" title="Szansa gola przeciw bramkarzowi rywala"><i class="so-pct__bar"><i data-b="${band}" style="width:${Math.max(0, Math.min(100, (x.pct - 45) / 50 * 100))}%"></i></i><b>${x.pct}%</b></span>
         <span class="so-mv"><button class="so-btn" data-md="soMove:${esc(id)}|-1" ${i === 0 ? 'disabled' : ''} aria-label="${esc(`${x.name} wyżej`)}">▲</button><button class="so-btn" data-md="soMove:${esc(id)}|1" ${i === listIds.length - 1 ? 'disabled' : ''} aria-label="${esc(`${x.name} niżej`)}">▼</button></span>
         <span class="sr-only">${k ? `strzela jako ${k}.` : 'nie strzela'}, szansa ${x.pct} procent, ${esc(meta)}</span>
       </li>`;
@@ -1424,7 +1429,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const dots = (sd) => Array.from({ length: rounds }, (_, r) => {
       const e = kicks.slice(0, shown).find((k) => k.side === sd && k.round === r + 1);
       const st = !e ? 'wait' : e.scored ? 'goal' : 'miss';
-      return `<span class="so-dot so-dot--${st}${r >= 5 ? ' is-sd' : ''}"><span class="sr-only">${r + 1}. seria: ${st === 'wait' ? 'jeszcze nie strzelał' : st === 'goal' ? 'gol' : 'nie strzelił'}</span></span>`;
+      return `<span class="so-dot so-dot--${st}${r >= 5 ? ' is-sd' : ''}${e && e === kicks[shown - 1] ? ' is-new' : ''}"><span class="sr-only">${r + 1}. seria: ${st === 'wait' ? 'jeszcze nie strzelał' : st === 'goal' ? 'gol' : 'nie strzelił'}</span></span>`;
     }).join('');
     const cur = done ? null : kicks[shown];
     const who = (id) => shortPlayerName(whoById(id));
@@ -1434,17 +1439,20 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     shell(`
       <h1 class="so-title">Seria rzutów karnych</h1>
       <div class="brk-board">${boardHtml(S.M.score, `karne ${tally[0]}:${tally[1]}`)}</div>
-      <section class="so-led" aria-label="Przebieg serii">
+      <section class="so-led so-reveal" aria-label="Przebieg serii">
         ${[0, 1].map((sd) => `<div class="so-led__row" data-side="${sd}"><span class="so-led__t">${crest(sd === 0 ? fixture.home : fixture.away, 22)}<b>${esc(shortName(sd))}</b></span><span class="so-dots">${dots(sd)}</span><b class="so-led__n">${tally[sd]}</b></div>`).join('')}
       </section>
+      <div class="so-reveal">
       <div class="so-spot${cur ? ' is-runup' : ''}${done ? ' is-done' : ''}" id="soSpot" data-side="${cur?.side ?? last?.side ?? ''}">
-        ${cur ? `<small>${cur.round > 5 ? `Nagła śmierć, ${cur.round}. seria` : `${cur.round}. seria`}, strzela ${esc(sideName(cur.side))}</small>
-          <b class="so-spot__nm">${esc(who(cur.pid))}</b><span class="so-spot__vs">w bramce ${esc(who(cur.gkId) || 'zawodnik z pola')}</span>
-          <span class="so-spot__ball" aria-hidden="true">${ICON.ball}</span>`
+        ${cur ? `<div class="so-goal" id="soGoal"><span class="so-goal__gk">${esc(who(cur.gkId) || 'zawodnik z pola')}</span></div>
+          <small>${cur.round > 5 ? `Nagła śmierć, ${cur.round}. seria` : `${cur.round}. seria`}, strzela ${esc(sideName(cur.side))}</small>
+          <span class="so-spot__ball" aria-hidden="true">${ICON.ball}</span>
+          <b class="so-spot__nm">${esc(who(cur.pid))}</b>`
         : `<small>Koniec serii</small><b class="so-spot__nm">${esc(sideName(winner))}</b><span class="so-spot__vs">wygrywa ${S.M.shootout.goals[winner]}:${S.M.shootout.goals[1 - winner]} w rzutach karnych</span>`}
       </div>
       <p class="sr-only" aria-live="polite" id="soLive">${last ? esc(last.text) : ''}</p>
-      <ol class="so-log">${kicks.slice(0, shown).map((e) => `<li data-side="${e.side}" class="${e.scored ? 'is-goal' : 'is-miss'}"><span class="so-log__r">${e.round}.</span><b>${esc(shortName(e.side))}</b><span>${esc(who(e.pid))}</span><em>${res(e)}</em></li>`).reverse().join('')}</ol>`,
+      <ol class="so-log">${kicks.slice(0, shown).map((e) => `<li data-side="${e.side}" class="${e.scored ? 'is-goal' : 'is-miss'}"><span class="so-log__r">${e.round}.</span><b>${esc(shortName(e.side))}</b><span>${esc(who(e.pid))}</span><em>${res(e)}</em></li>`).reverse().join('')}</ol>
+      </div>`,
       done ? btn('soEnd', 'Dalej') : btn('soSkip', 'Pokaż wynik serii', false));
     clearTimeout(ui.soTimer);
     if (!done) {
@@ -1455,7 +1463,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
         if (spot && cur) {
           spot.classList.remove('is-runup');
           spot.classList.add(cur.scored ? 'is-goal' : 'is-miss');
-          spot.insertAdjacentHTML('beforeend', `<b class="so-spot__res">${res(cur)}</b>`);
+          (spot.querySelector('#soGoal') ?? spot).insertAdjacentHTML('beforeend', `<b class="so-spot__res">${res(cur)}</b>`);
         }
         ui.soTimer = setTimeout(() => { ui.soShown = shown + 1; if (S.step === 'shootout') renderShootoutReveal(); }, fast ? 600 : 700);
       }, fast ? 700 : 900);
@@ -1594,7 +1602,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
   function cleanup() {
     app.removeEventListener('click', onClick); document.removeEventListener('keydown', onKey);
     ro?.disconnect(); headRo?.disconnect(); cancelAnimationFrame(ui.raf); clearTimeout(ui.soTimer);
-    mqWide.removeEventListener('change', onMq); mqHuge.removeEventListener('change', onMq);
+    mqWide.removeEventListener('change', onMq); mqHuge.removeEventListener('change', onMq); mqLaptop.removeEventListener('change', onMq);
     closeMenu({ restoreFocus: false });
     app.mdMenuOpen = null; delete app.mdSession;
     for (const k of ['--home', '--home-ink', '--away', '--away-ink']) app.style.removeProperty(k);

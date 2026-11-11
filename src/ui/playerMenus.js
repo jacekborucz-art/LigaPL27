@@ -51,6 +51,8 @@ const shortName = (p) => p.last ?? p.name;
 // ------------------------------------------------------------ Nawigacja (sekwencje istniejących akcji)
 export const NAV = {
   profile: (id) => ({ steps: [{ act: 'tab', tab: 'kadra' }, { act: 'tsub', s: 'players' }, { act: 'player', id }], focus: '[data-act="squadback"]' }),
+  // Profil przewinięty do statystyk (src/ui/playerStatsView.js, nagłówek #pst-h)
+  stats: (id) => ({ steps: [{ act: 'tab', tab: 'kadra' }, { act: 'tsub', s: 'players' }, { act: 'player', id }], focus: '#pst-h' }),
   lineup: (loc) => ({ steps: [{ act: 'tab', tab: 'kadra' }, { act: 'tsub', s: 'tactics' }, { act: 'tpick', loc }], focus: `[data-act="tpick"][data-loc="${q(loc)}"]` }),
   training: (id) => ({ steps: [{ act: 'tab', tab: 'trening' }, { act: 'tr-tab', tab: 'zawodnicy' }, { act: 'tr-player', id }], focus: '[data-act="tr-pback"]' }),
   report: () => ({ steps: [{ act: 'tab', tab: 'trening' }, { act: 'tr-tab', tab: 'rozwoj' }], focus: '[data-act="tr-tab"][data-tab="rozwoj"]' }),
@@ -315,6 +317,7 @@ export function playerMenu(game, pid, { view, ui = {}, why = null, lineup = null
 
   const academy = !!game.world.clubs?.[game.clubId]?.academy?.includes(p.id);
   const profile = item('Profil zawodnika', NAV.profile(p.id), { primary: view === 'squad', hint: 'Atrybuty, stan, kontrakt, charakter' });
+  const stats = item('Statystyki i historia', NAV.stats(p.id), { hint: 'Mecze, gole, asysty i oceny w rozgrywkach, kluby' });
   if (academy) {
     return { ...head, note: 'Akademia', items: tidy([view === 'profile' ? null : profile, SEP, ...trainingItems(p, { inEditor: view === 'training' && ui.trPlayer === p.id })]) };
   }
@@ -359,14 +362,14 @@ export function playerMenu(game, pid, { view, ui = {}, why = null, lineup = null
       if (why === 'inj' || (!why && lp.injuryDays > 0)) items = [ret, profile, training, lineupNav, SEP, talk];
       else if (why === 'susp' || why === 'call') items = [lineupNav && { ...lineupNav, primary: true, hint: 'Znajdź zastępcę na najbliższy mecz' }, profile, SEP, talk];
       else if (why === 'contract') items = [{ ...contract[0], primary: true }, future, SEP, profile, ...contract.slice(1)];
-      else items = [profile, lineupNav, talk, training, contractSub];
+      else items = [profile, stats, lineupNav, talk, training, contractSub];
       break;
     }
     case 'profile':
-      items = [lineupNav, inLineup ? sub('Skład meczowy', lineupItems(p, L)) : null, talk, training, SEP, ...contract];
+      items = [stats, lineupNav, inLineup ? sub('Skład meczowy', lineupItems(p, L)) : null, talk, training, SEP, ...contract];
       break;
     default: // squad
-      items = [profile, inLineup ? sub('Skład meczowy', [...lineupItems(p, L), SEP, lineupNav]) : null, talk, training, SEP, ...contract];
+      items = [profile, stats, inLineup ? sub('Skład meczowy', [...lineupItems(p, L), SEP, lineupNav]) : null, talk, training, SEP, ...contract];
   }
   return { ...head, items: tidy(items) };
 }

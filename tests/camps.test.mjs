@@ -139,7 +139,8 @@ test('Sparingi: tylko w wolnych terminach, z rywalem z wolnym terminem, w dokła
   for (const o of opps.filter((x) => !x.foreign)) assert.ok(restOk(g.fixtures, o.id, date) && TR.levelText(0) && o.level);
   const r = TR.createFriendly(g, date, opps[0].id);
   assert.ok(r.ok, r.error);
-  assert.deepEqual(Object.keys(r.fixture).sort(), ['away', 'comp', 'date', 'home', 'id', 'label', 'neutral', 'played', 'round', 'time'].sort());
+  assert.deepEqual(Object.keys(r.fixture).sort(), ['away', 'comp', 'date', 'friendlyRules', 'home', 'id', 'label', 'neutral', 'played', 'round', 'time'].sort());
+  assert.deepEqual(r.fixture.friendlyRules, { decider: 'none', subs: 'unlimited', rotation: 'auto', period: dates[3].period.kind });
   assert.equal(r.fixture.id, `SP-${date}-${opps[0].id}`);
   assert.equal(r.fixture.comp, 'friendly');
   assert.equal(r.fixture.time, '17:00');
