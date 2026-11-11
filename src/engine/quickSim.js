@@ -10,6 +10,10 @@ import { teamRating } from './teamStrength.js';
 
 export const QS = {
   BETA: 0.225, MU_H: 1.50, MU_A: 1.19, MU_N: 1.34, RHO: -0.10,
+  // Nachylenie dla meczów klubowych z kadrami ze świata gry: dopasowane do pełnego silnika, który rozstrzyga mecze
+  // gracza (docs/balans.md: silnik dawał ok. 11 % większą przewagę lepszym; 0.225 -> 0.25). BETA zostaje dla
+  // modeli z własną kalibracją (puchary UEFA z ratingami klubów zagranicznych, reprezentacje).
+  BETA_CLUB: 0.25,
   XG_PER_SHOT: 0.108, // ok. 2,72 gola / 25 strzałów
   ON_TARGET_NON_GOAL: 0.28,
   CORNERS_PER_SHOT: 0.4,
@@ -25,8 +29,8 @@ export function expectedGoals(H, A, ctx = {}) {
   const muH = ctx.neutral ? QS.MU_N : QS.MU_H;
   const muA = ctx.neutral ? QS.MU_N : QS.MU_A;
   // Rywal bez prawdziwego bramkarza: każdy celny strzał wpada częściej (positions.js).
-  const lH = muH * Math.exp(QS.BETA * dH) * (H.qsMul ?? 1) * A.gkMods.goalMul;
-  const lA = muA * Math.exp(QS.BETA * dA) * (A.qsMul ?? 1) * H.gkMods.goalMul;
+  const lH = muH * Math.exp(QS.BETA_CLUB * dH) * (H.qsMul ?? 1) * A.gkMods.goalMul;
+  const lA = muA * Math.exp(QS.BETA_CLUB * dA) * (A.qsMul ?? 1) * H.gkMods.goalMul;
   return { lH, lA, dH, dA };
 }
 

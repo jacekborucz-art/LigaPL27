@@ -76,18 +76,21 @@ jest przyczyną zgłoszenia.
 | 1 | Skład gracza nie zmienia się sam: zastępca kontuzjowanego zostaje w jedenastce na stałe, brak rotacji | przeciw graczowi | ok. -8 pkt (ui wobec ui + asystent składu) |
 | 2 | Analiza wideo rywala tylko u gracza (plan asystenta robi ją dzień przed każdym meczem: +0,04 + 0,006 q analityka na zawodnika), kluby AI nie miały odpowiednika | dla gracza | ok. +2 pkt (wyłączenie `trainingPrep`) |
 | 3 | Kluby AI nie trenowały: ostrość spadała im o 1 dziennie między meczami (w lipcu z 70 do ok. 50), brak premii morale z zajęć (plan gracza: +0,25 morale i +14 ostrości tygodniowo) | dla gracza | ok. +1 pkt; razem z 2 składniki treningu w dniu meczu +0,22 pkt atrybutu (test `balance.test.mjs`) i ok. +3 pkt na sezon (quick wobec ai) |
-| 4 | Oceny z pełnego silnika średnio o ok. 0,33 niższe niż oceny meczów w tle; ocena wchodzi do formy (0,25 x (śr. - 6,6)) i morale | przeciw graczowi | forma ok. -0,08 pkt atrybutu na zawodnika, niższe morale |
-| 5 | Brak obozu u pasywnego gracza (AI jedzie sama); forma bazowa 0,45-0,65 na start rundy | przeciw graczowi | ok. -0,05 pkt atrybutu średnio w sezonie; mechanika zamierzona i zapowiadana w poczcie, zostaje |
+| 4 | Odprawa pomeczowa i konferencja tylko u gracza: domyślny ton (Pochwała) daje +1,0 morale po wygranej, +0,5 po remisie, -0,5 po porażce, domyślne odpowiedzi na konferencji ok. +0,3; trenerzy AI nie mieli odprawy pomeczowej | dla mocnych klubów gracza, przeciw słabym | po pozostałych poprawkach Legia +5,6, Lechia +8,6 pkt wobec AI (przed tą poprawką) |
+| 5 | Kalibracja pełnego silnika wobec szybkiej symulacji: silnik ok. 11 % bardziej stromy i inaczej wycenia strefy niektórych kadr (atrybuty w silniku, OVR w szybkiej symulacji) | zależy od klubu | Lechia +5,6, Legia +2,8, Widzew +2,0, Polonia +2,1, Resovia -0,4, GKS -2,4 pkt na sezon (ten sam klub, te same rywale, oba modele) |
+| 6 | Oceny z pełnego silnika średnio o ok. 0,33 niższe niż oceny meczów w tle; ocena wchodzi do formy (0,25 x (śr. - 6,6)) i morale | przeciw graczowi | forma ok. -0,08 pkt atrybutu na zawodnika, niższe morale |
+| 7 | Brak obozu u pasywnego gracza (AI jedzie sama); forma bazowa 0,45-0,65 na start rundy | przeciw graczowi | ok. -0,05 pkt atrybutu średnio w sezonie; mechanika zamierzona i zapowiadana w poczcie, zostaje |
 
 Sprawdzone i bez istotnej asymetrii:
 
-- Odprawy: średnie Z na start meczu 3,7 (gracz) wobec 4,0 (AI rywala) w meczach Widzewa, 4,5 wobec 4,4 w meczach GKS.
-  Zalecany ton gracza i reguły AI dają podobne zaangażowanie.
+- Odprawy przed meczem i w przerwie: średnie Z na start meczu 3,7 (gracz) wobec 4,0 (AI rywala) w meczach Widzewa,
+  4,5 wobec 4,4 w meczach GKS. Wyzerowanie Z obu stron (wariant `zeroz`) nie zmniejszyło przewagi gracza
+  (Widzew +1,2, GKS +1,5, Polonia 0,0 pkt), więc zalecany ton i reguły AI dają podobne zaangażowanie.
 - Spójność S na start: 99,0 wobec 98,7 (Widzew), 98,9 wobec 98,1 (GKS).
 - Asystent w meczu (`runToEnd`/`runToBreak` z `assistantFor`) używa tego samego `aiDecide` co trenerzy AI.
 - Kadry: siła zawodnika zależy tylko od L klubu (`playerGen.js`); poziom płac z `finanse_klubow.js` wpływa na pensje,
   nie na umiejętności. Rozwój zawodników w pierwszym sezonie nie różni gracza od AI w sposób mierzalny.
-- Zarząd, kibice, aklimatyzacja: nie wchodzą do siły meczowej poza morale (konferencja, odprawa pomeczowa: małe kwoty).
+- Zarząd, kibice, aklimatyzacja: nie wchodzą do siły meczowej poza morale.
 
 ## Zmiany
 
@@ -98,10 +101,14 @@ Zasada: kluby AI dostają te same mechanizmy co gracz, narzędzia gracza zostaj�
 | `src/training/cohesion.js` | `prepTerm`: klub AI w dniu meczu ma analizę rywala jak domyślny plan asystenta (analityk q >= 5, premia 0,04 + 0,006 q). Przeciw groźnej drużynie gracza do x2 (patrz niżej). `aiPrepToday` liczy premie raz na dzień. |
 | `src/training/config.js`, `src/training/index.js` | `AI_TRAINING = { moraleWeek: 0.25, sharpWeek: 14 }`: tygodniowy krok klubów AI daje dostępnym zawodnikom ostrość (do 85, jak trening gracza) i morale z zajęć. Liczby z domyślnego planu asystenta w sezonie 2026/27 (+0,250 morale, +14,4 ostrości na tydzień). |
 | `src/season/season.js` | `engineRatingShift` w `fromEngineResult`: oceny z pełnego silnika przesunięte o różnicę między średnią, jaką dałby model ocen szybkiej symulacji przy tych samych golach i kartkach, a średnią silnika (różnice między zawodnikami zostają). Gdy silnik zostanie przeskalowany, przesunięcie samo spadnie do ok. 0. Model ocen w tle wyniesiony do `QUICK_RATING`. |
+| `src/season/season.js` | `aiPostMatchTalk` w `applyResult`: po każdym meczu klubu AI jego trener robi odprawę pomeczową tym samym modelem co gracz (`postMatchBriefing`), ton z `aiChooseSpeech` według osobowości trenera, pamięć powtórzeń klubu w `game.aiSpeech`. |
+| `src/engine/quickSim.js` | `QS.BETA_CLUB = 0.25` (było 0,225) w `expectedGoals`: szybka symulacja meczów klubowych tak samo stroma jak pełny silnik. `QS.BETA` (puchary UEFA z ratingami klubów zagranicznych, reprezentacje) bez zmian. Studio przedmeczowe liczy kursy tym samym wzorem, więc kursy też lepiej pasują do silnika. |
 | `src/match/matchday.js` | `matchTactics`: zastępca wstawiony przez asystenta za niedostępnego zawodnika wraca na ławkę, gdy ten wyzdrowieje (jeśli gracz nie ruszał tego miejsca, także gdy zastępstwo zrobił ekran gry przed dniem meczowym). `tactics.assistant === true` oznacza skład wybierany przez asystenta przed każdym meczem, jak w klubach AI. |
 | `src/career/threat.js` (nowy) | Organiczna trudność, patrz niżej. |
 | `src/career/board.js`, `src/season/rollover.js` | `boardGoal`: po sezonie wyraźnie ponad cel zarząd podnosi cel na kolejny sezon (w połowie drogi do zajętego miejsca). `manager.seasons` zapisuje też cel (`target`). |
+| `src/career/careerSystem.js` | Zmiana klubu czyści pamięć zastępstw asystenta. |
 | `tests/balance.test.mjs` (nowy) | Tani strażnik balansu (patrz Testy). |
+| `tests/multiseason.test.mjs` | Test spadku do III ligi ustawia zaufanie zarządu na 100, żeby trener nie został zwolniony w trakcie sezonu (po zmianach balansu Chojniczanka z ziarnem 32 grała gorzej i zarząd zwalniał trenera w kwietniu, więc test sprawdzał inny klub). |
 
 ## Organiczna trudność (bez suwaka i bez ukrytych premii)
 

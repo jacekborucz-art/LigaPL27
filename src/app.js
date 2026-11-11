@@ -277,7 +277,8 @@ const DASH_ICONS = {
   squad: '<path d="M9.5 4h5v5.5H20v5h-5.5V20h-5v-5.5H4v-5h5.5z"/>',
 };
 const dashIcon = (k) => (DASH_ICONS[k] ? `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${DASH_ICONS[k]}</svg>` : icon(k));
-const dashLink = (tab, label) => `<button class="dash-link" data-act="tab" data-tab="${tab}">${esc(label)}</button>`;
+// data-sub: docelowa podzakładka (np. Transfery > Finanse), gdy obsługa kliknięcia ją uwzględni
+const dashLink = (tab, label, sub = '') => `<button class="dash-link" data-act="tab" data-tab="${tab}"${sub ? ` data-sub="${sub}"` : ''}>${esc(label)}</button>`;
 const dashPanel = (key, ico, title, body, link = '') => `
   <section class="dash-p dash-p--${key}" aria-labelledby="dp-${key}">
     <header class="dash-p__head"><span class="dash-p__ico">${dashIcon(ico)}</span><h3 id="dp-${key}">${title}</h3>${link}</header>
@@ -355,7 +356,7 @@ function dashHero(g, club, next, tableOf) {
     </header>
     <div class="dash-hero__match">
       ${team(next.home)}
-      <div class="dash-kick" role="img" aria-label="${days === 0 ? `Mecz dziś${next.time ? ` o ${esc(next.time)}` : ''}` : `${days} ${daysWord(days)} do meczu`}">
+      <div class="dash-kick${days === 0 ? ' is-today' : ''}" role="img" aria-label="${days === 0 ? `Mecz dziś${next.time ? ` o ${esc(next.time)}` : ''}` : `${days} ${daysWord(days)} do meczu`}">
         <span class="dash-kick__led" aria-hidden="true">${esc(led)}</span>
         <span class="dash-kick__lbl" aria-hidden="true">${ledLabel}</span>
       </div>
@@ -379,7 +380,7 @@ function dashTable(g, club, table) {
     const me = r.id === g.clubId;
     return `<tr class="${[me ? 'is-me' : '', tierCls(kOf(j))].filter(Boolean).join(' ')}"${z ? ` data-z="${z.kind}"` : ''}${me ? ' aria-current="true"' : ''}>
       <td class="dash-t__pos">${r.pos}</td>
-      <td class="dash-t__club">${crestHtml(c, { size: 20, clubsById })}<span>${esc(c.name)}</span></td>
+      <td class="dash-t__club"><span class="dash-t__cl">${crestHtml(c, { size: 20, clubsById })}<span>${esc(c.name)}</span></span></td>
       <td>${r.played}</td><td>${r.goalDiff > 0 ? '+' : ''}${r.goalDiff}</td><td class="dash-t__pts">${r.points}</td>
     </tr>`;
   }).join('');
@@ -418,7 +419,7 @@ function dashBoard(g, table) {
       ${rev ? `<li><span>Ostatnia ocena, ${esc(shortDate(rev.date))}</span><b data-sign="${rev.delta > 0 ? 'up' : rev.delta < 0 ? 'down' : ''}">${rev.delta > 0 ? '+' : ''}${esc(String(rev.delta).replace('.', ','))}</b></li>` : '<li><span>Pierwsza ocena zarządu</span><b>1. dnia miesiąca</b></li>'}
       ${fans ? `<li><span>Kibice</span><b>${esc(fans)}</b></li>` : ''}
     </ul>`;
-  return dashPanel('board', 'board', 'Zarząd', body, dashLink('transfery', 'Szczegóły'));
+  return dashPanel('board', 'board', 'Zarząd', body, dashLink('transfery', 'Transfery', 'zarzad'));
 }
 
 function dashFinance(g) {
@@ -441,7 +442,7 @@ function dashFinance(g) {
       <small>${bill > c.wageBudget ? `ponad budżet ${esc(fmtZl(c.wageBudget))}` : `z budżetu ${esc(fmtZl(c.wageBudget))}`}</small>
     </div>
     <p class="dash-note">Bilans miesiąca: <span data-sign="${month.net > 0 ? 'up' : month.net < 0 ? 'down' : ''}">${esc(signedZl(month.net))}</span></p>`;
-  return dashPanel('fin', 'fin', 'Finanse', body, dashLink('transfery', 'Szczegóły'));
+  return dashPanel('fin', 'fin', 'Finanse', body, dashLink('transfery', 'Transfery', 'finanse'));
 }
 
 function dashWindow(g) {
@@ -464,7 +465,23 @@ function dashWindow(g) {
       <p class="dash-note">${nx ? `Następne okno od ${esc(fmtDate(nx.from))}, za ${inDays} ${daysWord(inDays)}. Do tego czasu możesz podpisywać wolnych zawodników i przedłużać kontrakty.` : 'Terminy kolejnego okna pojawią się w nowym sezonie.'}</p>`;
   }
   body += offers ? `<p class="dash-alert">${offers} ${plural(offers, 'oferta', 'oferty', 'ofert')} za twoich zawodników czeka na odpowiedź.</p>` : '';
-  return dashPanel('window', 'transfery', 'Okno transferowe', body, dashLink('transfery', offers ? 'Zobacz oferty' : 'Rynek'));
+  // Ostatnie ruchy: najpierw twojego klubu, potem w twojej lidze (z historii rynku)
+  const tier = clubById(g.clubId)?.tier;
+  const hist = g.market?.history ?? [];
+  const mine = hist.filter((h) => h.from === g.clubId || h.to === g.clubId);
+  const league = hist.filter((h) => !mine.includes(h) && [h.from, h.to].some((id) => id && clubById(id)?.tier === tier));
+  const moves = [...mine, ...league].slice(0, 2);
+  const clubName = (id) => (id ? anyClub(id)?.name ?? 'klub zagraniczny' : 'wolny zawodnik');
+  const arrow = '<svg class="dash-moves__arrow" viewBox="0 0 16 10" aria-hidden="true"><path d="M1 5h13M10 1l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sr">do</span>';
+  const route = (h) => (h.kind === 'release'
+    ? `${esc(clubName(h.from))}, rozwiązany kontrakt`
+    : `${esc(clubName(h.from))} ${arrow} ${esc(clubName(h.to))}`);
+  const terms = (h) => (h.kind === 'release' ? '' : `${h.kind === 'loan' ? 'wypożyczenie' : h.fee ? fmtZl(h.fee) : 'bez odstępnego'}, `);
+  if (moves.length) {
+    body += `<h4 class="dash-sub">${mine.length ? 'Ostatnie ruchy' : 'Ostatnie ruchy w lidze'}</h4>
+      <ul class="dash-moves">${moves.map((h) => `<li${h.from === g.clubId || h.to === g.clubId ? ' class="is-mine"' : ''}><b>${esc(h.name)}</b><span class="dash-moves__route">${route(h)}</span><small>${esc(terms(h))}${esc(shortDate(h.date))}</small></li>`).join('')}</ul>`;
+  }
+  return dashPanel('window', 'transfery', 'Okno transferowe', body, dashLink('transfery', offers ? 'Zobacz oferty' : 'Transfery', offers ? 'oferty' : 'rynek'));
 }
 
 function dashSquad(g) {
@@ -482,22 +499,26 @@ function dashSquad(g) {
     return `<li><span class="pos" data-g="${GROUP[p.pos] ?? 'MID'}">${esc(p.pos)}</span><span class="dash-abs__name">${esc(p.name)}</span><span class="dash-abs__why" data-k="${k}">${esc(txt)}</span></li>`;
   }).join('');
   const freshBand = fresh == null ? '' : fresh >= 80 ? 'good' : fresh >= 65 ? 'mid' : 'low';
+  const ending = squadOf(g.world, g.clubId).filter((p) => !p.loan && p.contract?.until && daysBetween(g.date, p.contract.until) <= 365)
+    .sort((a, b) => a.contract.until.localeCompare(b.contract.until) || b.ovr - a.ovr);
+  const endList = ending.slice(0, 6).map((p, k) => `<li${k >= 3 ? ' class="dash-more"' : ''}><span class="pos" data-g="${GROUP[p.pos] ?? 'MID'}">${esc(p.pos)}</span><span class="dash-abs__name">${esc(p.name)}</span><span class="dash-abs__why" data-k="contract">${esc(fmtDate(p.contract.until))}</span></li>`).join('');
   const body = `<ul class="dash-stats">
       <li><span>Morale</span><b>${esc(moraleLabel(morale))}</b></li>
       <li><span>Świeżość składu</span><b data-b="${freshBand}">${fresh == null ? 'brak składu' : `${fresh}%`}</b></li>
       <li><span>Zgranie</span><b>${esc(coh.label)}</b></li>
     </ul>
     <h4 class="dash-sub">Niedostępni${out.length ? ` (${out.length})` : ''}</h4>
-    ${out.length ? `<ul class="dash-abs">${list}</ul>${out.length > 5 ? `<p class="dash-note">i jeszcze ${out.length - 5}</p>` : ''}` : '<p class="dash-note dash-note--ok">Wszyscy zawodnicy są do dyspozycji.</p>'}`;
+    ${out.length ? `<ul class="dash-abs">${list}</ul>${out.length > 5 ? `<p class="dash-note">i jeszcze ${out.length - 5}</p>` : ''}` : '<p class="dash-note dash-note--ok">Wszyscy zawodnicy są do dyspozycji.</p>'}
+    ${ending.length ? `<h4 class="dash-sub">Kontrakt kończy się w ciągu roku (${ending.length})</h4><ul class="dash-abs">${endList}</ul>` : ''}`;
   return dashPanel('squad', 'squad', 'Stan kadry', body, dashLink('kadra', 'Kadra'));
 }
 
 function dashMail(g) {
   const unread = unreadCount(g.inbox);
   const pend = pendingDecisions(g.inbox);
-  const latest = g.inbox.slice(0, 5);
+  const latest = g.inbox.slice(0, 8);
   const body = `${pend.length ? `<button class="dash-decide" data-act="mail" data-id="${esc(pend[0].id)}"><span class="dash-decide__card" aria-hidden="true"></span>${pend.length} ${plural(pend.length, 'wiadomość czeka', 'wiadomości czekają', 'wiadomości czeka')} na twoją decyzję</button>` : ''}
-    <ul class="mail-list stripes dash-mail">${latest.map(mailRow).join('') || '<li class="mail-empty">Brak wiadomości.</li>'}</ul>`;
+    <ul class="mail-list stripes dash-mail">${latest.map((m, k) => (k >= 5 ? mailRow(m).replace('<li>', '<li class="dash-more">') : mailRow(m))).join('') || '<li class="mail-empty">Brak wiadomości.</li>'}</ul>`;
   return dashPanel('mail', 'poczta', `Poczta${unread ? ` <span class="dash-p__count">${unread} ${plural(unread, 'nowa', 'nowe', 'nowych')}</span>` : ''}`, body, dashLink('poczta', 'Cała poczta'));
 }
 
