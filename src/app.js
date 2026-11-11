@@ -602,6 +602,11 @@ function renderLiveMatchday() {
   state.md = mountMatchday(app, {
     game: g, fixture: f, save,
     onExit: () => { state.md = null; state.screen = 'hub'; state.tab = 'pulpit'; render(); },
+    onLineup: () => {
+      state.md = null; state.screen = 'hub'; state.tab = 'kadra'; state.sqSub = 'tactics'; state.playerOpen = null; state.extPlayer = null;
+      state.tMsg = 'Ustaw skład, a potem kliknij „Zagraj mecz” na górze, żeby wrócić do dnia meczowego.';
+      render(); window.scrollTo({ top: 0 });
+    },
   });
 }
 

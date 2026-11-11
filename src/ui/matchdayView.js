@@ -113,7 +113,7 @@ function teamColors(f) {
 /**
  * Uruchamia dzień meczowy w kontenerze app. ctx: { game, fixture, save, onExit }.
  */
-export function mountMatchday(app, { game, fixture, save, onExit }) {
+export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
   const S = MD.startMatchday(game, fixture);
   const ui = { speed: 1, running: false, timer: null, sel: {}, tab: 'feed', overlay: null, adv: null, dialog: null, raf: null, dots: [] };
   const colors = teamColors(fixture);
@@ -252,7 +252,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
       </section>
       </div>`,
       done ? (phase === 'pre' ? btn('kickoff', 'Wyjdź na boisko') : phase === 'half' ? btn('resume', 'Rozpocznij 2. połowę') + secondBtn() + btn('dlg:manage', 'Zmiany i taktyka', false) : postActions())
-        : btn(`speech:${phase}`, 'Wygłoś odprawę') + (phase === 'half' ? secondBtn() + btn('dlg:manage', 'Zmiany i taktyka', false) : ''));
+        : btn(`speech:${phase}`, 'Wygłoś odprawę') + (phase === 'half' ? secondBtn() + btn('dlg:manage', 'Zmiany i taktyka', false) : phase === 'pre' ? lineupBtn() : ''));
     if (phase === 'half' && !app.querySelector('#mdDlg')) app.insertAdjacentHTML('beforeend', '<dialog id="mdDlg" class="panel md-dlg"></dialog>');
     const selects = [...app.querySelectorAll('[data-md-talk]')];
     const sync = () => { const used = selects.filter((s) => s.value).length; selects.forEach((s) => { s.disabled = !s.value && used >= MAX_TALKS; }); };
@@ -300,7 +300,9 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     if (slot.result) return btn(`pressView:${ph}`, 'Podsumowanie konferencji', false);
     return btn(`pressOpen:${ph}`, slot.conf?.answers?.length ? 'Wróć na konferencję' : ph === 'pre' ? 'Konferencja przedmeczowa' : 'Konferencja prasowa', false);
   }
-  const preActions = () => pressButtons('pre') + btn('toBriefing', 'Przejdź do odprawy');
+  // Zmiana składu przed meczem: powrót do ekranu Skład i taktyka (tylko przed odprawą w szatni)
+  const lineupBtn = () => (onLineup && !S.briefings?.pre ? btn('toLineup', 'Zmień skład', false) : '');
+  const preActions = () => lineupBtn() + pressButtons('pre') + btn('toBriefing', 'Przejdź do odprawy');
   const postActions = () => pressButtons('post') + btn('exit', 'Dalej');
 
   /** Ścianka za stołem: herb klubu i znak ligi na przemian (dekoracja, ukryta przed czytnikiem ekranu). */
@@ -1526,6 +1528,13 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     if (!el) return;
     const [act, arg] = el.dataset.md.split(':');
     const M = S.M;
+    if (act === 'toLineup' && onLineup) {
+      // Rozpoczęta konferencja przedmeczowa zostaje rozliczona (nie powtórzy się); nierozpoczęta czeka na powrót
+      if (MD.pressSlot(S, 'pre').conf?.answers?.length) MD.leaveStudio(game, S);
+      app.querySelector('#mdPress')?.remove();
+      stop(); cleanup(); await save(); onLineup();
+      return;
+    }
     if (act === 'toBriefing') {
       MD.leaveStudio(game, S); // konferencja przedmeczowa pominięta albo już rozliczona
       app.querySelector('#mdPress')?.remove();

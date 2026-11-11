@@ -236,7 +236,11 @@ export function doPreBriefing(game, S, tone, talks = []) {
   const res = preMatchBriefing({ players: matchSquadPlayers(game, S), tone, talks, memory: S.memory, ctx: { ...S.pre.forBriefing, clubId: game.clubId, date: S.f.date }, seed: `${game.seed}:${S.f.id}:pre` });
   S.memory = res.memory;
   S.briefings.pre = res;
-  for (const p of matchSquadPlayers(game, S)) { const w = game.world.players[p.id]; if (w) Object.assign(w, applyBriefing(w, res)); }
+  // Skutki dla morale tylko raz na mecz (powtórzona odprawa po ponownym wejściu w dzień meczowy działa tylko w meczu)
+  if (!mdDone(game, S.f.id, 'pre-speech')) {
+    for (const p of matchSquadPlayers(game, S)) { const w = game.world.players[p.id]; if (w) Object.assign(w, applyBriefing(w, res)); }
+    markDone(game, S.f.id, 'pre-speech');
+  }
   return res;
 }
 
@@ -613,6 +617,19 @@ export function pressCtxPre(game, S) {
   };
 }
 
+/**
+ * Trwały zapis w grze, co już się odbyło w dniu meczowym danego meczu (game.mdDone[fixtureId]). Chroni przed
+ * powtórzeniem konferencji i odprawy przedmeczowej, gdy dzień meczowy zaczyna się od nowa (np. po odświeżeniu
+ * strony albo powrocie ze zmiany składu). Trzyma ostatnie 60 meczów.
+ */
+export function mdDone(game, fid, key) { return !!game.mdDone?.[fid]?.[key]; }
+function markDone(game, fid, key) {
+  game.mdDone = game.mdDone ?? {};
+  (game.mdDone[fid] = game.mdDone[fid] ?? {})[key] = true;
+  const ids = Object.keys(game.mdDone);
+  if (ids.length > 60) for (const id of ids.slice(0, ids.length - 60)) delete game.mdDone[id];
+}
+
 /** Miejsce na stan konferencji danej fazy w sesji dnia meczowego (leniwie, także dla starej sesji). */
 export function pressSlot(S, phase = 'post') {
   S.pr = S.pr ?? {};
@@ -627,6 +644,7 @@ export function pressSlot(S, phase = 'post') {
 export function pressSetup(game, S, phase = 'post') {
   if (S.comp === 'friendly' || (phase === 'post' && !S.post) || (phase === 'pre' && !S.pre)) return null;
   const slot = pressSlot(S, phase);
+  if (!slot.settled && mdDone(game, S.f.id, `press-${phase}`)) return null; // ta konferencja już się odbyła
   if (!slot.room) {
     const state = pressState(game);
     const ctx = phase === 'pre' ? pressCtxPre(game, S) : pressCtx(game, S);
@@ -730,6 +748,7 @@ function settlePress(game, S, eff, phase = 'post') {
   if (msgs.length) game.inbox = addMessages(game.inbox ?? [], msgs).inbox;
   slot.result = eff;
   slot.settled = true;
+  markDone(game, S.f.id, `press-${phase}`);
   return eff;
 }
 
