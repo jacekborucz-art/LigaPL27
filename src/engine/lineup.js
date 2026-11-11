@@ -7,6 +7,7 @@ import { defaultInstructions, INSTRUCTIONS } from '../data/instructions.js';
 import { proficiency, posEff, assessLineup, validateLineup } from './positions.js';
 import { conditionTerms, lineupRating } from './teamStrength.js';
 import { GROUP, isAvailable } from '../career/squad.js';
+import { knockEligible } from './match/teams.js';
 
 /** Wartość zawodnika na danym slocie (OVR z karą pozycji + stan zawodnika). */
 export function slotValue(player, slot) {
@@ -150,7 +151,8 @@ export function checkTactics(tactics, squad, { benchSize = 12 } = {}) {
   const entries = lineupEntries(tactics, byId);
   const errors = validateLineup(entries, { bench: tactics.bench.map((id) => byId.get(id)).filter(Boolean), formationSlots: f.slots.length });
   for (const e of entries) {
-    if (e.player.injuryDays > 0 && !e.player.playingInjured) errors.push(`${e.player.name} jest kontuzjowany`);
+    // Gra z bólem (p.playingInjured) tylko z lekkim urazem do kilku dni (knockEligible, docs/taktyka-i-urazy.md)
+    if (e.player.injuryDays > 0 && !(e.player.playingInjured && knockEligible(e.player))) errors.push(`${e.player.name} jest kontuzjowany`);
     if (e.player.callUp) errors.push(`${e.player.name} jest na zgrupowaniu reprezentacji`);
   }
   for (const id of tactics.bench) {

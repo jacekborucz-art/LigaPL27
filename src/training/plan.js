@@ -89,10 +89,12 @@ export function dayContext(game, date, sets = matchSets(game), camp = campOn(gam
   }
   if (!NEAR.has(role) && phase === 'oboz') role = 'OBOZ';
   if (!NEAR.has(role) && phase === 'urlop') role = 'URLOP';
+  const mon = mondayOf(date);
+  const sun = addDays(mon, 6);
   return {
     date, a, b, oa: off.a, ob: off.b, prev: all.prev, next: all.next, role, phase, camp,
     friendly: b === 0 && sets.friendly.has(date),
-    matchesInWeek: sets.all.filter((d) => d >= mondayOf(date) && d <= addDays(mondayOf(date), 6)).length,
+    matchesInWeek: sets.all.filter((d) => d >= mon && d <= sun).length,
   };
 }
 
