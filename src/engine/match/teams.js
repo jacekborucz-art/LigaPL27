@@ -28,8 +28,13 @@ function mkPlayer(p, slot, side, rng, ctx, Z = 0) {
     cond: p.fresh ?? 95, on: !!slot, sentOff: false, subbedOff: false, injury: null, treatedUntil: -1,
     Z, yc: 0, minOn: slot ? 0 : null, minOff: null,
     ev: 0, g: 0, ast: 0, sh: 0, sot: 0, kp: 0, tk: 0, saves: 0, fouls: 0, offs: 0,
+    fit: null, prevSlot: null, bookChecked: false,
   };
 }
+
+// Pamięć dopasowania zawodnika do slotu: indeks pozycji * 3 + strona (brak, L, P)
+const POS_IDX = { BR: 0, ŚO: 1, BO: 2, WB: 3, DP: 4, ŚP: 5, OP: 6, SP: 7, SN: 8, NAP: 9 };
+const FIT_N = 30;
 
 // ------------------------------------------------------------ Parametry taktyki
 const NEUTRAL_ACT = () => ({ POZ: 1, SKR: 1, KON: 1, DYS: 1 });
@@ -61,15 +66,16 @@ export function tacticParams(formation, instructions) {
   return P;
 }
 
-function lerpParams(from, to, w) {
+/** Parametry w trakcie przejścia między taktykami; wynik zapisywany do bufora (bez alokacji co minutę). */
+function lerpParams(from, to, w, out) {
   if (w >= 1) return to;
-  const out = { ...to };
   for (const k of Object.keys(to)) {
-    if (typeof to[k] === 'number' && typeof from[k] === 'number') out[k] = from[k] + (to[k] - from[k]) * w;
-    else if (to[k] && typeof to[k] === 'object') {
-      out[k] = {};
-      for (const t of Object.keys(to[k])) out[k][t] = from[k][t] + (to[k][t] - from[k][t]) * w;
-    }
+    const tv = to[k]; const fv = from[k];
+    if (typeof tv === 'number' && typeof fv === 'number') out[k] = fv + (tv - fv) * w;
+    else if (tv && typeof tv === 'object') {
+      const o = out[k] && out[k] !== tv ? out[k] : (out[k] = {});
+      for (const t of Object.keys(tv)) o[t] = fv[t] + (tv[t] - fv[t]) * w;
+    } else out[k] = tv;
   }
   return out;
 }
@@ -89,11 +95,14 @@ export function buildTeam(side, cfg, rng, ctx) {
     tactics: { ...cfg.tactics }, formation, players, bench,
     subsUsed: 0, windowsUsed: 0, windowMinute: null, subsLimit: 5, windowsLimit: 3,
     S: clamp(cfg.cohesion ?? 85, 30, 100), lastTacChange: -99,
-    tac: { from: params, to: params, t0: 0, adapt: 0 }, P: params,
+    tac: { from: params, to: params, t0: 0, adapt: 0, buf: {} }, P: params,
     shout: null, shoutReadyAt: 0, shoutUses: {},
     takers: { penalty: cfg.tactics.penalty, freeKick: cfg.tactics.freeKick, corner: cfg.tactics.corner, captain: cfg.tactics.captain },
     zones: { DEF: 10, MID: 10, ATT: 10, GK: 10, SPA: 10, SPD: 10 },
     gkMods: { goalMul: 1 }, threat: 0,
+    react: [], injuredOff: [], dropPos: [], dropIdx: [], shape: formation.name, concussionUsed: 0,
+    str0: 0, strDiff: 0, baseInstr: null, plannedSubs: 4, chaseSubs: 0, protectSubs: 0, lastUserTick: -1,
+    assistant: false, injuredGk: null, staffYellow: 0, coachBanned: false, penMissed: [], central: 0, avg: null,
   };
 }
 
@@ -121,7 +130,7 @@ function eff(x, zone) {
 /** Przeliczenie stref drużyny (co minutę, tanio: 11 zawodników). */
 export function updateZones(T, M) {
   const w = T.tac.adapt ? Math.min(1, (M.minute - T.tac.t0) / T.tac.adapt) : 1;
-  T.P = lerpParams(T.tac.from, T.tac.to, w);
+  T.P = lerpParams(T.tac.from, T.tac.to, w, T.tac.buf);
   const xs = onPitch(T, M.minute);
   const missing = 11 - xs.length;
   const cohesion = (100 - T.S) * 0.015;
@@ -168,29 +177,140 @@ export function updateCondition(T, M) {
   T.S = Math.min(100, T.S + 1 + 0.05 * ((T.avg?.('LID') ?? 10) - 10));
 }
 
-/** Zmiana taktyki w trakcie meczu z bezwładnością i kosztem spójności (4.3). */
+// ------------------------------------------------------------ Ustawienie zawodników na slotach
+/** Zawodnicy na boisku łącznie z opatrywanymi (bez wykluczonych i zmienionych). */
+export const fieldPlayers = (T) => T.players.filter((x) => x.on && !x.sentOff);
+
+/** Dopasowanie zawodnika do slotu: biegłość na pozycji razy jego siła w strefach tej roli. */
+export function slotFit(x, slot) {
+  if (slot.pos === 'BR') return x.p.pos === 'BR' ? x.R.GK : 0.6 * x.R.GK;
+  const key = (POS_IDX[slot.pos] ?? 5) * 3 + (slot.side === 'L' ? 1 : slot.side === 'P' ? 2 : 0);
+  const fit = x.fit ?? (x.fit = new Array(FIT_N).fill(NaN));
+  let v = fit[key];
+  if (v !== v) { // NaN: jeszcze nie liczone
+    const sh = ROLE_SHARE[slot.pos] ?? ROLE_SHARE.ŚP;
+    const z = (sh.DEF * x.R.DEF + sh.MID * x.R.MID + sh.ATT * x.R.ATT) / (sh.DEF + sh.MID + sh.ATT);
+    v = fit[key] = posEff(proficiency(x.p, slot.pos, slot.side)) * z;
+  }
+  return v;
+}
+
+/** Linie formacji z nazwy (np. 4-2-3-1) i kolejności slotów (bez bramkarza). */
+function lineOf(formation) {
+  const digits = (/^[\d-]+/.exec(formation.name)?.[0] ?? '').split('-').map(Number).filter(Boolean);
+  const out = [];
+  digits.forEach((n, li) => { for (let k = 0; k < n; k++) out.push(li); });
+  return out; // indeks = numer slotu - 1
+}
+
+/** Etykieta kształtu po opuszczeniu slotów, np. 4-4-2 bez napastnika -> 4-4-1. */
+export function shapeLabel(formation, dropIdx = []) {
+  if (!dropIdx.length) return formation.name;
+  const lines = lineOf(formation);
+  const digits = (/^[\d-]+/.exec(formation.name)?.[0] ?? '').split('-').map(Number).filter(Boolean);
+  for (const i of dropIdx) if (lines[i - 1] != null) digits[lines[i - 1]]--;
+  return digits.join('-');
+}
+
+/** Sloty formacji (kopie) z pustymi miejscami dla opuszczonych pozycji, gdy drużyna gra w osłabieniu. */
+export function shapeSlots(formation, dropPos = [], n = 11) {
+  const slots = formation.slots.map((s) => ({ ...s }));
+  const dropIdx = [];
+  for (const pos of dropPos) {
+    if (slots.length - dropIdx.length <= n) break;
+    for (let i = slots.length - 1; i > 0; i--) {
+      if (slots[i] && slots[i].pos === pos && !dropIdx.includes(i)) { dropIdx.push(i); break; }
+    }
+  }
+  for (const i of dropIdx) {
+    const pos = slots[i].pos;
+    slots[i] = null;
+    const left = slots.filter((s) => s && s.pos === pos);
+    if (left.length === 1 && !left[0].side) left[0].x = 50; // samotny napastnik lub środkowy wraca na środek
+  }
+  return { slots, dropIdx };
+}
+
+/**
+ * Przypisanie zawodników do slotów: bramkarz zostaje w bramce, reszta zachłannie po najlepszym
+ * dopasowaniu, potem poprawa przez zamiany par i przejście na wolny slot. Działa dla 7-11 zawodników.
+ */
+export function assignSlots(xs, slots) {
+  const at = new Map();
+  const S = slots.length;
+  const taken = new Uint8Array(S);
+  let pool = xs;
+  const gi = slots.findIndex((s) => s && s.pos === 'BR');
+  const keeper = xs.find((x) => x.slot?.pos === 'BR');
+  if (gi >= 0 && keeper) { at.set(keeper, gi); taken[gi] = 1; pool = xs.filter((x) => x !== keeper); }
+  const field = [];
+  for (let i = 0; i < S; i++) if (slots[i] && slots[i].pos !== 'BR') field.push(i);
+  const P = pool.length;
+  const fit = new Float64Array(P * S);
+  for (let k = 0; k < P; k++) for (const i of field) fit[k * S + i] = slotFit(pool[k], slots[i]);
+  // Zachłannie: najlepsza para zawodnik-slot spośród wolnych, P razy (P <= 10, bez sortowania)
+  const pos = new Int16Array(P).fill(-1);
+  for (let round = 0; round < P; round++) {
+    let bk = -1; let bi = -1; let bv = -Infinity;
+    for (let k = 0; k < P; k++) {
+      if (pos[k] >= 0) continue;
+      for (const i of field) if (!taken[i] && fit[k * S + i] > bv) { bv = fit[k * S + i]; bk = k; bi = i; }
+    }
+    if (bk < 0) break;
+    pos[bk] = bi; taken[bi] = 1;
+  }
+  for (let pass = 0; pass < 3; pass++) {
+    let improved = false;
+    for (let a2 = 0; a2 < P; a2++) {
+      if (pos[a2] < 0) continue;
+      for (let b = a2 + 1; b < P; b++) {
+        if (pos[b] < 0) continue;
+        const ia = pos[a2]; const ib = pos[b];
+        if (fit[a2 * S + ib] + fit[b * S + ia] > fit[a2 * S + ia] + fit[b * S + ib] + 1e-9) { pos[a2] = ib; pos[b] = ia; improved = true; }
+      }
+      for (const i of field) {
+        if (taken[i]) continue;
+        if (fit[a2 * S + i] > fit[a2 * S + pos[a2]] + 1e-9) { taken[pos[a2]] = 0; pos[a2] = i; taken[i] = 1; improved = true; }
+      }
+    }
+    if (!improved) break;
+  }
+  for (let k = 0; k < P; k++) if (pos[k] >= 0) at.set(pool[k], pos[k]);
+  return at;
+}
+
+/** Bezpłatne przestawienie zawodników na sloty bieżącego kształtu (po zmianach personalnych AI). */
+export function reslot(T) {
+  const xs = fieldPlayers(T);
+  const { slots, dropIdx } = shapeSlots(T.formation, T.dropPos ?? [], xs.length);
+  const at = assignSlots(xs, slots);
+  for (const [x, i] of at) x.slot = slots[i];
+  T.dropIdx = dropIdx;
+  T.shape = shapeLabel(T.formation, dropIdx);
+}
+
+/**
+ * Zmiana taktyki w trakcie meczu z bezwładnością i kosztem spójności (4.3).
+ * patch: { formation?, instructions?, drop?: ['NAP', ...] pozycje zostawiane puste przy grze w osłabieniu }
+ */
 export function applyTacticChange(T, M, patch) {
   const newTactics = { ...T.tactics, ...patch, instructions: { ...T.tactics.instructions, ...(patch.instructions || {}) } };
+  delete newTactics.drop;
   const formation = formationById(newTactics.formation);
   const atBreak = M.phase === 'break' || M.minute === 0;
   let cost = 0;
+  const dropChanged = patch.drop && patch.drop.join() !== (T.dropPos ?? []).join();
   if (newTactics.formation !== T.tactics.formation) cost += 10;
+  else if (dropChanged) cost += 5; // przesunięcie zawodników w tej samej formacji
   for (const k of Object.keys(patch.instructions || {})) if (patch.instructions[k] !== T.tactics.instructions?.[k]) cost += 5;
   if (M.minute - T.lastTacChange < 10) cost *= 2;
   const adapt = clamp(6 - 0.2 * ((T.avg?.('DEC') ?? 10) - 10), 3, 8);
-  T.tac = { from: T.P, to: tacticParams(formation, newTactics.instructions), t0: M.minute, adapt: atBreak ? 0 : adapt };
-  if (!atBreak) { T.S = Math.max(30, T.S - cost); T.lastTacChange = M.minute; }
-  if (formation.id !== T.formation.id) {
-    // Zawodnicy zostają, sloty nowej formacji przypisane po kolei według pozycji
-    const xs = onPitch(T, M.minute);
-    const slots = formation.slots.slice();
-    for (const x of xs) {
-      let best = 0; let bestV = -1;
-      slots.forEach((s, i) => { if (!s) return; const v = proficiency(x.p, s.pos, s.side) + (x.slot.pos === 'BR' && s.pos === 'BR' ? 1000 : 0); if (v > bestV) { bestV = v; best = i; } });
-      x.slot = slots[best]; slots[best] = null;
-    }
-  }
+  const from = T.P === T.tac.buf ? { ...T.P, act: { ...T.P.act }, oppAct: { ...T.P.oppAct } } : T.P; // kopia, bo bufor się zmienia
+  T.tac = { from, to: tacticParams(formation, newTactics.instructions), t0: M.minute, adapt: atBreak ? 0 : adapt, buf: {} };
+  if (!atBreak && cost) { T.S = Math.max(30, T.S - cost); T.lastTacChange = M.minute; }
   T.formation = formation;
   T.tactics = newTactics;
+  if (patch.drop) T.dropPos = patch.drop.slice();
+  if (patch.formation || patch.drop) reslot(T);
   return { cost, adapt: atBreak ? 0 : adapt };
 }

@@ -3,7 +3,7 @@
 
 export const K = {
   posK: 0.20, posHome: 0.02, posClamp: [0.25, 0.75],
-  pAction: 0.385, kCreate: 0.05, lateRamp: 0.004, // 0.37 -> 0.385 po kalibracji na prawdziwych kadrach
+  pAction: 0.39, kCreate: 0.05, lateRamp: 0.004, // 0.37 -> 0.385 po kalibracji na prawdziwych kadrach, 0.39 po faulach taktycznych (sytuacje-meczowe.md)
   typeW: { POZ: 0.50, SKR: 0.22, KON: 0.13, DYS: 0.15 },
   brkBase: { POZ: -0.15, SKR: -0.25, KON: 0.35, DYS: 1.6 }, kBreak: 0.15,
   failCorner: { POZ: 0.34, SKR: 0.50, KON: 0.20, DYS: 0.40 },
@@ -20,12 +20,15 @@ export const K = {
   cornerShot: 0.30, cornerXg: [0.04, 0.14], saveCorner: 0.30, blockCorner: 0.33,
   foulTick: 0.27, foulDefShare: 0.78, dangerFK: 0.14,
   fkDirect: 0.45, fkXgD: [0.04, 0.09], fkCrossShot: 0.30, fkXgC: [0.05, 0.15],
-  yellowPerFoul: 0.148, redPerFoul: 0.003, otherYellowTick: 0.0032, // ŻK/faul 0.14 -> 0.155 (cel 4,3/mecz, PLAN 2.1)
+  yellowPerFoul: 0.140, redPerFoul: 0.0027, otherYellowTick: 0.0032, // ŻK/faul 0.14 -> 0.155 (cel 4,3/mecz, PLAN 2.1)
   bookedFoulMul: 0.4, bookedYellowMul: 0.7,
   homeCreate: 1.15, awayCreate: 0.90, homeCardMul: 0.88, awayCardMul: 1.15,
   ogPerMatch: 0.08,
   injTick: 4.3e-4, injContact: 0.004, // kontakt 0.012 -> 0.004: ok. 0,45 urazu widocznego w meczu (cel ok. 0,4)
-  varGoalCancel: 0.04, varPenAdd: 0.03, varPenCancel: 0.10, varRedAdd: 0.02,
+  // VAR (ekspert_sedzia A4): anulowany gol, karny odwołany, karny podyktowany po VAR (na nieudaną akcję
+  // w polu karnym), czerwona dodana po VAR (na żółtą za faul), czerwona zmieniona na żółtą, druga żółta cofnięta
+  varGoalCancel: 0.04, varPenAdd: 0.0015, varPenCancel: 0.10, varRedAdd: 0.008, varRedCancel: 0.08, varSecondYellowCancel: 0.03,
+  varGoalConfirm: 0.10, // widoczne sprawdzenie gola zakończone uznaniem [SZAC]
   postShare: 0.03, // część strzałów niecelnych z dużym xG trafia w słupek lub poprzeczkę
   // Statystyki dodatkowe [SZAC] (PLAN 3.1)
   passesPerMinute: 8.6, passAcc: 0.785, goalKickOnFail: 0.2, throwInTick: 0.44, goalKickPerMiss: 0.9,
@@ -34,6 +37,26 @@ export const K = {
   gsLeadAct: 0.85, gsLeadD: 0.3, gsTrailAct: 1.12, gsTrailD: -0.4, gsFrom: 65,
   // Momentum
   momentumScale: 12, momentumAct: 0.06,
+  // Sytuacje meczowe (docs/sytuacje-meczowe.md) [SZAC]
+  redShare: { dogso: 0.40, sfp: 0.33, violent: 0.12, handball: 0.15 }, // powody bezpośrednich czerwonych
+  tacFoul: 0.08, tacFoulYellow: 0.85, tacFoulDogso: 0.05, // faul taktyczny przerywający groźną kontrę
+  penRetake: 0.05, penRebound: 0.35, penReboundXg: [0.15, 0.45], // powtórka (bramkarz przed linią), dobitka
+  benchCardTick: 0.00035, benchRedShare: 0.08, // kartka dla rezerwowego lub zmienionego zawodnika
+  staffCardTick: 0.0007, staffRedShare: 0.08, // kartka dla trenera lub członka sztabu
+  gkUp: { shotMul: 1.35, counter: 0.25, counterXg: [0.45, 0.75] }, // bramkarz w polu karnym rywala przy rożnym
+  concussionMax: 2, // dodatkowe zmiany po wstrząśnieniu mózgu, tylko gdy rozgrywki je stosują (ctx.concussionSubs)
+  addedExtraMax: 2, // przedłużenie doliczonego czasu za zdarzenia w doliczonym czasie
+  coolingTempC: 32, coolingAdded: 3, // przerwa na schłodzenie (upał), doliczony czas
+  minPlayers: 7,
+};
+
+// Bezpośrednia czerwona kartka: kod -> [kod dla studia (długość kary), opis]
+export const RED_REASONS = {
+  second: ['druga żółta', 'druga żółta kartka'],
+  dogso: ['dogso', 'faul taktyczny: pozbawienie oczywistej okazji bramkowej'],
+  handball: ['ręka', 'zagranie ręką: pozbawienie oczywistej okazji bramkowej'],
+  sfp: ['rażący', 'rażący faul (nadmierna siła)'],
+  violent: ['przemoc', 'gwałtowne zachowanie'],
 };
 
 // Udział ról w strefach (6.1 a)

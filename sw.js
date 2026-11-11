@@ -111,6 +111,7 @@ const SHELL = [
   './src/data/names.js',
   './src/data/reprezentacje.json',
   './src/engine/lineup.js',
+  './src/engine/match/coach.js',
   './src/engine/match/constants.js',
   './src/engine/match/control.js',
   './src/engine/match/core.js',
