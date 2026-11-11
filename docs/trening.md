@@ -105,7 +105,7 @@ g [pkt OVR/mies.] = rate(wiek) * max(0, POT - OVR) / 12 * minuty * (0,8 + 0,02*P
 rate: <=19: 0,40; 20-21: 0,32; 22-23: 0,22; 24-26: 0,10; 27-28: 0,03; 29+: 0
 minuty = 0,6 + 0,4 * min(1, udział minut / 0,6)        (akademia: udział 0,5; program dla młodych: min. 0,85)
 sztab  = bramkarz: 0,75 + 0,025*q_bramk; inni: 0,85 + 0,015*śr(q_asyst, q_fiz); do 21 lat dodatkowo 0,75 + 0,025*q_młodz
-trening = 0,5 + 0,5 * (bodziec miesiąca / 16), zakres 0,5-1,4   (kluby AI i akademia: 1,0)
+trening = 0,5 + 0,5 * (bodziec miesiąca / 16), zakres 0,5-1,4   (akademia: 1,0; kluby AI: bodziec z własnego planu, docs/trening-ai.md)
 program dla młodych = 1,1 + 0,01*q_młodz
 ```
 
@@ -127,7 +127,7 @@ start spójności S w silniku = clamp(70 + 0,3 * zgranie, 70, 100)   (ekspert 4.
 - Instrukcje: +1,5 za mecz, taktyka +1,6, odprawa +1,5, każda zmiana instrukcji -7.
 - Znajomość systemu (zawodnik): +2 za mecz, taktyka +1; nowy zawodnik 40.
 - Rytm: po każdym meczu klubu `rh = 0,6*rh + 0,4*min(1, minuty/90)`; rotacja obniża.
-- Kluby AI: jeden krok tygodniowy: formacja +2,5 * asystent + 4 za mecz, instrukcje do 80.
+- Kluby AI: formacja z zajęć planu (ten sam wzór) i +4 za mecz, instrukcje do 88 (kalibracja do zgrania gracza), docs/trening-ai.md.
 
 Inne modyfikatory: `trainingPrep` (analiza wideo, 0,046-0,16 pkt tylko w dniu meczu), `trainingLoad` (ciężkie nogi i przeciążenie), `trainingSetPieces` (szybka symulacja: do ±0,05). W pełnym silniku stałe fragmenty działają przez dane wejściowe: `trainingMatchInput` podnosi SFR wykonawców o `(sp - 50)/50*1,2` (od -0,6 do +1,2) i WYJ bramkarza o połowę tego, więc SPA rośnie do +0,6.
 
@@ -159,7 +159,7 @@ Jakość na start: `3 + 1,3*prestiż + premia ligi (EK +1, 2L -1) + N(0; 1,8)`, 
 
 ## 10. Wydajność
 
-- Dzień: tylko klub gracza (ok. 25 zawodników, 1-3 zajęcia). Poniedziałek: kluby AI (54 kluby, kilka liczb). 1. dzień miesiąca: rozwój ok. 1700 zawodników.
+- Dzień: klub gracza (ok. 25 zawodników, 1-3 zajęcia) i 53 kluby AI (ok. 1300 zawodników, skutki zajęć liczone raz na klub, na zawodnika tylko mnożniki osobiste; ok. 1-2 ms). Poniedziałek: zgranie AI z meczów i decyzja o obozie. 1. dzień miesiąca: rozwój ok. 1700 zawodników.
 - Modyfikatory: kilka odczytów pól na zawodnika.
 - Pomiar: pół sezonu 600-800 ms bez treningu, 700-930 ms z treningiem (ok. +15-20 %). Test wydajności pilnuje progu 30 %.
 

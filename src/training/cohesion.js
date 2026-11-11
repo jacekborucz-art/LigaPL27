@@ -106,14 +106,26 @@ export function weeklyCohesionDecay(c) {
   c.sp = c.sp > COH.spNeutral ? Math.max(COH.spNeutral, c.sp - COH.spDecayWeek) : c.sp;
 }
 
-/** Klub AI: jeden zbiorczy krok tygodniowy (trening taktyczny + mecze z tego tygodnia). */
+/**
+ * Klub AI: krok tygodniowy zgrania (mecze z tego tygodnia). Zgranie formacji i stałe fragmenty z zajęć dopisuje
+ * codzienny plan klubu AI (aiClubs.js, aiSessionToClub). Instrukcje, znajomość systemu i rytm klub AI ma jako
+ * jedną liczbę zbliżającą się do COH.aiInstr (kalibracja: zgranie AI jak gracza z planem asystenta, ok. 95).
+ */
 export function aiWeeklyCohesion(game, clubId, matches) {
   const c = game.training.clubs[clubId];
   weeklyCohesionDecay(c);
-  const tac = staffMul.tac(staffQ(game, clubId, 'asystent'));
-  c.fam[c.form] = Math.min(100, famOf(c, c.form) + COH.aiFamWeek * tac + COH.famMatch * matches);
+  c.fam[c.form] = Math.min(100, famOf(c, c.form) + COH.famMatch * matches);
   c.instr = Math.min(100, c.instr + (COH.aiInstr - c.instr) * 0.25);
   c.z = aiClubZ(c);
+}
+
+/** Zajęcia klubu AI: zgranie formacji i stałe fragmenty tym samym wzorem co applySessionToClub. */
+export function aiSessionToClub(c, session, tac, campQ = 0) {
+  const def = SESSIONS[session.type];
+  if (!def.fam && !def.sp) return;
+  const im = INTENSITY[session.int].fam * (1 + CAMP.inCamp.cohesion * campQ);
+  if (def.fam) c.fam[c.form] = Math.min(100, famOf(c, c.form) + def.fam * im * tac);
+  if (def.sp) c.sp = Math.min(100, (c.sp ?? COH.spNeutral) + def.sp * im * tac);
 }
 
 /**

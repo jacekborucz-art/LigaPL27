@@ -53,11 +53,11 @@ export function regenMul(p, age) {
 
 /**
  * Szansa urazu na treningu w danym dniu (ekspert 8.1: 0,15 % na dzień, x2 przy intensywnym).
- * ctx: { sessions, age, acwr, fitQ, camp, rtp, fresh, mode, returning }
+ * ctx: { sessions | sessionMul, age, acwr, fitQ, campQ, baseMul, rtp, fresh, mode, returning }
  */
 export function trainingInjuryChance(p, ctx) {
-  let sessionMul = 0;
-  for (const x of ctx.sessions) sessionMul += INTENSITY[x.int].inj * SESSIONS[x.type].inj;
+  let sessionMul = ctx.sessionMul ?? 0; // kluby AI podają gotową sumę dla zajęć dnia (aiClubs.js)
+  if (ctx.sessionMul == null) for (const x of ctx.sessions) sessionMul += INTENSITY[x.int].inj * SESSIONS[x.type].inj;
   if (sessionMul <= 0) return 0;
   const odp = p.hidden?.ODP ?? 10;
   const mODP = 1.5 - 0.05 * odp;

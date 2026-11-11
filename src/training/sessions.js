@@ -45,7 +45,7 @@ export function sessionPreview(game, type, int, clubId = game.clubId) {
   };
 }
 
-function rollTrainingInjury(p, rng) {
+export function rollTrainingInjury(p, rng) {
   const r = rng.next();
   const odpShift = (p.hidden?.ODP ?? 10) >= 15 ? 0.05 : 0;
   const cat = r < LOAD.injuryCats.light + odpShift ? 'light' : r < 1 - LOAD.injuryCats.severe ? 'medium' : 'severe';

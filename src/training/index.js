@@ -1,7 +1,7 @@
 // Moduł treningu: rejestruje system dnia (po regeneracji z season.js) i modyfikatory silnika.
 // Zasada rozbudowy bez przebudowy (PLAN 4.1): pętla dni i silnik nie znają treningu.
-//  - dzień: plan i zajęcia klubu gracza (sessions.js),
-//  - poniedziałek: zbiorczy krok klubów AI (zgranie, urazy treningowe) i porządki,
+//  - dzień: plan i zajęcia klubu gracza (sessions.js) i klubów AI (aiClubs.js, te same wzory),
+//  - poniedziałek: zgranie klubów AI z meczów tygodnia, decyzja o obozie AI, porządki,
 //  - 1. dzień miesiąca: rozwój i spadek całego świata + raport dla gracza (development.js).
 // Modyfikatory: zgranie, analiza rywala, obciążenie (ciężkie nogi, przeciążenie), stałe fragmenty.
 
@@ -9,12 +9,9 @@ import { Rng } from '../core/rng.js';
 import { registerDailySystem, unregisterDailySystem } from '../core/gameLoop.js';
 import { createMessage } from '../core/inbox.js';
 import { registerModifier, unregisterModifier } from '../engine/modifiers.js';
-import { isAvailable } from '../career/squad.js';
 import { squadOf } from '../world/worldGen.js';
-import { INJURY_TYPES } from '../engine/match/constants.js';
 import { fmtDate } from '../ui/dom.js';
-import { LOAD, staffMul, AI_TRAINING } from './config.js';
-import { applyMorale } from '../career/morale.js';
+import { LOAD } from './config.js';
 import { ensureTraining, attachTraining, activeGame, weekdayIdx, daysBetween } from './state.js';
 import { staffQ, reportPrecision } from './staff.js';
 import { pruneOverrides } from './plan.js';
@@ -24,6 +21,7 @@ import { processUserDay } from './sessions.js';
 import { monthlyDevelopment } from './development.js';
 import { cohesionTerm, prepTerm, setPieceEdge, aiWeeklyCohesion, weeklyCohesionDecay } from './cohesion.js';
 import { legsTerm, overloadTerm } from './load.js';
+import { processAiDay, aiOverload } from './aiClubs.js';
 
 // Forma bazowa po okresie przygotowawczym: jedna liczba na klub i dzień (pamięć podręczna, tanio w meczu)
 const campCache = new WeakMap();
@@ -42,8 +40,8 @@ export function campTerm(game, p) {
 const MONTHS_PL = ['styczeń', 'luty', 'marzec', 'kwiecień', 'maj', 'czerwiec', 'lipiec', 'sierpień', 'wrzesień', 'październik', 'listopad', 'grudzień'];
 const msg = (date, from, priority, subject, body, key) => createMessage({ date, key, category: 'staff', from, subject, body, priority });
 
-/** Tygodniowy krok: kluby AI (zgranie, urazy na treningu), zapominanie, ostrzeżenia o obciążeniu. */
-export function weeklyStep(game, date, rng) {
+/** Tygodniowy krok: kluby AI (zgranie z meczów, obóz), zapominanie, ostrzeżenia o obciążeniu. */
+export function weeklyStep(game, date) {
   const T = game.training;
   const messages = [];
   const from = date.slice(0, 10);
@@ -58,30 +56,11 @@ export function weeklyStep(game, date, rng) {
   for (const clubId of Object.keys(game.world.clubs)) {
     if (clubId === game.clubId) continue;
     aiWeeklyCohesion(game, clubId, matches[clubId] ?? 0);
-    // Obóz klubu AI: jedna decyzja na rundę, według prestiżu i ligi
+    // Obóz klubu AI: jedna decyzja na rundę, według prestiżu i ligi (forma bazowa; dni obozu: aiClubs.js)
     const c = T.clubs[clubId];
     if (c.cb?.key !== key) {
       const cb = aiCampBase(game, clubId, half);
       if (date >= addDays(cb.start, -10)) c.cb = cb;
-    }
-    // Urazy na treningu w klubie AI: ta sama średnia co u gracza (0,15 % na zawodnika na dzień, 5 dni)
-    const pool = squadOf(game.world, clubId).filter(isAvailable);
-    // Ostrość i morale z tygodnia treningu (jak domyślny plan asystenta u gracza)
-    for (const p of pool) {
-      const sharp = p.sharp ?? 70;
-      if (sharp < LOAD.sharpTrainCap) p.sharp = Math.min(LOAD.sharpTrainCap, sharp + AI_TRAINING.sharpWeek);
-      p.morale = applyMorale(p.morale ?? 12, AI_TRAINING.moraleWeek);
-    }
-    const lambda = pool.length * 5 * LOAD.injBase * staffMul.inj(staffQ(game, clubId, 'fizyczny'));
-    const k = rng.poisson(lambda);
-    for (let i = 0; i < k && pool.length; i++) {
-      const p = rng.weighted(pool, (x) => 1.5 - 0.05 * (x.hidden?.ODP ?? 10));
-      if (p.injuryDays > 0) continue;
-      const cat = rng.next() < LOAD.injuryCats.light ? 'light' : 'medium';
-      const [name, lo, hi] = rng.pick(INJURY_TYPES[cat]);
-      const days = rng.int(lo, hi);
-      p.injuryDays = days;
-      p.injury = { name, days, cat, since: date, training: true };
     }
   }
   const c = T.clubs[game.clubId];
@@ -138,7 +117,8 @@ export const DAILY_SYSTEM = {
     const rng = new Rng(`trening:${game.seed}:${date}`);
     const messages = [];
     if (game.world.clubs[game.clubId]) messages.push(...processUserDay(game, date, rng));
-    if (weekdayIdx(date) === 0 && T.lastWeek !== date) { messages.push(...weeklyStep(game, date, rng)); T.lastWeek = date; }
+    processAiDay(game, date);
+    if (weekdayIdx(date) === 0 && T.lastWeek !== date) { messages.push(...weeklyStep(game, date)); T.lastWeek = date; }
     if (date.slice(0, 7) !== T.lastMonth) { messages.push(...monthlyStep(game, date)); T.lastMonth = date.slice(0, 7); }
     return { messages };
   },
@@ -147,7 +127,15 @@ export const DAILY_SYSTEM = {
 export const MODIFIERS = [
   { id: 'trainingCohesion', scope: 'player', label: 'Zgranie drużyny', apply: (p) => cohesionTerm(activeGame(), p) },
   { id: 'trainingPrep', scope: 'player', label: 'Analiza rywala', apply: (p) => prepTerm(activeGame(), p) },
-  { id: 'trainingLoad', scope: 'player', label: 'Obciążenie treningowe', apply: (p) => (p.training ? legsTerm(p.training) + overloadTerm(p.training) : 0) },
+  {
+    id: 'trainingLoad', scope: 'player', label: 'Obciążenie treningowe',
+    apply: (p) => {
+      const g = activeGame();
+      if (p.training && (!g || p.clubId === g.clubId)) return legsTerm(p.training) + overloadTerm(p.training);
+      // Klub AI: ciężkie nogi jedną liczbą na klub (c.legs), przeciążenie z obciążenia zawodnika (p.aiTr)
+      return g ? legsTerm(g.training?.clubs?.[p.clubId]) + aiOverload(p) : 0;
+    },
+  },
   { id: 'trainingCamp', scope: 'player', label: 'Forma bazowa (obóz)', apply: (p) => campTerm(activeGame(), p) },
   {
     id: 'trainingSetPieces', scope: 'player', label: 'Stałe fragmenty (trening)',
@@ -175,6 +163,7 @@ export { ensureTraining, attachTraining, fmtDate };
 export { teamCohesion, trainingMatchInput, cohesionLabel } from './cohesion.js';
 export { weekPlan, planDay, autoDay, dayContext, heavyBeforeMatch, setSession, removeSession, setRestDay, resetDay, resetWeek, PHASES, ROLE_LABELS } from './plan.js';
 export { developPlayer, monthlyDevelopment, focusAttrs } from './development.js';
+export { processAiDay, aiPlanFor, aiFocusAttr, aiStimFor, aiCampFor } from './aiClubs.js';
 export { loadSummary, acwrLabel, trainingInjuryChance } from './load.js';
 export { staffOf, staffQ, staffLabel } from './staff.js';
 export { sessionPreview, processUserDay } from './sessions.js';

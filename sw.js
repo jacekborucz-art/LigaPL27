@@ -154,6 +154,7 @@ const SHELL = [
   './src/styles/tokens.css',
   './src/styles/training.css',
   './src/styles/transfers.css',
+  './src/training/aiClubs.js',
   './src/training/camps.js',
   './src/training/cohesion.js',
   './src/training/config.js',

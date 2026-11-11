@@ -111,15 +111,22 @@ export const COH = {
   neutral: 65, perPoint: 0.008, min: -0.4, max: 0.28, // wpływ na siłę: 0.008 pkt za punkt zgrania ponad 65
   sStart: (z) => Math.max(70, Math.min(100, Math.round(70 + 0.3 * z))), // start spójności S w silniku (ekspert 4.3)
   spDecayWeek: 4, spNeutral: 50,
-  aiFamWeek: 2.5, aiInstr: 80,
+  aiInstr: 88, // kluby AI: instrukcje, znajomość systemu i rytm jako jedna liczba (kalibracja: zgranie AI = gracza z planem asystenta, docs/trening-ai.md)
 };
 
 /**
- * Trening klubów AI w kroku tygodniowym: to, co domyślny plan asystenta daje drużynie gracza (docs/balans.md).
- * Średnio na tydzień sezonu plan daje ok. +0,25 morale i ok. +14 pkt ostrości (do progu LOAD.sharpTrainCap);
- * bez tego zawodnicy AI tracili ostrość między meczami, a gracz miał premię tylko za to, że jego klub trenuje.
+ * Trening klubów AI (aiClubs.js, docs/trening-ai.md): kluby AI codziennie realizują plan asystenta z tymi samymi
+ * zajęciami i wzorami co klub gracza (zmęczenie, regeneracja, ostrość, morale, urazy, bodziec rozwojowy, stałe
+ * fragmenty, obóz). Trener AI wybiera akcent tygodnia według swojego typu (O ofensywny, S ostrożny, P pragmatyczny)
+ * i normalny poziom obciążeń, jak domyślny plan gracza. Młodym (do focusMaxAge lat) daje akcent indywidualny
+ * na najsłabszy kluczowy atrybut pozycji (te same 20-30 minut po zajęciach i ten sam koszt świeżości co u gracza).
  */
-export const AI_TRAINING = { moraleWeek: 0.25, sharpWeek: 14 };
+export const AI_PLAN = {
+  accent: { O: 'techniczny', S: 'taktyczny', P: 'zrownowazony' },
+  load: 'normalna',
+  focusMaxAge: 21,
+  focusStim: 0.4, focusFresh: 2, // jak akcent indywidualny gracza (sessions.js)
+};
 
 /** Sztab szkoleniowy: role i wpływ jakości 1-20. [SZAC] */
 export const STAFF_ROLES = {
