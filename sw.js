@@ -89,6 +89,7 @@ const SHELL = [
   './src/career/negotiationLines.js',
   './src/career/personality.js',
   './src/career/reputation.js',
+  './src/career/shirts.js',
   './src/career/squad.js',
   './src/career/teamTalks.js',
   './src/career/threat.js',

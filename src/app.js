@@ -29,6 +29,7 @@ import { ensureNational } from './season/nationalSystem.js';
 import { applySeasonState } from './season/rollover.js';
 import { ensureTraining, trainingMatchInput, teamCohesion } from './training/index.js';
 import { renderTraining, handleTrainingAction, isTrainingAction } from './ui/trainingView.js';
+import { shirtNumbers, kitColors } from './career/shirts.js';
 import { renderTransfers, handleTransferAction, isTransferAction } from './ui/transfersView.js';
 import { renderTalks, handleTalkAction, isTalkAction } from './ui/talksView.js';
 import { ensureCareer } from './career/careerSystem.js';
@@ -235,7 +236,7 @@ function renderTab(tab, g, club) {
     if (state.sqSub === 'talks') return sub + renderTalks(g, state);
     if (state.sqSub === 'tactics') {
       queueMicrotask(mountTacticsScreen); // po wstawieniu HTML: okno atrybutów i fokus
-      return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), info: state.tInfo, msg: state.tMsg });
+      return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), info: state.tInfo, msg: state.tMsg, numbers: shirtNumbers(g, g.clubId, squadOf(g.world, g.clubId)), kit: kitColors(clubById(g.clubId)) });
     }
     const ovrs = leagueOvrs(g, club.tier);
     const p = state.playerOpen && g.world.players[state.playerOpen];
