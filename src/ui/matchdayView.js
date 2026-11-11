@@ -117,7 +117,8 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
         <ul class="plain-list"><li><span class="k">Zarząd</span><span>${esc(p.expectations.board)}</span></li><li><span class="k">Kibice</span><span>${esc(p.expectations.fans)}</span></li>${p.expectations.notes.map((n) => `<li><span class="k"></span><span>${esc(n)}</span></li>`).join('')}</ul>
       </section>
       </div>
-      <section class="sec"><h2>Nagłówki dnia</h2><ul class="headlines">${p.headlines.map((h) => `<li>${esc(h.text)}</li>`).join('')}</ul></section>`,
+      <section class="sec"><h2>Nagłówki dnia</h2><ul class="headlines">${p.headlines.map((h) => `<li>${esc(h.text)}</li>`).join('')}</ul>
+        ${game.press?.last && CLIMATES[game.press.climate] ? `<p class="press-note">${climateChip(game.press.climate)}<span>${esc(game.press.left > 0 ? 'Ta narracja w mediach jeszcze trwa.' : 'Klimat po ostatnim meczu. Może się zmienić po tym spotkaniu.')}${game.press.log?.at(-1)?.headline ? ` Ostatni nagłówek o trenerze: „${esc(game.press.log.at(-1).headline)}”.` : ''}</span></p>` : ''}</section>`,
       btn('toBriefing', 'Przejdź do odprawy'));
   }
 
@@ -195,7 +196,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const started = S.pressConf?.answers?.length;
     return `<section class="pdoor" data-c="${cl}" aria-label="Konferencja prasowa">
       <div class="pdoor__head">${climateChip(cl)}<span class="pdoor__state">${esc(CLIMATES[cl].mood)}</span></div>
-      <p class="pdoor__why">${esc(room.climate.reasons.join('. '))}. W sali: ${esc(outlets.join(', '))}.</p>
+      <p class="pdoor__why">${esc(room.climate.reasons.join('. '))}. Na sali: ${esc(outlets.join(', '))}.</p>
       <p class="pdoor__skip">${talkDone ? (started ? 'Konferencja trwa. Wróć do sali albo kliknij Dalej, żeby ją przerwać.' : `Konferencja jest opcjonalna. ${esc(CLIMATES[cl].skip)}`) : 'Po odprawie w szatni możesz pójść na konferencję prasową albo ją pominąć.'}</p>
     </section>`;
   }
@@ -206,16 +207,18 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     return btn('pressOpen', S.pressConf?.answers?.length ? 'Wróć na konferencję' : 'Konferencja prasowa', false) + btn('exit', 'Dalej');
   }
 
-  function wallStyle() {
+  /** Ścianka za stołem: herb klubu i znak ligi na przemian (dekoracja, ukryta przed czytnikiem ekranu). */
+  function wallTiles() {
     const c = anyClub(game.clubId);
-    const src = CRESTS_AVAILABLE.has(c?.parent ?? c?.id) ? `assets/crests/${c.parent ?? c.id}-48.webp` : `data:image/svg+xml,${encodeURIComponent(fallbackCrestSvg(c))}`;
-    return `--wall:url(&quot;${src}&quot;)`;
+    const id = c?.parent ?? c?.id;
+    const crestImg = CRESTS_AVAILABLE.has(id) ? `<img src="assets/crests/${esc(id)}-48.webp" alt="" width="30" height="30">` : fallbackCrestSvg(c).replace('<svg ', '<svg width="26" height="30" aria-hidden="true" ');
+    return `<div class="prs__tiles" aria-hidden="true">${Array.from({ length: 48 }, (_, i) => `<span>${(i + Math.floor(i / 12)) % 2 ? '<b>LigaPL27</b>' : crestImg}</span>`).join('')}</div>`;
   }
 
   function pressDialog() {
     let dlg = app.querySelector('#mdPress');
     if (!dlg) {
-      app.insertAdjacentHTML('beforeend', `<dialog id="mdPress" class="prs" aria-labelledby="prsTitle" style="${wallStyle()}"></dialog>`);
+      app.insertAdjacentHTML('beforeend', `<dialog id="mdPress" class="prs" aria-labelledby="prsTitle"></dialog>`);
       dlg = app.querySelector('#mdPress');
       dlg.addEventListener('cancel', (ev) => {
         // Escape: przed pierwszą odpowiedzią i po końcu zamyka okno; w trakcie pyta o wyjście z sali
@@ -234,7 +237,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const q = currentQuestion(conf);
     const pr = progress(conf);
     const askedBy = new Set(conf.queue.slice(0, conf.idx).map((x) => x.by?.id).filter(Boolean));
-    const header = `<header class="prs__wall" data-c="${cl}">
+    const header = `<header class="prs__wall" data-c="${cl}">${wallTiles()}
         <div class="prs__bar">
           <div><h2 id="prsTitle">Konferencja prasowa</h2>
             <p class="prs__match">${esc(sideName(0))} ${esc(S.post.result.score)} ${esc(sideName(1))}</p></div>
@@ -266,7 +269,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
       stage = `<section class="prs__stage prs__confirm" role="alertdialog" aria-labelledby="prsConf">
         <h3 id="prsConf" tabindex="-1">Wyjść z sali przed końcem?</h3>
         <p>Dziennikarze zapamiętają, że przerwałeś konferencję, a nagłówki napiszą się same. Szatnia odczuje presję prasy bez reszty twoich odpowiedzi.</p>
-        <div class="prs__btns">${btn('pressOutNo', 'Zostań i odpowiadaj', false)}${btn('pressOutYes', 'Wyjdź z sali')}</div>
+        <div class="prs__btns">${btn('pressOutYes', 'Wyjdź z sali', false)}${btn('pressOutNo', 'Zostań i odpowiadaj')}</div>
       </section>`;
     } else {
       const who = q.officer ? `<b>${esc(conf.officer.name)}</b><span>${esc(conf.officer.role)}</span>` : `<b>${esc(q.by.name)}</b><span>${esc(q.by.outlet)}, ${esc(q.by.kind)}</span>`;
@@ -287,6 +290,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     dlg.innerHTML = `${header}<div class="prs__body">${room}<div class="prs__main">${stage}${transcript}</div></div>${foot ? `<footer class="prs__foot">${foot}</footer>` : ''}`;
     if (!dlg.open) dlg.showModal();
     dlg.querySelector('#prsQ, #prsAfter, #prsConf')?.focus({ preventScroll: false });
+    dlg.querySelector('.prs__p.is-now')?.scrollIntoView({ inline: 'center', block: 'nearest' });
     dlg.querySelector('.prs__main')?.scrollTo?.({ top: 0 });
   }
 

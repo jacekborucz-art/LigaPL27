@@ -11,6 +11,7 @@ import { DEV, staffMul } from './config.js';
 import { staffOf } from './staff.js';
 import { ageAt } from './state.js';
 import { squadOf, academyOf } from '../world/worldGen.js';
+import { aiStimFor, resetAiStim } from './aiClubs.js';
 
 export function offsetsFor(p) {
   const v = p.variant ? VARIANTS[p.pos]?.find((x) => x.name === p.variant) : null;
@@ -57,7 +58,7 @@ function stochastic(v, rng) {
 /**
  * Miesięczny rozwój jednego zawodnika (czysta funkcja na obiekcie zawodnika).
  * ctx: { date, staff: {asystent, fizyczny, bramkarze, mlodziez} (jakości 1-20),
- *        stim: { atrybut: punkty } | null (null = standardowy plan klubu AI), minShare 0-1, rng }
+ *        stim: { atrybut: punkty } | null (null = standardowy plan: akademia, stary zapis), minShare 0-1, rng }
  * Zwraca { before, after, delta: { atrybut: zmiana }, spurt }.
  */
 export function developPlayer(p, ctx) {
@@ -174,7 +175,9 @@ export function monthlyDevelopment(game, date) {
     for (const p of [...squadOf(game.world, clubId), ...academyOf(game.world, clubId)]) {
       const academy = p.squad === 'Y';
       const t = p.training;
-      const stim = mine && !academy && t ? t.stim ?? {} : null;
+      // Klub gracza: bodziec z zajęć zawodnika; klub AI: z planu klubu i udziału w zajęciach (aiClubs.js)
+      const stim = academy ? null : mine ? (t ? t.stim ?? {} : null) : aiStimFor(game, p);
+      if (p.aiTr) { if (mine) delete p.aiTr; else p.aiTr = { dp: 0, dd: 0 }; }
       const minShare = academy ? 0.5 : games ? (p.season?.min ?? 0) / (90 * games) : 0.6;
       const before = mine ? { ...p.attr } : null;
       const r = developPlayer(p, { date, staff: st, stim, minShare, rng });
@@ -192,6 +195,7 @@ export function monthlyDevelopment(game, date) {
         if (r.spurt) report.spurts.push({ id: p.id, name: p.name });
       }
     }
+    if (!mine) resetAiStim(game, clubId);
   }
   report.rows.sort((a, b) => b.d - a.d || b.trend - a.trend);
   return report;

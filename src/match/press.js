@@ -65,7 +65,8 @@ export function climateFactors(ctx, state = {}) {
   add(1.6 * d, d >= 0.8 ? 'Wynik ponad oczekiwania' : d > 0 ? 'Wynik zgodny z oczekiwaniami' : d <= -1.5 ? 'Porażka z teoretycznie słabszym rywalem' : 'Wynik poniżej oczekiwań');
   const l5 = ctx.last5 ?? [];
   const w = l5.filter((x) => x === 'W').length; const l = l5.filter((x) => x === 'P').length;
-  add(0.5 * (w - l), w - l >= 2 ? `${w} zwycięstwa w ostatnich ${l5.length} meczach` : l - w >= 2 ? `${l} porażki w ostatnich ${l5.length} meczach` : 'Nierówna forma');
+  add(0.5 * (w - l), w - l >= 2 ? `${w} ${plural(w, 'zwycięstwo', 'zwycięstwa', 'zwycięstw')} w ostatnich ${l5.length} meczach` : l - w >= 2 ? `${l} ${plural(l, 'porażka', 'porażki', 'porażek')} w ostatnich ${l5.length} meczach`
+    : w > l ? 'Więcej zwycięstw niż porażek w ostatnich meczach' : 'Więcej porażek niż zwycięstw w ostatnich meczach');
   if (ctx.position && ctx.goalTarget && (ctx.roundsPlayed ?? 0) >= 5) {
     const gap = ctx.goalTarget - ctx.position;
     add(clamp(gap * 0.25, -2, 1.5), gap >= 0 ? 'Drużyna realizuje cel zarządu' : 'Drużyna poniżej celu zarządu');
@@ -99,8 +100,8 @@ export function pickClimate(ctx, state = {}, seed = 'prasa') {
   const probs = Object.fromEntries(CLIMATE_IDS.map((k) => [k, r2(weights[k] / total)]));
   const climate = new Rng(`${seed}|klimat`).weighted(CLIMATE_IDS, (k) => weights[k]);
   const sign = climate === 'agresywna' ? -1 : climate === 'pozytywna' ? 1 : 0;
-  let reasons = factors.filter((x) => (sign ? Math.sign(x.v) === sign : true))
-    .sort((a, b) => Math.abs(b.v) - Math.abs(a.v)).slice(0, sign ? 2 : 1).map((x) => x.text);
+  let reasons = sign ? factors.filter((x) => Math.sign(x.v) === sign).sort((a, b) => Math.abs(b.v) - Math.abs(a.v)).slice(0, 2).map((x) => x.text)
+    : [score <= -1 ? 'Wynik dał powody do krytyki, ale media wstrzymują się z oceną' : score >= 1 ? 'Dobry wynik, ale media nie dają się porwać' : 'Bez wielkich emocji wokół klubu'];
   if (ctx.derby) reasons = ['Derby podgrzały atmosferę', ...reasons].slice(0, 3);
   if (inertia && state.climate === climate && (state.streak ?? 0) >= 1) reasons.push(`Ta narracja trwa od ${state.streak + 1} ${plural(state.streak + 1, 'meczu', 'meczów', 'meczów')}`);
   if (!reasons.length) reasons.push(sign < 0 ? 'Media zawsze znajdą temat' : sign > 0 ? 'Media są w dobrym nastroju' : 'Bez wielkich emocji wokół klubu');
@@ -147,9 +148,9 @@ function personFrom(rng) {
 }
 
 /** Dziennikarz redakcji: losowany raz na grę (lokalny i klubowy raz na klub), więc wraca co mecz. */
-export function journalist(outletId, { gameSeed = 'gra', clubId = '', region = '' } = {}) {
+export function journalist(outletId, { gameSeed = 'gra', clubId = '', region = '' } = {}, salt = 0) {
   const local = outletId === 'lokalne' || outletId === 'klubowa';
-  const p = personFrom(new Rng(`dziennikarz:${gameSeed}:${outletId}:${local ? clubId : ''}`));
+  const p = personFrom(new Rng(`dziennikarz:${gameSeed}:${outletId}:${local ? clubId : ''}${salt ? `:${salt}` : ''}`));
   const o = OUTLETS[outletId];
   const outlet = outletId === 'lokalne' ? `${o.name} ${CITY[region] ?? 'Region'}` : o.name;
   return { id: outletId, name: p.name, female: p.female, outlet, kind: o.kind };
@@ -447,9 +448,37 @@ const BANK = [
     id: 'fans-thanks', w: (c) => (c.climate === 'pozytywna' && c.res !== 'P' ? 4 : 0), by: ['klubowa'],
     q: { neu: 'Co chce pan przekazać kibicom, którzy dziś przyszli na stadion?' },
     a: () => [
-      { tone: 'spokojny', text: 'Dziękuję. Bez was ten wynik nie byłby możliwy.', fans: 2 },
+      { tone: 'spokojny', text: 'Dziękuję za doping. Czuliśmy was przez cały mecz.', fans: 2 },
       { tone: 'pewny', text: 'Do zobaczenia za tydzień. Będzie jeszcze lepiej.', fans: 1, morale: 0.2 },
       { tone: 'humor', text: 'Niech oszczędzają gardła. Przydadzą się w następnym meczu.', fans: 1 },
+    ],
+  },
+  {
+    id: 'opp', w: () => 2, by: ['tygodnik', 'dziennik', 'portal'],
+    q: { neu: 'Co zaskoczyło pana w grze drużyny {opp}?', agr: 'Drużyna {opp} wyglądała na lepiej przygotowaną. Czego zabrakło w analizie?' },
+    a: () => [
+      { tone: 'spokojny', text: 'Wiedzieliśmy, czego się spodziewać. Analiza była dokładna.' },
+      { tone: 'dyplomatyczny', text: 'To dobrze poukładana drużyna. Należą się jej słowa uznania.', fans: -1 },
+      { tone: 'humor', text: 'Zaskoczyło mnie, ile biegali. Zapytam, co jedzą na śniadanie.' },
+    ],
+  },
+  {
+    id: 'lineup', w: () => 2, by: ['kanal', 'portal', 'lokalne'],
+    q: { neu: 'Skąd takie decyzje personalne w wyjściowym składzie?', agr: 'Kibice nie rozumieją pana decyzji personalnych. Wytłumaczy je pan?' },
+    sensitive: true,
+    a: () => [
+      { tone: 'spokojny', text: 'Skład wybieram na podstawie treningów. Każdy dostaje swoją szansę.', morale: 0.1 },
+      { tone: 'pewny', text: 'Za skład odpowiadam ja i biorę to na siebie.', morale: 0.2 },
+      { tone: 'konfrontacyjny', text: 'Skład ustalam ja, a nie komentarze w internecie.', fans: -2, h: { agr: '{coach} do kibiców: skład ustalam ja', neu: '{coach}: „Skład ustalam ja”' } },
+    ],
+  },
+  {
+    id: 'form', w: () => 2, by: ['tygodnik', 'dziennik', 'lokalne'],
+    q: { neu: 'Jak ocenia pan formę drużyny w ostatnich tygodniach?', agr: 'Forma drużyny budzi niepokój. Co nie działa?', pos: 'Drużyna jest w dobrej formie. Co jest jej największą siłą?' },
+    a: () => [
+      { tone: 'spokojny', text: 'Idziemy krok po kroku. Widzę postęp na treningach.', morale: 0.1 },
+      { tone: 'pewny', text: 'Ta drużyna dopiero się rozkręca.', fans: 1, morale: 0.2 },
+      { tone: 'dyplomatyczny', text: 'Są lepsze i gorsze momenty. Pracujemy nad stabilnością.' },
     ],
   },
   {
@@ -507,10 +536,8 @@ export function openConference(ctx, state = {}, climateRes = null, seed = 'konfe
   const climate = cr.climate;
   const rng = new Rng(`${seed}|sala`);
   const c = { ...ctx, climate, promises: state.promises ?? [], lastMode: state.last?.mode ?? null, rumourRoll: rng.chance(0.3) };
-  const opts = { gameSeed: ctx.gameSeed, clubId: ctx.clubId, region: ctx.region };
-  const room = ROOMS[climate].map((id) => journalist(id, opts));
-  const officerP = personFrom(new Rng(`rzecznik:${ctx.gameSeed}:${ctx.clubId}`));
-  const officer = { name: officerP.name, role: officerP.female ? 'Rzeczniczka prasowa' : 'Rzecznik prasowy', female: officerP.female };
+  const room = roomPreview(climate, ctx);
+  const officer = pressOfficer(ctx);
   const n = climate === 'agresywna' ? 4 : 3; // [SZAC]
   // Wybór pytań: ważony, bez powtórzeń; klimat wzmacnia tematy trudne albo przyjazne
   const harsh = new Set(['job', 'board-goal', 'fans', 'rumour', 'red', 'promise-broken', 'promise-season', 'skipped', 'streak-loss', 'loss-heavy', 'win-lucky', 'referee']);
@@ -548,7 +575,7 @@ export function openConference(ctx, state = {}, climateRes = null, seed = 'konfe
       : 'Dzień dobry. Zgodnie ze zwyczajem zaczynamy od trenera gości.';
   return {
     v: 1, climate, climateRes: { climate, probs: cr.probs, reasons: cr.reasons },
-    officer, room, intro: `${intro} Mamy czas na ${n} ${plural(n, 'pytanie', 'pytania', 'pytań')}.`,
+    officer, room, intro: `${intro} Mamy czas na ${queue.length} ${plural(queue.length, 'pytanie', 'pytania', 'pytań')}.`,
     ctx: c, queue: [opening, ...queue], idx: 0, answers: [], followUps: 0, maxJournalist: 5, done: false, walkedOut: false,
   };
 }
@@ -664,7 +691,7 @@ export function conferenceEffects(conf) {
     headline = { text: h ? headlineFor(h, c) : `${c.coach ?? 'Trener'}: „${quote}”`, outlet };
   }
   // Presja klimatu plus osłona albo dociążenie z odpowiedzi; wyjście z sali: osłona tylko do tej pory
-  const base = CLIMATES[climate].base;
+  const base = conf.walkedOut && climate === 'pozytywna' ? CLIMATES.pozytywna.base / 2 : CLIMATES[climate].base; // po wyjściu dobra prasa działa słabiej
   const teamMorale = r2(clamp(base + eff.morale, ...PRESS_LIMITS.teamMorale));
   return {
     mode: conf.walkedOut ? 'walkout' : 'answered', climate,
@@ -738,8 +765,20 @@ export function effectWords(eff) {
   return out;
 }
 
-/** Krótki opis sali dla odprawy (przed otwarciem okna). */
+/** Rzecznik klubu (stały dla klubu w danej grze). */
+export function pressOfficer(ctx) {
+  const p = personFrom(new Rng(`rzecznik:${ctx.gameSeed}:${ctx.clubId}`));
+  return { name: p.name, role: p.female ? 'Rzeczniczka prasowa' : 'Rzecznik prasowy', female: p.female };
+}
+
+/** Sala: dziennikarze redakcji obecnych przy danym klimacie, bez powtórzonych nazwisk (także z rzecznikiem). */
 export function roomPreview(climate, ctx) {
   const opts = { gameSeed: ctx.gameSeed, clubId: ctx.clubId, region: ctx.region };
-  return ROOMS[climate].map((id) => journalist(id, opts));
+  const used = new Set([pressOfficer(ctx).name.split(' ').pop()]);
+  return (ROOMS[climate] ?? ROOMS.neutralna).map((id) => {
+    let j = journalist(id, opts);
+    for (let salt = 1; used.has(j.name.split(' ').pop()) && salt < 8; salt++) j = journalist(id, opts, salt);
+    used.add(j.name.split(' ').pop());
+    return j;
+  });
 }

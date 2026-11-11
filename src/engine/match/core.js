@@ -3,8 +3,8 @@
 // wynik, statystyki, oceny, relacja i momentum liczą się tylko z dziennika.
 
 import { Rng, clamp } from '../../core/rng.js';
-import { K, SHOOT_W, FOUL_W, INJURY_TYPES, RED_REASONS } from './constants.js';
-import { buildTeam, updateZones, updateCondition, onPitch, goalkeeper, fieldPlayers, slotFit } from './teams.js';
+import { K, SHOOT_W, FOUL_W, INJURY_TYPES, RED_REASONS, KNOCK } from './constants.js';
+import { buildTeam, updateZones, updateCondition, onPitch, goalkeeper, fieldPlayers, slotFit, makeKnock } from './teams.js';
 
 // Haki trenera (src/engine/match/coach.js rejestruje się przy imporcie). Silnik nie zna AI,
 // ale gdy drużyna prowadzona przez AI lub asystenta traci bramkarza, trener decyduje od razu.
@@ -242,6 +242,7 @@ export function sendOff(M, T, x, code = 'sfp', detail = '') {
   M.halfCounts.cards++;
   const wasGk = x.on && x.slot?.pos === 'BR';
   x.sentOff = true;
+  x.redCode = code;
   rateEv(x, -1.5);
   const [reason, reasonText] = RED_REASONS[code] ?? RED_REASONS.sfp;
   const left = fieldPlayers(T).length;
@@ -620,26 +621,59 @@ function pickInjury(M, x) {
  * opts.injury: wymuszony uraz { cat, name, days, playable } (scenariusze testowe, przyszłe zdarzenia).
  */
 export function injure(M, T, x, contact = false, opts = {}) {
-  if (x.injury) return;
+  if (x.injury && !(x.knock && !x.knock.aggravated)) return; // zawodnik grający z bólem może doznać kolejnego urazu
   const inj = opts.injury ?? pickInjury(M, x);
+  // Kolejny uraz grywalny u zawodnika, który już gra z bólem: uraz się pogłębia i zawodnik schodzi
+  if (inj.playable && x.knock && !x.knock.aggravated) { aggravate(M, T, x, contact); return; }
   x.injury = inj;
   M.halfCounts.injuries++;
   const gk = x.slot?.pos === 'BR';
   // IFAB 2026/27: opatrywany zawodnik schodzi na 1 minutę (bez bramkarza i faulu ukaranego kartką)
   const treated = !gk && !opts.cardedFoul;
   if (treated) x.treatedUntil = M.minute + 1;
-  if (inj.playable) x.base -= 0.045 * x.p.ovr;
-  else { x.on = false; if (!gk) T.injuredOff.push(x); } // musi zejść; drużyna gra w osłabieniu do zmiany
+  if (inj.playable) {
+    // Lekki uraz (gra z bólem): kara do formy wg typu, stan widoczny w x.knock (biały krzyżyk w UI)
+    x.knock = makeKnock(inj.name, M.minute, { days: inj.days });
+    x.base -= (KNOCK.types[x.knock.type]?.pen ?? 0.045) * x.p.ovr;
+  } else { x.on = false; if (!gk) T.injuredOff.push(x); } // musi zejść; drużyna gra w osłabieniu do zmiany
   const concussion = /wstrząśnienie/.test(inj.name);
   emit(M, 'injury', T.side, x, {
     injury: inj, severity: inj.cat, canContinue: inj.playable, days: inj.days, gk, treated, concussion, contact,
-    text: inj.playable ? `${last(x)} jest opatrywany (${inj.name}), może grać dalej.` : `${last(x)} doznaje kontuzji (${inj.name}) i nie może kontynuować gry.`,
+    knock: !!inj.playable, knockType: x.knock && inj.playable ? x.knock.type : null, aggravated: false, knocked: inj.playable ? countKnocks(T) : 0,
+    text: inj.playable ? `${last(x)} jest opatrywany (${inj.name}), może grać dalej z bólem.` : `${last(x)} doznaje kontuzji (${inj.name}) i nie może kontynuować gry.`,
   });
   if (!inj.playable) {
     T.react.push({ kind: 'injury', tick: M.tick, pos: x.slot?.pos ?? null, gk });
     if (gk) { T.injuredGk = x; goalkeeperLost(M, T, 'injury'); }
     checkMinPlayers(M, T);
-  }
+  } else T.react.push({ kind: 'knock', tick: M.tick, pos: x.slot?.pos ?? null, gk, type: x.knock.type });
+}
+
+const countKnocks = (T) => fieldPlayers(T).filter((y) => y.knock && !y.knock.aggravated).length;
+
+/**
+ * Pogłębienie lekkiego urazu (zawodnik grał z bólem): uraz średni, zejście z boiska.
+ * Zdarzenie 'injury' z aggravated: true, canContinue: false, from: nazwa lekkiego urazu.
+ */
+export function aggravate(M, T, x, contact = false) {
+  const k = x.knock;
+  const t = KNOCK.types[k.type] ?? KNOCK.types.contusion;
+  const [name, lo, hi] = t.worse;
+  const inj = { cat: 'medium', name, days: M.rng.int(lo, hi), playable: false, aggravated: true, from: k.name };
+  k.aggravated = true; k.aggravatedAt = M.minute;
+  x.injury = inj;
+  M.halfCounts.injuries++;
+  const gk = x.slot?.pos === 'BR';
+  x.on = false;
+  if (!gk) T.injuredOff.push(x);
+  emit(M, 'injury', T.side, x, {
+    injury: inj, severity: 'medium', canContinue: false, days: inj.days, gk, treated: false, concussion: false, contact,
+    knock: false, knockType: k.type, aggravated: true, from: k.name, knocked: countKnocks(T),
+    text: `${last(x)} nie wytrzymał gry z bólem: uraz się pogłębił (${name}). Musi zejść.`,
+  });
+  T.react.push({ kind: 'injury', tick: M.tick, pos: x.slot?.pos ?? null, gk });
+  if (gk) { T.injuredGk = x; goalkeeperLost(M, T, 'injury'); }
+  checkMinPlayers(M, T);
 }
 
 function phaseInjuries(M) {
@@ -649,6 +683,22 @@ function phaseInjuries(M) {
         * ((x.p.age ?? 25) >= 33 ? 1.3 : (x.p.age ?? 25) >= 30 ? 1.15 : 1) * (M.ctx.weather.inj ?? 1);
       if (M.rng.next() < K.injTick * m * 0.4) injure(M, T, x, false); // 40 % urazów widocznych w meczu
     }
+    if (T.knocked) knockRisk(M, T);
+  }
+}
+
+/**
+ * Ryzyko pogłębienia lekkiego urazu w każdej minucie gry z bólem: typ urazu, zmęczenie, wiek, intensywność gry
+ * (fatMul: pressing, tempo) i liczba lekko kontuzjowanych w drużynie [SZAC, docs/taktyka-i-urazy.md].
+ */
+function knockRisk(M, T) {
+  const extra = 1 + KNOCK.aggTeam * Math.max(0, T.knocked - 1);
+  for (const x of onPitch(T, M.minute)) {
+    const k = x.knock;
+    if (!k || k.aggravated || k.since === M.minute) continue;
+    const t = KNOCK.types[k.type] ?? KNOCK.types.contusion;
+    const p = t.agg * extra * (x.cond < 70 ? KNOCK.aggTired : 1) * ((x.p.age ?? 25) >= 30 ? KNOCK.aggAge : 1) * (T.P.fatMul ?? 1) * (M.ctx.weather.inj ?? 1);
+    if (M.rng.next() < p) aggravate(M, T, x);
   }
 }
 

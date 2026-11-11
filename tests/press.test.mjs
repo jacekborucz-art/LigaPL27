@@ -76,6 +76,16 @@ test('Sala: rzecznik, słowo wstępne i 3-5 pytań od nazwanych dziennikarzy', (
     assert.equal(conf.queue[0].officer, true);
     const js = conf.queue.filter((q) => !q.officer);
     assert.equal(js.length, climate === 'agresywna' ? 4 : 3);
+    // Nawet zwykły mecz bez kontekstu daje pełną salę pytań
+    for (const res of ['W', 'R', 'P']) {
+      const plain = { gameSeed: '1', clubId: 'motor', res, margin: res === 'W' ? 1 : res === 'P' ? -1 : 0, xgFor: 1, xgAgainst: 1 };
+      for (let i = 0; i < 10; i++) {
+        const pc = openConference(plain, {}, { climate }, `p${i}`);
+        assert.equal(pc.queue.filter((q) => !q.officer).length, climate === 'agresywna' ? 4 : 3);
+        assert.ok(pc.intro.includes(climate === 'agresywna' ? '4 pytania' : '3 pytania'));
+        assert.equal(new Set(pc.room.map((j) => j.name.split(' ').pop())).size, pc.room.length, 'bez powtórzonych nazwisk');
+      }
+    }
     assert.ok(js.every((q) => q.by?.name && q.by.outlet && q.answers.length >= 3 && !q.text.includes('{')));
     assert.ok(js.every((q) => q.answers.every((a) => a.toneLabel)));
     let c = conf;

@@ -71,7 +71,7 @@ const NEAR = new Set(['MD', 'MD±1', 'MD+1', 'MD-1']);
  * Sparing jest dniem meczowym (z rozruchem dzień wcześniej i regeneracją dzień później), ale nie przerywa
  * okresu przygotowawczego ani mikrocyklu przed meczem o punkty. Zarezerwowany obóz to zawsze okres „oboz”.
  */
-export function dayContext(game, date, sets = matchSets(game)) {
+export function dayContext(game, date, sets = matchSets(game), camp = campOn(game, date)) {
   if (Array.isArray(sets)) sets = { all: sets, official: sets, friendly: new Set() };
   const all = around(sets.all, date);
   const off = around(sets.official, date);
@@ -80,7 +80,6 @@ export function dayContext(game, date, sets = matchSets(game)) {
   const window = (m >= 6 && m <= 8) || m === 12 || m <= 2;
   let phase = 'sezon';
   if (off.a >= 10 && off.b >= 10) phase = window ? (off.b <= 24 ? 'oboz' : 'urlop') : 'przerwa';
-  const camp = campOn(game, date);
   if (camp) phase = 'oboz';
   let role = roleFor(a, b);
   const friendlyNear = (all.next && sets.friendly.has(all.next)) || (all.prev && sets.friendly.has(all.prev));
@@ -108,13 +107,17 @@ function shift(int, by) {
   return INT_ORDER[i];
 }
 
-/** Plan asystenta na dzień (bez ręcznych zmian). Zwraca { kind, sessions, role, phase, auto: true }. */
-export function autoDay(game, date, ctx = dayContext(game, date)) {
+/**
+ * Plan asystenta na dzień (bez ręcznych zmian). Zwraca { kind, sessions, role, phase, auto: true }.
+ * club: { clubId, accent, load } dla klubu AI (aiClubs.js); domyślnie klub gracza i jego ustawienia planu.
+ */
+export function autoDay(game, date, ctx = dayContext(game, date), club = null) {
   const T = game.training ?? {};
-  const accent = ACCENTS[T.settings?.accent] ?? ACCENTS.zrownowazony;
-  const loadShift = LOAD_LEVELS[T.settings?.load]?.shift ?? 0;
-  const asst = staffQ(game, game.clubId, 'asystent');
-  const analyst = staffQ(game, game.clubId, 'analityk');
+  const clubId = club?.clubId ?? game.clubId;
+  const accent = ACCENTS[club?.accent ?? T.settings?.accent] ?? ACCENTS.zrownowazony;
+  const loadShift = LOAD_LEVELS[club?.load ?? T.settings?.load]?.shift ?? 0;
+  const asst = staffQ(game, clubId, 'asystent');
+  const analyst = staffQ(game, clubId, 'analityk');
   const wd = weekdayIdx(date);
   let sessions = [];
   let kind = 'train';

@@ -1,6 +1,9 @@
-// 10 formacji (docs/ekspert_futbol.md 3, 3.1). Współrzędne: x 0-100 szerokość (0 = lewa),
+// 12 formacji (docs/ekspert_futbol.md 3, 3.1, docs/taktyka-i-urazy.md). Współrzędne: x 0-100 szerokość (0 = lewa),
 // y 0-100 długość (0 = własna bramka), drużyna atakuje w górę. Modyfikatory czyta silnik (etap 3).
 // Nowa formacja = nowy wpis tutaj; ekran składu i silnik nie wymagają zmian.
+// fx: efekty strukturalne formacji w tym samym słowniku co efekty instrukcji (src/data/instructions.js),
+// np. pActMul, D, pos, oppAct; silnik łączy je z instrukcjami (teams.js tacticParams).
+// family: formacje z tymi samymi rolami (warianty 4-4-2); przejście w rodzinie kosztuje mniej spójności.
 
 const SIDED = new Set(['BO', 'WB', 'SP', 'SN']);
 const slots = (spec) => spec.split(';').map((s) => {
@@ -11,9 +14,22 @@ const slots = (spec) => spec.split(';').map((s) => {
 });
 
 export const FORMATIONS = [
-  { id: '442', name: '4-4-2', nick: 'Dwie Linie', W: 1.0, act: { POZ: 1.0, SKR: 1.15, KON: 1.1, DYS: 1.0 }, counterVuln: 1.0,
+  { id: '442', name: '4-4-2', nick: 'Dwie Linie', family: '442', W: 1.0, act: { POZ: 1.0, SKR: 1.15, KON: 1.1, DYS: 1.0 }, counterVuln: 1.0,
     note: 'Prosta i szeroka. Słabsza w środku przeciw trzem pomocnikom.',
     slots: slots('BR 50,5; BO 15,25; ŚO 38,21; ŚO 62,21; BO 85,25; SP 15,50; ŚP 40,47; ŚP 60,47; SP 85,50; NAP 40,75; NAP 60,75') },
+  // Niski blok 4-4-2: dwie zwarte czwórki blisko własnego pola karnego, boczni pomocnicy schodzą do środka i asekurują
+  // bocznych obrońców, jeden napastnik cofa się na defensywnego pomocnika rywala (4-4-1-1 bez piłki). Pressing dopiero
+  // na własnej połowie (podanie do boku, podanie do tyłu, złe przyjęcie). Po odbiorze szybko do dwóch napastników.
+  { id: '442def', name: '4-4-2 defensywne', nick: 'Niski Blok', family: '442', W: 0.85, act: { POZ: 0.85, SKR: 1.0, KON: 1.3, DYS: 0.95 }, counterVuln: 0.8,
+    fx: { pActMul: 0.92, D: 0.3, pos: -0.06, oppAct: { KON: 0.85, SKR: 1.12, DYS: 1.15 }, oppOffsideMul: 0.7, fatMidMul: 0.95 },
+    note: 'Dwie niskie linie po cztery, mało miejsca między liniami. Dobra do obrony wyniku i przeciw silniejszym. Mniej własnych akcji, rywal dośrodkowuje i strzela z dystansu.',
+    slots: slots('BR 50,5; BO 18,19; ŚO 39,16; ŚO 61,16; BO 82,19; SP 21,37; ŚP 41,35; ŚP 59,35; SP 79,37; NAP 45,58; NAP 57,66') },
+  // Wysokie 4-4-2: obrona przy linii środkowej, boczni obrońcy podłączają się, boczni pomocnicy grają jak skrzydłowi,
+  // dwóch napastników atakuje środkowych obrońców rywala i zaczyna pressing (podanie do bramkarza, do boku).
+  { id: '442off', name: '4-4-2 ofensywne', nick: 'Wysokie Skrzydła', family: '442', W: 1.15, act: { POZ: 1.0, SKR: 1.25, KON: 0.95, DYS: 1.0 }, counterVuln: 1.2,
+    fx: { pActMul: 1.08, D: -0.25, oppPos: -0.06, oppPActMul: 0.97, oppOffsideMul: 1.2, fatMul: 1.06, foulMul: 1.05 },
+    note: 'Wysoka linia, skrzydłowi i dwaj napastnicy w polu karnym. Do gonienia wyniku i przeciw słabszym. Męczy i zostawia miejsce za plecami.',
+    slots: slots('BR 50,5; BO 13,33; ŚO 38,26; ŚO 62,26; BO 87,33; SP 12,62; ŚP 40,52; ŚP 60,52; SP 88,62; NAP 40,83; NAP 60,83') },
   { id: '433', name: '4-3-3', nick: 'Trójząb', W: 1.0, act: { POZ: 1.05, SKR: 1.1, KON: 1.0, DYS: 0.95 }, counterVuln: 1.1,
     note: 'Dobra do pressingu, męczy skrzydłowych.',
     slots: slots('BR 50,5; BO 15,26; ŚO 38,21; ŚO 62,21; BO 85,26; DP 50,38; ŚP 32,52; ŚP 68,52; SN 15,74; NAP 50,80; SN 85,74') },
