@@ -95,7 +95,10 @@ export function fixturesPanelBody(game, { past = 3, next = 5, morePast = 2, more
   const played = rows.filter((r) => r.played);
   const plan = rows.filter((r) => !r.played);
   const head = played.slice(-(past + morePast));
-  const tail = plan.slice(0, next + moreNext);
+  // Mniej rozegranych meczów (początek sezonu): wolne wiersze dla kolejnych meczów
+  const spare = past + morePast - head.length;
+  const tail = plan.slice(0, next + moreNext + spare);
+  next += Math.max(0, past - head.length);
   const xPast = Math.max(0, head.length - past);
   if (!head.length && !tail.length) return '<p class="dash-note">Brak meczów w tym sezonie. Terminarz pojawi się po losowaniu albo w nowym sezonie.</p>';
   const rec = recordOf(played);
@@ -118,15 +121,15 @@ function countBy(rows, key) {
   return m;
 }
 
-function splitTable(rows) {
+function splitTable(rows, showPlan = true) {
   const line = (label, list, k) => {
     const r = recordOf(list);
     const plan = list.filter((x) => !x.played).length;
-    return `<tr${k ? ` data-v="${k}"` : ''}><th scope="row">${k ? venueTag(k) : esc(label)}</th><td>${r.n}</td><td>${r.w}</td><td>${r.d}</td><td>${r.l}</td><td>${r.gf}:${r.ga}</td><td class="w">${plan || ''}</td></tr>`;
+    return `<tr${k ? ` data-v="${k}"` : ''}><th scope="row">${k ? venueTag(k) : esc(label)}</th><td>${r.n}</td><td>${r.w}</td><td>${r.d}</td><td>${r.l}</td><td>${r.gf}:${r.ga}</td>${showPlan ? `<td class="w">${plan || ''}</td>` : ''}</tr>`;
   };
   return `<table class="fxs-split">
     <caption class="sr">Bilans według miejsca meczu</caption>
-    <thead><tr><th scope="col"><span class="sr">Miejsce</span></th><th scope="col"><abbr title="Mecze rozegrane">M</abbr></th><th scope="col"><abbr title="Wygrane">W</abbr></th><th scope="col"><abbr title="Remisy">R</abbr></th><th scope="col"><abbr title="Porażki">P</abbr></th><th scope="col">Bramki</th><th scope="col" class="w">Do gry</th></tr></thead>
+    <thead><tr><th scope="col"><span class="sr">Miejsce</span></th><th scope="col"><abbr title="Mecze rozegrane">M</abbr></th><th scope="col"><abbr title="Wygrane">W</abbr></th><th scope="col"><abbr title="Remisy">R</abbr></th><th scope="col"><abbr title="Porażki">P</abbr></th><th scope="col">Bramki</th>${showPlan ? '<th scope="col" class="w">Do gry</th>' : ''}</tr></thead>
     <tbody>${VENUES.filter(([k]) => k !== 'N' || rows.some((r) => r.venue === k)).map(([k]) => line('', rows.filter((r) => r.venue === k), k)).join('')}</tbody>
     <tfoot>${line('Razem', rows, null)}</tfoot>
   </table>`;
@@ -178,7 +181,7 @@ export function renderFixtures(game, ui = {}) {
         <div class="chips chips--sm chips--wrap" role="group" aria-label="Rozgrywki">${compChips}</div>
         <div class="chips chips--sm chips--wrap" role="group" aria-label="Miejsce meczu">${venueChips}</div>
       </div>
-      <section class="fxs__sum" aria-label="Bilans">${splitTable(byComp)}</section>
+      <section class="fxs__sum" aria-label="Bilans">${splitTable(byComp, current)}</section>
     </div>
     ${rows.length ? `<ol class="fxs__list" aria-label="Mecze">${html}</ol>` : `<p class="panel">${esc(empty)}</p>`}
   </div>`;
