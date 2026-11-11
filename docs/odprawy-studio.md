@@ -48,7 +48,7 @@ Studio przedmeczowe -> Odprawa przedmeczowa -> 1. połowa (silnik)
 | Przerwa | Wynik, statystyki 1. połowy, momentum, oceny, opis sytuacji od asystenta | 1 przemowa, maks. 3 rozmowy | `assistantAdvice('half')`, `halftimeBriefing` | Nowy poziom Z na 2. połowę |
 | Studio pomeczowe | Wynik i wynik do przerwy, kluczowe momenty, zawodnik meczu, oceny, statystyki z werdyktem xG, kontrowersje, reakcje zarządu, kibiców i mediów, tabela po meczu, nowe kontuzje i pauzy, nagłówek dnia | Tylko „Dalej” | `postMatchStudio(ctx)` | `forBriefing`, historia nagłówków, `postMatchMessages` |
 | Odprawa pomeczowa | Reakcje drużyny i zawodników, strzałka morale drużyny, ewentualny konflikt | 1 przemowa, maks. 3 rozmowy (pochwała albo krytyka) | `postMatchBriefing` | Morale (przez `applyMorale`), relacje, konflikty |
-| Konferencja (opcja) | 2-3 pytania, po 3 odpowiedzi | Wybór odpowiedzi | `pressConference`, `answerPressConference` | Zmiana nastroju kibiców, zaufania zarządu, morale |
+| Konferencja (opcja, osobne okno) | Słowo wstępne, 3-4 pytania nazwanych dziennikarzy, do 2 dopytań | Odpowiedź z wybranym tonem | `src/match/press.js` (docs/konferencja-prasowa.md) | Klimat prasy, morale (także po pominięciu), kibice, zarząd, relacje z mediami |
 
 ## 2. Studio przedmeczowe
 
@@ -357,7 +357,7 @@ Niesprawiedliwa krytyka zjada niemal cały zysk z pochwały drużyny, a uraza Wi
 
 ## 10. Integracja i otwarte kwestie
 
-- Kolejność wywołań: `preMatchStudio` → `preMatchBriefing({ ctx: { ...pre.forBriefing, clubId, date } })` → silnik → `halftimeBriefing` → silnik → `postMatchStudio({ pre: pre.forPost })` → `postMatchBriefing({ ctx: post.forBriefing })` → `pressConference(post.forBriefing.press)` → `applyBriefing` dla każdego zawodnika → `closeMatchMemory`.
+- Kolejność wywołań: `preMatchStudio` → `preMatchBriefing({ ctx: { ...pre.forBriefing, clubId, date } })` → silnik → `halftimeBriefing` → silnik → `postMatchStudio({ pre: pre.forPost })` → `postMatchBriefing({ ctx: post.forBriefing })` → konferencja (`pressSetup`, `pressOpen`, `pressAnswer` w matchday.js) → `applyBriefing` dla każdego zawodnika → `closeMatchMemory`.
 - Adapter osobowości to jedna funkcja `traitsOf` w `briefings.js`. Zawodnik bez `traits` dostaje je deterministycznie z `personalityOf`.
 - Silnik powinien przyjąć `engine.zStart`, `cardRisk`, `nerves` i `defBonus`. Nerwowość nie ma jeszcze wpisu w `modifiers.js` (proponowany wpis w rozdz. 3.4).
 - Nastrój kibiców i zaufanie zarządu są w studiu tylko zmianami (`delta`); zapis do stanu kariery należy do modułu zarządu.

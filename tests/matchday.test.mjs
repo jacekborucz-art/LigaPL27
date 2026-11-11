@@ -7,7 +7,7 @@ import { createTactics } from '../src/engine/lineup.js';
 import { squadOf } from '../src/world/worldGen.js';
 import {
   startMatchday, preAdvice, doPreBriefing, kickOff, tick, halfAdvice, doHalfBriefing, continueAfterBreak, skip,
-  finishMatchday, doPostBriefing, doPress, closeMatchday, halfInfo,
+  finishMatchday, doPostBriefing, doPress, pressOpen, closeMatchday, halfInfo,
 } from '../src/match/matchday.js';
 import '../src/season/dailySystems.js';
 
@@ -62,12 +62,19 @@ test('Pełny dzień meczowy krok po kroku: studio, odprawy, mecz z przerwą, stu
   // Odprawa pomeczowa i konferencja
   const postB = doPostBriefing(g, S, 'focusNext', []);
   assert.ok(postB.players.length >= 11);
-  assert.ok(S.press.length >= 2);
+  const conf = pressOpen(g, S);
+  assert.ok(conf.queue.filter((q) => !q.officer).length >= 3, 'co najmniej 3 pytania dziennikarzy');
+  assert.ok(conf.room.length >= 4 && conf.room.every((j) => j.name && j.outlet));
   const before = g.board.trust;
-  const eff = doPress(g, S, Object.fromEntries(S.press.map((q) => [q.id, 0])));
-  assert.ok(typeof eff.text === 'string');
-  assert.ok(g.board.trust !== undefined && Math.abs(g.board.trust - before) <= 20);
-  closeMatchday(g, S);
+  const eff = doPress(g, S);
+  assert.equal(eff.mode, 'answered');
+  assert.ok(eff.headline?.text && eff.headline.outlet);
+  assert.ok(g.board.trust !== undefined && Math.abs(g.board.trust - before) <= 5);
+  assert.ok(g.inbox.some((m) => m.key === `prasa:${f.id}`), 'nagłówek konferencji w poczcie');
+  assert.equal(g.press.last.mode, 'answered');
+  const trust = g.board.trust;
+  closeMatchday(g, S); // konferencja już rozliczona: zamknięcie nie dolicza presji drugi raz
+  assert.equal(g.board.trust, trust);
   assert.ok(g.speechMemory.last.length >= 1);
   // Po meczu pętla dni idzie dalej
   assert.notEqual(primaryAction(g).kind, 'play');

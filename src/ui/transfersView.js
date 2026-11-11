@@ -16,6 +16,8 @@ import {
 import { spendable, wageRoom, wageBill, monthSummary, seasonSummary, FIN_LABELS } from '../career/finance.js';
 import { trustLabel, tablePos } from '../career/board.js';
 import { fansSummary } from '../career/fans.js';
+import { canSign, YOUTH_EXEMPT_AGE, KEEP_MAX, PRESSURE_DAYS } from '../career/squadLimit.js';
+import { limitStatus, toggleKeep, ageWord } from '../career/squadLimitSystem.js';
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size = 20) => (clubById(id) ? crestHtml(clubById(id), { size, clubsById }) : '');
@@ -41,13 +43,50 @@ function playerRow(game, p, extra = '', act = 'tf-open') {
   </button></li>`;
 }
 
+// ------------------------------------------------------------ Limit kadry (docs/limit-kadry.md)
+const inDays = (n) => (n === 0 ? 'dziś' : n === 1 ? 'jutro' : `za ${n} dni`);
+
+/** Panel „Limit kadry”: liczba wobec limitu zarządu i maksimum, sprawa zarządu z terminem i listą wskazanych. */
+export function limitPanel(game) {
+  const L = limitStatus(game);
+  const c = L.case;
+  const state = L.full ? 'full' : L.over > 0 || c ? 'over' : L.counted >= L.soft ? 'near' : 'ok';
+  const pct = (n) => Math.max(0, Math.min(100, Math.round((n / Math.max(1, L.hard)) * 100)));
+  const bonus = [L.europe ? 'gra w pucharach' : '', L.emergency ? 'kryzys kadrowy (za mało zdrowych na mecz)' : ''].filter(Boolean);
+  const exemptNames = L.exempt.map((p) => p.name);
+  let status;
+  if (c?.stage === 'warn') status = `Zarząd żąda redukcji o ${L.over} do ${fmtDate(c.deadline)} (${inDays(L.daysLeft)}). Potem wystawi na listę transferową zawodników wskazanych niżej.`;
+  else if (c?.stage === 'listed') status = `Zarząd wystawił zawodników na listę transferową. Jeśli do ${fmtDate(c.deadline)} (${inDays(L.daysLeft)}) kadra będzie wciąż za duża, wypożyczy młodszych, sprzeda taniej albo rozwiąże kontrakty.`;
+  else if (c) status = `Kadra nadal za duża o ${L.over}. Zarząd wróci do sprawy ${fmtDate(c.deadline)} (${inDays(L.daysLeft)}).`;
+  else if (L.over > 0) status = `Kadra ponad limitem zarządu o ${L.over}. Zarząd da ${PRESSURE_DAYS} dni na redukcję.`;
+  else if (L.counted >= L.soft) status = `Kadra na granicy limitu. Kolejny podpis uruchomi nacisk zarządu (${PRESSURE_DAYS} dni na redukcję).`;
+  else status = `Wolne miejsca do limitu zarządu: ${L.soft - L.counted}.`;
+  if (L.full) status = `Kadra pełna: nowe transfery, wypożyczenia do klubu i wolni zawodnicy są zablokowani. ${status}`;
+  const kept = c ? c.keep.map((id) => game.world.players[id]).filter(Boolean) : [];
+  const tRow = (p, kept = false) => `<li class="tf-limit__t">
+      <button class="tf-limit__who" data-act="tf-open" data-id="${esc(p.id)}"><span class="tf-pos">${esc(p.pos)}</span><span class="tf-name">${esc(p.name)}<small>${esc(ageWord(p.age))}, ${fmtZl(p.contract?.wage ?? 0)} tygodniowo${game.market.userListed[p.id] ? `, na liście za ${fmtZl(game.market.userListed[p.id])}` : ''}</small></span><span class="tf-ovr">${ovrTxt(p)}</span></button>
+      ${c ? `<button class="btn btn--quiet btn--sm" data-act="tf-keep" data-id="${esc(p.id)}"${!kept && c.keep.length >= KEEP_MAX ? ' disabled' : ''}>${kept ? 'Zdejmij osłonę' : 'Osłoń'}</button>` : ''}
+    </li>`;
+  const targets = L.targets.length ? `<h4>${c ? 'Zarząd wskaże' : 'Zarząd wskazałby'} (najsłabsi poza nietykalnymi)</h4><ul class="tf-limit__list">${L.targets.map((p) => tRow(p)).join('')}</ul>`
+    : (L.over > 0 ? '<p class="hint">Zarząd nie ma kogo wskazać: pozostali zawodnicy są nietykalni albo pozycja spadłaby poniżej minimum.</p>' : '');
+  return `<section class="tf-limit" data-state="${state}" aria-labelledby="tf-limit-h">
+    <h3 id="tf-limit-h">Limit kadry</h3>
+    <p class="tf-limit__nums"><b>${L.counted}</b><span>liczonych do limitu, limit zarządu <b>${L.soft}</b>, maksimum <b>${L.hard}</b></span></p>
+    <span class="tf-limit__bar" role="img" aria-label="${L.counted} z ${L.hard} miejsc, limit zarządu ${L.soft}"><i style="width:${pct(L.counted)}%"></i><b style="left:${pct(L.soft)}%"></b></span>
+    <p class="tf-limit__status">${esc(status)}</p>
+    ${(L.over > 0 || c) ? targets : ''}
+    ${kept.length ? `<h4>Osłonięci przez ciebie (${kept.length} z ${KEEP_MAX})</h4><ul class="tf-limit__list">${kept.map((p) => tRow(p, true)).join('')}</ul>` : ''}
+    <p class="hint">Liczą się wszyscy zawodnicy pierwszej drużyny, także wypożyczeni do klubu. Nie liczą się wychowankowie do ${YOUTH_EXEMPT_AGE} lat, którzy nigdy nie zmienili klubu${exemptNames.length ? ` (${exemptNames.length}: ${esc(exemptNames.join(', '))})` : ''}, ani zawodnicy wypożyczeni do innych klubów.${bonus.length ? ` Progi podniesione o ${bonus.length * 2}: ${esc(bonus.join(', '))}.` : ''} Zarząd nie rusza kapitana, pierwszej jedenastki, pięciu najlepszych ani sprowadzonych w ostatnich 120 dniach.</p>
+  </section>`;
+}
+
 // ------------------------------------------------------------ Rynek
 function marketView(game, ui) {
   const list = ui.tfList ?? 'transfer';
   const pos = ui.tfPos ?? 'all';
   const chips = `<div class="chips">${LISTS.map(([k, l]) => `<button class="chip" data-act="tf-list" data-l="${k}" aria-pressed="${list === k}">${l}</button>`).join('')}</div>
     <div class="chips chips--sm">${POS_FILTERS.map(([k, l]) => `<button class="chip" data-act="tf-pos" data-p="${k}" aria-pressed="${pos === k}">${l}</button>`).join('')}</div>`;
-  const money = `<p class="hint">${windowLine(game)} Budżet transferowy: <b>${fmtZl(spendable(game.finance, game.clubId))}</b>, wolne w budżecie płac: <b>${fmtZl(wageRoom(game.finance, game.world, game.clubId))}</b> tygodniowo.</p>`;
+  const money = `${limitPanel(game)}<p class="hint">${windowLine(game)} Budżet transferowy: <b>${fmtZl(spendable(game.finance, game.clubId))}</b>, wolne w budżecie płac: <b>${fmtZl(wageRoom(game.finance, game.world, game.clubId))}</b> tygodniowo.</p>`;
   let rows = [];
   if (list === 'search') {
     const f = ui.tfFilter ?? {};
@@ -81,6 +120,7 @@ function playerCard(game, p, ui) {
   const talk = game.market.talks[p.id];
   const free = !p.clubId;
   const nfs = notForSale(game, p) && !p.contract?.clause;
+  const cap = canSign(game);
   const actions = [];
   if (free) actions.push(`<button class="btn btn--primary" data-act="tf-negotiate" data-id="${esc(p.id)}">Rozmawiaj o kontrakcie</button>`);
   else if (talk?.accepted) actions.push(`<p class="notice">Klub przyjął ofertę ${fmtZl(talk.accepted)}.</p><button class="btn btn--primary" data-act="tf-negotiate" data-id="${esc(p.id)}">Rozmawiaj z zawodnikiem</button>`);
@@ -105,7 +145,8 @@ function playerCard(game, p, ui) {
         ${recentlyMoved(p, game.date) ? '<li><span class="k">Uwaga</span><span>Dopiero zmienił klub</span></li>' : ''}
       </ul>
       ${ui.tfMsg ? `<p class="notice">${esc(ui.tfMsg)}</p>` : ''}
-      ${will.verdict === 'odmowa' ? '<p class="notice notice--err">Zawodnik nie chce rozmawiać o przejściu do twojego klubu.</p>' : actions.join('')}
+      ${!cap.ok ? `<p class="notice notice--err">${esc(cap.text)}</p>` : cap.warn ? `<p class="notice">${esc(cap.text)}</p>` : ''}
+      ${will.verdict === 'odmowa' ? '<p class="notice notice--err">Zawodnik nie chce rozmawiać o przejściu do twojego klubu.</p>' : cap.ok ? actions.join('') : ''}
     </section>`;
 }
 
@@ -114,6 +155,10 @@ function ownCard(game, p, ui) {
   const listedPrice = game.market.userListed[p.id];
   const ml = monthsLeft(game, p);
   const canRenew = !p.loan && ml <= RENEW_WINDOW_MONTHS;
+  const L = limitStatus(game);
+  const kept = L.case?.keep.includes(p.id);
+  const target = L.targets.some((x) => x.id === p.id);
+  const limitNote = target || kept ? `<p class="notice${target ? ' notice--err' : ''}">${target ? `Zarząd wskaże tego zawodnika, jeśli kadra nie zmieści się w limicie (${L.counted}/${L.soft}).` : 'Osłoniłeś tego zawodnika przed działaniem zarządu.'}</p>${L.case ? `<button class="btn btn--quiet btn--sm" data-act="tf-keep" data-id="${esc(p.id)}">${kept ? 'Zdejmij osłonę' : 'Osłoń przed zarządem'}</button>` : ''}` : '';
   return `<button class="btn btn--quiet btn--sm" data-act="tf-close">Wróć do listy</button>
     <section class="panel tf-card">
       <div class="tf-card__head">${crest(p.clubId, 36)}<div><h2>${esc(p.name)}</h2><p class="hint">${esc(p.pos)}, ${p.age} lat, morale ${Math.round(p.morale ?? 12)}/20</p></div><b class="tf-big">${ovrTxt(p)}</b></div>
@@ -125,6 +170,7 @@ function ownCard(game, p, ui) {
         ${p.transferRequest ? '<li><span class="k">Uwaga</span><span>Prosi o transfer</span></li>' : ''}
       </ul>
       ${ui.tfMsg ? `<p class="notice">${esc(ui.tfMsg)}</p>` : ''}
+      ${limitNote}
       <div class="tf-actions">
         ${canRenew ? `<button class="btn btn--primary" data-act="tf-renew" data-id="${esc(p.id)}">Przedłuż kontrakt</button>` : `<p class="hint">Rozmowy o przedłużeniu najwcześniej ${RENEW_WINDOW_MONTHS} miesięcy przed końcem kontraktu.</p>`}
         ${p.loan ? '' : listedPrice ? `<p class="hint">Na liście transferowej za ${fmtZl(listedPrice)}.</p><button class="btn btn--quiet" data-act="tf-unlist" data-id="${esc(p.id)}">Zdejmij z listy</button>`
@@ -138,7 +184,7 @@ function ownCard(game, p, ui) {
 function contractsView(game) {
   const sq = squadOf(game.world, game.clubId).sort((a, b) => (a.contract.until.localeCompare(b.contract.until)) || b.ovr - a.ovr);
   const bill = wageBill(game.world, game.clubId);
-  return `<p class="hint">Płace: ${fmtZl(bill)} tygodniowo, budżet płac ${fmtZl(game.finance.clubs[game.clubId].wageBudget)}. Posortowane wg końca kontraktu.</p>
+  return `${limitPanel(game)}<p class="hint">Płace: ${fmtZl(bill)} tygodniowo, budżet płac ${fmtZl(game.finance.clubs[game.clubId].wageBudget)}. Posortowane wg końca kontraktu.</p>
     <ul class="tf-list">${sq.map((p) => playerRow(game, p, `${fmtZl(p.contract.wage)}<small>do ${fmtDate(p.contract.until).replace(/^\w+ \d+, /, '')}${game.market.userListed[p.id] ? ', na liście' : ''}${p.renewRefused ? ', odmówił' : ''}</small>`)).join('')}</ul>`;
 }
 
@@ -258,6 +304,8 @@ export function handleTransferAction(game, act, ds = {}, root = null) {
       const fee = p.clubId ? t?.accepted ?? 0 : 0;
       if (p.clubId && !t?.accepted) return { ui: { tfMsg: 'Najpierw dogadaj się z klubem.' } };
       if (p.clubId && !inWindow(game.date)) return { ui: { tfMsg: 'Okno transferowe jest zamknięte.' } };
+      const cap = canSign(game);
+      if (!cap.ok) return { ui: { tfMsg: cap.text } };
       return { ui: {}, negotiate: { kind: 'sign', playerId: p.id, fromClub: p.clubId ?? null, fee, limits: negotiationLimits(game, 'sign', p) } };
     }
     case 'tf-renew': return { ui: {}, negotiate: { kind: 'renew', playerId: p.id, fromClub: null, fee: 0, limits: negotiationLimits(game, 'renew', p) } };
@@ -267,6 +315,7 @@ export function handleTransferAction(game, act, ds = {}, root = null) {
       return { ui: { tfMsg: `${p.name} jest na liście transferowej za ${fmtZl(price)}.` }, save: true };
     }
     case 'tf-unlist': delete game.market.userListed[p.id]; return { ui: { tfMsg: `${p.name} zdjęty z listy.` }, save: true };
+    case 'tf-keep': { const r = toggleKeep(game, ds.id); return { ui: { tfMsg: r.text }, save: r.ok }; }
     case 'tf-release': return { ui: { tfConfirm: p.id } };
     case 'tf-release-ok': {
       const cost = releasePlayer(game, p.id);
