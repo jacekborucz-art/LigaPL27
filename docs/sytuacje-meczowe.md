@@ -127,6 +127,8 @@ Najważniejsze błędy znalezione przed zmianą:
 
 ## G. Dogrywka i rzuty karne po dogrywce
 
+Kolejność strzelców wybierana przez gracza, pauza przed serią, seria bez dogrywki (Superpuchar, sparing) i zasady sparingów: `docs/sparingi-i-karne.md`.
+
 | # | Sytuacja | Przepisy i zachowanie | Silnik przed | Przed | Silnik teraz | Teraz |
 |---|---|---|---|---|---|---|
 | 74 | Dogrywka: +1 zmiana i +1 okno, przerwy bez okna | IFAB Law 3 | Tak | OK | Bez zmian | OK |

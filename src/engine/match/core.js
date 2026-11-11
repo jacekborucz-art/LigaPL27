@@ -5,6 +5,7 @@
 import { Rng, clamp } from '../../core/rng.js';
 import { K, SHOOT_W, FOUL_W, INJURY_TYPES, RED_REASONS, KNOCK } from './constants.js';
 import { buildTeam, updateZones, updateCondition, onPitch, goalkeeper, fieldPlayers, slotFit, makeKnock } from './teams.js';
+import { matchRules, unlimitedSubs, UNLIMITED } from './rules.js';
 
 // Haki trenera (src/engine/match/coach.js rejestruje się przy imporcie). Silnik nie zna AI,
 // ale gdy drużyna prowadzona przez AI lub asystenta traci bramkarza, trener decyduje od razu.
@@ -19,7 +20,10 @@ const last = (x) => x.p.last ?? x.p.name;
 /**
  * cfg: { seed, home: {club, squad, tactics, ai, coach, zStart}, away: {...},
  *        ctx: { neutral, rank 0-3, var, weather: {conv, foul, fat, inj, name}, refStrict, attendance 0-1,
- *               knockout: false | 'single' | { firstLeg: [g dla obecnego gospodarza, g dla gościa] } } }
+ *               knockout: false | 'single' | 'penaltiesOnly' | { firstLeg: [g dla obecnego gospodarza, g dla gościa] },
+ *               friendly, friendlyRules: { decider, subs, rotation, period, plannedSubs } (sparing, rules.js),
+ *               shootoutPrep: true = pauza przed serią rzutów karnych (faza 'shootoutPrep', UI pyta o kolejność) } }
+ * M.rules: zasady meczu z matchRules(ctx) (rozstrzygnięcie remisu, reguła zmian).
  */
 export function createMatch(cfg) {
   const ctx = { neutral: false, rank: 0, var: true, refStrict: 1, attendance: 0.8, knockout: false, weather: {}, ...cfg.ctx };
@@ -30,8 +34,10 @@ export function createMatch(cfg) {
     halfCounts: freshCounts(), addedTimes: [], extraTime: false, shootout: null, ended: false,
     ai: 0, emptyNet: false, addedExtra: 0, abandoned: null,
     hfa: ctx.neutral ? 0 : 0.7 + 0.3 * ctx.attendance,
+    rules: matchRules(ctx),
   };
   M.teams = [buildTeam(0, cfg.home, rng, ctx), buildTeam(1, cfg.away, rng, ctx)];
+  if (unlimitedSubs(M)) for (const T of M.teams) { T.subsLimit = UNLIMITED; T.windowsLimit = UNLIMITED; }
   for (const T of M.teams) {
     updateZones(T, M); ensureGoalkeeper(M, T);
     T.str0 = (T.zones.ATT + T.zones.MID + T.zones.DEF) / 3 + 0.15 * T.zones.GK;

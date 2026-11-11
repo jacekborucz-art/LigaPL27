@@ -1,8 +1,11 @@
 // Przebieg meczu: minuty, przerwy, doliczony czas (z wydarzeń), dogrywka, seria rzutów karnych,
 // oceny zawodników i wynik. Interfejs dla UI: createMatch, step, resume, runToEnd, result.
+// Sparingi (M.rules, rules.js): rozstrzygnięcie remisu wg umowy, zmiany bez limitu lub rotacyjne, zmiany zaplanowane.
+// Seria rzutów karnych: kolejność strzelców i bramkarz do wyboru (setShootoutOrder), pauza 'shootoutPrep' na życzenie UI.
 
 import { createMatch, emit, runPhases, minuteLabel } from './core.js';
 import { substitute, changeTactics, shout, canSubstitute, canShout, subsAvailable } from './control.js';
+import { DECIDERS, SUB_RULES, ROTATIONS, FRIENDLY_DEFAULTS, matchRules } from './rules.js';
 import { aiDecide, assistantSuggest, applySuggestion, matchState } from './coach.js';
 import { goalkeeper, fieldPlayers, planShape, validateTacticPatch, knockEligible, slotIndex } from './teams.js';
 import { statsFromEvents } from '../matchStats.js';
@@ -11,6 +14,7 @@ import { clamp } from '../../core/rng.js';
 
 export { createMatch, substitute, changeTactics, shout, canSubstitute, canShout, minuteLabel, subsAvailable, assistantSuggest, applySuggestion, matchState };
 export { knockEligible };
+export { DECIDERS, SUB_RULES, ROTATIONS, FRIENDLY_DEFAULTS, matchRules };
 
 const HALVES = { 1: 45, 2: 45, 3: 15, 4: 15 };
 
@@ -25,13 +29,13 @@ function addedTime(M) {
   return clamp(Math.round(ev * 0.5 + r), 0, 3);
 }
 
+/** Remis, który trzeba rozstrzygnąć (M.rules.decider): mecz pucharowy, dwumecz albo sparing z umówioną serią. */
 function isLevel(M) {
-  const ko = M.ctx.knockout;
-  if (!ko) return false;
-  if (ko === 'single') return M.score[0] === M.score[1];
+  if (M.rules.decider === 'none') return false;
+  const fl = M.ctx.knockout?.firstLeg;
   // Dwumecz: obecny gospodarz był gościem w pierwszym meczu; suma bramek, bez bramek wyjazdowych
-  const [a, b] = ko.firstLeg;
-  return M.score[0] + a === M.score[1] + b;
+  if (fl) return M.score[0] + fl[0] === M.score[1] + fl[1];
+  return M.score[0] === M.score[1];
 }
 
 /**
@@ -41,10 +45,17 @@ function isLevel(M) {
 export function step(M) {
   if (M.ended) return { events: [], state: 'ended' };
   if (M.phase === 'break') return { events: [], state: 'break' };
+  if (M.phase === 'shootoutPrep') {
+    // Zgodność wstecz: kolejny krok po pauzie rozgrywa serię (kolejność ustawiona albo automatyczna)
+    const from0 = M.events.length;
+    startShootout(M);
+    return { events: M.events.slice(from0), pause: 0, state: 'ended' };
+  }
   const from = M.events.length;
   M.tick++; M.elapsed++;
   const base = { 1: 0, 2: 45, 3: 90, 4: 105 }[M.half];
   M.minute = base + Math.min(M.elapsed, M.length);
+  if (M.rules.plannedSubs && M.elapsed <= M.length) plannedSubs(M, M.minute);
   const prevEvents = M.events.length;
   runPhases(M);
   coolingBreak(M);
@@ -82,6 +93,10 @@ function endHalf(M) {
     emit(M, 'half', null, null, { text: 'Koniec pierwszej połowy.' });
     M.phase = 'break'; return;
   }
+  if (h === 2 && isLevel(M) && M.rules.decider === 'penalties') {
+    emit(M, 'half', null, null, { text: 'Koniec meczu. Remis, od razu rzuty karne!' });
+    toShootout(M); return;
+  }
   if (h === 2 && isLevel(M)) {
     emit(M, 'half', null, null, { text: 'Koniec regulaminowego czasu gry. Będzie dogrywka.' });
     M.extraTime = true;
@@ -89,13 +104,37 @@ function endHalf(M) {
     M.phase = 'break'; return;
   }
   if (h === 3) { emit(M, 'half', null, null, { text: 'Koniec pierwszej połowy dogrywki.' }); M.phase = 'break'; return; }
-  if (h === 4 && isLevel(M)) { emit(M, 'half', null, null, { text: 'Koniec dogrywki. Rzuty karne!' }); shootout(M); }
+  if (h === 4 && isLevel(M)) { emit(M, 'half', null, null, { text: 'Koniec dogrywki. Rzuty karne!' }); toShootout(M); return; }
   finish(M);
+}
+
+/** Do serii rzutów karnych: od razu (domyślnie) albo pauza 'shootoutPrep', gdy UI chce zapytać gracza o kolejność. */
+function toShootout(M) {
+  if (M.ctx.shootoutPrep) {
+    M.phase = 'shootoutPrep';
+    const n = Math.min(fieldPlayers(M.teams[0]).length, fieldPlayers(M.teams[1]).length);
+    emit(M, 'shootoutPrep', null, null, { takers: n, text: 'Przed serią rzutów karnych: trenerzy ustalają kolejność strzelających.' });
+    return;
+  }
+  shootout(M);
+  finish(M);
+}
+
+/**
+ * Rozpoczęcie serii po pauzie 'shootoutPrep' (po wyborze kolejności w UI). Kolejność nieustawiona: automatyczna.
+ * Zwraca { ok, error? }. Po wywołaniu mecz jest zakończony (M.ended), wynik w result(M).shootout.
+ */
+export function startShootout(M) {
+  if (M.phase !== 'shootoutPrep' || M.ended) return { ok: false, error: 'Seria rzutów karnych nie czeka na rozpoczęcie.' };
+  shootout(M);
+  finish(M);
+  return { ok: true };
 }
 
 /** Wznowienie po przerwie (po odprawie). */
 export function resume(M) {
   if (M.phase !== 'break' || M.ended) return;
+  if (M.rules.plannedSubs && M.half === 1) plannedSubs(M, 'HT');
   for (const T of M.teams) if (T.ai) aiDecide(M, T.side);
   M.half++; M.elapsed = 0; M.added = null; M.length = HALVES[M.half];
   M.halfCounts = { goals: 0, windows: 0, injuries: 0, var: 0, cards: 0, tw: 0 };
@@ -113,6 +152,7 @@ export function runToEnd(M, { assistantFor = [] } = {}) {
   let guard = 0;
   while (!M.ended && guard++ < 400) {
     if (M.phase === 'break') resume(M);
+    else if (M.phase === 'shootoutPrep') startShootout(M);
     else step(M);
   }
   return result(M);
@@ -134,34 +174,85 @@ function handOver(T) {
   if (!T.ai) { T.ai = true; T.assistant = true; T.baseInstr = { ...T.tactics.instructions }; }
 }
 
-// ------------------------------------------------------------ Rzuty karne po dogrywce (A6)
+// ------------------------------------------------------------ Zmiany zaplanowane przed sparingiem
+/**
+ * Zmiany zaplanowane przed meczem (M.rules.plannedSubs: { 0: [{ at: 'HT' | minuta, outId, inId }], 1: [...] }), np.
+ * „druga jedenastka” po przerwie. Wykonywane przez substitute (te same reguły), by: 'plan'. Nie da się wykonać
+ * (kontuzja, czerwona kartka, zawodnik już zszedł): zdarzenie 'plannedSubSkipped' z powodem, mecz toczy się dalej.
+ */
+function plannedSubs(M, when) {
+  const plan = M.rules.plannedSubs;
+  M.plannedDone = M.plannedDone ?? new Set();
+  for (const side of [0, 1]) {
+    const list = plan[side] ?? plan[String(side)] ?? [];
+    list.forEach((ps, i) => {
+      const key = `${side}:${i}`;
+      if (M.plannedDone.has(key)) return;
+      const at = ps.at === 'HT' || ps.at === 46 ? 'HT' : Number(ps.at);
+      if (when === 'HT' ? at !== 'HT' : (at === 'HT' || !(M.minute >= at))) return;
+      M.plannedDone.add(key);
+      const r = substitute(M, side, ps.outId, ps.inId, 'zmiana zaplanowana przed meczem', { by: 'plan', why: 'planned' });
+      if (!r.ok) emit(M, 'plannedSubSkipped', side, null, { outId: ps.outId, inId: ps.inId, error: r.error, text: `Zaplanowana zmiana niemożliwa: ${r.error}` });
+    });
+  }
+}
+
+// ------------------------------------------------------------ Rzuty karne (A6, IFAB Law 10)
+const kickSkill = (x) => (x.p.attr?.WYK ?? 10) + (x.p.attr?.OPA ?? 10) + (x.p.attr?.SFR ?? 10);
+
+/** Szansa gola w serii: strzelec (WYK, OPA, SFR) przeciw bramkarzowi (REF, JNJ); nagła śmierć: opanowanie. */
+function kickProb(x, G, suddenDeath) {
+  const skill = ((x.p.attr?.WYK ?? 10) + (x.p.attr?.OPA ?? 10) + (x.p.attr?.SFR ?? 10)) / 3;
+  const keep = G ? ((G.p.attr?.REF ?? 4) + (G.p.attr?.JNJ ?? 4)) / 2 : 3;
+  const pressure = suddenDeath ? 0.02 * ((x.p.attr?.OPA ?? 10) - 10) : 0;
+  return clamp(0.72 * Math.exp(0.03 * (skill - keep)) + pressure, 0.4, 0.95);
+}
+
+/** Bramkarz drużyny w serii: wybrany przez trenera (T.shootoutKeeperId, każdy uprawniony) albo ten, który stoi w bramce. */
+function shootoutKeeper(T) {
+  const chosen = T.shootoutKeeperId != null ? fieldPlayers(T).find((x) => x.id === T.shootoutKeeperId) : null;
+  return chosen ?? goalkeeper(T);
+}
+
+/**
+ * Kolejność strzelających po wyrównaniu liczebności do n. Najpierw zawodnicy z listy trenera (T.shootoutOrder, tylko
+ * uprawnieni), potem pozostali wg umiejętności, bramkarz na końcu. Bramkarz serii zawsze strzela: gdy nie mieści się
+ * w pierwszych n, wypada ostatni zawodnik z pola. Bez listy trenera: dokładnie dawna kolejność automatyczna.
+ */
+function takersOrder(T, n, order = T.shootoutOrder) {
+  const elig = fieldPlayers(T);
+  let gk = shootoutKeeper(T);
+  const auto = elig.filter((x) => x !== gk).sort((a, b) => kickSkill(b) - kickSkill(a)).concat(gk ? [gk] : []);
+  if (!gk) gk = auto[auto.length - 1];
+  const byId = new Map(elig.map((x) => [x.id, x]));
+  const chosen = [];
+  for (const id of order ?? []) { const x = byId.get(id); if (x && !chosen.includes(x)) chosen.push(x); }
+  const full = chosen.concat(auto.filter((x) => !chosen.includes(x)));
+  if (full.indexOf(gk) < n) return full.slice(0, n);
+  return full.filter((x) => x !== gk).slice(0, n - 1).concat(gk);
+}
+
+const shootoutSize = (M) => Math.min(fieldPlayers(M.teams[0]).length, fieldPlayers(M.teams[1]).length);
+
 function shootout(M) {
-  // Uprawnieni: zawodnicy na boisku na koniec dogrywki, także chwilowo opatrywani (Law 10). Kolejność wg umiejętności,
-  // bramkarz strzela na końcu i nie jest wyłączany przy wyrównaniu liczebności.
-  const kickSkill = (x) => (x.p.attr?.WYK ?? 10) + (x.p.attr?.OPA ?? 10) + (x.p.attr?.SFR ?? 10);
-  const takers = M.teams.map((T) => {
-    const gk = goalkeeper(T);
-    return fieldPlayers(T).filter((x) => x !== gk).sort((a, b) => kickSkill(b) - kickSkill(a)).concat(gk ? [gk] : []);
-  });
-  const n = Math.min(takers[0].length, takers[1].length); // wyrównanie liczebności
-  for (const t of takers) { const gk = t[t.length - 1]; if (t.length > n) { t.length = n - 1; t.push(gk); } }
+  // Uprawnieni: zawodnicy na boisku na koniec meczu (dogrywki), także chwilowo opatrywani (Law 10). Wyrównanie
+  // liczebności, potem kolejność trenera albo automatyczna (wg umiejętności, bramkarz na końcu).
+  const n = shootoutSize(M);
+  const takers = M.teams.map((T) => takersOrder(T, n));
+  const keepers = M.teams.map((T) => shootoutKeeper(T));
   const goals = [0, 0];
   const kicks = [];
   let round = 0;
   const kick = (side) => {
-    const T = M.teams[side]; const G = goalkeeper(M.teams[1 - side]);
+    const G = keepers[1 - side];
     const x = takers[side][round % n];
-    const skill = ((x.p.attr?.WYK ?? 10) + (x.p.attr?.OPA ?? 10) + (x.p.attr?.SFR ?? 10)) / 3;
-    const keep = G ? ((G.p.attr?.REF ?? 4) + (G.p.attr?.JNJ ?? 4)) / 2 : 3;
-    const pressure = round >= 5 ? 0.02 * ((x.p.attr?.OPA ?? 10) - 10) : 0;
-    const p = clamp(0.72 * Math.exp(0.03 * (skill - keep)) + pressure, 0.4, 0.95);
+    const p = kickProb(x, G, round >= 5);
     const scored = M.rng.next() < p;
     if (scored) goals[side]++;
     const outcome = scored ? 'goal' : G && M.rng.next() < 0.65 ? 'saved' : 'missed';
     kicks.push({ side, pid: x.id, scored, outcome, gkId: G?.id ?? null, round: round + 1, suddenDeath: round >= 5 });
     const how = scored ? 'gol' : outcome === 'saved' ? `obronił ${G.p.last ?? G.p.name}` : 'pudło';
     emit(M, 'shootoutKick', side, x, { scored, outcome, gkId: G?.id ?? null, round: round + 1, suddenDeath: round >= 5, text: `${x.p.last ?? x.p.name}: ${how} (${goals[0]}:${goals[1]}).` });
-    void T;
   };
   // 5 serii ABAB z wcześniejszym rozstrzygnięciem, potem nagła śmierć
   for (round = 0; round < 5; round++) {
@@ -177,7 +268,82 @@ function shootout(M) {
       if (goals[0] !== goals[1]) break;
     }
   }
-  M.shootout = { goals, kicks, suddenDeath: kicks.length > 10 };
+  M.shootout = {
+    goals, kicks, suddenDeath: kicks.length > 10,
+    order: takers.map((t) => t.map((x) => x.id)), keepers: keepers.map((G) => G?.id ?? null),
+    custom: M.teams.map((T) => !!(T.shootoutOrder || T.shootoutKeeperId != null)),
+  };
+}
+
+/** Czy w tym meczu może dojść do serii i czy jeszcze się nie odbyła; komunikat błędu albo null. */
+function shootoutOpen(M) {
+  if (M.rules.decider === 'none') return 'W tym meczu nie ma serii rzutów karnych.';
+  if (M.shootout) return 'Seria rzutów karnych już się odbyła.';
+  if (M.ended) return 'Mecz się zakończył.';
+  return null;
+}
+
+/**
+ * Kandydaci do serii rzutów karnych (UI: okno kolejności, także przed końcem dogrywki). Nic nie zmienia.
+ * Zwraca { available, error, n (strzelających po wyrównaniu liczebności przy obecnych składach), excluded
+ * (ilu zawodników z pola wypadnie), keeperId (bramkarz serii), order (lista trenera albo null), suggested (kolejność
+ * automatyczna, ids n strzelających, to samo co silnik zrobi bez wyboru), final (kolejność z obecnymi ustawieniami),
+ * players: [{ id, name, last, pos, natPos, keeper, kick (umiejętność 1-20: średnia WYK, OPA, SFR), opa, pct (szansa
+ * gola w %, przeciw bramkarzowi rywala), cond, knock, treated, autoRank (miejsce w kolejności automatycznej od 1, null:
+ * wypadłby przy wyrównaniu) }] w kolejności automatycznej }.
+ */
+export function shootoutCandidates(M, side) {
+  const T = M.teams[side]; const O = M.teams[1 - side];
+  const err = shootoutOpen(M);
+  const n = shootoutSize(M);
+  const gk = shootoutKeeper(T); const oppGk = shootoutKeeper(O);
+  const suggested = takersOrder(T, n, null);
+  const final = takersOrder(T, n);
+  const elig = fieldPlayers(T);
+  const auto = elig.filter((x) => x !== gk).sort((a, b) => kickSkill(b) - kickSkill(a)).concat(gk ? [gk] : []);
+  const r1 = (v) => Math.round(v * 10) / 10;
+  return {
+    available: !err, error: err, n, excluded: elig.length - n, keeperId: gk?.id ?? null,
+    order: T.shootoutOrder ? [...T.shootoutOrder] : null,
+    suggested: suggested.map((x) => x.id), final: final.map((x) => x.id),
+    players: auto.map((x) => ({
+      id: x.id, name: x.p.name, last: x.p.last ?? x.p.name, pos: x.slot?.pos ?? x.p.pos, natPos: x.p.pos, keeper: x === gk,
+      kick: r1(kickSkill(x) / 3), opa: x.p.attr?.OPA ?? 10, pct: Math.round(100 * kickProb(x, oppGk, false)),
+      cond: Math.round(x.cond), knock: !!(x.knock && !x.knock.aggravated), treated: x.treatedUntil >= M.minute,
+      autoRank: suggested.includes(x) ? suggested.indexOf(x) + 1 : null,
+    })),
+  };
+}
+
+/**
+ * Kolejność strzelających w serii (gracz albo AI), przed końcem meczu albo w pauzie 'shootoutPrep'.
+ * ids: lista id zawodników z boiska w kolejności strzałów (może być krótsza: resztę uzupełnia kolejność automatyczna;
+ * zawodnicy spoza pierwszych n wypadają przy wyrównaniu liczebności), null: powrót do kolejności automatycznej.
+ * opts.keeperId: zawodnik z boiska, który stanie w bramce w serii (Law 10: każdy uprawniony może zamienić się
+ * z bramkarzem), null: bramkarz z boiska. Lista sprawdzana teraz i ponownie na starcie serii (zawodnik zmieniony
+ * albo wykluczony po ustawieniu kolejności wypada z listy).
+ * Zwraca { ok: true, final: [ids], excluded: [ids] } albo { ok: false, error } (nic się nie zmienia).
+ */
+export function setShootoutOrder(M, side, ids, opts = {}) {
+  const T = M.teams[side];
+  const err = shootoutOpen(M);
+  if (err) return { ok: false, error: err };
+  const elig = new Set(fieldPlayers(T).map((x) => x.id));
+  if (ids != null) {
+    if (!Array.isArray(ids)) return { ok: false, error: 'Podaj listę zawodników w kolejności strzałów.' };
+    const seen = new Set();
+    for (const id of ids) {
+      if (!elig.has(id)) return { ok: false, error: 'Strzelać mogą tylko zawodnicy, którzy są na boisku (rezerwowi i zmienieni nie strzelają).' };
+      if (seen.has(id)) return { ok: false, error: 'Ten sam zawodnik dwa razy na liście: każdy strzela raz, zanim ktokolwiek strzeli drugi raz.' };
+      seen.add(id);
+    }
+  }
+  if (opts.keeperId != null && !elig.has(opts.keeperId)) return { ok: false, error: 'W bramce w serii może stanąć tylko zawodnik z boiska.' };
+  T.shootoutOrder = ids == null ? null : [...ids];
+  if ('keeperId' in opts) T.shootoutKeeperId = opts.keeperId ?? null;
+  const n = shootoutSize(M);
+  const final = takersOrder(T, n).map((x) => x.id);
+  return { ok: true, final, excluded: [...elig].filter((id) => !final.includes(id)) };
 }
 
 // ------------------------------------------------------------ Koniec i oceny
@@ -188,7 +354,7 @@ function leader(M) {
 }
 
 /** Minuty zawodnika do minuty `end` (wykluczony gra do końca w statystyce minut, jak w ocenach). */
-const minutesOf = (x, end) => (x.minOff ?? end) - x.minOn;
+const minutesOf = (x, end) => (x.prevMins ?? 0) + (x.minOff ?? end) - x.minOn;
 
 /** Ocena bez szumu: ta sama skala i te same składniki co ocena końcowa (6.1 d). */
 function ratingNoNoise(x, T, M, end, winner) {
@@ -209,7 +375,7 @@ export function liveRatings(M) {
   const out = {};
   const winner = leader(M);
   for (const T of M.teams) {
-    for (const x of T.players) {
+    for (const x of withBench(T)) {
       if (x.minOn === null) continue;
       const { ev, mins } = ratingNoNoise(x, T, M, M.minute, winner);
       out[x.id] = Math.round(clamp(mins < 20 ? 6 + 0.6 * ev : 6 + ev, 3, 10) * 10) / 10;
@@ -217,6 +383,9 @@ export function liveRatings(M) {
   }
   return out;
 }
+
+/** Wszyscy, którzy mogli zagrać: na boisku i zmienieni, potem ławka (przy zmianach rotacyjnych także z minutami). */
+const withBench = (T) => (T.bench.some((x) => x.minOn !== null) ? [...T.players, ...T.bench] : T.players);
 
 /** Podsumowanie lekkiego urazu zawodnika do minuty `end` (minuty gry z bólem). */
 function knockInfo(x, end) {
@@ -266,6 +435,7 @@ export function playerStates(M, side) {
       on, treated: on && x.treatedUntil >= M.minute, bench, subbedOff: !!x.subbedOff, sentOff: !!x.sentOff,
       card: cardOf(x), yc: x.yc ? 1 : 0, rc: x.sentOff ? 1 : 0,
       knock: k, injured: !!x.injury && !x.injury.playable, cond: Math.round(x.cond), rating: rt[x.id] ?? null,
+      minutes: x.minOn === null ? 0 : Math.max(0, minutesOf(x, M.minute)), rolledOff: x.rolledOff ?? 0,
     };
   };
   return [...T.players.map((x) => row(x, false)), ...T.bench.map((x) => row(x, true))];
@@ -306,7 +476,7 @@ export function result(M) {
   const winner = leader(M);
   const ratings = [];
   for (const T of M.teams) {
-    for (const x of T.players) {
+    for (const x of withBench(T)) {
       if (x.minOn === null) continue;
       const r0 = ratingNoNoise(x, T, M, end, winner);
       const mins = r0.mins;
@@ -326,7 +496,7 @@ export function result(M) {
     score: [...M.score],
     halfTimeScore: M.halfTimeScore,
     extraTime: M.extraTime,
-    shootout: M.shootout ? { goals: [...M.shootout.goals], kicks: M.shootout.kicks } : null,
+    shootout: M.shootout ? { goals: [...M.shootout.goals], kicks: M.shootout.kicks, order: M.shootout.order, keepers: M.shootout.keepers } : null,
     winner,
     abandoned: M.abandoned ? { ...M.abandoned } : null,
     addedTimes: M.addedTimes,

@@ -11,6 +11,7 @@ import { goalkeeper, fieldPlayers, slotFit, reslot, assignSlots, shapeSlots } fr
 import { proficiency } from '../positions.js';
 import { formationById } from '../../data/formations.js';
 import { K, KNOCK } from './constants.js';
+import { unlimitedSubs } from './rules.js';
 
 const CHECKPOINTS = new Set([46, 55, 60, 65, 70, 75, 80, 85, 88, 95, 100, 105, 110, 115, 119]);
 // Przegląd planu w 1. połowie: trener reaguje, gdy plan wyraźnie nie działa (nie tylko w przerwie) [SZAC]
@@ -57,7 +58,8 @@ export function matchState(M, side) {
   const lastTen = M.momentum.slice(-10);
   const mom = lastTen.length ? lastTen.reduce((s, v) => s + v, 0) / lastTen.length / 100 * (side === 0 ? 1 : -1) : 0;
   return {
-    diff, et, atBreak, halftime: atBreak && M.half === 1, ko: !!M.ctx.knockout, minute: M.minute,
+    diff, et, atBreak, halftime: atBreak && M.half === 1, ko: M.rules.decider !== 'none', minute: M.minute,
+    friendly: M.rules.friendly, pens: M.rules.decider === 'penalties',
     added: M.half % 2 === 0 && M.elapsed > M.length, men: fieldPlayers(T).length - fieldPlayers(O).length,
     str: T.strDiff ?? 0, mom, heat: (M.ctx.weather?.fat ?? 1) >= 1.25,
   };
@@ -104,7 +106,7 @@ export function desiredInstructions(T, st, extra = null) {
     if (st.minute >= 70) { w.mentality = '2'; w.tempo = 'fast'; }
   } else if (st.ko) {
     if (st.et && st.minute >= 112 && st.str < -0.5) { reason = 'gramy na rzuty karne'; w.mentality = String(Math.min(m, -1)); }
-    else if (!st.et && st.minute >= 85 && st.str < 0) { reason = 'bez ryzyka przed dogrywką'; w.mentality = String(Math.min(m, 0)); }
+    else if (!st.et && st.minute >= 85 && st.str < 0) { reason = st.pens ? 'bez ryzyka przed rzutami karnymi' : 'bez ryzyka przed dogrywką'; w.mentality = String(Math.min(m, 0)); }
   } else if (st.minute >= 70 && st.str > 1) {
     reason = 'faworyt szuka gola'; w.mentality = String(Math.max(m, 1));
   } else if (st.minute >= 80 && st.str < -1) {
@@ -120,6 +122,7 @@ export function desiredInstructions(T, st, extra = null) {
     if (Number(w.mentality ?? m) > -1) w.mentality = '-1';
     reason = reason ?? 'gra w osłabieniu';
   }
+  if (st.friendly && w.timewasting === 'on') delete w.timewasting; // w sparingu nikt nie gra na czas
   for (const k of MANAGED) if (!(k in w) && b[k] != null) w[k] = b[k];
   return { w, reason };
 }
@@ -388,7 +391,11 @@ function commitAdj(T, adjust, minute) {
 }
 
 // ------------------------------------------------------------ Wybór zawodników
-const benchPool = (T, reserved) => T.bench.filter((b) => !b.injury && !b.sentOff && !reserved.has(b));
+// Zmiany rotacyjne (sparing): zawodnik, który już zszedł, wraca tylko wtedy, gdy na ławce nie ma nikogo innego
+const benchPool = (T, reserved) => {
+  const xs = T.bench.filter((b) => !b.injury && !b.sentOff && !reserved.has(b));
+  return xs.some((b) => b.rolledOff) && xs.some((b) => !b.rolledOff) ? xs.filter((b) => !b.rolledOff) : xs;
+};
 
 /**
  * Najlepsze zastępstwo za schodzącego: wprost na jego slot albo z przesunięciem zawodnika z boiska
@@ -555,7 +562,11 @@ function plan(M, side, rng, advice) {
       }
     }
   }
-  if (checkpoint && left > 0) planSubs(M, T, st, rng, advice, { reserved, addSub, mergeTactic, left: () => left });
+  if (checkpoint && left > 0) {
+    const sctx = { reserved, addSub, mergeTactic, left: () => left };
+    if (st.friendly) friendlySubs(M, T, st, rng, advice, sctx);
+    else planSubs(M, T, st, rng, advice, sctx);
+  }
 
   const out = [...subs.map((s) => ({
     type: 'sub', outId: s.out.id, inId: s.inc.id, moveId: s.move?.id ?? null, why: s.why, text: s.text, concussion: !!s.concussion,
@@ -583,7 +594,7 @@ function knockSubs(M, T, st, rng, advice, ctx) {
   let made = 0;
   for (const x of xs) {
     if (ctx.left() <= 0 || late) break;
-    const risky = risk(x) >= 0.002;
+    const risky = risk(x) >= 0.002 || st.friendly; // w sparingu nikt nie gra z bólem
     if (x.slot.pos === 'BR' && !T.bench.some((b) => b.p.pos === 'BR' && !b.injury && !b.sentOff)) continue;
     if (!risky && !(several && made === 0)) continue;
     if (!risky && ctx.left() - reserve <= 0) continue;
@@ -659,13 +670,8 @@ function planSubs(M, T, st, rng, advice, ctx) {
     if (x) { cands.push({ x, why: 'timewasting', text: 'gra na czas', prio: 0.5, p: 0.5 }); taken.add(x); }
   }
   // Bramkarz od rzutów karnych tuż przed serią
-  if (st.ko && st.et && M.half === 4 && min >= 119 && st.diff === 0) {
-    const gk = goalkeeper(T);
-    const spec = benchPool(T, reserved).filter((b) => b.p.pos === 'BR').sort((a, b) => (attr(b, 'REF') + attr(b, 'JNJ')) - (attr(a, 'REF') + attr(a, 'JNJ')))[0];
-    if (gk && spec && (attr(spec, 'REF') + attr(spec, 'JNJ')) / 2 >= (attr(gk, 'REF') + attr(gk, 'JNJ')) / 2 + 1.5) {
-      cands.push({ x: gk, why: 'penaltyGk', text: 'bramkarz od rzutów karnych', prio: 2, p: 0.7 });
-    }
-  }
+  const pgk = penaltyKeeperCand(M, T, st, reserved);
+  if (pgk) cands.push(pgk);
   // Rotacja wg planu trenera (3-5 zmian w meczu, średnio ok. 4)
   const rotation = { 60: 0.65, 65: 0.45, 70: 0.6, 75: 0.55, 80: 0.6, 85: 0.6, 88: 0.5, 95: 0.4, 105: 0.6 }[min];
   const planned = T.plannedSubs ?? 4;
@@ -720,6 +726,119 @@ function planSubs(M, T, st, rng, advice, ctx) {
     if (sh) ctx.mergeTactic({ formation: sh.formation, drop: sh.drop }, 'zmiana ustawienia w osłabieniu');
   }
 }
+
+/**
+ * Bramkarz od rzutów karnych tuż przed serią (119-120' dogrywki; przy umówionej serii bez dogrywki w doliczonym
+ * czasie 2. połowy): rezerwowy ma średnio o 1,5 lepsze REF i JNJ [SZAC]. Kandydat do zmiany albo null.
+ */
+function penaltyKeeperCand(M, T, st, reserved) {
+  const due = (st.ko && st.et && M.half === 4 && st.minute >= 119) || (st.pens && M.half === 2 && st.added);
+  if (!due || st.diff !== 0) return null;
+  const gk = goalkeeper(T);
+  const spec = benchPool(T, reserved).filter((b) => b.p.pos === 'BR').sort((a, b) => (attr(b, 'REF') + attr(b, 'JNJ')) - (attr(a, 'REF') + attr(a, 'JNJ')))[0];
+  if (gk && spec && (attr(spec, 'REF') + attr(spec, 'JNJ')) / 2 >= (attr(gk, 'REF') + attr(gk, 'JNJ')) / 2 + 1.5) {
+    return { x: gk, why: 'penaltyGk', text: 'bramkarz od rzutów karnych', prio: 2, p: 0.7 };
+  }
+  return null;
+}
+
+// ------------------------------------------------------------ Sparing (docs/sparingi-i-karne.md)
+// Plan rotacji [SZAC]: szansa na „dwie jedenastki” wg okresu (wcześnie latem najczęściej), liczba zmian w przerwie
+// przy rotacji stopniowej, szansa zmiany bramkarza w przerwie, minuta, od której wchodzą pozostali rezerwowi.
+export const FRIENDLY_AI = {
+  twoXi: { lato: 0.6, zima: 0.45, fifa: 0.3, other: 0.45 }, twoXiBench: 8,
+  htStaggered: [4, 7], htStandard: 3, gkHt: { two_xi: 0.85, staggered: 0.6 },
+  starterOut: { 60: 0.5, 65: 0.4, 70: 0.6, 75: 0.85 }, keepOn: 1, // do 75' schodzą prawie wszyscy z wyjściowej jedenastki
+  restFrom: 70, restP: 0.7, tired: 72, debtHigh: 20,
+};
+
+/**
+ * Plan rotacji drużyny w sparingu, raz na mecz: two_xi (dwie jedenastki: wymiana w przerwie), staggered (część
+ * w przerwie, reszta 60-75'), match (jak w meczu o punkty). Asystent gracza bierze M.rules.rotation, AI wybiera sam
+ * ('auto'): wg reguły zmian, okresu (M.rules.period) i liczby rezerwowych. Podpowiedź (advice) bez losowania.
+ */
+function friendlyPlan(M, T, rng, advice) {
+  if (T.fplan) return T.fplan;
+  let kind = T.ai && !T.assistant ? 'auto' : M.rules.rotation;
+  const benchN = T.bench.filter((b) => !b.injury && !b.sentOff && b.p.pos !== 'BR').length;
+  if (kind === 'two_xi' && !unlimitedSubs(M)) kind = 'staggered'; // przy 5 zmianach dwóch jedenastek nie ma
+  if (kind === 'auto') {
+    const pTwo = FRIENDLY_AI.twoXi[M.rules.period] ?? FRIENDLY_AI.twoXi.other;
+    const two = unlimitedSubs(M) && benchN >= FRIENDLY_AI.twoXiBench && (advice ? true : rng.chance(pTwo));
+    kind = two ? 'two_xi' : 'staggered';
+  }
+  const [lo, hi] = FRIENDLY_AI.htStaggered;
+  const ht = kind === 'two_xi' ? 10 : kind === 'staggered' ? (unlimitedSubs(M) ? (advice ? Math.round((lo + hi) / 2) : rng.int(lo, hi)) : FRIENDLY_AI.htStandard) : 0;
+  const plan = { kind, ht };
+  if (!advice) T.fplan = plan;
+  return plan;
+}
+
+/**
+ * Kogo trener sparingu oszczędza najpierw: dług meczowy (p.matchDebt), niska świeżość, brak ostrości po urazie
+ * (p.sharp), wiek 31+, zawodnik z wyjściowej jedenastki (minuty), żółta kartka bez znaczenia. Wyżej = schodzi wcześniej.
+ */
+function protectScore(x, M) {
+  const p = x.p;
+  return (p.matchDebt ?? 0) / 10 + Math.max(0, 80 - x.cond) / 8 + Math.max(0, 60 - (p.sharp ?? 70)) / 10
+    + ((p.age ?? 25) >= 31 ? 1 : 0) + (M.minute - (x.minOn ?? M.minute)) / 45 + (x.knock && !x.knock.aggravated ? 3 : 0) + 0.05 * (p.ovr ?? 10);
+}
+
+/**
+ * Zmiany w sparingu: w przerwie masowa wymiana (dwie jedenastki: cała jedenastka, rotacja stopniowa: 4-7 zawodników,
+ * często bramkarz), po przerwie schodzą pozostali z wyjściowego składu (60-75'), zmęczeni i z długiem meczowym,
+ * a od 70' minuty dostają rezerwowi, którzy jeszcze nie grali (młodzież). Limity zmian i okien jak w regułach meczu.
+ */
+function friendlySubs(M, T, st, rng, advice, ctx) {
+  const plan = friendlyPlan(M, T, rng, advice);
+  if (plan.kind === 'match') { planSubs(M, T, st, rng, advice, ctx); return; }
+  const { reserved } = ctx;
+  const min = st.minute;
+  const xs = fieldPlayers(T).filter((x) => !reserved.has(x) && x.slot && x.slot.pos !== 'BR');
+  const byProtect = (a, b) => protectScore(b, M) - protectScore(a, M);
+  const outs = [];
+  const take = (x, why, text) => { outs.push({ x, why, text }); };
+  if (st.halftime) {
+    const n = Math.min(plan.ht, Math.max(0, ctx.left() - (unlimitedSubs(M) ? 0 : 2)));
+    xs.slice().sort(byProtect).slice(0, n).forEach((x) => take(x, 'rotation', plan.kind === 'two_xi' ? 'druga jedenastka' : 'rotacja w przerwie'));
+    const gk = goalkeeper(T);
+    const p = FRIENDLY_AI.gkHt[plan.kind] ?? 0;
+    if (gk && gk.p.pos === 'BR' && !reserved.has(gk) && benchPool(T, reserved).some((b) => b.p.pos === 'BR') && outs.length < ctx.left() && rng.chance(p)) {
+      take(gk, 'rotation', 'zmiana bramkarza w przerwie');
+    }
+  } else {
+    const pgk = penaltyKeeperCand(M, T, st, reserved);
+    if (pgk) take(pgk.x, pgk.why, pgk.text);
+    // Zmęczeni i z wysokim długiem meczowym schodzą bez względu na plan
+    for (const x of xs) {
+      if (x.cond < FRIENDLY_AI.tired || ((x.p.matchDebt ?? 0) >= FRIENDLY_AI.debtHigh && min >= 55)) take(x, 'tired', 'oszczędzamy zawodnika');
+    }
+    // Pozostali z wyjściowej jedenastki (rotacja stopniowa) schodzą między 60. a 75. minutą
+    const pOut = FRIENDLY_AI.starterOut[min];
+    if (pOut && plan.kind === 'staggered') {
+      const starters = xs.filter((x) => x.minOn === 0 && !x.prevMins && !outs.some((o) => o.x === x)).sort(byProtect);
+      const n = min >= 75 ? Math.max(0, starters.length - FRIENDLY_AI.keepOn) : Math.round(starters.length * pOut);
+      starters.slice(0, n).forEach((x) => take(x, 'rotation', 'zmiana zaplanowana'));
+    }
+    // Minuty dla rezerwowych, którzy jeszcze nie grali (często młodzież)
+    if (min >= FRIENDLY_AI.restFrom && CHECK_REST.has(min)) {
+      const fresh = benchPool(T, reserved).filter((b) => b.p.pos !== 'BR' && b.minOn === null).length;
+      const left = xs.filter((x) => !outs.some((o) => o.x === x)).sort(byProtect);
+      for (let i = 0; i < Math.min(fresh - outs.length, left.length); i++) if (rng.chance(FRIENDLY_AI.restP)) take(left[i], 'rotation', 'minuty dla rezerwowych');
+    }
+  }
+  let made = 0;
+  for (const o of outs) {
+    if (ctx.left() <= 0) break;
+    if (reserved.has(o.x)) continue; // już przesunięty na inną pozycję przy wcześniejszej zmianie
+    if (!unlimitedSubs(M) && !st.atBreak && made >= 3) break;
+    const repl = pickReplacement(T, o.x, { reserved });
+    if (!repl) continue;
+    ctx.addSub(o.x, repl, o.why, o.text);
+    made++;
+  }
+}
+const CHECK_REST = new Set([70, 75, 80, 85]);
 
 // ------------------------------------------------------------ Wykonanie
 function execute(M, side, actions, by) {
