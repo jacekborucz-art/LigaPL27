@@ -1,4 +1,5 @@
-// Sterowanie meczem: zmiany (5 w 3 oknach, +1 i +1 okno w dogrywce, przerwa nie zużywa okna),
+// Sterowanie meczem: zmiany (5 w 3 oknach, +1 i +1 okno w dogrywce, przerwa nie zużywa okna; w sparingu wg umowy:
+// bez limitu albo rotacyjne z powrotem zmienionego, M.rules z rules.js),
 // zmiany taktyki (bezwładność), okrzyki (cooldown 8 min). Gracz, asystent gracza i AI rywala
 // korzystają z tych samych funkcji, więc reguły obowiązują wszystkie strony. AI trenera: coach.js.
 
@@ -6,6 +7,7 @@ import { emit, ensureGoalkeeper } from './core.js';
 import { onPitch, applyTacticChange, goalkeeper, fieldPlayers } from './teams.js';
 import { INSTRUCTIONS } from '../../data/instructions.js';
 import { SHOUTS, SHOUT_COOLDOWN, SHOUT_DURATION, K } from './constants.js';
+import { unlimitedSubs } from './rules.js';
 
 const last = (x) => x.p.last ?? x.p.name;
 
@@ -18,11 +20,13 @@ export function isConcussionSub(M, T, out) {
 export function canSubstitute(M, side, outId, inId, opts = {}) {
   const T = M.teams[side];
   if (M.ended) return 'Mecz się zakończył.';
+  if (M.phase === 'shootoutPrep') return 'Przed serią rzutów karnych nie można już robić zmian: strzelają zawodnicy, którzy skończyli mecz na boisku.';
   const out = T.players.find((x) => x.id === outId && (x.on || x.injury) && !x.sentOff && !x.subbedOff);
   if (!out) return 'Tego zawodnika nie ma na boisku.';
   const inc = T.bench.find((x) => x.id === inId);
   if (!inc) return 'Tego zawodnika nie ma na ławce.';
   if (inc.sentOff) return 'Ten zawodnik dostał czerwoną kartkę na ławce.';
+  if (inc.injury && !inc.injury.playable) return 'Kontuzjowany zawodnik nie może wrócić na boisko.';
   if (opts.concussion) return isConcussionSub(M, T, out) ? null : 'Ta zmiana nie jest zmianą po wstrząśnieniu mózgu.';
   if (T.subsUsed >= T.subsLimit) return `Wykorzystano wszystkie zmiany (${T.subsLimit}).`;
   const breakTime = M.phase === 'break';
@@ -33,7 +37,10 @@ export function canSubstitute(M, side, outId, inId, opts = {}) {
 
 /** Czy drużyna może teraz zrobić zmianę (limit zmian i okien, bez wskazania zawodników). */
 export function subsAvailable(M, T) {
-  if (M.ended || T.subsUsed >= T.subsLimit) return 0;
+  if (M.ended || M.phase === 'shootoutPrep') return 0;
+  // Sparing bez limitu: tyle zmian, ilu zawodników może wejść z ławki (także wracający przy zmianach rotacyjnych)
+  if (unlimitedSubs(M)) return T.bench.filter((b) => !b.sentOff && !(b.injury && !b.injury.playable)).length;
+  if (T.subsUsed >= T.subsLimit) return 0;
   if (M.phase !== 'break' && T.windowMinute !== M.tick && T.windowsUsed >= T.windowsLimit) return 0;
   return T.subsLimit - T.subsUsed;
 }
@@ -68,7 +75,10 @@ export function substitute(M, side, outId, inId, reason = '', opts = {}) {
   const keeper = goalkeeper(T);
   const outWasOn = out.on;
   out.on = false; out.subbedOff = true; out.minOff = M.minute;
+  // Zmiany rotacyjne (sparing): zmieniony wraca na ławkę i może wejść ponownie (nie po kontuzji bez możliwości gry)
+  const back = M.rules?.reentry && !out.sentOff && !(out.injury && !out.injury.playable);
   let slot = out.slot;
+  const outPos = out.slot?.pos;
   const mover = opts.moveId ? fieldPlayers(T).find((x) => x.id === opts.moveId && x !== out && x.slot?.pos !== 'BR') : null;
   if (inc.p.pos === 'BR' && keeper && keeper !== out && keeper.p.pos !== 'BR') {
     // Rezerwowy bramkarz za zawodnika z pola: awaryjny bramkarz wraca na swoją pozycję
@@ -94,13 +104,23 @@ export function substitute(M, side, outId, inId, reason = '', opts = {}) {
   if (keeper && keeper !== out) keeper.slotIdx = -1;
   T.bench = T.bench.filter((x) => x !== inc);
   T.players.push(inc);
+  if (back) {
+    // Minuty z poprzednich wejść (prevMins) zostają, x.minOn/minOff opisują ostatni pobyt na boisku
+    out.prevMins = (out.prevMins ?? 0) + Math.max(0, M.minute - out.minOn);
+    out.minOn = M.minute;
+    out.subbedOff = false; out.rolledOff = (out.rolledOff ?? 0) + 1; out.slot = null; out.slotIdx = -1;
+    T.players.splice(T.players.indexOf(out), 1);
+    T.bench.push(out);
+  }
+  if (inc.rolledOff) inc.minOff = null;
   if (!goalkeeper(T)) ensureGoalkeeper(M, T);
   const by = opts.by ?? 'user';
   if (by === 'user') T.lastUserTick = M.tick;
   const why = opts.why ?? (concussion ? 'concussion' : null);
   emit(M, 'sub', side, inc, {
     outId: out.id, inId: inc.id, why, by, pos: inc.slot?.pos ?? null, gk: inc.p.pos === 'BR', concussion, moveId: mover?.id ?? null, atBreak: M.phase === 'break',
-    text: `Zmiana: wchodzi ${last(inc)}, schodzi ${last(out)}${reason ? ` (${reason})` : ''}${mover ? `; ${last(mover)} przechodzi na pozycję ${out.slot?.pos}` : ''}.`,
+    ...(back ? { outToBench: true } : {}), ...(inc.rolledOff ? { reentry: true } : {}),
+    text: `Zmiana: wchodzi ${last(inc)}, schodzi ${last(out)}${reason ? ` (${reason})` : ''}${mover ? `; ${last(mover)} przechodzi na pozycję ${outPos}` : ''}.`,
   });
   return { ok: true };
 }

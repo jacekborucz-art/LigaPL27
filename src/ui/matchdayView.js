@@ -568,6 +568,69 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     if (lbl) lbl.textContent = Math.abs(k) < 0.15 ? 'Gra wyrównana' : `${Math.abs(k) > 0.55 ? 'Wyraźnie naciska' : 'Przewaga'}: ${shortName(k > 0 ? 0 : 1)}`;
   }
 
+  // ------------------------------------------------------------ Składy na żywo (po bokach boiska na PC)
+  // Panel ekspert silnika i projektant: najważniejsze w trakcie meczu są kondycja (kiedy zmieniać), kartki
+  // (ryzyko drugiej żółtej), lekkie urazy (ryzyko pogłębienia), ocena na żywo i gra poza pozycją. Te same dane
+  // dla rywala: widać, kto u niego słabnie albo ma żółtą kartkę.
+  const condCls = (c) => (c < 60 ? 'low' : c < 75 ? 'mid' : '');
+  function markers(r, x, { live = true } = {}) {
+    const m = [];
+    if (r.card === 'yellow') m.push(`<span class="mk" title="Żółta kartka">${ICON.yellow}<span class="sr-only">żółta kartka</span></span>`);
+    if (r.card === 'secondYellow') m.push(`<span class="mk" title="Druga żółta, czerwona kartka">${ICON.second}<span class="sr-only">druga żółta i czerwona kartka</span></span>`);
+    if (r.card === 'red') m.push(`<span class="mk" title="Czerwona kartka">${ICON.red}<span class="sr-only">czerwona kartka</span></span>`);
+    if (r.knock && r.on) m.push(`<span class="mk" title="${esc(`Gra z bólem: ${r.knock.name}`)}">${ICON.knock}<span class="sr-only">lekki uraz, gra z bólem</span></span>`);
+    if (r.injured && !r.subbedOff) m.push(`<span class="mk" title="${esc(`Uraz: ${x?.injury?.name ?? ''}`)}">${ICON.hurt}<span class="sr-only">uraz, nie może grać</span></span>`);
+    if (live && r.treated) m.push('<small class="ros__note">opatrywany</small>');
+    if (x?.minOn > 0 && !r.bench) m.push(`<small class="ros__in" title="Wszedł w ${x.minOn}. minucie">↑${x.minOn}'</small>`);
+    if (r.subbedOff) m.push(`<small class="ros__out" title="Zszedł w ${x?.minOff}. minucie">↓${x?.minOff ?? ''}'</small>`);
+    return m.join('');
+  }
+  function rosterRow(side, r, x) {
+    const pos = r.on ? r.pos : x?.p.pos ?? r.pos;
+    const prof = r.on && x?.slot ? proficiency(x.p, x.slot.pos, x.slot.side) : 100;
+    const band = fitBand(prof);
+    const no = kitNo(side, r.id) ?? '';
+    const rt = r.rating;
+    const cls = [r.on ? '' : r.bench ? 'is-bench' : 'is-out', band !== 'ok' ? `is-off is-off--${band}` : '', r.knock && r.on ? 'is-knock' : ''].filter(Boolean).join(' ');
+    const label = [x?.p.name ?? r.name, pos, band !== 'ok' ? `poza nominalną pozycją, ${prof} procent` : '', rt != null ? `ocena ${String(rt).replace('.', ',')}` : 'bez oceny', r.on || r.bench ? `kondycja ${r.cond} procent` : ''].filter(Boolean).join(', ');
+    return `<li class="ros__i ${cls}"><button class="ros__row" data-mdp="${side}|${esc(r.id)}" aria-label="${esc(label)}" title="${esc(x?.p.name ?? r.name)}">
+      <span class="ros__no" aria-hidden="true">${esc(String(no))}</span>
+      <span class="pos" data-g="${GROUP[pos] ?? 'MID'}" aria-hidden="true">${esc(pos)}</span>
+      <span class="ros__nm" aria-hidden="true"><span class="ros__last">${esc(lastName(x?.p ?? r))}</span>${markers(r, x)}</span>
+      ${r.on || r.bench ? `<span class="ros__c" data-c="${condCls(r.cond)}" aria-hidden="true"><i style="width:${r.cond}%"></i></span>` : '<span aria-hidden="true"></span>'}
+      ${rt != null ? `<b class="rt rt--${rBand(rt)}" aria-hidden="true">${rt.toFixed(1)}</b>` : '<b class="rt rt--none" aria-hidden="true">–</b>'}
+    </button></li>`;
+  }
+  function rosterHtml(side) {
+    const M = S.M; const T = M.teams[side];
+    const st = playerStates(M, side);
+    const byId = new Map([...T.players, ...T.bench].map((x) => [x.id, x]));
+    const on = st.filter((r) => r.on).sort((a, b) => (a.slotIdx < 0 ? 99 : a.slotIdx) - (b.slotIdx < 0 ? 99 : b.slotIdx));
+    const bench = st.filter((r) => r.bench);
+    const out = st.filter((r) => !r.on && !r.bench);
+    const used = new Set(on.map((r) => r.slotIdx));
+    const empty = T.formation.slots.map((_, i) => i).filter((i) => !used.has(i));
+    let shape = T.formation.name;
+    try { if (empty.length && on.length < 11) shape = `${TEAMS.shapeLabel(T.formation, empty)} (z ${T.formation.name})`; } catch { /* zostaje nazwa formacji */ }
+    const rows = (list) => list.map((r) => rosterRow(side, r, byId.get(r.id))).join('');
+    return `<header class="ros__head"><span class="ros__team">${crest(side === 0 ? fixture.home : fixture.away, 22)}<b>${esc(sideName(side))}</b></span><span class="ros__shape">${esc(shape)}${on.length < 11 ? `, ${on.length} na boisku` : ''}</span></header>
+      <ol class="ros__list" aria-label="Na boisku">${rows(on)}</ol>
+      <h3 class="ros__sub">Ławka rezerwowych <small>zmiany ${T.subsUsed} z ${T.subsLimit}</small></h3>
+      <ul class="ros__list ros__list--bench">${rows(bench) || '<li class="hint">Brak rezerwowych.</li>'}</ul>
+      ${out.length ? `<h3 class="ros__sub">Poza grą</h3><ul class="ros__list ros__list--out">${rows(out)}</ul>` : ''}`;
+  }
+  function renderRosters() {
+    const focus = document.activeElement?.closest?.('[data-mdp]')?.dataset.mdp;
+    for (const sd of [0, 1]) {
+      const el = app.querySelector(`#mdRos${sd}`);
+      if (!el) continue;
+      const scroll = el.scrollTop;
+      el.innerHTML = rosterHtml(sd);
+      el.scrollTop = scroll;
+    }
+    if (focus) app.querySelector(`[data-mdp="${CSS.escape(focus)}"]`)?.focus({ preventScroll: true });
+  }
+
   // Numery na koszulkach (trwałe w klubie, career/shirts.js); liczone raz na mecz
   let kitMaps = null;
   function kitNo(side, id) {
@@ -587,18 +650,24 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     ro.observe(canvas);
   }
   function layoutDots() {
-    const M = S.M; const poss = M.possession[M.possession.length - 1] ?? 0.5; const homeBall = M.ai === 0;
+    const M = S.M; const homeBall = M.ai === 0;
     const next = [];
     for (const T of M.teams) {
-      onPitch(T, M.minute).forEach((x, i) => {
+      // Na boisku także opatrywani (półprzezroczyści); wykluczony w tej minucie zostaje chwilę z czerwoną kartką
+      const xs = T.players.filter((x) => x.slot && ((x.on && !x.sentOff) || (x.sentOff && M.events.some((e) => e.type === 'red' && e.pid === x.id && e.t === M.tick))));
+      xs.forEach((x, i) => {
         const s = x.slot; const shift = s.pos === 'BR' ? 0 : (T.side === 0) === homeBall ? 10 : -3;
         let sy = 96 - (s.y + shift) * 0.5; let sx = s.x;
         if (T.side === 1) { sy = 100 - sy; sx = 100 - sx; }
         const j = Math.sin(M.tick * 1.7 + i * 3.1) * 2;
-        next.push({ id: x.id, side: T.side, x: sx + j, y: sy + Math.cos(M.tick + i) * 1.5, label: String(kitNo(T.side, x.id) ?? (x.slot.pos === 'BR' ? 'BR' : i + 1)) });
+        next.push({
+          id: x.id, side: T.side, x: sx + j, y: sy + Math.cos(M.tick + i) * 1.5, label: String(kitNo(T.side, x.id) ?? (x.slot.pos === 'BR' ? 'BR' : i + 1)),
+          card: x.sentOff ? (x.redCode === 'second' ? 'second' : 'red') : x.yc ? 'yellow' : null,
+          knock: !!(x.knock && !x.knock.aggravated && !x.sentOff), hurt: !!(x.injury && !x.injury.playable),
+          dim: x.sentOff || x.treatedUntil >= M.minute,
+        });
       });
     }
-    void poss;
     const prev = new Map(ui.dots.map((d) => [d.id, d]));
     ui.dots = next.map((d) => ({ ...d, fx: prev.get(d.id)?.x ?? d.x, fy: prev.get(d.id)?.y ?? d.y }));
     cancelAnimationFrame(ui.raf);
@@ -606,6 +675,20 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const t0 = performance.now(); const dur = Math.min(800, 900 / ui.speed);
     const frame = (now) => { const k = reduce ? 1 : Math.min(1, (now - t0) / dur); const e = k * (2 - k); drawPitch(e); if (k < 1) ui.raf = requestAnimationFrame(frame); };
     ui.raf = requestAnimationFrame(frame);
+  }
+  /** Kartka „przyklejona” do ikony zawodnika: lekko obrócony prostokąt w prawym górnym rogu. */
+  function drawCard(c, x, y, w, h, color, angle) {
+    c.save(); c.translate(x, y); c.rotate(angle);
+    c.fillStyle = color; c.strokeStyle = '#14211A'; c.lineWidth = 1;
+    c.beginPath(); c.roundRect ? c.roundRect(-w / 2, -h / 2, w, h, 1.5) : c.rect(-w / 2, -h / 2, w, h); c.fill(); c.stroke();
+    c.restore();
+  }
+  /** Krzyżyk na ikonie zawodnika: biały na ciemnym tle (lekki uraz) albo biały na czerwonym (uraz, musi zejść). */
+  function drawCross(c, x, y, r, bg) {
+    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fillStyle = bg; c.fill();
+    c.lineWidth = 1; c.strokeStyle = '#F3F6F1'; c.stroke();
+    const a = r * 0.58; c.lineWidth = Math.max(1.6, r * 0.42); c.lineCap = 'butt'; c.strokeStyle = '#FFFFFF';
+    c.beginPath(); c.moveTo(x - a, y); c.lineTo(x + a, y); c.moveTo(x, y - a); c.lineTo(x, y + a); c.stroke();
   }
   function drawPitch(e = 1) {
     if (!ctx2d) return;
@@ -618,14 +701,23 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     ctx2d.beginPath(); ctx2d.moveTo(X(4), Y(50)); ctx2d.lineTo(X(96), Y(50)); ctx2d.stroke();
     ctx2d.beginPath(); ctx2d.arc(X(50), Y(50), W * 0.13, 0, Math.PI * 2); ctx2d.stroke();
     for (const top of [true, false]) { const y0 = top ? Y(2.8) : Y(97.2); const d = top ? 1 : -1; ctx2d.strokeRect(X(21), y0, X(58), d * H * 0.16); ctx2d.strokeRect(X(37), y0, X(26), d * H * 0.055); }
-    const rad = Math.max(9, Math.min(14, W * 0.032));
+    const rad = Math.max(9, Math.min(15, W * 0.033));
     ctx2d.font = `700 ${Math.round(rad * 1.0)}px "Barlow Condensed", sans-serif`; ctx2d.textAlign = 'center'; ctx2d.textBaseline = 'middle';
     for (const d of ui.dots) {
-      const x = d.fx + (d.x - d.fx) * e; const y = d.fy + (d.y - d.fy) * e;
-      ctx2d.beginPath(); ctx2d.arc(X(x), Y(y), rad, 0, Math.PI * 2);
+      const x = X(d.fx + (d.x - d.fx) * e); const y = Y(d.fy + (d.y - d.fy) * e);
+      d.px = x; d.py = y; d.pr = rad;
+      ctx2d.globalAlpha = d.dim ? 0.5 : 1;
+      ctx2d.beginPath(); ctx2d.arc(x, y, rad, 0, Math.PI * 2);
       ctx2d.fillStyle = d.side === 0 ? colors.home : colors.away; ctx2d.fill();
       ctx2d.lineWidth = 1.5; ctx2d.strokeStyle = d.side === 0 ? colors.homeInk : colors.awayInk; ctx2d.stroke();
-      ctx2d.fillStyle = d.side === 0 ? colors.homeInk : colors.awayInk; ctx2d.fillText(d.label, X(x), Y(y) + 1);
+      ctx2d.fillStyle = d.side === 0 ? colors.homeInk : colors.awayInk; ctx2d.fillText(d.label, x, y + 1);
+      ctx2d.globalAlpha = 1;
+      const cw = rad * 0.62; const ch = rad * 0.86;
+      if (d.card === 'yellow') drawCard(ctx2d, x + rad * 0.82, y - rad * 0.72, cw, ch, '#F5C518', 0.22);
+      if (d.card === 'second') { drawCard(ctx2d, x + rad * 0.68, y - rad * 0.78, cw, ch, '#F5C518', -0.12); drawCard(ctx2d, x + rad * 1.0, y - rad * 0.62, cw, ch, '#D62839', 0.28); }
+      if (d.card === 'red') drawCard(ctx2d, x + rad * 0.82, y - rad * 0.72, cw, ch, '#D62839', 0.22);
+      if (d.knock) drawCross(ctx2d, x - rad * 0.85, y - rad * 0.8, rad * 0.5, '#14211A');
+      else if (d.hurt) drawCross(ctx2d, x - rad * 0.85, y - rad * 0.8, rad * 0.5, '#D62839');
     }
   }
 
