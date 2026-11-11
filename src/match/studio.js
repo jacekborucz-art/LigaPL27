@@ -752,10 +752,16 @@ export function keyMoments(events, names) {
       const lead = Math.abs(h - a);
       const how = e.ownGoal ? ' (samobójczy)' : e.penalty ? ' z rzutu karnego' : '';
       const assist = e.assistName ? `, asysta: ${e.assistName}` : '';
-      out.push({ min: e.min, imp: 3 + (lead <= 1 ? 1 : 0), type: 'goal', side: e.side, text: `${min} GOL! ${e.name}${how} (${team})${assist}. ${h}:${a}` });
+      out.push({ min: e.min, imp: 3 + (lead <= 1 ? 1 : 0), type: 'goal', side: e.side, scorer: e.name, text: `${min} GOL! ${e.name}${how} (${team})${assist}. ${h}:${a}` });
     } else if (e.type === 'varOverturn') {
-      if (e.cancelGoal) { if (e.side === 'home') h--; else a--; }
-      out.push({ min: e.min, imp: 3.5, type: 'var', side: e.side, text: `${min} ${varText(e)} (${team}). ${h}:${a}` });
+      let who = '';
+      if (e.cancelGoal) {
+        if (e.side === 'home') h--; else a--;
+        // Anulowany gol nie zostaje w kluczowych momentach jako GOL z zawyżonym wynikiem
+        const gi = out.findLastIndex((m) => m.type === 'goal' && m.side === e.side);
+        if (gi >= 0) { who = out[gi].scorer ? `: ${out[gi].scorer}` : ''; out.splice(gi, 1); }
+      }
+      out.push({ min: e.min, imp: 3.5, type: 'var', side: e.side, text: `${min} ${varText(e)}${who} (${team}). ${h}:${a}` });
     } else if (e.type === 'red') {
       out.push({ min: e.min, imp: 3, type: 'red', side: e.side, text: `${min} Czerwona kartka: ${e.name} (${team})${e.second ? ', druga żółta' : ''}` });
     } else if (isShot(e.type) && e.penalty) {
@@ -766,7 +772,8 @@ export function keyMoments(events, names) {
       out.push({ min: e.min, imp: 1.5, type: 'injury', side: e.side, text: `${min} ${e.name} (${team}) schodzi z urazem` });
     }
   }
-  return out.sort((x, y) => y.imp - x.imp).slice(0, 8).sort((x, y) => x.min - y.min).map(({ imp, ...m }) => m);
+  out.forEach((m, i) => { m.i = i; });
+  return out.sort((x, y) => y.imp - x.imp).slice(0, 8).sort((x, y) => x.min - y.min || x.i - y.i).map(({ imp, i, scorer, ...m }) => m);
 }
 
 /** Tabela po meczu: aktualizuje dwa wiersze i sortuje (punkty, różnica bramek, gole, nazwa). */

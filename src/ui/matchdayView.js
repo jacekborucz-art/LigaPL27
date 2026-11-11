@@ -11,6 +11,7 @@ import { INSTRUCTIONS } from '../data/instructions.js';
 import { anyClub, compLabel } from '../season/season.js';
 import { statsFromEvents } from '../engine/matchStats.js';
 import { onPitch } from '../engine/match/teams.js';
+import * as TEAMS from '../engine/match/teams.js';
 import { substitute, changeTactics, shout, canShout } from '../engine/match/match.js';
 import { SHOUTS } from '../engine/match/constants.js';
 import { TONES, TALKS, POST_TONES, MAX_TALKS } from '../match/briefings.js';
@@ -26,6 +27,9 @@ function luminance(hex) {
   const n = parseInt((hex || '#888888').slice(1), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => v / 255).reduce((s, c, i) => s + c * [0.2126, 0.7152, 0.0722][i], 0);
 }
+const MOMENT_ICON = { goal: 'GOL', var: 'VAR', red: 'CZ', penMiss: 'K', chance: 'SZ', injury: '+' };
+const rBand = (r) => (r >= 7.5 ? 'top' : r >= 6.8 ? 'good' : r >= 6.0 ? 'mid' : 'low');
+const sideIdx = (sd) => (sd === 'home' || sd === 0 ? 0 : sd === 'away' || sd === 1 ? 1 : null);
 function teamColors(f) {
   const h = anyClub(f.home)?.colors ?? ['#FFD100', '#14211A'];
   const a = anyClub(f.away)?.colors ?? ['#0055A5', '#FFFFFF'];
@@ -128,31 +132,42 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
         : `${S.post.result.label} ${S.post.result.score}. ${S.post.reactions.board.text}`;
     const reactionOf = (id) => done?.players.find((r) => r.id === id);
     const title = { pre: 'Odprawa przedmeczowa', half: 'Odprawa w przerwie', post: 'Odprawa pomeczowa' }[phase];
+    const rating = (id) => (phase === 'post' ? S.result.ratings.find((x) => x.id === id)?.rating : null);
+    const pressHtml = phase !== 'post' ? ''
+      : S.pressResult ? `<p class="notice">${esc(S.pressResult.text)}</p>`
+        : done && S.press ? renderPressForm()
+          : '<p class="hint">Konferencja prasowa zacznie się po odprawie w szatni.</p>';
     shell(`
       <h1>${title}</h1>
-      <p class="talk-ctx">${esc(ctxText)}</p>
-      ${ui.adv && !done ? `<blockquote class="assistant">${esc(ui.adv.text)} Zalecana przemowa: ${esc(ui.adv.toneLabel)}.<footer>Asystent trenera</footer></blockquote>` : ''}
-      ${done?.team?.backfireText ? `<p class="notice notice--err">${esc(done.team.backfireText)}</p>` : ''}
-      ${done?.team?.summary ? `<p class="notice">${esc(done.team.summary)}</p>` : ''}
-      <h2>Przemowa do drużyny</h2>
-      <fieldset class="tones" ${done ? 'disabled' : ''}>
-        <legend class="hint">Wybierz ton. Ta sama przemowa powtarzana mecz po meczu działa słabiej.</legend>
-        ${Object.entries(tones).map(([id, t]) => `<label class="tone"><input type="radio" name="tone" value="${id}" ${id === chosen ? 'checked' : ''} data-md-tone="${id}"><div><strong>${esc(t.label)}${ui.adv?.tone === id && !done ? ' (zalecana)' : ''}</strong><span>${esc(t.quote)}</span></div></label>`).join('')}
-      </fieldset>
-      <h2>Rozmowy indywidualne</h2>
-      <p class="hint">Maksymalnie ${MAX_TALKS} zawodników.${ui.adv?.talks?.length && !done ? ` Asystent proponuje: ${esc(ui.adv.talks.map((t) => t.reason).join(' '))}` : ''}</p>
-      <ul class="players">${players.map((p, i) => {
-        const r = reactionOf(p.id);
-        const head = phase === 'pre' && i === game.tactics.xi.length ? '<li class="sub-head">Rezerwowi</li>' : phase === 'pre' && i === 0 ? '<li class="sub-head">Pierwszy skład</li>' : '';
-        return `${head}<li class="prow"><span class="num">${esc(p.pos)}</span><span class="pname">${esc(p.name)}<small>${esc(p.persona ?? '')}${r?.talk ? `: „${esc(r.talk.quote.replace(/[„”]/g, ''))}”` : ''}</small></span>
-          ${r ? `<span class="react" data-r="${esc(r.reaction === 'obojetny' ? 'obojętny' : r.reaction === 'urazony' ? 'urażony' : r.reaction)}" title="${esc(r.text)}">${esc(r.label.toLowerCase())}</span>`
-    : `<select class="pick-select" data-md-talk="${esc(p.id)}" aria-label="Rozmowa z: ${esc(p.name)}"><option value="">Bez rozmowy</option>${talks.map(([k, t]) => `<option value="${k}" ${ui.sel.talks?.[p.id] === k ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select>`}
-        </li>`;
-      }).join('')}</ul>
-      ${phase === 'post' && done && S.press && !S.pressResult ? renderPressForm() : ''}
-      ${S.pressResult ? `<p class="notice">${esc(S.pressResult.text)}</p>` : ''}`,
-      done ? (phase === 'pre' ? btn('kickoff', 'Wyjdź na boisko') : phase === 'half' ? btn('resume', 'Rozpocznij 2. połowę') + btn('dlg:subs', 'Zmiany', false) + btn('dlg:tactics', 'Taktyka', false) : (S.pressResult ? btn('exit', 'Zakończ dzień meczowy') : btn('press', 'Odpowiedz na pytania') + btn('exit', 'Pomiń konferencję', false)))
-        : btn(`speech:${phase}`, 'Wygłoś odprawę') + (phase === 'half' ? btn('dlg:subs', 'Zmiany', false) + btn('dlg:tactics', 'Taktyka', false) : ''));
+      <div class="talk-grid talk-grid--${phase}">
+      <section class="tpanel tpanel--speech">
+        <p class="talk-ctx">${esc(ctxText)}</p>
+        ${ui.adv && !done ? `<blockquote class="assistant">${esc(ui.adv.text)} Zalecana przemowa: ${esc(ui.adv.toneLabel)}.<footer>Asystent trenera</footer></blockquote>` : ''}
+        ${done?.team?.backfireText ? `<p class="notice notice--err">${esc(done.team.backfireText)}</p>` : ''}
+        ${done?.team?.summary ? `<p class="notice">${esc(done.team.summary)}</p>` : ''}
+        <h2>Przemowa do drużyny</h2>
+        <fieldset class="tones" ${done ? 'disabled' : ''}>
+          <legend class="hint">Wybierz ton. Ta sama przemowa powtarzana mecz po meczu działa słabiej.</legend>
+          ${Object.entries(tones).map(([id, t]) => `<label class="tone"><input type="radio" name="tone" value="${id}" ${id === chosen ? 'checked' : ''} data-md-tone="${id}"><div><strong>${esc(t.label)}${ui.adv?.tone === id && !done ? ' (zalecana)' : ''}</strong><span>${esc(t.quote)}</span></div></label>`).join('')}
+        </fieldset>
+      </section>
+      <section class="tpanel tpanel--talks">
+        <h2>Rozmowy indywidualne</h2>
+        <p class="hint">Maksymalnie ${MAX_TALKS} zawodników.${ui.adv?.talks?.length && !done ? ` Asystent proponuje: ${esc(ui.adv.talks.map((t) => t.reason).join(' '))}` : ''}</p>
+        <ul class="players">${players.map((p, i) => {
+          const r = reactionOf(p.id); const rt = rating(p.id);
+          const head = phase === 'pre' && i === game.tactics.xi.length ? '<li class="sub-head">Rezerwowi</li>' : phase === 'pre' && i === 0 ? '<li class="sub-head">Pierwszy skład</li>' : '';
+          return `${head}<li class="prow"><span class="num">${esc(p.pos)}</span><span class="pname">${esc(p.name)}<small>${esc(p.persona ?? '')}${r?.talk ? `: „${esc(r.talk.quote.replace(/[„”]/g, ''))}”` : ''}</small></span>
+            ${rt != null ? `<b class="rt rt--${rBand(rt)}" title="Ocena za mecz">${rt.toFixed(1)}</b>` : ''}
+            ${r ? `<span class="react" data-r="${esc(r.reaction === 'obojetny' ? 'obojętny' : r.reaction === 'urazony' ? 'urażony' : r.reaction)}" title="${esc(r.text)}">${esc(r.label.toLowerCase())}</span>`
+      : `<select class="pick-select" data-md-talk="${esc(p.id)}" aria-label="Rozmowa z: ${esc(p.name)}"><option value="">Bez rozmowy</option>${talks.map(([k, t]) => `<option value="${k}" ${ui.sel.talks?.[p.id] === k ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select>`}
+          </li>`;
+        }).join('')}</ul>
+      </section>
+      ${phase === 'post' ? `<section class="tpanel tpanel--press"><h2>Konferencja prasowa</h2>${pressHtml}</section>` : ''}
+      </div>`,
+      done ? (phase === 'pre' ? btn('kickoff', 'Wyjdź na boisko') : phase === 'half' ? btn('resume', 'Rozpocznij 2. połowę') + btn('dlg:manage', 'Zmiany i taktyka', false) : (S.pressResult ? btn('exit', 'Zakończ dzień meczowy') : btn('press', 'Odpowiedz na pytania') + btn('exit', 'Pomiń konferencję', false)))
+        : btn(`speech:${phase}`, 'Wygłoś odprawę') + (phase === 'half' ? btn('dlg:manage', 'Zmiany i taktyka', false) : ''));
     if (phase === 'half' && !app.querySelector('#mdDlg')) app.insertAdjacentHTML('beforeend', '<dialog id="mdDlg" class="panel md-dlg"></dialog>');
     const selects = [...app.querySelectorAll('[data-md-talk]')];
     const sync = () => { const used = selects.filter((s) => s.value).length; selects.forEach((s) => { s.disabled = !s.value && used >= MAX_TALKS; }); };
@@ -162,7 +177,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
   }
 
   function renderPressForm() {
-    return `<h2>Konferencja prasowa</h2>${S.press.map((q) => `<fieldset class="qa"><p>${esc(q.question)}</p>${q.answers.map((a) => `<label class="tone"><input type="radio" name="q-${esc(q.id)}" value="${a.i}" ${a.i === 0 ? 'checked' : ''}><div><strong>${esc(a.text)}</strong></div></label>`).join('')}</fieldset>`).join('')}`;
+    return `${S.press.map((q) => `<fieldset class="qa"><p>${esc(q.question)}</p>${q.answers.map((a) => `<label class="tone"><input type="radio" name="q-${esc(q.id)}" value="${a.i}" ${a.i === 0 ? 'checked' : ''}><div><strong>${esc(a.text)}</strong></div></label>`).join('')}</fieldset>`).join('')}`;
   }
 
   // ------------------------------------------------------------ Mecz na żywo
@@ -186,26 +201,30 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
         </div>
         <div class="pitch-area">
           <div class="pitch-wrap"><canvas class="pitch" id="mdPitch" aria-label="Boisko"></canvas>
+            <div class="goal" id="mdGoal" role="status"><div class="goal__in"><b id="mdGoalTitle">GOL</b><small id="mdGoalWho"></small></div></div>
             <div class="md-toasts" id="mdToasts" aria-live="polite"></div>
             <div class="md-halt" id="mdHalt" hidden role="alertdialog" aria-labelledby="mdHaltTitle">
               <b id="mdHaltTitle">Gra wstrzymana</b><p id="mdHaltText"></p>
-              <div class="md-halt__btns"><button class="btn btn--quiet btn--sm" data-md="dlg:subs">Zmiany</button><button class="btn btn--quiet btn--sm" data-md="dlg:tactics">Taktyka</button><button class="btn btn--primary btn--sm" data-md="haltGo">Graj dalej</button></div>
+              <div class="md-halt__btns"><button class="btn btn--quiet btn--sm" data-md="dlg:manage">Zmiany i taktyka</button><button class="btn btn--primary btn--sm" data-md="haltGo">Graj dalej</button></div>
             </div>
           </div>
           <div class="coachbar" role="toolbar" aria-label="Decyzje trenera">
-            <button data-md="dlg:subs">Zmiany</button><button data-md="dlg:tactics">Taktyka</button><button data-md="dlg:shout">Okrzyk</button>
+            <button data-md="dlg:manage">Zmiany i taktyka</button><button data-md="dlg:shout">Okrzyk</button>
           </div>
         </div>
         <div class="mom-area">
           <div class="poss"><span id="mdPh">50%</span><div class="bar2"><i class="bh" id="mdPbh" style="width:50%"></i><i class="ba" id="mdPba" style="width:50%"></i></div><span id="mdPa">50%</span></div>
-          <svg class="momentum" id="mdMom" viewBox="0 0 96 56" preserveAspectRatio="none" role="img" aria-label="Przewaga w kolejnych minutach"></svg>
+          <div class="press" aria-live="off">
+            <div class="press__track"><i class="press__knob" id="mdPressKnob" style="left:50%"></i></div>
+            <span class="press__lbl" id="mdPressLbl">Gra wyrównana</span>
+          </div>
+          <svg class="momentum" id="mdMom" viewBox="0 0 90 60" preserveAspectRatio="none" role="img" aria-label="Przewaga w kolejnych minutach"></svg>
         </div>
         <div class="feed-area"><h2>Relacja</h2><ul class="feed" id="mdFeed"></ul></div>
         <div class="side-area"><div class="tabs2" role="tablist">
           <button role="tab" data-md="tab:stats" aria-selected="${ui.tab === 'stats'}">Statystyki</button>
           <button role="tab" data-md="tab:lineups" aria-selected="${ui.tab === 'lineups'}">Składy</button></div><div id="mdSide"></div></div>
       </div>
-      <div class="goal" id="mdGoal" role="status"><div><b id="mdGoalTitle">GOL</b><small id="mdGoalWho"></small></div></div>
       <dialog id="mdDlg" class="panel md-dlg"></dialog>`, '');
     setupCanvas();
     updateLive();
@@ -220,16 +239,10 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const stats = statsFromEvents(M.events);
     q('#mdPh').textContent = `${stats[0].possession}%`; q('#mdPa').textContent = `${stats[1].possession}%`;
     q('#mdPbh').style.width = `${stats[0].possession}%`; q('#mdPba').style.width = `${stats[1].possession}%`;
-    // Momentum
-    const mom = M.momentum; const w = Math.max(96, mom.length + 1);
-    q('#mdMom').setAttribute('viewBox', `0 0 ${w} 56`);
-    let bars = `<line x1="0" y1="28" x2="${w}" y2="28" stroke="currentColor" stroke-opacity=".25" stroke-width=".4"/>`;
-    mom.forEach((v, i) => { const h = Math.abs(v) / 100 * 26; bars += `<rect x="${i + 0.1}" y="${v >= 0 ? 28 - h : 28}" width=".8" height="${Math.max(0.5, h)}" fill="${v >= 0 ? 'var(--home)' : 'var(--away)'}"/>`; });
-    for (const e of M.events.filter((x) => x.type === 'goal' && !x.provisional)) bars += `<rect x="${e.t - 0.6}" y="${e.side === 0 ? 0 : 50}" width="1.2" height="6" fill="var(--led)"/>`;
-    q('#mdMom').style.color = 'var(--text)'; q('#mdMom').innerHTML = bars;
+    drawMomentum(M, q);
     // Relacja
     const feed = M.events.filter((e) => e.text && !['possessionMinute'].includes(e.type)).slice(-60).reverse();
-    q('#mdFeed').innerHTML = feed.map((e) => `<li class="${e.type === 'goal' && !e.provisional ? 'goalrow' : ''}"><span class="m">${esc(e.min)}</span><span>${e.side != null ? `<b>${esc(shortName(e.side))}</b> ` : ''}${e.type === 'yellow' ? '<i class="card-ico y" aria-hidden="true"></i>' : e.type === 'red' ? '<i class="card-ico r" aria-hidden="true"></i>' : ''}${esc(e.text)}</span></li>`).join('') || `<li><span class="m"></span><span class="hint">Naciśnij Start. 1 minuta meczu trwa 1 sekundę.</span></li>`;
+    q('#mdFeed').innerHTML = feed.map((e) => `<li class="${e.type === 'goal' && !e.provisional ? 'goalrow' : ''}"${e.side != null ? ` data-side="${e.side}"` : ''}><span class="m">${esc(e.min)}</span><span>${e.side != null ? `<b class="tm">${esc(shortName(e.side))}</b> ` : ''}${e.type === 'yellow' ? '<i class="card-ico y" aria-hidden="true"></i>' : e.type === 'red' ? '<i class="card-ico r" aria-hidden="true"></i>' : ''}${esc(e.text)}</span></li>`).join('') || `<li><span class="m"></span><span class="hint">Naciśnij Start. 1 minuta meczu trwa 1 sekundę.</span></li>`;
     // Statystyki albo składy
     const side = q('#mdSide');
     if (ui.tab === 'stats') {
@@ -245,11 +258,63 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const varEv = newEvents.find((e) => e.type === 'varOverturn' || e.type === 'varCheck');
     if (goalEv || varEv) {
       const ov = q('#mdGoal');
-      q('#mdGoalTitle').textContent = goalEv && !newEvents.some((e) => e.type === 'varOverturn') ? 'GOL' : 'VAR';
+      const isGoal = goalEv && !newEvents.some((e) => e.type === 'varOverturn');
+      ov.dataset.side = isGoal ? String(goalEv.side) : 'var';
+      ov.classList.remove('on'); void ov.offsetWidth;
+      q('#mdGoalTitle').textContent = isGoal ? 'GOL' : 'VAR';
       q('#mdGoalWho').textContent = (goalEv && !newEvents.some((e) => e.type === 'varOverturn')) ? `${goalEv.text.replace(/^GOL! /, '')} ${sideName(goalEv.side)}` : (newEvents.find((e) => e.type === 'varOverturn')?.text ?? varEv.text);
       ov.classList.add('on');
       setTimeout(() => ov.classList.remove('on'), goalEv ? 3000 : 2000);
     }
+  }
+
+  /**
+   * Momentum: słupek na każdą minutę (gospodarze w górę, goście w dół), skala dopasowana
+   * do najmocniejszej fazy meczu (pierwiastek wzmacnia słabsze fazy), kropki strzałów
+   * wielkości xG, gole jako piłki na krawędzi. Wskaźnik nad wykresem pokazuje ostatnie 5 minut.
+   */
+  const SHOTS = new Set(['shotOn', 'shotOff', 'shotBlocked', 'post', 'goal']);
+  function drawMomentum(M, q) {
+    const svg = q('#mdMom');
+    if (!svg) return;
+    const mom = M.momentum;
+    const N = Math.max(90, mom.length);
+    const mid = 30; const amp = 24;
+    const scale = Math.max(25, ...mom.map((v) => Math.abs(v)));
+    const f = (v) => Math.sign(v) * Math.pow(Math.min(1, Math.abs(v) / scale), 0.7) * amp;
+    svg.setAttribute('viewBox', `0 0 ${N} 60`);
+    let out = `<rect x="0" y="0" width="${N}" height="60" fill="transparent"/>`
+      + `<line x1="45" y1="2" x2="45" y2="58" class="mom-ht"/>`
+      + `<line x1="0" y1="${mid}" x2="${N}" y2="${mid}" class="mom-axis"/>`;
+    const last = mom.length - 1;
+    mom.forEach((v, i) => {
+      const h = Math.max(0.6, Math.abs(f(v)));
+      const op = i >= last - 4 ? 1 : 0.78;
+      out += `<rect x="${i + 0.08}" y="${v >= 0 ? mid - h : mid}" width=".84" height="${h}" fill="${v >= 0 ? 'var(--home)' : 'var(--away)'}" opacity="${op}"/>`;
+    });
+    for (const e of M.events) {
+      if (!SHOTS.has(e.type) || e.side == null || e.provisional || e.t == null) continue;
+      const x = Math.min(N - 0.5, e.t + 0.5);
+      if (e.type === 'goal') {
+        out += `<circle cx="${x}" cy="${e.side === 0 ? 3.2 : 56.8}" r="2.6" class="mom-goal"/>`;
+      } else {
+        const r = 0.5 + Math.min(1.6, (e.xg ?? 0.08) * 4);
+        out += `<circle cx="${x}" cy="${e.side === 0 ? mid - amp - 2 : mid + amp + 2}" r="${r}" class="mom-shot" fill="${e.side === 0 ? 'var(--home)' : 'var(--away)'}"/>`;
+      }
+    }
+    if (mom.length) out += `<line x1="${mom.length}" y1="2" x2="${mom.length}" y2="58" class="mom-now"/>`;
+    svg.innerHTML = out;
+    // Kto naciska: średnia ostatnich 5 minut, przesuwany znacznik
+    const recent = mom.slice(-5);
+    const avg = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : 0;
+    const k = Math.sign(avg) * Math.pow(Math.min(1, Math.abs(avg) / scale), 0.7);
+    const knob = q('#mdPressKnob');
+    if (knob) {
+      knob.style.left = `${50 - k * 46}%`;
+      knob.dataset.side = Math.abs(k) < 0.15 ? '' : k > 0 ? '0' : '1';
+    }
+    const lbl = q('#mdPressLbl');
+    if (lbl) lbl.textContent = Math.abs(k) < 0.15 ? 'Gra wyrównana' : `${Math.abs(k) > 0.55 ? 'Wyraźnie naciska' : 'Przewaga'}: ${shortName(k > 0 ? 0 : 1)}`;
   }
 
   // Boisko w canvasie: ustawienie z formacji, przesunięcie wg posiadania
@@ -359,27 +424,24 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
   function hideHalt() { const h = app.querySelector('#mdHalt'); if (h) h.hidden = true; }
 
   // ------------------------------------------------------------ Dialogi w meczu
-  function openDialog(kind) {
+  function openDialog(kind, fresh = false) {
     const dlg = app.querySelector('#mdDlg');
     const M = S.M; const T = M.teams[S.userSide];
-    let html = '';
-    if (kind === 'subs') {
-      html = subsPanel(T, M);
-      dlg.classList.add('md-dlg--wide');
-    } else if (kind === 'tactics') {
-      const keys = ['mentality', 'pressing', 'tempo', 'passing', 'line', 'tackling', 'timewasting'];
-      html = `<h2>Taktyka</h2><p class="hint">Zmiana działa w pełni po kilku minutach. Kolejna zmiana w ciągu 10 minut kosztuje podwójnie. Spójność: ${Math.round(T.S)} na 100.</p>
-        <label class="role"><span>Ustawienie</span><select id="mdForm">${FORMATIONS.map((f) => `<option value="${f.id}" ${f.id === T.formation.id ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}</select></label>
-        ${keys.map((k) => { const ins = INSTRUCTIONS.find((i) => i.id === k); return `<label class="role"><span>${esc(ins.label)}</span><select data-ins="${k}">${ins.options.map((o) => `<option value="${o.id}" ${T.tactics.instructions[k] === o.id ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}</select></label>`; }).join('')}
-        <p id="mdDlgMsg" class="hint"></p><p class="tac__actions">${btn('doTactics', 'Zastosuj')}${btn('closeDlg', 'Zamknij', false)}</p>`;
-    } else {
-      html = `<h2>Okrzyk z linii bocznej</h2><ul class="plain-list">${Object.entries(SHOUTS).map(([k, s]) => { const err = canShout(M, S.userSide, k); return `<li><button class="btn btn--quiet" data-md="doShout:${k}" ${err ? 'disabled' : ''}>${esc(s.label)}</button><span class="hint">${esc(err ?? '')}</span></li>`; }).join('')}</ul>
-        <p id="mdDlgMsg" class="hint"></p><p>${btn('closeDlg', 'Zamknij', false)}</p>`;
+    if (kind === 'subs' || kind === 'tactics') kind = 'manage';
+    if (kind === 'manage') {
+      if (fresh || !dlg.open) { ui.tac = null; ui.subMsg = ''; ui.subSel = null; }
+      const scroll = dlg.querySelector('.mm__lists')?.scrollTop ?? 0;
+      dlg.className = 'panel md-dlg md-dlg--wide mm-dlg';
+      dlg.innerHTML = managePanel(T, M);
+      if (!dlg.open) dlg.showModal();
+      const l = dlg.querySelector('.mm__lists'); if (l) l.scrollTop = scroll;
+      mountSubsDrag(dlg);
+      return;
     }
-    if (kind !== 'subs') dlg.classList.remove('md-dlg--wide');
-    dlg.innerHTML = html;
+    dlg.className = 'panel md-dlg';
+    dlg.innerHTML = `<h2>Okrzyk z linii bocznej</h2><p class="hint">Okrzyk działa od razu przez kilka minut.</p><ul class="plain-list">${Object.entries(SHOUTS).map(([k, sh]) => { const err = canShout(M, S.userSide, k); return `<li><button class="btn btn--quiet" data-md="doShout:${k}" ${err ? 'disabled' : ''}>${esc(sh.label)}</button><span class="hint">${esc(err ?? '')}</span></li>`; }).join('')}</ul>
+      <p id="mdDlgMsg" class="hint"></p><p>${btn('closeDlg', 'Zamknij', false)}</p>`;
     if (!dlg.open) dlg.showModal();
-    if (kind === 'subs') mountSubsDrag(dlg);
   }
 
   // ------------------------------------------------------------ Zmiany: listy, przeciąganie, zatwierdzanie
@@ -392,11 +454,44 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const windowBlocked = M.phase !== 'break' && T.windowMinute !== M.tick && T.windowsUsed >= T.windowsLimit;
     return { left, windowBlocked };
   }
-  function subsPanel(T, M) {
+  // Taktyka: szkic zmian w oknie, wchodzi razem ze zmianami zawodników po zatwierdzeniu
+  const SHORT = { 'Zamurowanie': 'Mur', 'Wszystko do ataku': 'Atak', 'Równowaga': 'Równo', 'Indywidualne': 'Indyw.', 'Strefowe': 'Strefa', 'Normalne': 'Norm.', 'Normalna': 'Norm.' };
+  const INS_KEYS = ['mentality', 'pressing', 'tempo', 'passing', 'line', 'tackling', 'marking', 'counter', 'timewasting'];
+  function tacDraft(T) {
+    ui.tac ??= { formation: T.formation.id, ins: Object.fromEntries(INS_KEYS.map((k) => [k, String(T.tactics.instructions?.[k] ?? '')])) };
+    return ui.tac;
+  }
+  function tacDiff(T) {
+    const d = tacDraft(T);
+    const ins = {};
+    for (const k of INS_KEYS) if (d.ins[k] !== String(T.tactics.instructions?.[k] ?? '')) ins[k] = d.ins[k];
+    const formation = d.formation !== T.formation.id ? d.formation : null;
+    return { formation, ins, n: (formation ? 1 : 0) + Object.keys(ins).length };
+  }
+  const insLabel = (k, v) => INSTRUCTIONS.find((i) => i.id === k)?.options.find((o) => String(o.id) === String(v))?.label ?? String(v);
+  /** Gdzie stoi każdy zawodnik po zatwierdzeniu: nowa formacja i zaplanowane zmiany. */
+  function previewXI(T) {
+    const d = tacDraft(T);
+    let xs = onPitchNow(T).map((x) => ({ x, slot: x.slot }));
+    if (d.formation !== T.formation.id) {
+      const F = FORMATIONS.find((f) => f.id === d.formation);
+      if (F && typeof TEAMS.reslot === 'function') {
+        const clone = { ...T, formation: F, players: T.players.map((x) => ({ ...x })) };
+        try { TEAMS.reslot(clone); xs = xs.map((o) => ({ x: o.x, slot: clone.players.find((c) => c.id === o.x.id)?.slot ?? o.slot })); } catch { /* podgląd bez zmiany ustawienia */ }
+      } else if (F) {
+        const free = F.slots.slice();
+        xs = xs.map((o) => { let i = free.findIndex((sl) => sl.pos === o.slot?.pos); if (i < 0) i = free.reduce((b, sl, j) => (Math.abs(sl.y - (o.slot?.y ?? 50)) < Math.abs(free[b].y - (o.slot?.y ?? 50)) ? j : b), 0); const sl = free.splice(i, 1)[0] ?? o.slot; return { x: o.x, slot: sl }; });
+      }
+    }
+    return xs;
+  }
+  function managePanel(T, M) {
     const st = subsState(T, M);
     const pend = ui.pend;
     const outIds = new Set(pend.map((x) => x.out)); const inIds = new Set(pend.map((x) => x.in));
     const sel = ui.subSel;
+    const d = tacDraft(T); const diff = tacDiff(T);
+    const condCls = (c) => (c < 60 ? 'low' : c < 75 ? 'mid' : '');
     const row = (x, kind) => {
       const planned = kind === 'on' ? outIds.has(x.id) : inIds.has(x.id);
       const isSel = sel && sel.kind === kind && sel.id === x.id;
@@ -404,30 +499,67 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
       const cond = Math.round(x.cond ?? 100);
       const note = [x.injury ? 'uraz' : '', x.yc ? 'żółta kartka' : '', kind === 'bench' ? `OVR ${Math.round(x.p.ovr)}` : ''].filter(Boolean).join(', ');
       return `<li class="sub-row ${planned ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${x.injury ? 'is-hurt' : ''}" data-sdrop="${kind}:${esc(x.id)}">
-        <button class="sub-row__main" data-md="subPick:${kind}|${esc(x.id)}" data-sdrag="${kind}:${esc(x.id)}" aria-pressed="${isSel}" ${planned ? 'disabled' : ''}>
+        <button class="sub-row__main" data-md="subPick:${kind}|${esc(x.id)}" data-sdrag="${kind}:${esc(x.id)}" data-name="${esc(x.p.name)}" aria-pressed="${isSel}" ${planned ? 'disabled' : ''}>
           <span class="sub-handle" data-shandle aria-hidden="true"></span>
           <span class="pos" data-g="${GROUP[pos] ?? 'MID'}">${esc(pos)}</span>
           <span class="sub-name">${esc(x.p.name)}${note ? `<small>${esc(note)}</small>` : ''}</span>
-          <span class="sub-cond" title="Kondycja"><i style="width:${cond}%" class="${cond < 60 ? 'low' : cond < 75 ? 'mid' : ''}"></i></span><b>${cond}%</b>
+          <span class="sub-cond" title="Kondycja"><i style="width:${cond}%" class="${condCls(cond)}"></i></span><b>${cond}%</b>
         </button></li>`;
     };
-    const pendRows = pend.map((x, i) => {
-      const o = T.players.find((y) => y.id === x.out); const n = T.bench.find((y) => y.id === x.in);
-      const gkWarn = o?.slot?.pos === 'BR' && n?.p.pos !== 'BR';
-      return `<li class="sub-pend"><span><b class="out">${esc(o?.p.name ?? '')}</b> schodzi, <b class="in">${esc(n?.p.name ?? '')}</b> wchodzi${gkWarn ? '<small> Uwaga: do bramki wejdzie zawodnik z pola.</small>' : ''}</span><button class="btn btn--quiet btn--sm" data-md="subDrop:${i}" aria-label="Usuń zaplanowaną zmianę">Usuń</button></li>`;
+    // Boisko: żetony w miejscach po zatwierdzeniu, zaplanowany zmiennik zamiast schodzącego
+    const tokens = previewXI(T).map(({ x, slot }) => {
+      const pl = pend.find((q) => q.out === x.id);
+      const inc = pl ? T.bench.find((b) => b.id === pl.in) : null;
+      const cond = Math.round(x.cond ?? 100);
+      const isSel = sel && sel.kind === 'on' && sel.id === x.id;
+      const last = (n) => String(n).split(' ').slice(-1)[0];
+      const pos = slot?.pos ?? x.p.pos;
+      return `<button class="mm-tok ${pos === 'BR' ? 'is-gk' : ''} ${pl ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${x.injury ? 'is-hurt' : ''}" style="--x:${slot?.x ?? 50};--y:${slot?.y ?? 50};--cond:${cond}" data-c="${condCls(cond)}"
+        data-sdrop="on:${esc(x.id)}" data-sdrag="on:${esc(x.id)}" data-shandle data-name="${esc(x.p.name)}" data-md="subPick:on|${esc(x.id)}" ${pl ? 'disabled' : ''} title="${esc(`${x.p.name}, ${pos}, kondycja ${cond}%`)}">
+        <span class="mm-tok__dot"><span>${esc(pos)}</span></span>${x.yc ? '<i class="mm-tok__yc" aria-label="żółta kartka"></i>' : ''}${x.injury ? '<i class="mm-tok__inj" aria-label="uraz">+</i>' : ''}
+        <span class="mm-tok__name">${inc ? `↑ ${esc(last(inc.p.name))}` : esc(last(x.p.name))}</span></button>`;
     }).join('');
-    const info = st.windowBlocked ? 'Wykorzystano wszystkie okna zmian. Zmiany możliwe tylko w przerwie.'
+    // Instrukcje jako segmenty
+    const seg = (k) => {
+      const ins = INSTRUCTIONS.find((i) => i.id === k); if (!ins) return '';
+      const dirty = d.ins[k] !== String(T.tactics.instructions?.[k] ?? '');
+      return `<fieldset class="mm-seg ${dirty ? 'is-dirty' : ''}"><legend class="mm-seg__lbl">${esc(ins.label)}</legend><div class="mm-seg__opts">${ins.options.map((o) => `<label title="${esc(o.label)}"><input type="radio" name="ins-${k}" value="${esc(String(o.id))}" data-ins="${k}" ${d.ins[k] === String(o.id) ? 'checked' : ''}><span>${esc(SHORT[o.label] ?? o.label)}</span></label>`).join('')}</div></fieldset>`;
+    };
+    // Kolejka do zatwierdzenia
+    const chips = [
+      ...pend.map((x, i) => { const o = T.players.find((y) => y.id === x.out); const n = T.bench.find((y) => y.id === x.in); const gkWarn = o?.slot?.pos === 'BR' && n?.p.pos !== 'BR'; return `<li class="mm-pend ${gkWarn ? 'is-warn' : ''}"><span><b class="out">${esc(o?.p.name ?? '')}</b> <b class="in">${esc(n?.p.name ?? '')}</b>${gkWarn ? '<small>Do bramki wejdzie zawodnik z pola.</small>' : ''}</span><button data-md="subDrop:${i}" aria-label="Usuń zmianę">×</button></li>`; }),
+      diff.formation ? `<li class="mm-pend"><span>Ustawienie: ${esc(T.formation.name)} → ${esc(FORMATIONS.find((f) => f.id === diff.formation)?.name ?? diff.formation)}</span><button data-md="tacUndo:formation" aria-label="Cofnij zmianę ustawienia">×</button></li>` : '',
+      ...Object.entries(diff.ins).map(([k, v]) => `<li class="mm-pend"><span>${esc(INSTRUCTIONS.find((i) => i.id === k)?.label ?? k)}: ${esc(insLabel(k, T.tactics.instructions?.[k]))} → ${esc(insLabel(k, v))}</span><button data-md="tacUndo:${k}" aria-label="Cofnij">×</button></li>`),
+    ].filter(Boolean);
+    const nAll = pend.length + diff.n;
+    const live = M.phase !== 'break' && M.minute > 0;
+    const costWarn = diff.n && live && M.minute - (T.lastTacChange ?? -99) < 10 ? 'Kolejna zmiana taktyki w ciągu 10 minut kosztuje podwójnie.' : '';
+    const info = st.windowBlocked ? 'Okna zmian wykorzystane, zmiany zawodników tylko w przerwie.'
       : st.left <= 0 ? `Wykorzystano wszystkie zmiany (${T.subsLimit}).`
-        : `Zostało ${st.left} z ${T.subsLimit} zmian${M.phase === 'break' ? ' (w przerwie bez zużycia okna)' : `, okna: ${T.windowsUsed} z ${T.windowsLimit}`}.`;
-    return `<h2>Zmiany</h2>
-      <p class="hint">${esc(info)} Przeciągnij zawodnika z ławki na zawodnika na boisku (na telefonie za uchwyt z kropkami) albo dotknij kolejno obu. Zmiana wejdzie po zatwierdzeniu.</p>
-      <div class="subs-grid">
-        <section><h3>Na boisku</h3><ul class="sub-list">${onPitchNow(T).map((x) => row(x, 'on')).join('')}</ul></section>
-        <section><h3>Ławka</h3><ul class="sub-list">${T.bench.map((x) => row(x, 'bench')).join('') || '<li class="hint">Brak rezerwowych.</li>'}</ul></section>
+        : `Zmiany: ${st.left} z ${T.subsLimit}${M.phase === 'break' ? ', w przerwie bez zużycia okna' : `, okna ${T.windowsUsed} z ${T.windowsLimit}`}.`;
+    const tab = ui.mmTab ?? 'bench';
+    return `<div class="mm" data-tab="${tab}">
+      <header class="mm__head"><h2>Zmiany i taktyka</h2><span class="mm__info">${esc(info)} Spójność ${Math.round(T.S)} na 100.</span>
+        <button class="mm__x" data-md="subClose" aria-label="Zamknij">×</button></header>
+      <section class="mm__pitch">
+        <label class="mm-form"><span>Ustawienie</span><select id="mdForm">${FORMATIONS.map((f) => `<option value="${f.id}" ${f.id === d.formation ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}</select></label>
+        <div class="pitch2 mm-field">${tokens}</div>
+        <p class="mm__tip">Przeciągnij rezerwowego na zawodnika na boisku albo dotknij kolejno obu.</p>
+      </section>
+      <nav class="mm__tabs" role="tablist" aria-label="Widok">
+        ${[['bench', 'Ławka'], ['xi', 'Na boisku'], ['tac', 'Taktyka']].map(([k, l]) => `<button role="tab" data-md="mmTab:${k}" aria-selected="${tab === k}">${l}${k === 'tac' && diff.n ? ` <i class="dot"></i>` : ''}</button>`).join('')}
+      </nav>
+      <div class="mm__lists">
+        <section class="mm__xi"><h3>Na boisku</h3><ul class="sub-list">${onPitchNow(T).map((x) => row(x, 'on')).join('')}</ul></section>
+        <section class="mm__bench"><h3>Ławka</h3><ul class="sub-list">${T.bench.map((x) => row(x, 'bench')).join('') || '<li class="hint">Brak rezerwowych.</li>'}</ul></section>
+        <section class="mm__tac"><h3>Instrukcje</h3><div class="mm-segs">${INS_KEYS.map(seg).join('')}</div></section>
       </div>
-      <section class="subs-pending"><h3>Zaplanowane zmiany (${pend.length})</h3>${pend.length ? `<ul class="sub-list">${pendRows}</ul>` : '<p class="hint">Brak. Wybierz zawodnika z ławki i zawodnika na boisku.</p>'}</section>
-      <p id="mdDlgMsg" class="hint" role="status">${esc(ui.subMsg ?? '')}</p>
-      <p class="tac__actions">${pend.length ? btn('subConfirm', `Zatwierdź zmiany (${pend.length})`) : ''}${btn('subClose', 'Zamknij', false)}</p>`;
+      <footer class="mm__foot">
+        <div class="mm__queue">${chips.length ? `<ul>${chips.join('')}</ul>` : '<p class="hint">Nic do zatwierdzenia. Zmiany zawodników i taktyki wejdą razem po zatwierdzeniu.</p>'}
+          <p id="mdDlgMsg" class="hint" role="status">${esc([ui.subMsg ?? '', costWarn].filter(Boolean).join(' '))}</p></div>
+        <div class="mm__btns">${nAll ? btn('mmDiscard', 'Odrzuć', false) : btn('subClose', 'Zamknij', false)}<button class="btn btn--primary mm__ok" data-md="mmConfirm" ${nAll ? '' : 'disabled'}>Zatwierdź${nAll ? ` (${nAll})` : ''}</button></div>
+      </footer>
+    </div>`;
   }
   function planSub(outId, inId) {
     const M = S.M; const T = M.teams[S.userSide];
@@ -448,6 +580,23 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const err = planSub(outId, inId);
     ui.subSel = null; ui.subMsg = err ?? 'Zmiana zaplanowana. Zatwierdź, żeby weszła.';
   }
+  function confirmAll() {
+    const M = S.M; const T = M.teams[S.userSide];
+    const nSubs = ui.pend.length;
+    if (nSubs) confirmSubs();
+    const subMsg = nSubs ? ui.subMsg : '';
+    const diff = tacDiff(T);
+    let tacMsg = '';
+    if (diff.n) {
+      const patch = { instructions: diff.ins };
+      if (diff.formation) patch.formation = diff.formation;
+      const r = changeTactics(M, S.userSide, patch);
+      tacMsg = r?.adapt ? `Taktyka wejdzie w pełni po ok. ${Math.round(r.adapt)} min (koszt spójności ${r.cost}).` : 'Taktyka obowiązuje od razu.';
+    }
+    ui.tac = null;
+    ui.subMsg = [subMsg, tacMsg].filter(Boolean).join(' ');
+    if (S.step.startsWith('live')) updateLive();
+  }
   function confirmSubs() {
     const M = S.M; const T = M.teams[S.userSide];
     const done = []; const errors = [];
@@ -466,7 +615,14 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     dlg.dataset.sdnd = '1';
     // Escape nie gubi niezatwierdzonych zmian
     dlg.addEventListener('cancel', (ev) => {
-      if (dlg.classList.contains('md-dlg--wide') && ui.pend?.length) { ev.preventDefault(); ui.subMsg = 'Masz niezatwierdzone zmiany. Zatwierdź je albo usuń przed zamknięciem.'; openDialog('subs'); }
+      if (dlg.classList.contains('mm-dlg') && (ui.pend?.length || tacDiff(S.M.teams[S.userSide]).n)) { ev.preventDefault(); ui.subMsg = 'Masz niezatwierdzone zmiany. Zatwierdź je albo odrzuć.'; openDialog('manage'); }
+    });
+    dlg.addEventListener('change', (ev) => {
+      const t = ev.target;
+      if (!dlg.classList.contains('mm-dlg')) return;
+      const T = S.M.teams[S.userSide];
+      if (t.matches('[data-ins]')) { tacDraft(T).ins[t.dataset.ins] = t.value; ui.subMsg = ''; openDialog('manage'); }
+      if (t.id === 'mdForm') { tacDraft(T).formation = t.value; ui.subMsg = ''; openDialog('manage'); }
     });
     let pending = null; let drag = null;
     dlg.addEventListener('pointerdown', (ev) => {
@@ -479,7 +635,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
       if (pending && !drag && Math.hypot(ev.clientX - pending.x, ev.clientY - pending.y) > 6) {
         drag = { ...pending, ghost: document.createElement('div') };
         drag.ghost.className = 'sub-ghost';
-        drag.ghost.textContent = pending.el.querySelector('.sub-name')?.firstChild?.textContent ?? '';
+        drag.ghost.textContent = pending.el.dataset.name ?? '';
         dlg.appendChild(drag.ghost);
         try { pending.el.setPointerCapture(ev.pointerId); } catch { /* bez przechwytu */ }
         dlg.classList.add('is-dragging');
@@ -487,10 +643,12 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
       if (!drag) return;
       ev.preventDefault();
       // Autoprzewijanie okna przy górnej i dolnej krawędzi (na telefonie listy są jedna pod drugą)
-      const rr = dlg.getBoundingClientRect();
-      drag.edge = ev.clientY < rr.top + 70 ? -1 : ev.clientY > rr.bottom - 110 ? 1 : 0;
+      const sc = dlg.querySelector('.mm__lists') ?? dlg;
+      const scr = getComputedStyle(sc).overflowY === 'auto' ? sc : dlg;
+      const rr = scr.getBoundingClientRect();
+      drag.edge = ev.clientY < rr.top + 50 ? -1 : ev.clientY > rr.bottom - 50 ? 1 : 0;
       if (drag.edge && !drag.raf) {
-        const tick = () => { if (!drag || !drag.edge) { if (drag) drag.raf = 0; return; } dlg.scrollTop += drag.edge * 10; drag.raf = requestAnimationFrame(tick); };
+        const tick = () => { if (!drag || !drag.edge) { if (drag) drag.raf = 0; return; } scr.scrollTop += drag.edge * 10; drag.raf = requestAnimationFrame(tick); };
         drag.raf = requestAnimationFrame(tick);
       }
       const r = dlg.getBoundingClientRect();
@@ -512,7 +670,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
         }
         drag = null; pending = null;
         ui.suppressClick = Date.now() + 400;
-        openDialog('subs');
+        openDialog('manage');
         return;
       }
       pending = null;
@@ -532,27 +690,41 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
         <section class="sec"><h2>Statystyki</h2><table class="vs"><tbody>${STAT_ROWS.map(([k, l]) => `<tr><td>${h.stats[0][k]}</td><td class="lbl">${esc(l)}</td><td>${h.stats[1][k]}</td></tr>`).join('')}</tbody></table></section>
         <section class="sec"><h2>Oceny</h2><ul class="ratings">${ratings.map(([x, r]) => `<li><span>${esc(x.p.last ?? x.p.name)}</span><b>${r.toFixed(1)}</b></li>`).join('')}</ul></section>
       </div>`,
-      (S.step === 'etbreak' ? btn('resumeET', 'Rozpocznij dogrywkę') : btn('toHalfTalk', 'Odprawa w przerwie')) + btn('dlg:subs', 'Zmiany', false) + btn('dlg:tactics', 'Taktyka', false));
+      (S.step === 'etbreak' ? btn('resumeET', 'Rozpocznij dogrywkę') : btn('toHalfTalk', 'Odprawa w przerwie')) + btn('dlg:manage', 'Zmiany i taktyka', false));
     if (!app.querySelector('#mdDlg')) app.insertAdjacentHTML('beforeend', '<dialog id="mdDlg" class="panel md-dlg"></dialog>');
   }
 
+  // Studio pomeczowe: każda sekcja ma własną formę (oś czasu, paski, cytaty, oceny), żeby nic się nie zlewało
   function renderPost() {
     const p = S.post; const r = S.result;
+    const mine = S.userSide === 0 ? p.ratings.home : p.ratings.away;
+    const tb = p.table?.user; const move = tb && tb.before != null ? tb.before - tb.after : 0;
+    const off = [...p.injuries.map((x) => ({ k: 'inj', t: x.text })), ...p.suspensions.map((x) => ({ k: 'sus', t: `${x.name} (${x.team}) pauzuje: ${x.reason}` }))];
     shell(`
-      <h1>Studio pomeczowe</h1>
-      <div class="final"><div class="board"><div class="board__t">${crest(fixture.home, 34)}<span>${esc(shortName(0))}</span></div><div><div class="board__score">${r.score[0]}:${r.score[1]}</div><span class="board__min">${r.shootout ? `karne ${r.shootout.goals[0]}:${r.shootout.goals[1]}` : r.extraTime ? 'po dogrywce' : 'Koniec'}</span></div><div class="board__t"><span>${esc(shortName(1))}</span>${crest(fixture.away, 34)}</div></div>
-        <p class="hint">Do przerwy ${esc(p.result.halftime)}. ${esc(p.stats.verdict)}</p></div>
-      ${p.motm ? `<div class="mvp"><div><small style="opacity:.75">Zawodnik meczu</small><br><strong style="font:700 var(--step-2)/1.1 var(--font-display)">${esc(p.motm.name)}</strong><br><small style="opacity:.75">${esc(p.motm.team)}</small></div><span class="r">${p.motm.rating.toFixed(1)}</span></div>` : ''}
-      <div class="studio-cols">
-        <section class="sec"><h2>Kluczowe momenty</h2><ul class="moments">${p.keyMoments.map((m) => { const [, min, rest] = /^(\S+')\s(.*)$/.exec(m.text) ?? [null, '', m.text]; return `<li><span class="m">${esc(min)}</span><span>${esc(rest)}</span></li>`; }).join('') || '<li><span></span><span>Mecz bez wielkich emocji.</span></li>'}</ul>
-          ${p.controversies.length ? `<h3>Kontrowersje</h3><ul class="plain-list">${p.controversies.map((c) => `<li><span>${esc(c.text)}</span></li>`).join('')}</ul>` : ''}</section>
-        <section class="sec"><h2>Statystyki</h2><table class="vs"><tbody>${STAT_ROWS.map(([k, l]) => `<tr><td>${p.stats.home[k]}</td><td class="lbl">${esc(l)}</td><td>${p.stats.away[k]}</td></tr>`).join('')}</tbody></table></section>
-        <section class="sec"><h2>Reakcje</h2><ul class="plain-list"><li><span class="k">Zarząd</span><span>${esc(p.reactions.board.text)}</span></li><li><span class="k">Kibice</span><span>${esc(p.reactions.fans.text)}</span></li><li><span class="k">Media</span><span>${esc(p.reactions.media.text)}</span></li></ul>
-          ${p.headline ? `<ul class="headlines"><li>${esc(p.headline.text)}<small>Nagłówek dnia</small></li></ul>` : ''}</section>
-        <section class="sec"><h2>Po meczu</h2><ul class="plain-list">${[...p.injuries.map((x) => x.text), ...p.suspensions.map((x) => `${x.name} (${x.team}) pauzuje: ${x.reason}`)].map((t) => `<li><span>${esc(t)}</span></li>`).join('') || '<li><span>Bez nowych kontuzji i pauz.</span></li>'}</ul>
-          ${p.table ? `<p class="hint">Miejsce w tabeli: ${p.table.user.before ?? '-'} przed meczem, ${p.table.user.after} po meczu.</p>` : ''}</section>
-      </div>
-      <section class="sec"><h2>Oceny: ${esc(userName)}</h2><ul class="ratings">${(S.userSide === 0 ? p.ratings.home : p.ratings.away).map((x) => `<li><span>${esc(x.name)}</span><b>${x.rating.toFixed(1)}</b></li>`).join('')}</ul></section>`,
+      <h1 class="sr-only">Studio pomeczowe</h1>
+      <div class="pst">
+        <section class="pst__score">
+          <div class="final"><div class="board"><div class="board__t">${crest(fixture.home, 34)}<span>${esc(shortName(0))}</span></div><div><div class="board__score">${r.score[0]}:${r.score[1]}</div><span class="board__min">${r.shootout ? `karne ${r.shootout.goals[0]}:${r.shootout.goals[1]}` : r.extraTime ? 'po dogrywce' : 'Koniec'}</span></div><div class="board__t"><span>${esc(shortName(1))}</span>${crest(fixture.away, 34)}</div></div></div>
+          <p class="pst__verdict"><span>Do przerwy ${esc(p.result.halftime)}</span>${esc(p.stats.verdict)}</p>
+        </section>
+        ${p.motm ? `<section class="pst__motm"><small>Zawodnik meczu</small><strong>${esc(p.motm.name)}</strong><span>${esc(p.motm.team)}</span><b class="rt rt--${rBand(p.motm.rating)}">${p.motm.rating.toFixed(1)}</b></section>` : ''}
+        <section class="pcard pcard--moments"><h2>Kluczowe momenty</h2>
+          <ol class="tl">${p.keyMoments.map((m) => { const [, min, rest] = /^(\S+')\s(.*)$/.exec(m.text) ?? [null, '', m.text]; const sd = sideIdx(m.side); return `<li class="tl__i tl--${esc(m.type ?? '')}"${sd != null ? ` data-side="${sd}"` : ''}><span class="tl__m">${esc(min)}</span><span class="tl__k" aria-hidden="true">${MOMENT_ICON[m.type] ?? ''}</span><span class="tl__t">${esc(rest)}</span></li>`; }).join('') || '<li class="tl__i"><span class="tl__m"></span><span class="tl__k"></span><span class="tl__t">Mecz bez wielkich emocji.</span></li>'}</ol>
+          ${p.controversies.length ? `<h3>Kontrowersje</h3><ul class="pst-list">${p.controversies.map((c) => `<li>${esc(c.text)}</li>`).join('')}</ul>` : ''}</section>
+        <section class="pcard pcard--stats"><h2>Statystyki</h2>
+          <div class="pst-teams"><span>${esc(shortName(0))}</span><span>${esc(shortName(1))}</span></div>
+          <table class="vs"><tbody>${STAT_ROWS.map(([k, l]) => { const a = Number(p.stats.home[k]); const b = Number(p.stats.away[k]); const t = a + b || 1; return `<tr><td>${p.stats.home[k]}</td><td class="lbl">${esc(l)}<div class="bar2"><i class="bh" style="width:${a / t * 100}%"></i><i class="ba" style="width:${b / t * 100}%"></i></div></td><td>${p.stats.away[k]}</td></tr>`; }).join('')}</tbody></table></section>
+        <div class="pst__side">
+        <section class="pcard pcard--voices"><h2>Reakcje</h2>
+          ${p.headline ? `<blockquote class="paper"><p>${esc(p.headline.text)}</p><footer>Nagłówek dnia</footer></blockquote>` : ''}
+          <ul class="voices">${[['Zarząd', p.reactions.board.text, p.reactions.board.delta], ['Kibice', p.reactions.fans.text, p.reactions.fans.delta], ['Media', p.reactions.media.text, null]].map(([k, t, d]) => `<li class="voice${d > 0 ? ' is-up' : d < 0 ? ' is-down' : ''}"><span class="voice__k">${k}</span><span>${esc(t)}</span></li>`).join('')}</ul></section>
+        <section class="pcard pcard--after"><h2>Po meczu</h2>
+          ${tb ? `<div class="pos-move ${move > 0 ? 'is-up' : move < 0 ? 'is-down' : ''}"><b>${tb.after}.</b><span>miejsce w tabeli${tb.before != null ? `<small>${move > 0 ? `awans o ${move}` : move < 0 ? `spadek o ${-move}` : 'bez zmian'} (przed meczem ${tb.before}.)</small>` : ''}</span></div>` : ''}
+          <ul class="pst-list">${off.map((x) => `<li class="is-${x.k}">${esc(x.t)}</li>`).join('') || '<li>Bez nowych kontuzji i pauz.</li>'}</ul></section>
+        </div>
+        <section class="pcard pcard--ratings"><h2>Oceny: ${esc(userName)}</h2>
+          <ol class="rts">${mine.map((x) => `<li><b class="rt rt--${rBand(x.rating)}">${x.rating.toFixed(1)}</b><span>${esc(x.name)}</span></li>`).join('')}</ol></section>
+      </div>`,
       btn('toPostTalk', 'Odprawa pomeczowa'));
   }
 
@@ -589,21 +761,17 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     if (act === 'speed') { ui.speed = Number(arg); app.querySelectorAll('.speed').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.md === `speed:${arg}`))); if (ui.running) { stop(); start(); } }
     if (act === 'tab') { ui.tab = arg; app.querySelectorAll('[data-md^="tab:"]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.md === `tab:${arg}`))); updateLive(); }
     if (act === 'skip') { stop(); MD.skip(S); route(); }
-    if (act === 'dlg') { if (ui.running) stop(); openDialog(arg); }
+    if (act === 'dlg') { if (ui.running) stop(); openDialog(arg, true); }
+    if (act === 'mmTab') { ui.mmTab = arg; openDialog('manage'); }
+    if (act === 'mmConfirm') { confirmAll(); openDialog('manage'); }
+    if (act === 'mmDiscard') { ui.pend = []; ui.tac = null; ui.subSel = null; ui.subMsg = 'Odrzucono niezatwierdzone zmiany.'; openDialog('manage'); }
+    if (act === 'tacUndo') { const T = M.teams[S.userSide]; const d = tacDraft(T); if (arg === 'formation') d.formation = T.formation.id; else d.ins[arg] = String(T.tactics.instructions?.[arg] ?? ''); openDialog('manage'); }
     if (act === 'closeDlg') app.querySelector('#mdDlg')?.close();
-    if (act === 'subPick') { if (Date.now() < (ui.suppressClick ?? 0)) return; const [k, id] = arg.split('|'); pickSub(k, id); openDialog('subs'); }
-    if (act === 'subDrop') { ui.pend.splice(Number(arg), 1); ui.subMsg = 'Usunięto zaplanowaną zmianę.'; openDialog('subs'); }
-    if (act === 'subConfirm') { confirmSubs(); openDialog('subs'); }
+    if (act === 'subPick') { if (Date.now() < (ui.suppressClick ?? 0)) return; const [k, id] = arg.split('|'); pickSub(k, id); openDialog('manage'); }
+    if (act === 'subDrop') { ui.pend.splice(Number(arg), 1); ui.subMsg = 'Usunięto zaplanowaną zmianę.'; openDialog('manage'); }
     if (act === 'subClose') {
-      if (ui.pend?.length) { ui.subMsg = 'Masz niezatwierdzone zmiany. Zatwierdź je albo usuń przed zamknięciem.'; openDialog('subs'); return; }
-      ui.subSel = null; ui.subMsg = ''; app.querySelector('#mdDlg')?.close();
-    }
-    if (act === 'doTactics') {
-      const instructions = Object.fromEntries([...app.querySelectorAll('[data-ins]')].map((s) => [s.dataset.ins, s.value]));
-      const formation = app.querySelector('#mdForm').value;
-      const r = changeTactics(M, S.userSide, { formation, instructions });
-      app.querySelector('#mdDlgMsg').textContent = r.adapt ? `Zmiana wejdzie w pełni po ok. ${Math.round(r.adapt)} min. Koszt spójności: ${r.cost}.` : 'Zmiana obowiązuje od razu.';
-      updateLive();
+      if (ui.pend?.length || tacDiff(M.teams[S.userSide]).n) { ui.subMsg = 'Masz niezatwierdzone zmiany. Zatwierdź je albo odrzuć.'; openDialog('manage'); return; }
+      ui.subSel = null; ui.subMsg = ''; ui.tac = null; app.querySelector('#mdDlg')?.close();
     }
     if (act === 'doShout') { const r = shout(M, S.userSide, arg); app.querySelector('#mdDlgMsg').textContent = r.ok ? 'Drużyna usłyszała okrzyk.' : r.error; updateLive(); }
     if (act === 'toHalfTalk') { S.step = 'odprawa2'; ui.adv = null; ui.sel = {}; route(); }
