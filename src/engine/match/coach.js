@@ -26,7 +26,7 @@ const ATTACK1 = { 4141: '4231', 4231: '442', 442: '442', '442d': '442', 4321: '4
 const ATTACK2 = { 4141: '343', 4231: '343', 442: '343', '442d': '343', 4321: '343', 433: '343', 352: '343', 343: '343', 532: '352', 541: '352' };
 const DEFEND_MID = { 4231: '4141', 433: '4141', 442: '4141', '442d': '4141', 4321: '4141', 4141: '4141', 352: '532', 343: '532', 532: '532', 541: '541' };
 // Dodatkowy środkowy pomocnik, gdy przegrywamy środek pola (tylko w przerwie, tylko gdy zawodnicy pasują) [SZAC]
-const MID_PLUS = { 442: '4231', 343: '352', 541: '532', 4231: '4321', 433: '4321', 4141: '4321' };
+const MID_PLUS = { 442: '4231', 343: '352', 541: '532', 4231: '442d', 433: '442d', 4141: '442d' };
 
 // Osobowość trenera (T.coach: O ofensywny, S ostrożny, P pragmatyczny). alert: szansa, że w punkcie oceny
 // trener zareaguje na sposób gry rywala (style) albo na przebieg meczu (flow); upór losowany raz na mecz [SZAC].
@@ -111,7 +111,8 @@ export function desiredInstructions(T, st, extra = null) {
     w.pressing = 'high'; // rywal w dziesiątkę: wyżej i szybciej, niech biega
     if (Number(w.mentality ?? m) < 1) w.mentality = '1';
   }
-  if (st.men < 0 && st.diff >= 0) {
+  if (st.men < 0 && (st.diff >= 0 || !reason)) {
+    // W osłabieniu zwarty blok i kontry; przy niekorzystnym wyniku do czasu pogoni (bez „powrotu do planu” w 10)
     w.pressing = 'low'; w.counter = 'yes';
     if (Number(w.mentality ?? m) > -1) w.mentality = '-1';
     reason = reason ?? 'gra w osłabieniu';
@@ -276,7 +277,8 @@ function reviewAdjust(M, T, st, rng, advice, mind) {
   if ((min >= 20 && min <= 78) || st.halftime) {
     v = flowView(M, T.side, st.halftime ? M.tick : 20);
     const k = v.span / 20;
-    const pinned = (v.xgA - v.xgF >= 0.35 + 0.15 * k && v.shA >= v.shF + 2 + k) || (v.bigA >= 1 + k && v.xgA >= v.xgF + 0.3) || v.mom <= -0.3;
+    const pinned = (v.xgA - v.xgF >= 0.35 + 0.15 * k && v.shA >= v.shF + 2 + k) || (v.bigA >= 1 + k && v.xgA >= v.xgF + 0.3)
+      || (v.mom <= -0.12 && v.xgA >= v.xgF + 0.15); // momentum 20 min: -0,12 to ok. 5 % najgorszych okresów
     if (pinned && st.diff >= 0 && st.diff <= 1) {
       if (v.konA >= 2 && v.konA >= 0.4 * v.shA && plan.line !== 'low') add('line', stepDown[plan.line ?? 'mid'], 'dostajemy kontry: cofamy linię obrony', 'flow');
       else if (v.dysA >= 3 && v.dysA >= 0.5 * v.shA && plan.line === 'low') add('line', 'mid', 'rywal strzela z dystansu: wyżej linia obrony', 'flow');
@@ -321,10 +323,10 @@ function reviewAdjust(M, T, st, rng, advice, mind) {
     }
     // Przegrany środek pola w przerwie: dodatkowy środkowy pomocnik (za darmo w przerwie), gdy zawodnicy pasują
     let formation = null;
-    if (st.halftime && fieldPlayers(T).length >= 11 && v && v.poss < 0.42 && v.xgA >= v.xgF && (advice || mind.used + out.length < (mind.stubborn ? 2 : MAX_ADJ))) {
+    if (st.halftime && st.diff > -2 && fieldPlayers(T).length >= 11 && v && v.poss < 0.42 && v.xgA >= v.xgF && (advice || mind.used + out.length < (mind.stubborn ? 2 : MAX_ADJ))) {
       const target = MID_PLUS[T.tactics.formation];
       const oppCentral = formationById(seen.formation).slots.filter((x) => CENTRAL.has(x.pos)).length;
-      if (target && oppCentral > T.central && (advice || rng.chance((ALERT[T.coach] ?? ALERT.P).flow)) && shapeFit(T, target) >= 0.97 * currentFit(T)) formation = target;
+      if (target && oppCentral > T.central && (advice || rng.chance((ALERT[T.coach] ?? ALERT.P).flow)) && shapeFit(T, target) >= 0.98 * currentFit(T)) formation = target;
     }
     if (!out.length && !formation) return null;
     const set = Object.fromEntries(out.map((c) => [c.key, c.v]));
@@ -497,6 +499,7 @@ function plan(M, side, rng, advice) {
     if (adjust?.formation && fieldPlayers(T).length >= 11 && !tactic.patch?.formation) {
       if (!advice && !fromAdj) commitAdj(T, { cands: [], formation: adjust.formation }, M.minute);
       mergeTactic({ formation: adjust.formation }, adjust.formationReason);
+      if (tactic.reason !== adjust.formationReason) tactic.reason = `${tactic.reason}; ${adjust.formationReason}`;
     }
     // W osłabieniu kształt dopasowany do wyniku (np. 4-4-1 -> 4-3-2 przy pogoni)
     if (fieldPlayers(T).length < 11 && !tactic.patch?.formation) {
@@ -670,8 +673,8 @@ function aiShout(M, T, st, rng) {
   let id = null; let p = 0;
   if (scored && ok('brawo')) { id = 'brawo'; p = 0.35; }
   else if (st.diff < 0 && st.minute >= 75 && ok('naprzod')) { id = 'naprzod'; p = T.coach === 'S' ? 0.2 : 0.3; }
-  else if (st.diff === 1 && st.minute >= 80 && st.mom < -0.15 && ok('uwaga')) { id = 'uwaga'; p = T.coach === 'O' ? 0.3 : 0.5; }
-  else if (st.diff < 0 && st.minute >= 50 && st.minute < 75 && st.mom < -0.2 && ok('walka')) { id = 'walka'; p = 0.2; }
+  else if (st.diff === 1 && st.minute >= 80 && st.mom < -0.1 && ok('uwaga')) { id = 'uwaga'; p = T.coach === 'O' ? 0.3 : 0.5; }
+  else if (st.diff < 0 && st.minute >= 50 && st.minute < 75 && st.mom < -0.1 && ok('walka')) { id = 'walka'; p = 0.2; }
   if (id && rng.chance(p)) shout(M, T.side, id);
 }
 

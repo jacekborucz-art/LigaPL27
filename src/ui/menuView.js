@@ -49,8 +49,12 @@ const INTRO_KEY = 'ligapl27-intro';
 /** Boisko w perspektywie: pasy koszenia i linie kredą (SVG, bez plików). */
 function pitchSvg() {
   // Pasy poprzeczne zwężające się ku horyzontowi
-  const bands = []; let y = 400; let h = 46;
-  for (let i = 0; y > 170; i++) { const top = Math.max(170, y - h); bands.push(`<rect x="0" y="${top.toFixed(1)}" width="1000" height="${(y - top).toFixed(1)}" fill="${i % 2 ? '#1c6337' : '#226f3e'}"/>`); y = top; h *= 0.8; }
+  const bands = []; let y = 400; let h = 40;
+  for (let i = 0; i < 14 && y > 170; i++) {
+    const top = i === 13 ? 170 : Math.max(170, y - h); // ostatni pas domyka boisko do horyzontu
+    bands.push(`<rect x="0" y="${top.toFixed(1)}" width="1000" height="${(y - top).toFixed(1)}" fill="${i % 2 ? '#1c6337' : '#226f3e'}"/>`);
+    y = top; h *= 0.86;
+  }
   return `<svg class="intro__pitch" viewBox="0 0 1000 400" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
     <defs><clipPath id="intro-field"><path d="M-260 400 L300 170 L700 170 L1260 400 Z"/></clipPath></defs>
     <g clip-path="url(#intro-field)">${bands.join('')}</g>
