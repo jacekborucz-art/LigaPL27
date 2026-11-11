@@ -1088,3 +1088,13 @@
 .poss--live span { font-variant-numeric: tabular-nums; min-width: 3.2ch; }
 .mom-area .press__lbl { margin: 0; text-align: center; }
 @media (prefers-reduced-motion: reduce) { .poss--live .bh, .poss--live .ba { transition: none; } }
+
+/* Przerwa: tylko statystyki meczu, wyśrodkowane */
+.brk-stats { max-width: 760px; margin: var(--space-4) auto 0; }
+.brk-stats h2 { text-align: center; }
+.brk-stats .vs .lbl .bar2 { height: 5px; margin-top: 4px; }
+
+/* Strzelcy na tablicy: obok siebie w linii, zawijanie dopiero przy braku miejsca; bramki jednego zawodnika za jego nazwiskiem */
+.bev { flex-direction: row; flex-wrap: wrap; align-content: flex-start; gap: 3px 16px; }
+.bev--a { justify-content: flex-end; }
+.bev li { flex-wrap: wrap; max-width: 100%; }
