@@ -197,6 +197,8 @@ export function processAiDay(game, date) {
     if (day.kind === 'match' || day.kind === 'off') continue;
     const campQ = camp?.q ?? 0;
     const fitQ = staffQ(game, clubId, 'fizyczny');
+    // Akcent indywidualny dla młodych tylko w klubach z dobrym trenerem młodzieży (decyzja gracza)
+    const youthFocus = staffQ(game, clubId, 'mlodziez') >= AI_PLAN.focusMinYouthQ;
     const tac = staffMul.tac(staffQ(game, clubId, 'asystent'));
     // Forma bazowa (obóz): brak przygotowania wolniej buduje ostrość i podnosi ryzyko urazu przez 6 tygodni
     const f = c.cb && c.cb.key === key ? baseFactor(c.cb.start, date) : 0;
@@ -248,7 +250,7 @@ export function processAiDay(game, date) {
         p.sharp = sharp;
         tr.dp = r2(tr.dp + pr.dp);
         load += pr.load;
-        if (pr.dev && age <= AI_PLAN.focusMaxAge) { tr.dd++; fresh -= AI_PLAN.focusFresh; load += 5; }
+        if (pr.dev && youthFocus && age <= AI_PLAN.focusMaxAge) { tr.dd++; fresh -= AI_PLAN.focusFresh; load += 5; }
         p.fresh = Math.round(clamp(fresh, 20, 100 - (p.matchDebt ?? 0)));
         morale += pr.morale + campMorale;
         updateLoad(tr, today, load);

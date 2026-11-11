@@ -700,3 +700,183 @@
   .prs__foot .btn { flex: 1; min-width: 0; }
   .prs-fx .voice { grid-template-columns: 78px 1fr; }
 }
+
+/* ================= Mecz na żywo v3: składy po bokach, zdarzenia na tablicy =================
+   Tablica jak grafika telewizyjna: pełne nazwy (telefon: skróty), pod nimi strzelcy i czerwone kartki.
+   PC od 1280 px: składy obu drużyn przy liniach bocznych (gospodarze z lewej, goście z prawej, jak na tablicy),
+   pasek w barwach drużyny po zewnętrznej stronie. Środek: boisko, przebieg meczu, Relacja/Statystyki. */
+.board { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-areas: "th mid ta" "eh mid ea"; row-gap: 6px; column-gap: var(--space-3); }
+.board:not(.has-ev) { row-gap: 0; }
+.board > .board__t:first-child { grid-area: th; min-width: 0; }
+.board > .board__t:nth-child(3) { grid-area: ta; min-width: 0; }
+.board__mid { grid-area: mid; align-self: center; text-align: center; }
+.board__t { font: 700 var(--step-1)/1.05 var(--font-display); }
+.board__t .nm { min-width: 0; overflow: hidden; }
+.nm__full { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nm__short { display: none; }
+.bev { grid-area: eh; display: flex; flex-direction: column; gap: 2px; min-width: 0; margin: 0; padding: 0; list-style: none; font: 600 13px/1.3 var(--font-body); color: rgb(243 246 241 / .88); }
+.bev--a { grid-area: ea; align-items: flex-end; text-align: right; }
+.bev li { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; max-width: 100%; }
+.bev--a li { justify-content: flex-end; }
+.bev__n { white-space: nowrap; }
+.bev__n small, .bev__m small { color: var(--led); font: 700 11px/1 var(--font-display); }
+.bev__m { display: inline-flex; align-items: center; gap: 3px; font: 700 14px/1 var(--font-display); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bev .ico { width: 14px; height: 14px; flex: none; }
+.bev__m--nogoal .ico { opacity: .45; }
+.bev__m--nogoal .bev__t, .bev__m--nogoal ~ .bev__t { text-decoration: line-through; text-decoration-thickness: 2px; color: rgb(243 246 241 / .6); }
+.bev__m--penmiss .bev__t { color: rgb(243 246 241 / .75); }
+.bev .var { padding: 2px 4px; border-radius: 3px; background: #6FA8FF; color: #0E1511; font: 700 10px/1 var(--font-display); letter-spacing: .02em; }
+.brk-board { margin-bottom: 16px; }
+@media (min-width: 700px) {
+  .board__t { font-size: var(--step-2); }
+}
+@media (max-width: 699px) {
+  .nm__full { display: none; }
+  .nm__short { display: inline; }
+  .board { padding: 10px 12px; column-gap: 8px; }
+  .bev { font-size: 12px; }
+  .bev__m { font-size: 13px; }
+}
+
+/* Składy na żywo */
+.ros { --tc: var(--home); --ti: var(--home-ink); min-width: 0; padding: 10px 8px 10px 14px; border-radius: var(--radius-m); background: var(--surface); box-shadow: inset 5px 0 0 var(--tc), inset 6px 0 0 color-mix(in srgb, var(--text) 20%, transparent); }
+.ros[data-side="1"] { --tc: var(--away); --ti: var(--away-ink); padding: 10px 14px 10px 8px; box-shadow: inset -5px 0 0 var(--tc), inset -6px 0 0 color-mix(in srgb, var(--text) 20%, transparent); }
+.ros__head { display: grid; gap: 2px; padding: 0 4px 8px; border-bottom: 1px solid var(--line); }
+.ros__team { display: flex; align-items: center; gap: 8px; min-width: 0; font: 700 var(--step-1)/1.1 var(--font-display); }
+.ros__team b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ros__shape { font-size: 12px; color: var(--text-muted); }
+.ros__list { margin: 0; padding: 0; list-style: none; }
+.ros__row { display: grid; grid-template-columns: 24px 32px minmax(0, 1fr) 28px 38px; align-items: center; gap: 6px; width: 100%; min-height: 34px; padding: 3px 4px; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent); background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.ros__row:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.ros__row:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; border-radius: 4px; }
+.ros__no { display: grid; place-items: center; height: 22px; border-radius: 4px; background: var(--tc); color: var(--ti); font: 700 13px/1 var(--font-display); font-variant-numeric: tabular-nums; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text) 28%, transparent); }
+.ros .pos { min-height: 22px; font-size: 11px; }
+.ros__nm { display: flex; align-items: center; gap: 4px; min-width: 0; font: 600 var(--step--1)/1.2 var(--font-body); }
+.ros__last { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mk { flex: none; display: inline-grid; }
+.mk .ico { width: 14px; height: 14px; }
+.ros__in, .ros__out, .ros__note { flex: none; font: 700 11px/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.ros__in { color: #2E8A4E; }
+.ros__out { color: var(--bad-text); }
+.ros__note { color: var(--warn-text); }
+.ros__c { height: 5px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.ros__c i { display: block; height: 100%; background: #2E8A4E; }
+.ros__c[data-c="mid"] i { background: var(--kartka-zolta); }
+.ros__c[data-c="low"] i { background: var(--kartka-czerwona); }
+.ros .rt { min-width: 36px; padding: 4px 3px; font-size: var(--step--1); }
+.rt--none { color: var(--text-muted); }
+.ros__sub { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 12px 4px 4px; font: 700 var(--step-0)/1.2 var(--font-display); }
+.ros__sub small { font: 500 12px/1 var(--font-body); color: var(--text-muted); }
+.ros__i.is-out .ros__row { opacity: .6; }
+.ros__i.is-off .pos { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--kartka-zolta); }
+.ros__i.is-off--bad .pos { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--kartka-czerwona); }
+.ros__list .hint { padding: 6px 4px; font-size: 12px; }
+
+/* Zakładki i układ: telefon i tablet w jednej kolumnie */
+.live { --md-top: calc(52px + var(--md-head, 170px) + 12px); }
+.live__tabs { margin: 0; }
+.live__tabs [hidden] { display: none; }
+.stats-area, .rosters { min-width: 0; }
+.rosters { display: grid; gap: var(--space-3); }
+.live[data-tab="stats"] .rosters, .live[data-tab="feed"] .rosters { display: none; }
+.live[data-tab="lineups"] .stats-area { display: none; }
+@media (max-width: 1023px) {
+  .live .live__tabs { order: 4; }
+  .live .stats-area { order: 5; }
+  .live .rosters { order: 6; }
+}
+
+/* Laptop 1024-1279: relacja | boisko | przebieg i Statystyki/Składy */
+@media (min-width: 1024px) {
+  .live { grid-template-columns: minmax(240px, 1fr) auto minmax(280px, 1fr); grid-template-rows: auto auto auto 1fr; grid-template-areas: "head head head" "feed pitch mom" "feed pitch tabs" "feed pitch panel"; }
+  .live .live__tabs { grid-area: tabs; }
+  .live .stats-area, .live .rosters { grid-area: panel; }
+  .live .pitch-area { top: var(--md-top); width: clamp(260px, calc((100dvh - var(--md-top) - 64px) * .68), 420px); }
+  .live .feed { max-height: calc(100dvh - var(--md-top) - 60px); }
+}
+
+/* PC od 1280: skład gospodarzy | boisko | przebieg, Relacja/Statystyki | skład gości */
+@media (min-width: 1280px) {
+  .md__main:has(.live) { max-width: 1840px; padding-left: var(--space-5, 24px); padding-right: var(--space-5, 24px); }
+  .live { column-gap: 14px; grid-template-columns: minmax(260px, 300px) auto minmax(300px, 1fr) minmax(260px, 300px); grid-template-rows: auto auto auto 1fr; grid-template-areas: "head head head head" "rosh pitch mom rosa" "rosh pitch tabs rosa" "rosh pitch panel rosa"; }
+  .live[data-tab] .rosters { display: contents; }
+  .live .ros { position: sticky; top: var(--md-top); max-height: calc(100dvh - var(--md-top) - 12px); overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+  .live .ros[data-side="0"] { grid-area: rosh; }
+  .live .ros[data-side="1"] { grid-area: rosa; }
+  .live .feed-area, .live .stats-area { grid-area: panel; }
+  .live[data-tab="stats"] .feed-area, .live[data-tab="feed"] .stats-area { display: none; }
+  .live .feed-area h2 { display: none; }
+  .live .feed, .live .stats-area { max-height: calc(100dvh - var(--md-top) - 230px); overflow: auto; }
+  .live .pitch-area { width: clamp(280px, calc((100dvh - var(--md-top) - 64px) * .68), 460px); }
+}
+/* Bardzo szeroki ekran: relacja i statystyki obok siebie, bez zakładek */
+@media (min-width: 1760px) {
+  .live { grid-template-columns: 310px auto minmax(300px, 1fr) minmax(280px, 1fr) 310px; grid-template-rows: auto auto 1fr; grid-template-areas: "head head head head head" "rosh pitch mom mom rosa" "rosh pitch feed stats rosa"; }
+  .live .live__tabs { display: none; }
+  .live .feed-area { grid-area: feed; }
+  .live .stats-area { grid-area: stats; }
+  .live[data-tab] .feed-area, .live[data-tab] .stats-area { display: block; }
+  .live .feed-area h2 { display: block; }
+  .live .feed, .live .stats-area { max-height: calc(100dvh - var(--md-top) - 190px); }
+}
+
+/* ================= Zmiany i taktyka: ustawienie przyciskami, gra poza pozycją, osłabienie ================= */
+.mm-forms { margin: 0; padding: 0; border: 0; min-width: 0; }
+.mm-forms__lbl { padding: 0; margin-bottom: 6px; font: 700 var(--step--1)/1 var(--font-display); }
+.mm-forms__opts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.mm-fchip { position: relative; min-width: 0; }
+.mm-fchip input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.mm-fchip span { display: grid; place-items: center; min-height: 34px; padding: 0 4px; border: 1px solid #2F4438; border-radius: 6px; background: #14211A; color: #F3F6F1; font: 700 14px/1 var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mm-fchip:hover span { border-color: #2E8A4E; }
+.mm-fchip input:checked + span { background: #1E6B3A; border-color: var(--led); box-shadow: inset 0 0 0 1px var(--led); color: #fff; }
+.mm-fchip.is-now span { position: relative; }
+.mm-fchip.is-now span::after { content: ""; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--led); }
+.mm-fchip input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 1px; }
+.mm-short, .mm-err { margin: 0; padding: 8px 10px; border-radius: 6px; font-size: 13px; line-height: 1.35; }
+.mm-short { background: color-mix(in srgb, var(--kartka-czerwona) 10%, var(--surface)); border-left: 4px solid var(--kartka-czerwona); }
+.mm-err { margin-bottom: 6px; background: color-mix(in srgb, var(--kartka-czerwona) 16%, var(--surface)); border-left: 4px solid var(--kartka-czerwona); color: var(--bad-text); font-weight: 600; }
+.mm-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; margin: 0; font-size: 12px; color: var(--text-muted); }
+.mm-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.fit { display: inline-block; width: 12px; height: 12px; border-radius: 50%; }
+.fit--mid { background: var(--kartka-zolta); }
+.fit--bad { background: var(--kartka-czerwona); }
+/* Poza pozycją: obwódka kropki i podświetlone nazwisko na boisku, pasek i obwódka pozycji na liście */
+.mm-tok[data-fit="mid"] .mm-tok__dot { box-shadow: 0 0 0 2px #14211A, 0 0 0 5px var(--kartka-zolta); }
+.mm-tok[data-fit="bad"] .mm-tok__dot { box-shadow: 0 0 0 2px #14211A, 0 0 0 5px var(--kartka-czerwona); }
+.mm-tok[data-fit="mid"] .mm-tok__name { background: var(--kartka-zolta); color: #14211A; }
+.mm-tok[data-fit="bad"] .mm-tok__name { background: var(--kartka-czerwona); color: #fff; }
+.sub-row.is-off:not(.is-sel) .sub-row__main { box-shadow: inset 4px 0 0 var(--kartka-zolta); background: color-mix(in srgb, var(--kartka-zolta) 9%, var(--surface)); }
+.sub-row.is-off--bad:not(.is-sel) .sub-row__main { box-shadow: inset 4px 0 0 var(--kartka-czerwona); background: color-mix(in srgb, var(--kartka-czerwona) 8%, var(--surface)); }
+.sub-row.is-off .pos { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--kartka-zolta); }
+.sub-row.is-off--bad .pos { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--kartka-czerwona); }
+.sub-name .ico { display: inline-block; width: 13px; height: 13px; margin-left: 5px; vertical-align: -2px; }
+/* Puste miejsce w osłabieniu */
+.mm-tok--empty .mm-tok__dot { padding: 0; background: none; border: 2px dashed rgb(243 246 241 / .8); box-shadow: none; }
+.mm-tok--empty .mm-tok__dot > span { background: rgb(14 21 17 / .3); color: #F3F6F1; }
+.mm-tok--empty .mm-tok__name { font-style: italic; background: rgb(14 21 17 / .5); }
+.mm-tok--empty.is-open .mm-tok__dot, .mm-tok--empty.is-target .mm-tok__dot { border-color: var(--led); border-style: solid; }
+.mm-tok--empty:focus-visible .mm-tok__dot { outline: 3px solid var(--focus); outline-offset: 2px; }
+.mm-tok__knock { position: absolute; top: -4px; left: 10px; width: 15px; height: 15px; }
+.mm-tok__knock .ico { display: block; width: 15px; height: 15px; }
+@media (max-width: 699px) {
+  .mm-forms__opts { display: flex; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+  .mm-fchip { flex: none; }
+  .mm-fchip span { padding: 0 10px; min-height: 36px; }
+  .mm-legend { justify-content: flex-start; }
+  .mm-short { font-size: 12px; }
+  .mm__tabs button { font-size: 13px; padding: 0 2px; }
+}
+
+/* Statystyki zawodnika w meczu (menu zawodnika) */
+.pstat-dlg { width: min(420px, calc(100vw - 32px)); }
+.pstat__head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; margin-bottom: 8px; }
+.pstat__head h2 { margin: 0; font: 700 var(--step-2)/1.1 var(--font-display); }
+.pstat__head p { margin: 2px 0 0; color: var(--text-muted); font-size: var(--step--1); }
+.pstat__no { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 8px; background: var(--home); color: var(--home-ink); font: 700 var(--step-2)/1 var(--font-display); }
+.pstat__head[data-side="1"] .pstat__no { background: var(--away); color: var(--away-ink); }
+.pstat__st { margin: 0 0 8px; font-weight: 600; }
+.pstat { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; margin: 0 0 8px; }
+.pstat div { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.pstat dt { color: var(--text-muted); }
+.pstat dd { margin: 0; font: 700 var(--step-0)/1.2 var(--font-display); font-variant-numeric: tabular-nums; }
+@media (max-width: 479px) { .pstat { grid-template-columns: 1fr; } }

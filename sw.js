@@ -120,6 +120,7 @@ const SHELL = [
   './src/engine/match/control.js',
   './src/engine/match/core.js',
   './src/engine/match/match.js',
+  './src/engine/match/rules.js',
   './src/engine/match/teams.js',
   './src/engine/matchStats.js',
   './src/engine/modifiers.js',

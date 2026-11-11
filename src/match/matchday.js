@@ -20,7 +20,7 @@ import { winnerOf } from '../season/cup.js';
 import { preMatchStudio, postMatchStudio, postMatchMessages, preMatchMessages, odds1X2 } from './studio.js';
 import {
   preMatchBriefing, halftimeBriefing, postMatchBriefing, assistantAdvice, aiBriefing, newSpeechMemory, closeMatchMemory,
-  applyBriefing,
+  applyBriefing, POST_TONES,
 } from './briefings.js';
 import {
   pressState, pickClimate, openConference, answerQuestion, walkOut as pressWalkOutConf, currentQuestion,
@@ -359,6 +359,26 @@ function toStudioEvent(e) {
     player: e.player ?? e.pid, // studio (pauzy, kontuzje) czyta zawodnika z `player`, silnik podaje `pid`
     penalty: e.how === 'PEN', second: /druga żółta/.test(e.text ?? ''), days: e.injury?.days, injuryType: e.injury?.name,
   };
+}
+
+/**
+ * Zalecana przemowa pomeczowa asystenta: ten sam model co odprawa (postMatchBriefing, bez rozmów, to samo ziarno),
+ * wybór tonu z najlepszym średnim wpływem na morale (przy równych wcześniejszy ton). Nic nie zmienia w grze.
+ * Wcześniej ekran zaznaczał zawsze pierwszy ton (Pochwała), który po porażce obniża morale.
+ */
+export function postAdvice(game, S) {
+  const ids = new Set(S.result.ratings.filter((x) => x.side === S.userSide).map((x) => x.id));
+  const players = squadFor(game, game.clubId, S.comp).filter((p) => ids.has(p.id));
+  const scored = Object.keys(POST_TONES).map((tone, i) => {
+    const r = postMatchBriefing({ players, tone, talks: [], memory: S.memory, ctx: S.post.forBriefing, seed: `${game.seed}:${S.f.id}:post` });
+    const vals = Object.values(r.morale).map((m) => m.delta);
+    const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+    return { tone, v: avg - i * 1e-6 };
+  }).sort((a, b) => b.v - a.v);
+  const tone = scored[0].tone;
+  const { for: gf, against: ga } = S.post.forBriefing.score;
+  const res = gf > ga ? 'Po wygranej' : gf === ga ? 'Po remisie' : 'Po porażce';
+  return { tone, toneLabel: POST_TONES[tone].label, text: `${res} ta przemowa najlepiej podziała na szatnię.` };
 }
 
 export function doPostBriefing(game, S, tone, talks = []) {

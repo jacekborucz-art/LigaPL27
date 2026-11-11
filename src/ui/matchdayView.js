@@ -212,7 +212,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const players = phase === 'pre' ? MD.matchSquadPlayers(game, S) : phase === 'half' ? onPitch(S.M.teams[S.userSide], S.M.minute).map((x) => x.p) : S.result.ratings.filter((x) => x.side === S.userSide).map((r) => game.world.players[r.id]).filter(Boolean);
     const done = S.briefings[phase];
     const tones = phase === 'post' ? POST_TONES : TONES;
-    if (!ui.adv && phase !== 'post') ui.adv = phase === 'pre' ? MD.preAdvice(game, S) : MD.halfAdvice(game, S);
+    if (!ui.adv) { try { ui.adv = phase === 'pre' ? MD.preAdvice(game, S) : phase === 'half' ? MD.halfAdvice(game, S) : MD.postAdvice(game, S); } catch { ui.adv = null; } }
     const chosen = done?.tone ?? ui.sel.tone ?? ui.adv?.tone ?? Object.keys(tones)[0];
     const talks = Object.entries(TALKS).filter(([, t]) => t.phases.includes(phase));
     const ctxText = phase === 'pre' ? `${S.pre.preview.rank.label}. ${S.pre.expectations.board}`
@@ -802,6 +802,13 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     if (kind === 'subs' || kind === 'tactics') kind = 'manage';
     if (kind === 'manage') {
       if (fresh || !dlg.open) { ui.tac = null; ui.subMsg = ''; ui.subSel = null; }
+      if (ui.preSel) {
+        const T0 = M.teams[S.userSide];
+        ui.subSel = ui.preSel; ui.mmTab = ui.preSel.kind === 'on' ? 'bench' : 'xi';
+        const nm = (ui.preSel.kind === 'on' ? T0.players : T0.bench).find((x) => x.id === ui.preSel.id)?.p.name ?? '';
+        ui.subMsg = ui.preSel.kind === 'on' ? `${nm}: wybierz rezerwowego, który wejdzie za niego.` : `${nm}: wybierz zawodnika, który zejdzie.`;
+        ui.preSel = null;
+      }
       const scroll = dlg.querySelector('.mm__lists')?.scrollTop ?? 0;
       dlg.className = 'panel md-dlg md-dlg--wide mm-dlg';
       dlg.innerHTML = managePanel(T, M);
@@ -826,71 +833,118 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const windowBlocked = M.phase !== 'break' && T.windowMinute !== M.tick && T.windowsUsed >= T.windowsLimit;
     return { left, windowBlocked };
   }
-  // Taktyka: szkic zmian w oknie, wchodzi razem ze zmianami zawodników po zatwierdzeniu
+  // Taktyka: szkic zmian w oknie, wchodzi razem ze zmianami zawodników po zatwierdzeniu.
+  // Ustawienie zawodników: assign { [id]: indeks slotu } (podgląd z silnika: previewShape), także w osłabieniu,
+  // gdzie puste zostają miejsca, na które nikt nie stoi.
   const SHORT = { 'Zamurowanie': 'Mur', 'Wszystko do ataku': 'Atak', 'Równowaga': 'Równo', 'Indywidualne': 'Indyw.', 'Strefowe': 'Strefa', 'Normalne': 'Norm.', 'Normalna': 'Norm.' };
   const INS_KEYS = ['mentality', 'pressing', 'tempo', 'passing', 'line', 'tackling', 'marking', 'counter', 'timewasting'];
+  const formShort = (f) => f.name.replace(' defensywne', ' def.').replace(' ofensywne', ' of.');
+  function curAssign() {
+    const a = {};
+    for (const r of playerStates(S.M, S.userSide)) if (r.on && r.slotIdx >= 0) a[r.id] = r.slotIdx;
+    return a;
+  }
+  const fieldIds = (T) => T.players.filter((x) => x.on && !x.sentOff).map((x) => x.id);
+  function autoAssign(fid) {
+    const pv = previewShape(S.M, S.userSide, fid, {});
+    return pv.ok ? pv.assign : {};
+  }
   function tacDraft(T) {
-    ui.tac ??= { formation: T.formation.id, ins: Object.fromEntries(INS_KEYS.map((k) => [k, String(T.tactics.instructions?.[k] ?? '')])) };
+    ui.tac ??= { formation: T.formation.id, ins: Object.fromEntries(INS_KEYS.map((k) => [k, String(T.tactics.instructions?.[k] ?? '')])), assign: curAssign(), moved: false };
+    // Skład na boisku zmienił się pod oknem (np. podpowiedź asystenta): ustawienie od nowa
+    const ids = fieldIds(T);
+    const keys = Object.keys(ui.tac.assign);
+    if (keys.length !== ids.length || keys.some((id) => !ids.includes(id))) {
+      ui.tac.assign = ui.tac.formation === T.formation.id ? curAssign() : autoAssign(ui.tac.formation);
+      ui.tac.moved = false;
+    }
     return ui.tac;
+  }
+  function setDraftFormation(T, fid) {
+    const d = tacDraft(T);
+    d.formation = fid;
+    d.assign = fid === T.formation.id ? curAssign() : autoAssign(fid);
+    d.moved = false;
   }
   function tacDiff(T) {
     const d = tacDraft(T);
     const ins = {};
     for (const k of INS_KEYS) if (d.ins[k] !== String(T.tactics.instructions?.[k] ?? '')) ins[k] = d.ins[k];
     const formation = d.formation !== T.formation.id ? d.formation : null;
-    return { formation, ins, n: (formation ? 1 : 0) + Object.keys(ins).length };
+    const cur = curAssign();
+    const moved = d.moved && Object.entries(d.assign).some(([id, i]) => cur[id] !== i);
+    return { formation, ins, moved, n: (formation ? 1 : 0) + (moved && !formation ? 1 : 0) + Object.keys(ins).length };
+  }
+  const draftPreview = (T) => { const d = tacDraft(T); return previewShape(S.M, S.userSide, d.formation, { assign: d.assign }); };
+  function swapSlots(a, b) {
+    const T = S.M.teams[S.userSide]; const d = tacDraft(T);
+    const ia = d.assign[a]; const ib = d.assign[b];
+    if (ia == null || ib == null || a === b) return;
+    d.assign[a] = ib; d.assign[b] = ia; d.moved = true;
+    const n = (id) => lastName(T.players.find((x) => x.id === id)?.p);
+    ui.subMsg = `${n(a)} i ${n(b)} zamieniają się pozycjami. Zatwierdź, żeby weszło.`;
+  }
+  function moveToSlot(id, i) {
+    const T = S.M.teams[S.userSide]; const d = tacDraft(T);
+    if (d.assign[id] == null) return;
+    const other = Object.entries(d.assign).find(([pid, j]) => j === i && pid !== id);
+    if (other) { swapSlots(id, other[0]); return; }
+    d.assign[id] = i; d.moved = true;
+    const pos = FORMATIONS.find((f) => f.id === d.formation)?.slots[i]?.pos ?? '';
+    ui.subMsg = `${lastName(T.players.find((x) => x.id === id)?.p)} przechodzi na ${pos}. Jego dawne miejsce zostaje puste.`;
   }
   const insLabel = (k, v) => INSTRUCTIONS.find((i) => i.id === k)?.options.find((o) => String(o.id) === String(v))?.label ?? String(v);
-  /** Gdzie stoi każdy zawodnik po zatwierdzeniu: nowa formacja i zaplanowane zmiany. */
-  function previewXI(T) {
-    const d = tacDraft(T);
-    let xs = onPitchNow(T).map((x) => ({ x, slot: x.slot }));
-    if (d.formation !== T.formation.id) {
-      const F = FORMATIONS.find((f) => f.id === d.formation);
-      if (F && typeof TEAMS.reslot === 'function') {
-        const clone = { ...T, formation: F, players: T.players.map((x) => ({ ...x })) };
-        try { TEAMS.reslot(clone); xs = xs.map((o) => ({ x: o.x, slot: clone.players.find((c) => c.id === o.x.id)?.slot ?? o.slot })); } catch { /* podgląd bez zmiany ustawienia */ }
-      } else if (F) {
-        const free = F.slots.slice();
-        xs = xs.map((o) => { let i = free.findIndex((sl) => sl.pos === o.slot?.pos); if (i < 0) i = free.reduce((b, sl, j) => (Math.abs(sl.y - (o.slot?.y ?? 50)) < Math.abs(free[b].y - (o.slot?.y ?? 50)) ? j : b), 0); const sl = free.splice(i, 1)[0] ?? o.slot; return { x: o.x, slot: sl }; });
-      }
-    }
-    return xs;
-  }
   function managePanel(T, M) {
     const st = subsState(T, M);
     const pend = ui.pend;
     const outIds = new Set(pend.map((x) => x.out)); const inIds = new Set(pend.map((x) => x.in));
     const sel = ui.subSel;
     const d = tacDraft(T); const diff = tacDiff(T);
-    const condCls = (c) => (c < 60 ? 'low' : c < 75 ? 'mid' : '');
+    const pv = draftPreview(T);
+    const F = FORMATIONS.find((f) => f.id === d.formation) ?? T.formation;
+    // Pozycja po zatwierdzeniu: slot z podglądu (zaplanowany zmiennik zajmuje miejsce schodzącego)
+    const slotOfId = new Map((pv.ok ? pv.slots : []).filter((sl) => sl.playerId).map((sl) => [sl.playerId, sl]));
+    const fitOf = (p, sl) => (p && sl ? proficiency(p, sl.pos, sl.side) : 100);
     const row = (x, kind) => {
       const planned = kind === 'on' ? outIds.has(x.id) : inIds.has(x.id);
       const isSel = sel && sel.kind === kind && sel.id === x.id;
-      const pos = kind === 'on' ? x.slot?.pos ?? x.p.pos : x.p.pos;
+      const sl = kind === 'on' ? slotOfId.get(x.id) ?? x.slot : null;
+      const pos = kind === 'on' ? sl?.pos ?? x.p.pos : x.p.pos;
+      const prof = kind === 'on' ? fitOf(x.p, sl) : 100;
+      const band = fitBand(prof);
       const cond = Math.round(x.cond ?? 100);
-      const note = [x.injury ? 'uraz' : '', x.yc ? 'żółta kartka' : '', kind === 'bench' ? `OVR ${Math.round(x.p.ovr)}` : ''].filter(Boolean).join(', ');
-      return `<li class="sub-row ${planned ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${x.injury ? 'is-hurt' : ''}" data-sdrop="${kind}:${esc(x.id)}">
+      const k = x.knock && !x.knock.aggravated;
+      const note = [kind === 'on' && pos !== x.p.pos ? `nominalnie ${x.p.pos}${band !== 'ok' ? `, ${prof}% na tej pozycji` : ''}` : '', x.injury && !x.injury.playable ? 'uraz' : k ? `gra z bólem (${x.knock.name})` : '', x.yc ? 'żółta kartka' : '', kind === 'bench' ? `OVR ${Math.round(x.p.ovr)}` : ''].filter(Boolean).join(', ');
+      return `<li class="sub-row ${planned ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${x.injury && !x.injury.playable ? 'is-hurt' : ''} ${band !== 'ok' ? `is-off is-off--${band}` : ''}" data-sdrop="${kind}:${esc(x.id)}">
         <button class="sub-row__main" data-md="subPick:${kind}|${esc(x.id)}" data-sdrag="${kind}:${esc(x.id)}" data-name="${esc(x.p.name)}" aria-pressed="${isSel}" ${planned ? 'disabled' : ''}>
           <span class="sub-handle" data-shandle aria-hidden="true"></span>
           <span class="pos" data-g="${GROUP[pos] ?? 'MID'}">${esc(pos)}</span>
-          <span class="sub-name">${esc(x.p.name)}${note ? `<small>${esc(note)}</small>` : ''}</span>
+          <span class="sub-name">${esc(x.p.name)}${x.yc ? ICON.yellow : ''}${k ? ICON.knock : ''}${note ? `<small>${esc(note)}</small>` : ''}</span>
           <span class="sub-cond" title="Kondycja"><i style="width:${cond}%" class="${condCls(cond)}"></i></span><b>${cond}%</b>
         </button></li>`;
     };
-    // Boisko: żetony w miejscach po zatwierdzeniu, zaplanowany zmiennik zamiast schodzącego
-    const tokens = previewXI(T).map(({ x, slot }) => {
+    // Boisko: wszystkie miejsca formacji; puste miejsca przy grze w osłabieniu, zaplanowany zmiennik zamiast schodzącego
+    const last = (n) => String(n).split(' ').slice(-1)[0];
+    const tokens = (pv.ok ? pv.slots : []).map((sl) => {
+      const x = sl.playerId ? T.players.find((y) => y.id === sl.playerId) : null;
+      if (!x) {
+        return `<button class="mm-tok mm-tok--empty ${sel?.kind === 'on' ? 'is-open' : ''}" style="--x:${sl.x};--y:${sl.y}" data-sdrop="slot:${sl.i}" data-md="slotPick:${sl.i}" aria-label="Puste miejsce: ${esc(sl.pos)}">
+          <span class="mm-tok__dot"><span>${esc(sl.pos)}</span></span><span class="mm-tok__name">puste</span></button>`;
+      }
       const pl = pend.find((q) => q.out === x.id);
       const inc = pl ? T.bench.find((b) => b.id === pl.in) : null;
-      const cond = Math.round(x.cond ?? 100);
+      const who = inc ?? x;
+      const cond = Math.round(who.cond ?? 100);
       const isSel = sel && sel.kind === 'on' && sel.id === x.id;
-      const last = (n) => String(n).split(' ').slice(-1)[0];
-      const pos = slot?.pos ?? x.p.pos;
-      return `<button class="mm-tok ${pos === 'BR' ? 'is-gk' : ''} ${pl ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${x.injury ? 'is-hurt' : ''}" style="--x:${slot?.x ?? 50};--y:${slot?.y ?? 50};--cond:${cond}" data-c="${condCls(cond)}"
-        data-sdrop="on:${esc(x.id)}" data-sdrag="on:${esc(x.id)}" data-shandle data-name="${esc(x.p.name)}" data-md="subPick:on|${esc(x.id)}" ${pl ? 'disabled' : ''} title="${esc(`${x.p.name}, ${pos}, kondycja ${cond}%`)}">
-        <span class="mm-tok__dot"><span>${esc(pos)}</span></span>${x.yc ? '<i class="mm-tok__yc" aria-label="żółta kartka"></i>' : ''}${x.injury ? '<i class="mm-tok__inj" aria-label="uraz">+</i>' : ''}
+      const prof = fitOf(who.p, sl); const band = fitBand(prof);
+      const k = who.knock && !who.knock.aggravated;
+      return `<button class="mm-tok ${sl.pos === 'BR' ? 'is-gk' : ''} ${pl ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${x.injury && !x.injury.playable ? 'is-hurt' : ''}" style="--x:${sl.x};--y:${sl.y};--cond:${cond}" data-c="${condCls(cond)}" data-fit="${band}"
+        data-sdrop="on:${esc(x.id)}" data-sdrag="on:${esc(x.id)}" data-shandle data-name="${esc(x.p.name)}" data-md="tokPick:${esc(x.id)}" ${pl ? 'disabled' : ''} title="${esc(`${who.p.name}, ${sl.pos}${band !== 'ok' ? ` (nominalnie ${who.p.pos}, ${prof}%)` : ''}, kondycja ${cond}%`)}">
+        <span class="mm-tok__dot"><span>${esc(sl.pos)}</span></span>${who.yc ? '<i class="mm-tok__yc" aria-label="żółta kartka"></i>' : ''}${x.injury && !x.injury.playable ? '<i class="mm-tok__inj" aria-label="uraz">+</i>' : k ? `<i class="mm-tok__knock" aria-label="gra z bólem">${ICON.knock}</i>` : ''}
         <span class="mm-tok__name">${inc ? `↑ ${esc(last(inc.p.name))}` : esc(last(x.p.name))}</span></button>`;
     }).join('');
+    // Ustawienie: przyciski zamiast listy rozwijanej (czytelne w obu motywach, jeden dotyk)
+    const chips = `<fieldset class="mm-forms"><legend class="mm-forms__lbl">Ustawienie</legend><div class="mm-forms__opts">${FORMATIONS.map((f) => `<label class="mm-fchip ${f.id === T.formation.id ? 'is-now' : ''}" title="${esc(`${f.name} „${f.nick}”${f.id === T.formation.id ? ', obecne ustawienie' : ''}`)}"><input type="radio" name="mdForm" value="${f.id}" ${f.id === d.formation ? 'checked' : ''}><span>${esc(formShort(f))}</span></label>`).join('')}</div></fieldset>`;
     // Instrukcje jako segmenty
     const seg = (k) => {
       const ins = INSTRUCTIONS.find((i) => i.id === k); if (!ins) return '';
@@ -898,9 +952,10 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
       return `<fieldset class="mm-seg ${dirty ? 'is-dirty' : ''}"><legend class="mm-seg__lbl">${esc(ins.label)}</legend><div class="mm-seg__opts">${ins.options.map((o) => `<label title="${esc(o.label)}"><input type="radio" name="ins-${k}" value="${esc(String(o.id))}" data-ins="${k}" ${d.ins[k] === String(o.id) ? 'checked' : ''}><span>${esc(SHORT[o.label] ?? o.label)}</span></label>`).join('')}</div></fieldset>`;
     };
     // Kolejka do zatwierdzenia
-    const chips = [
+    const chipsQ = [
       ...pend.map((x, i) => { const o = T.players.find((y) => y.id === x.out); const n = T.bench.find((y) => y.id === x.in); const gkWarn = o?.slot?.pos === 'BR' && n?.p.pos !== 'BR'; return `<li class="mm-pend ${gkWarn ? 'is-warn' : ''}"><span><b class="out">${esc(o?.p.name ?? '')}</b> <b class="in">${esc(n?.p.name ?? '')}</b>${gkWarn ? '<small>Do bramki wejdzie zawodnik z pola.</small>' : ''}</span><button data-md="subDrop:${i}" aria-label="Usuń zmianę">×</button></li>`; }),
-      diff.formation ? `<li class="mm-pend"><span>Ustawienie: ${esc(T.formation.name)} → ${esc(FORMATIONS.find((f) => f.id === diff.formation)?.name ?? diff.formation)}</span><button data-md="tacUndo:formation" aria-label="Cofnij zmianę ustawienia">×</button></li>` : '',
+      diff.formation ? `<li class="mm-pend"><span>Ustawienie: ${esc(T.formation.name)} → ${esc(F.name)}${pv.ok && pv.need ? ` (${esc(pv.shape)})` : ''}</span><button data-md="tacUndo:formation" aria-label="Cofnij zmianę ustawienia">×</button></li>` : '',
+      diff.moved && !diff.formation ? `<li class="mm-pend"><span>Nowe pozycje zawodników${pv.ok && pv.need ? ` (${esc(pv.shape)})` : ''}</span><button data-md="tacUndo:assign" aria-label="Cofnij przesunięcia zawodników">×</button></li>` : '',
       ...Object.entries(diff.ins).map(([k, v]) => `<li class="mm-pend"><span>${esc(INSTRUCTIONS.find((i) => i.id === k)?.label ?? k)}: ${esc(insLabel(k, T.tactics.instructions?.[k]))} → ${esc(insLabel(k, v))}</span><button data-md="tacUndo:${k}" aria-label="Cofnij">×</button></li>`),
     ].filter(Boolean);
     const nAll = pend.length + diff.n;
@@ -910,26 +965,32 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
       : st.left <= 0 ? `Wykorzystano wszystkie zmiany (${T.subsLimit}).`
         : `Zmiany: ${st.left} z ${T.subsLimit}${M.phase === 'break' ? ', w przerwie bez zużycia okna' : `, okna ${T.windowsUsed} z ${T.windowsLimit}`}.`;
     const tab = ui.mmTab ?? 'bench';
+    const short = pv.ok && pv.need > 0
+      ? `<p class="mm-short" role="note"><b>Gracie w ${11 - pv.need}.</b> ${pv.need === 1 ? 'Jedno miejsce zostaje puste' : `${pv.need} miejsca zostają puste`}, ustawienie ${esc(pv.shape)}. Wybierz dowolną formację, a potem przeciągnij zawodnika na puste miejsce albo dotknij zawodnika i miejsce.</p>` : '';
+    const err = pv.ok ? '' : `<p class="mm-err" role="alert">${esc(pv.error)} Popraw ustawienie albo cofnij zmianę.</p>`;
+    const onList = onPitchNow(T).slice().sort((a, b) => (slotOfId.get(a.id)?.i ?? 99) - (slotOfId.get(b.id)?.i ?? 99));
     return `<div class="mm" data-tab="${tab}">
       <header class="mm__head"><h2>Zmiany i taktyka</h2><span class="mm__info">${esc(info)} Spójność ${Math.round(T.S)} na 100.</span>
         <button class="mm__x" data-md="subClose" aria-label="Zamknij">×</button></header>
       <section class="mm__pitch">
-        <label class="mm-form"><span>Ustawienie</span><select id="mdForm">${FORMATIONS.map((f) => `<option value="${f.id}" ${f.id === d.formation ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}</select></label>
+        ${chips}
+        ${short}
         <div class="pitch2 mm-field">${tokens}</div>
-        <p class="mm__tip">Przeciągnij rezerwowego na zawodnika na boisku albo dotknij kolejno obu.</p>
+        <p class="mm-legend"><span><i class="fit fit--mid"></i>poza nominalną pozycją</span><span><i class="fit fit--bad"></i>daleko od swojej pozycji</span></p>
+        <p class="mm__tip">Przeciągnij rezerwowego na zawodnika na boisku albo dotknij kolejno obu. Dwóch zawodników na boisku: zamiana pozycji.</p>
       </section>
       <nav class="mm__tabs" role="tablist" aria-label="Widok">
-        ${[['bench', 'Ławka'], ['xi', 'Na boisku'], ['tac', 'Taktyka']].map(([k, l]) => `<button role="tab" data-md="mmTab:${k}" aria-selected="${tab === k}">${l}${k === 'tac' && diff.n ? ` <i class="dot"></i>` : ''}</button>`).join('')}
+        ${[['bench', 'Ławka rezerwowych'], ['xi', 'Pierwszy skład'], ['tac', 'Taktyka']].map(([k, l]) => `<button role="tab" data-md="mmTab:${k}" aria-selected="${tab === k}">${l}${k === 'tac' && Object.keys(diff.ins).length ? ` <i class="dot"></i>` : ''}</button>`).join('')}
       </nav>
       <div class="mm__lists">
-        <section class="mm__xi"><h3>Na boisku</h3><ul class="sub-list">${onPitchNow(T).map((x) => row(x, 'on')).join('')}</ul></section>
-        <section class="mm__bench"><h3>Ławka</h3><ul class="sub-list">${T.bench.map((x) => row(x, 'bench')).join('') || '<li class="hint">Brak rezerwowych.</li>'}</ul></section>
+        <section class="mm__xi"><h3>Pierwszy skład</h3><ul class="sub-list">${onList.map((x) => row(x, 'on')).join('')}</ul></section>
+        <section class="mm__bench"><h3>Ławka rezerwowych</h3><ul class="sub-list">${T.bench.map((x) => row(x, 'bench')).join('') || '<li class="hint">Brak rezerwowych.</li>'}</ul></section>
         <section class="mm__tac"><h3>Instrukcje</h3><div class="mm-segs">${INS_KEYS.map(seg).join('')}</div></section>
       </div>
       <footer class="mm__foot">
-        <div class="mm__queue">${chips.length ? `<ul>${chips.join('')}</ul>` : '<p class="hint">Nic do zatwierdzenia. Zmiany zawodników i taktyki wejdą razem po zatwierdzeniu.</p>'}
+        <div class="mm__queue">${err}${chipsQ.length ? `<ul>${chipsQ.join('')}</ul>` : '<p class="hint">Nic do zatwierdzenia. Zmiany zawodników i taktyki wejdą razem po zatwierdzeniu.</p>'}
           <p id="mdDlgMsg" class="hint" role="status">${esc([ui.subMsg ?? '', costWarn].filter(Boolean).join(' '))}</p></div>
-        <div class="mm__btns">${nAll ? btn('mmDiscard', 'Odrzuć', false) : btn('subClose', 'Zamknij', false)}<button class="btn btn--primary mm__ok" data-md="mmConfirm" ${nAll ? '' : 'disabled'}>Zatwierdź${nAll ? ` (${nAll})` : ''}</button></div>
+        <div class="mm__btns">${nAll ? btn('mmDiscard', 'Odrzuć', false) : btn('subClose', 'Zamknij', false)}<button class="btn btn--primary mm__ok" data-md="mmConfirm" ${nAll && pv.ok ? '' : 'disabled'}>Zatwierdź${nAll ? ` (${nAll})` : ''}</button></div>
       </footer>
     </div>`;
   }
@@ -952,17 +1013,44 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const err = planSub(outId, inId);
     ui.subSel = null; ui.subMsg = err ?? 'Zmiana zaplanowana. Zatwierdź, żeby weszła.';
   }
+  function tokPick(id) {
+    const sel = ui.subSel;
+    if (sel && sel.kind === 'on' && sel.id !== id) { swapSlots(sel.id, id); ui.subSel = null; return; }
+    pickSub('on', id);
+    if (ui.subSel) ui.subMsg = 'Teraz wybierz rezerwowego, który wejdzie, albo innego zawodnika na boisku (zamiana pozycji) lub puste miejsce.';
+  }
+  function slotPick(i) {
+    const sel = ui.subSel;
+    if (!sel || sel.kind !== 'on') { ui.subMsg = 'Najpierw dotknij zawodnika na boisku, a potem puste miejsce.'; return; }
+    moveToSlot(sel.id, i); ui.subSel = null;
+  }
   function confirmAll() {
     const M = S.M; const T = M.teams[S.userSide];
-    const nSubs = ui.pend.length;
+    const d = tacDraft(T);
+    const diff = tacDiff(T);
+    const plannedSubs = ui.pend.slice();
+    const nSubs = plannedSubs.length;
+    // Ustawienie z okna: zmiennik zajmuje slot schodzącego (zmiany zawodników wchodzą najpierw)
+    const assign = { ...d.assign };
     if (nSubs) confirmSubs();
     const subMsg = nSubs ? ui.subMsg : '';
-    const diff = tacDiff(T);
     let tacMsg = '';
     if (diff.n) {
-      const patch = { instructions: diff.ins };
+      const done = new Set(fieldIds(T));
+      for (const x of plannedSubs) if (assign[x.out] != null && done.has(x.in)) { assign[x.in] = assign[x.out]; delete assign[x.out]; }
+      for (const id of Object.keys(assign)) if (!done.has(id)) delete assign[id];
+      const patch = {};
+      if (Object.keys(diff.ins).length) patch.instructions = diff.ins;
       if (diff.formation) patch.formation = diff.formation;
+      if (diff.formation || diff.moved) patch.assign = assign;
       const r = changeTactics(M, S.userSide, patch);
+      if (r?.ok === false) {
+        tacMsg = `Taktyka nie weszła: ${r.error}`;
+        d.assign = assign;
+        if (S.step.startsWith('live')) updateLive();
+        ui.subMsg = [subMsg, tacMsg].filter(Boolean).join(' ');
+        return;
+      }
       tacMsg = r?.adapt ? `Taktyka wejdzie w pełni po ok. ${Math.round(r.adapt)} min (koszt spójności ${r.cost}).` : 'Taktyka obowiązuje od razu.';
     }
     ui.tac = null;
@@ -994,7 +1082,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
       if (!dlg.classList.contains('mm-dlg')) return;
       const T = S.M.teams[S.userSide];
       if (t.matches('[data-ins]')) { tacDraft(T).ins[t.dataset.ins] = t.value; ui.subMsg = ''; openDialog('manage'); }
-      if (t.id === 'mdForm') { tacDraft(T).formation = t.value; ui.subMsg = ''; openDialog('manage'); }
+      if (t.name === 'mdForm') { setDraftFormation(T, t.value); ui.subMsg = ''; openDialog('manage'); dlg.querySelector(`input[name="mdForm"][value="${t.value}"]`)?.focus(); }
     });
     let pending = null; let drag = null;
     dlg.addEventListener('pointerdown', (ev) => {
@@ -1037,8 +1125,12 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
         const [sk, sid] = drag.src.split(':');
         if (over) {
           const [dk, did] = over.dataset.sdrop.split(':');
-          if (dk !== sk) { const err = planSub(sk === 'on' ? sid : did, sk === 'bench' ? sid : did); ui.subMsg = err ?? 'Zmiana zaplanowana. Zatwierdź, żeby weszła.'; ui.subSel = null; }
-          else ui.subMsg = 'Upuść rezerwowego na zawodnika na boisku (albo odwrotnie).';
+          const tokToTok = drag.el.classList.contains('mm-tok') && over.classList.contains('mm-tok');
+          if (sk === 'on' && dk === 'slot') { moveToSlot(sid, Number(did)); ui.subSel = null; }
+          else if (dk === 'slot') ui.subMsg = 'Na puste miejsce przesuń zawodnika z boiska. Rezerwowy wchodzi tylko za kogoś.';
+          else if (sk === 'on' && dk === 'on' && tokToTok) { if (sid !== did) swapSlots(sid, did); ui.subSel = null; }
+          else if (dk !== sk) { const err = planSub(sk === 'on' ? sid : did, sk === 'bench' ? sid : did); ui.subMsg = err ?? 'Zmiana zaplanowana. Zatwierdź, żeby weszła.'; ui.subSel = null; }
+          else ui.subMsg = 'Upuść rezerwowego na zawodnika na boisku (albo odwrotnie). Na boisku przeciągnij zawodnika na innego, żeby zamienić pozycje.';
         }
         drag = null; pending = null;
         ui.suppressClick = Date.now() + 400;
@@ -1049,6 +1141,87 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     };
     dlg.addEventListener('pointerup', end);
     dlg.addEventListener('pointercancel', () => { if (drag) { drag.ghost.remove(); dlg.classList.remove('is-dragging'); } drag = null; pending = null; });
+  }
+
+  // ------------------------------------------------------------ Menu zawodnika w meczu (prawy przycisk, przytrzymanie)
+  // Na listach składów i na boisku: zmiana zawodnika (okno „Zmiany i taktyka” z nim wybranym), statystyki meczu
+  // zawodnika i wykonawcy stałych fragmentów (silnik czyta T.takers przy każdym karnym, wolnym i rożnym).
+  const TAKERS = [['penalty', 'Rzuty karne'], ['freeKick', 'Rzuty wolne'], ['corner', 'Rzuty rożne']];
+  function findX(side, id) {
+    const T = S.M?.teams[side];
+    return T ? T.players.find((x) => x.id === id) ?? T.bench.find((x) => x.id === id) ?? null : null;
+  }
+  function playerMenuModel(side, id) {
+    const M = S.M; const T = M.teams[side]; const x = findX(side, id);
+    if (!x) return null;
+    const mine = side === S.userSide;
+    const on = x.on && !x.sentOff && !x.subbedOff;
+    const onBench = T.bench.includes(x);
+    const pos = on ? x.slot?.pos ?? x.p.pos : x.p.pos;
+    const st = subsState(T, M);
+    const subWhy = st.windowBlocked ? 'Okna zmian wykorzystane' : st.left <= 0 ? 'Wykorzystano wszystkie zmiany' : null;
+    const items = [];
+    if (mine && on) items.push({ label: 'Zmień zawodnika', hint: 'Okno zmian z nim wybranym', primary: true, disabled: subWhy, act: 'sub' });
+    if (mine && onBench) items.push({ label: 'Wprowadź na boisko', hint: 'Okno zmian z nim wybranym', primary: true, disabled: subWhy, act: 'subIn' });
+    items.push({ label: 'Statystyki meczu', hint: x.minOn === null ? 'Jeszcze nie grał' : null, act: 'stats' });
+    if (mine && on && M.phase !== 'ended') {
+      items.push({ sep: true });
+      items.push({ label: 'Stałe fragmenty', items: TAKERS.map(([k, l]) => ({ label: l, checked: T.takers?.[k] === x.id, act: `taker:${k}` })) });
+    }
+    const no = kitNo(side, id);
+    return { title: x.p.name, pos, group: GROUP[pos] ?? 'MID', meta: `${no != null ? `nr ${no}, ` : ''}${sideName(side)}`, note: x.knock && !x.knock.aggravated && on ? `Gra z bólem: ${x.knock.name}` : null, items };
+  }
+  function runPlayerMenu(side, id, it) {
+    const T = S.M.teams[side]; const x = findX(side, id);
+    if (!x || !it?.act) return;
+    if (it.act === 'sub' || it.act === 'subIn') { if (ui.running) stop(); ui.preSel = { kind: it.act === 'sub' ? 'on' : 'bench', id }; openDialog('manage', true); return; }
+    if (it.act === 'stats') { if (ui.running) stop(); openPlayerStats(side, id); return; }
+    if (it.act.startsWith('taker:')) {
+      const k = it.act.slice(6);
+      T.takers = { ...(T.takers ?? {}), [k]: id };
+      menuToast(`${TAKERS.find(([q]) => q === k)?.[1]}: ${x.p.name}.`);
+    }
+  }
+  function openPlayerStats(side, id) {
+    const M = S.M; const x = findX(side, id); const dlg = app.querySelector('#mdDlg');
+    if (!x || !dlg) return;
+    const r = playerStates(M, side).find((q) => q.id === id);
+    const mins = x.minOn === null ? 0 : Math.max(0, (x.minOff ?? M.minute) - x.minOn);
+    const gk = (r?.pos ?? x.p.pos) === 'BR';
+    const rows = [['Minuty', mins], ['Gole', x.g ?? 0], ['Asysty', x.ast ?? 0], ['Strzały (celne)', `${x.sh ?? 0} (${x.sot ?? 0})`], ['Kluczowe podania', x.kp ?? 0], ['Odbiory', x.tk ?? 0], ...(gk ? [['Obrony', x.saves ?? 0]] : []), ['Faule', x.fouls ?? 0], ['Kondycja', `${Math.round(x.cond)}%`]];
+    const status = [r?.card === 'yellow' ? 'żółta kartka' : r?.card === 'secondYellow' ? 'druga żółta, czerwona kartka' : r?.card === 'red' ? 'czerwona kartka' : '', r?.knock && r.on ? `gra z bólem (${r.knock.name}, od ${r.knock.since}. min)` : '', r?.injured ? `uraz: ${x.injury?.name ?? ''}` : '', x.subbedOff ? `zszedł w ${x.minOff}. min` : '', x.minOn > 0 ? `wszedł w ${x.minOn}. min` : ''].filter(Boolean);
+    dlg.className = 'panel md-dlg pstat-dlg';
+    dlg.innerHTML = `<header class="pstat__head" data-side="${side}"><span class="pstat__no">${esc(String(kitNo(side, id) ?? ''))}</span><div><h2>${esc(x.p.name)}</h2><p>${esc(r?.pos ?? x.p.pos)}${r?.pos && r.pos !== x.p.pos ? ` (nominalnie ${esc(x.p.pos)})` : ''}, ${esc(sideName(side))}</p></div>
+        ${r?.rating != null ? `<b class="rt rt--${rBand(r.rating)}" title="Ocena na żywo">${r.rating.toFixed(1)}</b>` : ''}</header>
+      ${status.length ? `<p class="pstat__st">${esc(status.join(', '))}</p>` : ''}
+      <dl class="pstat">${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(String(v))}</dd></div>`).join('')}</dl>
+      <p class="hint">Ocena na żywo: zdarzenia meczu, bez losowej korekty oceny końcowej.</p>
+      <p>${btn('closeDlg', 'Zamknij', false)}</p>`;
+    if (!dlg.open) dlg.showModal();
+  }
+  /** Otwiera menu dla elementu listy składu albo zawodnika na boisku (trafienie w kropkę na canvasie). */
+  function openPlayerMenuAt(el, at) {
+    if (!S.M || !S.step.startsWith('live')) return false;
+    let side; let id;
+    if (el.id === 'mdPitch') {
+      const rc = el.getBoundingClientRect();
+      const px = at.x - rc.left; const py = at.y - rc.top;
+      const hit = ui.dots.filter((d) => d.px != null && Math.hypot(d.px - px, d.py - py) <= d.pr + 6).sort((a, b) => Math.hypot(a.px - px, a.py - py) - Math.hypot(b.px - px, b.py - py))[0];
+      if (!hit || at.keyboard) return false;
+      side = hit.side; id = hit.id;
+    } else {
+      const [sd, pid] = el.dataset.mdp.split('|');
+      side = Number(sd); id = pid;
+    }
+    const model = playerMenuModel(side, id);
+    if (!model) return false;
+    openMenu({ ...at, model, anchor: el, onSelect: (it) => runPlayerMenu(side, id, it) });
+    return true;
+  }
+  app.mdMenuOpen = openPlayerMenuAt;
+  if (!app.dataset.mdMenu) {
+    app.dataset.mdMenu = '1';
+    bindContextTrigger(app, { selector: '[data-mdp], #mdPitch', open: (el, at) => app.mdMenuOpen?.(el, at) ?? false });
   }
 
   // ------------------------------------------------------------ Przerwa, dogrywka, studio pomeczowe
@@ -1114,6 +1287,12 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
   }
 
   async function onClick(ev) {
+    const row = ev.target.closest('[data-mdp]');
+    if (row && !ev.target.closest('[data-md]')) {
+      const r = row.getBoundingClientRect();
+      openPlayerMenuAt(row, { x: ev.clientX || r.left + 24, y: ev.clientY || r.bottom - 4, keyboard: ev.detail === 0 });
+      return;
+    }
     const el = ev.target.closest('[data-md]');
     if (!el) return;
     const [act, arg] = el.dataset.md.split(':');
@@ -1151,7 +1330,9 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     if (act === 'mmTab') { ui.mmTab = arg; openDialog('manage'); }
     if (act === 'mmConfirm') { confirmAll(); openDialog('manage'); }
     if (act === 'mmDiscard') { ui.pend = []; ui.tac = null; ui.subSel = null; ui.subMsg = 'Odrzucono niezatwierdzone zmiany.'; openDialog('manage'); }
-    if (act === 'tacUndo') { const T = M.teams[S.userSide]; const d = tacDraft(T); if (arg === 'formation') d.formation = T.formation.id; else d.ins[arg] = String(T.tactics.instructions?.[arg] ?? ''); openDialog('manage'); }
+    if (act === 'tacUndo') { const T = M.teams[S.userSide]; const d = tacDraft(T); if (arg === 'formation' || arg === 'assign') setDraftFormation(T, T.formation.id); else d.ins[arg] = String(T.tactics.instructions?.[arg] ?? ''); openDialog('manage'); }
+    if (act === 'tokPick') { if (Date.now() < (ui.suppressClick ?? 0)) return; tokPick(arg); openDialog('manage'); }
+    if (act === 'slotPick') { if (Date.now() < (ui.suppressClick ?? 0)) return; slotPick(Number(arg)); openDialog('manage'); }
     if (act === 'closeDlg') app.querySelector('#mdDlg')?.close();
     if (act === 'subPick') { if (Date.now() < (ui.suppressClick ?? 0)) return; const [k, id] = arg.split('|'); pickSub(k, id); openDialog('manage'); }
     if (act === 'subDrop') { ui.pend.splice(Number(arg), 1); ui.subMsg = 'Usunięto zaplanowaną zmianę.'; openDialog('manage'); }
@@ -1175,11 +1356,15 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
   function onKey(ev) { if (ev.key === ' ' && S.step.startsWith('live') && !ev.target.closest('input,select,button,dialog')) { ev.preventDefault(); ui.running ? stop() : start(); } }
   function cleanup() {
     app.removeEventListener('click', onClick); document.removeEventListener('keydown', onKey);
-    ro?.disconnect(); cancelAnimationFrame(ui.raf);
+    ro?.disconnect(); headRo?.disconnect(); cancelAnimationFrame(ui.raf);
+    mqWide.removeEventListener('change', onMq); mqHuge.removeEventListener('change', onMq);
+    closeMenu({ restoreFocus: false });
+    app.mdMenuOpen = null; delete app.mdSession;
     for (const k of ['--home', '--home-ink', '--away', '--away-ink']) app.style.removeProperty(k);
   }
   app.addEventListener('click', onClick);
   document.addEventListener('keydown', onKey);
+  app.mdSession = S; // podgląd stanu meczu dla testów w przeglądarce i debugowania (nic tego nie zmienia)
   route();
   return { session: S, stop, cleanup };
 }
