@@ -123,6 +123,10 @@ export const FORMATIONS = {
   '4-2-3-1': { nick: 'Parasol', W: 0.9, slots: 'BR BO:L ŚO ŚO BO:P DP DP SP:L OP SP:P NAP' },
   '4-1-4-1': { nick: 'Kurtyna', W: 0.9, slots: 'BR BO:L ŚO ŚO BO:P DP SP:L ŚP ŚP SP:P NAP' },
   '4-4-2D': { nick: 'Diament', W: 0.6, slots: 'BR BO:L ŚO ŚO BO:P DP ŚP ŚP OP NAP NAP' },
+  // Nazwy z src/data/formations.js (formationById(...).name): warianty 4-4-2 i romb pod pełną nazwą
+  '4-4-2 romb': { nick: 'Diament', W: 0.6, slots: 'BR BO:L ŚO ŚO BO:P DP ŚP ŚP OP NAP NAP', alias: '4-4-2D' },
+  '4-4-2 defensywne': { nick: 'Niski Blok', W: 0.85, slots: 'BR BO:L ŚO ŚO BO:P SP:L ŚP ŚP SP:P NAP NAP', family: '442', block: 'low' },
+  '4-4-2 ofensywne': { nick: 'Wysokie Skrzydła', W: 1.15, slots: 'BR BO:L ŚO ŚO BO:P SP:L ŚP ŚP SP:P NAP NAP', family: '442', block: 'high' },
   '3-5-2': { nick: 'Wahadło', W: 0.9, slots: 'BR ŚO ŚO ŚO WB:L DP ŚP ŚP WB:P NAP NAP' },
   '3-4-3': { nick: 'Wysoki Trójkąt', W: 1.2, slots: 'BR ŚO ŚO ŚO WB:L ŚP ŚP WB:P SN:L NAP SN:P' },
   '5-3-2': { nick: 'Bunkier', W: 0.8, slots: 'BR WB:L ŚO ŚO ŚO WB:P ŚP DP ŚP NAP NAP' },
@@ -348,7 +352,8 @@ export function assistantReport({ user, opp, comp = 'league', stage = 'main', us
   const t = opp.tactics || {};
   const oppF = FORMATIONS[opp.formation] ? opp.formation : '4-4-2';
   const style = [];
-  style.push(`${opp.name} gra ustawieniem ${oppF.replace('D', '')} „${FORMATIONS[oppF].nick}” i ${ATT_LABEL[String(t.attitude ?? 0)]}.`);
+  const oppLabel = oppF === '4-4-2D' ? '4-4-2 romb' : oppF;
+  style.push(`${opp.name} gra ustawieniem ${oppLabel} „${FORMATIONS[oppF].nick}” i ${ATT_LABEL[String(t.attitude ?? 0)]}.`);
   const bits = [];
   if (t.pressing === 'wysoki') bits.push('wysoko pressuje');
   if (t.pressing === 'niski') bits.push('cofa się po stracie');
@@ -372,11 +377,15 @@ export function assistantReport({ user, opp, comp = 'league', stage = 'main', us
   if (t.passing === 'dlugie' && (ua.GLO_cb ?? 12) >= (oa.GLO_fw ?? 12) - 1) counters.push('Niska linia i krycie strefowe: nasi stoperzy wygrają walkę w powietrzu.');
   if ((t.line === 'wysoka' || (t.attitude ?? 0) >= 1) && (ua.SZY_att ?? 12) >= (oa.SZY_def ?? 12) - 1) counters.push('Kontratak: za ich wysoko ustawioną obroną jest dużo miejsca.');
   if (t.counter) counters.push('Niska linia i wolniejsze tempo odbiorą im kontrataki.');
+  // Warianty 4-4-2: niski blok i wysokie skrzydła (docs/taktyka-i-urazy.md 1)
+  if (FORMATIONS[oppF].block === 'low') counters.push('Rywal ustawi niski blok: cierpliwe rozgrywanie, strzały z dystansu i stałe fragmenty. Uwaga na kontry dwóch napastników.');
+  if (FORMATIONS[oppF].block === 'high') counters.push('Rywal gra wysoko i szeroko: za plecami jego bocznych obrońców jest miejsce na szybkie kontry.');
   if ((oa.DRY ?? 11) >= 13) counters.push('Twardsza gra w odbiorze ograniczy ich drybling, ale grozi kartkami.');
   // formacja
   let formation = null;
   const oppW = FORMATIONS[oppF].W;
   if (oppW <= 0.6) formation = { name: '4-4-2', why: 'Rywal gra wąsko. Szeroka formacja da przewagę na skrzydłach.' };
+  else if (FORMATIONS[oppF].block === 'high') formation = { name: '4-2-3-1', why: 'Rywal gra wysoko skrzydłami. Dwóch defensywnych pomocników zabezpieczy środek, a skrzydłowi wyjdą do kontry.' };
   else if (centralMids(oppF) === 2) formation = { name: '4-3-3', why: 'Rywal ma tylko dwóch środkowych pomocników. Trzech w środku da nam kontrolę nad piłką.' };
   else if ((t.attitude ?? 0) >= 1) formation = { name: '4-2-3-1', why: 'Rywal atakuje. Dwóch defensywnych pomocników zabezpieczy środek i da kontry.' };
   else if ((t.attitude ?? 0) <= -1) formation = { name: '3-4-3', why: 'Rywal się broni. Szerokie ustawienie rozciągnie jego obronę.' };

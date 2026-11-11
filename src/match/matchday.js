@@ -17,10 +17,10 @@ import { createTactics, refreshTactics } from '../engine/lineup.js';
 import { squadFor, anyClub, applyResult, fromEngineResult, walkoverScore, LEAGUE_COMPS, compLabel } from '../season/season.js';
 import { standings } from '../season/standings.js';
 import { winnerOf } from '../season/cup.js';
-import { preMatchStudio, postMatchStudio, postMatchMessages, preMatchMessages } from './studio.js';
+import { preMatchStudio, postMatchStudio, postMatchMessages, preMatchMessages, odds1X2 } from './studio.js';
 import {
   preMatchBriefing, halftimeBriefing, postMatchBriefing, assistantAdvice, aiBriefing, newSpeechMemory, closeMatchMemory,
-  applyBriefing,
+  applyBriefing, POST_TONES,
 } from './briefings.js';
 import {
   pressState, pickClimate, openConference, answerQuestion, walkOut as pressWalkOutConf, currentQuestion,
@@ -134,7 +134,7 @@ export function startMatchday(game, f) {
   const mySquad = squadFor(game, game.clubId, comp);
   game.tactics = matchTactics(game, mySquad, benchSize);
   const oppSquad = squadFor(game, oppId, comp);
-  const oppTactics = createTactics(oppSquad, { benchSize });
+  const oppTactics = createTactics(oppSquad, { benchSize, formation: aiPreMatchFormation(game, f, { userSide, mySquad, oppSquad, comp }) });
   const weather = weatherFor(f.date, rng);
   const pitch = rng.weighted(['doskonala', 'dobra', 'zla', 'sztuczna'], (p) => ({ doskonala: 2, dobra: 6, zla: weather.type === 'deszcz' || weather.type === 'snieg' ? 2 : 0.5, sztuczna: 0.6 })[p]);
   const referee = { name: rng.pick(REFEREES), strictness: Math.round(Math.max(0.7, Math.min(1.4, rng.gauss(1, 0.13))) * 100) / 100 };
@@ -159,6 +159,40 @@ export function startMatchday(game, f) {
     fixtureId: f.id, f, userSide, oppId, comp, tier, step: 'studio', pre, preCtx, weather, pitch, referee, hasVar,
     oppTactics, benchSize, memory: game.speechMemory ?? newSpeechMemory(), M: null, briefings: {}, post: null, pr: { pre: null, post: null },
   };
+}
+
+/**
+ * Ustawienie rywala AI na start meczu (docs/taktyka-i-urazy.md 6, panel ekspert silnika i trener).
+ * Punkt wyjścia to 4-2-3-1 (najlepszy bilans na cały mecz). Warianty 4-4-2 tylko w wyraźnych sytuacjach,
+ * bo na cały mecz nie dają przewagi, a w meczu AI przełącza się w rodzinie 4-4-2 (coach.js variant442):
+ * - wyraźnie słabszy na wyjeździe (albo trener ostrożny): 4-4-2 defensywne, niski blok i więcej remisów;
+ * - wyraźny faworyt u siebie z trenerem ofensywnym: 4-4-2 ofensywne.
+ * Osobne ziarno, więc reszta dnia meczowego (pogoda, sędzia) się nie zmienia. Zwraca id formacji.
+ */
+export function aiPreMatchFormation(game, f, { userSide, mySquad, oppSquad, comp }) {
+  const base = '4231';
+  if (!oppSquad?.length || !mySquad?.length) return base;
+  const oppSide = 1 - userSide;
+  const coach = anyClub(oppSide === 0 ? f.home : f.away)?.coach ?? 'P';
+  const userF = formationById(game.tactics?.formation ?? base).name;
+  const ct = compInfo(f).type;
+  const compType = ct === 'supercup' ? 'cup' : ct;
+  void comp;
+  const mine = { squad: mySquad, formation: userF };
+  const theirs = { squad: oppSquad, formation: formationById(base).name };
+  let o;
+  try { o = odds1X2(userSide === 0 ? mine : theirs, userSide === 0 ? theirs : mine, { neutral: !!f.neutral, comp: compType }); } catch { return base; }
+  const pWin = oppSide === 0 ? o.home : o.away;
+  const pLose = oppSide === 0 ? o.away : o.home;
+  const away = oppSide === 1 && !f.neutral;
+  const rng = new Rng(`ai-ustawienie:${game.seed}:${f.id}`);
+  // [SZAC] progi: wyraźny słabszy to szansa na wygraną poniżej 22 % przy porażce powyżej 52 %
+  if (pWin < 0.22 && pLose > 0.52 && (away || coach === 'S')) {
+    const p = { S: 0.8, P: 0.5, O: 0.15 }[coach] ?? 0.5;
+    if (rng.next() < p) return '442def';
+  }
+  if (pWin > 0.6 && !away && coach === 'O' && rng.next() < 0.35) return '442off';
+  return base;
 }
 
 /** Zawodnicy kadry meczowej gracza (jedenastka + ławka) jako obiekty świata. */
@@ -325,6 +359,26 @@ function toStudioEvent(e) {
     player: e.player ?? e.pid, // studio (pauzy, kontuzje) czyta zawodnika z `player`, silnik podaje `pid`
     penalty: e.how === 'PEN', second: /druga żółta/.test(e.text ?? ''), days: e.injury?.days, injuryType: e.injury?.name,
   };
+}
+
+/**
+ * Zalecana przemowa pomeczowa asystenta: ten sam model co odprawa (postMatchBriefing, bez rozmów, to samo ziarno),
+ * wybór tonu z najlepszym średnim wpływem na morale (przy równych wcześniejszy ton). Nic nie zmienia w grze.
+ * Wcześniej ekran zaznaczał zawsze pierwszy ton (Pochwała), który po porażce obniża morale.
+ */
+export function postAdvice(game, S) {
+  const ids = new Set(S.result.ratings.filter((x) => x.side === S.userSide).map((x) => x.id));
+  const players = squadFor(game, game.clubId, S.comp).filter((p) => ids.has(p.id));
+  const scored = Object.keys(POST_TONES).map((tone, i) => {
+    const r = postMatchBriefing({ players, tone, talks: [], memory: S.memory, ctx: S.post.forBriefing, seed: `${game.seed}:${S.f.id}:post` });
+    const vals = Object.values(r.morale).map((m) => m.delta);
+    const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+    return { tone, v: avg - i * 1e-6 };
+  }).sort((a, b) => b.v - a.v);
+  const tone = scored[0].tone;
+  const { for: gf, against: ga } = S.post.forBriefing.score;
+  const res = gf > ga ? 'Po wygranej' : gf === ga ? 'Po remisie' : 'Po porażce';
+  return { tone, toneLabel: POST_TONES[tone].label, text: `${res} ta przemowa najlepiej podziała na szatnię.` };
 }
 
 export function doPostBriefing(game, S, tone, talks = []) {
