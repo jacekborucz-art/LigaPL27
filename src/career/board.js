@@ -1,4 +1,4 @@
-// Zarząd i posada trenera (etap 9): cel sezonu, comiesięczna ocena (miejsce wobec celu, finanse, kibice),
+// Zarząd i posada trenera (etap 9): cel sezonu, comiesięczna ocena (miejsce wobec celu, finanse, kibice, prasa),
 // zaufanie 0-100, zwolnienie, oferty pracy z innych klubów, reputacja trenera.
 
 import { Rng, clamp } from '../core/rng.js';
@@ -7,6 +7,7 @@ import { COMPETITIONS } from '../config/competitions.js';
 import { standings } from '../season/standings.js';
 import { SEASON_YEAR } from '../config/calendar2026.js';
 import { clubReputation } from './reputation.js';
+import { pressBoardTerm } from '../match/press.js';
 
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
 
@@ -91,6 +92,10 @@ export function boardMonth(game, date) {
   }
   delta += clamp((B.fansMood - 55) * 0.06, -3, 3);
   if (B.fansMood < 35) notes.push('Kibice są coraz bardziej niezadowoleni.');
+  // Prasa: klimat w mediach z ostatniego miesiąca i relacje trenera z dziennikarzami (src/match/press.js) [SZAC]
+  const press = pressBoardTerm(game.press, date);
+  delta += press.delta;
+  notes.push(...press.notes);
   B.trust = Math.round(clamp(B.trust + delta, 0, 100));
   const review = { date, trust: B.trust, delta: Math.round(delta * 10) / 10, pos, notes };
   B.reviews.unshift(review); B.reviews.length = Math.min(B.reviews.length, 12);

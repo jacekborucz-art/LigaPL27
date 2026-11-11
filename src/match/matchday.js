@@ -24,8 +24,9 @@ import {
 } from './briefings.js';
 import {
   pressState, pickClimate, openConference, answerQuestion, walkOut as pressWalkOutConf, currentQuestion,
-  conferenceEffects, skipEffects, nextPressState, pressMoraleDelta, roomPreview,
+  conferenceEffects, skipEffects, nextPressState, nextPressStatePre, pressMoraleDelta, roomPreview, openCase,
 } from './press.js';
+import './pressSystem.js'; // decyzje komisji dyscyplinarnych po słowach o sędziach
 import { addMessages, createMessage } from '../core/inbox.js';
 import { applyMorale } from '../career/morale.js';
 import { isAvailable } from '../career/squad.js';
@@ -156,7 +157,7 @@ export function startMatchday(game, f) {
   if (pre.conditions?.attendance) pre.conditions.attendance.expected = Math.round(pre.conditions.attendance.expected * fanMul / 100) * 100;
   return {
     fixtureId: f.id, f, userSide, oppId, comp, tier, step: 'studio', pre, preCtx, weather, pitch, referee, hasVar,
-    oppTactics, benchSize, memory: game.speechMemory ?? newSpeechMemory(), M: null, briefings: {}, post: null, pressRoom: null,
+    oppTactics, benchSize, memory: game.speechMemory ?? newSpeechMemory(), M: null, briefings: {}, post: null, pr: { pre: null, post: null },
   };
 }
 
@@ -384,78 +385,124 @@ export function pressCtx(game, S) {
   };
 }
 
+/** Kontekst prasy PRZED meczem (forma, tabela, rywal, absencje, sędzia). */
+export function pressCtxPre(game, S) {
+  const clubId = game.clubId;
+  const club = anyClub(clubId);
+  const u = S.userSide;
+  const side = u === 0 ? 'home' : 'away';
+  const results = (game.fixtures || []).filter((x) => x.played && x.result && x.comp !== 'friendly' && (x.home === clubId || x.away === clubId))
+    .sort((a, b) => a.date.localeCompare(b.date)).map((x) => resOf(x, clubId));
+  const streak = (r) => { let n = 0; for (let i = results.length - 1; i >= 0 && results[i] === r; i--) n++; return n; };
+  const pWin = S.pre?.forBriefing?.pWin ?? 0.4;
+  const abs = S.pre?.absences?.[side];
+  const absent = abs?.injured?.[0]?.name ?? abs?.suspended?.[0]?.name ?? null;
+  const mine = matchSquadPlayers(game, S);
+  const top = [...mine].sort((a, b) => (b.ovr ?? 0) - (a.ovr ?? 0))[0];
+  const goal = game.board?.goal;
+  const league = LEAGUE_COMPS.includes(S.comp);
+  return {
+    phase: 'pre', gameSeed: `${game.seed}`, clubId, clubName: club?.name ?? clubId, oppName: anyClub(S.oppId)?.name ?? '', region: club?.region,
+    prestige: club?.prestige ?? 5, tier: club?.tier ?? 1, coach: game.manager?.profile?.lastName || 'Trener',
+    userHome: u === 0, neutral: !!S.f.neutral, date: S.f.date, season: game.season, matchId: S.f.id, comp: S.comp,
+    favourite: pWin >= 0.55, underdog: pWin <= 0.3, derby: !!S.pre?.preview?.rank?.tags?.includes('derby'),
+    oppStar: S.pre?.keyPlayers?.opponent?.[0]?.name ?? null, absent, refName: S.referee?.name ?? '',
+    last5: results.slice(-5), winStreak: streak('W'), lossStreak: streak('P'),
+    boardTrust: game.board?.trust ?? 60, fansMood: game.board?.fansMood ?? 55,
+    position: league ? S.preCtx?.[side]?.position ?? null : null, roundsPlayed: S.preCtx?.table?.roundsPlayed ?? 0,
+    relegationFrom: (S.preCtx?.table?.size ?? 0) >= 10 ? S.preCtx.table.size - 2 : null,
+    goalTarget: league ? goal?.target ?? null : null, goalText: goal?.text ?? null,
+    rumour: top ? { id: top.id, name: top.name } : null,
+  };
+}
+
+/** Miejsce na stan konferencji danej fazy w sesji dnia meczowego (leniwie, także dla starej sesji). */
+export function pressSlot(S, phase = 'post') {
+  S.pr = S.pr ?? {};
+  S.pr[phase] = S.pr[phase] ?? { room: null, conf: null, settled: false, result: null };
+  return S.pr[phase];
+}
+
 /**
  * Klimat prasy i dane sali (leniwie, deterministycznie: to samo ziarno daje ten sam klimat).
- * Sparing nie ma konferencji ani presji prasy (null).
+ * Sparing nie ma konferencji ani presji prasy (null). Po meczu wymaga S.post.
  */
-export function pressSetup(game, S) {
-  if (!S.post || S.comp === 'friendly') return null;
-  if (!S.pressRoom) {
+export function pressSetup(game, S, phase = 'post') {
+  if (S.comp === 'friendly' || (phase === 'post' && !S.post) || (phase === 'pre' && !S.pre)) return null;
+  const slot = pressSlot(S, phase);
+  if (!slot.room) {
     const state = pressState(game);
-    const ctx = pressCtx(game, S);
-    const seed = `prasa:${game.seed}:${S.f.id}`;
-    S.pressRoom = { ctx, seed, climate: pickClimate(ctx, state, seed), state: JSON.parse(JSON.stringify(state)) };
+    const ctx = phase === 'pre' ? pressCtxPre(game, S) : pressCtx(game, S);
+    const seed = `prasa${phase === 'pre' ? '-przed' : ''}:${game.seed}:${S.f.id}`;
+    slot.room = { ctx, seed, climate: pickClimate(ctx, state, seed), state: JSON.parse(JSON.stringify(state)) };
   }
-  return S.pressRoom;
+  return slot.room;
 }
 
 /** Kto czeka w sali (przed otwarciem okna). */
-export function pressRoomPreview(game, S) {
-  const room = pressSetup(game, S);
+export function pressRoomPreview(game, S, phase = 'post') {
+  const room = pressSetup(game, S, phase);
   return room ? roomPreview(room.climate.climate, room.ctx) : [];
 }
 
 /** Otwiera salę (okno konferencji). Ponowne otwarcie wraca do tej samej sesji. */
-export function pressOpen(game, S) {
-  const room = pressSetup(game, S);
-  if (!room || S.pressSettled) return S.pressConf ?? null;
-  S.pressConf = S.pressConf ?? openConference(room.ctx, room.state, room.climate, room.seed);
-  return S.pressConf;
+export function pressOpen(game, S, phase = 'post') {
+  const room = pressSetup(game, S, phase);
+  const slot = pressSlot(S, phase);
+  if (!room || slot.settled) return slot.conf ?? null;
+  slot.conf = slot.conf ?? openConference(room.ctx, room.state, room.climate, room.seed, phase);
+  return slot.conf;
 }
 
 /** Odpowiedź na bieżące pytanie; po ostatnim rozlicza konferencję. */
-export function pressAnswer(game, S, i) {
-  if (!S.pressConf || S.pressSettled) return S.pressConf;
-  S.pressConf = answerQuestion(S.pressConf, i);
-  if (S.pressConf.done) doPress(game, S);
-  return S.pressConf;
+export function pressAnswer(game, S, i, phase = 'post') {
+  const slot = pressSlot(S, phase);
+  if (!slot.conf || slot.settled) return slot.conf;
+  slot.conf = answerQuestion(slot.conf, i);
+  if (slot.conf.done) doPress(game, S, [], phase);
+  return slot.conf;
 }
 
 /** Wyjście z sali przed końcem. */
-export function pressWalkOut(game, S) {
-  if (!S.pressConf || S.pressSettled) return S.pressConf;
-  S.pressConf = pressWalkOutConf(S.pressConf);
-  doPress(game, S);
-  return S.pressConf;
+export function pressWalkOut(game, S, phase = 'post') {
+  const slot = pressSlot(S, phase);
+  if (!slot.conf || slot.settled) return slot.conf;
+  slot.conf = pressWalkOutConf(slot.conf);
+  doPress(game, S, [], phase);
+  return slot.conf;
 }
 
 /**
  * Rozlicza konferencję. answers (opcjonalnie): indeksy odpowiedzi na pozostałe pytania (testy, szybka ścieżka).
  * Zwraca skutki (conferenceEffects).
  */
-export function doPress(game, S, answers = []) {
-  if (S.pressSettled) return S.pressResult;
-  const conf = pressOpen(game, S);
+export function doPress(game, S, answers = [], phase = 'post') {
+  const slot = pressSlot(S, phase);
+  if (slot.settled) return slot.result;
+  const conf = pressOpen(game, S, phase);
   if (!conf) return null;
   let c = conf; let k = 0;
   while (!c.done && currentQuestion(c) && k < 12) c = answerQuestion(c, answers[k++] ?? 0);
-  S.pressConf = c;
-  return settlePress(game, S, conferenceEffects(c));
+  slot.conf = c;
+  return settlePress(game, S, conferenceEffects(c), phase);
 }
 
-/** Pominięcie konferencji (Dalej): presja prasy bez osłony trenera. */
-export function skipPress(game, S) {
-  if (S.pressSettled) return S.pressResult;
-  const room = pressSetup(game, S);
+/** Pominięcie konferencji (Dalej albo przejście do odprawy): presja prasy bez osłony trenera. */
+export function skipPress(game, S, phase = 'post') {
+  const slot = pressSlot(S, phase);
+  if (slot.settled) return slot.result;
+  const room = pressSetup(game, S, phase);
   if (!room) return null;
-  return settlePress(game, S, skipEffects(room.ctx, room.climate.climate, room.state));
+  return settlePress(game, S, skipEffects(room.ctx, room.climate.climate, room.state, phase), phase);
 }
 
-/** Jedno miejsce, które zapisuje skutki prasy w grze (dokładnie raz na mecz). */
-function settlePress(game, S, eff) {
-  const room = S.pressRoom;
-  game.board.trust = Math.max(0, Math.min(100, Math.round(game.board.trust + eff.board)));
-  game.board.fansMood = Math.max(0, Math.min(100, Math.round(game.board.fansMood + eff.fans)));
+/** Jedno miejsce, które zapisuje skutki prasy w grze (dokładnie raz na fazę meczu). */
+function settlePress(game, S, eff, phase = 'post') {
+  const slot = pressSlot(S, phase);
+  const room = slot.room;
+  game.board = game.board ?? { trust: 60, fansMood: 55 };
+  game.board.trust = Math.max(0, Math.min(100, Math.round((game.board.trust ?? 60) + eff.board)));
+  game.board.fansMood = Math.max(0, Math.min(100, Math.round((game.board.fansMood ?? 55) + eff.fans)));
   const extra = new Map((eff.players ?? []).map((p) => [p.id, p.d]));
   for (const id of game.world.clubs[game.clubId]?.squad ?? []) {
     const p = game.world.players[id];
@@ -463,20 +510,43 @@ function settlePress(game, S, eff) {
     const d = Math.max(-3, Math.min(2, pressMoraleDelta(eff.teamMorale, p.persona) + (extra.get(id) ?? 0))); // [SZAC] limit na zawodnika
     if (d) p.morale = applyMorale(p.morale ?? 12, d);
   }
-  game.press = nextPressState(pressState(game), eff, { climate: room.climate.climate, date: S.f.date, season: game.season, matchId: S.f.id, seed: room.seed });
+  const st = pressState(game);
+  game.press = phase === 'pre'
+    ? nextPressStatePre(st, eff, { date: S.f.date, matchId: S.f.id })
+    : nextPressState(st, eff, { climate: room.climate.climate, date: S.f.date, season: game.season, matchId: S.f.id, seed: room.seed });
+  const msgs = [];
   if (eff.headline) {
-    const body = eff.mode === 'skipped' ? 'Trener nie pojawił się na konferencji prasowej po meczu.'
+    const body = eff.mode === 'skipped' ? (phase === 'pre' ? 'Trener nie przyszedł na konferencję przed meczem.' : 'Trener nie pojawił się na konferencji prasowej po meczu.')
       : eff.quotes.slice(0, 3).map((q) => `„${q.text}”`).join(' ');
-    game.inbox = addMessages(game.inbox ?? [], [createMessage({ date: S.f.date, category: 'media', from: eff.headline.outlet, key: `prasa:${S.f.id}`, subject: eff.headline.text, body })]).inbox;
+    msgs.push(createMessage({ date: S.f.date, category: 'media', from: eff.headline.outlet, key: `prasa${phase === 'pre' ? '-przed' : ''}:${S.f.id}`, subject: eff.headline.text, body }));
   }
-  S.pressResult = eff;
-  S.pressSettled = true;
+  // Słowa o sędziach: wniosek rzecznika dyscyplinarnego, decyzja po kilku dniach (src/match/pressSystem.js)
+  const kase = openCase(eff, room.ctx, `${room.seed}|sprawa`);
+  if (kase && !game.press.cases.some((c) => c.id === kase.id)) {
+    game.press.cases = [...game.press.cases, kase];
+    msgs.push(createMessage({
+      date: S.f.date, category: 'club', from: kase.body, key: `komisja-wniosek:${kase.id}`,
+      subject: 'Wniosek o ukaranie za wypowiedź o sędziach',
+      body: `Rzecznik dyscyplinarny skierował do komisji wniosek w sprawie twojej wypowiedzi na konferencji ${phase === 'pre' ? 'przed meczem' : 'po meczu'}${kase.quote ? `: „${kase.quote}”` : ''}. Decyzja zapadnie na najbliższym posiedzeniu, za kilka dni. Możliwe jest umorzenie, upomnienie albo kara finansowa.`,
+    }));
+  }
+  if (msgs.length) game.inbox = addMessages(game.inbox ?? [], msgs).inbox;
+  slot.result = eff;
+  slot.settled = true;
   return eff;
+}
+
+/** Wyjście ze studia do odprawy: konferencja przedmeczowa pominięta, jeśli gracz jej nie zaczął i nie skończył. */
+export function leaveStudio(game, S) {
+  const slot = pressSlot(S, 'pre');
+  if (slot.settled) return slot.result;
+  if (slot.conf?.answers?.length) return doPress(game, S, [], 'pre'); // przerwana w połowie: reszta odpowiedzi domyślnie
+  return skipPress(game, S, 'pre');
 }
 
 /** Zamknięcie dnia meczowego: pamięć przemów na kolejne mecze. */
 export function closeMatchday(game, S) {
-  if (S.post && !S.pressSettled) skipPress(game, S); // Dalej bez konferencji: prasa i tak pisze
+  if (S.post && !pressSlot(S, 'post').settled) skipPress(game, S); // Dalej bez konferencji: prasa i tak pisze
   game.speechMemory = closeMatchMemory(S.memory);
   S.step = 'done';
 }

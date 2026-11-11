@@ -37,6 +37,8 @@ export const CLIMATE_IDS = Object.keys(CLIMATES);
 
 // Limity łącznych skutków jednej konferencji [SZAC]
 export const PRESS_LIMITS = { teamMorale: [-1.5, 1.0], board: [-5, 4], fans: [-6, 6], media: [-10, 8], player: [-2, 1.5] };
+// Konferencja przedmeczowa: mniejszy wpływ (zapowiedź, nie recenzja meczu) [SZAC]
+export const PRESS_LIMITS_PRE = { teamMorale: [-0.8, 0.6], board: [-3, 3], fans: [-4, 4], media: [-8, 6] };
 
 /** Stan prasy w grze (leniwie: stare zapisy nie mają tego pola). */
 export function pressState(game) {
@@ -50,6 +52,10 @@ export function pressState(game) {
     promises: Array.isArray(p.promises) ? p.promises : [],
     last: p.last ?? null,
     log: Array.isArray(p.log) ? p.log : [],
+    pre: p.pre ?? null,
+    preLog: Array.isArray(p.preLog) ? p.preLog : [],
+    cases: Array.isArray(p.cases) ? p.cases : [], // sprawy dyscyplinarne czekające na decyzję
+    discipline: Array.isArray(p.discipline) ? p.discipline : [], // decyzje (upomnienia, kary) do recydywy
   };
   return game.press;
 }
@@ -61,8 +67,8 @@ export function pressState(game) {
 export function climateFactors(ctx, state = {}) {
   const f = [];
   const add = (v, text) => { if (Math.abs(v) >= 0.05) f.push({ v: r2(v), text }); };
-  const d = (ctx.pts ?? 1) - (ctx.expPts ?? 1.2);
-  add(1.6 * d, d >= 0.8 ? 'Wynik ponad oczekiwania' : d > 0 ? 'Wynik zgodny z oczekiwaniami' : d <= -1.5 ? 'Porażka z teoretycznie słabszym rywalem' : 'Wynik poniżej oczekiwań');
+  const d = ctx.pts == null ? 0 : ctx.pts - (ctx.expPts ?? 1.2); // przed meczem: bez wyniku
+  if (ctx.pts != null) add(1.6 * d, d >= 0.8 ? 'Wynik ponad oczekiwania' : d > 0 ? 'Wynik zgodny z oczekiwaniami' : d <= -1.5 ? 'Porażka z teoretycznie słabszym rywalem' : 'Wynik poniżej oczekiwań');
   const l5 = ctx.last5 ?? [];
   const w = l5.filter((x) => x === 'W').length; const l = l5.filter((x) => x === 'P').length;
   add(0.5 * (w - l), w - l >= 2 ? `${w} ${plural(w, 'zwycięstwo', 'zwycięstwa', 'zwycięstw')} w ostatnich ${l5.length} meczach` : l - w >= 2 ? `${l} ${plural(l, 'porażka', 'porażki', 'porażek')} w ostatnich ${l5.length} meczach`
@@ -308,8 +314,8 @@ const BANK = [
     sensitive: true,
     a: (c) => [
       { tone: 'dyplomatyczny', text: 'Nie komentuję pracy sędziów.' },
-      ...(c.res !== 'W' ? [{ tone: 'konfrontacyjny', text: 'Te decyzje kosztowały nas punkty.', fans: 3, board: -1, morale: 0.3, fine: true, follow: 'ref-bias', h: { agr: '{coach} atakuje sędziego!', neu: '{coach}: „Decyzje sędziego kosztowały nas punkty”', pos: '{coach} rozczarowany sędziowaniem' } }]
-        : [{ tone: 'konfrontacyjny', text: 'Wygraliśmy mimo sędziego. To mówi wszystko.', fans: 2, board: -1, fine: true, h: { agr: '{coach} drwi z sędziego', neu: '{coach}: „Wygraliśmy mimo sędziego”' } }]),
+      ...(c.res !== 'W' ? [{ tone: 'konfrontacyjny', text: 'Te decyzje kosztowały nas punkty.', fans: 3, board: -1, morale: 0.3, ref: 1, follow: 'ref-bias', h: { agr: '{coach} atakuje sędziego!', neu: '{coach}: „Decyzje sędziego kosztowały nas punkty”', pos: '{coach} rozczarowany sędziowaniem' } }]
+        : [{ tone: 'konfrontacyjny', text: 'Wygraliśmy mimo sędziego. To mówi wszystko.', fans: 2, board: -1, ref: 1, h: { agr: '{coach} drwi z sędziego', neu: '{coach}: „Wygraliśmy mimo sędziego”' } }]),
       { tone: 'humor', text: 'Może sędzia też miał dziś słabszy dzień. Jak my wszyscy.' },
     ],
   },
@@ -317,8 +323,8 @@ const BANK = [
     id: 'ref-bias', follow: true, by: [],
     q: { neu: 'Czyli uważa pan, że sędzia był stronniczy?' },
     a: () => [
-      { tone: 'dyplomatyczny', text: 'Tego nie powiedziałem. Mówię o konkretnych decyzjach.', media: 1, board: 1, unfine: true },
-      { tone: 'konfrontacyjny', text: 'Niech każdy obejrzy powtórki i oceni sam.', fans: 2, board: -1, fine: true, h: { agr: '{coach} nie odpuszcza sędziemu. Będzie kara?', neu: '{coach}: „Niech każdy obejrzy powtórki”' } },
+      { tone: 'dyplomatyczny', text: 'Tego nie powiedziałem. Mówię o konkretnych decyzjach.', media: 1, board: 1, ref: -0.5 },
+      { tone: 'konfrontacyjny', text: 'Niech każdy obejrzy powtórki i oceni sam.', fans: 2, board: -1, ref: 1, h: { agr: '{coach} nie odpuszcza sędziemu. Będzie kara?', neu: '{coach}: „Niech każdy obejrzy powtórki”' } },
       { tone: 'bezkomentarza', text: 'Powiedziałem, co miałem do powiedzenia.', media: 1 },
     ],
   },
@@ -491,7 +497,98 @@ const BANK = [
     ],
   },
 ];
-const BY_ID = new Map([OPENING, ...BANK].map((q) => [q.id, q]));
+// Pytania przed meczem (konferencja przedmeczowa, dzień przed meczem w prawdziwym kalendarzu)
+const PRE_BANK = [
+  {
+    id: 'pre-expect', phase: 'pre', first: true, w: () => 5, by: ['dziennik', 'lokalne', 'portal'],
+    q: (c) => (c.favourite ? { neu: 'Jesteście faworytem meczu z drużyną {opp}. Czego się pan spodziewa?', agr: 'Wszyscy oczekują zwycięstwa z drużyną {opp}. Udźwigniecie tę presję?' }
+      : c.underdog ? { neu: 'Drużyna {opp} jest faworytem. Na co stać pana zespół?', agr: 'Czy z drużyną {opp} macie w ogóle szanse?', pos: 'Ostatnio gracie dobrze. Stać was na niespodziankę z drużyną {opp}?' }
+        : { neu: 'Czego spodziewa się pan po meczu z drużyną {opp}?', agr: 'Kolejny mecz, który trzeba wygrać. Czuje pan presję?' }),
+    a: () => [
+      { tone: 'pewny', text: 'Gramy o trzy punkty i wygramy ten mecz.', fans: 1, morale: 0.2, promise: 'winNext', h: { neu: '{coach} przed meczem: wygramy', agr: '{coach} zapowiada zwycięstwo. Trzymamy za słowo' } },
+      { tone: 'spokojny', text: 'Szanujemy rywala, ale skupiamy się na sobie.', morale: 0.1 },
+      { tone: 'dyplomatyczny', text: 'To będzie wyrównany mecz. Zdecydują detale.', fans: -1 },
+    ],
+  },
+  {
+    id: 'pre-opp', phase: 'pre', w: () => 3, by: ['tygodnik', 'portal', 'kanal'],
+    q: (c) => (c.oppStar ? { neu: '{oppStar} jest w świetnej formie. Jak go zatrzymać?', agr: '{oppStar} rozbija każdą obronę. Ma pan na niego sposób?' } : { neu: 'Czym może was zaskoczyć drużyna {opp}?' }),
+    a: () => [
+      { tone: 'spokojny', text: 'Mamy plan. Szczegóły zostaną w szatni.' },
+      { tone: 'pewny', text: 'Nikogo się nie boimy. To rywal powinien martwić się o nas.', fans: 1, media: -1, morale: 0.2, h: { neu: '{coach}: „Nikogo się nie boimy”', agr: '{coach} lekceważy rywala?' } },
+      { tone: 'humor', text: 'Najbardziej obawiam się ich kucharza. Podobno świetnie gotuje.' },
+    ],
+  },
+  {
+    id: 'pre-lineup', phase: 'pre', w: () => 3, by: ['kanal', 'lokalne', 'portal'],
+    q: (c) => (c.absent ? { neu: 'Jak drużyna poradzi sobie bez zawodnika, którym jest {absent}?', agr: 'Bez zawodnika, którym jest {absent}, ta drużyna gra o połowę słabiej. Ma pan plan B?' } : { neu: 'Czy szykuje pan zmiany w składzie?' }),
+    sensitive: true,
+    a: (c) => [
+      { tone: 'spokojny', text: c.absent ? 'Mamy szeroką kadrę. Ktoś dostanie swoją szansę.' : 'Skład poznacie godzinę przed meczem.', morale: 0.1 },
+      { tone: 'pewny', text: 'Kto wyjdzie na boisko, będzie gotowy. Ufam każdemu.', morale: 0.3 },
+      { tone: 'humor', text: 'Skład podam państwu w zaklejonej kopercie. Otwarcie po meczu.' },
+    ],
+  },
+  {
+    id: 'pre-derby', phase: 'pre', w: (c) => (c.derby ? 9 : 0), by: ['lokalne', 'tabloid', 'portal'],
+    q: { neu: 'Derby. Co powie pan kibicom przed tym meczem?', agr: 'W mieście mówi się tylko o derbach. Czy drużyna wytrzyma tę atmosferę?' },
+    a: () => [
+      { tone: 'pewny', text: 'Miasto będzie nasze. Obiecuję to kibicom.', fans: 3, media: -1, morale: 0.3, promise: 'winNext', h: { neu: '{coach} przed derbami: miasto będzie nasze', agr: '{coach} podgrzewa atmosferę przed derbami' } },
+      { tone: 'spokojny', text: 'To wyjątkowy mecz, ale trzeba zachować chłodną głowę.', board: 1, morale: 0.1 },
+      { tone: 'konfrontacyjny', text: 'Oni bardziej potrzebują tego meczu niż my.', fans: 2, h: { agr: '{coach} prowokuje przed derbami' } },
+    ],
+  },
+  {
+    id: 'pre-job', phase: 'pre', w: (c) => ((c.boardTrust ?? 60) < 40 ? 7 : 0), by: ['tabloid', 'kanal', 'dziennik'],
+    q: { neu: 'Mówi się, że to mecz o pana posadę. Czuje pan presję?', agr: 'Podobno zarząd ma już następcę. To pana ostatni mecz?' },
+    sensitive: true,
+    a: () => [
+      { tone: 'spokojny', text: 'Presja to część tej pracy. Myślę tylko o meczu.', board: 1, morale: 0.2 },
+      { tone: 'pewny', text: 'Wygramy i temat się skończy.', fans: 1, morale: 0.3, promise: 'winNext', h: { neu: '{coach} odpowiada na pytania o posadę: wygramy', agr: '{coach} gra o posadę i obiecuje zwycięstwo' } },
+      { tone: 'konfrontacyjny', text: 'Nie będę komentował plotek. Następne pytanie.', h: { agr: '{coach} nerwowy przed meczem o posadę' } },
+    ],
+  },
+  {
+    id: 'pre-crisis', phase: 'pre', w: (c) => (c.lossStreak >= 2 ? 6 : 0), by: ['dziennik', 'tabloid', 'lokalne'],
+    q: { neu: 'Seria porażek. Co zmieni się w tym meczu?', agr: 'Kolejna porażka i robi się kryzys. Co pan zmienił w tygodniu?' },
+    a: () => [
+      { tone: 'spokojny', text: 'Przepracowaliśmy dobry tydzień. Wierzę w przełamanie.', morale: 0.3 },
+      { tone: 'pewny', text: 'Ta seria skończy się jutro.', fans: 1, morale: 0.3, promise: 'winNext' },
+      { tone: 'dyplomatyczny', text: 'Szukamy rozwiązań. Nie ma jednej przyczyny.' },
+    ],
+  },
+  {
+    id: 'pre-streak', phase: 'pre', w: (c) => (c.winStreak >= 3 ? 4 : 0), by: ['portal', 'lokalne', 'klubowa'],
+    q: { neu: 'Seria zwycięstw. Nie boi się pan zadyszki?', pos: 'Drużyna jest na fali. Co jest jej siłą?' },
+    a: () => [
+      { tone: 'spokojny', text: 'Każdy mecz zaczyna się od zera. Tak to tłumaczę zawodnikom.', morale: 0.2 },
+      { tone: 'pewny', text: 'Ta drużyna jest głodna. Seria będzie trwać.', fans: 1, morale: 0.2 },
+      { tone: 'humor', text: 'Zadyszkę to mam ja, po każdej konferencji.' },
+    ],
+  },
+  {
+    id: 'pre-referee', phase: 'pre', w: (c) => (c.refName ? 2 : 0), by: ['kanal', 'portal', 'tabloid'],
+    q: { neu: 'Sędzią meczu będzie {ref}. Ma pan jakieś obawy?', agr: 'Sędzia {ref} nie miał ostatnio dobrej prasy. Boi się pan jego decyzji?' },
+    sensitive: true,
+    a: () => [
+      { tone: 'dyplomatyczny', text: 'Nie oceniam sędziów przed meczem.', board: 1 },
+      { tone: 'konfrontacyjny', text: 'Mam nadzieję, że tym razem gwizdek nie zdecyduje o wyniku.', fans: 2, board: -1, ref: 1, h: { agr: '{coach} uderza w sędziów jeszcze przed meczem', neu: '{coach} ostrzega przed sędzią' } },
+      { tone: 'humor', text: 'Życzę mu nudnego wieczoru. To będzie znaczyło, że wszystko poszło dobrze.' },
+    ],
+  },
+  {
+    id: 'pre-tip', phase: 'pre', w: () => 2, by: ['kanal', 'portal', 'lokalne'],
+    q: { neu: 'Na koniec poproszę o typ na mecz.' },
+    a: () => [
+      { tone: 'pewny', text: 'Wygramy 2:0.', fans: 1, promise: 'winNext', h: { neu: '{coach} typuje: 2:0 dla nas' } },
+      { tone: 'spokojny', text: 'Nie typuję. Zostawiam to bukmacherom.' },
+      { tone: 'humor', text: 'Typuję, że ktoś strzeli gola. Albo i nie.' },
+    ],
+  },
+];
+// Pytania z banku pomeczowego, które pasują też przed meczem
+const BOTH = new Set(['form', 'skipped', 'promise-season', 'board-goal', 'fans', 'rumour', 'table-top', 'table-bottom']);
+const BY_ID = new Map([OPENING, ...BANK, ...PRE_BANK].map((q) => [q.id, q]));
 
 function seasonPromiseBroken(c) {
   const p = c.promises?.find((x) => x.kind === 'season' || x.kind === 'goal');
@@ -531,17 +628,19 @@ function makeQuestion(def, c, j) {
  * Otwiera konferencję. ctx: kontekst meczu (pressCtx w matchday.js), state: game.press, climateRes: pickClimate(...).
  * Zwraca obiekt sesji (JSON): klimat, rzecznik, sala, kolejka pytań, odpowiedzi.
  */
-export function openConference(ctx, state = {}, climateRes = null, seed = 'konferencja') {
+export function openConference(ctx, state = {}, climateRes = null, seed = 'konferencja', phase = 'post') {
   const cr = climateRes ?? pickClimate(ctx, state, seed);
   const climate = cr.climate;
   const rng = new Rng(`${seed}|sala`);
   const c = { ...ctx, climate, promises: state.promises ?? [], lastMode: state.last?.mode ?? null, rumourRoll: rng.chance(0.3) };
   const room = roomPreview(climate, ctx);
   const officer = pressOfficer(ctx);
+  const pre = phase === 'pre';
   const n = climate === 'agresywna' ? 4 : 3; // [SZAC]
   // Wybór pytań: ważony, bez powtórzeń; klimat wzmacnia tematy trudne albo przyjazne
   const harsh = new Set(['job', 'board-goal', 'fans', 'rumour', 'red', 'promise-broken', 'promise-season', 'skipped', 'streak-loss', 'loss-heavy', 'win-lucky', 'referee']);
-  const soft = new Set(['star', 'win-big', 'win-key', 'streak-win', 'promise-kept', 'fans-thanks', 'table-top', 'injury']);
+  harsh.add('pre-job'); harsh.add('pre-crisis'); harsh.add('pre-referee');
+  const soft = new Set(['star', 'win-big', 'win-key', 'streak-win', 'promise-kept', 'fans-thanks', 'table-top', 'injury', 'pre-streak', 'pre-tip']);
   const weight = (d) => {
     let w = d.w(c);
     if (!w) return 0;
@@ -549,7 +648,8 @@ export function openConference(ctx, state = {}, climateRes = null, seed = 'konfe
     if (climate === 'pozytywna' && soft.has(d.id)) w *= 1.5;
     return w;
   };
-  let pool = BANK.filter((d) => !d.follow && weight(d) > 0);
+  const bank = pre ? [...PRE_BANK, ...BANK.filter((d) => BOTH.has(d.id))] : BANK;
+  let pool = bank.filter((d) => !d.follow && weight(d) > 0);
   const picked = [];
   while (picked.length < n && pool.length) {
     const d = rng.weighted(pool, weight);
@@ -557,9 +657,9 @@ export function openConference(ctx, state = {}, climateRes = null, seed = 'konfe
     pool = pool.filter((x) => x !== d);
   }
   // Pytanie o wynik pada zawsze i jako pierwsze (tak jest w prawdziwej sali), reszta wg wagi
-  const RESULT = new Set(['win-key', 'win-big', 'win-lucky', 'draw', 'loss-why', 'loss-heavy', 'loss-unlucky', 'derby']);
+  const RESULT = pre ? new Set(['pre-expect', 'pre-derby']) : new Set(['win-key', 'win-big', 'win-lucky', 'draw', 'loss-why', 'loss-heavy', 'loss-unlucky', 'derby']);
   if (!picked.some((d) => RESULT.has(d.id))) {
-    const best = BANK.filter((d) => RESULT.has(d.id) && weight(d) > 0).sort((a, b) => weight(b) - weight(a))[0];
+    const best = bank.filter((d) => RESULT.has(d.id) && weight(d) > 0).sort((a, b) => weight(b) - weight(a))[0];
     if (best) picked.splice(Math.max(0, picked.length - 1), 1, best);
   }
   picked.sort((a, b) => (RESULT.has(b.id) - RESULT.has(a.id)) || weight(b) - weight(a));
@@ -569,14 +669,15 @@ export function openConference(ctx, state = {}, climateRes = null, seed = 'konfe
     used.add(j.id);
     return makeQuestion(d, c, j);
   });
-  const opening = { ...makeQuestion(OPENING, c, null), officer: true };
-  const intro = ctx.neutral ? 'Dzień dobry, zaczynamy. Zapraszam, panie trenerze.'
-    : ctx.userHome ? 'Trener gości już za nami. Teraz trener gospodarzy, zapraszam.'
-      : 'Dzień dobry. Zgodnie ze zwyczajem zaczynamy od trenera gości.';
+  const opening = pre ? [] : [{ ...makeQuestion(OPENING, c, null), officer: true }];
+  const intro = pre ? `Dzień dobry, zapraszamy na konferencję przed meczem z drużyną ${ctx.oppName ?? 'rywala'}.`
+    : ctx.neutral ? 'Dzień dobry, zaczynamy. Zapraszam, panie trenerze.'
+      : ctx.userHome ? 'Trener gości już za nami. Teraz trener gospodarzy, zapraszam.'
+        : 'Dzień dobry. Zgodnie ze zwyczajem zaczynamy od trenera gości.';
   return {
-    v: 1, climate, climateRes: { climate, probs: cr.probs, reasons: cr.reasons },
+    v: 1, phase, climate, climateRes: { climate, probs: cr.probs, reasons: cr.reasons },
     officer, room, intro: `${intro} Mamy czas na ${queue.length} ${plural(queue.length, 'pytanie', 'pytania', 'pytań')}.`,
-    ctx: c, queue: [opening, ...queue], idx: 0, answers: [], followUps: 0, maxJournalist: 5, done: false, walkedOut: false,
+    ctx: c, queue: [...opening, ...queue], idx: 0, answers: [], followUps: 0, maxJournalist: 5, done: false, walkedOut: false,
   };
 }
 
@@ -645,7 +746,8 @@ export function conferenceEffects(conf) {
   const climate = conf.climate;
   const eff = { fans: 0, board: 0, media: 0, morale: 0 };
   const players = new Map();
-  let fine = false;
+  let ref = 0;
+  const pre = conf.phase === 'pre';
   const promisesAdd = []; const promisesDrop = [];
   let loud = null;
   const heavyLoss = c.res === 'P' && c.margin <= -2;
@@ -662,11 +764,10 @@ export function conferenceEffects(conf) {
     if (a.tone === 'konfrontacyjny' && climate === 'agresywna') { media -= 1; fans += 1; } // kibice lubią, gdy trener się stawia
     if (a.tone === 'bezkomentarza' && climate === 'agresywna') media -= 1;
     eff.fans += fans; eff.board += board; eff.media += media; eff.morale += morale;
-    if (a.fine) fine = true;
-    if (a.unfine) fine = false;
+    ref += a.ref ?? 0;
     if (a.promise) {
       const amb = ambition(c);
-      promisesAdd.push(a.promise === 'winNext' ? { kind: 'winNext', text: 'zwycięstwo w kolejnym meczu', date: c.date }
+      promisesAdd.push(a.promise === 'winNext' ? { kind: 'winNext', text: pre ? `zwycięstwo z drużyną ${c.oppName ?? 'rywala'}` : 'zwycięstwo w kolejnym meczu', date: c.date, pre }
         : a.promise === 'season' ? { kind: 'season', text: amb.text, target: amb.target, season: c.season, date: c.date }
           : { kind: 'goal', text: c.goalText ?? 'cel zarządu', target: c.goalTarget ?? 12, season: c.season, date: c.date });
     }
@@ -682,7 +783,7 @@ export function conferenceEffects(conf) {
   let headline;
   if (conf.walkedOut) {
     eff.media -= 5; eff.board -= 1; // [SZAC]
-    headline = { text: headlineFor(climate === 'agresywna' ? '{coach} wyszedł z konferencji. Pytania bez odpowiedzi' : '{coach} przerwał konferencję prasową', c), outlet: OUTLETS[climate === 'agresywna' ? 'tabloid' : 'portal'].name };
+    headline = { text: headlineFor(pre ? '{coach} przerwał konferencję przed meczem' : climate === 'agresywna' ? '{coach} wyszedł z konferencji. Pytania bez odpowiedzi' : '{coach} przerwał konferencję prasową', c), outlet: OUTLETS[climate === 'agresywna' ? 'tabloid' : 'portal'].name };
   } else if (loud) {
     const h = loud.a.h?.[key] ?? loud.a.h?.neu;
     const quote = loud.a.text.split(/(?<=[.!?])\s/)[0].replace(/\.$/, '');
@@ -691,23 +792,39 @@ export function conferenceEffects(conf) {
     headline = { text: h ? headlineFor(h, c) : `${c.coach ?? 'Trener'}: „${quote}”`, outlet };
   }
   // Presja klimatu plus osłona albo dociążenie z odpowiedzi; wyjście z sali: osłona tylko do tej pory
-  const base = conf.walkedOut && climate === 'pozytywna' ? CLIMATES.pozytywna.base / 2 : CLIMATES[climate].base; // po wyjściu dobra prasa działa słabiej
-  const teamMorale = r2(clamp(base + eff.morale, ...PRESS_LIMITS.teamMorale));
+  // Przed meczem presja jest o połowę mniejsza (zapowiedzi, nie recenzje), limity węższe [SZAC]
+  const L = pre ? PRESS_LIMITS_PRE : PRESS_LIMITS;
+  let base = conf.walkedOut && climate === 'pozytywna' ? CLIMATES.pozytywna.base / 2 : CLIMATES[climate].base; // po wyjściu dobra prasa działa słabiej
+  if (pre) base /= 2;
+  const teamMorale = r2(clamp(base + (pre ? eff.morale * 0.6 : eff.morale), ...L.teamMorale));
+  const refSeverity = r1(Math.max(0, ref));
   return {
-    mode: conf.walkedOut ? 'walkout' : 'answered', climate,
-    fans: Math.round(clamp(eff.fans, ...PRESS_LIMITS.fans)),
-    board: Math.round(clamp(eff.board, ...PRESS_LIMITS.board)),
-    media: r1(clamp(eff.media, ...PRESS_LIMITS.media)),
+    phase: pre ? 'pre' : 'post', mode: conf.walkedOut ? 'walkout' : 'answered', climate,
+    fans: Math.round(clamp(eff.fans, ...L.fans)),
+    board: Math.round(clamp(eff.board, ...L.board)),
+    media: r1(clamp(eff.media, ...L.media)),
     teamMorale,
     players: [...players.values()].map((p) => ({ ...p, d: r2(clamp(p.d, ...PRESS_LIMITS.player)) })),
-    fine, promisesAdd, promisesDrop, headline,
+    ref: refSeverity, fine: refSeverity >= 1, promisesAdd, promisesDrop, headline,
     quotes: conf.answers.map((r) => ({ by: r.by, text: r.text })),
   };
 }
 
 /** Skutki pominięcia konferencji (przycisk Dalej). Presja działa, ale bez osłony trenera. [SZAC] */
-export function skipEffects(ctx, climate = 'neutralna', state = {}) {
+export function skipEffects(ctx, climate = 'neutralna', state = {}, phase = 'post') {
   const c = ctx;
+  const coachPre = c.coach ?? 'Trener';
+  if (phase === 'pre') {
+    const pre = {
+      agresywna: { media: -2, morale: r2(CLIMATES.agresywna.base / 2), h: `${coachPre} odwołał konferencję przed meczem. Co ukrywa?`, outlet: OUTLETS.tabloid.name },
+      neutralna: { media: -1, morale: 0, h: 'Przed meczem bez konferencji trenera', outlet: OUTLETS.dziennik.name },
+      pozytywna: { media: -0.5, morale: r2(CLIMATES.pozytywna.base / 4), h: 'Trener w ciszy szykuje drużynę do meczu', outlet: OUTLETS.dziennik.name },
+    }[climate];
+    return {
+      phase: 'pre', mode: 'skipped', climate, fans: 0, board: 0, media: pre.media, teamMorale: pre.morale, players: [], ref: 0, fine: false,
+      promisesAdd: [], promisesDrop: [], headline: { text: pre.h, outlet: pre.outlet }, quotes: [],
+    };
+  }
   const broken = (state.promises ?? []).some((p) => p.kind === 'winNext') && c.res !== 'W';
   const coach = c.coach ?? 'Trener';
   const by = {
@@ -716,9 +833,9 @@ export function skipEffects(ctx, climate = 'neutralna', state = {}) {
     pozytywna: { media: -1, fans: 0, board: 0, morale: r2(CLIMATES.pozytywna.base / 2), h: 'Asystent zastąpił trenera na konferencji. Nastroje dobre', outlet: OUTLETS.dziennik.name },
   }[climate];
   return {
-    mode: 'skipped', climate,
+    phase: 'post', mode: 'skipped', climate,
     fans: by.fans + (broken ? -1 : 0), board: by.board, media: by.media + (broken ? -1 : 0),
-    teamMorale: r2(clamp(by.morale, ...PRESS_LIMITS.teamMorale)), players: [], fine: false,
+    teamMorale: r2(clamp(by.morale, ...PRESS_LIMITS.teamMorale)), players: [], ref: 0, fine: false,
     promisesAdd: [], promisesDrop: [], headline: { text: broken ? `${coach} obiecał zwycięstwo, a potem nie przyszedł na konferencję` : by.h, outlet: by.outlet }, quotes: [],
   };
 }
@@ -737,9 +854,25 @@ export function nextPressState(state, eff, { climate, date, season, matchId, see
   if (eff.promisesDrop?.includes('season')) promises = promises.filter((p) => p.kind !== 'season' && p.kind !== 'goal');
   for (const p of eff.promisesAdd ?? []) promises = [...promises.filter((x) => x.kind !== p.kind), p];
   return {
-    v: 1, climate, left, streak: same ? (s.streak ?? 0) + 1 : 1, relation, promises: promises.slice(-4),
+    ...s, v: 1, climate, left, streak: same ? (s.streak ?? 0) + 1 : 1, relation, promises: promises.slice(-4),
     last: { mode: eff.mode, date, matchId },
     log: [...(s.log ?? []), { date, climate, mode: eff.mode, headline: eff.headline?.text ?? null }].slice(-6),
+  };
+}
+
+/**
+ * Stan prasy po konferencji PRZEDMECZOWEJ: relacje i obietnice. Narracji (klimatu) nie zmienia, a obietnica
+ * zwycięstwa zostaje do rozliczenia na konferencji po tym meczu.
+ */
+export function nextPressStatePre(state, eff, { date, matchId } = {}) {
+  const s = state ?? {};
+  let relation = clamp((s.relation ?? 50) + (eff.media ?? 0), 0, 100);
+  relation = r1(relation);
+  let promises = [...(s.promises ?? [])];
+  for (const p of eff.promisesAdd ?? []) promises = [...promises.filter((x) => x.kind !== p.kind), p];
+  return {
+    ...s, relation, promises: promises.slice(-4), pre: { mode: eff.mode, date, matchId },
+    preLog: [...(s.preLog ?? []), { date, climate: eff.climate, mode: eff.mode, headline: eff.headline?.text ?? null }].slice(-6),
   };
 }
 
@@ -760,7 +893,7 @@ export function effectWords(eff) {
   out.push({ k: 'Kibice', dir: Math.sign(f), t: f >= 3 ? 'Kibice kupili twoje słowa.' : f > 0 ? 'Kibicom spodobały się twoje słowa.' : f === 0 ? 'Kibice bez większych emocji.' : f > -3 ? 'Część kibiców jest rozczarowana.' : 'Kibice są wściekli na twoje słowa.' });
   const md = eff.media;
   out.push({ k: 'Media', dir: Math.sign(md >= 1 ? 1 : md <= -1 ? -1 : 0), t: md >= 3 ? 'Dziennikarze cię polubili. Następnym razem będzie łagodniej.' : md >= 1 ? 'Relacje z mediami lekko się poprawiły.' : md > -1 ? 'Relacje z mediami bez zmian.' : md > -4 ? 'Dziennikarze zapamiętają ten dzień.' : 'Media mają z tobą na pieńku. Następna sala będzie gorąca.' });
-  if (eff.fine) out.push({ k: 'Liga', dir: -1, t: 'Rzecznik ligi zapowiada analizę twoich słów o sędziach. Może skończyć się karą.' });
+  if (eff.fine) out.push({ k: 'Liga', dir: -1, t: eff.ref >= 2 ? 'Rzecznik dyscyplinarny kieruje wniosek o ukaranie za słowa o sędziach. Decyzja za kilka dni, grozi kara finansowa.' : 'Rzecznik dyscyplinarny przyjrzy się twoim słowom o sędziach. Decyzja za kilka dni.' });
   for (const p of eff.promisesAdd ?? []) out.push({ k: 'Obietnica', dir: 0, t: `Media zapamiętały: ${p.text}. Wrócą do tego.` });
   return out;
 }
@@ -774,11 +907,106 @@ export function pressOfficer(ctx) {
 /** Sala: dziennikarze redakcji obecnych przy danym klimacie, bez powtórzonych nazwisk (także z rzecznikiem). */
 export function roomPreview(climate, ctx) {
   const opts = { gameSeed: ctx.gameSeed, clubId: ctx.clubId, region: ctx.region };
-  const used = new Set([pressOfficer(ctx).name.split(' ').pop()]);
+  const used = new Set([pressOfficer(ctx).name.split(' ').pop(), ctx.coach].filter(Boolean)); // bez nazwiska rzecznika i trenera
   return (ROOMS[climate] ?? ROOMS.neutralna).map((id) => {
     let j = journalist(id, opts);
     for (let salt = 1; used.has(j.name.split(' ').pop()) && salt < 8; salt++) j = journalist(id, opts, salt);
     used.add(j.name.split(' ').pop());
     return j;
   });
+}
+
+// ================================================================ Dyscyplina: słowa o sędziach
+// Ekstraklasa: Komisja Ligi Ekstraklasy; 1 i 2 Liga oraz Puchar Polski: Komisja Dyscyplinarna PZPN.
+// Punkt odniesienia: 50 tys. zł dla trenera Legii za wulgarne słowa wobec sędziego technicznego (Komisja Ligi),
+// 100 tys. zł i dyskwalifikacja za niedozwolony kontakt z sędzią (sprawa poważniejsza niż wypowiedź).
+// Zwykła krytyka sędziów kończy się zwykle upomnieniem, naganą albo karą kilku do kilkunastu tysięcy złotych.
+// Kwoty dla 1 i 2 Ligi skalowane do budżetów tych lig. Wszystko [SZAC], źródła: docs/konferencja-prasowa.md, rozdz. 5.
+
+export const DISCIPLINE = {
+  body: { 1: 'Komisja Ligi Ekstraklasy', 2: 'Komisja Dyscyplinarna PZPN', 3: 'Komisja Dyscyplinarna PZPN' },
+  fine: { 1: [5000, 20000], 2: [2000, 8000], 3: [1000, 4000] }, // zł, pierwsze przewinienie, zwykła krytyka [SZAC]
+  cap: { 1: 50000, 2: 20000, 3: 10000 }, // [SZAC] górna granica (Ekstraklasa: poziom kary za wulgaryzmy)
+  repeatMul: 1.5, // za każde przewinienie w ostatnich 365 dniach, najwyżej 3 [SZAC]
+  days: [3, 6], // decyzja po kilku dniach (posiedzenie komisji) [SZAC]
+  trust: { umorzenie: 0, upomnienie: -1, kara: -2, karaRecydywa: -3 }, // zaufanie zarządu [SZAC]
+};
+
+const COMP_TIER = { ekstraklasa: 1, liga1: 2, liga2: 3, l1: 1, l2: 2, l3: 3 };
+
+/** Poziom rozgrywek dla dyscypliny (null: puchary UEFA i sparingi bez sprawy krajowej). */
+export function disciplineTier(comp, clubTier = 1) {
+  if (!comp || comp === 'friendly' || comp === 'uefa') return null;
+  if (COMP_TIER[comp]) return COMP_TIER[comp];
+  if (comp === 'pp' || comp === 'super') return Math.min(3, clubTier ?? 1);
+  return Math.min(3, clubTier ?? 1);
+}
+
+/** Sprawa po konferencji (albo null). ctx: kontekst konferencji, eff: skutki z ref >= 1. */
+export function openCase(eff, ctx, seed = 'sprawa') {
+  if (!eff?.fine) return null;
+  const tier = disciplineTier(ctx.comp, ctx.tier);
+  if (!tier) return null;
+  const days = new Rng(`${seed}|termin`).int(...DISCIPLINE.days);
+  const quote = (eff.quotes ?? []).find((q) => /sędzi|gwizd|powtórk|decyzje/i.test(q.text))?.text ?? null;
+  return { id: `${ctx.matchId}:${eff.phase ?? 'post'}`, matchId: ctx.matchId, date: ctx.date, days, severity: eff.ref, tier, body: DISCIPLINE.body[tier], quote, phase: eff.phase ?? 'post', opp: ctx.oppName ?? null };
+}
+
+/** Data decyzji (YYYY-MM-DD). */
+export function caseDue(c) {
+  const [y, m, d] = c.date.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + c.days)).toISOString().slice(0, 10);
+}
+
+/** Liczba upomnień i kar w ostatnich 365 dniach przed datą. */
+export function priorOffences(history, date) {
+  const t = Date.parse(`${date}T00:00:00Z`);
+  return (history ?? []).filter((h) => h.outcome !== 'umorzenie' && t - Date.parse(`${h.date}T00:00:00Z`) <= 365 * 864e5).length;
+}
+
+/** Decyzja komisji (deterministycznie z ziarna). Zwraca { outcome, amount, trust, priors }. [SZAC] */
+export function decideCase(c, history = [], date = c.date, seed = 'komisja') {
+  const rng = new Rng(`${seed}|${c.id}`);
+  const priors = priorOffences(history, date);
+  const sev = c.severity ?? 1;
+  let p;
+  if (sev >= 2) p = priors ? { umorzenie: 0.03, upomnienie: 0, kara: 0.97 } : { umorzenie: 0.05, upomnienie: 0.2, kara: 0.75 };
+  else p = priors >= 2 ? { umorzenie: 0.05, upomnienie: 0.05, kara: 0.9 } : priors === 1 ? { umorzenie: 0.1, upomnienie: 0.25, kara: 0.65 } : { umorzenie: 0.25, upomnienie: 0.45, kara: 0.3 };
+  const outcome = rng.weighted(['umorzenie', 'upomnienie', 'kara'], (k) => p[k]);
+  let amount = 0;
+  if (outcome === 'kara') {
+    const [lo, hi] = DISCIPLINE.fine[c.tier] ?? DISCIPLINE.fine[3];
+    const raw = (lo + rng.next() * (hi - lo)) * (1 + 0.5 * (Math.min(3, sev) - 1)) * DISCIPLINE.repeatMul ** Math.min(3, priors);
+    amount = Math.min(DISCIPLINE.cap[c.tier] ?? DISCIPLINE.cap[3], Math.round(raw / 500) * 500);
+  }
+  const trust = outcome === 'kara' ? (priors ? DISCIPLINE.trust.karaRecydywa : DISCIPLINE.trust.kara) : DISCIPLINE.trust[outcome];
+  return { outcome, amount, trust, priors };
+}
+
+// ================================================================ Prasa w ocenie zarządu
+
+/**
+ * Składnik miesięcznej oceny zarządu z klimatu prasy (ostatnie 31 dni) i relacji z mediami.
+ * Zwraca { delta, notes }. Limit od -2,5 do +1,5 punktu zaufania [SZAC].
+ */
+export function pressBoardTerm(state, date) {
+  if (!state || !date) return { delta: 0, notes: [] };
+  const t = Date.parse(`${date}T00:00:00Z`);
+  const recent = (list) => (list ?? []).filter((e) => e.date && t - Date.parse(`${e.date}T00:00:00Z`) <= 31 * 864e5 && t >= Date.parse(`${e.date}T00:00:00Z`));
+  const post = recent(state.log); const pre = recent(state.preLog);
+  if (!post.length && !pre.length) return { delta: 0, notes: [] };
+  let v = 0;
+  for (const e of post) v += e.climate === 'agresywna' ? -0.8 : e.climate === 'pozytywna' ? 0.6 : 0;
+  const skips = [...post, ...pre].filter((e) => e.mode === 'skipped' || e.mode === 'walkout').length;
+  v -= 0.3 * skips;
+  v += ((state.relation ?? 50) - 50) * 0.02;
+  const delta = r1(clamp(v, -2.5, 1.5));
+  const notes = [];
+  const agr = post.filter((e) => e.climate === 'agresywna').length; const pos = post.filter((e) => e.climate === 'pozytywna').length;
+  if (delta <= -1) notes.push(agr >= 2 ? 'Media nie zostawiają na nas suchej nitki. Zarząd nie lubi czytać takich nagłówków.' : 'Prasa jest krytyczna wobec klubu.');
+  else if (delta <= -0.4) notes.push('Wizerunek klubu w mediach słabnie.');
+  else if (delta >= 0.8) notes.push(pos >= 2 ? 'Dobra prasa wokół klubu. Zarząd to docenia.' : 'Media piszą o klubie przychylnie.');
+  else if (delta >= 0.3) notes.push('Media piszą o klubie przychylnie.');
+  if (skips >= 2) notes.push('Zarząd zauważył, że trener unika konferencji prasowych.');
+  return { delta, notes };
 }
