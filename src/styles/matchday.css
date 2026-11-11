@@ -536,14 +536,26 @@
 .rts { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; }
 .rts li { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: var(--radius-s); background: color-mix(in srgb, var(--text) 4%, transparent); min-width: 0; }
 .rts li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Telefon: wynik i statystyki na górze, potem reszta */
+.pst__score { order: 0; } .pcard--stats { order: 1; } .pst__motm { order: 2; } .pcard--moments { order: 3; } .pst__side { order: 4; } .pcard--ratings { order: 5; }
+/* PC: na środku wynik i pod nim statystyki; z lewej zawodnik meczu i kluczowe momenty, z prawej reakcje i po meczu; oceny na dole */
+.md__main:has(> .pst) { max-width: 1680px; }
 @media (min-width: 1024px) {
-  .pst { grid-template-columns: repeat(12, minmax(0, 1fr)); align-items: start; }
-  .pst__score { grid-column: 1 / 9; }
-  .pst__motm { grid-column: 9 / 13; align-self: stretch; }
-  .pcard--moments { grid-column: 1 / 6; grid-row: span 2; }
-  .pcard--stats { grid-column: 6 / 9; grid-row: span 2; }
-  .pst__side { grid-column: 9 / 13; grid-row: span 2; }
-  .pcard--ratings { grid-column: 1 / 13; }
+  .pst { align-items: start; column-gap: var(--space-4);
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    grid-template-areas: "score motm" "stats moments" "stats side" "ratings ratings"; }
+  .pst > * { order: 0; }
+  .pst__score { grid-area: score; } .pcard--stats { grid-area: stats; } .pst__motm { grid-area: motm; align-self: stretch; }
+  .pcard--moments { grid-area: moments; } .pst__side { grid-area: side; } .pcard--ratings { grid-area: ratings; }
+}
+@media (min-width: 1280px) {
+  .pst { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr);
+    grid-template-areas: "motm score side" "moments stats side" "ratings ratings ratings"; }
+  .pst__motm { align-self: stretch; }
+  .pcard--moments, .pst__side { align-self: start; }
+}
+@media (min-width: 1600px) {
+  .pst .rts { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 }
 
 /* ================= Odprawy: panele obok siebie na PC ================= */
@@ -1126,3 +1138,11 @@
 @media (prefers-reduced-motion: reduce) { .sh-card { transition: none; } .sh-card:hover:not([disabled]) { transform: none; } }
 /* Zawodnicy, którzy zeszli: bez nagłówka, oddzieleni cienką linią pod ławką (nazwiska są wyszarzone) */
 .ros__list--out { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--line); }
+/* Studio pomeczowe: tablica równo z panelami obok, szerszy środek, mniejsze nazwy, żeby mieściły się pełne */
+.pst__score .final, .pst__score .board { margin-top: 0; }
+.pst__score .final .board { margin-bottom: 0; }
+@media (min-width: 1280px) {
+  .pst { grid-template-columns: minmax(250px, 1fr) minmax(560px, 1.5fr) minmax(250px, 1fr); }
+  .pst__score .nm__full { font-size: var(--step-1); }
+}
+.pst__score .final { padding: 0; }
