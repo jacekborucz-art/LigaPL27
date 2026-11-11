@@ -128,19 +128,22 @@ test('Czerwona po wykorzystaniu wszystkich zmian i kontuzja bez zmian: gra w 10 
     assert.ok(!M.events.slice(from).some((e) => e.type === 'sub' && e.side === 0));
     const t = M.events.slice(from).find((e) => e.type === 'tactic' && e.side === 0);
     assert.ok(t, 'reorganizacja');
-    assert.equal(fieldPlayers(T).filter((x) => x.slot.pos === 'ŚO').length, 2, 'dwóch środkowych obrońców po przesunięciu');
+    // Obrona prowadzenia w 80. min: niski blok 4-4-1 albo piątka obrońców 5-3-1 (shortShape), luka po obrońcy zapełniona
+    assert.ok(fieldPlayers(T).filter((x) => x.slot.pos === 'ŚO').length >= 2, 'co najmniej dwóch środkowych obrońców po przesunięciu');
+    assert.ok(['442def', '541'].includes(T.formation.id), `ustawienie ${T.formation.id}`);
     assert.equal(M.events.slice(from).find((e) => e.type === 'red').second, true);
   }
   {
     const { M, T, from } = setup('injall', { min: 85 });
     T.subsUsed = T.subsLimit;
     const x = T.players.find((y) => y.on && y.slot.pos === 'ŚO');
+    const before = fieldPlayers(T).length; // wcześniejsza czerwona w tym ziarnie jest możliwa
     injure(M, T, x, false, { injury: HARD });
     step(M);
     const inj = M.events.slice(from).find((e) => e.type === 'injury');
     assert.equal(inj.canContinue, false);
     assert.equal(inj.severity, 'severe');
-    assert.equal(fieldPlayers(T).length, 10);
+    assert.equal(fieldPlayers(T).length, before - 1);
     assert.ok(M.events.slice(from).some((e) => e.type === 'tactic' && e.side === 0 && e.patch.drop));
   }
 });

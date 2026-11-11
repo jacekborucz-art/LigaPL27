@@ -85,6 +85,23 @@ export const INJURY_TYPES = {
   severe: [['złamanie kości śródstopia', 50, 90, false], ['zerwanie więzadła krzyżowego', 190, 270, false], ['uraz barku', 45, 80, false], ['zerwanie ścięgna Achillesa', 180, 240, false]],
 };
 
+// Lekkie urazy: gra z bólem (docs/taktyka-i-urazy.md) [SZAC]. Typ z nazwy urazu grywalnego (INJURY_TYPES.light).
+// pen: kara do formy w meczu (x OVR), agg: szansa pogłębienia na minutę gry z urazem, ext: dni przerwy więcej
+// za każde pełne 30 min gry z urazem, worse: uraz po pogłębieniu [nazwa, min dni, max dni] (zejście z boiska).
+export const KNOCK = {
+  types: {
+    contusion: { name: 'stłuczenie', pen: 0.03, agg: 0.0010, ext: 0, worse: ['krwiak mięśnia po stłuczeniu', 8, 16] },
+    strain: { name: 'naciągnięcie mięśnia', pen: 0.065, agg: 0.0045, ext: 1, worse: ['naderwanie mięśnia', 18, 35] },
+    sprain: { name: 'lekkie skręcenie kostki', pen: 0.05, agg: 0.0025, ext: 1, worse: ['skręcenie kostki z uszkodzeniem więzadła', 20, 42] },
+  },
+  maxDays: 14, // lekki uraz po meczu (bez pogłębienia) trwa najwyżej 14 dni
+  fatigue: 1.12, // kulejący zawodnik szybciej się męczy
+  aggTired: 1.4, aggAge: 1.15, // zmęczony (kondycja < 70) i 30+ lat: wyższe ryzyko pogłębienia
+  team: 0.15, teamExp: 1.3, teamMax: 0.6, // kara drużyny od drugiego lekko kontuzjowanego na boisku (strefy, pkt)
+  aggTeam: 0.1, // ryzyko pogłębienia +10 % za każdego kolejnego lekko kontuzjowanego (więcej pojedynków i biegania)
+  preDays: 7, // przed meczem z urazem może zagrać zawodnik z lekkim urazem do 7 dni przerwy (p.playingInjured)
+};
+
 // Oceny meczowe (6.1 d)
 export const RATING = {
   start: 6.0, goal: 1.0, goalNap: 0.9, goalDef: 1.2, assist: 0.6, keyPass: 0.15, shotOn: 0.1, bigMiss: -0.3,

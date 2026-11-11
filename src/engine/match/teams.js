@@ -1,12 +1,12 @@
 // Drużyny w trakcie meczu: zawodnicy na boisku i ławce, strefy siły (6.1 a),
 // parametry taktyki z danych formacji i instrukcji (z bezwładnością 4.3), kondycja i spójność.
 
-import { formationById } from '../../data/formations.js';
+import { formationById, FORMATIONS } from '../../data/formations.js';
 import { INSTRUCTIONS } from '../../data/instructions.js';
 import { proficiency, posEff, goalkeeperSlotModifiers } from '../positions.js';
 import { evaluate } from '../modifiers.js';
 import { clamp } from '../../core/rng.js';
-import { K, ROLE_SHARE, ZONE_N, FATIGUE_ROLE } from './constants.js';
+import { K, ROLE_SHARE, ZONE_N, FATIGUE_ROLE, KNOCK } from './constants.js';
 
 const a = (p, k) => p.attr?.[k] ?? p.ovr ?? 10;
 
@@ -20,15 +20,43 @@ export function zoneRatings(p) {
   };
 }
 
+// ------------------------------------------------------------ Lekkie urazy (gra z bólem)
+/** Kod typu lekkiego urazu z nazwy (KNOCK.types); nieznany lekki uraz liczy się jak stłuczenie. */
+export function knockTypeOf(name = '') {
+  for (const [code, t] of Object.entries(KNOCK.types)) if (name.startsWith(t.name)) return code;
+  return 'contusion';
+}
+
+/**
+ * Czy zawodnik z urazem sprzed meczu może zagrać z bólem (decyzja gracza lub AI, flaga p.playingInjured):
+ * lekki uraz (bez wstrząśnienia mózgu) z przerwą najwyżej KNOCK.preDays dni.
+ */
+export function knockEligible(p) {
+  const days = p?.injuryDays ?? 0;
+  if (!(days > 0) || days > KNOCK.preDays) return false;
+  if ((p.injury?.cat ?? 'light') !== 'light') return false;
+  return !/wstrząśnienie/.test(p.injury?.name ?? '');
+}
+
+/**
+ * Stan lekkiego urazu na zawodniku meczowym (x.knock), czytany przez UI (biały krzyżyk na ikonie):
+ * { name, type: contusion|strain|sprain, since: minuta, pre: uraz sprzed meczu, aggravated, aggravatedAt, days }.
+ */
+export function makeKnock(name, minute, { pre = false, days = 0 } = {}) {
+  return { name, type: knockTypeOf(name), since: minute, pre, aggravated: false, aggravatedAt: null, days };
+}
+
 function mkPlayer(p, slot, side, rng, ctx, Z = 0) {
   const dayForm = rng.gauss(0, Math.max(0.2, 0.9 - 0.035 * (p.hidden?.KON ?? 10)));
   const waz = ctx.rank >= 2 ? 0.04 * ((p.hidden?.WAZ ?? 10) - 10) : 0;
+  // Uraz sprzed meczu, z którym zawodnik gra z bólem: kara do formy daje modyfikator playingInjured (modifiers.js)
+  const knock = p.playingInjured && p.injuryDays > 0 ? makeKnock(p.injury?.name ?? 'stłuczenie', 0, { pre: true, days: p.injuryDays }) : null;
   return {
     id: p.id, p, slot, side, R: zoneRatings(p), base: evaluate('player', p, { inMatch: true }).total + dayForm + waz,
     cond: p.fresh ?? 95, on: !!slot, sentOff: false, subbedOff: false, injury: null, treatedUntil: -1,
     Z, yc: 0, minOn: slot ? 0 : null, minOff: null,
     ev: 0, g: 0, ast: 0, sh: 0, sot: 0, kp: 0, tk: 0, saves: 0, fouls: 0, offs: 0,
-    fit: null, prevSlot: null, bookChecked: false,
+    fit: null, prevSlot: null, bookChecked: false, knock, slotIdx: -1, redCode: null,
   };
 }
 
@@ -40,6 +68,16 @@ const FIT_N = 30;
 const NEUTRAL_ACT = () => ({ POZ: 1, SKR: 1, KON: 1, DYS: 1 });
 
 /** Łączy efekty formacji i wybranych instrukcji w jeden zestaw liczb dla silnika. */
+/** Dodaje efekty (instrukcji albo formacji, ten sam słownik) do parametrów taktyki. */
+function addEffect(P, effect) {
+  for (const [k, v] of Object.entries(effect ?? {})) {
+    if (k === 'act' || k === 'oppAct') for (const [t, m] of Object.entries(v)) P[k][t] *= m;
+    else if (k === 'konVsAttack') P.konVsAttack = v;
+    else if (k.endsWith('Mul') || k === 'yellowPerFoul' || k === 'redPerFoul') P[k] *= v;
+    else P[k] = (P[k] ?? 0) + v;
+  }
+}
+
 export function tacticParams(formation, instructions) {
   const P = {
     pActMul: 1, D: 0, counterVulnMul: formation.counterVuln ?? 1, fatMul: 1, fatMidMul: 1, pos: 0,
@@ -48,15 +86,11 @@ export function tacticParams(formation, instructions) {
     DvsPOZ: 0, DvsKON: 0, addedTime: 0, yellowPerMin: 0, oppOffsideMul: 1, redMul: 1, konVsAttack: 1,
     brkPerTec: 0, brkPerAerial: 0, W: formation.W ?? 1, timewasting: false,
   };
+  addEffect(P, formation.fx); // efekty strukturalne formacji (np. niski blok 4-4-2), docs/taktyka-i-urazy.md
   for (const ins of INSTRUCTIONS) {
     const opt = ins.options.find((o) => o.id === instructions?.[ins.id]) ?? ins.options.find((o) => o.id === ins.default);
     if (opt?.onlyWhenLeading) P.timewasting = true;
-    for (const [k, v] of Object.entries(opt?.effect ?? {})) {
-      if (k === 'act' || k === 'oppAct') for (const [t, m] of Object.entries(v)) P[k][t] *= m;
-      else if (k === 'konVsAttack') P.konVsAttack = v;
-      else if (k.endsWith('Mul') || k === 'yellowPerFoul' || k === 'redPerFoul') P[k] *= v;
-      else P[k] = (P[k] ?? 0) + v;
-    }
+    addEffect(P, opt?.effect);
   }
   P.mentality = Number(instructions?.mentality ?? 0);
   P.passing = instructions?.passing ?? 'mixed';
@@ -86,7 +120,12 @@ export function buildTeam(side, cfg, rng, ctx) {
   const formation = formationById(cfg.tactics.formation);
   const z = cfg.zStart || {};
   const players = cfg.tactics.xi
-    .map((id, i) => (byId.get(id) ? mkPlayer(byId.get(id), formation.slots[i], side, rng, ctx, z[id] ?? 0) : null))
+    .map((id, i) => {
+      if (!byId.get(id)) return null;
+      const x = mkPlayer(byId.get(id), formation.slots[i], side, rng, ctx, z[id] ?? 0);
+      x.slotIdx = i;
+      return x;
+    })
     .filter(Boolean);
   const bench = cfg.tactics.bench.map((id) => byId.get(id)).filter(Boolean).map((p) => mkPlayer(p, null, side, rng, ctx, z[p.id] ?? 0));
   const params = tacticParams(formation, cfg.tactics.instructions);
@@ -100,7 +139,8 @@ export function buildTeam(side, cfg, rng, ctx) {
     takers: { penalty: cfg.tactics.penalty, freeKick: cfg.tactics.freeKick, corner: cfg.tactics.corner, captain: cfg.tactics.captain },
     zones: { DEF: 10, MID: 10, ATT: 10, GK: 10, SPA: 10, SPD: 10 },
     gkMods: { goalMul: 1 }, threat: 0,
-    react: [], injuredOff: [], dropPos: [], dropIdx: [], shape: formation.name, concussionUsed: 0,
+    react: [], injuredOff: [], dropPos: [], dropIdx: [], emptyIdx: null, emptyFor: null, shape: formation.name, concussionUsed: 0,
+    knocked: 0, knockPen: 0,
     str0: 0, strDiff: 0, baseInstr: null, plannedSubs: 4, chaseSubs: 0, protectSubs: 0, lastUserTick: -1,
     assistant: false, injuredGk: null, staffYellow: 0, coachBanned: false, penMissed: [], central: 0, avg: null,
     // Historia ustawień widoczna z ławki rywala (coach.js czyta ją z opóźnieniem rozpoznania)
@@ -136,6 +176,12 @@ export function updateZones(T, M) {
   const xs = onPitch(T, M.minute);
   const missing = 11 - xs.length;
   const cohesion = (100 - T.S) * 0.015;
+  // Kilku lekko kontuzjowanych naraz: partnerzy asekurują i biegają za nich, drużyna traci organizację.
+  // Kara od drugiego zawodnika, rośnie szybciej niż liniowo, ograniczona (KNOCK.teamMax < kara za brak zawodnika).
+  let knocked = 0;
+  for (const x of xs) if (x.knock && !x.knock.aggravated) knocked++;
+  T.knocked = knocked;
+  T.knockPen = knocked >= 2 ? Math.min(KNOCK.teamMax, KNOCK.team * (knocked - 1) ** KNOCK.teamExp) : 0;
   const zones = { DEF: 0, MID: 0, ATT: 0 };
   for (const x of xs) {
     const share = ROLE_SHARE[x.slot.pos] ?? ROLE_SHARE.ŚP;
@@ -145,7 +191,7 @@ export function updateZones(T, M) {
   // formacji (wykładnik 0.15). Brakujący zawodnicy obniżają licznik i dają karę za osłabienie.
   const fs = formationShares(T.formation);
   for (const zn of ['DEF', 'MID', 'ATT']) {
-    zones[zn] = (zones[zn] / fs[zn]) * (fs[zn] / ZONE_N[zn]) ** 0.15 - missing * K.shortHanded - cohesion;
+    zones[zn] = (zones[zn] / fs[zn]) * (fs[zn] / ZONE_N[zn]) ** 0.15 - missing * K.shortHanded - cohesion - T.knockPen;
   }
   const gk = goalkeeper(T);
   if (gk && gk.p.pos === 'BR') { zones.GK = eff(gk, 'GK'); T.gkMods = { goalMul: 1 }; }
@@ -172,7 +218,8 @@ export function updateCondition(T, M) {
   for (const x of onPitch(T, M.minute)) {
     const role = FATIGUE_ROLE[x.slot.pos] ?? 1;
     const mid = ['DP', 'ŚP', 'OP', 'SP'].includes(x.slot.pos) ? P.fatMidMul : 1;
-    const dK = 0.22 * P.fatMul * mid * role * (1.4 - 0.04 * a(x.p, 'WYT')) * (M.ctx.weather?.fat ?? 1) * ((x.p.age ?? 25) >= 31 ? 1.1 : 1);
+    const dK = 0.22 * P.fatMul * mid * role * (1.4 - 0.04 * a(x.p, 'WYT')) * (M.ctx.weather?.fat ?? 1) * ((x.p.age ?? 25) >= 31 ? 1.1 : 1)
+      * (x.knock && !x.knock.aggravated ? KNOCK.fatigue : 1);
     x.cond = Math.max(20, x.cond - dK);
     x.Z *= 0.97;
   }
@@ -281,29 +328,146 @@ export function assignSlots(xs, slots) {
   return at;
 }
 
+/** Kopie slotów formacji z pustymi miejscami pod podanymi indeksami (samotny środkowy wraca na środek). */
+function slotsWithEmpty(formation, emptyIdx) {
+  const slots = formation.slots.map((s) => ({ ...s }));
+  for (const i of emptyIdx) slots[i] = null;
+  for (const i of emptyIdx) {
+    const pos = formation.slots[i].pos;
+    const left = slots.filter((s) => s && s.pos === pos);
+    if (left.length === 1 && !left[0].side) left[0].x = 50;
+  }
+  return slots;
+}
+
+/** Ustawia zawodników na slotach (Map zawodnik -> indeks) i zapisuje kształt drużyny. */
+function placeAll(T, slots, at, formation) {
+  for (const [x, i] of at) {
+    x.slot = slots[i];
+    x.slotIdx = i;
+    if (slots[i].pos !== 'BR') x.prevSlot = null;
+  }
+  const used = new Set(at.values());
+  const empty = [];
+  for (let i = 0; i < slots.length; i++) if (!used.has(i)) empty.push(i);
+  T.dropIdx = empty;
+  T.shape = shapeLabel(formation, empty);
+}
+
 /** Bezpłatne przestawienie zawodników na sloty bieżącego kształtu (po zmianach personalnych AI). */
 export function reslot(T) {
   const xs = fieldPlayers(T);
-  const { slots, dropIdx } = shapeSlots(T.formation, T.dropPos ?? [], xs.length);
-  const at = assignSlots(xs, slots);
-  for (const [x, i] of at) x.slot = slots[i];
-  T.dropIdx = dropIdx;
-  T.shape = shapeLabel(T.formation, dropIdx);
+  let slots;
+  if (T.emptyIdx?.length && T.emptyFor === T.formation.id) {
+    // Puste miejsca wybrane ręcznie (gracz albo AI): zostają, dopóki liczba zawodników na to pozwala
+    slots = slotsWithEmpty(T.formation, T.emptyIdx.slice(0, Math.max(0, T.formation.slots.length - xs.length)));
+  } else slots = shapeSlots(T.formation, T.dropPos ?? [], xs.length).slots;
+  placeAll(T, slots, assignSlots(xs, slots), T.formation);
+}
+
+const isInt = (v) => Number.isInteger(v);
+
+/** Indeks slotu formacji, na którym stoi zawodnik (-1: poza boiskiem). Używa x.slotIdx, gdy jest aktualny. */
+export function slotIndex(T, x) {
+  if (!x.slot) return -1;
+  const fs = T.formation.slots;
+  const s = fs[x.slotIdx];
+  if (s && s.pos === x.slot.pos && s.side === x.slot.side && s.y === x.slot.y) return x.slotIdx;
+  let best = -1; let bd = Infinity;
+  for (let i = 0; i < fs.length; i++) {
+    if (fs[i].pos !== x.slot.pos || fs[i].side !== x.slot.side) continue;
+    const d = Math.abs(fs[i].y - x.slot.y) + Math.abs(fs[i].x - x.slot.x);
+    if (d < bd) { bd = d; best = i; }
+  }
+  return best;
+}
+
+/**
+ * Plan ustawienia na formacji bez zmiany stanu (podgląd w UI, walidacja, gracz i AI).
+ * opts.assign: { [idZawodnika]: indeksSlotu } (dowolny zawodnik na dowolnym slocie, także częściowo),
+ * opts.empty: [indeksSlotu] sloty, które zostają puste (dokładnie 11 - liczba zawodników na boisku).
+ * Zawodnicy bez przypisania trafiają na pozostałe sloty wg dopasowania (assignSlots).
+ * Zwraca { ok: true, formation, slots, at: Map(zawodnik -> indeks), assign: { id: indeks }, empty, shape }
+ * albo { ok: false, error } (komunikat po polsku).
+ */
+export function planShape(T, formationId = T.formation.id, { assign = null, empty = null } = {}) {
+  if (!FORMATIONS.some((f) => f.id === formationId)) return { ok: false, error: 'Nieznane ustawienie.' };
+  const formation = formationById(formationId);
+  const xs = fieldPlayers(T);
+  const S = formation.slots.length;
+  const gi = formation.slots.findIndex((s) => s.pos === 'BR');
+  const need = S - xs.length;
+  if (need < 0) return { ok: false, error: 'Za dużo zawodników na boisku.' };
+  let forced = null;
+  if (empty != null) {
+    if (!Array.isArray(empty) || !empty.every(isInt) || new Set(empty).size !== empty.length || empty.some((i) => i < 0 || i >= S)) {
+      return { ok: false, error: 'Puste miejsca: podaj różne numery slotów formacji.' };
+    }
+    if (empty.includes(gi)) return { ok: false, error: 'Bramka nie może zostać pusta.' };
+    if (empty.length !== need) {
+      return { ok: false, error: `Przy ${xs.length} zawodnikach na boisku puste ${need === 1 ? 'musi zostać dokładnie 1 miejsce' : `muszą zostać dokładnie ${need} miejsca`}.` };
+    }
+    forced = empty.slice();
+  }
+  const at = new Map();
+  if (assign != null) {
+    if (typeof assign !== 'object' || Array.isArray(assign)) return { ok: false, error: 'Nieprawidłowe przypisanie zawodników.' };
+    const byId = new Map(xs.map((x) => [String(x.id), x]));
+    const taken = new Set();
+    for (const [id, i] of Object.entries(assign)) {
+      const x = byId.get(String(id));
+      if (!x) return { ok: false, error: 'Przypisany zawodnik nie gra teraz na boisku.' };
+      if (!isInt(i) || i < 0 || i >= S) return { ok: false, error: 'Nieprawidłowy numer slotu.' };
+      if (taken.has(i)) return { ok: false, error: 'Dwóch zawodników na jednym miejscu.' };
+      if (forced?.includes(i)) return { ok: false, error: 'Zawodnik przypisany do miejsca, które ma zostać puste.' };
+      taken.add(i); at.set(x, i);
+    }
+    if (!forced && at.size === xs.length) forced = [...Array(S).keys()].filter((i) => !taken.has(i));
+  }
+  const slots = slotsWithEmpty(formation, forced ?? []);
+  const rest = xs.filter((x) => !at.has(x));
+  if (rest.length) {
+    const free = slots.map((s, i) => (s && ![...at.values()].includes(i) ? s : null));
+    for (const [x, i] of assignSlots(rest, free)) at.set(x, i);
+  }
+  if (![...at.values()].includes(gi)) return { ok: false, error: 'Ktoś musi stanąć w bramce.' };
+  if (at.size !== xs.length) return { ok: false, error: 'Nie wszyscy zawodnicy mają miejsce na boisku.' };
+  const used = new Set(at.values());
+  const emptyOut = [...Array(S).keys()].filter((i) => !used.has(i));
+  return {
+    ok: true, formation, slots, at, empty: emptyOut, shape: shapeLabel(formation, emptyOut),
+    assign: Object.fromEntries([...at].map(([x, i]) => [x.id, i])),
+  };
+}
+
+/** Walidacja zmiany taktyki: komunikat błędu albo null (formacja, puste miejsca, przypisanie zawodników). */
+export function validateTacticPatch(T, patch = {}) {
+  if (patch.formation != null && !FORMATIONS.some((f) => f.id === patch.formation)) return 'Nieznane ustawienie.';
+  if (patch.assign == null && patch.empty == null) return null;
+  const r = planShape(T, patch.formation ?? T.formation.id, { assign: patch.assign ?? null, empty: patch.empty ?? null });
+  return r.ok ? null : r.error;
 }
 
 /**
  * Zmiana taktyki w trakcie meczu z bezwładnością i kosztem spójności (4.3).
- * patch: { formation?, instructions?, drop?: ['NAP', ...] pozycje zostawiane puste przy grze w osłabieniu }
+ * patch: { formation?, instructions?, drop?: ['NAP', ...] pozycje zostawiane puste przy grze w osłabieniu,
+ *          assign?: { [id]: indeksSlotu } dowolny zawodnik na dowolnym slocie, empty?: [indeksSlotu] puste miejsca }
+ * Zwraca { ok, cost, adapt } albo { ok: false, error } (nic się nie zmienia).
  */
 export function applyTacticChange(T, M, patch) {
+  const err = validateTacticPatch(T, patch);
+  if (err) return { ok: false, error: err, cost: 0, adapt: 0 };
+  const manual = patch.assign != null || patch.empty != null;
+  const plan = manual ? planShape(T, patch.formation ?? T.formation.id, { assign: patch.assign ?? null, empty: patch.empty ?? null }) : null;
   const newTactics = { ...T.tactics, ...patch, instructions: { ...T.tactics.instructions, ...(patch.instructions || {}) } };
-  delete newTactics.drop;
+  delete newTactics.drop; delete newTactics.assign; delete newTactics.empty;
   const formation = formationById(newTactics.formation);
   const atBreak = M.phase === 'break' || M.minute === 0;
   let cost = 0;
   const dropChanged = patch.drop && patch.drop.join() !== (T.dropPos ?? []).join();
-  if (newTactics.formation !== T.tactics.formation) cost += 10;
-  else if (dropChanged) cost += 5; // przesunięcie zawodników w tej samej formacji
+  const moved = plan && [...plan.at].some(([x, i]) => slotIndex(T, x) !== i);
+  if (newTactics.formation !== T.tactics.formation) cost += formation.family && formation.family === T.formation.family ? 5 : 10; // w rodzinie 4-4-2 te same role
+  else if (dropChanged || moved) cost += 5; // przesunięcie zawodników w tej samej formacji
   for (const k of Object.keys(patch.instructions || {})) if (patch.instructions[k] !== T.tactics.instructions?.[k]) cost += 5;
   if (M.minute - T.lastTacChange < 10) cost *= 2;
   const adapt = clamp(6 - 0.2 * ((T.avg?.('DEC') ?? 10) - 10), 3, 8);
@@ -312,8 +476,16 @@ export function applyTacticChange(T, M, patch) {
   if (!atBreak && cost) { T.S = Math.max(30, T.S - cost); T.lastTacChange = M.minute; }
   T.formation = formation;
   T.tactics = newTactics;
-  if (patch.drop) T.dropPos = patch.drop.slice();
-  if (patch.formation || patch.drop) reslot(T);
+  if (plan) {
+    // Ręczne ustawienie: dokładnie te sloty puste, zawodnicy tam, gdzie wskazano
+    T.emptyIdx = plan.empty.slice(); T.emptyFor = formation.id;
+    T.dropPos = plan.empty.map((i) => formation.slots[i].pos);
+    placeAll(T, plan.slots, plan.at, formation);
+  } else {
+    if (patch.formation || patch.drop) { T.emptyIdx = null; T.emptyFor = null; }
+    if (patch.drop) T.dropPos = patch.drop.slice();
+    if (patch.formation || patch.drop) reslot(T);
+  }
   T.tacLog?.push({ min: M.minute, formation: newTactics.formation, instr: newTactics.instructions });
-  return { cost, adapt: atBreak ? 0 : adapt };
+  return { ok: true, cost, adapt: atBreak ? 0 : adapt };
 }

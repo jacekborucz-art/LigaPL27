@@ -4,12 +4,13 @@
 import { createMatch, emit, runPhases, minuteLabel } from './core.js';
 import { substitute, changeTactics, shout, canSubstitute, canShout, subsAvailable } from './control.js';
 import { aiDecide, assistantSuggest, applySuggestion, matchState } from './coach.js';
-import { goalkeeper, fieldPlayers } from './teams.js';
+import { goalkeeper, fieldPlayers, planShape, validateTacticPatch, knockEligible, slotIndex } from './teams.js';
 import { statsFromEvents } from '../matchStats.js';
-import { RATING, K } from './constants.js';
+import { RATING, K, KNOCK } from './constants.js';
 import { clamp } from '../../core/rng.js';
 
 export { createMatch, substitute, changeTactics, shout, canSubstitute, canShout, minuteLabel, subsAvailable, assistantSuggest, applySuggestion, matchState };
+export { knockEligible };
 
 const HALVES = { 1: 45, 2: 45, 3: 15, 4: 15 };
 
@@ -180,6 +181,118 @@ function shootout(M) {
 }
 
 // ------------------------------------------------------------ Koniec i oceny
+/** Zwycięzca (strona) według bieżącego wyniku, po serii karnych według serii; null przy remisie. */
+function leader(M) {
+  if (M.score[0] !== M.score[1]) return M.score[0] > M.score[1] ? 0 : 1;
+  return M.shootout ? (M.shootout.goals[0] > M.shootout.goals[1] ? 0 : 1) : null;
+}
+
+/** Minuty zawodnika do minuty `end` (wykluczony gra do końca w statystyce minut, jak w ocenach). */
+const minutesOf = (x, end) => (x.minOff ?? end) - x.minOn;
+
+/** Ocena bez szumu: ta sama skala i te same składniki co ocena końcowa (6.1 d). */
+function ratingNoNoise(x, T, M, end, winner) {
+  const mins = minutesOf(x, end);
+  let ev = x.ev;
+  if (M.score[1 - T.side] === 0 && mins >= 60) ev += RATING.cleanSheet[x.slot?.pos] ?? 0;
+  if (winner !== null) ev += winner === T.side ? RATING.win : RATING.loss;
+  return { ev, mins };
+}
+
+/**
+ * Oceny na żywo { [idZawodnika]: ocena 3.0-10.0 } dla wszystkich, którzy weszli na boisko (obie drużyny).
+ * Skala i składniki jak w result(): zdarzenia, czyste konto od 60 min, premia za bieżące prowadzenie, krótki
+ * występ (< 20 min) x0,6. Bez losowego szumu (result() dodaje N(0, 0,2)), bez zużycia RNG, koszt O(liczba zawodników):
+ * można wołać po każdej minucie.
+ */
+export function liveRatings(M) {
+  const out = {};
+  const winner = leader(M);
+  for (const T of M.teams) {
+    for (const x of T.players) {
+      if (x.minOn === null) continue;
+      const { ev, mins } = ratingNoNoise(x, T, M, M.minute, winner);
+      out[x.id] = Math.round(clamp(mins < 20 ? 6 + 0.6 * ev : 6 + ev, 3, 10) * 10) / 10;
+    }
+  }
+  return out;
+}
+
+/** Podsumowanie lekkiego urazu zawodnika do minuty `end` (minuty gry z bólem). */
+function knockInfo(x, end) {
+  const k = x.knock;
+  if (!k) return null;
+  const from = Math.max(k.since, x.minOn ?? k.since);
+  const to = k.aggravatedAt ?? x.minOff ?? end;
+  return { name: k.name, type: k.type, since: k.since, pre: k.pre, aggravated: k.aggravated, aggravatedAt: k.aggravatedAt, minutes: x.minOn === null ? 0 : Math.max(0, to - from) };
+}
+
+/**
+ * Uraz po meczu: lekki uraz grany z bólem wydłuża przerwę o KNOCK.types[typ].ext dni za każde pełne 30 min
+ * (najwyżej KNOCK.maxDays). Uraz sprzed meczu bez pogłębienia: nowy wpis tylko wtedy, gdy przerwa się wydłuża.
+ */
+function injuryAfter(x, end) {
+  const k = x.knock;
+  if (!k || k.aggravated || (x.injury && !x.injury.playable)) return x.injury;
+  const info = knockInfo(x, end);
+  const ext = (KNOCK.types[k.type]?.ext ?? 0) * Math.floor(info.minutes / 30);
+  if (!k.pre) return { ...x.injury, days: Math.min(KNOCK.maxDays, Math.max(x.injury.days, x.injury.days + ext)) };
+  if (!ext || info.minutes === 0) return null;
+  return { cat: 'light', name: k.name, days: Math.min(KNOCK.maxDays, k.days + ext), playable: true, pre: true };
+}
+
+/** Kartka zawodnika dla UI: null | 'yellow' | 'secondYellow' | 'red'. */
+function cardOf(x) {
+  if (x.sentOff) return x.redCode === 'second' ? 'secondYellow' : 'red';
+  return x.yc ? 'yellow' : null;
+}
+
+/**
+ * Stan zawodników drużyny dla UI meczu (boisko, ławka, zmienieni), tani do wołania co minutę.
+ * Każdy wpis: { id, name, pos (rola na slocie albo pozycja naturalna), slotIdx (indeks slotu formacji, -1 poza boiskiem),
+ * x, y (współrzędne slotu), on (gra teraz, także opatrywany), treated, bench, subbedOff, sentOff,
+ * card: null|'yellow'|'secondYellow'|'red', yc: 0|1, rc: 0|1, knock: null | { name, type, since, pre, minutes }
+ * (biały krzyżyk: knock !== null i on), injured: uraz bez możliwości gry, cond, rating (liveRatings) }.
+ */
+export function playerStates(M, side) {
+  const T = M.teams[side];
+  const rt = liveRatings(M);
+  const row = (x, bench) => {
+    const on = !!x.on && !x.sentOff && !x.subbedOff;
+    const k = x.knock && !x.knock.aggravated ? knockInfo(x, M.minute) : null;
+    return {
+      id: x.id, name: x.p.name, pos: (on ? x.slot?.pos : null) ?? x.p.pos, slotIdx: on ? slotIndex(T, x) : -1,
+      x: on ? x.slot?.x ?? null : null, y: on ? x.slot?.y ?? null : null,
+      on, treated: on && x.treatedUntil >= M.minute, bench, subbedOff: !!x.subbedOff, sentOff: !!x.sentOff,
+      card: cardOf(x), yc: x.yc ? 1 : 0, rc: x.sentOff ? 1 : 0,
+      knock: k, injured: !!x.injury && !x.injury.playable, cond: Math.round(x.cond), rating: rt[x.id] ?? null,
+    };
+  };
+  return [...T.players.map((x) => row(x, false)), ...T.bench.map((x) => row(x, true))];
+}
+
+/**
+ * Podgląd ustawienia przed zmianą (gracz w oknie „Zmiany i taktyka”, także w osłabieniu): formationId,
+ * opts { assign: { [id]: indeksSlotu }, empty: [indeksSlotu] }. Zwraca { ok, error?, assign, empty, shape,
+ * need (ile miejsc musi zostać pustych), slots: [{ i, pos, side, x, y, playerId|null }] }. Nic nie zmienia.
+ */
+export function previewShape(M, side, formationId, opts = {}) {
+  const T = M.teams[side];
+  const need = 11 - fieldPlayers(T).length;
+  const r = planShape(T, formationId, opts);
+  if (!r.ok) return { ok: false, error: r.error, need };
+  const who = new Map([...r.at].map(([x, i]) => [i, x.id]));
+  return {
+    ok: true, assign: r.assign, empty: r.empty, shape: r.shape, need,
+    slots: r.formation.slots.map((s, i) => ({ i, pos: s.pos, side: s.side, x: s.x, y: s.y, playerId: who.get(i) ?? null })),
+  };
+}
+
+/** Sprawdzenie zmiany taktyki bez wykonywania: komunikat błędu albo null. */
+export function checkTacticPatch(M, side, patch) {
+  return validateTacticPatch(M.teams[side], patch);
+}
+
 function finish(M) {
   M.ended = true;
   M.phase = 'ended';
@@ -190,23 +303,21 @@ function finish(M) {
 export function result(M) {
   const stats = statsFromEvents(M.events);
   const end = M.minute;
-  const winner = M.score[0] !== M.score[1] ? (M.score[0] > M.score[1] ? 0 : 1)
-    : M.shootout ? (M.shootout.goals[0] > M.shootout.goals[1] ? 0 : 1) : null;
+  const winner = leader(M);
   const ratings = [];
   for (const T of M.teams) {
-    const conceded = M.score[1 - T.side];
     for (const x of T.players) {
       if (x.minOn === null) continue;
-      const mins = (x.minOff ?? (x.sentOff ? end : end)) - x.minOn;
-      let ev = x.ev;
-      if (conceded === 0 && mins >= 60) ev += RATING.cleanSheet[x.slot?.pos] ?? 0;
-      if (winner !== null) ev += winner === T.side ? RATING.win : RATING.loss;
+      const r0 = ratingNoNoise(x, T, M, end, winner);
+      const mins = r0.mins;
+      let ev = r0.ev;
       ev += M.rng.gauss(0, RATING.noise);
       const rating = mins < 20 ? 6 + 0.6 * ev : 6 + ev;
       ratings.push({
         id: x.id, side: T.side, name: x.p.name, pos: x.slot?.pos ?? x.p.pos, minutes: Math.max(0, mins),
         rating: Math.round(clamp(rating, 3, 10) * 10) / 10, g: x.g, a: x.ast, sh: x.sh, sot: x.sot, kp: x.kp, tk: x.tk,
-        saves: x.saves, fouls: x.fouls, yc: x.yc, rc: x.sentOff ? 1 : 0, cond: Math.round(x.cond), injury: x.injury, Z: Math.round(x.Z * 10) / 10,
+        saves: x.saves, fouls: x.fouls, yc: x.yc, rc: x.sentOff ? 1 : 0, cond: Math.round(x.cond), injury: injuryAfter(x, end), Z: Math.round(x.Z * 10) / 10,
+        knock: knockInfo(x, end), card: cardOf(x),
       });
     }
   }

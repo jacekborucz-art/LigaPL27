@@ -12,8 +12,8 @@ const world = generateWorld(77);
 const squad = squadOf(world, 'legia');
 const byId = new Map(squad.map((p) => [p.id, p]));
 
-test('10 formacji, każda ma 11 slotów i dokładnie jednego bramkarza', () => {
-  assert.equal(FORMATIONS.length, 10);
+test('12 formacji, każda ma 11 slotów i dokładnie jednego bramkarza', () => {
+  assert.equal(FORMATIONS.length, 12);
   for (const f of FORMATIONS) {
     assert.equal(f.slots.length, 11, f.id);
     assert.equal(f.slots.filter((s) => s.pos === 'BR').length, 1, f.id);

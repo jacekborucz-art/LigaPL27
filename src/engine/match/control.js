@@ -89,6 +89,9 @@ export function substitute(M, side, outId, inId, reason = '', opts = {}) {
   const same = (a, b) => a && b && a.pos === b.pos && a.x === b.x && a.y === b.y;
   if (!outWasOn && slot?.pos !== 'BR' && fieldPlayers(T).some((x) => x !== inc && same(x.slot, slot))) slot = freeSlot(T); // slot zajęty po przestawieniu
   inc.slot = slot; inc.on = true; inc.minOn = M.minute;
+  inc.slotIdx = slot === out.slot ? out.slotIdx : -1; // -1: indeks znajdzie slotIndex() (teams.js)
+  if (mover) mover.slotIdx = -1;
+  if (keeper && keeper !== out) keeper.slotIdx = -1;
   T.bench = T.bench.filter((x) => x !== inc);
   T.players.push(inc);
   if (!goalkeeper(T)) ensureGoalkeeper(M, T);
@@ -105,7 +108,7 @@ export function substitute(M, side, outId, inId, reason = '', opts = {}) {
 /** Opis zmiany instrukcji dla relacji, np. „Nastawienie: Do przodu, Tempo: Szybkie”. */
 export function describePatch(T, patch) {
   const parts = [];
-  if (patch.formation || patch.drop) parts.push(`ustawienie ${T.shape ?? T.formation.name}`);
+  if (patch.formation || patch.drop || patch.assign || patch.empty) parts.push(`ustawienie ${T.shape ?? T.formation.name}`);
   for (const [k, v] of Object.entries(patch.instructions ?? {})) {
     const ins = INSTRUCTIONS.find((i) => i.id === k);
     const opt = ins?.options.find((o) => o.id === v);
@@ -115,17 +118,21 @@ export function describePatch(T, patch) {
 }
 
 /**
- * Zmiana taktyki. patch: { formation?, instructions?, drop? }. opts: { by, reason }.
- * Zdarzenie 'tactic': { patch, by, reason, formation, shape, cost, text }.
+ * Zmiana taktyki. patch: { formation?, instructions?, drop?, assign?: { [id]: indeksSlotu }, empty?: [indeksSlotu] }.
+ * assign i empty: dowolny zawodnik na dowolnym slocie i wybór pustych miejsc w osłabieniu (planShape w teams.js).
+ * opts: { by, reason }. Zwraca { ok, cost, adapt } albo { ok: false, error } bez zmian w meczu.
+ * Zdarzenie 'tactic': { patch, by, reason, formation, shape, empty, cost, text }.
  */
 export function changeTactics(M, side, patch, opts = {}) {
   const T = M.teams[side];
+  if (M.ended) return { ok: false, error: 'Mecz się zakończył.', cost: 0, adapt: 0 };
   const r = applyTacticChange(T, M, patch);
+  if (!r.ok) return r; // błędne ustawienie (np. zła liczba pustych miejsc): nic się nie zmienia
   const by = opts.by ?? 'user';
   if (by === 'user') T.lastUserTick = M.tick;
   const what = describePatch(T, patch);
   emit(M, 'tactic', side, null, {
-    patch, by, reason: opts.reason ?? null, formation: T.formation.id, shape: T.shape ?? T.formation.name, cost: r.cost, atBreak: M.phase === 'break',
+    patch, by, reason: opts.reason ?? null, formation: T.formation.id, shape: T.shape ?? T.formation.name, empty: [...(T.dropIdx ?? [])], cost: r.cost, atBreak: M.phase === 'break',
     text: `${what ? `Zmiana taktyki: ${what}` : 'Zmiana instrukcji taktycznych'}${opts.reason ? ` (${opts.reason})` : ''}.`,
   });
   return r;

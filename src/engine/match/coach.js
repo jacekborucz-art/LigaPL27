@@ -10,7 +10,7 @@ import { setCoachHooks } from './core.js';
 import { goalkeeper, fieldPlayers, slotFit, reslot, assignSlots, shapeSlots } from './teams.js';
 import { proficiency } from '../positions.js';
 import { formationById } from '../../data/formations.js';
-import { K } from './constants.js';
+import { K, KNOCK } from './constants.js';
 
 const CHECKPOINTS = new Set([46, 55, 60, 65, 70, 75, 80, 85, 88, 95, 100, 105, 110, 115, 119]);
 // Przegląd planu w 1. połowie: trener reaguje, gdy plan wyraźnie nie działa (nie tylko w przerwie) [SZAC]
@@ -22,11 +22,14 @@ const BACK3 = new Set(['352', '343', '532', '541']);
 const CENTRAL = new Set(['DP', 'ŚP', 'OP']);
 const MANAGED = ['mentality', 'tempo', 'pressing', 'line', 'passing', 'timewasting', 'tackling', 'marking', 'counter'];
 // Ustawienia przy pogoni za wynikiem (1: umiarkowanie, 2: trójka z tyłu) i przy obronie wyniku [SZAC]
-const ATTACK1 = { 4141: '4231', 4231: '442', 442: '442', '442d': '442', 4321: '4231', 433: '433', 352: '352', 343: '343', 532: '352', 541: '442' };
-const ATTACK2 = { 4141: '343', 4231: '343', 442: '343', '442d': '343', 4321: '343', 433: '343', 352: '343', 343: '343', 532: '352', 541: '352' };
-const DEFEND_MID = { 4231: '4141', 433: '4141', 442: '4141', '442d': '4141', 4321: '4141', 4141: '4141', 352: '532', 343: '532', 532: '532', 541: '541' };
+const ATTACK1 = { 4141: '4231', 4231: '442', 442: '442', '442def': '442def', '442off': '442off', '442d': '442', 4321: '4231', 433: '433', 352: '352', 343: '343', 532: '352', 541: '442' };
+const ATTACK2 = { 4141: '343', 4231: '343', 442: '343', '442def': '343', '442off': '343', '442d': '343', 4321: '343', 433: '343', 352: '343', 343: '343', 532: '352', 541: '352' };
+const DEFEND_MID = { 4231: '4141', 433: '4141', 442: '4141', '442def': '4141', '442off': '4141', '442d': '4141', 4321: '4141', 4141: '4141', 352: '532', 343: '532', 532: '532', 541: '541' };
 // Dodatkowy środkowy pomocnik, gdy przegrywamy środek pola (tylko w przerwie, tylko gdy zawodnicy pasują) [SZAC]
-const MID_PLUS = { 442: '4231', 343: '352', 541: '532', 4231: '442d', 433: '442d', 4141: '442d' };
+const MID_PLUS = { 442: '4231', '442def': '4141', '442off': '4231', 343: '352', 541: '532', 4231: '442d', 433: '442d', 4141: '442d' };
+// Warianty 4-4-2 (te same role, inna wysokość linii): zmiana bez zmian personalnych (docs/taktyka-i-urazy.md)
+const FAMILY_442 = new Set(['442', '442def', '442off']);
+const DEEP = new Set(['541', '532', '442def']);
 
 // Osobowość trenera (T.coach: O ofensywny, S ostrożny, P pragmatyczny). alert: szansa, że w punkcie oceny
 // trener zareaguje na sposób gry rywala (style) albo na przebieg meczu (flow); upór losowany raz na mecz [SZAC].
@@ -132,7 +135,40 @@ export function shortShape(T, st, k = 11 - fieldPlayers(T).length) {
   if (k <= 0) return null;
   const back3 = BACK3.has(T.tactics.formation);
   if (st.diff < 0 && st.minute >= 55) return back3 ? { formation: '352', drop: ['DP', 'ŚP', 'ŚP'].slice(0, k) } : { formation: '442d', drop: ['OP', 'ŚP', 'DP'].slice(0, k) };
-  return back3 ? { formation: '532', drop: ['NAP', 'ŚP', 'NAP'].slice(0, k) } : { formation: '442', drop: ['NAP', 'SP', 'ŚP'].slice(0, k) };
+  const deep = { formation: '442def', drop: ['NAP', 'SP', 'SP'].slice(0, k) };
+  if (st.diff > 0 && st.minute >= 70) {
+    // Obrona prowadzenia w osłabieniu: piątka obrońców (5-3-1 w dziesiątkę, 5-2-1 w dziewiątkę), gdy zawodnicy
+    // pasują do takiego ustawienia; w innym razie niski blok 4-4-1 (4-3-1)
+    const five = { formation: '541', drop: ['SP', 'SP', 'NAP'].slice(0, k) };
+    return back3 || shapeFit(T, five.formation, five.drop) >= 0.97 * shapeFit(T, deep.formation, deep.drop) ? five : deep;
+  }
+  if (back3) return { formation: '532', drop: ['NAP', 'ŚP', 'NAP'].slice(0, k) };
+  // Niski blok 4-4-1 przy prowadzeniu lub przeciw silniejszemu, zwykłe 4-4-1 przy remisie z równym lub słabszym
+  return st.diff > 0 || st.str < 0 ? deep : { formation: '442', drop: ['NAP', 'SP', 'ŚP'].slice(0, k) };
+}
+
+/**
+ * Wariant 4-4-2 dla stanu meczu (bez zmian personalnych): pogoń za wynikiem -> 4-4-2 ofensywne,
+ * obrona prowadzenia albo remis z silniejszym pod koniec -> 4-4-2 defensywne. Tylko w pełnym składzie.
+ * Zwraca { formation, reason } albo null.
+ */
+export function variant442(T, st) {
+  const f = T.tactics.formation;
+  if (!FAMILY_442.has(f) || fieldPlayers(T).length < 11) return null;
+  let to = null; let reason = null;
+  if (st.diff < 0) {
+    if (st.minute >= chaseAt(T, st.diff <= -2 ? 60 : 65) || (st.diff <= -2 && st.halftime) || st.et) { to = '442off'; reason = 'gonimy wynik: wyżej linie, skrzydłowi do przodu'; }
+    else if (f === '442def') { to = '442'; reason = 'straciliśmy gola: wychodzimy z niskiego bloku'; }
+  } else if (st.diff > 0) {
+    const late = st.minute >= protectAt(T, st.diff >= 2 ? 75 : 72);
+    if (late && (st.diff === 1 || T.coach === 'S' || st.mom < -0.15)) { to = '442def'; reason = 'bronimy wyniku: niski blok, dwie linie po czterech'; }
+    else if (f === '442off') { to = '442'; reason = 'prowadzimy: wracamy do równowagi'; }
+  } else if (st.minute >= 75 && st.str < -1 && !st.ko) {
+    to = '442def'; reason = 'bierzemy punkt z silniejszym: niski blok';
+  } else if (f === '442off' && st.minute < 85 && st.str <= 1) {
+    to = '442'; reason = 'wyrównaliśmy: wracamy do równowagi';
+  }
+  return to && to !== f ? { formation: to, reason } : null;
 }
 
 // ------------------------------------------------------------ Obraz meczu z ławki
@@ -263,7 +299,7 @@ function reviewAdjust(M, T, st, rng, advice, mind) {
     else if (so.pressing === 'high' && plan.passing !== 'short' && tec >= 12.3) add('passing', 'short', 'rywal pressuje wysoko: rozgrywamy krótko przez pressing', 'style');
     if ((Number(so.mentality ?? 0) >= 1 || so.line === 'high') && plan.counter === 'no') add('counter', 'yes', 'rywal gra wysoko: szybkie kontry za plecy', 'style');
     if ((so.passing === 'long' || Number(so.mentality ?? 0) >= 2) && plan.line === 'high') add('line', 'mid', so.passing === 'long' ? 'rywal gra długimi piłkami: niżej linia obrony' : 'rywal rzuca się do ataku: niżej linia obrony', 'style');
-    const deep = Number(so.mentality ?? 0) <= -1 || so.line === 'low' || seen.formation === '541' || seen.formation === '532';
+    const deep = Number(so.mentality ?? 0) <= -1 || so.line === 'low' || DEEP.has(seen.formation);
     if (deep && st.diff === 0 && min >= 25 && min <= 80 && st.str > -1) {
       if (plan.passing !== 'short' && tec >= 11.5) add('passing', 'short', 'rywal się cofnął: cierpliwie, krótkimi podaniami', 'style');
       else if (plan.pressing !== 'high' && legs >= 80) add('pressing', 'high', 'rywal się cofnął: odbieramy piłkę wysoko', 'style');
@@ -335,10 +371,10 @@ function reviewAdjust(M, T, st, rng, advice, mind) {
 }
 
 function currentFit(T) { return fieldPlayers(T).reduce((s, x) => s + (x.slot ? slotFit(x, x.slot) : 0), 0); }
-/** Suma dopasowania zawodników z boiska do slotów innej formacji (bez zmiany stanu). */
-function shapeFit(T, fid) {
+/** Suma dopasowania zawodników z boiska do slotów innej formacji (bez zmiany stanu), drop: pozycje puste w osłabieniu. */
+function shapeFit(T, fid, drop = []) {
   const xs = fieldPlayers(T);
-  const { slots } = shapeSlots(formationById(fid), [], xs.length);
+  const { slots } = shapeSlots(formationById(fid), drop, xs.length);
   let sum = 0;
   for (const [x, i] of assignSlots(xs, slots)) sum += slotFit(x, slots[i]);
   return sum;
@@ -394,7 +430,7 @@ export function leastNeeded(T, st, reserved = new Set(), except = null) {
     + (st.diff >= 0 && ATT.has(y.slot.pos) ? -3 : 0)
     + (st.diff < 0 && DEF_ROLE.has(y.slot.pos) && backs > 3 ? -2 : 0)
     + (st.diff < 0 && ATT.has(y.slot.pos) ? 2 : 0)
-    + (y.yc ? -1 : 0);
+    + (y.yc ? -1 : 0) + (y.knock && !y.knock.aggravated ? -2 : 0);
   return xs.reduce((a, b) => (score(b) < score(a) ? b : a));
 }
 
@@ -450,6 +486,10 @@ function plan(M, side, rng, advice) {
     }
   }
 
+  // 1b. Lekkie urazy (gra z bólem): ryzykowny uraz (naciągnięcie, skręcenie) albo kilku kulejących naraz,
+  // trener zmienia od razu; pojedyncze stłuczenie czeka na przerwę lub punkt kontrolny (planSubs)
+  if (left > 0) knockSubs(M, T, st, rng, advice, { reserved, addSub, left: () => left });
+
   // 2. Reakcje na czerwone kartki i osłabienie po kontuzji
   const reacts = T.react.filter((r) => !(T.lastUserTick >= r.tick));
   const ownRed = reacts.find((r) => r.kind === 'ownRed');
@@ -501,6 +541,11 @@ function plan(M, side, rng, advice) {
       mergeTactic({ formation: adjust.formation }, adjust.formationReason);
       if (tactic.reason !== adjust.formationReason) tactic.reason = `${tactic.reason}; ${adjust.formationReason}`;
     }
+    // Warianty 4-4-2 bez zmian personalnych: gonimy -> ofensywne, bronimy -> defensywne
+    if (!tactic.patch?.formation && (advice || st.atBreak || M.minute - T.lastTacChange >= 10)) {
+      const v = variant442(T, st);
+      if (v && (advice || rng.chance(T.mind?.stubborn ? 0.4 : 0.75))) mergeTactic({ formation: v.formation }, v.reason);
+    }
     // W osłabieniu kształt dopasowany do wyniku (np. 4-4-1 -> 4-3-2 przy pogoni)
     if (fieldPlayers(T).length < 11 && !tactic.patch?.formation) {
       const sh = shortShape(T, st);
@@ -520,6 +565,36 @@ function plan(M, side, rng, advice) {
   return out;
 }
 
+/**
+ * Zmiany za zawodników grających z bólem poza punktami kontrolnymi (zaraz po urazie albo w kolejnym przeglądzie).
+ * Ryzyko pogłębienia rośnie z typem urazu (KNOCK.types[].agg), więc naciągnięcie i skręcenie trener zmienia zwykle
+ * od razu, stłuczenie zostawia do przerwy, chyba że kulejących jest kilku (kara drużyny) [SZAC].
+ * Przed 70. minutą jedna zmiana zostaje w zapasie, chyba że uraz jest ryzykowny. W ostatnich minutach gra dalej.
+ */
+function knockSubs(M, T, st, rng, advice, ctx) {
+  const { reserved } = ctx;
+  const xs = fieldPlayers(T).filter((x) => x.knock && !x.knock.aggravated && x.slot && !reserved.has(x));
+  if (!xs.length) return;
+  const risk = (x) => KNOCK.types[x.knock.type]?.agg ?? 0;
+  xs.sort((a, b) => risk(b) - risk(a));
+  const several = xs.length >= 2;
+  const late = !st.et && st.minute >= 86;
+  const reserve = !st.atBreak && st.minute < 70 ? 1 : 0;
+  let made = 0;
+  for (const x of xs) {
+    if (ctx.left() <= 0 || late) break;
+    const risky = risk(x) >= 0.002;
+    if (x.slot.pos === 'BR' && !T.bench.some((b) => b.p.pos === 'BR' && !b.injury && !b.sentOff)) continue;
+    if (!risky && !(several && made === 0)) continue;
+    if (!risky && ctx.left() - reserve <= 0) continue;
+    if (!advice && !rng.chance(risky ? 0.85 : 0.6)) continue;
+    const repl = pickReplacement(T, x, { reserved });
+    if (!repl) continue;
+    ctx.addSub(x, repl, 'injury', `uraz: ${x.knock.name}${several ? ', kilku zawodników gra z bólem' : ''}`);
+    made++;
+  }
+}
+
 /** Zmiany w punkcie kontrolnym: urazy z bólem, zmęczenie, kartki, taktyka wg wyniku, rotacja; grupowanie w oknach. */
 function planSubs(M, T, st, rng, advice, ctx) {
   const min = st.minute;
@@ -533,10 +608,11 @@ function planSubs(M, T, st, rng, advice, ctx) {
   const hot = (x) => x.yc && DEF_ROLE.has(x.slot.pos) && (attr(x, 'AGR') >= 13 || (x.p.hidden?.TMP ?? 10) >= 14);
   for (const x of xs) {
     if (x.slot.pos === 'BR') {
-      if (x.injury?.playable && x.p.pos === 'BR' && (atBreak || min >= 46)) cands.push({ x, why: 'injury', text: 'uraz bramkarza', prio: 0.85, p: 0.5 });
+      if (((x.knock && !x.knock.aggravated) || x.injury?.playable) && x.p.pos === 'BR' && (atBreak || min >= 46)) cands.push({ x, why: 'injury', text: 'uraz bramkarza', prio: 0.85, p: 0.5 });
       continue;
     }
-    if (x.injury?.playable && (atBreak || min >= 46)) cands.push({ x, why: 'injury', text: 'uraz', prio: 0.9, p: 0.7 });
+    const hurt = (x.knock && !x.knock.aggravated) || x.injury?.playable;
+    if (hurt && (atBreak || min >= 46)) cands.push({ x, why: 'injury', text: x.knock ? `uraz: ${x.knock.name}` : 'uraz', prio: 0.9, p: x.knock?.type === 'contusion' ? 0.55 : 0.8 });
     else if (x.cond < tiredThr && (min >= 55 || st.et)) cands.push({ x, why: 'tired', text: 'zmęczenie', prio: 0.6 + (tiredThr - x.cond) / 30, p: 0.8 });
     else if (hot(x) && (min >= 55 || st.halftime) && !x.bookChecked) {
       if (!advice) x.bookChecked = true; // trener ocenia ryzyko raz (w przerwie albo po 55. minucie)
