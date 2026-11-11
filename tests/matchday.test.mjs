@@ -97,3 +97,25 @@ test('Odprawa ma wpływ: zaangażowanie z odprawy trafia do silnika', () => {
   const x = T.players[3];
   assert.equal(x.Z, res.engine.zStart[x.id]);
 });
+
+test('Dane dla silnika i ze silnika: temperatura, kara za czerwoną z powodu, walkower, zawodnik w zdarzeniach studia', async () => {
+  const { engineWeather } = await import('../src/match/matchday.js');
+  const { fromEngineResult, walkoverScore, RED_BAN } = await import('../src/season/season.js');
+  assert.equal(engineWeather({ type: 'slonce', tempC: 34 }, 'dobra').tempC, 34);
+  const base = { score: [1, 0], ratings: [{ id: 'a', side: 0, minutes: 90, rating: 6.5, g: 1, a: 0, yc: 0, rc: 0 }, { id: 'b', side: 1, minutes: 70, rating: 5, g: 0, a: 0, yc: 0, rc: 1 }], events: [{ type: 'red', pid: 'b', side: 1, reasonCode: 'violent' }], stats: [{ shots: 1, onTarget: 1, possession: 50, xg: 1 }, { shots: 0, onTarget: 0, possession: 50, xg: 0 }], extraTime: false };
+  const res = fromEngineResult(base);
+  assert.equal(res.players[1][0].redReason, 'violent');
+  assert.equal(RED_BAN.violent, 3);
+  assert.deepEqual(walkoverScore({ score: [1, 0], abandoned: { side: 1, minute: 70 } }), [3, 0]);
+  assert.deepEqual(walkoverScore({ score: [0, 4], abandoned: { side: 0, minute: 70 } }), [0, 4]);
+  assert.deepEqual(walkoverScore({ score: [2, 2], abandoned: null }), [2, 2]);
+  // Pełny dzień meczowy: zdarzenia w studiu mają zawodnika (pauzy po czerwonej kartce)
+  const g = newGame('widzew', 11);
+  const S = startMatchday(g, primaryAction(g).match);
+  doPreBriefing(g, S, preAdvice(g, S).tone, []);
+  kickOff(g, S);
+  assert.equal(S.M.ctx.concussionSubs, false);
+  skip(S); if (S.step === 'break') { doHalfBriefing(g, S, 'calm', []); continueAfterBreak(S); skip(S); }
+  const post = finishMatchday(g, S);
+  for (const x of post.suspensions) assert.ok(x.id, JSON.stringify(x));
+});

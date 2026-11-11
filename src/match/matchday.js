@@ -14,7 +14,7 @@ import { createMatch, step, resume, runToEnd, runToBreak, result as matchResult 
 import { onPitch } from '../engine/match/teams.js';
 import { statsFromEvents } from '../engine/matchStats.js';
 import { createTactics, refreshTactics } from '../engine/lineup.js';
-import { squadFor, anyClub, applyResult, fromEngineResult, LEAGUE_COMPS, compLabel } from '../season/season.js';
+import { squadFor, anyClub, applyResult, fromEngineResult, walkoverScore, LEAGUE_COMPS, compLabel } from '../season/season.js';
 import { standings } from '../season/standings.js';
 import { winnerOf } from '../season/cup.js';
 import { preMatchStudio, postMatchStudio, postMatchMessages, preMatchMessages } from './studio.js';
@@ -24,6 +24,7 @@ import {
 } from './briefings.js';
 import { addMessages } from '../core/inbox.js';
 import { applyMorale } from '../career/morale.js';
+import { isAvailable } from '../career/squad.js';
 
 const REFEREES = ['Marek Wierzbicki', 'Tomasz Kwiecień', 'Paweł Sokołowski', 'Krzysztof Malec', 'Bartosz Frankowski-Nowak', 'Damian Kos', 'Jarosław Przybył', 'Łukasz Szczepan', 'Piotr Lasyk-Kral', 'Szymon Marcinek', 'Wojciech Myć-Ostrowski', 'Karol Arys-Wolny', 'Daniel Stefański-Mróz', 'Sebastian Jarzębak', 'Mariusz Złotek-Bąk'];
 
@@ -40,7 +41,7 @@ export function weatherFor(date, rng) {
 
 /** Wpływ pogody i murawy na silnik (ekspert 6.1 b). */
 export function engineWeather(w, pitch) {
-  const out = { conv: 1, foul: 1, inj: 1, fat: 1, act: 1, dys: 1 };
+  const out = { conv: 1, foul: 1, inj: 1, fat: 1, act: 1, dys: 1, tempC: w.tempC }; // tempC: przerwa na schłodzenie w silniku (>= 32 st.)
   if (w.type === 'deszcz') Object.assign(out, { conv: 1.06, foul: 1.08, inj: 1.05, dys: 1.15 });
   if (w.type === 'snieg') Object.assign(out, { act: 0.92, fat: 1.1, inj: 1.1 });
   if (w.type === 'wiatr') out.dys = 0.85;
@@ -72,6 +73,49 @@ function teamCtx(game, clubId, comp, table, tactics) {
   };
 }
 
+/**
+ * Skład gracza na mecz (docs/balans.md). Asystent zastępuje niedostępnych (refreshTactics), a gdy zastąpiony
+ * zawodnik znów jest zdrowy i gracz nie ruszał tego miejsca, wraca do jedenastki. Wcześniej zastępstwo zostawało
+ * na stałe, więc pasywny gracz po kilku kontuzjach grał rezerwowymi do końca sezonu.
+ * tactics.assistant === true: skład przed każdym meczem wybiera asystent, tak jak w klubach AI (formacja i instrukcje gracza).
+ */
+export function matchTactics(game, squad, benchSize) {
+  const prev = game.tactics;
+  if (prev.assistant) return { ...createTactics(squad, { formation: prev.formation, instructions: prev.instructions, benchSize }), assistant: true };
+  const subs = { ...(game.tacticsSubs ?? {}) }; // miejsce w jedenastce -> { orig: zastąpiony, sub: zastępca }
+  const byId = new Map(squad.map((p) => [p.id, p]));
+  const out = (id) => { const p = byId.get(id); return !p || !isAvailable(p); };
+  const xi = [...prev.xi];
+  let bench = [...prev.bench];
+  // Zastępstwa zrobione przed dniem meczowym (ekran gry odświeża skład): miejsce zmienione, poprzedni zawodnik niedostępny
+  const last = game.tacticsLast;
+  if (last) {
+    xi.forEach((id, i) => {
+      const was = last[i];
+      if (!was || id === was || !byId.has(was) || !out(was)) return;
+      if (subs[i] && subs[i].sub === was) subs[i] = { ...subs[i], sub: id }; // zastępca też wypadł
+      else if (!subs[i]) subs[i] = { orig: was, sub: id };
+    });
+  }
+  for (const [i, s] of Object.entries(subs)) {
+    const o = byId.get(s.orig);
+    if (xi[i] !== s.sub || !o || xi.includes(s.orig)) { delete subs[i]; continue; } // gracz sam zmienił to miejsce
+    if (!isAvailable(o)) continue;
+    xi[i] = s.orig;
+    bench = bench.filter((id) => id !== s.orig);
+    if (!bench.includes(s.sub) && byId.has(s.sub)) bench = [...bench.slice(0, Math.max(0, benchSize - 1)), s.sub];
+    delete subs[i];
+  }
+  const { tactics } = refreshTactics({ ...prev, xi, bench }, squad, { benchSize });
+  tactics.xi.forEach((id, i) => {
+    if (!xi[i] || id === xi[i]) return;
+    subs[i] = subs[i] ? { ...subs[i], sub: id } : { orig: xi[i], sub: id };
+  });
+  game.tacticsSubs = subs;
+  game.tacticsLast = [...tactics.xi];
+  return tactics;
+}
+
 /** Zaczyna dzień meczowy dla meczu gracza. */
 export function startMatchday(game, f) {
   const rng = new Rng(`dzien-meczowy:${game.seed}:${f.id}`);
@@ -83,7 +127,7 @@ export function startMatchday(game, f) {
     ? standings(game.fixtures.filter((x) => x.comp === comp), CLUBS_PL.filter((c) => c.tier === COMPETITIONS[comp].tier).map((c) => c.id)) : null;
   const benchSize = (LEAGUE_COMPS.includes(comp) ? COMPETITIONS[comp].benchSize : 12);
   const mySquad = squadFor(game, game.clubId, comp);
-  game.tactics = refreshTactics(game.tactics, mySquad, { benchSize }).tactics;
+  game.tactics = matchTactics(game, mySquad, benchSize);
   const oppSquad = squadFor(game, oppId, comp);
   const oppTactics = createTactics(oppSquad, { benchSize });
   const weather = weatherFor(f.date, rng);
@@ -156,6 +200,7 @@ export function kickOff(game, S) {
     away: S.userSide === 0 ? theirs : mine,
     ctx: {
       neutral: !!S.f.neutral, var: S.hasVar, rank: S.pre.preview.rank.level, refStrict: S.referee.strictness,
+      concussionSubs: false, // zmiany po wstrząśnieniu mózgu: flaga rozgrywek (UEFA ich nie stosuje, brak potwierdzenia dla Ekstraklasy)
       attendance: S.pre.conditions.attendance.fill, weather: engineWeather(S.weather, S.pitch),
       knockout: S.f.knockout === 'single' ? 'single' : S.f.knockout?.firstLeg ? { firstLeg: [...S.f.knockout.firstLeg] } : false,
     },
@@ -237,6 +282,7 @@ export function finishMatchday(game, S) {
   const M = S.M;
   if (M.phase === 'break' && !M.ended) runToEnd(M, { assistantFor: [S.userSide] });
   const r = matchResult(M);
+  r.score = walkoverScore(r); // mecz przerwany (za mało zawodników): walkower 0:3, chyba że wynik był wyższy
   if (S.f.knockout === 'penaltiesOnly' && r.score[0] === r.score[1] && !r.shootout) {
     const rng = new Rng(`karne:${S.f.id}`);
     r.shootout = { goals: rng.chance(0.5) ? [4, 3] : [3, 4], kicks: [] };
@@ -271,6 +317,7 @@ function toStudioEvent(e) {
   const m = /^(\d+)(?:\+(\d+))?'$/.exec(e.min ?? '');
   return {
     ...e, min: m ? Number(m[1]) : null, added: m?.[2] ? Number(m[2]) : 0, // strona zostaje liczbą (statsFromEvents)
+    player: e.player ?? e.pid, // studio (pauzy, kontuzje) czyta zawodnika z `player`, silnik podaje `pid`
     penalty: e.how === 'PEN', second: /druga żółta/.test(e.text ?? ''), days: e.injury?.days, injuryType: e.injury?.name,
   };
 }

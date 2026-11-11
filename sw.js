@@ -91,6 +91,7 @@ const SHELL = [
   './src/career/reputation.js',
   './src/career/squad.js',
   './src/career/teamTalks.js',
+  './src/career/threat.js',
   './src/career/transfers.js',
   './src/config/calendar2026.js',
   './src/config/competitions.js',

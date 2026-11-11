@@ -21,6 +21,7 @@ import { afterMatchDelta, applyMorale, weeklyDrift } from '../career/morale.js';
 import { INJURY_TYPES } from '../engine/match/constants.js';
 import { fmtDate } from '../ui/dom.js';
 import { UEFA_CLUBS, createUefa } from './uefa.js';
+import { aiChooseSpeech, postMatchBriefing, closeMatchMemory } from '../match/briefings.js';
 
 export const LEAGUE_COMPS = ['ekstraklasa', 'liga1', 'liga2'];
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
@@ -141,6 +142,9 @@ function tableTermFor(game, clubId, comp, cache) {
   return row ? tableConfidence({ played: row.played, points: row.points }, club?.L ?? leagueL, leagueL) : 0;
 }
 
+/** Model ocen meczów w tle (playQuick); fromEngineResult sprowadza oceny pełnego silnika do tej skali. */
+export const QUICK_RATING = { base: 6.4, goal: 0.9, assist: 0.5, assistShare: 0.72, yellow: -0.3, red: -1.2 };
+
 /** Mecz w tle (AI vs AI) szybką symulacją. */
 export function playQuick(game, f, rng, cache = new Map()) {
   const home = { squad: squadFor(game, f.home, f.comp), tableTerm: tableTermFor(game, f.home, f.comp, cache) };
@@ -157,12 +161,13 @@ export function playQuick(game, f, rng, cache = new Map()) {
     const find = (id) => out.find((x) => x.id === id);
     for (const id of r.scorers[s]) {
       const x = find(id); if (x) x.g++;
-      if (rng.chance(0.72) && out.length > 1) { const as = rng.pick(out.filter((y) => y.id !== id)); as.a++; }
+      if (rng.chance(QUICK_RATING.assistShare) && out.length > 1) { const as = rng.pick(out.filter((y) => y.id !== id)); as.a++; }
     }
     for (let i = 0; i < r.yellow[s]; i++) rng.weighted(out, (x) => (byId.get(x.id).attr?.AGR ?? 10) * (x.yc ? 0.4 : 1)).yc++;
     for (let i = 0; i < r.red[s]; i++) rng.weighted(out, (x) => byId.get(x.id).attr?.AGR ?? 10).rc = 1;
     const win = r.score[s] > r.score[1 - s] ? 0.2 : r.score[s] < r.score[1 - s] ? -0.2 : 0;
-    for (const x of out) x.rating = Math.round(clamp(6.4 + 0.9 * x.g + 0.5 * x.a - 0.3 * x.yc - 1.2 * x.rc + win + rng.gauss(0, 0.45), 4, 9.5) * 10) / 10;
+    const Q = QUICK_RATING;
+    for (const x of out) x.rating = Math.round(clamp(Q.base + Q.goal * x.g + Q.assist * x.a + Q.yellow * x.yc + Q.red * x.rc + win + rng.gauss(0, 0.45), 4, 9.5) * 10) / 10;
     // Kontuzje z modelu (liczba z quickSim), z wagą niskiej odporności
     for (let i = 0; i < r.injuries[s] && out.length; i++) {
       const x = rng.weighted(out, (y) => 1.5 - 0.05 * (byId.get(y.id).hidden?.ODP ?? 10));
@@ -184,21 +189,76 @@ export function rollInjury(rng) {
   return { name, days: rng.int(lo, hi), cat };
 }
 
+/**
+ * Przesunięcie ocen z pełnego silnika na skalę ocen meczów w tle (balans, docs/balans.md).
+ * Oceny trafiają do formy (modyfikator siły), morale i wartości zawodników, a mecze gracza idą pełnym silnikiem,
+ * mecze AI szybką symulacją. Średnia ocen silnika była o ok. 0,3 niższa, więc drużyna gracza miała stale gorszą
+ * formę i morale niż te same kluby pod AI. Liczymy, jaką średnią dałby model ocen z playQuick przy tych samych
+ * golach i kartkach, i przesuwamy oceny meczu o różnicę (różnice między zawodnikami zostają).
+ * Gdy skala silnika zgadza się z modelem, przesunięcie wynosi ok. 0.
+ */
+export function engineRatingShift(r) {
+  const xs = r.ratings.filter((x) => x.minutes > 0);
+  const w = xs.reduce((s, x) => s + Math.min(90, x.minutes), 0);
+  if (!w) return 0;
+  const eMean = xs.reduce((s, x) => s + x.rating * Math.min(90, x.minutes), 0) / w;
+  const goals = r.score[0] + r.score[1];
+  const yc = xs.reduce((s, x) => s + (x.yc && !x.rc ? 1 : 0), 0);
+  const rc = xs.reduce((s, x) => s + (x.rc ? 1 : 0), 0);
+  const qMean = QUICK_RATING.base + (QUICK_RATING.goal * goals + QUICK_RATING.assist * QUICK_RATING.assistShare * goals + QUICK_RATING.yellow * yc + QUICK_RATING.red * rc) / 22;
+  return clamp(qMean - eMean, -1, 1);
+}
+
+/** Mecz przerwany (drużyna ma za mało zawodników, result.abandoned): walkower 0:3, chyba że rywal wygrywał wyżej. */
+export function walkoverScore(r) {
+  const ab = r.abandoned;
+  if (!ab) return r.score;
+  const s = ab.side; const o = 1 - s;
+  if (r.score[o] - r.score[s] >= 3) return r.score;
+  return s === 0 ? [0, 3] : [3, 0];
+}
+
+/** Długość kary za czerwoną kartkę z powodu z silnika (reasonCode); bez powodu losujemy jak w meczach w tle. */
+export const RED_BAN = { second: 1, dogso: 1, handball: 1, sfp: 2, violent: 3 };
+
 /** Wynik z pełnego silnika zamieniony na ten sam format co z szybkiej symulacji. */
 export function fromEngineResult(r) {
+  const shift = engineRatingShift(r);
+  const redWhy = new Map(r.events.filter((e) => e.type === 'red' && e.pid).map((e) => [e.pid, e.reasonCode ?? (e.second ? 'second' : null)]));
   const players = [0, 1].map((s) => r.ratings.filter((x) => x.side === s && x.minutes > 0).map((x) => ({
-    id: x.id, minutes: x.minutes, g: x.g, a: x.a, yc: x.yc, rc: x.rc, rating: x.rating,
+    id: x.id, minutes: x.minutes, g: x.g, a: x.a, yc: x.yc, rc: x.rc, rating: Math.round(clamp(x.rating + shift, 3, 10) * 10) / 10,
     injury: x.injury ? { name: x.injury.name, days: x.injury.days, cat: x.injury.cat } : null, motm: x.id === r.motm,
+    ...(x.rc && redWhy.get(x.id) ? { redReason: redWhy.get(x.id) } : {}),
   })));
   const scorers = [0, 1].map((s) => r.events.filter((e) => e.type === 'goal' && !e.provisional && e.side === s && e.pid).map((e) => e.pid));
   return {
-    score: r.score, scorers, shootout: r.shootout?.goals ?? null, extraTime: r.extraTime,
+    score: walkoverScore(r), scorers, shootout: r.shootout?.goals ?? null, extraTime: r.extraTime,
     stats: { shots: [r.stats[0].shots, r.stats[1].shots], onTarget: [r.stats[0].onTarget, r.stats[1].onTarget], possession: [r.stats[0].possession, r.stats[1].possession], xg: [r.stats[0].xg, r.stats[1].xg] },
     players, strengthDiff: 0, quick: false,
   };
 }
 
 // ------------------------------------------------------------ Skutki meczu
+/**
+ * Odprawa pomeczowa trenera klubu AI (docs/balans.md): ten sam model co odprawa gracza (postMatchBriefing),
+ * ton według osobowości trenera (aiChooseSpeech) i pamięć powtórzeń klubu. Wcześniej tylko drużyna gracza
+ * dostawała morale z odprawy po meczu, co przy częstych zwycięstwach dawało jej stałą premię morale.
+ */
+function aiPostMatchTalk(game, f, clubId, s, res, squad, played) {
+  const players = squad.filter((p) => played.has(p.id));
+  if (!players.length) return;
+  const mem = (game.aiSpeech ??= {});
+  const gf = res.score[s]; const ga = res.score[1 - s];
+  const xg = res.stats?.xg ?? [0, 0];
+  const tone = aiChooseSpeech(anyClub(clubId)?.coach ?? 'P', { phase: 'post', diff: gf - ga, xgDiff: (xg[s] ?? 0) - (xg[1 - s] ?? 0), memory: mem[clubId] });
+  const r = postMatchBriefing({
+    players, tone, memory: mem[clubId], seed: `${game.seed}:${f.id}:po-meczu-ai:${clubId}`,
+    ctx: { score: { for: gf, against: ga }, xgFor: xg[s] ?? 0, xgAgainst: xg[1 - s] ?? 0, ratings: Object.fromEntries(res.players[s].map((x) => [x.id, x.rating])), rank: f.derby ? 2 : f.comp === 'pp' ? 1 : 0, clubId },
+  });
+  for (const p of players) { const m = r.morale[p.id]; if (m) p.morale = applyMorale(p.morale ?? 12, m.delta); }
+  mem[clubId] = closeMatchMemory(r.memory);
+}
+
 function yellowSuspension(comp, count) {
   const rules = COMPETITIONS[comp]?.yellowSuspension ?? (comp === 'pp' ? COMPETITIONS.pucharPolski.yellowSuspension : []);
   if (!Array.isArray(rules)) {
@@ -273,7 +333,7 @@ export function applyResult(game, f, res, rng) {
           }
         }
         if (x.rc) {
-          const games = rng.weighted([1, 2, 3], (g) => ({ 1: 0.6, 2: 0.3, 3: 0.1 })[g]);
+          const games = RED_BAN[x.redReason] ?? rng.weighted([1, 2, 3], (g) => ({ 1: 0.6, 2: 0.3, 3: 0.1 })[g]);
           p.susp[key] = (p.susp[key] ?? 0) + games;
           if (mine) msgs.push(['important', `Czerwona kartka: ${p.name}`, `${p.name} został ukarany ${games === 1 ? '1 meczem' : `${games} meczami`} zawieszenia.`]);
         }
@@ -284,6 +344,7 @@ export function applyResult(game, f, res, rng) {
         if (mine) msgs.push(['important', `Kontuzja: ${p.name}`, `${p.name}: ${x.injury.name}. Przerwa potrwa ok. ${x.injury.days} dni (powrót ok. ${fmtDate(addDays(f.date, x.injury.days))}).`]);
       }
     }
+    if (!mine && f.comp !== 'friendly') aiPostMatchTalk(game, f, clubId, s, res, squad, played);
   });
   if (f.comp === 'pp' || f.comp === 'super' || f.comp.startsWith('playoff')) {
     const w = winnerOf(f);

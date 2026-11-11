@@ -13,7 +13,8 @@ import { isAvailable } from '../career/squad.js';
 import { squadOf } from '../world/worldGen.js';
 import { INJURY_TYPES } from '../engine/match/constants.js';
 import { fmtDate } from '../ui/dom.js';
-import { LOAD, staffMul } from './config.js';
+import { LOAD, staffMul, AI_TRAINING } from './config.js';
+import { applyMorale } from '../career/morale.js';
 import { ensureTraining, attachTraining, activeGame, weekdayIdx, daysBetween } from './state.js';
 import { staffQ, reportPrecision } from './staff.js';
 import { pruneOverrides } from './plan.js';
@@ -65,6 +66,12 @@ export function weeklyStep(game, date, rng) {
     }
     // Urazy na treningu w klubie AI: ta sama średnia co u gracza (0,15 % na zawodnika na dzień, 5 dni)
     const pool = squadOf(game.world, clubId).filter(isAvailable);
+    // Ostrość i morale z tygodnia treningu (jak domyślny plan asystenta u gracza)
+    for (const p of pool) {
+      const sharp = p.sharp ?? 70;
+      if (sharp < LOAD.sharpTrainCap) p.sharp = Math.min(LOAD.sharpTrainCap, sharp + AI_TRAINING.sharpWeek);
+      p.morale = applyMorale(p.morale ?? 12, AI_TRAINING.moraleWeek);
+    }
     const lambda = pool.length * 5 * LOAD.injBase * staffMul.inj(staffQ(game, clubId, 'fizyczny'));
     const k = rng.poisson(lambda);
     for (let i = 0; i < k && pool.length; i++) {

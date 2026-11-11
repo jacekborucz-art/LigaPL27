@@ -9,6 +9,7 @@ import { clamp } from '../core/rng.js';
 import { COH, SESSIONS, INTENSITY, CAMP, staffMul } from './config.js';
 import { staffQ } from './staff.js';
 import { aiClubZ } from './state.js';
+import { managerThreat, THREAT } from '../career/threat.js';
 
 const W = COH.weights;
 const r1 = (v) => Math.round(v * 10) / 10;
@@ -115,10 +116,39 @@ export function aiWeeklyCohesion(game, clubId, matches) {
   c.z = aiClubZ(c);
 }
 
-/** Bonus z analizy wideo rywala (tylko w dniu meczu, na który była analiza). */
+/**
+ * Bonus z analizy wideo rywala (tylko w dniu meczu, na który była analiza).
+ * Klub gracza: z zajęć „Analiza wideo rywala” w planie (c.prep). Klub AI: ten sam plan co domyślny plan asystenta
+ * (analiza dzień przed meczem, gdy analityk ma jakość co najmniej 5), więc w dniu meczu dostaje tę samą premię
+ * 0.04 + 0.006 q. Przeciw groźnej drużynie gracza (career/threat.js) analiza jest staranniejsza: do x2.
+ */
 export function prepTerm(game, p) {
   const c = game?.training?.clubs?.[p.clubId];
-  return c?.prep && c.prep.date === game.date ? c.prep.v : 0;
+  if (!c) return 0;
+  if (p.clubId === game.clubId) return c.prep && c.prep.date === game.date ? c.prep.v : 0;
+  return aiPrepToday(game).get(p.clubId) ?? 0;
+}
+
+const AI_PREP_MIN_ANALYST = 5;
+const aiPrepCache = new WeakMap();
+/** Premie analizy klubów AI grających dziś: Map clubId -> punkty (liczone raz na dzień). */
+export function aiPrepToday(game) {
+  const n = game.fixtures?.length ?? 0;
+  const hit = aiPrepCache.get(game);
+  if (hit && hit.date === game.date && hit.n === n && hit.clubId === game.clubId) return hit.map;
+  const map = new Map();
+  for (const f of game.fixtures ?? []) {
+    if (f.date !== game.date || !f.home || !f.away) continue;
+    for (const [id, opp] of [[f.home, f.away], [f.away, f.home]]) {
+      if (id === game.clubId || !game.training?.clubs?.[id]) continue;
+      const q = staffQ(game, id, 'analityk');
+      if (q < AI_PREP_MIN_ANALYST) continue;
+      const mul = opp === game.clubId ? 1 + THREAT.prepMul * managerThreat(game) : 1;
+      map.set(id, Math.round(staffMul.prep(q) * mul * 1000) / 1000);
+    }
+  }
+  aiPrepCache.set(game, { date: game.date, n, clubId: game.clubId, map });
+  return map;
 }
 
 /** Przesunięcie stałych fragmentów: SFR wykonawców od -0.6 do +1.2 (poziom wyćwiczenia 0-100). */

@@ -24,7 +24,7 @@ import { COUNTRY_COEF_2026, UCOMP_NAMES } from './uefa.js';
 import { FIFA_WINDOWS_ALL } from './national.js';
 import { initClub, seasonSummary, FIN } from '../career/finance.js';
 import { addFreeAgents } from '../career/transfers.js';
-import { seasonGoalFor, jobOffers, ensureBoard } from '../career/board.js';
+import { boardGoal, jobOffers, ensureBoard } from '../career/board.js';
 import { fmtDate } from '../ui/dom.js';
 
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
@@ -289,9 +289,9 @@ export function rolloverSeason(game) {
   if (res.tables[1][0] === game.clubId) delta += 15;
   if (res.cup.winner === game.clubId) delta += 8;
   B.trust = Math.round(clamp(50 + (B.trust - 50) * 0.5 + delta, 0, 100));
-  B.goal = seasonGoalFor(clubById(game.clubId)); B.goalClub = game.clubId;
   B.reviews = [{ date: newStart, trust: B.trust, delta: Math.round(delta * 10) / 10, pos: userPos, notes: [`Sezon ${oldSeason} zakończony na ${userPos}. miejscu.`] }, ...(B.reviews ?? [])].slice(0, 12);
-  game.manager.seasons = [...(game.manager.seasons ?? []), { season: oldSeason, club: game.clubId, tier: userTier, pos: userPos }];
+  game.manager.seasons = [...(game.manager.seasons ?? []), { season: oldSeason, club: game.clubId, tier: userTier, pos: userPos, target }];
+  B.goal = boardGoal(game, clubById(game.clubId)); B.goalClub = game.clubId;
   const droppedOut = clubById(game.clubId).tier > 3; // III liga nie jest symulowana: trener szuka nowego klubu
   const fired = B.trust < 18 || droppedOut;
 

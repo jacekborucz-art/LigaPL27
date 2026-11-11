@@ -99,6 +99,7 @@ test('Klub gracza spada do III ligi: automatyczne zwolnienie i oferty pracy z li
   const g = newGame('chojniczanka', 32);
   const club = CLUBS_PL.find((c) => c.id === 'chojniczanka');
   if (club.tier !== 3) return;
+  g.board.trust = 100; // test spadku po sezonie: trener nie może zostać zwolniony w trakcie (wynik sezonu zależy od balansu)
   playTo(g, '2027-06-30');
   // Wymuszamy ostatnie miejsce: wszystkie mecze ligowe klubu gracza przegrane
   for (const f of g.fixtures.filter((x) => x.comp === 'liga2' && (x.home === g.clubId || x.away === g.clubId))) f.result.score = f.home === g.clubId ? [0, 5] : [5, 0];
