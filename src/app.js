@@ -39,6 +39,7 @@ import { spendable, wageBill, monthSummary } from './career/finance.js';
 import { teamMorale, moraleLabel } from './career/morale.js';
 import { fanMoodLabel } from './career/fans.js';
 import { GROUP } from './career/squad.js';
+import { limitStatus } from './career/squadLimitSystem.js';
 import { runDecision } from './core/decisions.js';
 import { startNegotiation, renderNegotiation, handleNegotiationAction, isNegotiationAction, readNegotiationForm, refreshNegotiationHints } from './ui/negotiationView.js';
 import { renderMenu, renderCareer, newCareerState, maybePlayIntro, readTheme, applyTheme, nextTheme, nameError, ageError, profileOf, randomCoach, updateCoachPreview, setFieldError, isNationality, managerName, AGE_MIN, AGE_MAX } from './ui/menuView.js';
@@ -498,13 +499,23 @@ function dashSquad(g) {
   const ending = squadOf(g.world, g.clubId).filter((p) => !p.loan && p.contract?.until && daysBetween(g.date, p.contract.until) <= 365)
     .sort((a, b) => a.contract.until.localeCompare(b.contract.until) || b.ovr - a.ovr);
   const endList = ending.slice(0, 6).map((p, k) => `<li${k >= 3 ? ' class="dash-more"' : ''}><span class="pos" data-g="${GROUP[p.pos] ?? 'MID'}">${esc(p.pos)}</span><span class="dash-abs__name">${esc(p.name)}</span><span class="dash-abs__why" data-k="contract">${esc(fmtDate(p.contract.until))}</span></li>`).join('');
-  const body = `<ul class="dash-stats">
+  // Limit kadry (docs/limit-kadry.md): ostrzeżenie, gdy kadra jest ponad limitem zarządu albo biegnie termin
+  const L = limitStatus(g);
+  const lc = L.case;
+  const limitText = lc ? `Kadra ${L.counted}/${L.soft}: ${lc.stage === 'warn' ? `zarząd żąda redukcji o ${L.over}` : lc.stage === 'listed' ? 'zarząd wystawił zawodników na listę' : `wciąż ${L.over} ponad limit`}, termin ${L.daysLeft === 0 ? 'dziś' : `za ${L.daysLeft} ${daysWord(L.daysLeft)}`}.`
+    : L.over > 0 ? `Kadra ${L.counted}/${L.soft}: ponad limitem zarządu o ${L.over}.`
+      : L.full ? `Kadra pełna (${L.counted}/${L.hard}): nowe transfery zablokowane.` : '';
+  const limitHtml = limitText
+    ? `<p class="dash-alert dash-alert--top">${esc(limitText)} <button class="dash-link" data-act="tab" data-tab="transfery" data-sub="rynek">Limit kadry</button></p>`
+    : '';
+  const body = `${limitHtml}<ul class="dash-stats">
       <li><span>Morale</span><b>${esc(moraleLabel(morale))}</b></li>
       <li><span>Świeżość składu</span><b data-b="${freshBand}">${fresh == null ? 'brak składu' : `${fresh}%`}</b></li>
       <li><span>Zgranie</span><b>${esc(coh.label)}</b></li>
     </ul>
     <h4 class="dash-sub">Niedostępni${out.length ? ` (${out.length})` : ''}</h4>
     ${out.length ? `<ul class="dash-abs">${list}</ul>${out.length > 5 ? `<p class="dash-note">i jeszcze ${out.length - 5}</p>` : ''}` : '<p class="dash-note dash-note--ok">Wszyscy zawodnicy są do dyspozycji.</p>'}
+    ${limitHtml ? '' : `<p class="dash-note">Limit kadry: ${L.counted} z ${L.soft} (maksimum ${L.hard}), bez ${L.exempt.length} ${plural(L.exempt.length, 'wychowanka', 'wychowanków', 'wychowanków')} do 21 lat.</p>`}
     ${ending.length ? `<h4 class="dash-sub">Kontrakt kończy się w ciągu roku (${ending.length})</h4><ul class="dash-abs">${endList}</ul>` : ''}`;
   return dashPanel('squad', 'squad', 'Stan kadry', body, dashLink('kadra', 'Kadra'));
 }

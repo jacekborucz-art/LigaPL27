@@ -419,3 +419,6 @@
 .dash-moves__route { font-size: 12px; color: var(--text); overflow-wrap: anywhere; }
 .dash-moves__arrow { width: 14px; height: 9px; margin: 0 2px; color: var(--pa); vertical-align: 0; }
 .dash-p--window .dash-alert { margin-top: 0; }
+/* Limit kadry: ostrzeżenie na górze panelu Stan kadry */
+.dash-alert--top { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px var(--space-2); }
+.dash-alert--top .dash-link { min-height: 36px; padding: 0 var(--space-2); margin-left: auto; }

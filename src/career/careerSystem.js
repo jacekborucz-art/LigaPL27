@@ -14,6 +14,7 @@ import { standings } from '../season/standings.js';
 import { createFinance, financeDay, book, matchIncome, attendanceFill, uefaPrize, PP_PRIZE, stadiumCapacity, meritTv, clubPlan, FIN } from './finance.js';
 import { createMarket, marketWeek, answerIncoming, aiRenewals, inWindow, windowOf, fmtZl, SEASON_END } from './transfers.js';
 import { ensureBoard, boardMonth, seasonGoalFor, trustLabel } from './board.js';
+import './squadLimitSystem.js'; // limit kadry i nacisk zarządu (docs/limit-kadry.md)
 
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
 
@@ -111,6 +112,7 @@ export function switchClub(game, clubId, date) {
   delete game.tacticsSubs; delete game.tacticsLast; // zastępstwa asystenta (match/matchday.js) dotyczyły starej kadry
   game.board = { trust: 55, fansMood: 55, reviews: [], goal: seasonGoalFor(clubById(clubId)), goalClub: clubId };
   game.market.userListed = {};
+  if (game.squadLimit) game.squadLimit.case = null; // sprawa limitu kadry dotyczyła poprzedniego klubu
   game.market.offers = game.market.offers.filter((o) => o.kind !== 'incoming');
   if (game.summary) game.summary.clubId = clubId;
 }

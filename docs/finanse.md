@@ -246,3 +246,7 @@ Po 10 sezonach (lipiec 2036) salda w Ekstraklasie: Legia 183,9, Lech 113,7, Widz
 - Kluby AI kupują mało (ok. 30 płatnych transferów na sezon, mediana 0,23 mln EUR), bo pulę ogranicza lista transferowa; budżety są wyższe niż wydatki.
 - Kwoty niższych lig i część danych Ekstraklasy to szacunki. Do weryfikacji w pełnych raportach Grant Thornton (https://grantthornton.pl/publikacja/finansowa-ekstraklasa-sezon-2025-2026/ i https://grantthornton.pl/finansowa-pierwsza-liga-sezon-2025-2026/), gdy będą dostępne z sesji.
 - Nowa umowa telewizyjna Ekstraklasy na lata 2027-31 nie jest jeszcze znana; po jej ogłoszeniu wystarczy zmienić `FIN.TV_FIXED`, `FIN.TV_RANKING` i `FIN.MERIT`.
+
+## Limit kadry
+
+Odprawy i sprzedaże zarządu przy zbyt dużej kadrze (docs/limit-kadry.md) trafiają do księgi jako `release` (odprawa, zdejmowana też z budżetu transferowego) i `sales` (sprzedaż za 60 % wartości). Kluby AI płacą odprawy tylko wtedy, gdy stać je na nie (`spendable`), poza przekroczeniem maksimum kadry.
