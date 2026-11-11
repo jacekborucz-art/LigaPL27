@@ -42,6 +42,8 @@ import { GROUP } from './career/squad.js';
 import { limitStatus } from './career/squadLimitSystem.js';
 import { runDecision } from './core/decisions.js';
 import { startNegotiation, renderNegotiation, handleNegotiationAction, isNegotiationAction, readNegotiationForm, refreshNegotiationHints } from './ui/negotiationView.js';
+import { bindContextTrigger, openMenu, showToast } from './ui/contextMenu.js';
+import { playerMenu } from './ui/playerMenus.js';
 import { renderMenu, renderCareer, newCareerState, maybePlayIntro, readTheme, applyTheme, nextTheme, nameError, ageError, profileOf, randomCoach, updateCoachPreview, setFieldError, isNationality, managerName, AGE_MIN, AGE_MAX } from './ui/menuView.js';
 
 const app = document.getElementById('app');
@@ -476,7 +478,7 @@ function dashWindow(g) {
   const terms = (h) => (h.kind === 'release' ? '' : `${h.kind === 'loan' ? 'wypożyczenie' : h.fee ? fmtZl(h.fee) : 'bez odstępnego'}, `);
   if (moves.length) {
     body += `<h4 class="dash-sub">${mine.length ? 'Ostatnie ruchy' : 'Ostatnie ruchy w lidze'}</h4>
-      <ul class="dash-moves">${moves.map((h) => `<li${h.from === g.clubId || h.to === g.clubId ? ' class="is-mine"' : ''}><b>${esc(h.name)}</b><span class="dash-moves__route">${route(h)}</span><small>${esc(terms(h))}${esc(shortDate(h.date))}</small></li>`).join('')}</ul>`;
+      <ul class="dash-moves">${moves.map((h) => `<li${h.from === g.clubId || h.to === g.clubId ? ' class="is-mine"' : ''}${g.world.players[h.playerId] ? ` data-pid="${esc(h.playerId)}" data-why="move"` : ''}><b>${esc(h.name)}</b><span class="dash-moves__route">${route(h)}</span><small>${esc(terms(h))}${esc(shortDate(h.date))}</small></li>`).join('')}</ul>`;
   }
   return dashPanel('window', 'transfery', 'Okno transferowe', body, dashLink('transfery', offers ? 'Zobacz oferty' : 'Transfery', offers ? 'oferty' : 'rynek'));
 }
@@ -493,12 +495,12 @@ function dashSquad(g) {
     : p.suspended > 0 ? ['susp', `pauza, ${p.suspended} ${plural(p.suspended, 'mecz', 'mecze', 'meczów')}`] : ['call', 'reprezentacja']);
   const list = out.slice(0, 5).map((p) => {
     const [k, txt] = why(p);
-    return `<li><span class="pos" data-g="${GROUP[p.pos] ?? 'MID'}">${esc(p.pos)}</span><span class="dash-abs__name">${esc(p.name)}</span><span class="dash-abs__why" data-k="${k}">${esc(txt)}</span></li>`;
+    return `<li data-pid="${esc(p.id)}" data-why="${k}"><span class="pos" data-g="${GROUP[p.pos] ?? 'MID'}">${esc(p.pos)}</span><span class="dash-abs__name">${esc(p.name)}</span><span class="dash-abs__why" data-k="${k}">${esc(txt)}</span></li>`;
   }).join('');
   const freshBand = fresh == null ? '' : fresh >= 80 ? 'good' : fresh >= 65 ? 'mid' : 'low';
   const ending = squadOf(g.world, g.clubId).filter((p) => !p.loan && p.contract?.until && daysBetween(g.date, p.contract.until) <= 365)
     .sort((a, b) => a.contract.until.localeCompare(b.contract.until) || b.ovr - a.ovr);
-  const endList = ending.slice(0, 6).map((p, k) => `<li${k >= 3 ? ' class="dash-more"' : ''}><span class="pos" data-g="${GROUP[p.pos] ?? 'MID'}">${esc(p.pos)}</span><span class="dash-abs__name">${esc(p.name)}</span><span class="dash-abs__why" data-k="contract">${esc(fmtDate(p.contract.until))}</span></li>`).join('');
+  const endList = ending.slice(0, 6).map((p, k) => `<li${k >= 3 ? ' class="dash-more"' : ''} data-pid="${esc(p.id)}" data-why="contract"><span class="pos" data-g="${GROUP[p.pos] ?? 'MID'}">${esc(p.pos)}</span><span class="dash-abs__name">${esc(p.name)}</span><span class="dash-abs__why" data-k="contract">${esc(fmtDate(p.contract.until))}</span></li>`).join('');
   // Limit kadry (docs/limit-kadry.md): ostrzeżenie, gdy kadra jest ponad limitem zarządu albo biegnie termin
   const L = limitStatus(g);
   const lc = L.case;
@@ -791,19 +793,32 @@ async function tacticsClick(g, el) {
   renderTacticsAfter();
 }
 
+/** Ruch w składzie (przeciąganie i menu kontekstowe „tmove”): te same reguły co wybór dwoma dotknięciami. */
+async function applyMove(src, dst) {
+  const g = state.game;
+  const r = resolveMove(g.tactics, src, dst, tCtx(g));
+  if (!r.ok) return r;
+  g.tactics = r.tactics;
+  state.tSel = null;
+  state.tMsg = r.text;
+  tUi.lastTap = null;
+  await save();
+  renderTacticsAfter();
+  return r;
+}
+
+const ROLE_KEYS = ['captain', 'penalty', 'freeKick', 'corner'];
+/** Kapitan i wykonawcy stałych fragmentów (lista wyboru na ekranie składu i menu kontekstowe). */
+async function setRole(role, id) {
+  if (!ROLE_KEYS.includes(role) || !id) return;
+  state.game.tactics = { ...state.game.tactics, [role]: id };
+  await save();
+  render();
+}
+
 mountTacticsDrag(app, {
   resolve: (src, dst) => resolveMove(state.game.tactics, src, dst, tCtx(state.game)),
-  onDrop: async (src, dst) => {
-    const g = state.game;
-    const r = resolveMove(g.tactics, src, dst, tCtx(g));
-    if (!r.ok) return;
-    g.tactics = r.tactics;
-    state.tSel = null;
-    state.tMsg = r.text;
-    tUi.lastTap = null;
-    await save();
-    renderTacticsAfter();
-  },
+  onDrop: (src, dst) => applyMove(src, dst),
   onReject: (reason) => { state.tMsg = reason; renderTacticsAfter(); },
 });
 
@@ -831,9 +846,7 @@ app.addEventListener('input', (ev) => {
 app.addEventListener('change', async (ev) => {
   const sel = ev.target.closest('select[data-act="trole"]');
   if (!sel) return;
-  state.game.tactics = { ...state.game.tactics, [sel.dataset.role]: sel.value };
-  await save();
-  render();
+  await setRole(sel.dataset.role, sel.value);
 });
 
 // ---------- Akcje ----------
@@ -862,19 +875,27 @@ async function newGame(slot, clubId, profile = null) {
   render();
 }
 
-app.addEventListener('click', async (ev) => {
+app.addEventListener('click', (ev) => {
   const el = ev.target.closest('[data-act]');
   if (!el || el.tagName === 'INPUT') return;
+  return dispatchAct(el);
+});
+
+/**
+ * Wykonuje akcję data-act. el: przycisk albo { dataset } z menu kontekstowego.
+ * root: miejsce, z którego handlery czytają pola formularzy (null = tylko wartości z dataset).
+ */
+async function dispatchAct(el, { root = app } = {}) {
   const act = el.dataset.act;
   if (isTalkAction(act) && state.game) {
-    const r = handleTalkAction(state.game, act, el.dataset, app);
+    const r = handleTalkAction(state.game, act, el.dataset, root);
     Object.assign(state, r.ui ?? {});
     if (r.save) await save();
     render();
     return;
   }
   if (isTransferAction(act) && state.game) {
-    const r = handleTransferAction(state.game, act, el.dataset, app);
+    const r = handleTransferAction(state.game, act, el.dataset, root);
     Object.assign(state, r.ui ?? {});
     if (r.resolveOffer) state.game.inbox = state.game.inbox.map((m) => (m.refs?.offerId === r.resolveOffer ? { ...m, read: true, resolved: true } : m));
     if (r.negotiate) {
@@ -1016,6 +1037,11 @@ app.addEventListener('click', async (ev) => {
       state.tSel = null; renderTacticsAfter();
     }
     if (act === 'tslot' || act === 'tpick') await tacticsClick(g, el);
+    if (act === 'tmove') {
+      const r = await applyMove(parseLoc(el.dataset.src), parseLoc(el.dataset.dst));
+      if (!r.ok) { state.tMsg = r.reason || 'Ten ruch nic nie zmienia.'; renderTacticsAfter(); }
+    }
+    if (act === 'trole' && el.dataset.id) await setRole(el.dataset.role, el.dataset.id);
     if (act === 'tinfo') { if (state.tInfo === el.dataset.id) closeInfo(); else openInfo(el.dataset.id, el); }
     if (act === 'tinfoclose') closeInfo();
     if (act === 'mailcat') { state.mailCat = el.dataset.cat || null; render(); }
@@ -1054,6 +1080,61 @@ app.addEventListener('click', async (ev) => {
   } catch (err) {
     state.notice = err.message; state.screen = 'start'; render();
   }
+}
+
+// ---------- Menu kontekstowe zawodnika (prawy przycisk, przytrzymanie, klawisz menu, Shift+F10) ----------
+/** Widok dla dostawcy opcji (src/ui/playerMenus.js) albo null, gdy menu zawodnika nie ma sensu. */
+function menuView() {
+  if (state.screen !== 'hub' || !state.game) return null;
+  if (state.tab === 'pulpit') return 'dashboard';
+  if (state.tab === 'kadra') return state.sqSub === 'tactics' ? 'tactics' : state.sqSub === 'talks' ? 'talks' : state.playerOpen ? 'profile' : 'squad';
+  if (state.tab === 'transfery') return state.ng ? null : 'transfers';
+  if (state.tab === 'trening') return 'training';
+  return null;
+}
+
+const MSG_KEYS = ['tfMsg', 'trNotice', 'ttResult', 'tMsg'];
+
+/** Fokus po akcji z menu: wskazany element, a gdy fokus wypadł z ekranu, ten sam zawodnik albo główna część. */
+function focusAfterMenu(run, pid) {
+  const want = run.focus && app.querySelector(run.focus);
+  if (want) { want.focus({ preventScroll: false }); return; }
+  if (app.contains(document.activeElement) && document.activeElement !== app) return;
+  const row = app.querySelector(`[data-pid="${CSS.escape(pid)}"]`);
+  const btn = row && (row.matches('button') ? row : row.querySelector('button'));
+  if (btn) { btn.focus({ preventScroll: true }); return; }
+  const main = app.querySelector('#main');
+  if (main) { main.setAttribute('tabindex', '-1'); main.focus({ preventScroll: true }); }
+}
+
+/** Pozycja menu: kolejne akcje data-act, potem komunikat (toast) i fokus. */
+async function runMenuItem(it, pid) {
+  const run = it.run;
+  if (!run?.steps?.length) return;
+  if (run.toast === true) for (const k of MSG_KEYS) state[k] = null;
+  for (const { act, ...data } of run.steps) {
+    const dataset = { act };
+    for (const [k, v] of Object.entries(data)) dataset[k] = String(v ?? '');
+    await dispatchAct({ dataset, tagName: 'MENU' }, { root: null });
+  }
+  const msg = typeof run.toast === 'string' ? run.toast : run.toast ? MSG_KEYS.map((k) => state[k]).find(Boolean) : null;
+  if (msg) showToast(msg);
+  focusAfterMenu(run, pid);
+}
+
+bindContextTrigger(app, {
+  selector: '[data-pid]',
+  noTouch: '[data-handle]', // na ekranie składu przytrzymanie uchwytu zaczyna przeciąganie
+  open(el, at) {
+    const view = menuView();
+    if (!view) return false;
+    const g = state.game;
+    const pid = el.dataset.pid;
+    const model = playerMenu(g, pid, { view, ui: state, why: el.dataset.why ?? null, lineup: { tactics: g.tactics, ...tCtx(g) } });
+    if (!model?.items.length) return false;
+    openMenu({ ...at, model, anchor: el, onSelect: (it) => runMenuItem(it, pid) });
+    return true;
+  },
 });
 
 app.addEventListener('change', async (ev) => {

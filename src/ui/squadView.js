@@ -45,7 +45,7 @@ export function renderSquadList(players, { filter = 'all', leagueOvrs = [], acad
         <span role="columnheader" class="w">Wartość</span><span role="columnheader">OVR</span>
       </div>
       ${sorted.map((p) => `
-      <button class="sq__row" role="row" data-act="player" data-id="${esc(p.id)}">
+      <button class="sq__row" role="row" data-act="player" data-id="${esc(p.id)}" data-pid="${esc(p.id)}">
         <span class="pos" data-g="${GROUP[p.pos]}">${esc(p.pos)}${sideLabel(p)}</span>
         <span class="sq__name">${moraleDot(p.morale)}<span><b>${esc(p.name)}</b><small>${esc(p.nat)}, ${p.age} lat${p.persona === 'Lider' ? ', lider' : ''}</small></span></span>
         <span class="w">${p.age}</span><span class="w">${esc(NAT_NAMES[p.nat] ?? p.nat)}</span>
@@ -80,7 +80,7 @@ export function renderPlayerProfile(p, opts = {}) {
   const alt = Object.entries(p.alt || {}).filter(([, v]) => v >= 70).map(([k]) => k);
   return `
     <button class="btn btn--quiet" data-act="squadback">Wróć do kadry</button>
-    <header class="pp">
+    <header class="pp" data-pid="${esc(p.id)}">
       <div class="pp__ovr"><span class="led">${p.ovr.toFixed(1)}</span>${stars(starsFor(p.ovr, leagueOvrs))}</div>
       <div>
         <h2 class="pp__name">${esc(p.name)}</h2>

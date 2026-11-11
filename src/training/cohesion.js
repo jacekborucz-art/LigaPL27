@@ -109,7 +109,7 @@ export function weeklyCohesionDecay(c) {
 /**
  * Klub AI: krok tygodniowy zgrania (mecze z tego tygodnia). Zgranie formacji i stałe fragmenty z zajęć dopisuje
  * codzienny plan klubu AI (aiClubs.js, aiSessionToClub). Instrukcje, znajomość systemu i rytm klub AI ma jako
- * jedną liczbę zbliżającą się do COH.aiInstr (kalibracja: zgranie AI ok. 93, gracza z planem asystenta ok. 95).
+ * jedną liczbę zbliżającą się do COH.aiInstr (kalibracja: zgranie AI jak gracza z planem asystenta, ok. 95).
  */
 export function aiWeeklyCohesion(game, clubId, matches) {
   const c = game.training.clubs[clubId];

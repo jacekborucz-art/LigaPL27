@@ -3,8 +3,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CLIMATES, PRESS_LIMITS, pressState, pickClimate, openConference, answerQuestion, currentQuestion, walkOut,
-  conferenceEffects, skipEffects, nextPressState, pressMoraleDelta, effectWords, progress,
+  CLIMATES, PRESS_LIMITS, PRESS_LIMITS_PRE, pressState, pickClimate, openConference, answerQuestion, currentQuestion, walkOut,
+  conferenceEffects, skipEffects, nextPressState, nextPressStatePre, pressMoraleDelta, effectWords, progress,
+  openCase, decideCase, priorOffences, DISCIPLINE, pressBoardTerm,
 } from '../src/match/press.js';
 import { generateWorld, squadOf } from '../src/world/worldGen.js';
 import { createSeason } from '../src/season/season.js';
@@ -232,4 +233,170 @@ test('Dzień meczowy: Dalej bez konferencji też zmienia morale kadry wg klimatu
   const diff = after.map((v, i) => v - before[i]);
   if (room.climate.climate === 'neutralna') assert.ok(diff.every((d) => Math.abs(d) < 1e-9));
   else assert.ok(diff.some((d) => Math.abs(d) > 0) && diff.every((d) => d >= -1.3 && d <= 0.5), JSON.stringify(diff));
+});
+
+// ---------------------------------------------------------------- Konferencja przedmeczowa
+
+const PRE = { ...BASE, phase: 'pre', pts: undefined, res: undefined, gf: undefined, ga: undefined, margin: undefined, oppStar: 'Jan Snajper', absent: 'Piotr Kontuzja', refName: 'Marek Gwizdek', comp: 'ekstraklasa', matchId: 'm-pre' };
+
+test('Konferencja przedmeczowa: pytania przed meczem, bez słowa wstępnego, deterministycznie', () => {
+  for (const climate of Object.keys(CLIMATES)) {
+    const conf = openConference(PRE, {}, { climate }, `pre-${climate}`, 'pre');
+    assert.equal(conf.phase, 'pre');
+    assert.ok(conf.queue.every((q) => !q.officer));
+    assert.equal(conf.queue.length, climate === 'agresywna' ? 4 : 3);
+    assert.ok(conf.queue.every((q) => !['win-key', 'loss-why', 'draw', 'opp', 'lineup', 'next'].includes(q.id)), conf.queue.map((q) => q.id).join());
+    assert.ok(conf.queue.every((q) => !q.text.includes('{') && q.by?.name));
+    assert.match(conf.intro, /przed meczem/);
+  }
+  assert.deepEqual(openConference(PRE, {}, null, 'x', 'pre'), openConference(PRE, {}, null, 'x', 'pre'));
+  let derby = 0;
+  for (let i = 0; i < 20; i++) if (openConference({ ...PRE, derby: true }, {}, null, `d${i}`, 'pre').queue.some((q) => q.id === 'pre-derby')) derby++;
+  assert.ok(derby >= 16, `derby ${derby}/20`);
+  // Bez wyniku klimat liczy się z formy, tabeli i relacji (nie z punktów)
+  assert.ok(!pickClimate(PRE, {}, 'p').factors.some((f) => /oczekiwa|słabszym/.test(f.text) && !/zarządu/.test(f.text)));
+});
+
+test('Konferencja przedmeczowa: mniejszy wpływ, obietnica wraca po meczu, pominięcie kosztuje mało', () => {
+  for (let i = 0; i < 60; i++) {
+    let c = openConference(PRE, {}, null, `pb${i}`, 'pre');
+    let k = 0;
+    while (!c.done) c = answerQuestion(c, (i + k++) % currentQuestion(c).answers.length);
+    const e = conferenceEffects(c);
+    assert.equal(e.phase, 'pre');
+    assert.ok(e.teamMorale >= PRESS_LIMITS_PRE.teamMorale[0] && e.teamMorale <= PRESS_LIMITS_PRE.teamMorale[1], `${e.teamMorale}`);
+    assert.ok(Math.abs(e.board) <= 3 && Math.abs(e.fans) <= 4);
+  }
+  // „Wygramy” przed meczem: obietnica zostaje do konferencji po meczu
+  let c = openConference(PRE, {}, { climate: 'neutralna' }, 'obiet', 'pre');
+  const first = currentQuestion(c);
+  assert.equal(first.id, 'pre-expect');
+  c = answerQuestion(c, 0);
+  while (!c.done) c = answerQuestion(c, 1);
+  const e = conferenceEffects(c);
+  assert.equal(e.promisesAdd[0].kind, 'winNext');
+  const st = nextPressStatePre(pressState({}), e, { date: '2026-08-01', matchId: 'm-pre' });
+  assert.equal(st.promises[0].kind, 'winNext');
+  assert.equal(st.climate, 'neutralna', 'przedmeczowa nie zmienia narracji');
+  let hits = 0;
+  for (let i = 0; i < 20; i++) if (openConference({ ...BASE, res: 'P', margin: -1, pts: 0 }, st, null, `po${i}`).queue.some((q) => q.id === 'promise-broken')) hits++;
+  assert.ok(hits >= 16);
+  const skipA = skipEffects(PRE, 'agresywna', {}, 'pre');
+  const skipPost = skipEffects(BASE, 'agresywna', {}, 'post');
+  assert.ok(skipA.teamMorale < 0 && skipA.teamMorale > skipPost.teamMorale && skipA.media > skipPost.media);
+  assert.equal(skipEffects(PRE, 'neutralna', {}, 'pre').teamMorale, 0);
+});
+
+// ---------------------------------------------------------------- Dyscyplina
+
+test('Słowa o sędziach: wniosek tylko po mocnej wypowiedzi, wycofanie się go unika', () => {
+  const ctx = { ...BASE, res: 'P', gf: 0, ga: 1, margin: -1, pts: 0, controversy: true, againstUs: true, refName: 'Jan Sędzia', comp: 'ekstraklasa', matchId: 'm1' };
+  let found = 0;
+  for (let i = 0; i < 60 && found < 3; i++) {
+    const conf = openConference(ctx, {}, { climate: 'neutralna' }, `r${i}`);
+    const at = conf.queue.findIndex((q) => q.id === 'referee');
+    if (at < 0) continue;
+    found++;
+    const go = (pick, follow) => { let c = conf; while (c.idx < at) c = answerQuestion(c, 0); c = answerQuestion(c, pick); if (follow != null && currentQuestion(c)?.id === 'ref-bias') c = answerQuestion(c, follow); while (!c.done) c = answerQuestion(c, 0); return conferenceEffects(c); };
+    assert.equal(go(0).fine, false, 'bez komentarza do sędziów: bez sprawy');
+    const hard = go(1, 1);
+    assert.ok(hard.fine && hard.ref >= 2);
+    const kase = openCase(hard, ctx, 's');
+    assert.equal(kase.tier, 1);
+    assert.equal(kase.body, 'Komisja Ligi Ekstraklasy');
+    assert.ok(kase.days >= 3 && kase.days <= 6);
+    const back = go(1, 0); // „Tego nie powiedziałem”
+    assert.equal(back.fine, false, 'wycofanie się łagodzi sprawę');
+    assert.equal(openCase(hard, { ...ctx, comp: 'uefa' }), null);
+    assert.equal(openCase(hard, { ...ctx, comp: 'liga2', tier: 3 }).body, 'Komisja Dyscyplinarna PZPN');
+  }
+  assert.ok(found >= 3);
+});
+
+test('Decyzja komisji: upomnienie albo kara w realnych widełkach, recydywa podnosi karę', () => {
+  const run = (tier, severity, history = []) => Array.from({ length: 400 }, (_, i) => decideCase({ id: `c${i}`, date: '2026-10-01', tier, severity }, history, '2026-10-05', 'x'));
+  const first = run(1, 1);
+  const fines = first.filter((d) => d.outcome === 'kara');
+  const share = fines.length / first.length;
+  assert.ok(share > 0.18 && share < 0.45, `kary przy pierwszym przewinieniu ${share}`);
+  assert.ok(first.some((d) => d.outcome === 'upomnienie') && first.some((d) => d.outcome === 'umorzenie'));
+  assert.ok(fines.every((d) => d.amount >= DISCIPLINE.fine[1][0] && d.amount <= DISCIPLINE.fine[1][1]));
+  const hist = [{ date: '2026-09-01', outcome: 'kara', amount: 10000 }, { date: '2026-09-20', outcome: 'upomnienie' }];
+  const repeat = run(1, 2, hist);
+  const rf = repeat.filter((d) => d.outcome === 'kara');
+  assert.ok(rf.length / repeat.length > 0.9);
+  const mean = (l) => l.reduce((s, d) => s + d.amount, 0) / l.length;
+  assert.ok(mean(rf) > mean(fines) * 1.5);
+  assert.ok(rf.every((d) => d.amount <= DISCIPLINE.cap[1]));
+  assert.ok(run(3, 3, hist).every((d) => d.amount <= DISCIPLINE.cap[3]));
+  assert.ok(mean(run(2, 1).filter((d) => d.amount)) < mean(fines));
+  assert.ok(rf.every((d) => d.trust === DISCIPLINE.trust.karaRecydywa));
+  // Stare przewinienia (ponad rok) się nie liczą
+  assert.equal(priorOffences([{ date: '2025-01-01', outcome: 'kara' }], '2026-10-01'), 0);
+  assert.deepEqual(decideCase({ id: 'a', date: '2026-10-01', tier: 1, severity: 1 }, [], '2026-10-04', 's'), decideCase({ id: 'a', date: '2026-10-01', tier: 1, severity: 1 }, [], '2026-10-04', 's'));
+});
+
+test('Prasa w ocenie zarządu: zła prasa obniża, dobra podnosi, z limitem i opisem', () => {
+  const log = (climate, n, mode = 'answered') => Array.from({ length: n }, (_, i) => ({ date: `2026-10-${String(5 + i * 7).padStart(2, '0')}`, climate, mode }));
+  const bad = pressBoardTerm({ log: log('agresywna', 4, 'skipped'), relation: 20 }, '2026-10-31');
+  assert.equal(bad.delta, -2.5);
+  assert.ok(bad.notes.some((n) => /suchej nitki/.test(n)) && bad.notes.some((n) => /unika konferencji/.test(n)));
+  const good = pressBoardTerm({ log: log('pozytywna', 3), relation: 70 }, '2026-10-31');
+  assert.ok(good.delta > 0.8 && good.delta <= 1.5);
+  assert.ok(good.notes.some((n) => /Dobra prasa/.test(n)));
+  assert.deepEqual(pressBoardTerm({ log: log('agresywna', 3) }, '2027-01-31'), { delta: 0, notes: [] }, 'stare wpisy się nie liczą');
+  assert.deepEqual(pressBoardTerm(undefined, '2026-10-31'), { delta: 0, notes: [] }, 'stary zapis bez prasy');
+});
+
+test('Dzień meczowy z konferencją przedmeczową, decyzja komisji po kilku dniach i ocena zarządu', async () => {
+  const { addDays } = await import('../src/core/gameLoop.js');
+  const { boardMonth } = await import('../src/career/board.js');
+  const { leaveStudio, pressOpen, doPress, pressSlot } = await import('../src/match/matchday.js');
+  const g = { seed: 47, clubId: 'widzew', date: '2026-07-01', season: '2026/27', inbox: [] };
+  g.world = generateWorld(47);
+  g.season = createSeason(47, { playerClub: 'widzew' });
+  g.fixtures = g.season.fixtures;
+  g.tactics = createTactics(squadOf(g.world, 'widzew'), { benchSize: 12 });
+  processDay(g);
+  while (primaryAction(g).kind !== 'play') {
+    if (primaryAction(g).kind === 'decide') g.inbox = g.inbox.map((m) => ({ ...m, resolved: true }));
+    else continueUntilStop(g);
+  }
+  delete g.press;
+  const S = startMatchday(g, primaryAction(g).match);
+  // Konferencja przedmeczowa: osobna sesja, rozliczona raz
+  const conf = pressOpen(g, S, 'pre');
+  assert.equal(conf.phase, 'pre');
+  const pre = doPress(g, S, [], 'pre');
+  assert.equal(pre.phase, 'pre');
+  assert.ok(g.inbox.some((m) => m.key === `prasa-przed:${S.f.id}`));
+  assert.equal(leaveStudio(g, S), pre, 'przejście do odprawy nie dolicza drugi raz');
+  assert.equal(g.press.pre.mode, 'answered');
+  assert.equal(pressSlot(S, 'post').settled, false);
+  // Sprawa dyscyplinarna: decyzja po terminie, kara w księdze i niższe zaufanie
+  const st = g.press;
+  st.discipline = [{ date: addDays(g.date, -30), outcome: 'kara', amount: 10000 }, { date: addDays(g.date, -10), outcome: 'upomnienie' }];
+  st.cases = [{ id: 'test:post', matchId: 'test', date: g.date, days: 3, severity: 3, tier: 1, body: 'Komisja Ligi Ekstraklasy', quote: 'Te decyzje kosztowały nas punkty.', phase: 'post', opp: 'Lech Poznań' }];
+  const trust = g.board.trust;
+  const fin = g.finance?.clubs?.widzew;
+  processDay(g, addDays(g.date, 2));
+  assert.equal(g.press.cases.length, 1, 'przed terminem bez decyzji');
+  processDay(g, addDays(g.date, 3));
+  assert.equal(g.press.cases.length, 0);
+  const verdict = g.inbox.find((m) => m.key === 'komisja:test:post');
+  assert.ok(verdict, 'wiadomość z decyzją');
+  const last = g.press.discipline.at(-1);
+  assert.equal(last.outcome, 'kara');
+  assert.ok(last.amount > 0 && last.amount <= DISCIPLINE.cap[1]);
+  assert.match(verdict.subject, /Kara za wypowiedź o sędziach/);
+  assert.ok(g.board.trust <= trust - 2);
+  if (fin) {
+    assert.ok((fin.ledger[addDays(g.date, 3).slice(0, 7)]?.out?.fines ?? 0) >= last.amount, 'kara w księdze (Kary PZPN)');
+    assert.ok(fin.log.some((l) => l.kind === 'fines' && l.amount === last.amount && /sędziach/.test(l.note)));
+  }
+  // Ocena zarządu czyta klimat prasy
+  g.press.log = [{ date: addDays(g.date, -3), climate: 'agresywna', mode: 'skipped' }, { date: addDays(g.date, -10), climate: 'agresywna', mode: 'skipped' }];
+  g.press.relation = 30;
+  const r = boardMonth(g, addDays(g.date, 1));
+  assert.ok(r.review.notes.some((n) => /suchej nitki|krytyczna/.test(n)), r.review.notes.join(' | '));
 });

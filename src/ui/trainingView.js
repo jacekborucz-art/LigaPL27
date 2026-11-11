@@ -198,7 +198,7 @@ function playerRow(p, game) {
   const lbl = acwrLabel(t.acwr ?? 1);
   const extra = [t.focus && `akcent: ${focusName(t.focus)}`, t.pos && `nauka: ${t.pos} ${Math.round(Math.max(proficiency({ ...p, alt: {} }, t.pos), p.alt?.[t.pos] ?? 0))} %`,
     t.prog && PROGRAMS[t.prog]?.name, t.rtp > 0 && `powrót: ${t.rtp} dni`, t.mode && t.mode !== 'normal' && MODES[t.mode].name].filter(Boolean).join(', ');
-  return `<button class="tr-prow" data-act="tr-player" data-id="${esc(p.id)}">
+  return `<button class="tr-prow" data-act="tr-player" data-id="${esc(p.id)}" data-pid="${esc(p.id)}">
     <span class="pos" data-g="${GROUP[p.pos]}">${esc(p.pos)}</span>
     <span class="tr-prow__name"><b>${esc(p.name)}</b><small>${ageAt(p, game.date)} lat, OVR ${num(p.ovr)}${extra ? `, ${esc(extra)}` : ''}</small></span>
     <span class="tr-prow__fresh">${p.injuryDays > 0 ? `<span class="tr-badge" data-acwr="bad">uraz ${p.injuryDays} d</span>` : `${meter(p.fresh ?? 95, 100, (p.fresh ?? 95) >= 85 ? 'ok' : (p.fresh ?? 95) >= 70 ? 'mid' : 'bad')}<small>${p.fresh ?? 95} %</small>`}</span>
@@ -224,7 +224,7 @@ function playerEditor(game, p) {
   const term = legsTerm(t) + overloadTerm(t);
   const lbl = acwrLabel(sum.acwr);
   return `<section class="panel tr-editor">
-    <div class="tr-editor__head"><h3>${esc(p.name)}</h3><button class="btn btn--quiet tr-mini" data-act="tr-pback">Wróć do listy</button></div>
+    <div class="tr-editor__head" data-pid="${esc(p.id)}"><h3>${esc(p.name)}</h3><button class="btn btn--quiet tr-mini" data-act="tr-pback">Wróć do listy</button></div>
     <p class="muted">${esc(POS_NAMES[p.pos])}, ${age} lat, OVR ${num(p.ovr)}</p>
     <dl class="tr-dl">
       <div><dt>Świeżość</dt><dd>${p.fresh ?? 95} %</dd></div><div><dt>Ostrość</dt><dd>${Math.round(p.sharp ?? 70)} %</dd></div>
@@ -262,7 +262,7 @@ function loadTab(game) {
     const t = p.training ?? {};
     const sum = loadSummary(t);
     const lbl = acwrLabel(sum.acwr);
-    return `<tr><th scope="row"><span class="pos" data-g="${GROUP[p.pos]}">${esc(p.pos)}</span> ${esc(p.last ?? p.name)}</th>
+    return `<tr data-pid="${esc(p.id)}"><th scope="row"><span class="pos" data-g="${GROUP[p.pos]}">${esc(p.pos)}</span> ${esc(p.last ?? p.name)}</th>
       <td>${sum.acute}</td><td>${sum.chronic}</td><td data-acwr="${lbl.id}">${num(sum.acwr, 2)}</td><td>${p.injuryDays > 0 ? `uraz ${p.injuryDays} d` : `${p.fresh ?? 95} %`}</td><td>${num(t.legs ?? 0, 2)}</td></tr>`;
   }).join('');
   return `<section class="panel">
@@ -301,7 +301,7 @@ function devTab(game, ui) {
   const r = reports[i];
   const prec = reportPrecision(staffOf(game, game.clubId).asystent?.q ?? 10);
   const chips = reports.map((x, k) => `<button class="chip" data-act="tr-report" data-i="${k}" aria-pressed="${k === i}">${esc(fmtDate(x.date))}</button>`).join('');
-  const fmtRow = (x) => `<li><span class="pos" data-g="${GROUP[x.pos]}">${esc(x.pos)}</span><span class="tr-rep__name">${esc(x.name)}${x.academy ? ' <small>(akademia)</small>' : ''}<small>${prec === 'exact' ? esc(x.attrs.map(([a, v]) => `${a} ${v > 0 ? '+' : ''}${v}`).join(', ')) : ''}</small></span>
+  const fmtRow = (x) => `<li data-pid="${esc(x.id)}"><span class="pos" data-g="${GROUP[x.pos]}">${esc(x.pos)}</span><span class="tr-rep__name">${esc(x.name)}${x.academy ? ' <small>(akademia)</small>' : ''}<small>${prec === 'exact' ? esc(x.attrs.map(([a, v]) => `${a} ${v > 0 ? '+' : ''}${v}`).join(', ')) : ''}</small></span>
     <b data-trend="${x.d > 0 || (x.d === 0 && x.trend > 0) ? 'up' : 'down'}">${prec === 'vague' ? (x.d > 0 || x.trend > 0 ? 'rośnie' : 'spada') : prec === 'approx' ? (x.d > 0 || x.trend > 0 ? '▲' : '▼') : signed(x.d)}</b></li>`;
   const up = r ? r.rows.filter((x) => x.d > 0 || (x.d === 0 && x.trend > 0)).slice(0, 8) : [];
   const down = r ? r.rows.filter((x) => x.d < 0 || (x.d === 0 && x.trend < 0)).sort((a, b) => a.d - b.d || a.trend - b.trend).slice(0, 8) : [];

@@ -65,6 +65,8 @@ function roleFor(a, b) {
   return 'TR';
 }
 const NEAR = new Set(['MD', 'MD±1', 'MD+1', 'MD-1']);
+let lastSun = ['', ''];
+const sundayOf = (mon) => (lastSun[0] === mon ? lastSun[1] : (lastSun = [mon, addDays(mon, 6)])[1]);
 
 /**
  * Kontekst dnia: dni od ostatniego meczu (a) i do następnego (b), także sparingu; oa, ob: tylko mecze o punkty.
@@ -90,7 +92,7 @@ export function dayContext(game, date, sets = matchSets(game), camp = campOn(gam
   if (!NEAR.has(role) && phase === 'oboz') role = 'OBOZ';
   if (!NEAR.has(role) && phase === 'urlop') role = 'URLOP';
   const mon = mondayOf(date);
-  const sun = addDays(mon, 6);
+  const sun = sundayOf(mon);
   return {
     date, a, b, oa: off.a, ob: off.b, prev: all.prev, next: all.next, role, phase, camp,
     friendly: b === 0 && sets.friendly.has(date),

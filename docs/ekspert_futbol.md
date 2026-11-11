@@ -280,6 +280,13 @@ Współrzędne: `x` 0-100 szerokość (0 = lewa linia boczna), `y` 0-100 długo�
 | 9 | 5-4-1 "Mur" | BR 50,5; WB 12,26; ŚO 30,19; ŚO 50,17; ŚO 70,19; WB 88,26; SP 15,45; ŚP 40,42; ŚP 60,42; SP 85,45; NAP 50,68 |
 | 10 | 4-3-2-1 "Choinka" | BR 50,5; BO 15,26; ŚO 38,21; ŚO 62,21; BO 85,26; DP 50,38; ŚP 30,46; ŚP 70,46; OP 37,64; OP 63,64; NAP 50,82 |
 
+Warianty 4-4-2 (te same role co nr 1, inne linie i efekty, szczegóły i kalibracja: `docs/taktyka-i-urazy.md`):
+
+| # | Nazwa | Ustawienie (rola: x,y) |
+|---|---|---|
+| 11 | 4-4-2 defensywne "Niski Blok" | BR 50,5; BO 18,19; ŚO 39,16; ŚO 61,16; BO 82,19; SP 21,37; ŚP 41,35; ŚP 59,35; SP 79,37; NAP 45,58; NAP 57,66 |
+| 12 | 4-4-2 ofensywne "Wysokie Skrzydła" | BR 50,5; BO 13,33; ŚO 38,26; ŚO 62,26; BO 87,33; SP 12,62; ŚP 40,52; ŚP 60,52; SP 88,62; NAP 40,83; NAP 60,83 |
+
 Animacja na boisku: pozycja ikony = slot + przesunięcie fazy. Drużyna przy piłce: `y += 8 * (1 + 0.5*nastawienie)` (ograniczone do 92), drużyna broniąca: `y -= 6`, szerokość broniącej x 0.85 wokół x=50. Ikony interpolowane liniowo (lerp 0.1 na klatkę), piłka skacze do wykonawcy zdarzenia. Koszt: 23 elementy DOM/canvas, bez fizyki.
 
 ### 3.1 Modyfikatory formacji dla silnika
@@ -787,6 +794,9 @@ Po powrocie z urazu > 28 dni: ostrość = 30, ryzyko nawrotu x1.3 przez 30 dni.
 Lekki uraz grywalny: zawodnik może wystąpić (decyzja gracza lub AI przy ważnym meczu). Efekt: atrybuty fizyczne -15 %, posEff x0.95, w każdym meczu `p = 0.20` pogorszenia do kategorii średniej (dni x2), w treningu `p = 0.05`.
 
 W meczu przy urazie: lekki -> zawodnik gra dalej z karą (gracz dostaje komunikat i decyduje); średni/ciężki -> zejście natychmiast.
+
+Wdrożenie w silniku (kary wg typu, ryzyko pogłębienia na minutę, kara drużyny przy kilku kulejących, dni po meczu,
+gra z urazem sprzed meczu, AI): `docs/taktyka-i-urazy.md`, rozdz. 2.
 
 ---
 

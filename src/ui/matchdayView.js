@@ -78,6 +78,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const c = p.conditions;
     shell(`
       <h1>Studio przedmeczowe</h1>
+      ${renderPressDoor('pre', true)}
       <div class="fixture">
         <div class="fixture__team">${crest(fixture.home, 64)}${esc(p.preview.home.name)}</div>
         <div class="fixture__mid"><span class="led">${esc(fixture.time ?? '')}</span></div>
@@ -119,7 +120,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
       </div>
       <section class="sec"><h2>Nagłówki dnia</h2><ul class="headlines">${p.headlines.map((h) => `<li>${esc(h.text)}</li>`).join('')}</ul>
         ${game.press?.last && CLIMATES[game.press.climate] ? `<p class="press-note">${climateChip(game.press.climate)}<span>${esc(game.press.left > 0 ? 'Ta narracja w mediach jeszcze trwa.' : 'Klimat po ostatnim meczu. Może się zmienić po tym spotkaniu.')}${game.press.log?.at(-1)?.headline ? ` Ostatni nagłówek o trenerze: „${esc(game.press.log.at(-1).headline)}”.` : ''}</span></p>` : ''}</section>`,
-      btn('toBriefing', 'Przejdź do odprawy'));
+      preActions());
   }
 
   // ------------------------------------------------------------ Odprawy
@@ -138,7 +139,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const rating = (id) => (phase === 'post' ? S.result.ratings.find((x) => x.id === id)?.rating : null);
     shell(`
       <h1>${title}</h1>
-      ${phase === 'post' ? renderPressDoor(!!done) : ''}
+      ${phase === 'post' ? renderPressDoor('post', !!done) : ''}
       <div class="talk-grid talk-grid--${phase}">
       <section class="tpanel tpanel--speech">
         <p class="talk-ctx">${esc(ctxText)}</p>
@@ -179,33 +180,43 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
   const climateChip = (id) => `<span class="pclimate" data-c="${id}"><i aria-hidden="true"></i>${esc(CLIMATES[id].label)}</span>`;
   const wordsList = (eff) => `<ul class="voices prs-fx">${effectWords(eff).map((w) => `<li class="voice${w.dir > 0 ? ' is-up' : w.dir < 0 ? ' is-down' : ''}"><span class="voice__k">${esc(w.k)}</span><span>${esc(w.t)}</span></li>`).join('')}</ul>`;
 
-  /** Pasek przed salą na odprawie pomeczowej: klimat, kto czeka, co da pominięcie. */
-  function renderPressDoor(talkDone) {
-    const room = MD.pressSetup(game, S);
+  const slotOf = (ph) => MD.pressSlot(S, ph);
+
+  /** Pasek przed salą (studio przed meczem, odprawa po meczu): klimat, kto czeka, co da pominięcie. */
+  function renderPressDoor(ph, ready) {
+    const room = MD.pressSetup(game, S, ph);
     if (!room) return '';
     const cl = room.climate.climate;
-    const eff = S.pressResult;
+    const slot = slotOf(ph);
+    const eff = slot.result;
+    const label = ph === 'pre' ? 'Konferencja przedmeczowa' : 'Konferencja prasowa';
     if (eff) {
-      const verb = eff.mode === 'skipped' ? 'Konferencja pominięta.' : eff.mode === 'walkout' ? 'Wyszedłeś z sali przed końcem.' : 'Konferencja zakończona.';
-      return `<section class="pdoor" data-c="${cl}" aria-label="Konferencja prasowa">
+      const verb = eff.mode === 'skipped' ? `${label}: pominięta.` : eff.mode === 'walkout' ? 'Wyszedłeś z sali przed końcem.' : `${label}: zakończona.`;
+      return `<section class="pdoor" data-c="${cl}" aria-label="${label}">
         <div class="pdoor__head">${climateChip(cl)}<span class="pdoor__state">${esc(verb)}</span></div>
         ${eff.headline ? `<blockquote class="paper paper--sm"><p>${esc(eff.headline.text)}</p><footer>${esc(eff.headline.outlet)}</footer></blockquote>` : ''}
       </section>`;
     }
-    const outlets = MD.pressRoomPreview(game, S).map((j) => j.outlet);
-    const started = S.pressConf?.answers?.length;
-    return `<section class="pdoor" data-c="${cl}" aria-label="Konferencja prasowa">
+    const outlets = MD.pressRoomPreview(game, S, ph).map((j) => j.outlet);
+    const started = slot.conf?.answers?.length;
+    const skipTxt = ph === 'pre'
+      ? `${label} jest opcjonalna. Jeśli od razu przejdziesz do odprawy, media napiszą zapowiedź bez twoich słów${cl === 'agresywna' ? ', a krytyka trochę uderzy w szatnię przed meczem' : ''}.`
+      : `Konferencja jest opcjonalna. ${CLIMATES[cl].skip}`;
+    return `<section class="pdoor" data-c="${cl}" aria-label="${label}">
       <div class="pdoor__head">${climateChip(cl)}<span class="pdoor__state">${esc(CLIMATES[cl].mood)}</span></div>
       <p class="pdoor__why">${esc(room.climate.reasons.join('. '))}. Na sali: ${esc(outlets.join(', '))}.</p>
-      <p class="pdoor__skip">${talkDone ? (started ? 'Konferencja trwa. Wróć do sali albo kliknij Dalej, żeby ją przerwać.' : `Konferencja jest opcjonalna. ${esc(CLIMATES[cl].skip)}`) : 'Po odprawie w szatni możesz pójść na konferencję prasową albo ją pominąć.'}</p>
+      <p class="pdoor__skip">${ready ? esc(started ? `${label} trwa. Wróć do sali albo idź dalej, żeby ją zakończyć.` : skipTxt) : 'Po odprawie w szatni możesz pójść na konferencję prasową albo ją pominąć.'}</p>
     </section>`;
   }
 
-  function postActions() {
-    if (S.comp === 'friendly' || !MD.pressSetup(game, S)) return btn('exit', 'Dalej');
-    if (S.pressResult) return btn('pressView', 'Podsumowanie konferencji', false) + btn('exit', 'Dalej');
-    return btn('pressOpen', S.pressConf?.answers?.length ? 'Wróć na konferencję' : 'Konferencja prasowa', false) + btn('exit', 'Dalej');
+  function pressButtons(ph) {
+    if (!MD.pressSetup(game, S, ph)) return '';
+    const slot = slotOf(ph);
+    if (slot.result) return btn(`pressView:${ph}`, 'Podsumowanie konferencji', false);
+    return btn(`pressOpen:${ph}`, slot.conf?.answers?.length ? 'Wróć na konferencję' : ph === 'pre' ? 'Konferencja przedmeczowa' : 'Konferencja prasowa', false);
   }
+  const preActions = () => pressButtons('pre') + btn('toBriefing', 'Przejdź do odprawy');
+  const postActions = () => pressButtons('post') + btn('exit', 'Dalej');
 
   /** Ścianka za stołem: herb klubu i znak ligi na przemian (dekoracja, ukryta przed czytnikiem ekranu). */
   function wallTiles() {
@@ -222,25 +233,33 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
       dlg = app.querySelector('#mdPress');
       dlg.addEventListener('cancel', (ev) => {
         // Escape: przed pierwszą odpowiedzią i po końcu zamyka okno; w trakcie pyta o wyjście z sali
-        if (S.pressSettled || !S.pressConf?.answers?.length) return;
+        const sl = slotOf(ui.prsPhase);
+        if (sl.settled || !sl.conf?.answers?.length) return;
         ev.preventDefault(); ui.prsConfirm = true; renderPressDialog();
       });
-      dlg.addEventListener('close', () => { ui.prsConfirm = false; if (S.step === 'odprawa3') { renderTalk('post'); app.querySelector('[data-md="exit"]')?.focus(); } });
+      dlg.addEventListener('close', () => {
+        ui.prsConfirm = false;
+        if (S.step === 'odprawa3') { renderTalk('post'); app.querySelector('[data-md="exit"]')?.focus(); }
+        if (S.step === 'studio') { renderStudio(); app.querySelector('[data-md="toBriefing"]')?.focus(); }
+      });
     }
     return dlg;
   }
 
   function renderPressDialog() {
     const dlg = pressDialog();
-    const conf = S.pressConf;
+    const ph = ui.prsPhase ?? 'post';
+    const pre = ph === 'pre';
+    const slot = slotOf(ph);
+    const conf = slot.conf;
     const cl = conf.climate;
     const q = currentQuestion(conf);
     const pr = progress(conf);
     const askedBy = new Set(conf.queue.slice(0, conf.idx).map((x) => x.by?.id).filter(Boolean));
     const header = `<header class="prs__wall" data-c="${cl}">${wallTiles()}
         <div class="prs__bar">
-          <div><h2 id="prsTitle">Konferencja prasowa</h2>
-            <p class="prs__match">${esc(sideName(0))} ${esc(S.post.result.score)} ${esc(sideName(1))}</p></div>
+          <div><h2 id="prsTitle">${pre ? 'Konferencja przedmeczowa' : 'Konferencja prasowa'}</h2>
+            <p class="prs__match">${pre ? `${esc(sideName(0))} kontra ${esc(sideName(1))}, ${esc(S.pre.date)}` : `${esc(sideName(0))} ${esc(S.post.result.score)} ${esc(sideName(1))}`}</p></div>
           ${climateChip(cl)}
         </div>
         <p class="prs__mood">${esc(CLIMATES[cl].mood)} <span>${esc(conf.climateRes.reasons.join('. '))}.</span></p>
@@ -252,18 +271,20 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
           ${conf.room.map((j) => `<li class="prs__p ${q?.by?.id === j.id ? 'is-now' : askedBy.has(j.id) ? 'is-done' : ''}"><b>${esc(j.name)}</b><span>${esc(j.outlet)}</span></li>`).join('')}
         </ol>
       </aside>`;
-    const transcript = conf.answers.length ? `<details class="prs__log" ${S.pressSettled ? '' : 'open'}><summary>Zapis konferencji</summary><ol>${conf.answers.map((a) => {
+    const transcript = conf.answers.length ? `<details class="prs__log" ${slot.settled ? '' : 'open'}><summary>Zapis konferencji</summary><ol>${conf.answers.map((a) => {
       const by = conf.room.find((j) => j.id === a.by);
       return `<li><p class="prs__lq"><b>${esc(by ? `${by.name}, ${by.outlet}` : conf.officer.name)}:</b> ${esc(a.question)}</p><p class="prs__la">${esc(a.text)}</p></li>`;
     }).join('')}</ol></details>` : '';
     let stage;
-    if (S.pressSettled) {
-      const eff = S.pressResult;
+    if (slot.settled) {
+      const eff = slot.result;
+      const after = pre ? (eff.promisesAdd?.length ? 'Media sprawdzą twoje zapowiedzi po meczu.' : 'Przed meczem prasa działa na szatnię słabiej niż po meczu.')
+        : game.press?.left > 0 ? `Ta atmosfera w mediach może potrwać jeszcze ${game.press.left === 1 ? 'mecz' : `${game.press.left} mecze`}.` : 'Klimat w mediach może się zmienić po kolejnym meczu.';
       stage = `<section class="prs__stage prs__stage--after" aria-labelledby="prsAfter">
         <h3 id="prsAfter" tabindex="-1">${eff.mode === 'walkout' ? 'Wyszedłeś z sali' : 'Po konferencji'}</h3>
         ${eff.headline ? `<blockquote class="paper prs__paper"><p>${esc(eff.headline.text)}</p><footer>${esc(eff.headline.outlet)}</footer></blockquote>` : ''}
         ${wordsList(eff)}
-        <p class="hint">${esc(game.press?.left > 0 ? `Ta atmosfera w mediach może potrwać jeszcze ${game.press.left === 1 ? 'mecz' : `${game.press.left} mecze`}.` : 'Klimat w mediach może się zmienić po kolejnym meczu.')}</p>
+        <p class="hint">${esc(after)}</p>
       </section>`;
     } else if (ui.prsConfirm) {
       stage = `<section class="prs__stage prs__confirm" role="alertdialog" aria-labelledby="prsConf">
@@ -284,8 +305,9 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
         </div>
       </section>`;
     }
-    const foot = S.pressSettled ? `${btn('pressClose', 'Wróć do odprawy', false)}${btn('exit', 'Dalej')}`
-      : ui.prsConfirm ? '' : `${conf.answers.length ? btn('pressOut', 'Wyjdź z sali', false) : btn('pressClose', 'Wróć do odprawy', false)}`;
+    const back = pre ? 'Wróć do studia' : 'Wróć do odprawy';
+    const foot = slot.settled ? `${btn('pressClose', back, false)}${pre ? btn('toBriefing', 'Przejdź do odprawy') : btn('exit', 'Dalej')}`
+      : ui.prsConfirm ? '' : `${conf.answers.length ? btn('pressOut', 'Wyjdź z sali', false) : btn('pressClose', back, false)}`;
     dlg.dataset.c = cl;
     dlg.innerHTML = `${header}<div class="prs__body">${room}<div class="prs__main">${stage}${transcript}</div></div>${foot ? `<footer class="prs__foot">${foot}</footer>` : ''}`;
     if (!dlg.open) dlg.showModal();
@@ -890,7 +912,11 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     if (!el) return;
     const [act, arg] = el.dataset.md.split(':');
     const M = S.M;
-    if (act === 'toBriefing') { S.step = 'odprawa'; ui.adv = null; ui.sel = {}; route(); }
+    if (act === 'toBriefing') {
+      MD.leaveStudio(game, S); // konferencja przedmeczowa pominięta albo już rozliczona
+      app.querySelector('#mdPress')?.remove();
+      S.step = 'odprawa'; ui.adv = null; ui.sel = {}; await save(); route();
+    }
     if (act === 'speech') {
       const tone = app.querySelector('input[name="tone"]:checked')?.value;
       const talks = Object.entries(ui.sel.talks || {}).filter(([, k]) => k).map(([id, kind]) => ({ id, kind }));
@@ -931,11 +957,11 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     if (act === 'toHalfTalk') { S.step = 'odprawa2'; ui.adv = null; ui.sel = {}; route(); }
     if (act === 'resume' || act === 'resumeET') { MD.continueAfterBreak(S); route(); }
     if (act === 'toPostTalk') { S.step = 'odprawa3'; ui.sel = {}; ui.adv = null; route(); }
-    if (act === 'pressOpen' || act === 'pressView') { MD.pressOpen(game, S); ui.prsConfirm = false; renderPressDialog(); }
-    if (act === 'pressAns') { MD.pressAnswer(game, S, Number(arg)); if (S.pressSettled) await save(); renderPressDialog(); }
+    if (act === 'pressOpen' || act === 'pressView') { ui.prsPhase = arg === 'pre' ? 'pre' : 'post'; MD.pressOpen(game, S, ui.prsPhase); ui.prsConfirm = false; renderPressDialog(); }
+    if (act === 'pressAns') { MD.pressAnswer(game, S, Number(arg), ui.prsPhase); if (slotOf(ui.prsPhase).settled) await save(); renderPressDialog(); }
     if (act === 'pressOut') { ui.prsConfirm = true; renderPressDialog(); }
     if (act === 'pressOutNo') { ui.prsConfirm = false; renderPressDialog(); }
-    if (act === 'pressOutYes') { ui.prsConfirm = false; MD.pressWalkOut(game, S); await save(); renderPressDialog(); }
+    if (act === 'pressOutYes') { ui.prsConfirm = false; MD.pressWalkOut(game, S, ui.prsPhase); await save(); renderPressDialog(); }
     if (act === 'pressClose') app.querySelector('#mdPress')?.close();
     if (act === 'exit') { stop(); MD.closeMatchday(game, S); app.querySelector('#mdPress')?.remove(); cleanup(); await save(); onExit(); }
   }

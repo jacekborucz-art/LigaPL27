@@ -177,7 +177,7 @@ export function monthlyDevelopment(game, date) {
       const t = p.training;
       // Klub gracza: bodziec z zajęć zawodnika; klub AI: z planu klubu i udziału w zajęciach (aiClubs.js)
       const stim = academy ? null : mine ? (t ? t.stim ?? {} : null) : aiStimFor(game, p);
-      if (p.aiTr) { if (mine) delete p.aiTr; else p.aiTr = { dp: 0, dd: 0 }; }
+      if (p.aiTr) { if (mine) delete p.aiTr; else { p.aiTr.dp = 0; p.aiTr.dd = 0; } }
       const minShare = academy ? 0.5 : games ? (p.season?.min ?? 0) / (90 * games) : 0.6;
       const before = mine ? { ...p.attr } : null;
       const r = developPlayer(p, { date, staff: st, stim, minShare, rng });

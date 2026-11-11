@@ -430,8 +430,8 @@ export function planShape(T, formationId = T.formation.id, { assign = null, empt
     const free = slots.map((s, i) => (s && ![...at.values()].includes(i) ? s : null));
     for (const [x, i] of assignSlots(rest, free)) at.set(x, i);
   }
-  if (at.size !== xs.length) return { ok: false, error: 'Nie wszyscy zawodnicy mają miejsce na boisku.' };
   if (![...at.values()].includes(gi)) return { ok: false, error: 'Ktoś musi stanąć w bramce.' };
+  if (at.size !== xs.length) return { ok: false, error: 'Nie wszyscy zawodnicy mają miejsce na boisku.' };
   const used = new Set(at.values());
   const emptyOut = [...Array(S).keys()].filter((i) => !used.has(i));
   return {

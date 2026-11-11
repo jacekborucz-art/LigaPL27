@@ -18,10 +18,29 @@ export function attachTraining(game) { ACTIVE = game ?? null; return game; }
 export function activeGame() { return ACTIVE; }
 
 const DAY = 86400000;
-const t = (iso) => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10));
+// Daty liczone wiele razy dziennie (plan dnia klubu gracza i 53 klubów AI): mała pamięć podręczna
+const tCache = new Map();
+const t = (iso) => {
+  let v = tCache.get(iso);
+  if (v === undefined) {
+    if (tCache.size > 4096) tCache.clear();
+    v = Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10));
+    tCache.set(iso, v);
+  }
+  return v;
+};
 export const daysBetween = (a, b) => Math.round((t(b) - t(a)) / DAY);
 export const weekdayIdx = (iso) => (new Date(t(iso)).getUTCDay() + 6) % 7; // 0 = poniedziałek
-export const mondayOf = (iso) => addDays(iso, -weekdayIdx(iso));
+const monCache = new Map();
+export const mondayOf = (iso) => {
+  let v = monCache.get(iso);
+  if (v === undefined) {
+    if (monCache.size > 4096) monCache.clear();
+    v = addDays(iso, -weekdayIdx(iso));
+    monCache.set(iso, v);
+  }
+  return v;
+};
 
 /** Wiek w danym dniu z daty urodzenia (gdy jest), inaczej pole age. */
 export function ageAt(p, date) {

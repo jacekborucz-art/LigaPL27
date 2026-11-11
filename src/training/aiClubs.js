@@ -2,10 +2,11 @@
 // dla własnego terminarza, z akcentem tygodnia według typu trenera, i dostają skutki zajęć z tych samych wzorów
 // co klub gracza (sessions.js): zmęczenie i regeneracja, ostrość, morale, urazy treningowe, bodziec rozwojowy,
 // stałe fragmenty, zgranie formacji, obóz przygotowawczy. Różnice wobec klubu gracza (świadome uproszczenia):
-//  - bez dziennika obciążeń 28 dni: ACWR klubu AI = 1 (plan asystenta trzyma obciążenie w normie),
+//  - obciążenie bez dziennika 28 dni: średnie wykładnicze 7 i 28 dni (ten sam ACWR, mniej danych w zapisie),
 //  - „ciężkie nogi” jedną liczbą na klub (wszyscy robią te same zajęcia),
 //  - bodziec rozwojowy: rozkład na atrybuty na klub, udział zawodnika w zajęciach osobno (p.aiTr),
-//  - bez programu powrotu po kontuzji i programu dla młodych (narzędzia gracza).
+//  - program powrotu po dłuższym urazie jak automatyczny program gracza (ryzyko x0,7, ostrość +2), bez obniżania
+//    intensywności; bez programu dla młodych (narzędzie gracza).
 // Koszt: ok. 1300 zawodników x kilka działań na liczbach dziennie.
 
 import { Rng, clamp } from '../core/rng.js';
@@ -18,13 +19,20 @@ import { staffQ } from './staff.js';
 import { dayContext, autoDay } from './plan.js';
 import { campWindow, halfOf, halfKey, baseFactor, aiCampChoice } from './camps.js';
 import { aiSessionToClub } from './cohesion.js';
-import { fatigueMul, regenMul, trainingInjuryChance } from './load.js';
+import { fatigueMul, regenMul, trainingInjuryChance, overloadTerm } from './load.js';
 import { rollTrainingInjury } from './sessions.js';
 import { offsetsFor } from './development.js';
 
 const r2 = (v) => Math.round(v * 100) / 100;
+/** Liczba z cyfr napisu (bez tworzenia podnapisów). */
+function digits(str, from, to) {
+  let v = 0;
+  for (let i = from; i < to; i++) v = v * 10 + (str.charCodeAt(i) - 48);
+  return v;
+}
 const r3 = (v) => Math.round(v * 1000) / 1000;
 
+const planCache = new Map();
 /** Akcent i poziom obciążeń planu klubu AI (typ trenera z danych klubu). */
 export function aiPlanFor(clubId) {
   const coach = clubById(clubId)?.coach ?? 'P';
@@ -131,6 +139,26 @@ function addStim(acc, s) {
   return s.dp;
 }
 
+/**
+ * Skutki zajęć dnia dla pełnego uczestnika: zmęczenie (przed mnożnikiem zawodnika), regeneracja (przed mnożnikiem
+ * zawodnika), ostrość, bodziec, morale i suma ryzyka urazu. Te same składniki co pętla zajęć w sessions.js.
+ */
+function profileOf(list, gk, campQ, rec, sharpMul) {
+  const o = { fat: 0, rec: 0, sharp: 0, dp: 0, dev: false, morale: 0, inj: 0, load: 0 };
+  for (const s of list) {
+    const swap = gk && s.gkSwap;
+    if (s.def.recover) o.rec += rec;
+    else o.fat += s.I.fat * s.def.fat * (1 - CAMP.inCamp.fatigue * campQ) * (swap ? 0.7 : 1);
+    o.sharp += s.I.sharp * s.def.sharp * sharpMul;
+    o.dp += gk ? s.gk.dp : s.out.dp;
+    if (s.def.dev >= 0.5) o.dev = true;
+    o.morale += s.def.morale + s.I.morale;
+    o.inj += s.I.inj * s.def.inj;
+    o.load += s.I.load * s.def.load;
+  }
+  return o;
+}
+
 /** Stan rozwojowy klubu AI w miesiącu (rozkład bodźca dla pełnego uczestnika). */
 function stimState(c) {
   return c.aiStim ?? (c.aiStim = { out: {}, gk: {}, dpOut: 0, dpGk: 0 });
@@ -144,8 +172,15 @@ export function processAiDay(game, date) {
   const rng = new Rng(`trening-ai:${game.seed}:${date}`);
   const setsMap = allClubSets(game);
   const yesterday = addDays(date, -1);
-  const dY = +date.slice(0, 4); const dMD = date.slice(5);
-  const ageOf = (p) => (p.birthDate ? dY - +p.birthDate.slice(0, 4) - (dMD >= p.birthDate.slice(5) ? 0 : 1) : p.age ?? 25);
+  const dY = digits(date, 0, 4); const dMD = digits(date, 5, 7) * 100 + digits(date, 8, 10);
+  // Wiek jak ageAt (state.js), bez cięcia napisów dla 1300 zawodników dziennie
+  const ageOf = (p) => {
+    const b = p.birthDate;
+    if (!b) return p.age ?? 25;
+    return dY - digits(b, 0, 4) - (dMD >= digits(b, 5, 7) * 100 + digits(b, 8, 10) ? 0 : 1);
+  };
+  const injCtx = { sessionMul: 0, age: 25, acwr: 1, fitQ: 10, campQ: 0, baseMul: 1, fresh: 100, mode: 'normal', rtp: false, returning: false };
+  const today = Math.round(Date.UTC(dY, digits(date, 5, 7) - 1, digits(date, 8, 10)) / 86400000);
   const half = halfOf(date);
   const key = halfKey(half);
   for (const clubId of Object.keys(game.world.clubs)) {
@@ -156,7 +191,7 @@ export function processAiDay(game, date) {
     const ac = aiCampFor(game, clubId, date, sets);
     const camp = ac.from && date >= ac.from && date <= ac.to ? { ...ac, half } : null;
     const ctx = dayContext(game, date, sets, camp);
-    const plan = c.aiPlan ?? (c.aiPlan = aiPlanFor(clubId));
+    const plan = planCache.get(clubId) ?? planCache.set(clubId, aiPlanFor(clubId)).get(clubId);
     const day = autoDay(game, date, ctx, plan);
     c.legs = r3((c.legs ?? 0) * LOAD.legsDecay);
     if (day.kind === 'match' || day.kind === 'off') continue;
@@ -178,46 +213,83 @@ export function processAiDay(game, date) {
       st.dpGk = r3(st.dpGk + addStim(st.gk, s.gk));
       c.legs = r3(Math.max(0, c.legs + (s.def.recover ? s.def.legs : s.I.legs * s.def.legs)));
     }
-    // Rezerwowi po meczu: trening uzupełniający zamiast regeneracji (jak w planie gracza)
-    const subs = ctx.role === 'MD+1' && day.sessions.length
-      ? sessionStim({ type: 'gierki', int: 'mid' }, campQ, !!camp) : null;
-    const restDay = day.kind === 'rest';
+    // Skutki dnia dla pełnego uczestnika (z pola, bramkarz) i dla rezerwowych po meczu, którzy zamiast
+    // regeneracji mają trening uzupełniający (jak w planie gracza). Na zawodnika zostają tylko mnożniki osobiste.
+    const rec = staffMul.recover(fitQ);
+    const prof = (list, gk) => profileOf(list, gk, campQ, rec, sharpMul);
+    const subsList = ctx.role === 'MD+1' && team.length ? [sessionStim({ type: 'gierki', int: 'mid' }, campQ, !!camp), ...team.slice(1)] : null;
+    const P = { out: prof(team, false), gk: prof(team, true), subsOut: subsList && prof(subsList, false), subsGk: subsList && prof(subsList, true) };
+    const restMorale = day.kind === 'rest' ? 0.15 : 0;
+    const campMorale = camp ? CAMP.inCamp.morale * campQ : 0;
     for (const p of squadOf(game.world, clubId)) {
-      if (p.injuryDays > 0) continue;
-      let list = p.callUp || p.onLoanOut ? null : team;
-      let sess = list ? day.sessions : null;
-      if (list && subs && p.lastMatch !== yesterday) { list = [subs, ...team.slice(1)]; sess = [{ type: 'gierki', int: 'mid' }, ...day.sessions.slice(1)]; }
-      let morale = restDay ? 0.15 : 0;
-      if (list && list.length) {
-        const age = ageOf(p); // jak ageAt (state.js), bez ponownego cięcia daty dnia
-        const gk = p.pos === 'BR';
-        let fresh = p.fresh ?? 95;
-        let dp = 0; let dev = false;
-        for (const s of list) {
-          const swap = gk && s.gkSwap;
-          if (s.def.recover) fresh += staffMul.recover(fitQ) * regenMul(p, age);
-          else fresh -= s.I.fat * s.def.fat * fatigueMul(p, age) * (1 - CAMP.inCamp.fatigue * campQ) * (swap ? 0.7 : 1);
-          const sharp = p.sharp ?? 70;
-          if (sharp < LOAD.sharpTrainCap) p.sharp = Math.min(LOAD.sharpTrainCap, sharp + s.I.sharp * s.def.sharp * sharpMul);
-          dp += gk ? s.gk.dp : s.out.dp;
-          if (s.def.dev >= 0.5) dev = true;
-          morale += s.def.morale + s.I.morale;
-        }
-        const tr = p.aiTr ?? (p.aiTr = { dp: 0, dd: 0 });
-        tr.dp = r2(tr.dp + dp);
-        if (dev && age <= AI_PLAN.focusMaxAge) { tr.dd++; fresh -= AI_PLAN.focusFresh; }
-        if (camp) morale += CAMP.inCamp.morale * campQ;
-        p.fresh = Math.round(clamp(fresh, 20, 100 - (p.matchDebt ?? 0)));
-        const chance = trainingInjuryChance(p, { sessions: sess, age, acwr: 1, fitQ, campQ, baseMul: injuryMul, fresh: p.fresh, mode: 'normal' });
-        if (chance > 0 && rng.next() < chance) {
-          const inj = rollTrainingInjury(p, rng);
-          p.injuryDays = inj.days;
-          p.injury = { ...inj, since: date, training: true };
-        }
+      const tr = p.aiTr ?? (p.aiTr = newAiTr(p, today));
+      if (p.injuryDays > 0) { tr.il = Math.max(tr.il ?? 0, p.injury?.days ?? p.injuryDays); continue; }
+      if (tr.il) { // powrót po urazie: program powrotu po dłuższym urazie (jak automatyczny program gracza)
+        tr.ret = today;
+        if (tr.il >= LOAD.rtpFrom && fitQ >= 8) tr.rtp = today + LOAD.rtpDays;
+        tr.il = 0;
       }
+      // Obciążenie meczowe (minuty od ostatniego dnia z zajęciami)
+      const min = p.season?.min ?? 0;
+      let load = 0;
+      if (tr.m == null || min < tr.m) tr.m = min;
+      else if (min > tr.m) { load += LOAD.matchLoad * (min - tr.m) / 90; tr.m = min; }
+      const gk = p.pos === 'BR';
+      const pr = !team.length || p.callUp || p.onLoanOut ? null
+        : subsList && p.lastMatch !== yesterday ? (gk ? P.subsGk : P.subsOut) : (gk ? P.gk : P.out);
+      let morale = restMorale;
+      if (pr) {
+        const age = ageOf(p);
+        const rtp = tr.rtp > today;
+        let fresh = (p.fresh ?? 95) - pr.fat * fatigueMul(p, age) + pr.rec * regenMul(p, age);
+        let sharp = p.sharp ?? 70;
+        if (rtp) sharp = Math.min(100, sharp + 2);
+        if (sharp < LOAD.sharpTrainCap && pr.sharp) sharp = Math.min(LOAD.sharpTrainCap, sharp + pr.sharp);
+        p.sharp = sharp;
+        tr.dp = r2(tr.dp + pr.dp);
+        load += pr.load;
+        if (pr.dev && age <= AI_PLAN.focusMaxAge) { tr.dd++; fresh -= AI_PLAN.focusFresh; load += 5; }
+        p.fresh = Math.round(clamp(fresh, 20, 100 - (p.matchDebt ?? 0)));
+        morale += pr.morale + campMorale;
+        updateLoad(tr, today, load);
+        const acwr = aiAcwr(tr);
+        if (acwr > 1.5) morale -= 0.1; // przetrenowanie: zmęczenie psychiczne
+        if (pr.inj > 0) {
+          injCtx.sessionMul = pr.inj; injCtx.age = age; injCtx.acwr = acwr; injCtx.fitQ = fitQ; injCtx.campQ = campQ;
+          injCtx.baseMul = injuryMul; injCtx.fresh = p.fresh; injCtx.rtp = rtp; injCtx.returning = !rtp && tr.ret != null && today - tr.ret <= 14;
+          if (rng.next() < trainingInjuryChance(p, injCtx)) {
+            const inj = rollTrainingInjury(p, rng);
+            p.injuryDays = inj.days;
+            p.injury = { ...inj, since: date, training: true };
+            tr.il = inj.days;
+          }
+        }
+      } else updateLoad(tr, today, load);
       if (morale) p.morale = applyMorale(p.morale ?? 12, morale);
     }
   }
+}
+
+// Obciążenie zawodnika AI: średnie wykładnicze z 7 i 28 dni (ten sam stosunek ostrego do przewlekłego co dziennik
+// 28 dni gracza, bez trzymania dziennika). Dni bez wpisu (mecz, urlop, uraz) liczą się jako zero.
+const LA = 2 / (7 + 1); const LC = 2 / (28 + 1);
+function newAiTr(p, today) {
+  return { dp: 0, dd: 0, a: LOAD.baselineDay, c: LOAD.baselineDay, m: p.season?.min ?? 0, d: today };
+}
+function updateLoad(tr, today, load) {
+  const gap = today - (tr.d ?? today);
+  if (gap > 1) { tr.a *= (1 - LA) ** (gap - 1); tr.c *= (1 - LC) ** (gap - 1); }
+  if (gap >= 1) { tr.a += (load - tr.a) * LA; tr.c += (load - tr.c) * LC; } else { tr.a += load * LA; tr.c += load * LC; }
+  tr.a = Math.round(tr.a * 10) / 10; tr.c = Math.round(tr.c * 10) / 10; tr.d = today;
+}
+/** ACWR zawodnika AI (ostre do przewlekłego). */
+export const aiAcwr = (tr) => (tr && tr.c > 1 ? tr.a / tr.c : 1);
+const ovr = { acwr: 1 };
+/** Kara za przeciążenie zawodnika AI: ten sam wzór co u gracza (overloadTerm). */
+export function aiOverload(p) {
+  if (!p.aiTr) return 0;
+  ovr.acwr = aiAcwr(p.aiTr);
+  return overloadTerm(ovr);
 }
 
 /**

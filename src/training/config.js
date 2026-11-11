@@ -111,7 +111,7 @@ export const COH = {
   neutral: 65, perPoint: 0.008, min: -0.4, max: 0.28, // wpływ na siłę: 0.008 pkt za punkt zgrania ponad 65
   sStart: (z) => Math.max(70, Math.min(100, Math.round(70 + 0.3 * z))), // start spójności S w silniku (ekspert 4.3)
   spDecayWeek: 4, spNeutral: 50,
-  aiInstr: 80, // kluby AI: znajomość instrukcji, systemu i rytm jako jedna liczba (kalibracja do zgrania gracza)
+  aiInstr: 88, // kluby AI: instrukcje, znajomość systemu i rytm jako jedna liczba (kalibracja: zgranie AI = gracza z planem asystenta, docs/trening-ai.md)
 };
 
 /**

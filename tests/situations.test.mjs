@@ -137,12 +137,13 @@ test('Czerwona po wykorzystaniu wszystkich zmian i kontuzja bez zmian: gra w 10 
     const { M, T, from } = setup('injall', { min: 85 });
     T.subsUsed = T.subsLimit;
     const x = T.players.find((y) => y.on && y.slot.pos === 'ŚO');
+    const before = fieldPlayers(T).length; // wcześniejsza czerwona w tym ziarnie jest możliwa
     injure(M, T, x, false, { injury: HARD });
     step(M);
     const inj = M.events.slice(from).find((e) => e.type === 'injury');
     assert.equal(inj.canContinue, false);
     assert.equal(inj.severity, 'severe');
-    assert.equal(fieldPlayers(T).length, 10);
+    assert.equal(fieldPlayers(T).length, before - 1);
     assert.ok(M.events.slice(from).some((e) => e.type === 'tactic' && e.side === 0 && e.patch.drop));
   }
 });

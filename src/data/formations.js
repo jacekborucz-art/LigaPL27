@@ -21,13 +21,13 @@ export const FORMATIONS = [
   // bocznych obrońców, jeden napastnik cofa się na defensywnego pomocnika rywala (4-4-1-1 bez piłki). Pressing dopiero
   // na własnej połowie (podanie do boku, podanie do tyłu, złe przyjęcie). Po odbiorze szybko do dwóch napastników.
   { id: '442def', name: '4-4-2 defensywne', nick: 'Niski Blok', family: '442', W: 0.85, act: { POZ: 0.85, SKR: 1.0, KON: 1.3, DYS: 0.95 }, counterVuln: 0.8,
-    fx: { pActMul: 0.92, D: 0.3, pos: -0.06, oppAct: { KON: 0.85, SKR: 1.12, DYS: 1.15 }, oppOffsideMul: 0.7, fatMidMul: 0.95 },
+    fx: { pActMul: 0.92, D: 0.5, oppPActMul: 0.88, pos: -0.05, oppAct: { KON: 0.8, SKR: 1.12, DYS: 1.2 }, oppOffsideMul: 0.7, fatMidMul: 0.95 },
     note: 'Dwie niskie linie po cztery, mało miejsca między liniami. Dobra do obrony wyniku i przeciw silniejszym. Mniej własnych akcji, rywal dośrodkowuje i strzela z dystansu.',
     slots: slots('BR 50,5; BO 18,19; ŚO 39,16; ŚO 61,16; BO 82,19; SP 21,37; ŚP 41,35; ŚP 59,35; SP 79,37; NAP 45,58; NAP 57,66') },
   // Wysokie 4-4-2: obrona przy linii środkowej, boczni obrońcy podłączają się, boczni pomocnicy grają jak skrzydłowi,
   // dwóch napastników atakuje środkowych obrońców rywala i zaczyna pressing (podanie do bramkarza, do boku).
   { id: '442off', name: '4-4-2 ofensywne', nick: 'Wysokie Skrzydła', family: '442', W: 1.15, act: { POZ: 1.0, SKR: 1.25, KON: 0.95, DYS: 1.0 }, counterVuln: 1.2,
-    fx: { pActMul: 1.08, D: -0.25, oppPos: -0.06, oppPActMul: 0.97, oppOffsideMul: 1.2, fatMul: 1.06, foulMul: 1.05 },
+    fx: { pActMul: 1.12, D: -0.4, oppPActMul: 1.06, oppAct: { KON: 1.25 }, oppOffsideMul: 1.25, fatMul: 1.06, foulMul: 1.05 },
     note: 'Wysoka linia, skrzydłowi i dwaj napastnicy w polu karnym. Do gonienia wyniku i przeciw słabszym. Męczy i zostawia miejsce za plecami.',
     slots: slots('BR 50,5; BO 13,33; ŚO 38,26; ŚO 62,26; BO 87,33; SP 12,62; ŚP 40,52; ŚP 60,52; SP 88,62; NAP 40,83; NAP 60,83') },
   { id: '433', name: '4-3-3', nick: 'Trójząb', W: 1.0, act: { POZ: 1.05, SKR: 1.1, KON: 1.0, DYS: 0.95 }, counterVuln: 1.1,

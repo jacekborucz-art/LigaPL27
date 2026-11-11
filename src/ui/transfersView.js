@@ -27,7 +27,20 @@ const LISTS = [['transfer', 'Lista transferowa'], ['loan', 'Do wypożyczenia'], 
 const POS_FILTERS = [['all', 'Wszyscy'], ['GK', 'Bramkarze'], ['DEF', 'Obrońcy'], ['MID', 'Pomocnicy'], ['ATT', 'Napastnicy']];
 export const isTransferAction = (act) => typeof act === 'string' && act.startsWith('tf-');
 const ovrTxt = (p) => Math.round(p.ovr);
-const monthsLeft = (game, p) => (p.contract?.until ? (Number(p.contract.until.slice(0, 4)) - Number(game.date.slice(0, 4))) * 12 + Number(p.contract.until.slice(5, 7)) - Number(game.date.slice(5, 7)) : 0);
+export const monthsLeft = (game, p) => (p.contract?.until ? (Number(p.contract.until.slice(0, 4)) - Number(game.date.slice(0, 4))) * 12 + Number(p.contract.until.slice(5, 7)) - Number(game.date.slice(5, 7)) : 0);
+
+/** Najlepszy zawodnik twojej kadry na tej samej pozycji (porównanie w karcie i w menu kontekstowym). */
+export function bestOwnAt(game, pos) {
+  return squadOf(game.world, game.clubId).filter((x) => x.pos === pos).sort((a, b) => b.ovr - a.ovr)[0] ?? null;
+}
+
+/** Tekst porównania z najlepszym zawodnikiem twojej kadry na pozycji p.pos. */
+export function compareText(game, p) {
+  const b = bestOwnAt(game, p.pos);
+  if (!b) return `Nie masz w kadrze zawodnika na pozycji ${p.pos}.`;
+  const d = Math.round(p.ovr) - Math.round(b.ovr);
+  return `Twój najlepszy ${p.pos}: ${b.name}, OVR ${Math.round(b.ovr)} (${d > 0 ? `ten lepszy o ${d}` : d < 0 ? `ten słabszy o ${-d}` : 'ten sam poziom'}).`;
+}
 
 function windowLine(game) {
   const w = windowOf(game.date);
@@ -35,7 +48,7 @@ function windowLine(game) {
 }
 
 function playerRow(game, p, extra = '', act = 'tf-open') {
-  return `<li><button class="tf-row" data-act="${act}" data-id="${esc(p.id)}">
+  return `<li><button class="tf-row" data-act="${act}" data-id="${esc(p.id)}" data-pid="${esc(p.id)}">
     <span class="tf-pos">${esc(p.pos)}</span>
     <span class="tf-name">${esc(p.name)}<small>${p.clubId ? `${crest(p.clubId, 14)} ${esc(clubById(p.clubId)?.name ?? '')}` : 'bez klubu'}, ${p.age} lat</small></span>
     <span class="tf-ovr">${ovrTxt(p)}</span>
@@ -63,7 +76,7 @@ export function limitPanel(game) {
   else status = `Wolne miejsca do limitu zarządu: ${L.soft - L.counted}.`;
   if (L.full) status = `Kadra pełna: nowe transfery, wypożyczenia do klubu i wolni zawodnicy są zablokowani. ${status}`;
   const kept = c ? c.keep.map((id) => game.world.players[id]).filter(Boolean) : [];
-  const tRow = (p, kept = false) => `<li class="tf-limit__t">
+  const tRow = (p, kept = false) => `<li class="tf-limit__t" data-pid="${esc(p.id)}">
       <button class="tf-limit__who" data-act="tf-open" data-id="${esc(p.id)}"><span class="tf-pos">${esc(p.pos)}</span><span class="tf-name">${esc(p.name)}<small>${esc(ageWord(p.age))}, ${fmtZl(p.contract?.wage ?? 0)} tygodniowo${game.market.userListed[p.id] ? `, na liście za ${fmtZl(game.market.userListed[p.id])}` : ''}</small></span><span class="tf-ovr">${ovrTxt(p)}</span></button>
       ${c ? `<button class="btn btn--quiet btn--sm" data-act="tf-keep" data-id="${esc(p.id)}"${!kept && c.keep.length >= KEEP_MAX ? ' disabled' : ''}>${kept ? 'Zdejmij osłonę' : 'Osłoń'}</button>` : ''}
     </li>`;
@@ -134,10 +147,11 @@ function playerCard(game, p, ui) {
   }
   return `<button class="btn btn--quiet btn--sm" data-act="tf-close">Wróć do listy</button>
     <section class="panel tf-card">
-      <div class="tf-card__head">${crest(p.clubId, 36)}<div><h2>${esc(p.name)}</h2><p class="hint">${esc(POS_NAMES?.[p.pos] ?? p.pos)}, ${p.age} lat, ${esc(NAT_NAMES[p.nat] ?? p.nat)}${p.clubId ? `, ${esc(clubById(p.clubId)?.name)}` : ', wolny zawodnik'}</p></div><b class="tf-big">${ovrTxt(p)}</b></div>
+      <div class="tf-card__head" data-pid="${esc(p.id)}">${crest(p.clubId, 36)}<div><h2>${esc(p.name)}</h2><p class="hint">${esc(POS_NAMES?.[p.pos] ?? p.pos)}, ${p.age} lat, ${esc(NAT_NAMES[p.nat] ?? p.nat)}${p.clubId ? `, ${esc(clubById(p.clubId)?.name)}` : ', wolny zawodnik'}</p></div><b class="tf-big">${ovrTxt(p)}</b></div>
       <ul class="plain-list">
         <li><span class="k">Reputacja</span><span>${esc(reputationLabel(p.rep ?? 30))}</span></li>
         <li><span class="k">Mocne strony</span><span>${esc(topAttrs(p))}</span></li>
+        <li><span class="k">Porównanie</span><span>${esc(compareText(game, p))}</span></li>
         <li><span class="k">Wartość</span><span>${fmtZl(p.value)}</span></li>
         ${free ? `<li><span class="k">Oczekuje</span><span>ok. ${fmtZl(p.askWage ?? 0)} tygodniowo</span></li>` : `<li><span class="k">Cena klubu</span><span>${nfs ? 'nie na sprzedaż' : fmtZl(price)}${listed ? ` (${esc(listed.reasons.join(', ').toLowerCase())})` : ''}</span></li>
         <li><span class="k">Kontrakt</span><span>${fmtZl(p.contract.wage)} tygodniowo, do ${fmtDate(p.contract.until)}${p.contract.clause ? `, klauzula ${fmtZl(p.contract.clause)}` : ''}</span></li>`}
@@ -161,7 +175,7 @@ function ownCard(game, p, ui) {
   const limitNote = target || kept ? `<p class="notice${target ? ' notice--err' : ''}">${target ? `Zarząd wskaże tego zawodnika, jeśli kadra nie zmieści się w limicie (${L.counted}/${L.soft}).` : 'Osłoniłeś tego zawodnika przed działaniem zarządu.'}</p>${L.case ? `<button class="btn btn--quiet btn--sm" data-act="tf-keep" data-id="${esc(p.id)}">${kept ? 'Zdejmij osłonę' : 'Osłoń przed zarządem'}</button>` : ''}` : '';
   return `<button class="btn btn--quiet btn--sm" data-act="tf-close">Wróć do listy</button>
     <section class="panel tf-card">
-      <div class="tf-card__head">${crest(p.clubId, 36)}<div><h2>${esc(p.name)}</h2><p class="hint">${esc(p.pos)}, ${p.age} lat, morale ${Math.round(p.morale ?? 12)}/20</p></div><b class="tf-big">${ovrTxt(p)}</b></div>
+      <div class="tf-card__head" data-pid="${esc(p.id)}">${crest(p.clubId, 36)}<div><h2>${esc(p.name)}</h2><p class="hint">${esc(p.pos)}, ${p.age} lat, morale ${Math.round(p.morale ?? 12)}/20</p></div><b class="tf-big">${ovrTxt(p)}</b></div>
       <ul class="plain-list">
         <li><span class="k">Kontrakt</span><span>${fmtZl(p.contract.wage)} tygodniowo, do ${fmtDate(p.contract.until)}${p.loan ? ` (wypożyczony z ${esc(clubById(p.loan.from)?.name ?? '')})` : ''}</span></li>
         <li><span class="k">Wartość</span><span>${fmtZl(p.value)}</span></li>
@@ -195,7 +209,7 @@ function offersView(game) {
   const hist = game.market.history.filter((h) => h.from === game.clubId || h.to === game.clubId).slice(0, 20);
   const all = game.market.history.slice(0, 25);
   const hRow = (h) => `<li><span class="k">${esc(fmtDate(h.date).replace(/, \d{4}$/, ''))}</span><span>${esc(h.name)} (${esc(h.pos)}): ${esc(clubById(h.from)?.name ?? 'wolny')} -> ${esc(h.to ? clubById(h.to)?.name : 'bez klubu')}</span><b>${h.kind === 'loan' ? 'wyp.' : h.fee ? fmtZl(h.fee) : h.kind === 'release' ? 'rozwiązanie' : 'wolny'}</b></li>`;
-  return `<section class="stat-sec"><h3>Oferty za twoich zawodników</h3>${open.length ? `<ul class="plain-list">${open.map((o) => { const p = game.world.players[o.playerId]; return `<li class="tf-incoming"><span>${crest(o.from)} <b>${esc(clubById(o.from).name)}</b> chce ${esc(p.name)} za ${fmtZl(o.fee)} (ważna do ${esc(fmtDate(o.expires))})</span><span class="tf-btns"><button class="btn btn--primary btn--sm" data-act="tf-answer" data-o="${esc(o.id)}" data-a="accept">Przyjmij</button>${o.raised ? '' : `<button class="btn btn--quiet btn--sm" data-act="tf-answer" data-o="${esc(o.id)}" data-a="more">Żądaj więcej</button>`}<button class="btn btn--quiet btn--sm" data-act="tf-answer" data-o="${esc(o.id)}" data-a="reject">Odrzuć</button></span></li>`; }).join('')}</ul>` : '<p class="hint">Brak ofert.</p>'}</section>
+  return `<section class="stat-sec"><h3>Oferty za twoich zawodników</h3>${open.length ? `<ul class="plain-list">${open.map((o) => { const p = game.world.players[o.playerId]; return `<li class="tf-incoming" data-pid="${esc(o.playerId)}"><span>${crest(o.from)} <b>${esc(clubById(o.from).name)}</b> chce ${esc(p.name)} za ${fmtZl(o.fee)} (ważna do ${esc(fmtDate(o.expires))})</span><span class="tf-btns"><button class="btn btn--primary btn--sm" data-act="tf-answer" data-o="${esc(o.id)}" data-a="accept">Przyjmij</button>${o.raised ? '' : `<button class="btn btn--quiet btn--sm" data-act="tf-answer" data-o="${esc(o.id)}" data-a="more">Żądaj więcej</button>`}<button class="btn btn--quiet btn--sm" data-act="tf-answer" data-o="${esc(o.id)}" data-a="reject">Odrzuć</button></span></li>`; }).join('')}</ul>` : '<p class="hint">Brak ofert.</p>'}</section>
     <section class="stat-sec"><h3>Twoje rozmowy z klubami</h3>${mine.length ? `<ul class="plain-list">${mine.map(({ p, t }) => `<li><span>${esc(p.name)} (${esc(clubById(p.clubId)?.name ?? '')})</span><b>${t.accepted ? `przyjęta: ${fmtZl(t.accepted)}` : t.until ? `przerwa do ${esc(fmtDate(t.until))}` : t.counter ? `klub chce ${fmtZl(t.counter)}` : 'odrzucona'}</b></li>`).join('')}</ul>` : '<p class="hint">Nie prowadzisz rozmów.</p>'}</section>
     <section class="stat-sec"><h3>Transfery twojego klubu</h3>${hist.length ? `<ul class="plain-list">${hist.map(hRow).join('')}</ul>` : '<p class="hint">Jeszcze żadnych.</p>'}</section>
     <section class="stat-sec"><h3>Ostatnie transfery w Polsce</h3><ul class="plain-list">${all.map(hRow).join('') || '<li>Brak.</li>'}</ul></section>`;

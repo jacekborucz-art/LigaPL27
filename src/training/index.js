@@ -21,7 +21,7 @@ import { processUserDay } from './sessions.js';
 import { monthlyDevelopment } from './development.js';
 import { cohesionTerm, prepTerm, setPieceEdge, aiWeeklyCohesion, weeklyCohesionDecay } from './cohesion.js';
 import { legsTerm, overloadTerm } from './load.js';
-import { processAiDay } from './aiClubs.js';
+import { processAiDay, aiOverload } from './aiClubs.js';
 
 // Forma bazowa po okresie przygotowawczym: jedna liczba na klub i dzień (pamięć podręczna, tanio w meczu)
 const campCache = new WeakMap();
@@ -132,7 +132,8 @@ export const MODIFIERS = [
     apply: (p) => {
       const g = activeGame();
       if (p.training && (!g || p.clubId === g.clubId)) return legsTerm(p.training) + overloadTerm(p.training);
-      return g ? legsTerm(g.training?.clubs?.[p.clubId]) : 0; // klub AI: ciężkie nogi jedną liczbą na klub (c.legs)
+      // Klub AI: ciężkie nogi jedną liczbą na klub (c.legs), przeciążenie z obciążenia zawodnika (p.aiTr)
+      return g ? legsTerm(g.training?.clubs?.[p.clubId]) + aiOverload(p) : 0;
     },
   },
   { id: 'trainingCamp', scope: 'player', label: 'Forma bazowa (obóz)', apply: (p) => campTerm(activeGame(), p) },
