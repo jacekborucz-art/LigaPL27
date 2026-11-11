@@ -12,7 +12,7 @@ import { anyClub, compLabel } from '../season/season.js';
 import { statsFromEvents } from '../engine/matchStats.js';
 import { onPitch } from '../engine/match/teams.js';
 import * as TEAMS from '../engine/match/teams.js';
-import { substitute, changeTactics, shout, canShout } from '../engine/match/match.js';
+import { substitute, changeTactics, shout, canShout, assistantSuggest, applySuggestion } from '../engine/match/match.js';
 import { SHOUTS } from '../engine/match/constants.js';
 import { TONES, TALKS, POST_TONES, MAX_TALKS } from '../match/briefings.js';
 import * as MD from '../match/matchday.js';
@@ -205,6 +205,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
             <div class="md-toasts" id="mdToasts" aria-live="polite"></div>
             <div class="md-halt" id="mdHalt" hidden role="alertdialog" aria-labelledby="mdHaltTitle">
               <b id="mdHaltTitle">Gra wstrzymana</b><p id="mdHaltText"></p>
+              <div class="md-halt__sugg" id="mdHaltSugg"></div>
               <div class="md-halt__btns"><button class="btn btn--quiet btn--sm" data-md="dlg:manage">Zmiany i taktyka</button><button class="btn btn--primary btn--sm" data-md="haltGo">Graj dalej</button></div>
             </div>
           </div>
@@ -414,10 +415,30 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
       : `${inj.text} Możesz go zmienić albo zostawić na boisku.`;
     return null;
   }
+  /** Podpowiedzi asystenta po czerwonej kartce lub urazie (silnik: assistantSuggest, bez zmiany meczu). */
+  function suggLabel(a) {
+    if (a.type === 'sub') return `Zmiana: ${a.outName} schodzi, ${a.inName} wchodzi${a.text ? ` (${a.text})` : ''}`;
+    const pt = a.patch ?? {};
+    const parts = [];
+    if (pt.formation) parts.push(`${FORMATIONS.find((f) => f.id === pt.formation)?.name ?? pt.formation}${pt.drop?.length ? ` bez ${pt.drop.join(', ')}` : ''}`);
+    else if (pt.drop?.length) parts.push(`gramy bez ${pt.drop.join(', ')}`);
+    for (const [k, v] of Object.entries(pt.instructions ?? {})) parts.push(`${INSTRUCTIONS.find((i) => i.id === k)?.label ?? k}: ${insLabel(k, v)}`);
+    return `Taktyka: ${parts.join(', ') || 'korekta'}${a.reason ? ` (${a.reason})` : ''}`;
+  }
+  function renderSugg() {
+    const box = app.querySelector('#mdHaltSugg');
+    if (!box) return;
+    const list = ui.sugg ?? [];
+    box.innerHTML = (ui.suggMsg ? `<small class="ok">${esc(ui.suggMsg)}</small>` : '')
+      + (list.length ? `<small>Asystent proponuje:</small>${list.map((a, i) => `<button class="md-sugg" data-md="haltSug:${i}">${esc(suggLabel(a))}<span>Zastosuj</span></button>`).join('')}` : '');
+  }
   function showHalt(text) {
     const h = app.querySelector('#mdHalt');
     if (!h) return;
     app.querySelector('#mdHaltText').textContent = text;
+    try { ui.sugg = assistantSuggest(S.M, S.userSide).slice(0, 3); } catch { ui.sugg = []; }
+    ui.suggMsg = '';
+    renderSugg();
     h.hidden = false;
     h.querySelector('[data-md="haltGo"]')?.focus();
   }
@@ -757,6 +778,16 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     }
     if (act === 'kickoff') { MD.kickOff(game, S); route(); }
     if (act === 'pause') (ui.running ? stop() : start());
+    if (act === 'haltSug') {
+      const a = ui.sugg?.[Number(arg)];
+      if (a) {
+        const r = applySuggestion(M, S.userSide, a);
+        ui.suggMsg = r?.ok === false ? (r.error ?? 'Nie udało się.') : `Wykonano: ${suggLabel(a)}.`;
+        try { ui.sugg = assistantSuggest(M, S.userSide).slice(0, 3); } catch { ui.sugg = []; }
+        renderSugg();
+        updateLive();
+      }
+    }
     if (act === 'haltGo') { if (app.querySelector('#mdDlg')?.open) return; start(); }
     if (act === 'speed') { ui.speed = Number(arg); app.querySelectorAll('.speed').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.md === `speed:${arg}`))); if (ui.running) { stop(); start(); } }
     if (act === 'tab') { ui.tab = arg; app.querySelectorAll('[data-md^="tab:"]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.md === `tab:${arg}`))); updateLive(); }
