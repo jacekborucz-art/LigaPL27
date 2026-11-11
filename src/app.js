@@ -40,10 +40,12 @@ import { fanMoodLabel } from './career/fans.js';
 import { GROUP } from './career/squad.js';
 import { runDecision } from './core/decisions.js';
 import { startNegotiation, renderNegotiation, handleNegotiationAction, isNegotiationAction, readNegotiationForm, refreshNegotiationHints } from './ui/negotiationView.js';
+import { renderMenu, renderCareer, newCareerState, maybePlayIntro, readTheme, applyTheme, nextTheme, nameError, ageError, profileOf, randomCoach, updateCoachPreview, setFieldError, isNationality, managerName, AGE_MIN, AGE_MAX } from './ui/menuView.js';
 
 const app = document.getElementById('app');
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
-const state = { screen: 'start', slot: null, game: null, tab: 'pulpit', tier: 1, notice: null, mailCat: null, mailOpen: null, running: false, sqFilter: 'all', playerOpen: null, sqSub: 'players', tSel: null, matchNotes: [], cComp: null, cView: 'table', cRound: null, lastResult: null, uFilter: 'pl', uDraw: null };
+const state = { screen: 'start', slot: null, game: null, tab: 'pulpit', tier: 1, notice: null, mailCat: null, mailOpen: null, running: false, sqFilter: 'all', playerOpen: null, sqSub: 'players', tSel: null, matchNotes: [], cComp: null, cView: 'table', cRound: null, lastResult: null, uFilter: 'pl', uDraw: null, nc: null, confirmDel: null, theme: readTheme(), menuFocus: null };
+const WIDE_PICK = '(min-width: 1024px)';
 
 const benchSizeFor = (g) => COMPETITIONS[['ekstraklasa', 'liga1', 'liga2'][clubById(g.clubId).tier - 1]].benchSize;
 const nextFixture = (g) => (g.fixtures || []).filter((f) => !f.played && (f.home === g.clubId || f.away === g.clubId)).sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? '')))[0];
@@ -72,7 +74,7 @@ const TABS = [
 
 function render() {
   if (state.screen === 'start') return renderStart();
-  if (state.screen === 'pick') return renderPick();
+  if (state.screen === 'career' || state.screen === 'pick') return renderCareerScreen();
   if (state.screen === 'matchday') return renderLiveMatchday();
   if (state.screen === 'match') return renderMatchDay();
   if (state.screen === 'matchResult') return renderMatchResult();
@@ -82,7 +84,8 @@ function render() {
 // ---------- Zapis ----------
 async function save() {
   const g = state.game;
-  g.summary = { clubId: g.clubId, season: g.season, date: g.date };
+  const p = g.manager?.profile;
+  g.summary = { clubId: g.clubId, season: typeof g.season === 'string' ? g.season : (g.season?.seasonId ?? SEASON), date: g.date, ...(p ? { managerName: managerName(g) } : {}) };
   await store.saveSlot(state.slot, g);
 }
 
@@ -116,81 +119,73 @@ function ensureGameShape(g) {
   return g;
 }
 
-// ---------- Start ----------
+// ---------- Menu główne ----------
 async function renderStart() {
   const slots = await store.listSlots();
-  const rows = slots.map((s) => {
-    if (s.empty) {
-      return `<li class="slot">
-        <div class="slot__body"><span class="slot__title">Slot ${s.slot}</span><span class="muted">Pusty</span></div>
-        <button class="btn btn--primary" data-act="new" data-slot="${s.slot}">Nowa kariera</button>
-      </li>`;
-    }
-    const club = clubById(s.summary?.clubId);
-    return `<li class="slot">
-      ${club ? crestHtml(club, { size: 40, clubsById }) : ''}
-      <div class="slot__body">
-        <span class="slot__title">${esc(club?.name ?? 'Nieznany klub')}</span>
-        <span class="muted">${esc(s.summary?.season ?? '')}, ${esc(fmtDate(s.summary?.date ?? GAME_START))}</span>
-        ${s.savedAt ? `<span class="muted">Zapisano: ${esc(new Date(s.savedAt).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' }))}</span>` : ''}
-      </div>
-      <div class="slot__actions">
-        <button class="btn btn--primary" data-act="load" data-slot="${s.slot}">Graj</button>
-        <button class="btn btn--quiet" data-act="export" data-slot="${s.slot}" aria-label="Eksportuj zapis ze slotu ${s.slot}">Eksportuj</button>
-        <button class="btn btn--quiet" data-act="delete" data-slot="${s.slot}" aria-label="Usuń zapis ze slotu ${s.slot}">Usuń</button>
-      </div>
-    </li>`;
-  }).join('');
-
-  app.innerHTML = `
-  <main class="start">
-    <header class="start__head">
-      <div class="led" aria-hidden="true">${esc(SEASON)}</div>
-      <h1>Manager Piłkarski</h1>
-      <p class="muted">Ekstraklasa, 1 Liga, 2 Liga, Puchar Polski i puchary europejskie.</p>
-    </header>
-    ${state.notice ? `<p class="notice" role="status">${esc(state.notice)}</p>` : ''}
-    ${store.isMemoryOnly() ? '<p class="notice" role="status">Ta przeglądarka nie pozwala zapisać gry na stałe. Postęp zniknie po zamknięciu karty; użyj eksportu.</p>' : ''}
-    <h2>Zapisy</h2>
-    <ul class="slots stripes">${rows}</ul>
-    <label class="btn btn--quiet import">Wczytaj zapis z pliku
-      <input type="file" accept="application/json,.json" data-act="import" hidden>
-    </label>
-  </main>`;
+  state.slotsCache = slots;
+  app.innerHTML = renderMenu({ slots, notice: state.notice, memoryOnly: store.isMemoryOnly(), theme: state.theme, confirmDel: state.confirmDel });
   state.notice = null;
+  // Fokus po przerysowaniu: wskazany element (np. po usunięciu zapisu), inaczej pierwsza pozycja menu przy wejściu do menu
+  const want = state.menuFocus;
+  state.menuFocus = null;
+  const target = want ? app.querySelector(want) : (document.activeElement === document.body || !app.contains(document.activeElement) ? app.querySelector('.mi') : null);
+  if (target && !document.querySelector('.intro')) target.focus({ preventScroll: true });
 }
 
-// ---------- Wybór klubu ----------
-function renderPick() {
-  const list = CLUBS_PL.filter((c) => c.tier === state.tier && !c.parent);
-  const tabs = [1, 2, 3].map((t) => `<button role="tab" aria-selected="${t === state.tier}" class="seg__btn" data-act="tier" data-tier="${t}">${esc(LEAGUE_NAMES[t])}</button>`).join('');
-  const rows = list.map((c) => {
-    const europe = POLISH_EUROPE_2026.find((e) => e.club === c.id);
-    return `<li>
-      <button class="club-row" data-act="pick" data-club="${esc(c.id)}">
-        ${crestHtml(c, { size: 36, clubsById })}
-        <span class="club-row__name">${esc(c.name)}</span>
-        <span class="club-row__meta">${europe ? `<span class="tag">${esc(europe.comp)}</span>` : ''}${strength(c.L, c.tier)}</span>
-      </button>
-    </li>`;
-  }).join('');
-  app.innerHTML = `
-  <main class="pick">
-    <header class="bar">
-      <button class="btn btn--quiet" data-act="back">Wróć</button>
-      <h1 class="bar__title">Wybierz klub</h1>
-    </header>
-    <div class="seg" role="tablist" aria-label="Liga">${tabs}</div>
-    <p class="muted pick__hint">Siła to oczekiwania wobec kadry na tle ligi. Kadry zostaną wylosowane po wyborze klubu.</p>
-    <ul class="club-list stripes">${rows}</ul>
-  </main>`;
+// ---------- Nowa kariera: trener, klub, kontrakt ----------
+function renderCareerScreen() {
+  if (!state.nc) state.nc = newCareerState(state.slot ?? 1);
+  app.innerHTML = renderCareer(state.nc, { wide: matchMedia(WIDE_PICK).matches });
 }
 
-function strength(L, tier) {
-  const avg = { 1: 11.5, 2: 10, 3: 8.5 }[tier];
-  const d = L - avg;
-  const label = d >= 0.7 ? 'Faworyt' : d >= 0.2 ? 'Czołówka' : d > -0.25 ? 'Środek' : d > -0.45 ? 'Dół tabeli' : 'Outsider';
-  return `<span class="strength" data-level="${label}">${label}</span>`;
+/** Wejście do kreatora: pierwszy wolny slot albo wskazany. */
+function startCareer(slot) {
+  applySeasonState({}); // kalendarz i puchary 2026/27, także po wczytaniu późniejszego sezonu
+  state.slot = slot;
+  state.nc = newCareerState(slot);
+  state.screen = 'career';
+  render();
+  window.scrollTo({ top: 0 });
+  app.querySelector('#nc-first')?.focus();
+}
+
+function careerGo(step, focusSel) {
+  state.nc.step = step;
+  state.nc.msg = '';
+  render();
+  window.scrollTo({ top: 0 });
+  (app.querySelector(focusSel ?? '') ?? app.querySelector('.nc h2, .nc__h'))?.focus?.();
+}
+
+/** Odczyt i walidacja kroku Trener. Zwraca true, gdy można iść dalej. */
+function readCoachForm() {
+  const nc = state.nc;
+  const get = (id) => app.querySelector(`#nc-${id}`)?.value ?? '';
+  nc.first = get('first'); nc.last = get('last'); nc.age = get('age') || nc.age;
+  const nat = get('nat'); if (isNationality(nat)) nc.nat = nat;
+  nc.errors = { first: nameError(nc.first, 'first'), last: nameError(nc.last, 'last'), age: ageError(nc.age) };
+  for (const k of ['first', 'last', 'age']) setFieldError(app, k, nc.errors[k]);
+  const bad = ['first', 'last', 'age'].find((k) => nc.errors[k]);
+  if (bad) {
+    const el = app.querySelector(`#nc-${bad}`);
+    el?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    el?.focus({ preventScroll: true });
+    const msg = app.querySelector('#nc-msg'); if (msg) msg.textContent = 'Popraw zaznaczone pola.';
+    return false;
+  }
+  return true;
+}
+
+function setAge(delta) {
+  const nc = state.nc;
+  const input = app.querySelector('#nc-age');
+  const cur = Number(input?.value);
+  const v = Math.min(AGE_MAX, Math.max(AGE_MIN, Number.isInteger(cur) ? cur + delta : 40));
+  nc.age = v;
+  if (input) input.value = v;
+  nc.errors.age = '';
+  setFieldError(app, 'age', '');
+  updateCoachPreview(app, nc);
 }
 
 // ---------- Główny ekran ----------
@@ -217,7 +212,7 @@ function renderHub() {
       ${crestHtml(club, { size: 36, clubsById })}
       <div class="hub__club">
         <span class="hub__name">${esc(club.name)}</span>
-        <span class="muted">${esc(LEAGUE_NAMES[club.tier])}</span>
+        <span class="muted hub__sub"><span>${esc(LEAGUE_NAMES[club.tier])}</span><span class="hub__mgr">${esc(managerName(g))}</span></span>
       </div>
       <div class="led hub__date" id="leddate" aria-label="Data w grze: ${esc(fmtDate(g.date))}">${esc(fmtDate(g.date))}</div>
       <div class="go-wrap" id="gowrap">${goButton(g)}</div>
@@ -830,13 +825,15 @@ app.addEventListener('change', async (ev) => {
 });
 
 // ---------- Akcje ----------
-async function newGame(slot, clubId) {
+async function newGame(slot, clubId, profile = null) {
   applySeasonState({});
   const seed = hashString(`${clubId}:${Date.now()}:${Math.random()}`);
   const game = {
     seed, clubId, date: GAME_START, season: SEASON, createdAt: new Date().toISOString(),
     inbox: [],
   };
+  // Profil trenera: tylko w zapisie gry na tym urządzeniu (gra nie wysyła danych do sieci)
+  if (profile) game.manager = { profile };
   game.season = createSeason(seed, { playerClub: clubId });
   game.fixtures = game.season.fixtures;
   game.world = generateWorld(seed);
@@ -846,6 +843,7 @@ async function newGame(slot, clubId) {
   processDay(game);
   state.game = game;
   state.slot = slot;
+  state.nc = null;
   await save();
   state.screen = 'hub';
   state.tab = 'poczta';
@@ -900,10 +898,59 @@ app.addEventListener('click', async (ev) => {
   const slot = Number(el.dataset.slot);
   const g = state.game;
   try {
-    if (act === 'new') { state.slot = slot; state.screen = 'pick'; render(); }
-    if (act === 'back' || act === 'menu') { state.screen = 'start'; render(); }
-    if (act === 'tier') { state.tier = Number(el.dataset.tier); render(); }
-    if (act === 'pick') await newGame(state.slot, el.dataset.club);
+    if (act === 'new') startCareer(slot);
+    if (act === 'newcareer') {
+      const free = (await store.listSlots()).find((s) => s.empty);
+      if (free) startCareer(free.slot);
+      else { state.notice = 'Wszystkie sloty są zajęte. Usuń jeden zapis, aby zacząć nową karierę.'; state.menuFocus = '#saves-title'; render(); }
+    }
+    if (act === 'back' || act === 'menu') { state.running = false; state.screen = 'start'; state.confirmDel = null; render(); }
+    if (act === 'slots') {
+      const h = app.querySelector('#saves-title');
+      h?.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      h?.focus({ preventScroll: true });
+    }
+    if (act === 'theme') { state.theme = nextTheme(state.theme); applyTheme(state.theme); state.menuFocus = '[data-act="theme"]'; render(); }
+    if (act === 'ncBack') {
+      if (!state.nc || state.nc.step <= 1) { state.screen = 'start'; render(); }
+      else careerGo(state.nc.step - 1, state.nc.step === 3 && state.nc.clubId ? `[data-club="${state.nc.clubId}"]` : '#nc-first');
+    }
+    if (act === 'ncRandom' && state.nc) {
+      const natSel = app.querySelector('#nc-nat');
+      if (natSel && isNationality(natSel.value)) state.nc.nat = natSel.value;
+      const n = randomCoach(state.nc.nat);
+      state.nc.first = n.first; state.nc.last = n.last;
+      for (const k of ['first', 'last']) { const inp = app.querySelector(`#nc-${k}`); if (inp) inp.value = state.nc[k]; state.nc.errors[k] = ''; setFieldError(app, k, ''); }
+      updateCoachPreview(app, state.nc);
+      if (!state.nc.errors.age) { const m = app.querySelector('#nc-msg'); if (m) m.textContent = ''; }
+    }
+    if (act === 'ageDec') setAge(-1);
+    if (act === 'ageInc') setAge(1);
+    if (act === 'profileNext' && state.nc && readCoachForm()) {
+      if (state.nc.clubId) state.nc.tier = clubById(state.nc.clubId).tier;
+      careerGo(2, state.nc.clubId ? `[data-club="${state.nc.clubId}"]` : '[role="tab"][aria-selected="true"]');
+    }
+    if (act === 'tier' && state.nc) { state.nc.tier = Number(el.dataset.tier); state.nc.msg = ''; render(); app.querySelector(`[data-act="tier"][data-tier="${state.nc.tier}"]`)?.focus(); }
+    if (act === 'pick' && state.nc) {
+      state.nc.clubId = el.dataset.club; state.nc.tier = clubById(el.dataset.club).tier; state.nc.msg = '';
+      render();
+      app.querySelector(`[data-club="${state.nc.clubId}"]`)?.focus({ preventScroll: true });
+    }
+    if (act === 'pickConfirm' && state.nc) {
+      if (!state.nc.clubId) {
+        state.nc.msg = 'Wybierz klub z listy.';
+        const m = app.querySelector('#nc-msg'); if (m) m.textContent = state.nc.msg;
+        app.querySelector('.cc')?.focus();
+      } else careerGo(3, '[data-act="sign"]');
+    }
+    if (act === 'sign' && state.nc?.clubId) {
+      const nc = state.nc;
+      if (nameError(nc.first, 'first') || nameError(nc.last, 'last') || ageError(nc.age)) { careerGo(1); readCoachForm(); return; }
+      el.disabled = true; el.textContent = 'Podpisano. Przygotowuję sezon…'; el.setAttribute('aria-busy', 'true');
+      app.querySelector('.contract')?.classList.add('is-signed'); // podpis pojawia się na umowie
+      await new Promise((r) => setTimeout(r, matchMedia('(prefers-reduced-motion: reduce)').matches ? 150 : 450)); // podpis widoczny przed generowaniem świata
+      await newGame(nc.slot, nc.clubId, profileOf(nc));
+    }
     if (act === 'tab') { state.tab = el.dataset.tab; state.mailOpen = null; state.playerOpen = null; if (el.dataset.sub) state.tfTab = el.dataset.sub; render(); }
     if (act === 'go') {
       const a = primaryAction(g);
@@ -971,15 +1018,17 @@ app.addEventListener('click', async (ev) => {
       if (m?.refs?.kind === 'incomingOffer' || m?.refs?.kind === 'jobOffer') afterSquadChange(g);
       await save(); render();
     }
-    if (act === 'load') {
+    if (act === 'load' || act === 'continue') {
       const rec = await store.loadSlot(slot);
       if (!rec) throw new Error('Ten slot jest pusty.');
-      state.game = ensureGameShape(rec.game); state.slot = slot; state.screen = 'hub'; state.tab = 'pulpit'; render();
+      state.game = ensureGameShape(rec.game); state.slot = slot; state.screen = 'hub'; state.tab = 'pulpit'; state.confirmDel = null; render();
     }
-    if (act === 'delete') {
-      if (confirm(`Usunąć zapis ze slotu ${slot}? Tego nie da się cofnąć.`)) {
-        await store.deleteSlot(slot); state.notice = `Usunięto zapis ze slotu ${slot}.`; render();
-      }
+    // Usunięcie zapisu: potwierdzenie w wierszu slotu (bez okna przeglądarki)
+    if (act === 'delete') { state.confirmDel = slot; state.menuFocus = `[data-act="deleteNo"][data-slot="${slot}"]`; render(); }
+    if (act === 'deleteNo') { state.confirmDel = null; state.menuFocus = `[data-act="delete"][data-slot="${slot}"]`; render(); }
+    if (act === 'deleteYes') {
+      await store.deleteSlot(slot); state.confirmDel = null; state.notice = `Usunięto zapis ze slotu ${slot}.`;
+      state.menuFocus = `[data-act="new"][data-slot="${slot}"]`; render();
     }
     if (act === 'export') {
       const rec = await store.loadSlot(slot);
@@ -1011,10 +1060,63 @@ app.addEventListener('change', async (ev) => {
   render();
 });
 
-// Klawiatura na PC: Enter = Dalej / Zagraj mecz, Escape = menu główne.
+// Kreator kariery: walidacja pól (po pierwszym opuszczeniu pola, błąd znika przy poprawianiu) i podgląd karty trenera.
+const NC_FIELDS = { 'nc-first': 'first', 'nc-last': 'last', 'nc-age': 'age' };
+const ncError = (k, v) => (k === 'age' ? ageError(v) : nameError(v, k));
+app.addEventListener('input', (ev) => {
+  const k = NC_FIELDS[ev.target.id];
+  if (!k || !state.nc) return;
+  state.nc[k] = ev.target.value;
+  if (state.nc.errors[k]) { state.nc.errors[k] = ''; setFieldError(app, k, ''); }
+  if (state.nc.msg !== undefined && !Object.values(state.nc.errors).some(Boolean)) { const m = app.querySelector('#nc-msg'); if (m) m.textContent = ''; }
+  updateCoachPreview(app, state.nc);
+});
+app.addEventListener('focusout', (ev) => {
+  const k = NC_FIELDS[ev.target.id];
+  if (!k || !state.nc || state.screen !== 'career') return;
+  state.nc[k] = ev.target.value;
+  state.nc.errors[k] = ncError(k, ev.target.value);
+  setFieldError(app, k, state.nc.errors[k]);
+});
+app.addEventListener('change', (ev) => {
+  if (ev.target.id !== 'nc-nat' || !state.nc || !isNationality(ev.target.value)) return;
+  state.nc.nat = ev.target.value;
+  updateCoachPreview(app, state.nc);
+});
+app.addEventListener('keydown', (ev) => {
+  // Enter w formularzu trenera = Dalej
+  if (ev.key === 'Enter' && ev.target.matches('[data-nc-form] input')) { ev.preventDefault(); app.querySelector('[data-act="profileNext"]')?.click(); return; }
+  // Zakładki lig: strzałki, Home, End
+  const tab = ev.target.closest('[role="tab"][data-act="tier"]');
+  if (tab && ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(ev.key)) {
+    ev.preventDefault();
+    const tabs = [...app.querySelectorAll('[role="tab"][data-act="tier"]')];
+    const i = tabs.indexOf(tab);
+    const j = ev.key === 'Home' ? 0 : ev.key === 'End' ? tabs.length - 1 : (i + (ev.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+    tabs[j].click();
+    return;
+  }
+  // Menu główne: strzałki góra i dół między pozycjami
+  const mi = ev.target.closest('.mi');
+  if (mi && (ev.key === 'ArrowDown' || ev.key === 'ArrowUp')) {
+    ev.preventDefault();
+    const all = [...app.querySelectorAll('.mi')];
+    all[(all.indexOf(mi) + (ev.key === 'ArrowDown' ? 1 : -1) + all.length) % all.length].focus();
+  }
+});
+matchMedia(WIDE_PICK).addEventListener?.('change', () => {
+  if (state.screen !== 'career' || state.nc?.step !== 2) return;
+  const key = document.activeElement?.dataset?.club;
+  render();
+  if (key) app.querySelector(`[data-club="${key}"]`)?.focus({ preventScroll: true });
+});
+
+// Klawiatura na PC: Enter = Dalej / Zagraj mecz, Escape = menu główne (w kreatorze: krok wstecz).
 document.addEventListener('keydown', (ev) => {
   if (ev.target.closest('input, select, textarea')) return;
   if (state.screen === 'matchday') return;
+  if (ev.key === 'Escape' && state.screen === 'career') { ev.preventDefault(); app.querySelector('[data-act="ncBack"]')?.click(); return; }
+  if (ev.key === 'Escape' && state.screen === 'start' && state.confirmDel) { app.querySelector('[data-act="deleteNo"]')?.click(); return; }
   if (ev.key === 'Escape' && state.screen !== 'start') { state.running = false; state.screen = 'start'; render(); }
   if (ev.key === 'Enter' && state.screen === 'hub' && !state.running && !ev.target.closest('button')) document.querySelector('[data-act="go"]')?.click();
 });
@@ -1026,4 +1128,8 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('./sw.js').catch(() => { /* gra działa także bez trybu offline */ });
 }
 
-Promise.resolve(render()).then(() => { document.body.dataset.ready = '1'; });
+applyTheme(state.theme);
+Promise.resolve(render()).then(() => {
+  document.body.dataset.ready = '1';
+  maybePlayIntro(app, { onDone: () => { if (state.screen === 'start') app.querySelector('.mi')?.focus({ preventScroll: true }); } });
+});
