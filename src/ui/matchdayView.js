@@ -18,7 +18,7 @@ import * as TEAMS from '../engine/match/teams.js';
 import { substitute, changeTactics, shout, canShout, assistantSuggest, applySuggestion, playerStates, previewShape } from '../engine/match/match.js';
 import { proficiency } from '../engine/positions.js';
 import { openMenu, closeMenu, bindContextTrigger, showToast as menuToast } from './contextMenu.js';
-import { SHOUTS } from '../engine/match/constants.js';
+import { SHOUTS, SHOUT_COOLDOWN, SHOUT_DURATION } from '../engine/match/constants.js';
 import { TONES, TALKS, POST_TONES, MAX_TALKS } from '../match/briefings.js';
 import * as MD from '../match/matchday.js';
 import { CLIMATES, currentQuestion, progress, effectWords } from '../match/press.js';
@@ -493,6 +493,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     if (!q('#mdScore')) return;
     q('#mdScore').textContent = `${M.score[0]}:${M.score[1]}`;
     q('#mdMin').textContent = M.events[M.events.length - 1]?.min ?? "0'";
+    updateShoutBtn();
     const stats = statsFromEvents(M.events);
     drawMomentum(M, q);
     // Relacja
@@ -829,10 +830,50 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       mountSubsDrag(dlg);
       return;
     }
-    dlg.className = 'panel md-dlg';
-    dlg.innerHTML = `<h2>Okrzyk z linii bocznej</h2><p class="hint">Okrzyk działa od razu przez kilka minut.</p><ul class="plain-list">${Object.entries(SHOUTS).map(([k, sh]) => { const err = canShout(M, S.userSide, k); return `<li><button class="btn btn--quiet" data-md="doShout:${k}" ${err ? 'disabled' : ''}>${esc(sh.label)}</button><span class="hint">${esc(err ?? '')}</span></li>`; }).join('')}</ul>
-      <p id="mdDlgMsg" class="hint"></p><p>${btn('closeDlg', 'Zamknij', false)}</p>`;
+    dlg.className = 'panel md-dlg sh-dlg';
+    dlg.innerHTML = shoutPanel(M);
     if (!dlg.open) dlg.showModal();
+    dlg.querySelector('.sh-card:not([disabled])')?.focus();
+  }
+
+  // ------------------------------------------------------------ Okrzyk z linii bocznej
+  // Wybór okrzyku od razu go wykonuje, zamyka okno i wznawia mecz; kolejny okrzyk po SHOUT_COOLDOWN minutach.
+  const SHOUT_INFO = {
+    naprzod: { tone: 'att', what: 'Więcej akcji pod bramką rywala.', cost: 'Słabsza asekuracja z tyłu.' },
+    uwaga: { tone: 'def', what: 'Drużyna cofa się i pilnuje tyłów.', cost: 'Mniej akcji ofensywnych.' },
+    spokojnie: { tone: 'calm', what: 'Uspokaja rozgorączkowanych zawodników.', cost: 'Mniej żółtych kartek, ale mniej ognia.' },
+    walka: { tone: 'fight', what: 'Więcej zaangażowania i walki o piłkę.', cost: 'Więcej fauli i kartek.' },
+    brawo: { tone: 'praise', what: 'Pochwała podnosi morale i zaangażowanie.', cost: 'Działa najwyżej 2 razy w meczu.' },
+  };
+  function shoutWait(M) {
+    const T = M.teams[S.userSide];
+    if (T.coachBanned) return { blocked: 'Trener na trybunach: okrzyki niemożliwe.' };
+    const left = Math.max(0, (T.shoutReadyAt ?? 0) - M.minute);
+    return left > 0 ? { left } : null;
+  }
+  function shoutPanel(M) {
+    const T = M.teams[S.userSide];
+    const act = T.shout && M.minute < (T.shout.until ?? 0) ? T.shout : null;
+    const wait = shoutWait(M);
+    const cards = Object.entries(SHOUTS).map(([k, sh]) => {
+      const err = canShout(M, S.userSide, k);
+      const info = SHOUT_INFO[k] ?? { tone: 'calm', what: '', cost: '' };
+      const used = sh.maxUses ? `${T.shoutUses?.[k] ?? 0} z ${sh.maxUses}` : '';
+      return `<button class="sh-card sh-card--${info.tone}" data-md="doShout:${k}" ${err ? 'disabled' : ''} ${err ? `title="${esc(err)}"` : ''}>
+        <b class="sh-card__t">${esc(sh.label)}</b><span class="sh-card__w">${esc(info.what)}</span><small class="sh-card__c">${esc(info.cost)}${used ? ` Użyto: ${used}.` : ''}</small>
+        ${err && !wait ? `<small class="sh-card__x">${esc(err)}</small>` : ''}</button>`;
+    }).join('');
+    return `<header class="sh-head"><h2>Okrzyk z linii bocznej</h2><button class="mm__x" data-md="closeDlg" aria-label="Zamknij">×</button></header>
+      <p class="sh-sub">${act ? `Teraz działa: <b>${esc(act.label)}</b> (do ${act.until}'). ` : ''}Okrzyk działa od razu przez ok. ${SHOUT_DURATION} minut. Po wyborze mecz rusza dalej, a kolejny okrzyk będzie możliwy za ${SHOUT_COOLDOWN} min.</p>
+      ${wait?.blocked ? `<p class="notice">${esc(wait.blocked)}</p>` : wait ? `<p class="notice">Zawodnicy jeszcze przetrawiają poprzedni okrzyk. Kolejny za ${wait.left} min.</p>` : ''}
+      <div class="sh-grid">${cards}</div>`;
+  }
+  function updateShoutBtn() {
+    const b = app.querySelector('.coachbar__shout');
+    if (!b || !S.M) return;
+    const w = shoutWait(S.M);
+    b.disabled = !!w;
+    b.innerHTML = w?.blocked ? 'Okrzyk niedostępny' : w ? `Okrzyk <small>za ${w.left} min</small>` : 'Okrzyk';
   }
 
   // ------------------------------------------------------------ Zmiany: listy, przeciąganie, zatwierdzanie
@@ -1573,7 +1614,13 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       if (ui.pend?.length || tacDiff(M.teams[S.userSide]).n) { ui.subMsg = 'Masz niezatwierdzone zmiany. Zatwierdź je albo odrzuć.'; openDialog('manage'); return; }
       ui.subSel = null; ui.subMsg = ''; ui.tac = null; app.querySelector('#mdDlg')?.close();
     }
-    if (act === 'doShout') { const r = shout(M, S.userSide, arg); app.querySelector('#mdDlgMsg').textContent = r.ok ? 'Drużyna usłyszała okrzyk.' : r.error; updateLive(); }
+    if (act === 'doShout') {
+      const r = shout(M, S.userSide, arg);
+      if (!r.ok) { openDialog('shout'); return; }
+      app.querySelector('#mdDlg')?.close();
+      updateLive(); updateShoutBtn();
+      if (S.step === 'live1' || S.step === 'live2') start(); // mecz rusza dalej od razu
+    }
     if (act === 'toHalfTalk') { S.step = 'odprawa2'; ui.adv = null; ui.sel = {}; route(); }
     if (act === 'resume' || act === 'resumeET') { MD.continueAfterBreak(S); route(); }
     if (act === 'secondGo') applySecond();

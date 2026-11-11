@@ -2,6 +2,7 @@
 // osobowość, histereza, determinizm i podpowiedzi asystenta. Scenariusze ustawiają stan meczu wprost
 // (wynik, kartki, kondycja, strzały rywala w dzienniku zdarzeń), a AI widzi tylko to, co widać z ławki.
 import test from 'node:test';
+import { SHOUT_COOLDOWN } from '../src/engine/match/constants.js';
 import assert from 'node:assert/strict';
 import { generateWorld, squadOf } from '../src/world/worldGen.js';
 import { createTactics } from '../src/engine/lineup.js';
@@ -196,7 +197,7 @@ test('Determinizm: to samo ziarno daje te same decyzje trenera', () => {
   assert.equal(run(), run());
 });
 
-test('Okrzyki AI: te same zasady co u gracza (przerwa 8 min, „Brawo” najwyżej 2 razy)', () => {
+test('Okrzyki AI: te same zasady co u gracza (przerwa SHOUT_COOLDOWN min, „Brawo” najwyżej 2 razy)', () => {
   let shouts = 0;
   for (let i = 0; i < 300; i++) {
     const M = createMatch({ seed: `sh${i}`, home: side(EK[i % 18].id), away: side(EK[(i + 5) % 18].id), ctx: {} });
@@ -204,7 +205,7 @@ test('Okrzyki AI: te same zasady co u gracza (przerwa 8 min, „Brawo” najwyż
     for (const s of [0, 1]) {
       const ev = M.events.filter((e) => e.type === 'shout' && e.side === s);
       shouts += ev.length;
-      for (let k = 1; k < ev.length; k++) assert.ok(ev[k].t - ev[k - 1].t >= 8, `mecz ${i}: okrzyki co ${ev[k].t - ev[k - 1].t} min`);
+      for (let k = 1; k < ev.length; k++) assert.ok(ev[k].t - ev[k - 1].t >= SHOUT_COOLDOWN, `mecz ${i}: okrzyki co ${ev[k].t - ev[k - 1].t} min`);
       assert.ok(ev.filter((e) => e.shout === 'brawo').length <= 2);
       const banned = M.events.find((e) => e.type === 'staffCard' && e.side === s && e.card === 'red');
       if (banned) assert.ok(!ev.some((e) => e.t > banned.t), `mecz ${i}: okrzyk po odesłaniu trenera`);

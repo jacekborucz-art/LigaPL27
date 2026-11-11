@@ -1098,3 +1098,29 @@
 .bev { flex-direction: row; flex-wrap: wrap; align-content: flex-start; gap: 3px 16px; }
 .bev--a { justify-content: flex-end; }
 .bev li { flex-wrap: wrap; max-width: 100%; }
+
+/* ================= Okrzyk z linii bocznej ================= */
+.md-dlg.sh-dlg { width: min(720px, calc(100vw - 24px)); padding: 18px 20px 20px; }
+.sh-head { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+.sh-head h2 { margin: 0; margin-right: auto; font: 700 var(--step-2)/1.1 var(--font-display); }
+.sh-sub { margin: 0 0 12px; color: var(--text-muted); font-size: var(--step--1); }
+.sh-dlg .notice { margin: 0 0 12px; }
+.sh-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.sh-card { --sc: #F28C28; position: relative; display: grid; gap: 4px; align-content: start; min-height: 104px; padding: 14px 14px 12px 18px; border: 1px solid color-mix(in srgb, var(--sc) 40%, var(--line)); border-radius: var(--radius-m); background: color-mix(in srgb, var(--sc) 10%, var(--surface)); color: var(--text); text-align: left; cursor: pointer; overflow: hidden; transition: transform .12s ease, border-color .12s ease, background .12s ease; }
+.sh-card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 6px; background: var(--sc); }
+.sh-card:hover:not([disabled]) { border-color: var(--sc); background: color-mix(in srgb, var(--sc) 18%, var(--surface)); transform: translateY(-1px); }
+.sh-card:focus-visible { outline: 3px solid var(--focus, var(--led)); outline-offset: 2px; }
+.sh-card[disabled] { cursor: not-allowed; opacity: .5; filter: saturate(.4); }
+.sh-card__t { font: 700 var(--step-1)/1.1 var(--font-display); }
+.sh-card__w { font-weight: 600; font-size: var(--step--1); }
+.sh-card__c { color: var(--text-muted); font-size: 12px; }
+.sh-card__x { color: var(--kartka-czerwona); font-size: 12px; font-weight: 600; }
+.sh-card--att { --sc: #E0602B; }
+.sh-card--def { --sc: #3E7CB1; }
+.sh-card--calm { --sc: #2F8F8A; }
+.sh-card--fight { --sc: #C0392B; }
+.sh-card--praise { --sc: #E0A21A; }
+.coachbar .coachbar__shout:disabled { background: color-mix(in srgb, #F28C28 30%, var(--surface)); border-color: transparent; color: var(--text-muted); cursor: not-allowed; }
+.coachbar__shout small { font: 600 12px/1 var(--font-body); opacity: .85; }
+@media (max-width: 560px) { .sh-grid { grid-template-columns: 1fr; } .sh-card { min-height: 0; } }
+@media (prefers-reduced-motion: reduce) { .sh-card { transition: none; } .sh-card:hover:not([disabled]) { transform: none; } }

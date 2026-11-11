@@ -118,5 +118,5 @@ export const SHOUTS = {
   walka: { label: 'Więcej walki!', Z: 2, foulMul: 1.1, yellowMul: 1.15 },
   brawo: { label: 'Brawo!', Z: 1, morale: 0.3, maxUses: 2 },
 };
-export const SHOUT_COOLDOWN = 8;
+export const SHOUT_COOLDOWN = 5; // minuty meczu do kolejnego okrzyku (gracz i AI tak samo)
 export const SHOUT_DURATION = 8;
