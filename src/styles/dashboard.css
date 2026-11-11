@@ -301,7 +301,7 @@
 .dash-zones [data-z="playoff"]::before { background: #E0A21A; }
 .dash-zones [data-z="playoff-down"]::before { background: #E07B24; }
 .dash-zones [data-z="down"]::before { background: #D62839; }
-.dash-p--table .dash-note { margin-top: auto; }
+.dash-p--table .dash-note { margin-top: 12px; } /* opis zaraz pod tabelą, nie na dole panelu */
 
 /* ---------- Zarząd: wskaźnik zaufania i drabinka celu ---------- */
 .dash-gauge { position: relative; width: min(100%, 240px); margin: 0 auto; }
