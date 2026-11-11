@@ -444,7 +444,7 @@ const BANK = [
     ],
   },
   {
-    id: 'fans-thanks', w: (c) => (c.climate === 'pozytywna' ? 4 : 0), by: ['klubowa'],
+    id: 'fans-thanks', w: (c) => (c.climate === 'pozytywna' && c.res !== 'P' ? 4 : 0), by: ['klubowa'],
     q: { neu: 'Co chce pan przekazać kibicom, którzy dziś przyszli na stadion?' },
     a: () => [
       { tone: 'spokojny', text: 'Dziękuję. Bez was ten wynik nie byłby możliwy.', fans: 2 },
@@ -529,8 +529,13 @@ export function openConference(ctx, state = {}, climateRes = null, seed = 'konfe
     picked.push(d);
     pool = pool.filter((x) => x !== d);
   }
-  // Pytanie o wynik zawsze w pierwszej trójce (w prawdziwej sali pada jako pierwsze albo drugie)
-  picked.sort((a, b) => weight(b) - weight(a));
+  // Pytanie o wynik pada zawsze i jako pierwsze (tak jest w prawdziwej sali), reszta wg wagi
+  const RESULT = new Set(['win-key', 'win-big', 'win-lucky', 'draw', 'loss-why', 'loss-heavy', 'loss-unlucky', 'derby']);
+  if (!picked.some((d) => RESULT.has(d.id))) {
+    const best = BANK.filter((d) => RESULT.has(d.id) && weight(d) > 0).sort((a, b) => weight(b) - weight(a))[0];
+    if (best) picked.splice(Math.max(0, picked.length - 1), 1, best);
+  }
+  picked.sort((a, b) => (RESULT.has(b.id) - RESULT.has(a.id)) || weight(b) - weight(a));
   const used = new Set();
   const queue = picked.map((d) => {
     const j = room.find((r) => d.by.includes(r.id) && !used.has(r.id)) ?? room.find((r) => !used.has(r.id)) ?? room[0];
@@ -538,9 +543,9 @@ export function openConference(ctx, state = {}, climateRes = null, seed = 'konfe
     return makeQuestion(d, c, j);
   });
   const opening = { ...makeQuestion(OPENING, c, null), officer: true };
-  const intro = ctx.neutral ? `Zaczynamy. Zapraszam trenera ${ctx.clubName}.`
-    : ctx.userHome ? `Trener gości już za nami. Zapraszam trenera gospodarzy, ${ctx.clubName}.`
-      : 'Zgodnie ze zwyczajem zaczynamy od trenera gości.';
+  const intro = ctx.neutral ? 'Dzień dobry, zaczynamy. Zapraszam, panie trenerze.'
+    : ctx.userHome ? 'Trener gości już za nami. Teraz trener gospodarzy, zapraszam.'
+      : 'Dzień dobry. Zgodnie ze zwyczajem zaczynamy od trenera gości.';
   return {
     v: 1, climate, climateRes: { climate, probs: cr.probs, reasons: cr.reasons },
     officer, room, intro: `${intro} Mamy czas na ${n} ${plural(n, 'pytanie', 'pytania', 'pytań')}.`,

@@ -24,7 +24,7 @@ import {
 } from './briefings.js';
 import {
   pressState, pickClimate, openConference, answerQuestion, walkOut as pressWalkOutConf, currentQuestion,
-  conferenceEffects, skipEffects, nextPressState, pressMoraleDelta,
+  conferenceEffects, skipEffects, nextPressState, pressMoraleDelta, roomPreview,
 } from './press.js';
 import { addMessages, createMessage } from '../core/inbox.js';
 import { applyMorale } from '../career/morale.js';
@@ -399,6 +399,12 @@ export function pressSetup(game, S) {
   return S.pressRoom;
 }
 
+/** Kto czeka w sali (przed otwarciem okna). */
+export function pressRoomPreview(game, S) {
+  const room = pressSetup(game, S);
+  return room ? roomPreview(room.climate.climate, room.ctx) : [];
+}
+
 /** Otwiera salę (okno konferencji). Ponowne otwarcie wraca do tej samej sesji. */
 export function pressOpen(game, S) {
   const room = pressSetup(game, S);
@@ -454,7 +460,7 @@ function settlePress(game, S, eff) {
   for (const id of game.world.clubs[game.clubId]?.squad ?? []) {
     const p = game.world.players[id];
     if (!p) continue;
-    const d = pressMoraleDelta(eff.teamMorale, p.persona) + (extra.get(id) ?? 0);
+    const d = Math.max(-3, Math.min(2, pressMoraleDelta(eff.teamMorale, p.persona) + (extra.get(id) ?? 0))); // [SZAC] limit na zawodnika
     if (d) p.morale = applyMorale(p.morale ?? 12, d);
   }
   game.press = nextPressState(pressState(game), eff, { climate: room.climate.climate, date: S.f.date, season: game.season, matchId: S.f.id, seed: room.seed });
