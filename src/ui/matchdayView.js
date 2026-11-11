@@ -716,8 +716,8 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
       if (d.card === 'yellow') drawCard(ctx2d, x + rad * 0.82, y - rad * 0.72, cw, ch, '#F5C518', 0.22);
       if (d.card === 'second') { drawCard(ctx2d, x + rad * 0.68, y - rad * 0.78, cw, ch, '#F5C518', -0.12); drawCard(ctx2d, x + rad * 1.0, y - rad * 0.62, cw, ch, '#D62839', 0.28); }
       if (d.card === 'red') drawCard(ctx2d, x + rad * 0.82, y - rad * 0.72, cw, ch, '#D62839', 0.22);
-      if (d.knock) drawCross(ctx2d, x - rad * 0.85, y - rad * 0.8, rad * 0.5, '#14211A');
-      else if (d.hurt) drawCross(ctx2d, x - rad * 0.85, y - rad * 0.8, rad * 0.5, '#D62839');
+      if (d.knock) drawCross(ctx2d, x - rad * 0.86, y - rad * 0.78, Math.max(5.5, rad * 0.56), '#14211A');
+      else if (d.hurt) drawCross(ctx2d, x - rad * 0.86, y - rad * 0.78, Math.max(5.5, rad * 0.56), '#D62839');
     }
   }
 
