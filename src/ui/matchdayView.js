@@ -179,7 +179,13 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
           <svg class="momentum" id="mdMom" viewBox="0 0 96 56" preserveAspectRatio="none" role="img" aria-label="Momentum meczu"></svg>
           <div class="poss" style="margin-top:8px"><span id="mdPh">50%</span><div class="bar2"><i class="bh" id="mdPbh" style="width:50%"></i><i class="ba" id="mdPba" style="width:50%"></i></div><span id="mdPa">50%</span></div>
         </div>
-        <div class="pitch-area pitch-wrap"><canvas class="pitch" id="mdPitch" aria-label="Boisko"></canvas></div>
+        <div class="pitch-area pitch-wrap"><canvas class="pitch" id="mdPitch" aria-label="Boisko"></canvas>
+          <div class="md-toasts" id="mdToasts" aria-live="polite"></div>
+          <div class="md-halt" id="mdHalt" hidden role="alertdialog" aria-labelledby="mdHaltTitle">
+            <b id="mdHaltTitle">Gra wstrzymana</b><p id="mdHaltText"></p>
+            <div class="md-halt__btns"><button class="btn btn--quiet btn--sm" data-md="dlg:subs">Zmiany</button><button class="btn btn--quiet btn--sm" data-md="dlg:tactics">Taktyka</button><button class="btn btn--primary btn--sm" data-md="haltGo">Graj dalej</button></div>
+          </div>
+        </div>
         <div class="ctrl-area"><div class="controls">
           <button class="btn md-play ${ui.running ? 'is-running' : ''}" data-md="pause" id="mdPause" aria-live="polite">${ui.running ? 'Pauza' : M.minute > 0 ? 'Wznów mecz' : 'Start meczu'}</button>
           <button class="btn btn--quiet speed" data-md="speed:1" aria-pressed="${ui.speed === 1}">x1</button>
@@ -229,6 +235,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     }
     layoutDots();
     // GOL i VAR
+    for (const e of newEvents) if (TOAST[e.type]) showToast(e);
     const goalEv = newEvents.find((e) => e.type === 'goal');
     const varEv = newEvents.find((e) => e.type === 'varOverturn' || e.type === 'varCheck');
     if (goalEv || varEv) {
@@ -297,11 +304,54 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const r = MD.tick(S);
     updateLive(r.events);
     if (S.step !== 'live1' && S.step !== 'live2') { stop(); return route(); }
+    const halt = haltReason(r.events);
+    if (halt) { stop(); showHalt(halt); return; }
     const pause = (r.pause ?? 0) * 1000;
     ui.timer = setTimeout(loop, Math.max(pause, 1000 / ui.speed));
   }
-  function start() { ui.running = true; const b = app.querySelector('#mdPause'); if (b) { b.textContent = 'Pauza'; b.classList.add('is-running'); } ui.timer = setTimeout(loop, 1000 / ui.speed); }
+  function start() { hideHalt(); ui.running = true; const b = app.querySelector('#mdPause'); if (b) { b.textContent = 'Pauza'; b.classList.add('is-running'); } ui.timer = setTimeout(loop, 1000 / ui.speed); }
   function stop() { ui.running = false; clearTimeout(ui.timer); const b = app.querySelector('#mdPause'); if (b) { b.textContent = 'Wznów mecz'; b.classList.remove('is-running'); } }
+
+  // ------------------------------------------------------------ Zdarzenia: okienka i zatrzymanie gry
+  const TOAST = {
+    yellow: { cls: 'y', ms: 3200, label: 'Żółta kartka' },
+    red: { cls: 'r', ms: 4500, label: 'Czerwona kartka' },
+    varOverturn: { cls: 'var', ms: 4500, label: 'VAR' },
+    penalty: { cls: 'pen', ms: 3500, label: 'Rzut karny' },
+    injury: { cls: 'inj', ms: 4500, label: 'Kontuzja' },
+  };
+  function showToast(e) {
+    const box = app.querySelector('#mdToasts');
+    if (!box) return;
+    const t = TOAST[e.type];
+    const el = document.createElement('div');
+    const second = e.type === 'red' && (e.second || /druga żółta/i.test(e.text ?? ''));
+    el.className = `md-toast md-toast--${t.cls}`;
+    el.innerHTML = `<span class="md-toast__k">${esc(second ? 'Druga żółta, czerwona' : t.label)}${e.side != null ? `, ${esc(shortName(e.side))}` : ''} <small>${esc(e.min ?? '')}</small></span><span>${esc(e.text ?? '')}</span>`;
+    box.prepend(el);
+    while (box.children.length > 3) box.lastChild.remove();
+    setTimeout(() => el.remove(), t.ms / Math.max(1, ui.speed / 2));
+  }
+  /** Kiedy zatrzymać mecz, żeby gracz mógł zareagować. */
+  function haltReason(events) {
+    const red = events.find((e) => e.type === 'red');
+    if (red) return red.side === S.userSide
+      ? `Czerwona kartka dla twojego zawodnika. ${red.text} Drużyna gra w osłabieniu: możesz przestawić ustawienie albo dokonać zmiany.`
+      : `Rywal gra w osłabieniu. ${red.text} Możesz zagrać odważniej.`;
+    const inj = events.find((e) => e.type === 'injury' && e.side === S.userSide);
+    if (inj) return inj.injury?.playable === false
+      ? `${inj.text} Gramy w osłabieniu, dopóki nie wejdzie zmiennik.`
+      : `${inj.text} Możesz go zmienić albo zostawić na boisku.`;
+    return null;
+  }
+  function showHalt(text) {
+    const h = app.querySelector('#mdHalt');
+    if (!h) return;
+    app.querySelector('#mdHaltText').textContent = text;
+    h.hidden = false;
+    h.querySelector('[data-md="haltGo"]')?.focus();
+  }
+  function hideHalt() { const h = app.querySelector('#mdHalt'); if (h) h.hidden = true; }
 
   // ------------------------------------------------------------ Dialogi w meczu
   function openDialog(kind) {
@@ -530,6 +580,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     }
     if (act === 'kickoff') { MD.kickOff(game, S); route(); }
     if (act === 'pause') (ui.running ? stop() : start());
+    if (act === 'haltGo') { if (app.querySelector('#mdDlg')?.open) return; start(); }
     if (act === 'speed') { ui.speed = Number(arg); app.querySelectorAll('.speed').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.md === `speed:${arg}`))); if (ui.running) { stop(); start(); } }
     if (act === 'tab') { ui.tab = arg; app.querySelectorAll('[data-md^="tab:"]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.md === `tab:${arg}`))); updateLive(); }
     if (act === 'skip') { stop(); MD.skip(S); route(); }

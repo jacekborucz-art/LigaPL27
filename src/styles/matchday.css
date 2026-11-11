@@ -255,3 +255,23 @@
 /* Zatwierdzanie zmian zawsze widoczne na dole panelu */
 .md-dlg--wide .tac__actions { position: sticky; bottom: calc(-1 * var(--space-4)); margin: var(--space-2) calc(-1 * var(--space-4)) calc(-1 * var(--space-4)); padding: var(--space-3) var(--space-4); background: var(--surface); border-top: 1px solid var(--line); justify-content: flex-end; }
 .md-dlg--wide #mdDlgMsg:empty { display: none; }
+
+/* Okienka zdarzeń nad boiskiem: kartki, VAR, karne, kontuzje */
+.pitch-area { position: relative; }
+.md-toasts { position: absolute; left: 8px; right: 8px; top: 8px; z-index: 4; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+.md-toast { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border-radius: var(--radius-m); background: rgb(14 21 17 / .92); color: var(--kreda, #F3F6F1); border-left: 6px solid var(--line); box-shadow: 0 6px 16px rgb(0 0 0 / .3); font-size: var(--step--1); animation: md-toast-in .25s ease-out; }
+.md-toast__k { font: 700 var(--step-0)/1.2 var(--font-display); }
+.md-toast__k small { opacity: .7; font-weight: 400; }
+.md-toast--y { border-left-color: var(--kartka-zolta); }
+.md-toast--r { border-left-color: var(--kartka-czerwona); }
+.md-toast--var { border-left-color: #6FA8FF; }
+.md-toast--pen { border-left-color: var(--led); }
+.md-toast--inj { border-left-color: #E8A33D; }
+@keyframes md-toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+/* Gra wstrzymana po czerwonej kartce albo kontuzji zawodnika gracza */
+.md-halt { position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 5; padding: var(--space-3); border-radius: var(--radius-m); background: var(--surface); color: var(--text); border: 2px solid var(--led); box-shadow: 0 10px 28px rgb(0 0 0 / .35); }
+.md-halt[hidden] { display: none; }
+.md-halt b { font: 700 var(--step-1)/1.2 var(--font-display); }
+.md-halt p { margin: 4px 0 var(--space-2); font-size: var(--step--1); }
+.md-halt__btns { display: flex; flex-wrap: wrap; gap: 6px; }
+@media (prefers-reduced-motion: reduce) { .md-toast { animation: none; } }
