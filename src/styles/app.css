@@ -671,3 +671,31 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 .fx__team--out { color: var(--text-muted); font-weight: 500; }
 .fx__date .tag-up { margin-left: 8px; }
 .tag-up { display: inline-block; flex: none; padding: 1px 6px; border-radius: 999px; background: var(--led); color: #14211A; font: 700 10px/1.4 var(--font-body, inherit); text-transform: none; letter-spacing: .02em; }
+
+/* ================= Skład i taktyka: panele z własnym odcieniem tła =================
+   Każda sekcja ma inny odcień, żeby listy, siła składu, instrukcje i stałe fragmenty nie zlewały się w jedno. */
+.tac .tp-sec, .tac__strength, .tpanel3 {
+  --tint: var(--murawa, #2E8A4E);
+  padding: 12px 14px 14px; border-radius: var(--radius-m); border: 1px solid color-mix(in srgb, var(--tint) 28%, var(--line));
+  background: color-mix(in srgb, var(--tint) 9%, var(--surface));
+}
+.tac .tp-sec h3, .tac__strength h3, .tpanel3 h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 var(--space-2); }
+.tac .tp-sec h3::before, .tac__strength h3::before, .tpanel3 h3::before { content: ""; flex: none; width: 4px; height: 1.1em; border-radius: 2px; background: var(--tint); }
+.tac .tp-sec + .tp-sec { margin-top: var(--space-3); }
+.tp-sec--xi { --tint: var(--murawa, #2E8A4E); }
+.tp-sec--bench { --tint: #3E7CB1; }
+.tac .tp-out { --tint: #8A8F96; }
+.tac__strength { --tint: #C9962B; }
+.tpanel3 { margin-top: var(--space-4); }
+.tpanel3--instr { --tint: #2F8F8A; }
+.tpanel3--roles { --tint: #B8642E; margin-bottom: var(--space-5); }
+.tpanel3--roles .roles { margin-bottom: 0; }
+.tpanel3 .instr__row { padding: 10px 12px; border-radius: var(--radius-s); background: color-mix(in srgb, var(--surface) 70%, transparent); }
+.tp-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 var(--space-2); color: var(--text-muted); font-size: var(--step--1); }
+.tp-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.tp-legend .tp-fresh { height: 14px; }
+.tp-legend b { color: var(--text); font-family: var(--font-display); }
+.tdet__ovr { font: 700 var(--step-3)/1 var(--font-display); color: var(--led); }
+/* Koszulki na boisku w barwach klubu, numer z tyłu koszulki; obwódka nadal pokazuje dopasowanie do pozycji */
+.pitch2[style*="--kit"] .slot-btn:not(.slot-btn--gk):not(.slot-btn--empty) .slot-btn__dot { background: var(--kit); color: var(--kit-ink); box-shadow: inset 0 0 0 2px var(--kit-trim), 0 2px 4px rgba(0, 0, 0, .35); }
+.slot-btn__dot { font-variant-numeric: tabular-nums; }

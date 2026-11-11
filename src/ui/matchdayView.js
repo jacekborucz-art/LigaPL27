@@ -11,6 +11,7 @@ import { INSTRUCTIONS } from '../data/instructions.js';
 import { anyClub, compLabel } from '../season/season.js';
 import { statsFromEvents } from '../engine/matchStats.js';
 import { onPitch } from '../engine/match/teams.js';
+import { shirtNumbers } from '../career/shirts.js';
 import * as TEAMS from '../engine/match/teams.js';
 import { substitute, changeTactics, shout, canShout, assistantSuggest, applySuggestion } from '../engine/match/match.js';
 import { SHOUTS } from '../engine/match/constants.js';
@@ -318,6 +319,15 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     if (lbl) lbl.textContent = Math.abs(k) < 0.15 ? 'Gra wyrównana' : `${Math.abs(k) > 0.55 ? 'Wyraźnie naciska' : 'Przewaga'}: ${shortName(k > 0 ? 0 : 1)}`;
   }
 
+  // Numery na koszulkach (trwałe w klubie, career/shirts.js); liczone raz na mecz
+  let kitMaps = null;
+  function kitNo(side, id) {
+    if (!kitMaps) {
+      try { kitMaps = [0, 1].map((sd) => { const T = S.M.teams[sd]; return shirtNumbers(game, sd === 0 ? fixture.home : fixture.away, [...T.players, ...T.bench].map((x) => x.p)); }); } catch { kitMaps = [new Map(), new Map()]; }
+    }
+    return kitMaps[side]?.get(id);
+  }
+
   // Boisko w canvasie: ustawienie z formacji, przesunięcie wg posiadania
   let canvas; let ctx2d; let ro;
   function setupCanvas() {
@@ -336,7 +346,7 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
         let sy = 96 - (s.y + shift) * 0.5; let sx = s.x;
         if (T.side === 1) { sy = 100 - sy; sx = 100 - sx; }
         const j = Math.sin(M.tick * 1.7 + i * 3.1) * 2;
-        next.push({ id: x.id, side: T.side, x: sx + j, y: sy + Math.cos(M.tick + i) * 1.5, label: x.slot.pos === 'BR' ? 'BR' : String(i + 1) });
+        next.push({ id: x.id, side: T.side, x: sx + j, y: sy + Math.cos(M.tick + i) * 1.5, label: String(kitNo(T.side, x.id) ?? (x.slot.pos === 'BR' ? 'BR' : i + 1)) });
       });
     }
     void poss;
