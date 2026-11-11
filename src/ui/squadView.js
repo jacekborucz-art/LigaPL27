@@ -8,6 +8,7 @@ import { moraleLabel } from '../career/morale.js';
 import { AGENT_TYPES, TRAIT_LABELS } from '../career/personality.js';
 import { formatZl } from '../career/negotiation.js';
 import { esc, fmtDate } from './dom.js';
+import { playerStatsHtml } from './playerStatsView.js';
 
 export const SQUAD_FILTERS = [
   ['all', 'Wszyscy'], ['GK', 'Bramkarze'], ['DEF', 'Obrońcy'], ['MID', 'Pomocnicy'], ['ATT', 'Napastnicy'], ['academy', 'Akademia'],
@@ -50,7 +51,7 @@ export function renderSquadList(players, { filter = 'all', leagueOvrs = [], acad
         <span class="sq__name">${moraleDot(p.morale)}<span><b>${esc(p.name)}</b><small>${esc(p.nat)}, ${p.age} lat${p.persona === 'Lider' ? ', lider' : ''}</small></span></span>
         <span class="w">${p.age}</span><span class="w">${esc(NAT_NAMES[p.nat] ?? p.nat)}</span>
         <span class="w">${esc(fmtDate(p.contract.until))}</span><span class="w">${esc(formatZl(p.value))}</span>
-        <span class="sq__ovr"><b>${p.ovr.toFixed(1)}</b>${stars(starsFor(p.ovr, leagueOvrs))}</span>
+        <span class="sq__ovr"><b title="Ocena ogólna w skali 1-20">${Math.round(p.ovr)}</b>${stars(starsFor(p.ovr, leagueOvrs))}</span>
       </button>`).join('') || '<p class="mail-empty">Brak zawodników.</p>'}
     </div>`;
 }
@@ -81,7 +82,7 @@ export function renderPlayerProfile(p, opts = {}) {
   return `
     <button class="btn btn--quiet" data-act="squadback">Wróć do kadry</button>
     <header class="pp" data-pid="${esc(p.id)}">
-      <div class="pp__ovr"><span class="led">${p.ovr.toFixed(1)}</span>${stars(starsFor(p.ovr, leagueOvrs))}</div>
+      <div class="pp__ovr"><span class="pp__ovrn" title="Ocena ogólna w skali 1-20">${Math.round(p.ovr)}</span>${stars(starsFor(p.ovr, leagueOvrs))}</div>
       <div>
         <h2 class="pp__name">${esc(p.name)}</h2>
         <p class="muted">${esc(POS_NAMES[p.pos])}${p.side ? (p.side === 'L' ? ', lewa strona' : ', prawa strona') : ''}${p.variant ? `, ${esc(p.variant)}` : ''}${alt.length ? `. Gra też: ${esc(alt.join(', '))}` : ''}</p>
@@ -101,7 +102,6 @@ export function renderPlayerProfile(p, opts = {}) {
           <li><span class="k">Ostrość</span><span>${p.sharp}%</span></li>
           <li><span class="k">Zdrowie</span><span>${p.injuryDays > 0 ? `Kontuzja, ok. ${p.injuryDays} dni` : 'Zdrowy'}</span></li>
           ${p.acclim ? `<li><span class="k">Aklimatyzacja</span><span>${Math.round(p.acclim.level)} %, pełna ok. ${esc(fmtDate(acclimEta(p, opts.date ?? p.acclim.since)))}. ${esc(p.acclim.reasons.join(', '))}</span></li>` : ''}
-          ${p.history?.length ? `<li><span class="k">Kariera</span><span>${p.history.slice(-5).reverse().map((h) => `${esc(h.s)}: ${h.apps} mecze, ${h.g} goli`).join('; ')}</span></li>` : ''}
           ${p.callUp ? `<li><span class="k">Kadra</span><span>Na zgrupowaniu do ${esc(fmtDate(p.callUp.to))}</span></li>` : ''}
           ${p.intl?.caps || p.intlU21 ? `<li><span class="k">Reprezentacja</span><span>${p.intl?.caps ? `występy: ${p.intl.caps}, gole: ${p.intl.goals}` : ''}${p.intl?.caps && p.intlU21 ? '; ' : ''}${p.intlU21 ? `zgrupowania U21: ${p.intlU21}` : ''}</span></li>` : ''}
         </ul>
@@ -121,5 +121,6 @@ export function renderPlayerProfile(p, opts = {}) {
           <li><span class="k">Potencjał</span><span>Oceni skauting</span></li>
         </ul>
       </section>
-    </div>`;
+    </div>
+    ${playerStatsHtml(p, opts.game)}`;
 }

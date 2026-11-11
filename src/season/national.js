@@ -5,6 +5,7 @@
 import { Rng, clamp } from '../core/rng.js';
 import { QS, sampleScore } from '../engine/quickSim.js';
 import DATA from '../data/reprezentacje.json' with { type: 'json' };
+import { addPlayerMatch, quickRating } from './history.js';
 
 export const NT = DATA.reprezentacje.filter((t) => t.status === 'aktywna');
 const BY_CODE = new Map(NT.map((t) => [t.kod, t]));
@@ -206,7 +207,7 @@ function assignPlay(N, m, called, players, rng) {
       if (!minutes) continue;
       p.intl = p.intl ?? { caps: 0, goals: 0, team: code };
       p.intl.caps++; p.ntMinutes = (p.ntMinutes ?? 0) + minutes;
-      playedNow.push({ p, minutes });
+      playedNow.push({ p, minutes, g: 0, a: 0 });
     }
     // Gole drużyny: część dla naszych zawodników wg pozycji i minut, reszta dla kolegów spoza naszej gry
     const goals = m.result.score[side];
@@ -215,10 +216,26 @@ function assignPlay(N, m, called, players, rng) {
     for (let g = 0; g < goals; g++) {
       if (!playedNow.length || !rng.chance(wMine / (wMine + wRest))) continue;
       const x = rng.weighted(playedNow, (y) => (SCORE_W[y.p.pos] ?? 0.5) * y.minutes);
-      x.p.intl.goals++; x.p.ntGoals = (x.p.ntGoals ?? 0) + 1;
+      x.p.intl.goals++; x.p.ntGoals = (x.p.ntGoals ?? 0) + 1; x.g++;
       (m.result.ourScorers ??= []).push({ id: x.p.id, name: x.p.name, team: code });
     }
+    recordNtStats(m, side, playedNow);
   }
+}
+
+/**
+ * Statystyki zawodników w meczu kadry (grupa R, src/season/history.js): asysty i oceny z osobnego
+ * generatora z id meczu, żeby nie zmieniać przebiegu symulacji (wyniki, gole, powołania zostają te same).
+ */
+function recordNtStats(m, side, playedNow) {
+  if (!playedNow.length) return;
+  const r2 = new Rng(`kadra-staty:${m.id}:${side}`);
+  const gf = m.result.score[side]; const ga = m.result.score[1 - side];
+  // Asysta przy golu drużyny: 72 % goli ma asystę, nasza część według minut naszych zawodników na boisku
+  const share = Math.min(1, playedNow.reduce((s, x) => s + x.minutes, 0) / (10 * 90));
+  for (let i = 0; i < gf; i++) if (r2.chance(0.72 * share)) r2.weighted(playedNow, (y) => ((SCORE_W[y.p.pos] ?? 0.5) + 0.4) * y.minutes).a++;
+  const win = gf > ga ? 1 : gf < ga ? -1 : 0;
+  for (const x of playedNow) addPlayerMatch(x.p, 'R', { minutes: x.minutes, g: x.g, a: x.a, rating: quickRating({ g: x.g, a: x.a, win }, r2.gauss(0, 0.45)) });
 }
 
 // ------------------------------------------------------------ Dzień
@@ -250,7 +267,10 @@ export function nationalDay(N, date, players) {
         p.fresh = clamp(Math.round((p.fresh ?? 90) - 15 - Math.min(15, mins / 12) - (far ? 10 : 0)), 35, 100);
         p.morale = clamp((p.morale ?? 12) + 1 + Math.min(2, p.ntGoals ?? 0), 1, 20);
         if (c.u21) { p.intlU21 = (p.intlU21 ?? 0) + (mins > 0 ? 1 : 0); }
-        if (far) { p.intl = p.intl ?? { caps: 0, goals: 0, team: c.team }; p.intl.caps += mins > 0 ? 1 : 0; }
+        if (far) {
+          p.intl = p.intl ?? { caps: 0, goals: 0, team: c.team }; p.intl.caps += mins > 0 ? 1 : 0;
+          if (mins > 0) addPlayerMatch(p, 'R', { minutes: mins, rating: null }); // mecze poza symulacją: występ bez oceny
+        }
         c.minutes = mins; c.goals = p.ntGoals ?? 0;
         if (rng.chance(0.03) && !(p.injuryDays > 0)) {
           const days = rng.int(5, 24);

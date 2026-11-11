@@ -15,6 +15,7 @@ import { aiNegotiate, marketWage } from './negotiation.js';
 import { payLevel } from '../data/finanse_klubow.js';
 import { book, spendable, wageRoom, wageBill } from './finance.js';
 import { squadCount, canSign, boardTargets } from './squadLimit.js';
+import { spellsOf, syncSpell } from '../season/history.js';
 
 export { SEASON_END };
 const round = (x, step = 5000) => Math.round(x / step) * step;
@@ -131,6 +132,7 @@ export function offerForPlayer(game, playerId, fee) {
 export function completeTransfer(game, { playerId, to, fee = 0, contract, kind = 'transfer', date = game.date, loanShare = 0 }) {
   const W = game.world; const p = W.players[playerId];
   const from = p.clubId;
+  spellsOf(p); // historia klubowa: okres w dotychczasowym klubie (leniwie), zamknięcie niżej
   if (from && W.clubs[from]) W.clubs[from].squad = W.clubs[from].squad.filter((id) => id !== playerId);
   if (kind === 'free') game.market.free = game.market.free.filter((id) => id !== playerId);
   W.clubs[to].squad.push(playerId);
@@ -142,6 +144,7 @@ export function completeTransfer(game, { playerId, to, fee = 0, contract, kind =
     delete p.loan;
   }
   p.clubId = to; p.free = false; p.wage = p.contract.wage; p.squad = 'A'; p.lastMove = date;
+  syncSpell(p, date);
   delete p.askWage; delete p.transferRequest; p.unhappy = false; p.renewRefused = false;
   delete game.market.listed[playerId]; delete game.market.userListed[playerId]; delete game.market.talks[playerId];
   const F = game.finance;
@@ -177,11 +180,13 @@ export function releaseCost(game, p) {
 }
 export function releasePlayer(game, playerId) {
   const p = game.world.players[playerId];
+  spellsOf(p);
   const cost = releaseCost(game, p);
   book(game.finance, p.clubId, game.date, 'out', 'release', cost, `${p.name}: rozwiązanie kontraktu`);
   game.world.clubs[p.clubId].squad = game.world.clubs[p.clubId].squad.filter((id) => id !== playerId);
   game.market.history.unshift({ date: game.date, playerId, name: p.name, pos: p.pos, from: p.clubId, to: null, fee: 0, kind: 'release' });
   p.askWage = p.contract.wage; p.contract = null; p.wage = 0; p.clubId = null; p.free = true;
+  syncSpell(p, game.date); // historia klubowa: koniec okresu w klubie
   delete game.market.listed[playerId]; delete game.market.userListed[playerId];
   game.market.free.push(playerId);
   return cost;

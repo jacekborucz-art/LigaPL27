@@ -700,3 +700,5 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 /* Koszulki na boisku w barwach klubu, numer z tyłu koszulki; obwódka nadal pokazuje dopasowanie do pozycji */
 .pitch2[style*="--kit"] .slot-btn:not(.slot-btn--gk):not(.slot-btn--empty) .slot-btn__dot { background: var(--kit); color: var(--kit-ink); box-shadow: inset 0 0 0 2px var(--kit-trim), 0 2px 4px rgba(0, 0, 0, .35); }
 .slot-btn__dot { font-variant-numeric: tabular-nums; }
+/* Ocena ogólna w profilu: zaokrąglona, czcionka jak wynik meczu (bez kropkowanego LED) */
+.pp__ovrn { display: inline-block; min-width: 2.2ch; padding: 4px 12px; border-radius: 8px; background: #0E1511; color: var(--led); font: 700 var(--step-3)/1 var(--font-display); font-variant-numeric: tabular-nums; text-align: center; }

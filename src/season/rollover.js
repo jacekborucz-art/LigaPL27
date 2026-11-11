@@ -26,6 +26,7 @@ import { initClub, seasonSummary, FIN } from '../career/finance.js';
 import { addFreeAgents } from '../career/transfers.js';
 import { boardGoal, jobOffers, ensureBoard } from '../career/board.js';
 import { fmtDate } from '../ui/dom.js';
+import { archivePlayerSeason, archiveSeasonMatches, syncSpell } from './history.js';
 
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
 const groupOf = (p) => GROUP[p.pos] ?? 'MID';
@@ -99,9 +100,8 @@ function processPlayers(game, oldEnd, newStart, rng, report) {
     if (mineBefore.has(p.id)) report.loansBack.push(p.name);
     delete p.loan;
   }
-  // Statystyki sezonu do historii, kartki zerowane, wiek
+  // Statystyki sezonu wyzerowane (historia wyżej), kartki zerowane, wiek
   for (const p of Object.values(W.players)) {
-    if (p.season?.apps) p.history = [...(p.history ?? []), { s: SEASON, c: p.clubId, apps: p.season.apps, g: p.season.g, a: p.season.a, r: p.season.rating }].slice(-12);
     p.season = { apps: 0, subs: 0, min: 0, g: 0, a: 0, yc: 0, rc: 0, rating: 0, motm: 0, cs: 0 };
     p.yc = {};
     p.age = ageOn(p, newStart);
@@ -208,6 +208,10 @@ export function rolloverSeason(game) {
   const tiers = Object.fromEntries(Object.entries(moves.tiers).filter(([, t]) => t <= 4));
   const errors = validateTiers(tiers);
   const europe = polandNextSeason(game, res);
+  archiveSeasonMatches(game, oldSeason); // historia meczów drużyny gracza: sezon zamknięty przed nowym terminarzem
+  // Statystyki zawodników do p.history przed ruchami końca sezonu (spadki do III ligi, powroty z wypożyczeń),
+  // więc wiersz należy do klubu, w którym zawodnik kończył sezon
+  for (const p of Object.values(game.world.players)) archivePlayerSeason(p, oldSeason);
   // Archiwum sezonu
   game.archive = [...(game.archive ?? []), {
     season: oldSeason, champion: res.tables[1][0], cup: res.cup.winner, uefa: res.uefa,
@@ -259,6 +263,11 @@ export function rolloverSeason(game) {
     if (!clubById(cid)) continue;
     if (cid === game.clubId) fillSquad(game, cid, 18, newStart, rng.fork(`uzup:${cid}`), report);
     else fillSquad(game, cid, 23, newStart, rng.fork(`uzup:${cid}`));
+  }
+  // Historia klubowa: powroty z wypożyczeń, wygasłe kontrakty, nowi zawodnicy (src/season/history.js)
+  for (const p of Object.values(game.world.players)) {
+    if (p.cl) syncSpell(p, newStart);
+    else if (p.clubId && p.lastMove === newStart) p.cl = [{ c: p.clubId, f: newStart, m: 0, g: 0 }];
   }
 
   // Finanse: plan sezonu z danych klubu dla nowej ligi (docs/finanse.md), saldo przechodzi, bogaty właściciel

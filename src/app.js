@@ -12,6 +12,8 @@ import './season/dailySystems.js';
 import { createSeason, compLabel, applyResult, fromEngineResult, squadFor, anyClub, LEAGUE_COMPS } from './season/season.js';
 import { standings, zonesFor } from './season/standings.js';
 import { renderCompetitions } from './ui/competitionsView.js';
+import { fixturesPanelBody, renderFixtures } from './ui/fixturesView.js';
+import { ensureHistory } from './season/history.js';
 import { createMatch, runToEnd } from './engine/match/match.js';
 import { Rng } from './core/rng.js';
 import { addDays } from './core/gameLoop.js';
@@ -48,7 +50,7 @@ import { renderMenu, renderCareer, newCareerState, maybePlayIntro, readTheme, ap
 
 const app = document.getElementById('app');
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
-const state = { screen: 'start', slot: null, game: null, tab: 'pulpit', tier: 1, notice: null, mailCat: null, mailOpen: null, running: false, sqFilter: 'all', playerOpen: null, sqSub: 'players', tSel: null, matchNotes: [], cComp: null, cView: 'table', cRound: null, lastResult: null, uFilter: 'pl', uDraw: null, nc: null, confirmDel: null, theme: readTheme(), menuFocus: null };
+const state = { screen: 'start', slot: null, game: null, tab: 'pulpit', tier: 1, notice: null, mailCat: null, mailOpen: null, running: false, sqFilter: 'all', playerOpen: null, sqSub: 'players', tSel: null, matchNotes: [], cComp: null, cView: 'table', cRound: null, lastResult: null, uFilter: 'pl', uDraw: null, nc: null, confirmDel: null, theme: readTheme(), menuFocus: null, fx: null };
 const WIDE_PICK = '(min-width: 1024px)';
 
 const benchSizeFor = (g) => COMPETITIONS[['ekstraklasa', 'liga1', 'liga2'][clubById(g.clubId).tier - 1]].benchSize;
@@ -113,6 +115,7 @@ function ensureGameShape(g) {
   ensureNational(g);
   ensureTraining(g);
   ensureCareer(g);
+  ensureHistory(g); // historia meczów drużyny gracza (stare zapisy: bieżący sezon z terminarza)
   if (!g.inbox.length) {
     g.inbox = [];
     const today = g.date;
@@ -229,7 +232,7 @@ function renderHub() {
 }
 
 function renderTab(tab, g, club) {
-  if (tab === 'pulpit') return renderDashboard(g, club);
+  if (tab === 'pulpit') return state.fx ? renderFixtures(g, state.fx) : renderDashboard(g, club);
   if (tab === 'poczta') return renderMail(g);
   if (tab === 'trening') return renderTraining(g, state);
   if (tab === 'transfery') return state.ng ? renderNegotiation(g, state.ng) : renderTransfers(g, state);
@@ -243,7 +246,7 @@ function renderTab(tab, g, club) {
     }
     const ovrs = leagueOvrs(g, club.tier);
     const p = state.playerOpen && g.world.players[state.playerOpen];
-    if (p) return renderPlayerProfile(p, { leagueOvrs: ovrs, clubName: club.name, date: g.date });
+    if (p) return renderPlayerProfile(p, { leagueOvrs: ovrs, clubName: club.name, date: g.date, game: g });
     return sub + renderSquadList(squadOf(g.world, g.clubId), { filter: state.sqFilter, leagueOvrs: ovrs, academy: academyOf(g.world, g.clubId) });
   }
   const soon = {
@@ -274,6 +277,7 @@ const DASH_ICONS = {
   board: '<path d="M4 20V9l8-5 8 5v11M9 20v-6h6v6M3 20h18"/>',
   fin: '<ellipse cx="12" cy="6.5" rx="7" ry="2.8"/><path d="M5 6.5v5.5c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V6.5M5 12v5.5c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V12"/>',
   squad: '<path d="M9.5 4h5v5.5H20v5h-5.5V20h-5v-5.5H4v-5h5.5z"/>',
+  fix: '<rect x="4" y="5" width="16" height="15" rx="1.5"/><path d="M4 10h16M8.5 3v4M15.5 3v4M8 14h3M13 14h3M8 17h3"/>',
 };
 const dashIcon = (k) => (DASH_ICONS[k] ? `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${DASH_ICONS[k]}</svg>` : icon(k));
 // data-sub: docelowa podzakładka (np. Transfery > Finanse), gdy obsługa kliknięcia ją uwzględni
@@ -337,17 +341,6 @@ function dashHero(g, club, next, tableOf) {
   const venue = next.neutral ? 'teren neutralny' : next.home === g.clubId ? 'u siebie' : 'na wyjeździe';
   const led = days === 0 ? (next.time ?? '0') : String(days);
   const ledLabel = days === 0 ? 'mecz dziś' : days === 1 ? 'dzień do meczu' : 'dni do meczu';
-  const upcoming = (g.fixtures || []).filter((f) => !f.played && f !== next && (f.home === g.clubId || f.away === g.clubId))
-    .sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? ''))).slice(0, 3);
-  const upRow = (f) => {
-    const oppId = f.home === g.clubId ? f.away : f.home;
-    const o = oppId ? anyClub(oppId) : null;
-    return `<li>
-      <span class="dash-up__date">${esc(shortDate(f.date))}</span>
-      ${o ? crestHtml(o, { size: 22, clubsById }) : '<span class="dash-up__tbd" aria-hidden="true"></span>'}
-      <span class="dash-up__opp"><b>${o ? esc(o.name) : 'Rywal z losowania'}</b><small>${esc(compLabel(f))}, ${f.neutral ? 'teren neutralny' : f.home === g.clubId ? 'u siebie' : 'na wyjeździe'}</small></span>
-    </li>`;
-  };
   return `<section class="dash-hero" aria-labelledby="dh-t">
     <header class="dash-hero__top">
       <h3 id="dh-t" class="dash-hero__comp">${esc(compLabel(next))}</h3>
@@ -361,8 +354,12 @@ function dashHero(g, club, next, tableOf) {
       </div>
       ${team(next.away)}
     </div>
-    ${upcoming.length ? `<footer class="dash-up"><h4 class="dash-up__title">Kolejne mecze</h4><ol class="dash-up__list">${upcoming.map(upRow).join('')}</ol></footer>` : ''}
   </section>`;
+}
+
+/** Terminarz: ostatnie wyniki i najbliższe mecze z rozgrywkami i miejscem meczu (src/ui/fixturesView.js). */
+function dashFixtures(g) {
+  return dashPanel('fix', 'fix', 'Terminarz', fixturesPanelBody(g), '<button class="dash-link" data-act="fixtures">Pokaż wszystko</button>');
 }
 
 function dashTable(g, club, table) {
@@ -538,6 +535,7 @@ function renderDashboard(g, club) {
     <h2 class="dash__title">Pulpit</h2>
     <div class="dash__grid">
       ${dashHero(g, club, nextFixture(g), tableOf)}
+      ${dashFixtures(g)}
       ${dashTable(g, club, table)}
       ${dashSquad(g)}
       ${dashMail(g)}
@@ -987,7 +985,16 @@ async function dispatchAct(el, { root = app } = {}) {
       await new Promise((r) => setTimeout(r, matchMedia('(prefers-reduced-motion: reduce)').matches ? 150 : 450)); // podpis widoczny przed generowaniem świata
       await newGame(nc.slot, nc.clubId, profileOf(nc));
     }
-    if (act === 'tab') { state.tab = el.dataset.tab; state.mailOpen = null; state.playerOpen = null; if (el.dataset.sub) state.tfTab = el.dataset.sub; render(); }
+    if (act === 'tab') { state.tab = el.dataset.tab; state.mailOpen = null; state.playerOpen = null; state.fx = null; if (el.dataset.sub) state.tfTab = el.dataset.sub; render(); }
+    // Terminarz i wyniki (Pulpit > Pokaż wszystko): sezon, rozgrywki, miejsce meczu
+    if (act === 'fixtures') { state.tab = 'pulpit'; state.fx = { season: null, comp: 'all', venue: 'all' }; render(); window.scrollTo({ top: 0 }); app.querySelector('.fxs h2')?.setAttribute('tabindex', '-1'); app.querySelector('.fxs h2')?.focus({ preventScroll: true }); }
+    if (act === 'fxback') { state.fx = null; render(); app.querySelector('[data-act="fixtures"]')?.focus(); }
+    if (act === 'fxseason' || act === 'fxcomp' || act === 'fxvenue') {
+      const key = { fxseason: ['season', 's'], fxcomp: ['comp', 'k'], fxvenue: ['venue', 'v'] }[act];
+      state.fx = { ...(state.fx ?? {}), [key[0]]: el.dataset[key[1]], ...(act === 'fxseason' ? { comp: 'all', venue: 'all' } : act === 'fxcomp' ? { venue: 'all' } : {}) };
+      render();
+      app.querySelector(`[data-act="${act}"][data-${key[1]}="${CSS.escape(el.dataset[key[1]])}"]`)?.focus({ preventScroll: true });
+    }
     if (act === 'go') {
       const a = primaryAction(g);
       if (a.kind === 'play') {
