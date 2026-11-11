@@ -1082,3 +1082,9 @@
 @keyframes so-hit { from { transform: scale(1.35); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes so-pop { from { transform: scale(.4); } to { transform: scale(1); } }
 .sxi .pos { flex: none; min-width: 34px; text-align: center; }
+/* Jeden pasek przewagi: procenty z ostatnich 5 minut, płynny ruch */
+.poss--live .bar2 { height: 12px; }
+.poss--live .bh, .poss--live .ba { transition: width .6s cubic-bezier(.3, .7, .3, 1); }
+.poss--live span { font-variant-numeric: tabular-nums; min-width: 3.2ch; }
+.mom-area .press__lbl { margin: 0; text-align: center; }
+@media (prefers-reduced-motion: reduce) { .poss--live .bh, .poss--live .ba { transition: none; } }

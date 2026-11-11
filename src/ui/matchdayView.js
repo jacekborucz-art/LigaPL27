@@ -413,11 +413,8 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
         </div>
         <div class="live__centre">
           <div class="mom-area">
-            <div class="poss"><span id="mdPh">50%</span><div class="bar2"><i class="bh" id="mdPbh" style="width:50%"></i><i class="ba" id="mdPba" style="width:50%"></i></div><span id="mdPa">50%</span></div>
-            <div class="press" aria-live="off">
-              <div class="press__track"><i class="press__knob" id="mdPressKnob" style="left:50%"></i></div>
-              <span class="press__lbl" id="mdPressLbl">Gra wyrównana</span>
-            </div>
+            <div class="poss poss--live" role="img" aria-label="Przewaga w ostatnich 5 minutach" title="Przewaga w ostatnich 5 minutach (posiadanie za cały mecz w statystykach)"><span id="mdPh">50%</span><div class="bar2"><i class="bh" id="mdPbh" style="width:50%"></i><i class="ba" id="mdPba" style="width:50%"></i></div><span id="mdPa">50%</span></div>
+            <p class="press__lbl" id="mdPressLbl" aria-live="off">Gra wyrównana</p>
             <svg class="momentum" id="mdMom" viewBox="0 0 90 60" preserveAspectRatio="none" role="img" aria-label="Przewaga w kolejnych minutach"></svg>
           </div>
           <div class="pitch-area">
@@ -495,8 +492,6 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     q('#mdScore').textContent = `${M.score[0]}:${M.score[1]}`;
     q('#mdMin').textContent = M.events[M.events.length - 1]?.min ?? "0'";
     const stats = statsFromEvents(M.events);
-    q('#mdPh').textContent = `${stats[0].possession}%`; q('#mdPa').textContent = `${stats[1].possession}%`;
-    q('#mdPbh').style.width = `${stats[0].possession}%`; q('#mdPba').style.width = `${stats[1].possession}%`;
     drawMomentum(M, q);
     // Relacja
     const feed = M.events.filter((e) => e.text && !['possessionMinute'].includes(e.type)).slice(-60).reverse();
@@ -565,10 +560,11 @@ export function mountMatchday(app, { game, fixture, save, onExit }) {
     const recent = mom.slice(-5);
     const avg = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : 0;
     const k = Math.sign(avg) * Math.pow(Math.min(1, Math.abs(avg) / scale), 0.7);
-    const knob = q('#mdPressKnob');
-    if (knob) {
-      knob.style.left = `${50 - k * 46}%`;
-      knob.dataset.side = Math.abs(k) < 0.15 ? '' : k > 0 ? '0' : '1';
+    // Jeden pasek z procentami: udział w grze z ostatnich 5 minut (płynnie przesuwany, 5-95%)
+    const hp = mom.length ? Math.round(50 + k * 45) : 50;
+    if (q('#mdPh')) {
+      q('#mdPh').textContent = `${hp}%`; q('#mdPa').textContent = `${100 - hp}%`;
+      q('#mdPbh').style.width = `${hp}%`; q('#mdPba').style.width = `${100 - hp}%`;
     }
     const lbl = q('#mdPressLbl');
     if (lbl) lbl.textContent = Math.abs(k) < 0.15 ? 'Gra wyrównana' : `${Math.abs(k) > 0.55 ? 'Wyraźnie naciska' : 'Przewaga'}: ${shortName(k > 0 ? 0 : 1)}`;
