@@ -6,7 +6,7 @@
 import { emit, ensureGoalkeeper } from './core.js';
 import { onPitch, applyTacticChange, goalkeeper, fieldPlayers } from './teams.js';
 import { INSTRUCTIONS } from '../../data/instructions.js';
-import { SHOUTS, SHOUT_COOLDOWN, SHOUT_DURATION, K } from './constants.js';
+import { SHOUTS, SHOUT_COOLDOWN, SHOUT_DURATION, K, COACHQ } from './constants.js';
 import { unlimitedSubs } from './rules.js';
 
 const last = (x) => x.p.last ?? x.p.name;
@@ -175,9 +175,13 @@ export function shout(M, side, id) {
   const s = SHOUTS[id];
   T.shoutUses[id] = (T.shoutUses[id] ?? 0) + 1;
   T.shoutReadyAt = M.minute + SHOUT_COOLDOWN;
-  T.shout = { ...s, id, until: M.minute + SHOUT_DURATION };
+  // Siła okrzyku trenera AI zależy od motywacji (docs/trener-ai-atrybuty.md); okrzyk gracza: wartości z SHOUTS
+  const fx = T.ai && T.cq ? 1 + COACHQ.shoutFx * T.cq.mot : 1;
+  const sc = (v) => (v == null ? v : 1 + (v - 1) * fx);
+  T.shout = fx === 1 ? { ...s, id, until: M.minute + SHOUT_DURATION }
+    : { ...s, actMul: sc(s.actMul), D: s.D == null ? s.D : s.D * fx, foulMul: sc(s.foulMul), yellowMul: sc(s.yellowMul), id, until: M.minute + SHOUT_DURATION };
   for (const x of onPitch(T, M.minute)) {
-    if (s.Z) x.Z += s.Z;
+    if (s.Z) x.Z += s.Z * fx;
     if (s.calm && x.Z > 4) x.Z -= 2;
   }
   emit(M, 'shout', side, null, { shout: id, text: `Trener z linii bocznej: „${s.label}”` });

@@ -70,6 +70,7 @@ function endCell(r) {
   return `<span class="fxr__end"><span class="fxr__score" aria-label="Wynik ${r.gf}:${r.ga}">${r.gf}:${r.ga}</span>${dec}</span>${resChip(r.res)}`;
 }
 
+export function fixtureRowHtml(r, opts) { return rowHtml(r, opts); }
 function rowHtml(r, { wide = false, today = '', extra = false } = {}) {
   const isToday = r.d === today;
   const meta = wide

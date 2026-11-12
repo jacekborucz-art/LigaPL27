@@ -1,0 +1,93 @@
+/* Widok klubu (z tabeli): nagłówek, kadra ze statystykami, terminarz, informacje i sztab */
+.club-link { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.club-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.club-link:focus-visible { outline: 3px solid var(--focus, var(--led)); outline-offset: 2px; border-radius: 3px; }
+.clv { display: grid; gap: var(--space-4); }
+.clv > .btn { justify-self: start; }
+.clv__head { display: flex; align-items: center; gap: var(--space-4); padding: 16px 20px; border-radius: var(--radius-m); background: #0E1511; color: #F3F6F1; border-left: 8px solid var(--kit); }
+.clv__title h2 { margin: 0; font: 700 var(--step-3)/1.05 var(--font-display); }
+.clv__title p { margin: 4px 0 0; color: rgb(243 246 241 / .8); font-size: var(--step--1); }
+.clv__form { display: flex; gap: 4px; }
+.fchip { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 4px; font: 700 12px/1 var(--font-display); color: #fff; }
+.fchip--W { background: #2E8A4E; } .fchip--R { background: #7A8681; } .fchip--P { background: var(--kartka-czerwona); }
+.clv__grid { display: grid; gap: var(--space-4); }
+.clv-p { --t: var(--murawa, #2E8A4E); min-width: 0; padding: 14px 16px 16px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--t) 7%, var(--surface)); border: 1px solid color-mix(in srgb, var(--t) 25%, var(--line)); }
+.clv-p h3 { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; font: 700 var(--step-1)/1.1 var(--font-display); }
+.clv-p h3 small { font: 400 var(--step--1)/1.2 var(--font-body); color: var(--text-muted); }
+.clv-p--fx { --t: #3E7CB1; }
+.clv-p--info { --t: #C9962B; }
+.clv-p--info h3 + .clv-dl, .clv-p--info h3 + .clv-staff { margin-top: 0; }
+.clv-p--info .clv-dl + h3 { margin-top: var(--space-4); }
+.clv-dl { display: grid; gap: 0; margin: 0; }
+.clv-dl > div { display: grid; grid-template-columns: 100px 1fr; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.clv-dl dt { color: var(--text-muted); font-size: var(--step--1); }
+.clv-dl dd { margin: 0; font-weight: 600; }
+.clv-dl dd small { display: block; font-weight: 400; color: var(--text-muted); font-size: 12px; }
+.clv-staff { list-style: none; margin: 0; padding: 0; }
+.clv-staff li { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: var(--step--1); }
+.clv-staff li span { color: var(--text-muted); }
+.clv-sq { width: 100%; border-collapse: collapse; font-size: var(--step--1); font-variant-numeric: tabular-nums; }
+.clv-sq th { padding: 6px 6px; font: 700 12px/1.2 var(--font-display); color: var(--text-muted); text-align: center; border-bottom: 1px solid var(--line); }
+.clv-sq td { padding: 5px 6px; text-align: center; border-bottom: 1px solid var(--line); }
+.clv-sq .l { text-align: left; }
+.clv-sq td.n { color: var(--text-muted); font-weight: 700; }
+.clv-sq tbody tr:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
+.clv-pl { padding: 0; border: 0; background: none; color: var(--text); font: 600 var(--step--1)/1.3 var(--font-body); text-align: left; cursor: pointer; }
+.clv-pl:hover { text-decoration: underline; }
+.clv-pl:focus-visible { outline: 3px solid var(--focus, var(--led)); outline-offset: 2px; }
+.clv-inj { display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: var(--kartka-czerwona); color: #fff; font: 800 11px/1 var(--font-display); font-style: normal; }
+.clv-sus { display: inline-block; width: 8px; height: 11px; border-radius: 1px; background: var(--kartka-czerwona); }
+.fxc--clv { max-height: 640px; overflow: auto; }
+@media (max-width: 559px) {
+  .clv-sq th:nth-child(4), .clv-sq td:nth-child(4), .clv-sq th:nth-child(9), .clv-sq td:nth-child(9) { display: none; }
+  .clv__head { padding: 12px; gap: 12px; }
+}
+@media (min-width: 1024px) {
+  .hub__main:has(.clv) { max-width: 1320px; }
+  .clv__grid { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); grid-template-areas: "squad fx" "squad info"; align-items: start; }
+  .clv-p--squad { grid-area: squad; } .clv-p--fx { grid-area: fx; } .clv-p--info { grid-area: info; }
+}
+@media (min-width: 1600px) {
+  .hub__main:has(.clv) { max-width: 1840px; }
+  .clv__grid { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, .9fr); grid-template-areas: "squad fx info"; }
+}
+/* Forma, kluczowi zawodnicy, absencje */
+.clv__top { display: grid; gap: var(--space-4); }
+.clv-p--form { --t: #2E8A4E; } .clv-p--key { --t: #E0A21A; } .clv-p--abs { --t: #D62839; }
+.clv-streak { margin: 0 0 4px; font: 700 var(--step-0)/1.3 var(--font-display); }
+.clv-sum { margin: 0 0 8px; color: var(--text-muted); font-size: var(--step--1); }
+.clv-last { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.clv-last li { display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 8px; font-size: var(--step--1); }
+.clv-sc { font: 700 var(--step-0)/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.clv-keys { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.clv-keys li { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius-s); background: color-mix(in srgb, var(--text) 5%, transparent); }
+.clv-keys__n { display: grid; min-width: 0; }
+.clv-keys__n small { color: var(--text-muted); font-size: 12px; }
+.clv-keys__o { display: grid; place-items: center; min-width: 38px; height: 32px; border-radius: 6px; background: #0E1511; color: var(--led); font: 700 var(--step-1)/1 var(--font-display); }
+.clv-abs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.clv-abs li { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: center; gap: 2px 8px; padding: 6px 8px; border-radius: var(--radius-s); background: color-mix(in srgb, var(--text) 5%, transparent); }
+.clv-abs li small { grid-column: 2; color: var(--text-muted); font-size: 12px; }
+.clv-abs li.is-inj { border-left: 4px solid var(--kartka-czerwona); }
+.clv-abs li.is-sus { border-left: 4px solid var(--kartka-zolta); }
+@media (min-width: 1024px) { .clv__top { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; } }
+.clv-out { color: var(--kartka-czerwona); font-weight: 700; }
+
+/* Karta trenera klubu AI (docs/trener-ai-atrybuty.md) */
+.clv-p--info .clv-dl + h3, .clv-p--info .clv-coach + h3 { margin-top: var(--space-4); }
+.clv-coach__name { display: flex; flex-direction: column; gap: 2px; margin: 0 0 6px; }
+.clv-coach__name b { font: 700 var(--step-0)/1.2 var(--font-body); }
+.clv-coach__name small { color: var(--text-muted); font-size: var(--step--1); }
+.clv-coach__blurb { margin: 0 0 8px; font-style: italic; font-size: var(--step--1); }
+.clv-attrs { list-style: none; margin: 0; padding: 0; }
+.clv-attrs li { --c: #C9962B; display: grid; grid-template-columns: 72px minmax(0, 1fr) 4.2em; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: var(--step--1); }
+.clv-attrs li.is-hi { --c: var(--murawa-jasna); }
+.clv-attrs li.is-lo { --c: var(--kartka-czerwona); }
+.clv-attrs li span { color: var(--text-muted); }
+.clv-attrs li em { font-style: normal; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.clv-attrs--vague li em { font-weight: 600; font-size: 12px; }
+.clv-attrs--vague li { grid-template-columns: 72px minmax(0, 1fr) 6.6em; }
+.clv-bar { position: relative; display: block; height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--text) 12%, transparent); overflow: hidden; }
+.clv-bar b, .clv-bar s { position: absolute; top: 0; bottom: 0; left: 0; }
+.clv-bar b { border-radius: 4px; background: var(--c); }
+.clv-bar s { background: color-mix(in srgb, var(--c) 40%, transparent); text-decoration: none; }
+.clv-coach__note { margin: 6px 0 0; font-size: 12px; }

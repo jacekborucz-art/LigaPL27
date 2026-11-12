@@ -301,7 +301,7 @@
 .dash-zones [data-z="playoff"]::before { background: #E0A21A; }
 .dash-zones [data-z="playoff-down"]::before { background: #E07B24; }
 .dash-zones [data-z="down"]::before { background: #D62839; }
-.dash-p--table .dash-note { margin-top: auto; }
+.dash-p--table .dash-note { margin-top: 12px; } /* opis zaraz pod tabelą, nie na dole panelu */
 
 /* ---------- Zarząd: wskaźnik zaufania i drabinka celu ---------- */
 .dash-gauge { position: relative; width: min(100%, 240px); margin: 0 auto; }
@@ -411,3 +411,6 @@
 /* Limit kadry: ostrzeżenie na górze panelu Stan kadry */
 .dash-alert--top { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px var(--space-2); }
 .dash-alert--top .dash-link { min-height: 36px; padding: 0 var(--space-2); margin-left: auto; }
+/* Pasek decyzji na Pulpicie (Dalej zawsze wraca na Pulpit) */
+.dash .dash-decide { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 0 0 var(--space-3); padding: 10px 14px; border-radius: var(--radius-m); border: 1px solid color-mix(in srgb, var(--led) 55%, var(--line)); background: color-mix(in srgb, var(--led) 14%, var(--surface)); }
+.dash .dash-decide span { flex: 1 1 260px; min-width: 0; }

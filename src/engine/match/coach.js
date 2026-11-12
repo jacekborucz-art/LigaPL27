@@ -10,8 +10,9 @@ import { setCoachHooks } from './core.js';
 import { goalkeeper, fieldPlayers, slotFit, reslot, assignSlots, shapeSlots } from './teams.js';
 import { proficiency } from '../positions.js';
 import { formationById } from '../../data/formations.js';
-import { K, KNOCK } from './constants.js';
+import { K, KNOCK, COACHQ } from './constants.js';
 import { unlimitedSubs } from './rules.js';
+import { clamp } from '../../core/rng.js';
 
 const CHECKPOINTS = new Set([46, 55, 60, 65, 70, 75, 80, 85, 88, 95, 100, 105, 110, 115, 119]);
 // Przegląd planu w 1. połowie: trener reaguje, gdy plan wyraźnie nie działa (nie tylko w przerwie) [SZAC]
@@ -40,6 +41,23 @@ const MAX_ADJ = 4; // korekty planu z przebiegu meczu na mecz (uparty trener: 2)
 const KEY_COOLDOWN = 15; // ta sama instrukcja zmieniana z przebiegu meczu najwcześniej po 15 min (bez przestawiania tam i z powrotem)
 
 const attr = (x, k) => x.p.attr?.[k] ?? x.p.ovr ?? 10;
+
+// ------------------------------------------------------------ Umiejętności trenera (docs/trener-ai-atrybuty.md)
+// T.cq: { tak, skl, mot, pre } (od -1 do 1) z atrybutów trenera, dyspozycji dnia i wagi meczu (career/coaches.js).
+// Bez profilu (gracz, testy silnika) s = 0, czyli dokładnie zachowanie AI sprzed atrybutów (te same losowania).
+// Asystent gracza: T.assistantCq z jakości asystenta w sztabie (przy przejęciu drużyny i w podpowiedziach).
+const NO_CQ = { tak: 0, skl: 0, mot: 0, pre: 0 };
+const cqOf = (T) => T.cq ?? (T.ai ? null : T.assistantCq) ?? NO_CQ;
+/** Kluczowy moment: końcówka na styku (od 75. min, różnica najwyżej 1 gol), dogrywka, gra w osłabieniu lub przewadze. */
+const keyMoment = (st) => !!st && (st.et || st.men !== 0 || (st.minute >= 75 && Math.abs(st.diff) <= 1));
+/** Umiejętność taktyczna trenera w tej chwili meczu: TAK, w kluczowych momentach z odpornością na presję (PRE). */
+export function tacSkill(T, st = null) {
+  const c = cqOf(T);
+  if (c === NO_CQ) return 0;
+  return clamp(c.tak + (keyMoment(st) ? COACHQ.keyMoment * COACHQ.pressure * c.pre : 0), -1, 1);
+}
+/** Szansa p przesunięta umiejętnością s z siłą k: p x (1 + k s). Przy s = 0 bez zmian. */
+const pAdj = (p, s, k) => (s ? clamp(p * (1 + k * s), 0.02, 0.99) : p);
 const condAdj = (x) => (x.cond < 85 ? -0.04 * (85 - x.cond) : 0);
 const chaseAt = (T, b) => b + (T.coach === 'O' ? -10 : T.coach === 'S' ? 5 : 0);
 const protectAt = (T, b) => b + (T.coach === 'O' ? 7 : T.coach === 'S' ? -10 : 0);
@@ -240,8 +258,10 @@ export function seenTactics(M, O, lag = 8) {
 
 /** Osobowość trenera w tym meczu (upór, czas rozpoznania), losowana raz z RNG meczu. Podpowiedź: bez losowania. */
 function mindOf(T, rng, advice) {
-  if (advice) return { stubborn: false, lag: 5, used: 0 };
-  if (!T.mind) T.mind = { stubborn: rng.chance(STUBBORN[T.coach] ?? 0.15), lag: rng.int(6, 10), used: 0 };
+  const s = tacSkill(T);
+  // Dobry taktyk szybciej rozpoznaje zmiany rywala (4-8 min) i rzadziej jest uparty, słaby wolniej (8-12 min)
+  if (advice) return { stubborn: false, lag: Math.max(3, 5 - Math.round(COACHQ.lag * s)), used: 0 };
+  if (!T.mind) T.mind = { stubborn: rng.chance(pAdj(STUBBORN[T.coach] ?? 0.15, s, -COACHQ.stubborn)), lag: rng.int(6, 10) - Math.round(COACHQ.lag * s), used: 0 };
   return T.mind;
 }
 
@@ -268,7 +288,8 @@ function reviewAdjust(M, T, st, rng, advice, mind) {
   const min = st.minute;
   const adj = T.ai && T.adjBase === T.baseInstr ? (T.adj ?? {}) : {};
   const cands = [];
-  let v = null; let seen = null;
+  const s = tacSkill(T, st);
+  let v = null; let seen = null; let pinned = false;
   const add = (key, val, reason, kind) => {
     if (plan[key] === val || cands.some((c) => c.key === key)) return;
     if (!advice && adj[key] && min - adj[key].min < KEY_COOLDOWN) return;
@@ -316,13 +337,14 @@ function reviewAdjust(M, T, st, rng, advice, mind) {
   if ((min >= 20 && min <= 78) || st.halftime) {
     v = flowView(M, T.side, st.halftime ? M.tick : 20);
     const k = v.span / 20;
-    const pinned = (v.xgA - v.xgF >= 0.35 + 0.15 * k && v.shA >= v.shF + 2 + k) || (v.bigA >= 1 + k && v.xgA >= v.xgF + 0.3)
+    pinned = (v.xgA - v.xgF >= 0.35 + 0.15 * k && v.shA >= v.shF + 2 + k) || (v.bigA >= 1 + k && v.xgA >= v.xgF + 0.3)
       || (v.mom <= -0.12 && v.xgA >= v.xgF + 0.15); // momentum 20 min: -0,12 to ok. 5 % najgorszych okresów
     if (pinned && st.diff >= 0 && st.diff <= 1) {
       if (v.konA >= 2 && v.konA >= 0.4 * v.shA && plan.line !== 'low') add('line', stepDown[plan.line ?? 'mid'], 'dostajemy kontry: cofamy linię obrony', 'flow');
       else if (v.dysA >= 3 && v.dysA >= 0.5 * v.shA && plan.line === 'low') add('line', 'mid', 'rywal strzela z dystansu: wyżej linia obrony', 'flow');
       else if (v.spA >= 3 && plan.marking === 'man') add('marking', 'zone', 'groźne stałe fragmenty: krycie strefowe', 'flow');
-      else if (T.coach === 'S') {
+      // Ostrożny trener cofa się (w silniku nastawienie -1 prawie nie broni); dobry taktyk częściej wybiera pressing
+      else if (T.coach === 'S' && !(s > 0 && plan.pressing !== 'high' && legs >= 78 && v.poss < 0.47 && rng.chance(COACHQ.correct * s))) {
         if (mentality > -1) add('mentality', String(mentality - 1), 'rywal przeważa: cofamy się i zagęszczamy środek', 'flow');
         else if (st.diff > 0 && plan.line !== 'low') add('line', 'low', 'rywal przeważa: niski blok', 'flow');
       } else if (plan.pressing !== 'high' && legs >= 78 && (T.coach === 'O' || v.poss < 0.47)) {
@@ -347,7 +369,28 @@ function reviewAdjust(M, T, st, rng, advice, mind) {
       }
     }
   }
+  // Słaby taktyk (s < 0) czasem koryguje plan błędnie: decyzje, które w silniku kosztują punkty (docs/trener-ai-atrybuty.md)
+  if (!advice && s < 0 && rng.chance(COACHQ.mistake * -s)) mistake();
   return finish();
+
+  function mistake() {
+    const front = (key, val, reason) => {
+      if (plan[key] === val || (adj[key] && min - adj[key].min < KEY_COOLDOWN)) return false;
+      const i = cands.findIndex((c) => c.key === key);
+      if (i >= 0) cands.splice(i, 1);
+      cands.unshift({ key, v: val, reason, kind: 'mistake' });
+      return true;
+    };
+    const so = seen?.instr ?? {};
+    if (so.pressing === 'high' && front('passing', 'long', 'rywal pressuje wysoko: długie piłki za plecy obrońców')) return;
+    if (pinned && st.diff >= 0 && mentality > -1) {
+      front('line', 'low', 'rywal przeważa: cofamy się pod własne pole karne');
+      front('mentality', String(mentality - 1), 'rywal przeważa: cofamy się pod własne pole karne');
+      return;
+    }
+    if (st.diff === 0 && min >= 25 && min <= 75 && front('tempo', 'slow', 'remis nas urządza: zwalniamy grę')) return;
+    if (min <= 75) front('passing', 'long', 'gramy prościej: długie piłki do napastnika');
+  }
 
   function finish() {
     // Szansa reakcji wg osobowości; uparty trener reaguje rzadziej i wcześniej kończy korekty
@@ -356,7 +399,10 @@ function reviewAdjust(M, T, st, rng, advice, mind) {
     for (const c of cands) {
       if (out.length >= 2 || (!advice && out.length >= limit)) break;
       const a = ALERT[T.coach] ?? ALERT.P;
-      const p = c.kind === 'style' ? a.style : c.kind === 'legs' ? 0.8 : c.kind === 'cards' ? 0.6 : c.kind === 'revert' ? 0.5 : a.flow;
+      if (c.kind === 'mistake') { out.push(c); continue; }
+      // Trafność: dobry taktyk częściej robi korekty, które w silniku pomagają, i rzadziej te, które szkodzą
+      const val = worth(c, plan);
+      const p = pAdj(c.kind === 'style' ? a.style : c.kind === 'legs' ? 0.8 : c.kind === 'cards' ? 0.6 : c.kind === 'revert' ? 0.5 : a.flow, val < 0 ? -s : s, COACHQ.alert);
       if (!advice && !rng.chance(mind.stubborn ? p * 0.5 : p)) continue;
       out.push(c);
     }
@@ -365,12 +411,29 @@ function reviewAdjust(M, T, st, rng, advice, mind) {
     if (st.halftime && st.diff > -2 && fieldPlayers(T).length >= 11 && v && v.poss < 0.42 && v.xgA >= v.xgF && (advice || mind.used + out.length < (mind.stubborn ? 2 : MAX_ADJ))) {
       const target = MID_PLUS[T.tactics.formation];
       const oppCentral = formationById(seen.formation).slots.filter((x) => CENTRAL.has(x.pos)).length;
-      if (target && oppCentral > T.central && (advice || rng.chance((ALERT[T.coach] ?? ALERT.P).flow)) && shapeFit(T, target) >= 0.98 * currentFit(T)) formation = target;
+      if (target && oppCentral > T.central && (advice || rng.chance(pAdj((ALERT[T.coach] ?? ALERT.P).flow, s, COACHQ.alert))) && shapeFit(T, target) >= 0.98 * currentFit(T)) formation = target;
     }
     if (!out.length && !formation) return null;
     const set = Object.fromEntries(out.map((c) => [c.key, c.v]));
     return { set, cands: out, reason: out.map((c) => c.reason).join('; ') || null, formation, formationReason: 'przegrywamy środek pola: dodatkowy środkowy pomocnik' };
   }
+}
+
+/**
+ * Wartość korekty w silniku (pomiary docs/ai-trener.md i docs/trener-ai-atrybuty.md): +1 pomaga (wysoki pressing,
+ * krótkie albo prostsze rozegranie przeciw pressingowi, kontratak, odważniej przy jałowej przewadze, powrót do planu),
+ * -1 szkodzi (cofnięcie nastawienia, wolne tempo, długie piłki), 0 bez wyraźnego efektu (linia, krycie, zmęczenie, kartki).
+ */
+function worth(c, plan) {
+  if (c.kind === 'revert') return 1;
+  if (c.kind === 'legs' || c.kind === 'cards') return 0;
+  const k = c.key; const v = c.v;
+  if (k === 'pressing') return v === 'high' ? 1 : 0;
+  if (k === 'passing') return v === 'long' ? -1 : 1;
+  if (k === 'counter') return v === 'yes' ? 1 : -1;
+  if (k === 'mentality') return Number(v) > Number(plan.mentality ?? 0) ? 1 : -1;
+  if (k === 'tempo') return v === 'slow' ? -1 : 0;
+  return 0;
 }
 
 function currentFit(T) { return fieldPlayers(T).reduce((s, x) => s + (x.slot ? slotFit(x, x.slot) : 0), 0); }
@@ -454,6 +517,7 @@ function plan(M, side, rng, advice) {
   const T = M.teams[side];
   if (M.ended) return [];
   const st = matchState(M, side);
+  const s = tacSkill(T, st);
   const subs = [];
   const tactic = { patch: null, reason: null, urgent: false };
   const reserved = new Set();
@@ -503,7 +567,7 @@ function plan(M, side, rng, advice) {
   const injShort = reacts.find((r) => r.kind === 'injury' && !r.gk);
   const oppRed = reacts.find((r) => r.kind === 'oppRed');
   const menAfter = fieldPlayers(T).length + subs.filter((s) => !s.out.on).length;
-  if ((ownRed || injShort) && menAfter < 11 && rng.chance(0.95)) {
+  if ((ownRed || injShort) && menAfter < 11 && rng.chance(pAdj(0.95, s, COACHQ.act))) {
     // Za wykluczonego obrońcę: napastnik schodzi, wchodzi obrońca (gdy prowadzimy lub remis i jest zapas zmian)
     if (ownRed && !ownRed.gk && BACK.has(ownRed.pos) && st.minute < 85 && (st.diff >= 0 || (ownRed.pos === 'ŚO' && st.minute < 70))
       && left > (st.minute < 75 ? 1 : 0)) {
@@ -520,7 +584,7 @@ function plan(M, side, rng, advice) {
     mergeTactic({ formation: sh.formation, drop: sh.drop, instructions: instrPatch(T, d.w) },
       ownRed ? `czerwona kartka: gra w ${menAfter}` : `kontuzja bez zmiany: gra w ${menAfter}`, true);
   }
-  if (oppRed && rng.chance(0.8)) {
+  if (oppRed && rng.chance(pAdj(0.8, s, COACHQ.act))) {
     const d = desiredInstructions(T, st);
     mergeTactic({ instructions: instrPatch(T, d.w) }, d.reason ?? 'rywal w osłabieniu', true);
   }
@@ -538,7 +602,7 @@ function plan(M, side, rng, advice) {
     const patch = instrPatch(T, d.w);
     if (patch.timewasting === 'on' && !rng.chance(T.coach === 'O' ? 0.3 : 0.6)) delete patch.timewasting;
     const fromAdj = !!adjust && Object.keys(patch).some((k) => k in adjust.set && d.w[k] === adjust.set[k]);
-    if (Object.keys(patch).length && calm && (fromAdj || rng.chance(0.75))) {
+    if (Object.keys(patch).length && calm && (fromAdj || rng.chance(pAdj(0.75, s, COACHQ.act)))) {
       if (fromAdj && !advice) commitAdj(T, adjust, M.minute);
       const why = fromAdj && d.reason ? `${d.reason}; ${adjust.reason}` : fromAdj ? adjust.reason : d.reason;
       mergeTactic({ instructions: patch }, why ?? 'powrót do planu');
@@ -551,13 +615,13 @@ function plan(M, side, rng, advice) {
     // Warianty 4-4-2 bez zmian personalnych: gonimy -> ofensywne, bronimy -> defensywne
     if (!tactic.patch?.formation && (advice || st.atBreak || M.minute - T.lastTacChange >= 10)) {
       const v = variant442(T, st);
-      if (v && (advice || rng.chance(T.mind?.stubborn ? 0.4 : 0.75))) mergeTactic({ formation: v.formation }, v.reason);
+      if (v && (advice || rng.chance(pAdj(T.mind?.stubborn ? 0.4 : 0.75, s, COACHQ.act)))) mergeTactic({ formation: v.formation }, v.reason);
     }
     // W osłabieniu kształt dopasowany do wyniku (np. 4-4-1 -> 4-3-2 przy pogoni)
     if (fieldPlayers(T).length < 11 && !tactic.patch?.formation) {
       const sh = shortShape(T, st);
       if (sh && (sh.formation !== T.tactics.formation || sh.drop.join() !== (T.dropPos ?? []).join())
-        && (advice || st.atBreak || M.minute - T.lastTacChange >= 10) && rng.chance(0.6)) {
+        && (advice || st.atBreak || M.minute - T.lastTacChange >= 10) && rng.chance(pAdj(0.6, s, COACHQ.act))) {
         mergeTactic({ formation: sh.formation, drop: sh.drop }, st.diff < 0 ? 'w osłabieniu, ale gonimy wynik' : 'w osłabieniu bronimy się');
       }
     }
@@ -598,7 +662,7 @@ function knockSubs(M, T, st, rng, advice, ctx) {
     if (x.slot.pos === 'BR' && !T.bench.some((b) => b.p.pos === 'BR' && !b.injury && !b.sentOff)) continue;
     if (!risky && !(several && made === 0)) continue;
     if (!risky && ctx.left() - reserve <= 0) continue;
-    if (!advice && !rng.chance(risky ? 0.85 : 0.6)) continue;
+    if (!advice && !rng.chance(pAdj(risky ? 0.85 : 0.6, tacSkill(T, st), COACHQ.subs))) continue;
     const repl = pickReplacement(T, x, { reserved });
     if (!repl) continue;
     ctx.addSub(x, repl, 'injury', `uraz: ${x.knock.name}${several ? ', kilku zawodników gra z bólem' : ''}`);
@@ -615,7 +679,8 @@ function planSubs(M, T, st, rng, advice, ctx) {
   const { reserved } = ctx;
   const xs = fieldPlayers(T).filter((x) => !reserved.has(x) && x.slot);
   const cands = [];
-  const tiredThr = 70 + (st.heat ? 4 : 0) + (min >= 75 ? 3 : 0);
+  // Dobry taktyk wcześniej widzi zmęczenie (próg kondycji + 4 s), słaby zmienia zmęczonych później
+  const tiredThr = 70 + (st.heat ? 4 : 0) + (min >= 75 ? 3 : 0) + COACHQ.tired * tacSkill(T, st);
   const hot = (x) => x.yc && DEF_ROLE.has(x.slot.pos) && (attr(x, 'AGR') >= 13 || (x.p.hidden?.TMP ?? 10) >= 14);
   for (const x of xs) {
     if (x.slot.pos === 'BR') {
@@ -691,12 +756,13 @@ function planSubs(M, T, st, rng, advice, ctx) {
   if (maxNow <= 0) return;
   let made = 0;
   const shapes = [];
+  const s = tacSkill(T, st);
   for (const c of cands) {
     if (made >= maxNow) break;
     // Plan trenera (3-5 zmian) obejmuje też zmiany taktyczne; ponad plan tylko uraz, bramkarz i pogoń przy -2
     const cap = planned + (c.why === 'injury' || c.why === 'penaltyGk' ? 2 : c.why === 'chase' && st.diff <= -2 ? 1 : 0);
     if (!advice && T.subsUsed + made >= cap) continue;
-    if (!rng.chance(c.p)) continue;
+    if (!rng.chance(c.p < 1 ? pAdj(c.p, s, COACHQ.subs) : c.p)) continue;
     const repl = pickReplacement(T, c.x, { prefer: c.prefer, reserved });
     if (!repl) continue;
     if (c.prefer && !c.prefer.has(repl.inc.p.pos) && c.why !== 'protect') continue; // brak napastnika na ławce: bez zmiany
@@ -870,7 +936,7 @@ function aiShout(M, T, st, rng) {
   else if (st.diff < 0 && st.minute >= 75 && ok('naprzod')) { id = 'naprzod'; p = T.coach === 'S' ? 0.2 : 0.3; }
   else if (st.diff === 1 && st.minute >= 80 && st.mom < -0.1 && ok('uwaga')) { id = 'uwaga'; p = T.coach === 'O' ? 0.3 : 0.5; }
   else if (st.diff < 0 && st.minute >= 50 && st.minute < 75 && st.mom < -0.1 && ok('walka')) { id = 'walka'; p = 0.2; }
-  if (id && rng.chance(p)) shout(M, T.side, id);
+  if (id && rng.chance(pAdj(p, cqOf(T).mot, COACHQ.shoutP))) shout(M, T.side, id);
 }
 
 /** Decyzje AI (rywal albo asystent gracza) w danej minucie. Zmienia tylko swoją drużynę i tylko zgodnie z regułami. */

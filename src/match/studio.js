@@ -364,7 +364,8 @@ export function assistantReport({ user, opp, comp = 'league', stage = 'main', us
   if (t.counter) bits.push('czeka na kontry');
   if (t.aggression === 'twarda') bits.push('gra twardo w odbiorze');
   if (bits.length) style.push(`Rywal ${bits.join(', ')}.`);
-  if (opp.coach) style.push(`Trener rywala jest ${COACH_LABEL[opp.coach] || 'pragmatyczny'}.`);
+  if (opp.coachName) style.push(`Trener rywala, ${opp.coachName}, jest ${COACH_LABEL[opp.coach] || 'pragmatyczny'}. ${opp.coachNote ?? ''}`.trim());
+  else if (opp.coach) style.push(`Trener rywala jest ${COACH_LABEL[opp.coach] || 'pragmatyczny'}.`);
 
   // Kontry taktyczne (ekspert 4.2, 3.1)
   const ua = user.avg || {}; const oa = opp.avg || {};

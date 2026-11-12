@@ -16,6 +16,8 @@ import { fixturesPanelBody, renderFixtures } from './ui/fixturesView.js';
 import { ensureHistory } from './season/history.js';
 import { createMatch, runToEnd } from './engine/match/match.js';
 import { Rng } from './core/rng.js';
+import { coachOf, matchCoach, formRng, assistantProfile } from './career/coaches.js';
+import { staffQ } from './training/staff.js';
 import { addDays } from './core/gameLoop.js';
 import { generateWorld, squadOf, academyOf } from './world/worldGen.js';
 import { renderSquadList, renderPlayerProfile } from './ui/squadView.js';
@@ -32,6 +34,8 @@ import { applySeasonState } from './season/rollover.js';
 import { ensureTraining, trainingMatchInput, teamCohesion } from './training/index.js';
 import { renderTraining, handleTrainingAction, isTrainingAction } from './ui/trainingView.js';
 import { shirtNumbers, kitColors } from './career/shirts.js';
+import { playerStatsHtml } from './ui/playerStatsView.js';
+import { renderClubView, hasClubView } from './ui/clubView.js';
 import { renderTransfers, handleTransferAction, isTransferAction } from './ui/transfersView.js';
 import { renderTalks, handleTalkAction, isTalkAction } from './ui/talksView.js';
 import { ensureCareer } from './career/careerSystem.js';
@@ -232,6 +236,13 @@ function renderHub() {
 }
 
 function renderTab(tab, g, club) {
+  // Profil zawodnika innego klubu (z karty transferowej albo z menu): tylko podgląd, bez danych wewnętrznych klubu
+  const ext = state.extPlayer && g.world.players[state.extPlayer.id];
+  if (!ext && state.extClub) return renderClubView(g, state.extClub);
+  if (ext) {
+    const extClub = ext.clubId ? clubById(ext.clubId) : null;
+    return renderPlayerProfile(ext, { leagueOvrs: leagueOvrs(g, extClub?.tier ?? club.tier), clubName: extClub?.name ?? 'Wolny zawodnik', date: g.date, game: g, foreign: true, back: { act: 'extback', label: 'Wróć' } });
+  }
   if (tab === 'pulpit') return state.fx ? renderFixtures(g, state.fx) : renderDashboard(g, club);
   if (tab === 'poczta') return renderMail(g);
   if (tab === 'trening') return renderTraining(g, state);
@@ -242,7 +253,7 @@ function renderTab(tab, g, club) {
     if (state.sqSub === 'talks') return sub + renderTalks(g, state);
     if (state.sqSub === 'tactics') {
       queueMicrotask(mountTacticsScreen); // po wstawieniu HTML: okno atrybutów i fokus
-      return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), info: state.tInfo, msg: state.tMsg, numbers: shirtNumbers(g, g.clubId, squadOf(g.world, g.clubId)), kit: kitColors(clubById(g.clubId)) });
+      return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), info: state.tInfo, msg: state.tMsg, numbers: shirtNumbers(g, g.clubId, squadOf(g.world, g.clubId)), kit: kitColors(clubById(g.clubId)), infoExtra: state.tInfo && g.world.players[state.tInfo] ? playerStatsHtml(g.world.players[state.tInfo], g) : '' });
     }
     const ovrs = leagueOvrs(g, club.tier);
     const p = state.playerOpen && g.world.players[state.playerOpen];
@@ -376,7 +387,7 @@ function dashTable(g, club, table) {
     const me = r.id === g.clubId;
     return `<tr class="${[me ? 'is-me' : '', tierCls(kOf(j))].filter(Boolean).join(' ')}"${z ? ` data-z="${z.kind}"` : ''}${me ? ' aria-current="true"' : ''}>
       <td class="dash-t__pos">${r.pos}</td>
-      <td class="dash-t__club"><span class="dash-t__cl">${crestHtml(c, { size: 20, clubsById })}<span>${esc(c.name)}</span></span></td>
+      <td class="dash-t__club"><span class="dash-t__cl">${crestHtml(c, { size: 20, clubsById })}<button class="club-link" data-act="club" data-club="${esc(c.id)}" title="Pokaż klub">${esc(c.name)}</button></span></td>
       <td>${r.played}</td><td>${r.goalDiff > 0 ? '+' : ''}${r.goalDiff}</td><td class="dash-t__pts">${r.points}</td>
     </tr>`;
   }).join('');
@@ -531,8 +542,11 @@ function dashMail(g) {
 function renderDashboard(g, club) {
   const tableOf = dashTables(g);
   const table = tableOf(club.tier);
+  const waiting = pendingDecisions(g.inbox);
+  const decideBar = waiting.length ? `<div class="dash-decide" role="status"><span><b>${waiting.length === 1 ? 'Czeka decyzja' : `Czekają decyzje (${waiting.length})`}:</b> ${esc(waiting[0].subject ?? '')}. Gra ruszy dalej po decyzji.</span><button class="btn btn--primary btn--sm" data-act="mail" data-id="${esc(waiting[0].id)}">Otwórz decyzję</button></div>` : '';
   return `<div class="dash">
     <h2 class="dash__title">Pulpit</h2>
+    ${decideBar}
     <div class="dash__grid">
       ${dashHero(g, club, nextFixture(g), tableOf)}
       ${dashFixtures(g)}
@@ -596,6 +610,11 @@ function renderLiveMatchday() {
   state.md = mountMatchday(app, {
     game: g, fixture: f, save,
     onExit: () => { state.md = null; state.screen = 'hub'; state.tab = 'pulpit'; render(); },
+    onLineup: () => {
+      state.md = null; state.screen = 'hub'; state.tab = 'kadra'; state.sqSub = 'tactics'; state.playerOpen = null; state.extPlayer = null;
+      state.tMsg = 'Ustaw skład, a potem kliknij „Zagraj mecz” na górze, żeby wrócić do dnia meczowego.';
+      render(); window.scrollTo({ top: 0 });
+    },
   });
 }
 
@@ -658,6 +677,10 @@ async function playMyMatch() {
   const cfgFor = (id, squad, tactics, ai) => ({ club: anyClub(id), squad, tactics, ai, coach: anyClub(id)?.coach ?? 'P' });
   const mine = cfgFor(g.clubId, mySquad(g), g.tactics, false);
   const theirs = cfgFor(oppId, oppSquad, createTactics(oppSquad, { benchSize: bench }), true);
+  // Trener rywala z atrybutami i asystent gracza (docs/trener-ai-atrybuty.md)
+  const rank = f.comp === 'pp' ? (f.round === 'F' ? 3 : 1) : f.comp === 'super' ? 3 : f.comp === 'uefa' ? 2 : 0;
+  if (f.comp !== 'friendly') theirs.coachQ = matchCoach(coachOf(g, oppId, oppClub), { rank, rng: formRng(g, f.id, oppId) });
+  mine.assistantQ = matchCoach(assistantProfile(staffQ(g, g.clubId, 'asystent')), { rank, rng: formRng(g, f.id, g.clubId) });
   Object.assign(mine, trainingMatchInput(g, g.clubId, mine));
   Object.assign(theirs, trainingMatchInput(g, oppId, theirs));
   const M = createMatch({
@@ -702,7 +725,8 @@ async function runDays() {
     if (r.reason !== 'limit') { reason = r.reason; break; }
   }
   state.running = false;
-  if (reason === 'message' || reason === 'decision') { state.tab = 'poczta'; state.mailOpen = null; state.mailCat = null; }
+  // Po Dalej zawsze Pulpit (nowe wiadomości i decyzje widać w panelu Poczta i w pasku decyzji na Pulpicie)
+  if (reason === 'message' || reason === 'decision') { state.tab = 'pulpit'; state.fx = null; state.extPlayer = null; state.extClub = null; state.mailOpen = null; }
   await save();
   renderHub();
 }
@@ -985,7 +1009,7 @@ async function dispatchAct(el, { root = app } = {}) {
       await new Promise((r) => setTimeout(r, matchMedia('(prefers-reduced-motion: reduce)').matches ? 150 : 450)); // podpis widoczny przed generowaniem świata
       await newGame(nc.slot, nc.clubId, profileOf(nc));
     }
-    if (act === 'tab') { state.tab = el.dataset.tab; state.mailOpen = null; state.playerOpen = null; state.fx = null; if (el.dataset.sub) state.tfTab = el.dataset.sub; render(); }
+    if (act === 'tab') { state.tab = el.dataset.tab; state.mailOpen = null; state.playerOpen = null; state.fx = null; state.extPlayer = null; state.extClub = null; if (el.dataset.sub) state.tfTab = el.dataset.sub; render(); }
     // Terminarz i wyniki (Pulpit > Pokaż wszystko): sezon, rozgrywki, miejsce meczu
     if (act === 'fixtures') { state.tab = 'pulpit'; state.fx = { season: null, comp: 'all', venue: 'all' }; render(); window.scrollTo({ top: 0 }); app.querySelector('.fxs h2')?.setAttribute('tabindex', '-1'); app.querySelector('.fxs h2')?.focus({ preventScroll: true }); }
     if (act === 'fxback') { state.fx = null; render(); app.querySelector('[data-act="fixtures"]')?.focus(); }
@@ -1006,7 +1030,7 @@ async function dispatchAct(el, { root = app } = {}) {
         await save();
         state.screen = a.match.home && a.match.away ? 'matchday' : 'match'; render();
       }
-      else if (a.kind === 'decide') { state.tab = 'poczta'; state.mailOpen = pendingDecisions(g.inbox)[0].id; render(); }
+      else if (a.kind === 'decide') { state.tab = 'pulpit'; state.fx = null; state.extPlayer = null; state.extClub = null; render(); }
       else await runDays();
     }
     if (act === 'stop') state.running = false;
@@ -1031,6 +1055,20 @@ async function dispatchAct(el, { root = app } = {}) {
     if (act === 'sqfilter') { state.sqFilter = el.dataset.f; render(); }
     if (act === 'player') { state.playerOpen = el.dataset.id; render(); window.scrollTo({ top: 0 }); }
     if (act === 'squadback') { state.playerOpen = null; render(); }
+    if (act === 'extplayer') {
+      const id = el.dataset.id; const pl = state.game?.world.players[id];
+      if (pl && pl.clubId === state.game.clubId) { state.extPlayer = null; state.tab = 'kadra'; state.sqSub = 'players'; state.playerOpen = id; }
+      else if (pl) state.extPlayer = { id };
+      render(); window.scrollTo({ top: 0 });
+    }
+    if (act === 'extback') { state.extPlayer = null; render(); }
+    if (act === 'club') {
+      const id = el.dataset.club;
+      if (id === state.game.clubId) { state.extClub = null; state.extPlayer = null; state.tab = 'kadra'; state.sqSub = 'players'; state.playerOpen = null; }
+      else if (hasClubView(state.game, id)) { state.extClub = id; state.extPlayer = null; }
+      render(); window.scrollTo({ top: 0 });
+    }
+    if (act === 'clubback') { state.extClub = null; state.extPlayer = null; render(); }
     if (act === 'tsub') { state.sqSub = el.dataset.s; state.tSel = null; state.tInfo = null; state.tMsg = ''; state.playerOpen = null; state.ttResult = null; state.ttMeeting = null; render(); }
     if (act === 'tcancel') { state.tSel = null; state.tMsg = ''; renderTacticsAfter('[data-act="tauto"]'); }
     if (act === 'tform') { g.tactics = changeFormation(g.tactics, mySquad(g), el.dataset.f); state.tSel = null; state.tMsg = ''; await save(); renderTacticsAfter(); }

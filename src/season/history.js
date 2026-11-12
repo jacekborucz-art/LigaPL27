@@ -212,6 +212,13 @@ export function teamFixtures(game, key = seasonKey(game)) {
   return rows.map(viewRow).sort((x, y) => (x.d + (x.t ?? '')).localeCompare(y.d + (y.t ?? '')));
 }
 
+/** Mecze dowolnego klubu w bieżącym sezonie (z terminarza gry), w tym samym kształcie co teamFixtures. */
+export function clubFixtures(game, clubId) {
+  return (game.fixtures ?? []).filter((f) => f.home === clubId || f.away === clubId)
+    .map((f) => viewRow(f.played && f.result?.score ? matchRow(f, clubId) : { ...matchRow(f, clubId), s: null, plan: 1, post: f.postponed ? 1 : 0 }))
+    .sort((x, y) => (x.d + (x.t ?? '')).localeCompare(y.d + (y.t ?? '')));
+}
+
 export function venueOf(row) {
   if (row.n) return 'N';
   return row.h === row.me ? 'H' : 'A';

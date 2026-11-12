@@ -21,7 +21,9 @@ import { afterMatchDelta, applyMorale, weeklyDrift } from '../career/morale.js';
 import { INJURY_TYPES } from '../engine/match/constants.js';
 import { fmtDate } from '../ui/dom.js';
 import { UEFA_CLUBS, createUefa } from './uefa.js';
-import { aiChooseSpeech, postMatchBriefing, closeMatchMemory } from '../match/briefings.js';
+import { aiChooseSpeech, postMatchBriefing, closeMatchMemory, POST_TONES } from '../match/briefings.js';
+import { coachOf, matchCoach, quickCoachTerm, formRng, assistantProfile, motivationSkill, COACH } from '../career/coaches.js';
+import { staffQ } from '../training/staff.js';
 import { statGroup, addPlayerMatch, syncSpell, recordTeamMatch, CLUB_GROUPS } from './history.js';
 
 export const LEAGUE_COMPS = ['ekstraklasa', 'liga1', 'liga2'];
@@ -146,10 +148,44 @@ function tableTermFor(game, clubId, comp, cache) {
 /** Model ocen meczów w tle (playQuick); fromEngineResult sprowadza oceny pełnego silnika do tej skali. */
 export const QUICK_RATING = { base: 6.4, goal: 0.9, assist: 0.5, assistShare: 0.72, yellow: -0.3, red: -1.2 };
 
+/**
+ * Waga meczu w tle 0-3 jak ranga w studiu (match/studio.js matchRank), tanio: finał i Superpuchar 3, puchary UEFA,
+ * derby oraz mecze o tytuł i o utrzymanie w drugiej połowie sezonu 2, Puchar Polski 1.
+ */
+export function quickRank(game, f, cache = new Map()) {
+  if (f.comp === 'friendly') return 0;
+  if (f.comp === 'super' || f.round === 'F') return 3;
+  if (f.comp === 'uefa') return 2;
+  const H = anyClub(f.home); const A = anyClub(f.away);
+  if (H?.region && H.region === A?.region && H.parent !== A.id && A.parent !== H.id) return 2;
+  if (LEAGUE_COMPS.includes(f.comp) && cache.has(f.comp)) {
+    const t = cache.get(f.comp);
+    const ih = t.findIndex((r) => r.id === f.home); const ia = t.findIndex((r) => r.id === f.away);
+    if (ih >= 0 && ia >= 0 && t[ih].played >= 17) {
+      const rh = t[ih]; const ra = t[ia];
+      if (ih <= 1 && ia <= 1 && Math.abs(rh.points - ra.points) <= 4) return 2;
+      if (ih >= t.length - 5 && ia >= t.length - 5) return 2;
+    }
+  }
+  return f.comp === 'pp' ? 1 : 0;
+}
+
+/**
+ * Decyzje trenera w meczu w tle (docs/trener-ai-atrybuty.md): profil trenera klubu AI albo asystent gracza (jakość
+ * ze sztabu), dyspozycja dnia z ziarna meczu, waga meczu. Wynik w punktach atrybutu dla stref drużyny.
+ */
+function quickCoach(game, f, clubId, rank) {
+  const prof = clubId === game.clubId ? assistantProfile(staffQ(game, clubId, 'asystent')) : coachOf(game, clubId, anyClub(clubId));
+  return quickCoachTerm(matchCoach(prof, { rank, rng: formRng(game, f.id, clubId) }));
+}
+
 /** Mecz w tle (AI vs AI) szybką symulacją. */
 export function playQuick(game, f, rng, cache = new Map()) {
   const home = { squad: squadFor(game, f.home, f.comp), tableTerm: tableTermFor(game, f.home, f.comp, cache) };
   const away = { squad: squadFor(game, f.away, f.comp), tableTerm: tableTermFor(game, f.away, f.comp, cache) };
+  const rank = quickRank(game, f, cache);
+  home.coachTerm = quickCoach(game, f, f.home, rank);
+  away.coachTerm = quickCoach(game, f, f.away, rank);
   const ctx = { neutral: !!f.neutral, refStrict: 0.85 + rng.next() * 0.35 };
   const r = f.knockout ? quickKnockout(home, away, ctx, rng, f.knockout) : quickMatch(home, away, ctx, rng);
   // Zawodnicy w meczu: jedenastka z symulacji; kartki rozdzielone wg agresji, asysty do partnerów
@@ -251,12 +287,30 @@ function aiPostMatchTalk(game, f, clubId, s, res, squad, played) {
   const mem = (game.aiSpeech ??= {});
   const gf = res.score[s]; const ga = res.score[1 - s];
   const xg = res.stats?.xg ?? [0, 0];
-  const tone = aiChooseSpeech(anyClub(clubId)?.coach ?? 'P', { phase: 'post', diff: gf - ga, xgDiff: (xg[s] ?? 0) - (xg[1 - s] ?? 0), memory: mem[clubId] });
-  const r = postMatchBriefing({
-    players, tone, memory: mem[clubId], seed: `${game.seed}:${f.id}:po-meczu-ai:${clubId}`,
+  let tone = aiChooseSpeech(anyClub(clubId)?.coach ?? 'P', { phase: 'post', diff: gf - ga, xgDiff: (xg[s] ?? 0) - (xg[1 - s] ?? 0), memory: mem[clubId] });
+  const talk = (t) => postMatchBriefing({
+    players, tone: t, memory: mem[clubId], seed: `${game.seed}:${f.id}:po-meczu-ai:${clubId}`,
     ctx: { score: { for: gf, against: ga }, xgFor: xg[s] ?? 0, xgAgainst: xg[1 - s] ?? 0, ratings: Object.fromEntries(res.players[s].map((x) => [x.id, x.rating])), rank: f.derby ? 2 : f.comp === 'pp' ? 1 : 0, clubId },
   });
-  for (const p of players) { const m = r.morale[p.id]; if (m) p.morale = applyMorale(p.morale ?? 12, m.delta); }
+  // Motywacja trenera (docs/trener-ai-atrybuty.md): dobry trener częściej trafia z tonem (ocenia wszystkie, jak
+  // podpowiedź asystenta gracza), słaby czasem źle czyta szatnię i mówi coś gorszego niż zwykle; siła odprawy
+  // x(1 + 0,25 s)
+  const mot = motivationSkill(game, clubId);
+  if (mot) {
+    const pick = new Rng(`${game.seed}:${f.id}:po-meczu-ai-ton:${clubId}`);
+    const mean = (r) => players.reduce((a, p) => a + (r.morale[p.id]?.delta ?? 0), 0);
+    if (mot > 0 && pick.chance(COACH.talkBest * mot)) {
+      let best = -Infinity;
+      for (const t of Object.keys(POST_TONES)) { const v = mean(talk(t)); if (v > best) { best = v; tone = t; } }
+    } else if (mot < 0 && pick.chance(COACH.talkMiss * -mot)) {
+      const v0 = mean(talk(tone));
+      const worse = Object.keys(POST_TONES).filter((t) => mean(talk(t)) < v0);
+      if (worse.length) tone = pick.pick(worse);
+    }
+  }
+  const r = talk(tone);
+  const fx = (d) => (!mot ? d : d > 0 ? d * (1 + COACH.postFx * mot) : d * (1 - COACH.postFx * mot));
+  for (const p of players) { const m = r.morale[p.id]; if (m) p.morale = applyMorale(p.morale ?? 12, fx(m.delta)); }
   mem[clubId] = closeMatchMemory(r.memory);
 }
 

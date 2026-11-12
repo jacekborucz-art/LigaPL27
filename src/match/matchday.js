@@ -22,7 +22,10 @@ import { createTactics, refreshTactics } from '../engine/lineup.js';
 import { squadFor, anyClub, applyResult, fromEngineResult, walkoverScore, LEAGUE_COMPS, compLabel } from '../season/season.js';
 import { standings } from '../season/standings.js';
 import { winnerOf } from '../season/cup.js';
-import { preMatchStudio, postMatchStudio, postMatchMessages, preMatchMessages, odds1X2 } from './studio.js';
+import { preMatchStudio, postMatchStudio, postMatchMessages, preMatchMessages, odds1X2, matchRank } from './studio.js';
+import { aiPlanTactics } from './aiPlan.js';
+import { coachOf, matchCoach, formRng, assistantProfile, coachBlurb, COACH } from '../career/coaches.js';
+import { staffQ } from '../training/staff.js';
 import {
   preMatchBriefing, halftimeBriefing, postMatchBriefing, assistantAdvice, aiBriefing, newSpeechMemory, closeMatchMemory,
   applyBriefing, POST_TONES,
@@ -76,10 +79,13 @@ function teamCtx(game, clubId, comp, table, tactics) {
   const last5 = (game.fixtures || []).filter((x) => x.played && x.result && (x.home === clubId || x.away === clubId))
     .sort((a, b) => a.date.localeCompare(b.date)).slice(-5)
     .map((x) => { const me = x.home === clubId ? 0 : 1; const [a, b] = x.result.score; return a === b ? 'R' : (me === 0 ? a > b : b > a) ? 'W' : 'P'; });
+  // Trener klubu AI w zapowiedzi meczu: imię, styl i jedno zdanie o mocnych i słabych stronach (bez liczb)
+  const coach = clubId !== game.clubId ? coachOf(game, clubId, club) : null;
   return {
     id: clubId, name: club?.name ?? clubId, region: club?.region, prestige: club?.prestige ?? 3,
     squad: squadFor(game, clubId, comp), formation: formationById(tactics?.formation ?? '4231').name,
     last5, position: row?.pos ?? null, points: row?.points ?? null,
+    ...(coach ? { coach: coach.style, coachName: coach.name, coachNote: coachBlurb(coach) } : {}),
   };
 }
 
@@ -142,7 +148,16 @@ export function startMatchday(game, f) {
   // Sparing: na ławce cała dostępna kadra do 14 zawodników u obu drużyn (docs/sparingi-i-karne.md, rozdz. 4).
   // Ustawienia gracza (game.tactics) się nie zmieniają: dodatkowi rezerwowi dochodzą tylko na ten mecz.
   const matchBench = comp === 'friendly' ? FRIENDLY_BENCH : benchSize;
-  const oppTactics = createTactics(oppSquad, { benchSize: matchBench, formation: aiPreMatchFormation(game, f, { userSide, mySquad, oppSquad, comp }) });
+  // Trener rywala w tym meczu (docs/trener-ai-atrybuty.md): atrybuty, dyspozycja dnia i waga meczu (ranga jak w studiu)
+  const rank0 = matchRank({
+    competition: compInfo(f), home: teamCtx(game, f.home, comp, table, null), away: teamCtx(game, f.away, comp, table, null),
+    table: table ? { roundsPlayed: Math.max(...table.map((r) => r.played)), roundsTotal: 34, size: table.length } : null,
+  }).level;
+  const oppCoach = coachOf(game, oppId, anyClub(oppId));
+  const oppQ = comp === 'friendly' ? null : matchCoach(oppCoach, { rank: rank0, rng: formRng(game, f.id, oppId) });
+  const myQ = matchCoach(assistantProfile(staffQ(game, game.clubId, 'asystent')), { rank: rank0, rng: formRng(game, f.id, game.clubId) });
+  const formation = aiPreMatchFormation(game, f, { userSide, mySquad, oppSquad, comp });
+  const { tactics: oppTactics, plan: oppPlan } = aiPlanTactics(oppSquad, { formation, benchSize: matchBench, cq: oppQ, rng: new Rng(`ai-plan:${game.seed}:${f.id}`), oppSquad: mySquad });
   const weather = weatherFor(f.date, rng);
   const pitch = rng.weighted(['doskonala', 'dobra', 'zla', 'sztuczna'], (p) => ({ doskonala: 2, dobra: 6, zla: weather.type === 'deszcz' || weather.type === 'snieg' ? 2 : 0.5, sztuczna: 0.6 })[p]);
   const referee = { name: rng.pick(REFEREES), strictness: Math.round(Math.max(0.7, Math.min(1.4, rng.gauss(1, 0.13))) * 100) / 100 };
@@ -165,7 +180,8 @@ export function startMatchday(game, f) {
   if (pre.conditions?.attendance) pre.conditions.attendance.expected = Math.round(pre.conditions.attendance.expected * fanMul / 100) * 100;
   return {
     fixtureId: f.id, f, userSide, oppId, comp, tier, step: 'studio', pre, preCtx, weather, pitch, referee, hasVar,
-    oppTactics, benchSize: matchBench, memory: game.speechMemory ?? newSpeechMemory(), M: null, briefings: {}, post: null, pr: { pre: null, post: null },
+    oppTactics, oppQ, oppPlan, myQ, oppCoach: oppCoach ? { name: oppCoach.name, style: oppCoach.style } : null,
+    benchSize: matchBench, memory: game.speechMemory ?? newSpeechMemory(), M: null, briefings: {}, post: null, pr: { pre: null, post: null },
   };
 }
 
@@ -236,7 +252,11 @@ export function doPreBriefing(game, S, tone, talks = []) {
   const res = preMatchBriefing({ players: matchSquadPlayers(game, S), tone, talks, memory: S.memory, ctx: { ...S.pre.forBriefing, clubId: game.clubId, date: S.f.date }, seed: `${game.seed}:${S.f.id}:pre` });
   S.memory = res.memory;
   S.briefings.pre = res;
-  for (const p of matchSquadPlayers(game, S)) { const w = game.world.players[p.id]; if (w) Object.assign(w, applyBriefing(w, res)); }
+  // Skutki dla morale tylko raz na mecz (powtórzona odprawa po ponownym wejściu w dzień meczowy działa tylko w meczu)
+  if (!mdDone(game, S.f.id, 'pre-speech')) {
+    for (const p of matchSquadPlayers(game, S)) { const w = game.world.players[p.id]; if (w) Object.assign(w, applyBriefing(w, res)); }
+    markDone(game, S.f.id, 'pre-speech');
+  }
   return res;
 }
 
@@ -251,10 +271,13 @@ export function kickOff(game, S) {
   const mySquad = squadFor(game, game.clubId, S.comp);
   const oppSquad = squadFor(game, S.oppId, S.comp);
   const oppClub = anyClub(S.oppId);
-  const ai = aiBriefing({ coach: oppClub?.coach ?? 'P', personaMix: personaMix(oppSquad) }, { phase: 'pre', pWin: 1 - (S.pre.forBriefing.pWin ?? 0.4), rank: S.pre.forBriefing.rank }, `${game.seed}:${S.f.id}:ai`);
-  const zOpp = Object.fromEntries(oppSquad.map((p) => [p.id, ai.zByPersona[p.persona] ?? ai.teamZ]));
-  const mine = { club: anyClub(game.clubId), squad: mySquad, tactics: matchTacticsFor(game, S), ai: false, coach: 'P', zStart: S.briefings.pre?.engine?.zStart ?? {} };
-  const theirs = { club: oppClub, squad: oppSquad, tactics: S.oppTactics, ai: true, coach: oppClub?.coach ?? 'P', zStart: zOpp };
+  const oppQ = S.oppQ ?? null; // stary stan dnia meczowego (sprzed atrybutów trenerów): trener neutralny
+  const ai = aiBriefing({ coach: oppClub?.coach ?? 'P', personaMix: personaMix(oppSquad), mot: oppQ?.mot ?? 0 }, { phase: 'pre', pWin: 1 - (S.pre.forBriefing.pWin ?? 0.4), rank: S.pre.forBriefing.rank }, `${game.seed}:${S.f.id}:ai`);
+  // Wielki mecz: odporny trener uspokaja drużynę, nerwowy ją usztywnia (zaangażowanie na start, PRE)
+  const nerves = oppQ ? oppQ.imp * COACH.nerves * oppQ.pre : 0;
+  const zOpp = Object.fromEntries(oppSquad.map((p) => [p.id, (ai.zByPersona[p.persona] ?? ai.teamZ) + nerves]));
+  const mine = { club: anyClub(game.clubId), squad: mySquad, tactics: matchTacticsFor(game, S), ai: false, coach: 'P', zStart: S.briefings.pre?.engine?.zStart ?? {}, assistantQ: S.myQ ?? null };
+  const theirs = { club: oppClub, squad: oppSquad, tactics: S.oppTactics, ai: true, coach: oppClub?.coach ?? 'P', zStart: zOpp, coachQ: oppQ };
   // Trening: spójność zespołu na start meczu i stałe fragmenty (src/training)
   Object.assign(mine, trainingMatchInput(game, game.clubId, mine));
   Object.assign(theirs, trainingMatchInput(game, S.oppId, theirs));
@@ -324,7 +347,7 @@ export function doHalfBriefing(game, S, tone, talks = []) {
   for (const x of [...T.players, ...T.bench]) if (res.engine.zStart[x.id] != null) x.Z = res.engine.zStart[x.id];
   // AI rywala też ma odprawę
   const O = S.M.teams[1 - S.userSide];
-  const ai = aiBriefing({ coach: O.coach, personaMix: personaMix(O.players.map((x) => x.p)) }, { phase: 'half', diff: -h.score.for + h.score.against, xgDiff: h.xgAgainst - h.xgFor, pWin: 1 - (S.pre.forBriefing.pWin ?? 0.4) }, `${game.seed}:${S.f.id}:aihalf`);
+  const ai = aiBriefing({ coach: O.coach, personaMix: personaMix(O.players.map((x) => x.p)), mot: O.cq?.mot ?? 0 }, { phase: 'half', diff: -h.score.for + h.score.against, xgDiff: h.xgAgainst - h.xgFor, pWin: 1 - (S.pre.forBriefing.pWin ?? 0.4) }, `${game.seed}:${S.f.id}:aihalf`);
   for (const x of O.players) x.Z = ai.zByPersona[x.p.persona] ?? ai.teamZ;
   for (const p of onPitchPlayers(S)) { const w = game.world.players[p.id]; if (w) Object.assign(w, applyBriefing(w, res)); }
   return res;
@@ -613,6 +636,19 @@ export function pressCtxPre(game, S) {
   };
 }
 
+/**
+ * Trwały zapis w grze, co już się odbyło w dniu meczowym danego meczu (game.mdDone[fixtureId]). Chroni przed
+ * powtórzeniem konferencji i odprawy przedmeczowej, gdy dzień meczowy zaczyna się od nowa (np. po odświeżeniu
+ * strony albo powrocie ze zmiany składu). Trzyma ostatnie 60 meczów.
+ */
+export function mdDone(game, fid, key) { return !!game.mdDone?.[fid]?.[key]; }
+function markDone(game, fid, key) {
+  game.mdDone = game.mdDone ?? {};
+  (game.mdDone[fid] = game.mdDone[fid] ?? {})[key] = true;
+  const ids = Object.keys(game.mdDone);
+  if (ids.length > 60) for (const id of ids.slice(0, ids.length - 60)) delete game.mdDone[id];
+}
+
 /** Miejsce na stan konferencji danej fazy w sesji dnia meczowego (leniwie, także dla starej sesji). */
 export function pressSlot(S, phase = 'post') {
   S.pr = S.pr ?? {};
@@ -627,6 +663,7 @@ export function pressSlot(S, phase = 'post') {
 export function pressSetup(game, S, phase = 'post') {
   if (S.comp === 'friendly' || (phase === 'post' && !S.post) || (phase === 'pre' && !S.pre)) return null;
   const slot = pressSlot(S, phase);
+  if (!slot.settled && mdDone(game, S.f.id, `press-${phase}`)) return null; // ta konferencja już się odbyła
   if (!slot.room) {
     const state = pressState(game);
     const ctx = phase === 'pre' ? pressCtxPre(game, S) : pressCtx(game, S);
@@ -730,6 +767,7 @@ function settlePress(game, S, eff, phase = 'post') {
   if (msgs.length) game.inbox = addMessages(game.inbox ?? [], msgs).inbox;
   slot.result = eff;
   slot.settled = true;
+  markDone(game, S.f.id, `press-${phase}`);
   return eff;
 }
 

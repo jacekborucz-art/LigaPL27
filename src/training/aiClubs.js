@@ -22,6 +22,7 @@ import { aiSessionToClub } from './cohesion.js';
 import { fatigueMul, regenMul, trainingInjuryChance, overloadTerm } from './load.js';
 import { rollTrainingInjury } from './sessions.js';
 import { offsetsFor } from './development.js';
+import { trainingSkill, COACH } from '../career/coaches.js';
 
 const r2 = (v) => Math.round(v * 100) / 100;
 /** Liczba z cyfr napisu (bez tworzenia podnapisów). */
@@ -199,12 +200,14 @@ export function processAiDay(game, date) {
     const fitQ = staffQ(game, clubId, 'fizyczny');
     // Akcent indywidualny dla młodych tylko w klubach z dobrym trenerem młodzieży (decyzja gracza)
     const youthFocus = staffQ(game, clubId, 'mlodziez') >= AI_PLAN.focusMinYouthQ;
-    const tac = staffMul.tac(staffQ(game, clubId, 'asystent'));
+    // Metodyka treningu trenera (TRE, docs/trener-ai-atrybuty.md): zgranie, ostrość i urazy na zajęciach
+    const tre = trainingSkill(game, clubId);
+    const tac = staffMul.tac(staffQ(game, clubId, 'asystent')) * (1 + COACH.train.cohesion * tre);
     // Forma bazowa (obóz): brak przygotowania wolniej buduje ostrość i podnosi ryzyko urazu przez 6 tygodni
     const f = c.cb && c.cb.key === key ? baseFactor(c.cb.start, date) : 0;
     const lack = f ? Math.max(0, 1 - c.cb.base) * f : 0;
-    const sharpMul = 1 - 0.5 * lack;
-    const injuryMul = 1 + CAMP.injuryPenalty * lack;
+    const sharpMul = (1 - 0.5 * lack) * (1 + COACH.train.sharp * tre);
+    const injuryMul = (1 + CAMP.injuryPenalty * lack) * (1 - COACH.train.injury * tre);
 
     const team = day.sessions.map((x) => sessionStim(x, campQ, !!camp));
     const st = stimState(c);
@@ -305,7 +308,8 @@ export function aiStimFor(game, p) {
   const gk = p.pos === 'BR';
   const base = gk ? st.gk : st.out;
   const full = gk ? st.dpGk : st.dpOut;
-  const k = full > 0 ? tr.dp / full : 0;
+  // Metodyka treningu trenera: bodziec rozwojowy x(1 + 0,2 s) (docs/trener-ai-atrybuty.md)
+  const k = (full > 0 ? tr.dp / full : 0) * (1 + COACH.train.stim * trainingSkill(game, p.clubId));
   const stim = {};
   for (const a in base) stim[a] = base[a] * k;
   if (tr.dd) {

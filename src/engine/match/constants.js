@@ -118,5 +118,20 @@ export const SHOUTS = {
   walka: { label: 'Więcej walki!', Z: 2, foulMul: 1.1, yellowMul: 1.15 },
   brawo: { label: 'Brawo!', Z: 1, morale: 0.3, maxUses: 2 },
 };
-export const SHOUT_COOLDOWN = 8;
+export const SHOUT_COOLDOWN = 5; // minuty meczu do kolejnego okrzyku (gracz i AI tak samo)
 export const SHOUT_DURATION = 8;
+
+// Trener w meczu: umiejętności s (od -1 do 1) z atrybutów trenera (src/career/coaches.js, docs/trener-ai-atrybuty.md).
+// T.cq = { tak, skl, mot, pre } albo brak (gracz, testy): s = 0, czyli zachowanie AI sprzed atrybutów. [SZAC]
+export const COACHQ = {
+  alert: 0.5, // szansa reakcji na przebieg meczu i sposób gry rywala x(1 + 0,5 s); korekty szkodliwe x(1 - 0,5 s)
+  stubborn: 0.5, // upór x(1 - 0,5 s)
+  lag: 2, // czas rozpoznania zmian rywala: 6-10 min - 2 s
+  act: 0.25, // reakcje na kartki, wynik, warianty ustawienia x(1 + 0,25 s)
+  subs: 0.2, // szanse zmian zawodników (urazy, zmęczenie, kartki, słaba gra, pogoń, obrona wyniku) x(1 + 0,2 s)
+  tired: 4, // próg zmiany zmęczonego zawodnika: kondycja poniżej 70 + 4 s
+  mistake: 0.3, // słaby taktyk (s < 0): błędna korekta w przeglądzie planu z szansą 0,3 (-s)
+  correct: 0.5, // ostrożny trener z dobrą taktyką (s > 0): skuteczniejsza reakcja na przewagę rywala z szansą 0,5 s
+  keyMoment: 0.5, pressure: 0.4, // kluczowe momenty (końcówka na styku, dogrywka, czerwona kartka): + 0,5 * 0,4 * s(PRE)
+  shoutP: 0.4, shoutFx: 0.3, // okrzyki AI: szansa x(1 + 0,4 s), siła x(1 + 0,3 s) wg motywacji
+};

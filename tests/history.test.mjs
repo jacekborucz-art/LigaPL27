@@ -134,7 +134,8 @@ test('Koniec sezonu: historia meczów zostaje, statystyki do p.history z podzia�
   const played26 = g.history.m['2026/27'];
   assert.ok(played26.length >= 34, `mecze sezonu: ${played26.length}`);
   // Każdy mecz w historii to mecz klubu, który trener wtedy prowadził (także po zmianie pracy w trakcie sezonu)
-  const ledAt = (club, d) => (g.manager.history ?? []).some((h) => h.club === club && h.from <= d && (!h.to || d < h.to));
+  // Dzień zwolnienia włącznie: mecz tego dnia gra jeszcze stary klub (decyzja o nowej pracy przychodzi po meczu)
+  const ledAt = (club, d) => (g.manager.history ?? []).some((h) => h.club === club && h.from <= d && (!h.to || d <= h.to));
   for (const r of played26) assert.ok(r.s && (r.h === r.me || r.a === r.me) && ledAt(r.me, r.d), `${r.id} ${r.me} ${r.d}`);
   if (g.manager.history.length === 1) assert.equal(played26.filter((r) => r.c === 'ekstraklasa' || r.c === 'liga1' || r.c === 'liga2').length, 34);
   assert.deepEqual(historySeasons(g).slice(0, 2), ['2027/28', '2026/27']);

@@ -536,14 +536,26 @@
 .rts { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; }
 .rts li { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: var(--radius-s); background: color-mix(in srgb, var(--text) 4%, transparent); min-width: 0; }
 .rts li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Telefon: wynik i statystyki na górze, potem reszta */
+.pst__score { order: 0; } .pcard--stats { order: 1; } .pst__motm { order: 2; } .pcard--moments { order: 3; } .pst__side { order: 4; } .pcard--ratings { order: 5; }
+/* PC: na środku wynik i pod nim statystyki; z lewej zawodnik meczu i kluczowe momenty, z prawej reakcje i po meczu; oceny na dole */
+.md__main:has(> .pst) { max-width: 1680px; }
 @media (min-width: 1024px) {
-  .pst { grid-template-columns: repeat(12, minmax(0, 1fr)); align-items: start; }
-  .pst__score { grid-column: 1 / 9; }
-  .pst__motm { grid-column: 9 / 13; align-self: stretch; }
-  .pcard--moments { grid-column: 1 / 6; grid-row: span 2; }
-  .pcard--stats { grid-column: 6 / 9; grid-row: span 2; }
-  .pst__side { grid-column: 9 / 13; grid-row: span 2; }
-  .pcard--ratings { grid-column: 1 / 13; }
+  .pst { align-items: start; column-gap: var(--space-4);
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    grid-template-areas: "score score" "stats motm" "stats moments" "stats side" "ratings ratings"; }
+  .pst > * { order: 0; }
+  .pst__score { grid-area: score; } .pcard--stats { grid-area: stats; } .pst__motm { grid-area: motm; align-self: stretch; }
+  .pcard--moments { grid-area: moments; } .pst__side { grid-area: side; } .pcard--ratings { grid-area: ratings; }
+}
+@media (min-width: 1280px) {
+  .pst { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr);
+    grid-template-areas: "score score score" "motm stats side" "moments stats side" "ratings ratings ratings"; }
+  .pst__motm { align-self: stretch; }
+  .pcard--moments, .pst__side { align-self: start; }
+}
+@media (min-width: 1600px) {
+  .pst .rts { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 }
 
 /* ================= Odprawy: panele obok siebie na PC ================= */
@@ -1082,3 +1094,65 @@
 @keyframes so-hit { from { transform: scale(1.35); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes so-pop { from { transform: scale(.4); } to { transform: scale(1); } }
 .sxi .pos { flex: none; min-width: 34px; text-align: center; }
+/* Jeden pasek przewagi: procenty z ostatnich 5 minut, płynny ruch */
+.poss--live .bar2 { height: 12px; }
+.poss--live .bh, .poss--live .ba { transition: width .6s cubic-bezier(.3, .7, .3, 1); }
+.poss--live span { font-variant-numeric: tabular-nums; min-width: 3.2ch; }
+.mom-area .press__lbl { margin: 0; text-align: center; }
+@media (prefers-reduced-motion: reduce) { .poss--live .bh, .poss--live .ba { transition: none; } }
+
+/* Przerwa: tylko statystyki meczu, wyśrodkowane */
+.brk-stats { max-width: 760px; margin: var(--space-4) auto 0; }
+.brk-stats h2 { text-align: center; }
+.brk-stats .vs .lbl .bar2 { height: 5px; margin-top: 4px; }
+
+/* Strzelcy na tablicy: obok siebie w linii, zawijanie dopiero przy braku miejsca; bramki jednego zawodnika za jego nazwiskiem */
+.bev { flex-direction: row; flex-wrap: wrap; align-content: flex-start; gap: 3px 16px; }
+.bev--a { justify-content: flex-end; }
+.bev li { flex-wrap: wrap; max-width: 100%; }
+
+/* ================= Okrzyk z linii bocznej ================= */
+.md-dlg.sh-dlg { width: min(720px, calc(100vw - 24px)); padding: 18px 20px 20px; }
+.sh-head { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+.sh-head h2 { margin: 0; margin-right: auto; font: 700 var(--step-2)/1.1 var(--font-display); }
+.sh-sub { margin: 0 0 12px; color: var(--text-muted); font-size: var(--step--1); }
+.sh-dlg .notice { margin: 0 0 12px; }
+.sh-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.sh-card { --sc: #F28C28; position: relative; display: grid; gap: 4px; align-content: start; min-height: 104px; padding: 14px 14px 12px 18px; border: 1px solid color-mix(in srgb, var(--sc) 40%, var(--line)); border-radius: var(--radius-m); background: color-mix(in srgb, var(--sc) 10%, var(--surface)); color: var(--text); text-align: left; cursor: pointer; overflow: hidden; transition: transform .12s ease, border-color .12s ease, background .12s ease; }
+.sh-card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 6px; background: var(--sc); }
+.sh-card:hover:not([disabled]) { border-color: var(--sc); background: color-mix(in srgb, var(--sc) 18%, var(--surface)); transform: translateY(-1px); }
+.sh-card:focus-visible { outline: 3px solid var(--focus, var(--led)); outline-offset: 2px; }
+.sh-card[disabled] { cursor: not-allowed; opacity: .5; filter: saturate(.4); }
+.sh-card__t { font: 700 var(--step-1)/1.1 var(--font-display); }
+.sh-card__w { font-weight: 600; font-size: var(--step--1); }
+.sh-card__c { color: var(--text-muted); font-size: 12px; }
+.sh-card__x { color: var(--kartka-czerwona); font-size: 12px; font-weight: 600; }
+.sh-card--att { --sc: #E0602B; }
+.sh-card--def { --sc: #3E7CB1; }
+.sh-card--calm { --sc: #2F8F8A; }
+.sh-card--fight { --sc: #C0392B; }
+.sh-card--praise { --sc: #E0A21A; }
+.coachbar .coachbar__shout:disabled { background: color-mix(in srgb, #F28C28 30%, var(--surface)); border-color: transparent; color: var(--text-muted); cursor: not-allowed; }
+.coachbar__shout small { font: 600 12px/1 var(--font-body); opacity: .85; }
+@media (max-width: 560px) { .sh-grid { grid-template-columns: 1fr; } .sh-card { min-height: 0; } }
+@media (prefers-reduced-motion: reduce) { .sh-card { transition: none; } .sh-card:hover:not([disabled]) { transform: none; } }
+/* Zawodnicy, którzy zeszli: bez nagłówka, oddzieleni cienką linią pod ławką (nazwiska są wyszarzone) */
+.ros__list--out { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--line); }
+/* Studio pomeczowe: tablica równo z panelami obok, szerszy środek, mniejsze nazwy, żeby mieściły się pełne */
+.pst__score .final, .pst__score .board { margin-top: 0; }
+.pst__score .final .board { margin-bottom: 0; }
+@media (min-width: 1280px) {
+  .pst { grid-template-columns: minmax(250px, 1fr) minmax(560px, 1.5fr) minmax(250px, 1fr); }
+}
+.pst__score .final { padding: 0; }
+/* Zawodnik meczu: zwarta karta, kluczowe momenty pod nią (statystyki na środku zajmują wysokość obu wierszy) */
+@media (min-width: 1280px) {
+  .pst { grid-template-rows: auto auto 1fr auto; }
+  .pst__motm { align-self: start; min-height: 104px; }
+}
+/* Przyciski dnia meczowego z kolorem znaczenia (główna akcja zostaje zielona) */
+.actionbar .btn--lineup { background: #2F8F8A; border-color: #2F8F8A; color: #FFFFFF; }
+.actionbar .btn--lineup:hover { background: #267A76; border-color: #267A76; }
+.actionbar .btn--press { background: #2F6FB0; border-color: #2F6FB0; color: #FFFFFF; }
+.actionbar .btn--press:hover { background: #285F97; border-color: #285F97; }
+.actionbar .btn--lineup:focus-visible, .actionbar .btn--press:focus-visible { outline: 3px solid var(--focus, var(--led)); outline-offset: 2px; }

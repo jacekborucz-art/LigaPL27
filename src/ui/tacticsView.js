@@ -35,7 +35,7 @@ const dragAttrs = (loc, p) => `data-drag="${esc(locKey(loc))}" data-gname="${esc
  * sel: null | loc ({ zone: 'xi'|'bench'|'out', idx?, id? }), zob. tacticsMoves.js.
  * info: id zawodnika z otwartym panelem atrybutów. msg: komunikat po ostatnim ruchu.
  */
-export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg = '', numbers = null, kit = null }) {
+export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg = '', numbers = null, kit = null, infoExtra = '' }) {
   const byId = new Map(squad.map((p) => [p.id, p]));
   const f = formationById(tactics.formation);
   const check = checkTactics(tactics, squad, { benchSize });
@@ -170,7 +170,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
           ${[['Bramkarz', z.GK], ['Obrona', z.DEF], ['Pomoc', z.MID], ['Atak', z.ATT]].map(([k, v]) => `<li><span>${k}</span><span class="abar"><i data-b="${v >= 13 ? 'top' : v >= 11 ? 'good' : v >= 8 ? 'mid' : 'low'}" style="width:${Math.max(0, Math.min(100, v * 5))}%"></i></span><b>${Math.round(v)}</b></li>`).join('')}
         </ul>
       </div>
-      ${infoPlayer ? renderPlayerInfo(infoPlayer, tactics, f) : '<p class="tdet-empty">Kliknij dwukrotnie nazwisko zawodnika albo przycisk „i”, żeby zobaczyć tu jego atrybuty.</p>'}
+      ${infoPlayer ? renderPlayerInfo(infoPlayer, tactics, f, infoExtra) : '<p class="tdet-empty">Kliknij dwukrotnie nazwisko zawodnika albo przycisk „i”, żeby zobaczyć tu jego atrybuty.</p>'}
     </div>
   </div>
   <section class="tpanel3 tpanel3--instr" aria-labelledby="tp-h-instr">
@@ -195,7 +195,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
  * Panel atrybutów. Renderowany jako otwarty <dialog> (obok listy na szerokim ekranie);
  * na węższych ekranach app.js przełącza go w okno modalne (arkusz od dołu na telefonie).
  */
-function renderPlayerInfo(p, tactics, f) {
+function renderPlayerInfo(p, tactics, f, extra = '') {
   const slotIdx = tactics.xi.indexOf(p.id);
   const benchIdx = tactics.bench.indexOf(p.id);
   const slot = slotIdx >= 0 ? f.slots[slotIdx] : null;
@@ -225,6 +225,7 @@ function renderPlayerInfo(p, tactics, f) {
         ${fact('Morale', esc(moraleLabel(p.morale ?? 12)))}
       </dl>
       <div class="tdet__groups">${attrGroupsHtml(p, { heading: 'h4' })}</div>
+      ${extra ? `<div class="tdet__stats">${extra}</div>` : ''}
     </div>
   </dialog>`;
 }

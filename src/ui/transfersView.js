@@ -147,7 +147,7 @@ function playerCard(game, p, ui) {
   }
   return `<button class="btn btn--quiet btn--sm" data-act="tf-close">Wróć do listy</button>
     <section class="panel tf-card">
-      <div class="tf-card__head" data-pid="${esc(p.id)}">${crest(p.clubId, 36)}<div><h2>${esc(p.name)}</h2><p class="hint">${esc(POS_NAMES?.[p.pos] ?? p.pos)}, ${p.age} lat, ${esc(NAT_NAMES[p.nat] ?? p.nat)}${p.clubId ? `, ${esc(clubById(p.clubId)?.name)}` : ', wolny zawodnik'}</p></div><b class="tf-big">${ovrTxt(p)}</b></div>
+      <div class="tf-card__head" data-pid="${esc(p.id)}">${crest(p.clubId, 36)}<div><h2>${esc(p.name)} <button class="btn btn--quiet btn--sm" data-act="extplayer" data-id="${esc(p.id)}">Profil i statystyki</button></h2><p class="hint">${esc(POS_NAMES?.[p.pos] ?? p.pos)}, ${p.age} lat, ${esc(NAT_NAMES[p.nat] ?? p.nat)}${p.clubId ? `, ${esc(clubById(p.clubId)?.name)}` : ', wolny zawodnik'}</p></div><b class="tf-big">${ovrTxt(p)}</b></div>
       <ul class="plain-list">
         <li><span class="k">Reputacja</span><span>${esc(reputationLabel(p.rep ?? 30))}</span></li>
         <li><span class="k">Mocne strony</span><span>${esc(topAttrs(p))}</span></li>

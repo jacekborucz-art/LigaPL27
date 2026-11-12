@@ -77,7 +77,8 @@ export function lineupRating(entries, squad = [], ctx = {}) {
 function ratingFromPicked(xi, missing, squad, ctx) {
   const by = (g) => xi.filter((x) => x.group === g);
   const mean = (arr, f = (x) => x.value) => (arr.length ? arr.reduce((s, x) => s + f(x), 0) / arr.length : 0);
-  const extra = ctx.tableTerm || 0;
+  // Pewność siebie z tabeli i decyzje trenera w meczu w tle (career/coaches.js quickCoachTerm), w punktach atrybutu
+  const extra = (ctx.tableTerm || 0) + (ctx.coachTerm || 0);
   const gkEntry = by('GK')[0];
   const gkMods = gkEntry ? goalkeeperSlotModifiers(gkEntry.player) : goalkeeperSlotModifiers({ pos: 'NAP' });
   const shooters = [...by('ATT'), ...by('MID')];
@@ -104,7 +105,7 @@ function ratingFromPicked(xi, missing, squad, ctx) {
       positionLoss: mean(xi, (x) => x.player.ovr * (1 - posEff(x.prof))),
       ...Object.fromEntries(Object.keys(xi[0]?.terms ?? {}).map((k) => [k, avg(k)])),
       ...teamMods.parts,
-      table: extra, missingCount: missing.length,
+      table: ctx.tableTerm || 0, coach: ctx.coachTerm || 0, missingCount: missing.length,
     },
   };
 }
