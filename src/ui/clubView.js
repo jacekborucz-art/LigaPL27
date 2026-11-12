@@ -6,6 +6,8 @@
 import { CLUBS_PL, LEAGUE_NAMES, clubById } from '../data/clubs_pl.js';
 import { squadOf } from '../world/worldGen.js';
 import { coachOf, headCoachName, coachBlurb, coachSeen, coachBand, COACH_ATTRS, COACH_KEYS, COACH_STYLES } from '../career/coaches.js';
+import { ownerOf, ownerBlurb, OWNER_TYPES } from '../career/owners.js';
+import { NAT_NAMES } from '../data/names.js';
 import { GROUP } from '../career/squad.js';
 import { shirtNumbers, kitColors } from '../career/shirts.js';
 import { staffOf, staffQ } from '../training/staff.js';
@@ -52,14 +54,50 @@ export function coachCardHtml(game, clubId) {
     return `<li class="is-${band}" title="${esc(COACH_ATTRS[k].text)}"><span>${esc(COACH_ATTRS[k].short)}</span>
       <i class="clv-bar" role="img" aria-label="${esc(`${COACH_ATTRS[k].name}: ${prec === 'vague' ? coachBand(v) : `${seen.text} na 20`}`)}">${bar}</i><em>${esc(seen.text)}</em></li>`;
   }).join('');
-  const since = c.since && c.n ? `, w klubie od ${fmtDate(c.since)}` : '';
+  const tenure = coachTenureText(game, clubId, c);
   const note = prec === 'exact' ? 'Oceny od analityka wideo (skala 1-20).' : prec === 'approx' ? 'Oceny przybliżone: lepszy analityk wideo poda dokładne liczby.' : 'Analityk wideo ocenia trenera tylko ogólnie.';
   return `<div class="clv-coach">
-    <p class="clv-coach__name"><b>${esc(c.name)}</b><small>styl: ${esc(COACH_STYLES[c.style] ?? 'pragmatyczny')}, ${esc(plYears(c.age))}${esc(since)}</small></p>
+    <p class="clv-coach__name"><b>${esc(c.name)}</b><small>${c.caretaker ? 'trener tymczasowy, ' : ''}styl: ${esc(COACH_STYLES[c.style] ?? 'pragmatyczny')}, ${esc(plYears(c.age))}${c.nat && c.nat !== 'POL' ? `, ${esc(NAT_NAMES[c.nat] ?? c.nat)}` : ''}</small></p>
+    <p class="clv-coach__tenure">${esc(tenure)}</p>
     <p class="clv-coach__blurb">${esc(coachBlurb(c))}</p>
     <ul class="clv-attrs clv-attrs--${prec}">${rows}</ul>
     <p class="hint clv-coach__note">${esc(note)}</p>
+    ${coachHistoryHtml(game, clubId, c)}
   </div>`;
+}
+
+const WHY = { wyniki: 'zwolniony', kibice: 'zwolniony po presji kibiców', 'po sezonie': 'rozstanie po sezonie', 'odejście': 'odszedł do innego klubu' };
+
+/** Staż trenera: data objęcia i liczba meczów o punkty w tym sezonie (trener tymczasowy: do kiedy). */
+export function coachTenureText(game, clubId, c) {
+  if (!c?.from) return '';
+  if (c.caretaker) return `Prowadzi zespół od ${fmtDate(c.from)} jako asystent, ${c.until ? `do czasu wyboru nowego trenera` : 'do końca sezonu'}.`;
+  const n = (game.fixtures ?? []).filter((f) => f.played && f.date >= c.from && f.comp !== 'friendly' && (f.home === clubId || f.away === clubId)).length;
+  const start = (game.fixtures ?? []).reduce((m, f) => (f.date < m ? f.date : m), '9999');
+  return `W klubie od ${fmtDate(c.from)}${c.from >= start && n ? `, ${n} ${plural(n, 'mecz', 'mecze', 'meczów')} o punkty` : ''}.`;
+}
+
+/** Krótka historia: poprzednie kluby trenera i ostatnie zmiany trenera w tym klubie. */
+function coachHistoryHtml(game, clubId, c) {
+  const own = (c.hist ?? []).filter((h) => h.club !== clubId || h.to).slice(0, 3)
+    .map((h) => `<li>${esc(clubById(h.club)?.name ?? h.club)}: ${h.from ? `${esc(fmtDate(h.from))} - ` : 'do '}${esc(fmtDate(h.to))}, ${esc(WHY[h.why] ?? h.why ?? '')}</li>`);
+  const club = (game.coachLog ?? []).filter((x) => x.club === clubId).slice(0, 4)
+    .map((x) => `<li>${esc(fmtDate(x.date))}: ${x.out ? `${esc(x.out)} odchodzi, ` : ''}${x.caretaker ? `tymczasowo ${esc(x.in)}` : x.why === 'na stałe' ? `${esc(x.in)} zostaje na stałe` : `trenerem zostaje ${esc(x.in)}`}</li>`);
+  if (!own.length && !club.length) return '';
+  return `<details class="clv-coach__hist"><summary>Historia</summary>
+    ${own.length ? `<p>Wcześniej pracował:</p><ul>${own.join('')}</ul>` : ''}
+    ${club.length ? `<p>Zmiany trenera w klubie:</p><ul>${club.join('')}</ul>` : ''}
+  </details>`;
+}
+
+/** Właściciel klubu: nazwa, typ i jedno zdanie o charakterze (bez liczb). */
+function ownerHtml(game, clubId, facts) {
+  const o = game.world?.clubs?.[clubId] ? ownerOf(game, clubId) : null;
+  if (!o && !facts.owner) return '';
+  const name = facts.owner || o?.name;
+  const type = facts.ownerType || OWNER_TYPES[o?.type]?.label || '';
+  const blurb = o ? ownerBlurb(o) : '';
+  return `<div><dt>Właściciel</dt><dd>${esc(name)}${type ? `<small>${esc(type)}</small>` : ''}${blurb ? `<small class="clv-owner">${esc(blurb)}</small>` : ''}</dd></div>`;
 }
 
 const RES_WORD = { W: 'wygrana', R: 'remis', P: 'porażka' };
@@ -138,7 +176,7 @@ export function renderClubView(game, clubId) {
       ${facts.europe ? `<div><dt>Puchary</dt><dd>${esc(facts.europe.comp)}</dd></div>` : ''}
       <div><dt>Stadion</dt><dd>${facts.cap ? `${facts.cap.toLocaleString('pl-PL')} miejsc${facts.capEst ? ' (szacunek)' : ''}` : 'brak danych'}</dd></div>
       <div><dt>Frekwencja</dt><dd>${facts.att ? `średnio ${Math.round(facts.att).toLocaleString('pl-PL')}${facts.attEst ? ' (szacunek)' : ''}` : 'brak danych'}</dd></div>
-      ${facts.owner ? `<div><dt>Właściciel</dt><dd>${esc(facts.owner)}${facts.ownerType ? `<small>${esc(facts.ownerType)}</small>` : ''}</dd></div>` : ''}
+      ${ownerHtml(game, clubId, facts)}
       ${facts.rivals?.length ? `<div><dt>Rywale</dt><dd>${facts.rivals.map((r) => esc(r.c.name)).join(', ')}</dd></div>` : ''}
     </dl>
     <h3>Trener</h3>

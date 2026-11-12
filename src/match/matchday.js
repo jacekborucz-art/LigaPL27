@@ -760,7 +760,7 @@ function settlePress(game, S, eff, phase = 'post') {
   for (const id of game.world.clubs[game.clubId]?.squad ?? []) {
     const p = game.world.players[id];
     if (!p) continue;
-    const d = Math.max(-3, Math.min(2, pressMoraleDelta(eff.teamMorale, p.persona) + (extra.get(id) ?? 0))); // [SZAC] limit na zawodnika
+    const d = Math.max(-3, Math.min(2, pressMoraleDelta(eff.teamMorale, p.persona, p.morale ?? 12) + (extra.get(id) ?? 0))); // [SZAC] limit na zawodnika
     if (d) p.morale = applyMorale(p.morale ?? 12, d);
   }
   const st = pressState(game);

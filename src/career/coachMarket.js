@@ -41,14 +41,16 @@ export const MARKET = {
   cupShock: 9, cupShockLower: 6, uefaShock: 5, shockDays: 35, // odpadnięcie z pucharu (od niższej ligi więcej), wygasa liniowo
   fansW: 8, // presja kibiców (heat 0-100) x 0,08 x media/10
   honeyMatches: 6, // pierwsze mecze nowego trenera: presja x (0,35 + 0,65 x mecze/6)
-  thr: 21, thrPat: 1.1, thrTemper: 0.3, thrNoise: 0.22, // próg = 21 + 1,1 (cierpliwość - 10) - 0,3 (temperament - 10), los x temperament
+  thr: 25, thrPat: 1.1, thrTemper: 0.3, thrNoise: 0.22, // próg = 25 + 1,1 (cierpliwość - 10) - 0,3 (temperament - 10), los x temperament
+  thrTier: { 1: 1.5, 2: -2.5, 3: -1.3 }, // 1 Liga: walka o awans i tani trenerzy, więcej zmian; Ekstraklasa ostrożniej (odprawy)
+  winter: { date: '12-18', thr: -3 }, // przerwa zimowa: przegląd z niższym progiem (czas na nowego trenera przed obozem)
   credit: 5, longTenure: 3, // kapitał: cel wykonany w poprzednim sezonie, staż ponad 2 lata
   span: 12, hMax: 0.4, hPow: 1.5, // szansa zwolnienia po meczu: 0,4 x ((C - próg) / 12)^1,5
   // Trener tymczasowy (dni) wg typu właściciela; wiosną część prowadzi zespół do końca sezonu
   caretaker: { miasto: [7, 20], spolka: [6, 16], klub: [10, 30], miliarder: [2, 8], prywatny: [3, 12] },
   caretakerToEnd: 0.35, caretakerStays: 0.15,
   // Przegląd po sezonie (2 czerwca)
-  summer: { relegated: 0.5, perGap: 0.05, gapFrom: 2, base: 0.06, poached: 0.08, caretaker: 0.75, promoted: 0.03 },
+  summer: { relegated: 0.5, perGap: 0.07, gapFrom: 2, base: 0.11, poached: 0.1, caretaker: 0.75, promoted: 0.03 },
   // Zatrudnianie: poziom klubu + ambicja i pieniądze właściciela; ocena kandydata z błędem
   hire: { ambition: 0.08, wealth: 0.1, reach: 2, judgeSd: 0.6, judgeTemper: 0.06, poachP: 0.3, rescueS: 0.7 },
   // Pula wolnych trenerów
@@ -193,19 +195,19 @@ export function coachMatches(game, clubId, p = coachOf(game, clubId)) {
 export function ownerThreshold(game, clubId, p, date) {
   const K = MARKET;
   const o = ownerOf(game, clubId);
-  let thr = K.thr + K.thrPat * (o.cierpliwosc - 10) - K.thrTemper * (o.temperament - 10);
+  let thr = K.thr + (K.thrTier[tierOf(clubId)] ?? 0) + K.thrPat * (o.cierpliwosc - 10) - K.thrTemper * (o.temperament - 10);
   if (p?.credit) thr += K.credit;
   if (p?.from && daysBetween(p.from, date) > 730) thr += K.longTenure;
   return thr;
 }
 
 /** Szansa zwolnienia po meczu. rng: los właściciela (nastrój dnia: rozrzut zależny od temperamentu). */
-export function fireChance(game, clubId, pr, date, rng = null) {
+export function fireChance(game, clubId, pr, date, rng = null, shift = 0) {
   const K = MARKET;
   const o = ownerOf(game, clubId);
   const p = coachOf(game, clubId);
   if (pr.played < K.startRound) return 0;
-  const thr = ownerThreshold(game, clubId, p, date) + (rng ? rng.gauss(0, K.thrNoise * o.temperament) : 0);
+  const thr = ownerThreshold(game, clubId, p, date) + shift + (rng ? rng.gauss(0, K.thrNoise * o.temperament) : 0);
   const x = (pr.C - thr) / K.span;
   if (x <= 0) return 0;
   let h = K.hMax * Math.min(1, x) ** K.hPow;
@@ -280,9 +282,9 @@ export function fireCoach(game, clubId, date, opts = {}) {
   const pr = opts.pr;
   if (notable(game, clubId) && !opts.quiet && old && !old.caretaker) {
     const reason = why === 'kibice' ? 'po presji kibiców' : why === 'odejście' ? 'po sezonie' : why === 'po sezonie' ? 'po rozczarowującym sezonie' : pr ? `przy ${pr.pos}. miejscu w tabeli` : 'po słabych wynikach';
-    const verb = why === 'odejście' ? 'odchodzi z' : 'nie jest już trenerem';
+    const verb = why === 'odejście' ? 'odchodzi z klubu' : 'nie jest już trenerem klubu';
     messages.push(media(date, `trener-out:${clubId}:${date}`, `${nameOf(clubId)}: ${old.name} ${why === 'odejście' ? 'odchodzi' : 'zwolniony'}`,
-      `${old.name} ${verb} ${why === 'odejście' ? nameOf(clubId) : nameOf(clubId)} ${reason}.${old.from ? ` Prowadził zespół od ${fmtDate(old.from)}.` : ''} ${opts.toEnd ? `Do końca sezonu drużynę poprowadzi asystent ${ct.name}.` : `Tymczasowo drużynę poprowadzi asystent ${ct.name}.`}`));
+      `${old.name} ${verb} ${nameOf(clubId)} ${reason}.${old.from ? ` Prowadził zespół od ${fmtDate(old.from)}.` : ''} ${opts.toEnd ? `Do końca sezonu drużynę poprowadzi asystent ${ct.name}.` : `Tymczasowo drużynę poprowadzi asystent ${ct.name}.`}`));
   }
   return { out: old, caretaker: ct, messages };
 }
@@ -354,7 +356,7 @@ export function hireCoach(game, clubId, date, { rng = null, inDrop = false, quie
     const was = from ? ` Ostatnio pracował w klubie ${nameOf(from)}.` : best ? ' Był bez pracy.' : '';
     const nat = next.nat && next.nat !== 'POL' ? ' Szkoleniowiec z zagranicy.' : '';
     messages.push(media(date, `trener-in:${clubId}:${date}`, `${nameOf(clubId)}: nowy trener ${next.name}`,
-      `${next.name} (${next.age} ${plural(next.age, 'rok', 'lata', 'lat')}) został trenerem ${nameOf(clubId)}${prev?.caretaker ? ` po okresie, w którym drużynę prowadził ${prev.name}` : ''}. Styl: ${COACH_STYLES[next.style] ?? 'pragmatyczny'}.${was}${nat}`));
+      `${next.name} (${next.age} ${plural(next.age, 'rok', 'lata', 'lat')}) został trenerem klubu ${nameOf(clubId)}${prev?.caretaker ? ` po okresie, w którym drużynę prowadził ${prev.name}` : ''}. Styl: ${COACH_STYLES[next.style] ?? 'pragmatyczny'}.${was}${nat}`));
   }
   return { coach: next, from, messages };
 }
@@ -366,7 +368,7 @@ function keepCaretaker(game, clubId, date) {
   statsOf(game).hires.caretaker++;
   const log = (game.coachLog ??= []);
   log.unshift({ date, club: clubId, out: null, in: p.name, why: 'na stałe' });
-  return notable(game, clubId) ? [media(date, `trener-in:${clubId}:${date}`, `${nameOf(clubId)}: ${p.name} zostaje na dłużej`, `${p.name}, dotąd trener tymczasowy, poprowadzi ${nameOf(clubId)} na stałe.`)] : [];
+  return notable(game, clubId) ? [media(date, `trener-in:${clubId}:${date}`, `${nameOf(clubId)}: ${p.name} zostaje na dłużej`, `${p.name}, dotąd trener tymczasowy, poprowadzi zespół ${nameOf(clubId)} na stałe.`)] : [];
 }
 
 // ------------------------------------------------------------ Puchary: odpadnięcie jako wstrząs
@@ -427,8 +429,9 @@ export function coachMarketDay(game, date) {
     const pr = coachPressure(game, id, tables, date, p);
     messages.push(...(hireCoach(game, id, date, { rng, inDrop: pr.inDrop })?.messages ?? []));
   }
-  // Ocena po meczu
-  const played = playedYesterday(game, date);
+  // Ocena po meczu; w przerwie zimowej jeden przegląd wszystkich klubów
+  const winter = date === `${y}-${MARKET.winter.date}`;
+  const played = winter ? new Set(Object.keys(game.world.clubs)) : playedYesterday(game, date);
   if (!played.size) return messages;
   tables ??= tablesFor(game);
   for (const id of played) {
@@ -437,7 +440,7 @@ export function coachMarketDay(game, date) {
     if (!p || p.caretaker) continue;
     const pr = coachPressure(game, id, tables, date, p);
     const rng = new Rng(`ocena-trenera:${game.seed}:${id}:${date}`);
-    const h = fireChance(game, id, pr, date, rng);
+    const h = fireChance(game, id, pr, date, rng, winter ? MARKET.winter.thr : 0);
     if (!h || !rng.chance(h)) continue;
     const toEnd = date >= `${y + 1}-04-15` && rng.chance(MARKET.caretakerToEnd);
     const r = fireCoach(game, id, date, { why: 'wyniki', pr, rng, toEnd });
