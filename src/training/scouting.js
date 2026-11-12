@@ -84,12 +84,12 @@ export function userFamiliarity(game, tactics = game?.tactics) {
   const wsum = wts.reduce((a, b) => a + b, 0);
   let pred = null; let best = -1;
   for (const h of hist) {
-    const v = hist.reduce((s, x, k) => s + wts[k] * similarity(h.fp, x.fp), 0);
+    const v = hist.reduce((s, x, k) => s + wts[k] * similarity(h.fp, x.fp) ** 2, 0); // kwadrat: częściowa zmiana planu też myli rywala
     if (v > best + 1e-9) { best = v; pred = h.fp; }
   }
   const consistency = best / wsum;
   const ramp = Math.min(1, hist.length / SCOUT.ramp);
-  const match = tactics ? similarity(pred, fingerprint(tactics)) : 1;
+  const match = tactics ? similarity(pred, fingerprint(tactics)) ** 2 : 1;
   // Mało meczów: analitycy nie mają pełnego obrazu i przygotowują się jak na każdego rywala (znajomość neutralna)
   const fam = SCOUT.neutral * (1 - ramp) + ramp * consistency * match;
   return { fam: r3(fam), base: r3(consistency * ramp), pred, consistency: r3(consistency), ramp, match, n: hist.length };

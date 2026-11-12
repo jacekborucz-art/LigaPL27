@@ -477,13 +477,13 @@ export function summerReview(game, date) {
       else pFire = S.base * impatience;
       let leave = 0;
       if (!p.caretaker && gap <= -3 && tier > 1) leave = S.poached; // udany sezon: trener odchodzi do lepszego klubu
-      if (p.caretaker && !rng.chance(pFire)) { keepCaretaker(game, id, date); continue; }
+      if (p.caretaker) {
+        if (!rng.chance(pFire)) { keepCaretaker(game, id, date); continue; }
+        const r = hireCoach(game, id, date, { rng, inDrop: false, quiet: true });
+        if (r) changes.push({ id, out: p.name, in: r.coach.name, why: 'tymczasowy' });
+        continue;
+      }
       if (rng.chance(Math.max(0, pFire))) {
-        if (p.caretaker) {
-          const r = hireCoach(game, id, date, { rng, inDrop: false, quiet: true });
-          if (r) changes.push({ id, out: p.name, in: r.coach.name, why: 'tymczasowy' });
-          continue;
-        }
         const r = fireCoach(game, id, date, { why, rng, summer: true, quiet: true, direct: true });
         const h = r && hireCoach(game, id, date, { rng: rng.fork('nowy'), quiet: true });
         if (h) changes.push({ id, out: r.out?.name, in: h.coach.name, why });
@@ -518,6 +518,12 @@ export function coachMarketNewSeason(game, year) {
   // Historia statystyk: najwyżej 10 sezonów
   const ys = Object.keys(M.stats).sort();
   for (const k of ys.slice(0, Math.max(0, ys.length - 10))) delete M.stats[k];
+}
+
+/** Szansa, że właściciel ulegnie żądaniu kibiców (media 10: 0,45, media 18: 0,65, rezerwy: 0). */
+export function fansSackP(game, clubId) {
+  if (clubById(clubId)?.parent || !game?.world?.clubs?.[clubId]) return 0;
+  return clamp(0.2 + 0.025 * ownerOf(game, clubId).media, 0, 0.8);
 }
 
 /** Zgłoszenie z modułu kibiców: żądanie zwolnienia trenera, zarząd ulega (career/fans.js). */

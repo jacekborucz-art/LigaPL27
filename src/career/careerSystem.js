@@ -16,6 +16,7 @@ import { createFinance, financeDay, book, matchIncome, attendanceFill, uefaPrize
 import { createMarket, marketWeek, answerIncoming, aiRenewals, inWindow, windowOf, fmtZl, SEASON_END } from './transfers.js';
 import { ensureBoard, boardMonth, seasonGoalFor, trustLabel } from './board.js';
 import './squadLimitSystem.js'; // limit kadry i nacisk zarządu (docs/limit-kadry.md)
+import { ensureCoachMarket } from './coachMarket.js'; // rynek trenerów AI i właściciele (docs/trenerzy-i-wlasciciele.md)
 
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
 
@@ -27,6 +28,7 @@ export function ensureCareer(game) {
   if (!game.market) createMarket(game);
   ensureBoard(game);
   ensureCoaches(game); // trenerzy klubów AI z atrybutami (stary zapis: profile z ziarna gry, te same nazwiska)
+  ensureCoachMarket(game); // pula wolnych trenerów (stary zapis: tworzona z ziarna gry)
 }
 
 // ------------------------------------------------------------ Mecze: bilety i nagrody

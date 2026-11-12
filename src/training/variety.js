@@ -14,8 +14,8 @@ export const VARIETY = {
   full: 12, // po tylu tygodniach pełne znużenie
   edits: 2, // ręcznie zmienione dni w tygodniu, które liczą się jako urozmaicenie
   editRelief: 2, // o tyle tygodni zmniejszają licznik
-  moraleCut: 0.6, // morale z zajęć x(1 - 0,6 znużenia)
-  boredom: 0.03, // dodatkowo -0,03 morale za dzień zajęć przy pełnym znużeniu
+  moraleCut: 0.5, // morale z zajęć x(1 - 0,5 znużenia)
+  boredom: 0.01, // dodatkowo -0,01 morale za dzień zajęć przy pełnym znużeniu
   stimCut: 0.15, // bodziec rozwojowy x(1 - 0,15 znużenia)
   ai: { period: 6, tre: 3, min: 3, max: 10 }, // trener AI zmienia akcent co 6 - 3 s(TRE) tygodni
 };

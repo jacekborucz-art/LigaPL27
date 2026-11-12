@@ -21,7 +21,7 @@ import { standings } from '../season/standings.js';
 import { winnerOf } from '../season/cup.js';
 import { book, FIN } from './finance.js';
 import { applyMorale } from './morale.js';
-import { replaceCoach } from './coaches.js';
+import { fansSackCoach, fansSackP } from './coachMarket.js';
 
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
 const COMP_TIER = { ekstraklasa: 1, liga1: 2, liga2: 3 };
@@ -355,10 +355,13 @@ function escalate(game, C, clubId, date, rng, msgs, rise = true) {
   C.lastAt[next] = date;
   protestEvent(game, C, clubId, next, date, rng, msgs);
   // Klub AI: przy żądaniu zwolnienia zarząd często zmienia trenera i presja spada [SZAC]
-  if (clubId !== game.clubId && next >= 7 && rng.chance(0.45)) {
+  // Szansa rośnie z wrażliwością właściciela na kibiców i media (career/owners.js; media 10: 0,45)
+  if (clubId !== game.clubId && next >= 7 && rng.chance(fansSackP(game, clubId))) {
     C.heat = Math.round(C.heat * 0.3); C.level = levelFor(C.heat, P); C.season.coachChanges++;
-    const next = replaceCoach(game, clubId, date); // nowy trener: nowy profil atrybutów (career/coaches.js)
-    log(game, { date, club: clubId, kind: 'coachChange', text: `${anyClub(clubId)?.name ?? clubId}: zmiana trenera po presji kibiców${next ? `, nowy trener: ${next.name}` : ''}` });
+    // Zwolnienie przez rynek trenerów (career/coachMarket.js): trener do puli, asystent tymczasowo, potem nowy trener
+    const r = fansSackCoach(game, clubId, date);
+    msgs.push(...(r?.messages ?? []));
+    log(game, { date, club: clubId, kind: 'coachChange', text: `${anyClub(clubId)?.name ?? clubId}: zmiana trenera po presji kibiców${r?.caretaker ? `, tymczasowo prowadzi ${r.caretaker.name}` : ''}` });
   }
 }
 

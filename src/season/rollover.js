@@ -26,6 +26,7 @@ import { initClub, seasonSummary, FIN } from '../career/finance.js';
 import { addFreeAgents } from '../career/transfers.js';
 import { boardGoal, jobOffers, ensureBoard } from '../career/board.js';
 import { coachesNewSeason } from '../career/coaches.js';
+import { coachMarketNewSeason } from '../career/coachMarket.js';
 import { fmtDate } from '../ui/dom.js';
 import { archivePlayerSeason, archiveSeasonMatches, syncSpell } from './history.js';
 
@@ -229,6 +230,7 @@ export function rolloverSeason(game) {
   game.leagueState = { year, tiers: Object.fromEntries([...CLUBS_PL, ...CLUBS_L3].filter((c) => tiers[c.id] != null).map((c) => [c.id, tiers[c.id]])), dyn, groups };
   game.seasonYear = year;
   coachesNewSeason(game, year); // trenerzy AI: rok starsi, doświadczenie albo spadek formy (career/coaches.js)
+  coachMarketNewSeason(game, year); // pula wolnych trenerów: starsi, część odchodzi z zawodu, nowi (career/coachMarket.js)
   const polishEurope = europe.spots.map(({ club, comp, entry, path, via }) => ({ club, comp, entry, ...(path ? { path } : {}), via }));
   setSeasonYear(year, { windows: FIFA_WINDOWS_ALL, polishEurope });
   applyLeagueState(game);

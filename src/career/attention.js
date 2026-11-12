@@ -17,8 +17,8 @@ import { PASSIVE } from '../training/scouting.js';
 export const ATTN = {
   grace: 21, // tyle dni bez rozmowy zawodnik znosi bez skutków
   ramp: 28, // potem w ciągu 4 tygodni skutek rośnie do pełnego
-  week: 0.55, // spadek morale w tygodniu przy pełnej potrzebie (dryf tygodniowy +0,3 częściowo go znosi)
-  floor: 8, // samo zaniedbanie nie obniża morale poniżej 8
+  week: 0.45, // spadek morale w tygodniu przy pełnej potrzebie (dryf tygodniowy +0,3 znosi większość)
+  floor: 9, // samo zaniedbanie nie obniża morale poniżej 9
   trustEvery: 4, trustD: -0.5, // co 4 tygodnie pełnego zaniedbania: mniejsze zaufanie do trenera
   unhappyAfter: 10, unhappyP: 0.2, // ambitny rezerwowy po 10 tygodniach: szansa na niezadowolenie w tygodniu
   meetingFactor: 2, // zebranie drużyny liczy się jak rozmowa sprzed dwa razy dłuższego czasu
@@ -38,7 +38,6 @@ export function attentionNeed(p, date, { share = 1, games = 0 } = {}) {
   if (!p || p.injuryDays > 0 && p.injuryDays > 60) return { need: 0, why: null }; // długi uraz: opiekuje się sztab medyczny
   const out = [];
   if (p.persona === 'Wrażliwy') out.push([1, 'sensitive']);
-  if ((p.morale ?? 12) <= 9) out.push([1, 'low']);
   if (p.acclim || (p.lastMove && days(p.lastMove, date) <= ATTN.newcomerDays)) out.push([0.8, 'new']);
   if (games >= ATTN.benchMinGames && share < ATTN.benchShare && (p.age ?? 25) >= 20) {
     const t = personalityOf(p).traits;
