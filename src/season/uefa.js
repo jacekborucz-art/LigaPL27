@@ -31,9 +31,37 @@ function shortOf(name) {
   return main.normalize('NFD').replace(/[̀-ͯ]/g, '').slice(0, 3).toUpperCase();
 }
 
+// ------------------------------------------------------------ Skala siły klubów (docs/sila-lig-europy.md)
+// Jedna skala L dla Ekstraklasy i klubów zagranicznych, zakotwiczona na trzech punktach [SZAC, rozdz. 3]:
+//   najsilniejsza liga (Premier League): przeciętny klub ok. 14.6, czołówka 16.0-16.6;
+//   Ekstraklasa: przeciętny klub 11.5, czołówka (Lech, Legia, Raków) 12.4-12.6 (kalibracja krajowa, bez zmian);
+//   najsłabsza liga (San Marino): przeciętny klub ok. 6.5, mistrz ok. 8.0 (Gibraltar, Andora: mistrz ok. 9).
+// Przelicznik z rankingów Elo: 1 punkt L to ok. 100 pkt Elo, Lech (ok. 1600 Elo) = 12.6.
+// L z pliku danych powstało ze współczynnika klubowego UEFA (5 sezonów). Współczynnik zaniża kluby ze środka
+// Europy, które rzadko grają w fazach ligowych, a polskie kluby mają go zawyżonego ostatnimi sezonami w LK.
+// Porównanie z Elo (rozdz. 3.3) i z wynikami polskich klubów 2021-2026 (rozdz. 2) daje dla klubów zagranicznych
+// z przedziału L 10.5-13.5 niedoszacowanie 0.3-1.0; elita i najsłabsze kluby są na miejscu. Korekta niżej
+// (+0.3, dobrana do bilansu dwumeczów polskich klubów z ligami równymi) dotyczy tylko klubów zagranicznych:
+// polskie L zostają, liga krajowa się nie zmienia.
+export const STRENGTH_SCALE = {
+  top: { league: 'ENG', avgL: 14.6, bestL: 16.6, note: 'Premier League: przeciętny klub i czołówka' },
+  ekstraklasa: { league: 'POL', avgL: 11.5, topL: 12.6, note: 'Ekstraklasa: średnia ligi i czołowe kluby' },
+  bottom: { league: 'SMR', avgL: 6.5, bestL: 8.0, note: 'San Marino: przeciętny klub i mistrz' },
+  eloPerL: 100, anchorElo: { lech: 1600 },
+};
+/** Korekta siły klubu zagranicznego (punkty L) względem L z pliku danych, kształt trapezu. */
+export const FOREIGN_ADJ_MAX = 0.3;
+export function foreignStrengthAdj(L) {
+  if (L <= 9.5 || L >= 16.5) return 0;
+  if (L < 10.5) return FOREIGN_ADJ_MAX * (L - 9.5);
+  if (L <= 13.5) return FOREIGN_ADJ_MAX;
+  return FOREIGN_ADJ_MAX * (16.5 - L) / 3;
+}
+const strengthOf = (k) => Math.round((k.L + foreignStrengthAdj(k.L)) * 10) / 10;
+
 export const UEFA_CLUBS = DATA.kluby.map((k) => ({
   id: k.id, name: k.nazwa, short: shortOf(k.nazwa), tier: 0, foreign: true, country: k.kraj, coef: k.wspolczynnik,
-  L: k.L, prestige: k.prestiz, coach: k.trener, colors: PALETTE[hash(k.id) % PALETTE.length], label2026: k.rozgrywki2026,
+  L: strengthOf(k), Lbase: k.L, prestige: k.prestiz, coach: k.trener, colors: PALETTE[hash(k.id) % PALETTE.length], label2026: k.rozgrywki2026,
 }));
 const byId = new Map(UEFA_CLUBS.map((c) => [c.id, c]));
 const POLISH = new Map(DATA.polskieKlubyUEFA2026.map((k) => [k.id, k]));
@@ -59,28 +87,65 @@ const FEEDS = {
 const KO_FEEDS = { KPO: 'league', R16: 'KPO', QF: 'R16', SF: 'QF', F: 'SF' };
 export const LEAGUE_FORMAT = { LM: { pots: 4, perPot: 2 }, LE: { pots: 4, perPot: 2 }, LK: { pots: 6, perPot: 1 } };
 
-/** Przydział klubów do rund wejścia (wg etykiety z rzeczywistości 2026/27 i współczynnika). Polski klub
- * zastępuje najsłabszy klub zagraniczny w swojej rundzie wejścia (entry 'LP' = faza ligowa). */
+/**
+ * Liczba drużyn wchodzących do każdej rundy (bez zwycięzców i przegranych z innych rund). Rozmiary odwzorowują
+ * listę dostępu UEFA (docs/sila-lig-europy.md, rozdz. 5): faza ligowa LK prawie w całości z eliminacji
+ * (w rzeczywistości 0 bezpośrednich miejsc), LE ok. połowa bezpośrednio, LM 29 bezpośrednio.
+ * Kontrola: LE: 18 + 11 zwycięzców PO (8 + 7 z LE Q3 + 7 przegranych LM Q3 = 22) + 7 przegranych LM PO = 36;
+ * LK: Q1 8 -> 4; Q2 9 + 4 + 7 przegranych LM Q1 = 20 -> 10; Q3 10 + 10 = 20 -> 10; PO 13 + 10 + 7 przegranych
+ * LE Q3 = 30 -> 15; faza ligowa 10 + 15 + 11 przegranych LE PO = 36. W LK Q3 wchodzą kluby z lig średnich
+ * (jak w rzeczywistości), więc Q3 nie składa się z samych zwycięzców słabych par Q2.
+ */
+export const ENTRY_SLOTS = {
+  LM: { league: 29, PO: 7, Q3: 7, Q2: 7, Q1: 14 },
+  LE: { league: 18, PO: 8, Q3: 7 },
+  LK: { league: 10, PO: 13, Q3: 10, Q2: 9, Q1: 8 },
+};
+// Gdy w rundzie brak miejsca (np. wszedł do niej polski klub), najsłabszy wg współczynnika schodzi do rundy niżej.
+const ENTRY_FALLBACK = {
+  'LM:league': 'LM:PO', 'LM:PO': 'LM:Q3', 'LM:Q3': 'LM:Q2', 'LM:Q2': 'LM:Q1', 'LM:Q1': 'LK:Q1',
+  'LE:league': 'LE:PO', 'LE:PO': 'LE:Q3', 'LE:Q3': 'LK:Q3',
+  'LK:league': 'LK:PO', 'LK:PO': 'LK:Q3', 'LK:Q3': 'LK:Q2', 'LK:Q2': 'LK:Q1', 'LK:Q1': null,
+};
+const ENTRY_DATA = new Map(DATA.kluby.map((k) => [k.id, k.wejscie2026 ?? null]));
+
+/** Runda wejścia polskiego klubu w strukturze gry (LE Q1/Q2 -> Q3, bo LE nie ma tych rund). */
+export function polishEntryRound(x) {
+  let r = x.entry === 'LP' ? 'league' : x.entry;
+  if (x.comp === 'LE' && ['Q1', 'Q2'].includes(r)) r = 'Q3';
+  return ENTRY_SLOTS[x.comp]?.[r] ? r : null;
+}
+
+/**
+ * Przydział klubów do rund wejścia. Każdy klub zagraniczny ma rundę, od której naprawdę zaczął sezon 2026/27
+ * (pole wejscie2026 w kluby_uefa.json: kto przechodził eliminacje LM, kto LE PO, kto LK PO). Dzięki temu polskie
+ * kluby trafiają w eliminacjach na rywali o realnej sile, a nie tylko na kluby odpadłe w eliminacjach.
+ * Polskie kluby wchodzą pierwsze; nadmiar w rundzie (najniższy współczynnik) schodzi rundę niżej (ENTRY_FALLBACK).
+ */
 export function allocateEntrants(polish = POLISH_EUROPE_2026) {
-  const sorted = (label) => UEFA_CLUBS.filter((c) => c.label2026 === label).sort((a, b) => b.coef - a.coef).map((c) => c.id);
-  const lm = sorted('LM'); const le = sorted('LE'); const lk = sorted('LK'); const elim = sorted('ELIM'); const spare = sorted('BRAK');
-  const pool = [...elim, ...spare];
-  const take = (n) => pool.splice(0, n);
   const e = { LM: {}, LE: {}, LK: {} };
-  e.LM.league = lm.slice(0, 29); e.LM.PO = lm.slice(29, 36);
-  e.LM.Q3 = take(7); e.LM.Q2 = take(7); e.LM.Q1 = take(14);
-  e.LE.league = le.slice(0, 22); e.LE.Q3 = le.slice(22, 29);
-  const leRest = le.slice(29);
-  e.LK.league = lk.slice(0, 22); e.LK.Q1 = lk.slice(22, 36);
-  e.LK.Q2 = [...leRest.slice(0, 14), ...take(Math.max(0, 14 - leRest.length))];
+  for (const comp of Object.keys(ENTRY_SLOTS)) for (const r of Object.keys(ENTRY_SLOTS[comp])) e[comp][r] = [];
   for (const x of polish) {
-    let r = x.entry === 'LP' ? 'league' : x.entry;
-    if (x.comp === 'LE' && ['Q1', 'Q2'].includes(r)) r = 'Q3';
-    const list = e[x.comp]?.[r];
-    if (!list || list.includes(x.club)) continue;
-    const weakest = list.filter((id) => byId.has(id)).sort((a, b) => coefOf(a) - coefOf(b))[0];
-    if (weakest) list.splice(list.indexOf(weakest), 1);
-    list.push(x.club);
+    const r = polishEntryRound(x);
+    if (!r || UCOMPS.some((c) => Object.values(e[c]).some((l) => l.includes(x.club)))) continue;
+    e[x.comp][r].push(x.club);
+  }
+  const byCoef = (a, b) => coefOf(b) - coefOf(a);
+  const incoming = new Map();
+  for (const key of Object.keys(ENTRY_FALLBACK)) { // kolejność kluczy: każda runda zapasowa jest dalej na liście
+    const [comp, r] = key.split(':');
+    const cands = [...(incoming.get(key) ?? []), ...UEFA_CLUBS.filter((c) => ENTRY_DATA.get(c.id) === key).map((c) => c.id)].sort(byCoef);
+    const free = Math.max(0, ENTRY_SLOTS[comp][r] - e[comp][r].length);
+    e[comp][r].push(...cands.slice(0, free));
+    const fb = ENTRY_FALLBACK[key];
+    if (fb) incoming.set(fb, [...(incoming.get(fb) ?? []), ...cands.slice(free)]);
+  }
+  // Wolne miejsca (np. mniej polskich klubów niż zwykle): pozostałe kluby, najsłabsze do najniższych rund
+  const used = new Set(UCOMPS.flatMap((c) => Object.values(e[c]).flat()));
+  const rest = UEFA_CLUBS.filter((c) => !used.has(c.id)).map((c) => c.id).sort(byCoef);
+  for (const key of Object.keys(ENTRY_FALLBACK).reverse()) {
+    const [comp, r] = key.split(':');
+    while (e[comp][r].length < ENTRY_SLOTS[comp][r] && rest.length) e[comp][r].push(rest.pop());
   }
   return e;
 }
@@ -97,8 +162,25 @@ function newMatch(U, m) {
 }
 
 // ------------------------------------------------------------ Losowania
-/** Pary eliminacji i fazy pucharowej: rozstawieni vs nierozstawieni, bez klubów z jednego kraju. */
-export function drawPairs(teams, rng, { seeded = true } = {}) {
+// Ścieżka mistrzów w uproszczeniu: kluby z najsłabszych lig (współczynnik kraju poniżej progu) losujemy osobno,
+// jak w prawdziwych eliminacjach, gdzie mistrzowie małych federacji grają między sobą. Bez tego rozstawione polskie
+// kluby w późnych rundach eliminacji trafiały zbyt często na takie kluby i za łatwo wchodziły do faz ligowych,
+// a w fazie ligowej LK brakowało słabych mistrzów (docs/sila-lig-europy.md, rozdz. 5).
+export const MINNOW_COEF = 15;
+const isMinnow = (id) => (COUNTRY_COEF_2026[countryOf(id)] ?? 0) < MINNOW_COEF;
+
+/**
+ * Pary eliminacji i fazy pucharowej: rozstawieni vs nierozstawieni, bez klubów z jednego kraju.
+ * paths: osobno kluby z małych federacji i reszta (gdy obie grupy mają co najmniej 2 drużyny).
+ */
+export function drawPairs(teams, rng, { seeded = true, paths = true } = {}) {
+  if (paths) {
+    const small = teams.filter(isMinnow); const main = teams.filter((t) => !isMinnow(t));
+    if (small.length >= 2 && main.length >= 2) {
+      if (small.length % 2) { const s = [...small].sort((a, b) => coefOf(b) - coefOf(a))[0]; small.splice(small.indexOf(s), 1); main.push(s); }
+      return [...drawPairs(small, rng, { seeded, paths: false }), ...drawPairs(main, rng, { seeded, paths: false })];
+    }
+  }
   const list = [...teams].sort((a, b) => coefOf(b) - coefOf(a));
   const half = list.length / 2;
   const top = list.slice(0, half); const bottom = list.slice(half);
@@ -313,7 +395,8 @@ function doDraw(U, comp, r, date) {
   const draw = { comp, round: r, date, pairs: [], pots: null };
   if (['Q1', 'Q2', 'Q3', 'PO'].includes(r)) {
     R.teams = teamsFor(U, comp, r);
-    const pairs = drawPairs(R.teams, rng);
+    // Ścieżka mistrzów: cała LM i późne rundy LE/LK; w LK Q1-Q2 kluby z małych federacji grają z wszystkimi.
+    const pairs = drawPairs(R.teams, rng, { paths: comp === 'LM' || ['Q3', 'PO'].includes(r) });
     R.ties = pairs.map((p, i) => { const [a, b] = rng.chance(0.5) ? p : [p[1], p[0]]; return makeTie(U, comp, r, a, b, i); });
     draw.pairs = pairs.map(([s, u]) => ({ seeded: s, unseeded: u }));
     draw.seeded = pairs.map((p) => p[0]); draw.unseeded = pairs.map((p) => p[1]);

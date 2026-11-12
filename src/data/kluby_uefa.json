@@ -2,7 +2,7 @@
   "meta": {
     "sezon": "2026/27",
     "dataOpracowania": "Nov 10, 2026",
-    "opis": "Prawdziwe nazwy klubów, bez herbów i zawodników. L w skali 1-20. rozgrywki2026: LM, LE, LK (faza ligowa), ELIM (odpadł w eliminacjach), BRAK (rezerwa do przyszłych sezonów).",
+    "opis": "Prawdziwe nazwy klubów, bez herbów i zawodników. L w skali 1-20. rozgrywki2026: LM, LE, LK (faza ligowa), ELIM (odpadł w eliminacjach), BRAK (rezerwa do przyszłych sezonów). wejscie2026: runda wejścia w strukturze gry (np. LM:Q2, LE:PO, LK:league), odwzorowanie prawdziwej drogi 2026/27; null = rezerwa (docs/sila-lig-europy.md, rozdz. 5).",
     "zrodla": [
       "https://rsssf.org/tablesp/pol2026.html",
       "https://www.eska.pl/news/sport/ekstraklasa-przed-nowym-sezonem-kto-obroni-miejsce-na-podium-aa-8jYt-ZJVJ-UKZv.html",
@@ -616,6 +616,7 @@
       "narodowosc": "FRA",
       "rozgrywki2026": "LM",
       "droga2026": "Obrońca trofeum (zwycięzca LM 2025/26); koszyk 1",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -632,6 +633,7 @@
       "narodowosc": "GER",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 1",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -648,6 +650,7 @@
       "narodowosc": "ESP",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 1",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -664,6 +667,7 @@
       "narodowosc": "ENG",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 1",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -680,6 +684,7 @@
       "narodowosc": "ITA",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 1",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -696,6 +701,7 @@
       "narodowosc": "ENG",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 1",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -712,6 +718,7 @@
       "narodowosc": "ENG",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 1",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -728,6 +735,7 @@
       "narodowosc": "ESP",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 1",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -744,6 +752,7 @@
       "narodowosc": "ESP",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 1",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -760,6 +769,7 @@
       "narodowosc": "GER",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 2",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -776,6 +786,7 @@
       "narodowosc": "ITA",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 2",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -792,6 +803,7 @@
       "narodowosc": "POR",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 2",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -808,6 +820,7 @@
       "narodowosc": "ENG",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 2",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -824,6 +837,7 @@
       "narodowosc": "POR",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 2",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -840,6 +854,7 @@
       "narodowosc": "ENG",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 2",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -856,6 +871,7 @@
       "narodowosc": "BEL",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 2",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -872,6 +888,7 @@
       "narodowosc": "ESP",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 2",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -888,6 +905,7 @@
       "narodowosc": "NED",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 2",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -904,6 +922,7 @@
       "narodowosc": "NED",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 3",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -920,6 +939,7 @@
       "narodowosc": "FRA",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 3",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -936,6 +956,7 @@
       "narodowosc": "ITA",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 3",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -952,6 +973,7 @@
       "narodowosc": "NOR",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 3",
+      "wejscie2026": "LM:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -968,6 +990,7 @@
       "narodowosc": "GER",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 3",
+      "wejscie2026": "LM:league",
       "pewnosc": "pewne",
       "pewnoscUdzialu": "pewne"
     },
@@ -984,6 +1007,7 @@
       "narodowosc": "UKR",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 3",
+      "wejscie2026": "LM:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1000,6 +1024,7 @@
       "narodowosc": "ESP",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 3",
+      "wejscie2026": "LM:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1016,6 +1041,7 @@
       "narodowosc": "TUR",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 3; eliminacje LM ścieżka ligowa: Q2 wyelim. Górnik Zabrze, PO wyelim. Olympique Lyon 3-2",
+      "wejscie2026": "LM:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1032,6 +1058,7 @@
       "narodowosc": "TUR",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 3",
+      "wejscie2026": "LM:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1048,6 +1075,7 @@
       "narodowosc": "CZE",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 4",
+      "wejscie2026": "LM:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1064,6 +1092,7 @@
       "narodowosc": "GER",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 4",
+      "wejscie2026": "LM:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1080,6 +1109,7 @@
       "narodowosc": "GRE",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 4; LM PO wyelim. Lewski Sofia 4-0",
+      "wejscie2026": "LM:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1096,6 +1126,7 @@
       "narodowosc": "SVK",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 4; LM PO wyelim. NK Celje 3-2 po dogrywce",
+      "wejscie2026": "LM:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1112,6 +1143,7 @@
       "narodowosc": "AUT",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 4",
+      "wejscie2026": "LM:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1128,6 +1160,7 @@
       "narodowosc": "ESP",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 4; debiut w LM; kadra mocno hiszpańska",
+      "wejscie2026": "LM:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1144,6 +1177,7 @@
       "narodowosc": "FRA",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 4",
+      "wejscie2026": "LM:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1160,6 +1194,7 @@
       "narodowosc": "AZE",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 4; LM Q1 wyelim. The New Saints 4-1, potem Q2, Q3 i PO; debiut",
+      "wejscie2026": "LM:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1176,6 +1211,7 @@
       "narodowosc": "NOR",
       "rozgrywki2026": "LM",
       "droga2026": "Koszyk 4; LM PO wyelim. Dinamo Zagrzeb 5-3; debiut",
+      "wejscie2026": "LM:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1192,6 +1228,7 @@
       "narodowosc": "GER",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 1",
+      "wejscie2026": "LE:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1208,6 +1245,7 @@
       "narodowosc": "POR",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 1; LE PO wyelim. Aarhus GF 6-2 (wcześniej przegrana w eliminacjach LM)",
+      "wejscie2026": "LE:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1224,6 +1262,7 @@
       "narodowosc": "ITA",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 1",
+      "wejscie2026": "LE:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1240,6 +1279,7 @@
       "narodowosc": "ITA",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 1",
+      "wejscie2026": "LE:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1256,6 +1296,7 @@
       "narodowosc": "FRA",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 1; przegrał LM PO z Fenerbahçe 2-3",
+      "wejscie2026": "LM:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1272,6 +1313,7 @@
       "narodowosc": "GRE",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 1",
+      "wejscie2026": "LE:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1288,6 +1330,7 @@
       "narodowosc": "NED",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 1",
+      "wejscie2026": "LE:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1304,6 +1347,7 @@
       "narodowosc": "FRA",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 1",
+      "wejscie2026": "LE:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1320,6 +1364,7 @@
       "narodowosc": "ESP",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 1",
+      "wejscie2026": "LE:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1336,6 +1381,7 @@
       "narodowosc": "BEL",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 2",
+      "wejscie2026": "LE:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1352,6 +1398,7 @@
       "narodowosc": "CRO",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 2; LM Q2 wyelim. FC Thun po dogrywce, przegrał LM PO z Viking 3-5",
+      "wejscie2026": "LM:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1368,6 +1415,7 @@
       "narodowosc": "AUT",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 2; LE PO wyelim. Mjällby 4-0",
+      "wejscie2026": "LE:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1384,6 +1432,7 @@
       "narodowosc": "CZE",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 2; LE PO wyelim. Crvena zvezda 5-4 po dogrywce",
+      "wejscie2026": "LE:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1400,6 +1449,7 @@
       "narodowosc": "HUN",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 2; LE Q3 wyelim. Górnik Zabrze, LE PO wyelim. Trabzonspor 5-0",
+      "wejscie2026": "LE:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1416,6 +1466,7 @@
       "narodowosc": "SCO",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 2",
+      "wejscie2026": "LE:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1432,6 +1483,7 @@
       "narodowosc": "CZE",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 2",
+      "wejscie2026": "LE:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1448,6 +1500,7 @@
       "narodowosc": "BEL",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 2; w eliminacjach wyelim. Hammarby, LE PO wyelim. Kairat 6-0",
+      "wejscie2026": "LE:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1464,6 +1517,7 @@
       "narodowosc": "FRA",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 2",
+      "wejscie2026": "LE:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1480,6 +1534,7 @@
       "narodowosc": "ENG",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 3; zwycięzca LK 2025/26",
+      "wejscie2026": "LE:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1496,6 +1551,7 @@
       "narodowosc": "SVN",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 3; przegrał LM PO ze Slovanem 2-3 po dogrywce",
+      "wejscie2026": "LM:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1512,6 +1568,7 @@
       "narodowosc": "AUT",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 3; LM Q2 awans, potem przegrana w eliminacjach LM",
+      "wejscie2026": "LM:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1528,6 +1585,7 @@
       "narodowosc": "CYP",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 3; LM Q2 przegrana z Kairatem (karne), LE PO wyelim. Sint-Truiden 4-3",
+      "wejscie2026": "LM:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1544,6 +1602,7 @@
       "narodowosc": "ENG",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 3",
+      "wejscie2026": "LE:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1560,6 +1619,7 @@
       "narodowosc": "ENG",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 3",
+      "wejscie2026": "LE:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1576,6 +1636,7 @@
       "narodowosc": "ESP",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 3",
+      "wejscie2026": "LE:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1592,6 +1653,7 @@
       "narodowosc": "GER",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 4",
+      "wejscie2026": "LE:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1608,6 +1670,7 @@
       "narodowosc": "TUR",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 4; LE PO wyelim. Kauno Žalgiris 3-1",
+      "wejscie2026": "LE:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1624,6 +1687,7 @@
       "narodowosc": "NED",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 4",
+      "wejscie2026": "LE:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1640,6 +1704,7 @@
       "narodowosc": "POR",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 4; pierwszy start w pucharach",
+      "wejscie2026": "LE:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1656,6 +1721,7 @@
       "narodowosc": "ISR",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 4; LM Q2 awans, potem przegrana w eliminacjach LM",
+      "wejscie2026": "LM:Q2",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1672,6 +1738,7 @@
       "narodowosc": "BUL",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 4; LM Q1 awans, Q2 wyelim. U Craiova 3-2, przegrał LM PO z AEK 0-4",
+      "wejscie2026": "LM:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1688,6 +1755,7 @@
       "narodowosc": "GRE",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 4; LE PO wyelim. CSKA Sofia 5-0",
+      "wejscie2026": "LE:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1704,6 +1772,7 @@
       "narodowosc": "NOR",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 4; LE PO wyelim. Egnatia 2-1 po dogrywce",
+      "wejscie2026": "LE:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1720,6 +1789,7 @@
       "narodowosc": "ARM",
       "rozgrywki2026": "LE",
       "droga2026": "Koszyk 4; LM Q1 wyelim. Riga FC, Q2 wyelim. Shamrock 3-2, LE PO wyelim. U Craiova 2-1",
+      "wejscie2026": "LM:Q2",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1736,6 +1806,7 @@
       "narodowosc": "ITA",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 1; LK PO wyelim. Hapoel Tel Awiw 1-0",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1752,6 +1823,7 @@
       "narodowosc": "NED",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 1",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1768,6 +1840,7 @@
       "narodowosc": "POR",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 1; LK PO wyelim. Austria Wiedeń",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1784,6 +1857,7 @@
       "narodowosc": "DEN",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 1; LK PO wyelim. Inter Turku 4-1",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1800,6 +1874,7 @@
       "narodowosc": "FRA",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 1; LK PO wyelim. Górnik Zabrze 7-3 (3-2, 4-1)",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1816,6 +1891,7 @@
       "narodowosc": "GER",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 1; LK PO wyelim. Motherwell 7-2",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1832,6 +1908,7 @@
       "narodowosc": "SRB",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 2; LM Q2 wyelim. Larne 9-0, przegrał LE PO z Pilznem 4-5 po dogrywce",
+      "wejscie2026": "LM:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1848,6 +1925,7 @@
       "narodowosc": "DEN",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 2; LK PO wyelim. Rijeka 6-1",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1864,6 +1942,7 @@
       "narodowosc": "BEL",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 2; LK PO wyelim. Hibernian 3-2",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1880,6 +1959,7 @@
       "narodowosc": "GRE",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 2; LK PO wyelim. Hradec Králové 4-3",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1896,6 +1976,7 @@
       "narodowosc": "POR",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 2; kadra głównie portugalsko-brazylijska",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1912,6 +1993,7 @@
       "narodowosc": "ENG",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 2; LK PO wyelim. Tromsø 4-0",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1928,6 +2010,7 @@
       "narodowosc": "ESP",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 3; LK PO wyelim. Partizan 4-3",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1944,6 +2027,7 @@
       "narodowosc": "SUI",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 3",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1960,6 +2044,7 @@
       "narodowosc": "NED",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 3; LK Q3 wyelim. Dunajská Streda 9-3",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1976,6 +2061,7 @@
       "narodowosc": "GIB",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 3; LM Q1 wyelim. Inter Escaldes 4-2",
+      "wejscie2026": "LK:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -1992,6 +2078,7 @@
       "narodowosc": "BIH",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 3; LK Q3 awans po karnych, LK PO wyelim. Víkingur 6-2",
+      "wejscie2026": "LK:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2008,6 +2095,7 @@
       "narodowosc": "FIN",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 3; LM Q1 wyelim. Vardar 4-3 po dogrywce, LK PO wyelim. Shamrock 2-1",
+      "wejscie2026": "LK:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2024,6 +2112,7 @@
       "narodowosc": "NOR",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 4; LK PO wyelim. PAOK 4-3",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2040,6 +2129,7 @@
       "narodowosc": "BEL",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 4; przegrał LE PO z Omonią 3-4",
+      "wejscie2026": "LE:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2056,6 +2146,7 @@
       "narodowosc": "KAZ",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 4; LM Q1 wyelim. Sutjeska 4-1, Q2 wyelim. Omonię (karne), przegrał LE PO z Anderlechtem 0-6",
+      "wejscie2026": "LK:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2072,6 +2163,7 @@
       "narodowosc": "SCO",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 4; start w LM Q2 (ścieżka ligowa)",
+      "wejscie2026": "LM:Q2",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2088,6 +2180,7 @@
       "narodowosc": "TUR",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 4; przegrał LE PO z Ferencvárosem 0-5",
+      "wejscie2026": "LE:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2104,6 +2197,7 @@
       "narodowosc": "ROU",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 4; LM Q1 awans, Q2 przegrana z Lewskim 2-3, LE PO przegrana z Ararat-Armenia 1-2",
+      "wejscie2026": "LM:Q2",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2120,6 +2214,7 @@
       "narodowosc": "DEN",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 5; LK Q3 wyelim. Valur 7-0, LK PO wyelim. St. Gallen 4-2",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2136,6 +2231,7 @@
       "narodowosc": "CZE",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 5",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2152,6 +2248,7 @@
       "narodowosc": "DEN",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 5; LM Q2 wyelim. Lech Poznań (5-5, karne 4-3), przegrał LE PO z Benficą 2-6",
+      "wejscie2026": "LM:Q2",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2168,6 +2265,7 @@
       "narodowosc": "CRO",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 5; LK PO wyelim. Raków (2-2 i 3-2 po dogrywce)",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2184,6 +2282,7 @@
       "narodowosc": "LVA",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 5; LM Q1 przegrana z Ararat-Armenia, LK PO wyelim. KÍ Klaksvík 2-1",
+      "wejscie2026": "LK:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2200,6 +2299,7 @@
       "narodowosc": "ESP",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 5; LM Q1 przegrana z Lincoln Red Imps, dalej ścieżka mistrzów LK",
+      "wejscie2026": "LK:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2216,6 +2316,7 @@
       "narodowosc": "SUI",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 6; mistrz Szwajcarii; przegrał LE PO z Lechem 2-9",
+      "wejscie2026": "LK:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2232,6 +2333,7 @@
       "narodowosc": "BUL",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 6; przegrał LE PO z OFI 0-5",
+      "wejscie2026": "LE:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2248,6 +2350,7 @@
       "narodowosc": "SWE",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 6; przegrał LE PO z Salzburgiem 0-4",
+      "wejscie2026": "LE:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2264,6 +2367,7 @@
       "narodowosc": "LTU",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 6; LM Q1 wyelim. Drita 4-3, przegrał LE PO z Beşiktaşem 1-3",
+      "wejscie2026": "LK:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2280,6 +2384,7 @@
       "narodowosc": "GEO",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 6; LM Q1 wyelim. Flora Tallinn, później Larne; przegrał LE PO z Jagiellonią 1-6",
+      "wejscie2026": "LK:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2296,6 +2401,7 @@
       "narodowosc": "ALB",
       "rozgrywki2026": "LK",
       "droga2026": "Koszyk 6; LM Q1 awans, przegrał LE PO z Lillestrøm 1-2 po dogrywce",
+      "wejscie2026": "LK:league",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2312,6 +2418,7 @@
       "narodowosc": "SCO",
       "rozgrywki2026": "ELIM",
       "droga2026": "LE Q3 przegrana z Jagiellonią 2-3; następnie poza fazą ligową LK",
+      "wejscie2026": "LE:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2328,6 +2435,7 @@
       "narodowosc": "GRE",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK PO przegrana z Brann 3-4",
+      "wejscie2026": "LE:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2344,6 +2452,7 @@
       "narodowosc": "SRB",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK PO przegrana z Getafe 3-4",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2360,6 +2469,7 @@
       "narodowosc": "IRL",
       "rozgrywki2026": "ELIM",
       "droga2026": "LM Q1 wyelim. Floriana, Q2 przegrana z Ararat-Armenia 2-3, LK PO przegrana z KuPS 1-2",
+      "wejscie2026": "LM:Q2",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2376,6 +2486,7 @@
       "narodowosc": "FRO",
       "rozgrywki2026": "ELIM",
       "droga2026": "LM Q1 awans, LE Q3 przegrana z Lechem 0-6, LK PO przegrana z Riga FC 1-2",
+      "wejscie2026": "LM:Q2",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2392,6 +2503,7 @@
       "narodowosc": "MDA",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK Q3 przegrana z St. Gallen",
+      "wejscie2026": "LK:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2408,6 +2520,7 @@
       "narodowosc": "CRO",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK PO przegrana z Midtjylland 1-6",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2424,6 +2537,7 @@
       "narodowosc": "CZE",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK PO przegrana z Panathinaikosem 3-4",
+      "wejscie2026": "LK:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2440,6 +2554,7 @@
       "narodowosc": "ISL",
       "rozgrywki2026": "ELIM",
       "droga2026": "LM Q1 awans, LK PO przegrana z Borac 2-6",
+      "wejscie2026": "LM:Q1",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2456,6 +2571,7 @@
       "narodowosc": "LVA",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK Q3, para z FK Jablonec (Jablonec w fazie ligowej)",
+      "wejscie2026": "LK:Q2",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "szacunek"
     },
@@ -2472,6 +2588,7 @@
       "narodowosc": "AUT",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK Q3 wyelim. Beitar (karne), LK PO przegrana z Bragą",
+      "wejscie2026": "LK:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2488,6 +2605,7 @@
       "narodowosc": "NOR",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK PO przegrana z Brighton 0-4",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2504,6 +2622,7 @@
       "narodowosc": "SCO",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK PO przegrana z Gent 2-3",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2520,6 +2639,7 @@
       "narodowosc": "SCO",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK PO przegrana z Freiburgiem 2-7",
+      "wejscie2026": "LK:PO",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2536,6 +2656,7 @@
       "narodowosc": "WAL",
       "rozgrywki2026": "ELIM",
       "droga2026": "LM Q1 przegrana z Sabah 1-4",
+      "wejscie2026": "LM:Q1",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2552,6 +2673,7 @@
       "narodowosc": "SUI",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK Q3 wyelim. Sheriff, LK PO przegrana z Nordsjælland 2-4",
+      "wejscie2026": "LK:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2568,6 +2690,7 @@
       "narodowosc": "ISR",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK Q3 wyelim. GKS Katowice 3-2, LK PO przegrana z Atalantą 0-1",
+      "wejscie2026": "LK:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2584,6 +2707,7 @@
       "narodowosc": "SWE",
       "rozgrywki2026": "ELIM",
       "droga2026": "Eliminacje LE przegrana z Anderlechtem, LK Q3 przegrana z Rakowem",
+      "wejscie2026": "LE:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2600,6 +2724,7 @@
       "narodowosc": "SVK",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK Q2 przegrana z GKS Katowice",
+      "wejscie2026": "LK:Q2",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2616,6 +2741,7 @@
       "narodowosc": "KOS",
       "rozgrywki2026": "ELIM",
       "droga2026": "LM Q1 przegrana z Kauno Žalgiris 3-4",
+      "wejscie2026": "LM:Q1",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2632,6 +2758,7 @@
       "narodowosc": "LTU",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK Q3, para z Hajdukiem (Hajduk awansował)",
+      "wejscie2026": "LK:Q2",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "szacunek"
     },
@@ -2648,6 +2775,7 @@
       "narodowosc": "ISR",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK Q3 przegrana z Austrią Wiedeń (karne)",
+      "wejscie2026": "LK:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2664,6 +2792,7 @@
       "narodowosc": "CYP",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK Q3, para z Brann (Brann awansował)",
+      "wejscie2026": "LK:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "szacunek"
     },
@@ -2680,6 +2809,7 @@
       "narodowosc": "NIR",
       "rozgrywki2026": "ELIM",
       "droga2026": "LM Q1 awans, LM Q2 przegrana z Crvena zvezda 0-9, potem przegrana z Iberia 1999",
+      "wejscie2026": "LM:Q1",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2696,6 +2826,7 @@
       "narodowosc": "EST",
       "rozgrywki2026": "ELIM",
       "droga2026": "LM Q1 przegrana z Iberia 1999",
+      "wejscie2026": "LM:Q1",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2712,6 +2843,7 @@
       "narodowosc": "ARM",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK Q3 (para z Debreceni VSC), odpadł",
+      "wejscie2026": "LK:Q2",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "szacunek"
     },
@@ -2728,6 +2860,7 @@
       "narodowosc": "AZE",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK Q3 (para z Paide), odpadł",
+      "wejscie2026": "LK:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "szacunek"
     },
@@ -2744,6 +2877,7 @@
       "narodowosc": "HUN",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK Q3 (para z Pjunikiem), odpadł",
+      "wejscie2026": "LK:Q3",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "szacunek"
     },
@@ -2760,6 +2894,7 @@
       "narodowosc": "SVK",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK Q3 przegrana z Twente 3-9",
+      "wejscie2026": "LK:Q2",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2776,6 +2911,7 @@
       "narodowosc": "SUI",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK Q3 (para z Inter Turku), odpadł",
+      "wejscie2026": "LM:Q1",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "szacunek"
     },
@@ -2792,6 +2928,7 @@
       "narodowosc": "FIN",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK PO przegrana z FC Kopenhaga 1-4",
+      "wejscie2026": "LK:Q2",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2808,6 +2945,7 @@
       "narodowosc": "ISL",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK Q3 przegrana z Nordsjælland 0-7",
+      "wejscie2026": "LK:Q2",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2824,6 +2962,7 @@
       "narodowosc": "MKD",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK Q3 (para z Hibernian), odpadł",
+      "wejscie2026": "LM:Q1",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "szacunek"
     },
@@ -2840,6 +2979,7 @@
       "narodowosc": "BLR",
       "rozgrywki2026": "ELIM",
       "droga2026": "LM Q1 przegrana; źródła rozbieżne co do dalszej gry",
+      "wejscie2026": "LM:Q1",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "szacunek"
     },
@@ -2856,6 +2996,7 @@
       "narodowosc": "MLT",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK Q2 przegrana z Rakowem 1-7",
+      "wejscie2026": "LK:Q2",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2872,6 +3013,7 @@
       "narodowosc": "MKD",
       "rozgrywki2026": "ELIM",
       "droga2026": "LM Q1 przegrana z KuPS 3-4 po dogrywce",
+      "wejscie2026": "LM:Q1",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2888,6 +3030,7 @@
       "narodowosc": "MLT",
       "rozgrywki2026": "ELIM",
       "droga2026": "LM Q1 przegrana z Shamrock Rovers",
+      "wejscie2026": "LM:Q1",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2904,6 +3047,7 @@
       "narodowosc": "MNE",
       "rozgrywki2026": "ELIM",
       "droga2026": "LM Q1 przegrana z Kairatem 1-4",
+      "wejscie2026": "LM:Q1",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2920,6 +3064,7 @@
       "narodowosc": "BLR",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK Q3 (para z Borac wg jednego źródła), odpadł",
+      "wejscie2026": "LK:Q1",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "szacunek"
     },
@@ -2936,6 +3081,7 @@
       "narodowosc": "EST",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK Q3 (para z Zirə), odpadł",
+      "wejscie2026": "LK:Q1",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "szacunek"
     },
@@ -2952,6 +3098,7 @@
       "narodowosc": "KOS",
       "rozgrywki2026": "ELIM",
       "droga2026": "LK Q3 (para z Hibernian wg losowania), odpadł",
+      "wejscie2026": "LK:Q1",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "szacunek"
     },
@@ -2968,6 +3115,7 @@
       "narodowosc": "LUX",
       "rozgrywki2026": "ELIM",
       "droga2026": "LM Q1 przegrana",
+      "wejscie2026": "LM:Q1",
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "pewne"
     },
@@ -2984,6 +3132,7 @@
       "narodowosc": "ENG",
       "rozgrywki2026": "BRAK",
       "droga2026": "Brak w pucharach 2026/27 wg list koszyków; klub rezerwowy do przyszłych sezonów",
+      "wejscie2026": null,
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "szacunek"
     },
@@ -3000,6 +3149,7 @@
       "narodowosc": "ENG",
       "rozgrywki2026": "BRAK",
       "droga2026": "Jak wyżej",
+      "wejscie2026": null,
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "szacunek"
     },
@@ -3016,6 +3166,7 @@
       "narodowosc": "GER",
       "rozgrywki2026": "BRAK",
       "droga2026": "Jak wyżej",
+      "wejscie2026": null,
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "szacunek"
     },
@@ -3032,6 +3183,7 @@
       "narodowosc": "ITA",
       "rozgrywki2026": "BRAK",
       "droga2026": "Jak wyżej",
+      "wejscie2026": null,
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "szacunek"
     },
@@ -3048,6 +3200,7 @@
       "narodowosc": "ITA",
       "rozgrywki2026": "BRAK",
       "droga2026": "Jak wyżej",
+      "wejscie2026": null,
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "szacunek"
     },
@@ -3064,6 +3217,7 @@
       "narodowosc": "ESP",
       "rozgrywki2026": "BRAK",
       "droga2026": "Jak wyżej",
+      "wejscie2026": null,
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "szacunek"
     },
@@ -3080,6 +3234,7 @@
       "narodowosc": "ENG",
       "rozgrywki2026": "BRAK",
       "droga2026": "Jak wyżej",
+      "wejscie2026": null,
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "szacunek"
     },
@@ -3096,6 +3251,7 @@
       "narodowosc": "FRA",
       "rozgrywki2026": "BRAK",
       "droga2026": "Jak wyżej",
+      "wejscie2026": null,
       "pewnosc": "szacunek",
       "pewnoscUdzialu": "szacunek"
     }
