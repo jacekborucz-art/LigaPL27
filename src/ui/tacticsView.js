@@ -12,6 +12,7 @@ import { moraleLabel } from '../career/morale.js';
 import { attrGroupsHtml } from './squadView.js';
 import { locKey, playerAt } from './tacticsMoves.js';
 import { esc } from './dom.js';
+import { formChartHtml } from './formChart.js';
 
 const band = (prof) => (prof >= 85 ? 'ok' : prof >= 60 ? 'mid' : 'bad');
 const few = (n) => n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14);
@@ -224,6 +225,7 @@ function renderPlayerInfo(p, tactics, f, extra = '') {
         ${fact('Ostrość', `${Math.round(p.sharp ?? 70)}%`)}
         ${fact('Morale', esc(moraleLabel(p.morale ?? 12)))}
       </dl>
+      ${formChartHtml(p)}
       <div class="tdet__groups">${attrGroupsHtml(p, { heading: 'h4' })}</div>
       ${extra ? `<div class="tdet__stats">${extra}</div>` : ''}
     </div>

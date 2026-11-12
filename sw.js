@@ -179,6 +179,7 @@ const SHELL = [
   './src/ui/dom.js',
   './src/ui/europeView.js',
   './src/ui/fixturesView.js',
+  './src/ui/formChart.js',
   './src/ui/matchdayView.js',
   './src/ui/menuView.js',
   './src/ui/nationalView.js',
