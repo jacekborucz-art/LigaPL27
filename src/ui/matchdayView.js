@@ -199,6 +199,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
         <blockquote class="assistant">${esc(p.assistant.style)} ${esc([...(p.assistant.counters ?? [])].map((x) => x.text ?? x).join(' '))} ${esc(p.assistant.strength.notes.join(' '))}
           ${p.keyPlayers.opponent.length ? `<br><br>Kluczowi zawodnicy rywala: ${esc(p.keyPlayers.opponent.map((k) => `${k.name} (${k.pos})`).join(', '))}.` : ''}
           ${p.suspensionRisk.user.length ? `<br><br>${esc(p.suspensionRisk.user.map((x) => x.text).join('. '))}.` : ''}
+          ${p.scouting ? `<br><br>${esc(p.scouting.text)}` : ''}
           <footer>Asystent trenera</footer></blockquote>
       </section>
       <section class="sec"><h2>Oczekiwania</h2>

@@ -16,7 +16,7 @@ import { fixturesPanelBody, renderFixtures } from './ui/fixturesView.js';
 import { ensureHistory } from './season/history.js';
 import { createMatch, runToEnd } from './engine/match/match.js';
 import { Rng } from './core/rng.js';
-import { coachOf, matchCoach, formRng, assistantProfile } from './career/coaches.js';
+import { coachOf, coachStyle, matchCoach, formRng, assistantProfile } from './career/coaches.js';
 import { staffQ } from './training/staff.js';
 import { addDays } from './core/gameLoop.js';
 import { generateWorld, squadOf, academyOf } from './world/worldGen.js';
@@ -106,6 +106,8 @@ function ensureGameShape(g) {
   if (!g.tactics) g.tactics = createTactics(mySquad(g), { benchSize: benchSizeFor(g) });
   else g.tactics = refreshTactics(g.tactics, mySquad(g), { benchSize: benchSizeFor(g) }).tactics;
   if (!Array.isArray(g.inbox)) g.inbox = [];
+  // Stare zapisy: Superpuchar zawsze na PGE Narodowym (teren neutralny)
+  for (const f of g.fixtures ?? []) if (f.comp === 'super' && !f.played && !f.neutral) { f.neutral = true; f.venue = 'PGE Narodowy'; }
   if (!g.season) {
     // Zapis sprzed etapu 7: tworzymy sezon i rozgrywamy w tle mecze z minionych dni
     g.season = createSeason(g.seed, { playerClub: g.clubId });
@@ -674,13 +676,13 @@ async function playMyMatch() {
   const oppSquad = squadFor(g, oppId, f.comp);
   const tierComp = LEAGUE_COMPS.includes(f.comp) ? f.comp : 'pucharPolski';
   const bench = COMPETITIONS[tierComp]?.benchSize ?? 12;
-  const cfgFor = (id, squad, tactics, ai) => ({ club: anyClub(id), squad, tactics, ai, coach: anyClub(id)?.coach ?? 'P' });
+  const cfgFor = (id, squad, tactics, ai) => ({ club: anyClub(id), squad, tactics, ai, coach: coachStyle(g, id) });
   const mine = cfgFor(g.clubId, mySquad(g), g.tactics, false);
   const theirs = cfgFor(oppId, oppSquad, createTactics(oppSquad, { benchSize: bench }), true);
   // Trener rywala z atrybutami i asystent gracza (docs/trener-ai-atrybuty.md)
   const rank = f.comp === 'pp' ? (f.round === 'F' ? 3 : 1) : f.comp === 'super' ? 3 : f.comp === 'uefa' ? 2 : 0;
   if (f.comp !== 'friendly') theirs.coachQ = matchCoach(coachOf(g, oppId, oppClub), { rank, rng: formRng(g, f.id, oppId) });
-  mine.assistantQ = matchCoach(assistantProfile(staffQ(g, g.clubId, 'asystent')), { rank, rng: formRng(g, f.id, g.clubId) });
+  mine.assistantQ = matchCoach(assistantProfile(staffQ(g, g.clubId, 'asystent'), clubById(g.clubId)?.tier), { rank, rng: formRng(g, f.id, g.clubId) });
   Object.assign(mine, trainingMatchInput(g, g.clubId, mine));
   Object.assign(theirs, trainingMatchInput(g, oppId, theirs));
   const M = createMatch({

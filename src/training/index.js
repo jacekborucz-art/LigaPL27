@@ -21,7 +21,9 @@ import { processUserDay } from './sessions.js';
 import { monthlyDevelopment } from './development.js';
 import { cohesionTerm, prepTerm, setPieceEdge, aiWeeklyCohesion, weeklyCohesionDecay } from './cohesion.js';
 import { legsTerm, overloadTerm } from './load.js';
-import { processAiDay, aiOverload } from './aiClubs.js';
+import { processAiDay, aiOverload, aiPlanFor } from './aiClubs.js';
+import { varietyWeek, editsLastWeek, aiAccentAt, staleNote, staleness } from './variety.js';
+import { campOn } from './camps.js';
 
 // Forma bazowa po okresie przygotowawczym: jedna liczba na klub i dzień (pamięć podręczna, tanio w meczu)
 const campCache = new WeakMap();
@@ -53,9 +55,12 @@ export function weeklyStep(game, date) {
   }
   const half = halfOf(date);
   const key = halfKey(half);
+  const lastWeek = addDays(date, -1);
   for (const clubId of Object.keys(game.world.clubs)) {
     if (clubId === game.clubId) continue;
     aiWeeklyCohesion(game, clubId, matches[clubId] ?? 0);
+    // Monotonia treningu (variety.js): akcent trenera AI w minionym tygodniu
+    if (T.clubs[clubId]) varietyWeek(T.clubs[clubId], { accent: aiAccentAt(game, clubId, aiPlanFor(clubId, game).accent, lastWeek) });
     // Obóz klubu AI: jedna decyzja na rundę, według prestiżu i ligi (forma bazowa; dni obozu: aiClubs.js)
     const c = T.clubs[clubId];
     if (c.cb?.key !== key) {
@@ -65,6 +70,13 @@ export function weeklyStep(game, date) {
   }
   const c = T.clubs[game.clubId];
   if (c) {
+    // Monotonia treningu: ten sam akcent bez zmian w planie (docs/bierna-gra.md)
+    varietyWeek(c, { accent: T.settings?.accent ?? 'zrownowazony', edits: editsLastWeek(game, date), camp: !!campOn(game, lastWeek) });
+    const sn = staleNote(c);
+    if (sn && staleness(c) >= 0.5 && !c.var.warned) {
+      c.var.warned = true;
+      messages.push(msg(date, 'Asystent trenera', 'info', 'Zawodnicy są znużeni treningiem', `${sn} Ten sam akcent planu trwa od ${c.var.w} tygodni. Znużenie zmniejsza morale z zajęć i trochę spowalnia rozwój. Akcent zmienisz w zakładce Trening.`, `nuda:${date}`));
+    }
     weeklyCohesionDecay(c);
     if (c.prep && c.prep.date < date) c.prep = null;
     const over = squadOf(game.world, game.clubId).filter((p) => (p.training?.acwr ?? 1) > 1.5 && !(p.injuryDays > 0));

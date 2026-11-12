@@ -22,7 +22,7 @@ import { INJURY_TYPES } from '../engine/match/constants.js';
 import { fmtDate } from '../ui/dom.js';
 import { UEFA_CLUBS, createUefa } from './uefa.js';
 import { aiChooseSpeech, postMatchBriefing, closeMatchMemory, POST_TONES } from '../match/briefings.js';
-import { coachOf, matchCoach, quickCoachTerm, formRng, assistantProfile, motivationSkill, COACH } from '../career/coaches.js';
+import { coachOf, coachStyle, matchCoach, quickCoachTerm, formRng, assistantProfile, motivationSkill, COACH } from '../career/coaches.js';
 import { staffQ } from '../training/staff.js';
 import { statGroup, addPlayerMatch, syncSpell, recordTeamMatch, CLUB_GROUPS } from './history.js';
 
@@ -175,7 +175,7 @@ export function quickRank(game, f, cache = new Map()) {
  * ze sztabu), dyspozycja dnia z ziarna meczu, waga meczu. Wynik w punktach atrybutu dla stref drużyny.
  */
 function quickCoach(game, f, clubId, rank) {
-  const prof = clubId === game.clubId ? assistantProfile(staffQ(game, clubId, 'asystent')) : coachOf(game, clubId, anyClub(clubId));
+  const prof = clubId === game.clubId ? assistantProfile(staffQ(game, clubId, 'asystent'), clubById(clubId)?.tier) : coachOf(game, clubId, anyClub(clubId));
   return quickCoachTerm(matchCoach(prof, { rank, rng: formRng(game, f.id, clubId) }));
 }
 
@@ -287,7 +287,7 @@ function aiPostMatchTalk(game, f, clubId, s, res, squad, played) {
   const mem = (game.aiSpeech ??= {});
   const gf = res.score[s]; const ga = res.score[1 - s];
   const xg = res.stats?.xg ?? [0, 0];
-  let tone = aiChooseSpeech(anyClub(clubId)?.coach ?? 'P', { phase: 'post', diff: gf - ga, xgDiff: (xg[s] ?? 0) - (xg[1 - s] ?? 0), memory: mem[clubId] });
+  let tone = aiChooseSpeech(coachStyle(game, clubId), { phase: 'post', diff: gf - ga, xgDiff: (xg[s] ?? 0) - (xg[1 - s] ?? 0), memory: mem[clubId] });
   const talk = (t) => postMatchBriefing({
     players, tone: t, memory: mem[clubId], seed: `${game.seed}:${f.id}:po-meczu-ai:${clubId}`,
     ctx: { score: { for: gf, against: ga }, xgFor: xg[s] ?? 0, xgAgainst: xg[1 - s] ?? 0, ratings: Object.fromEntries(res.players[s].map((x) => [x.id, x.rating])), rank: f.derby ? 2 : f.comp === 'pp' ? 1 : 0, clubId },

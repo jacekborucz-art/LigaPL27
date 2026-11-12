@@ -203,3 +203,10 @@ więc to na granicy szumu, a powtarzalnie dodatnia Lechia wynika z wyceny kadry 
 
 `tests/matchday.test.mjs`: temperatura w danych dla silnika, kara za czerwoną z powodu, walkower, `concussionSubs`
 i zawodnik w pauzach studia po pełnym dniu meczowym.
+
+## Trenerzy AI z atrybutami (Nov 12, 2026)
+
+Trenerzy klubów AI mają atrybuty 1-20 (`docs/trener-ai-atrybuty.md`). Średni trener Ekstraklasy jest punktem
+neutralnym (zachowanie AI sprzed zmiany), a asystent gracza przy „Pokaż wynik” ma jakość ze sztabu przeliczoną
+na skalę trenera, więc średnio jest tak dobry jak trener AI tego samego klubu. Pomiar `sim.mjs` przed i po
+(30 sezonów): różnica pasywny gracz kontra AI bez istotnej zmiany (Widzew -7,5 i -5,8 pkt, GKS -4,0 i -4,5 pkt).

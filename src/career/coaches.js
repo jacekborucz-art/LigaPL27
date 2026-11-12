@@ -28,7 +28,13 @@ export const COACH_STYLES = { O: 'ofensywny', S: 'ostrożny', P: 'pragmatyczny' 
 export const COACH = {
   neutral: 10.5, span: 9.5,
   // Generowanie: średnia 3,5 + 0,8 prestiżu + premia ligi, wspólny talent trenera i rozrzut atrybutów
-  gen: { base: 3.5, perPrestige: 0.8, tier: { 1: 1, 2: 0, 3: -1, 4: -1.5 }, talentSd: 1.3, attrSd: 2.0, styleBonus: { O: 'MOT', S: 'SKL', P: 'TAK' } },
+  // Premia ligi (docs/trenerzy-i-wlasciciele.md, rozdz. 1): skala bezwzględna, ale różnica między ligami mniejsza
+  // niż w kadrach (licencje UEFA Pro i UEFA A, trenerzy krążą między ligami): Ekstraklasa ok. 10,4, 1 Liga ok. 9,
+  // 2 Liga ok. 8. Wcześniej 1 Liga 8 i 2 Liga 6 dawały amatorskie błędy w 2 Lidze.
+  gen: { base: 3.5, perPrestige: 0.8, tier: { 1: 1, 2: 0.9, 3: 1.15, 4: 0.5 }, talentSd: 1.3, attrSd: 2.0, styleBonus: { O: 'MOT', S: 'SKL', P: 'TAK' } },
+  // Słabszy od średniej trener to wciąż zawodowiec: ujemna strona skali jest łagodniejsza (s ujemne do potęgi 1,35),
+  // trener 8 ma s = -0,16 zamiast -0,26, trener 3 prawie bez zmian. Dodatnia strona i punkt 10,5 bez zmian.
+  lowCurve: 1.35,
   // Dyspozycja dnia: stały punkt + losowe odchylenie w punktach atrybutu (ok. +-5 % skali)
   formSd: 0.5, formMax: 1.0,
   // Waga meczu z rangi 0-3 (studio: zwykły, puchar, derby/UEFA/tytuł/utrzymanie, finał) i przesunięcie od PRE
@@ -43,12 +49,18 @@ export const COACH = {
   // Plan przedmeczowy: trafny plan pod rywala (s > 0), chybiony (s < 0), losowy błąd w ocenie zawodników
   plan: { good: 0.4, bad: 0.4, xiNoise: 1.2 },
   // Asystent gracza w meczu: atrybut trenera z jakości asystenta w sztabie
-  assistant: { base: 2, perQ: 0.62 },
+  assistant: { base: 2, perQ: 0.62, tier: { 1: 0, 2: 0.7, 3: 1.6 } },
+  // Sezon trenera w klubie (docs/trener-ai-atrybuty.md, „Stały punkt + los w skali sezonu”): dopasowanie stylu
+  // do kadry, chemia z szatnią (losowana raz na sezon) i efekt nowej miotły; punkty atrybutu dodawane do TAK, SKL, MOT
+  season: { styleFit: 0.75, chemSd: 1.5, chemMax: 3, bounce: 1.5, bounceDays: 42, max: 3.5 },
   // Doświadczenie: zmiany po sezonie
   age: { growUntil: 48, growP: 0.45, declineFrom: 62, declineP: 0.35 },
 };
 
-const skillOf = (v) => clamp((v - COACH.neutral) / COACH.span, -1, 1);
+const skillOf = (v) => {
+  const s = clamp((v - COACH.neutral) / COACH.span, -1, 1);
+  return s >= 0 ? s : -((-s) ** COACH.lowCurve);
+};
 export { skillOf as coachSkill };
 const r1 = (v) => Math.round(v * 10) / 10;
 
@@ -68,25 +80,49 @@ function nameRng(seed, clubId, n) {
   return new Rng(n ? `trener-glowny:${seed}:${clubId}:${n}` : `trener-glowny:${seed}:${clubId}`);
 }
 
+/** Średnia atrybutów trenera, na jakiego stać klub (prestiż i liga). Rynek trenerów używa jej przy zatrudnianiu. */
+export function coachLevelFor(clubId, club = null) {
+  const c = clubInfo(clubId, club);
+  const G = COACH.gen;
+  return G.base + G.perPrestige * genPrestige(c) + (G.tier[c?.tier] ?? 0);
+}
+
+/** Średnia atrybutów profilu. */
+export const coachAvg = (p) => (p?.a ? COACH_KEYS.reduce((s, k) => s + p.a[k], 0) / COACH_KEYS.length : COACH.neutral);
+
+/** Wersja profilu: 2 = skala lig z docs/trenerzy-i-wlasciciele.md, własny styl i staż trenera. */
+export const COACH_VERSION = 2;
+
+/** Początek pracy pierwszego trenera klubu (przed startem gry): staż średnio ok. 1,4 roku, najwyżej 8 lat [SZAC]. */
+function initialFrom(seed, clubId) {
+  const rng = new Rng(`trener-staz:${seed}:${clubId}`);
+  const days = Math.min(8 * 365, Math.round(-Math.log(1 - rng.next() * 0.999) * 1.4 * 365));
+  const d = new Date(Date.UTC(2026, 6, 1) - days * 86400000);
+  return d.toISOString().slice(0, 10);
+}
+
 /**
  * Nowy profil trenera (deterministycznie z ziarna gry, klubu i numeru trenera). Lepsze kluby mają średnio lepszych
  * trenerów, ale z rozrzutem: wspólny talent (odchylenie 1,3) i osobny rozrzut atrybutów (2,0).
- * opts: { n: numer trenera w klubie (0 = pierwszy), date, club, boost: przesunięcie średniej (np. nowy trener) }.
+ * opts: { n: numer trenera w klubie (0 = pierwszy), date, club, boost: przesunięcie średniej (np. nowy trener),
+ * style: własny styl trenera (domyślnie styl klubu: pierwszy trener prowadzi zespół zgodnie z dotychczasową filozofią) }.
  */
-export function generateCoach(seed, clubId, { n = 0, date = null, club = null, boost = 0 } = {}) {
+export function generateCoach(seed, clubId, { n = 0, date = null, club = null, boost = 0, style: own = null } = {}) {
   const c = clubInfo(clubId, club);
   const rng = nameRng(seed, clubId, n);
   const nm = randomName('POL', rng);
   const G = COACH.gen;
-  const style = c?.coach ?? 'P';
-  const mean = G.base + G.perPrestige * genPrestige(c) + (G.tier[c?.tier] ?? 0) + boost;
+  const style = own ?? c?.coach ?? 'P';
+  const mean = coachLevelFor(clubId, c) + boost;
   const talent = rng.gauss(0, G.talentSd);
   const a = {};
   for (const k of COACH_KEYS) {
     const tilt = G.styleBonus[style] === k ? 1 : 0;
     a[k] = clamp(Math.round(mean + talent + tilt + rng.gauss(0, G.attrSd)), 1, 20);
   }
-  return { name: `${nm.first} ${nm.last}`, style, age: rng.int(36, 64), a, n, since: date };
+  const p = { name: `${nm.first} ${nm.last}`, style, age: rng.int(36, 64), a, n, since: date, v: COACH_VERSION };
+  p.id = `${clubId}#${n}`; p.nat = 'POL'; p.from = n ? date : initialFrom(seed, clubId); p.hist = [];
+  return p;
 }
 
 /** Kluby, dla których profil jest zapisywany w grze (kluby ze stałą kadrą). Pozostałe: profil liczony na bieżąco. */
@@ -101,7 +137,9 @@ export function coachOf(game, clubId, club = null) {
   if (!game) return null;
   if (stored(game, clubId)) {
     const all = (game.coaches ??= {});
-    return all[clubId] ?? (all[clubId] = generateCoach(game.seed, clubId, { club, date: game.date ?? null }));
+    const p = all[clubId];
+    if (p && !p.v) upgradeProfile(game, clubId, p);
+    return p ?? (all[clubId] = generateCoach(game.seed, clubId, { club, date: game.date ?? null }));
   }
   const key = `${game.seed}:${clubId}`;
   if (!ephemeral.has(key)) {
@@ -111,10 +149,33 @@ export function coachOf(game, clubId, club = null) {
   return ephemeral.get(key);
 }
 
+/**
+ * Stary zapis (profil sprzed skali lig): atrybuty z obecnego wzoru (te same losowania, więc trenerzy Ekstraklasy
+ * bez zmian, w 1 i 2 Lidze lepsi), to samo nazwisko, wiek i styl; staż z ziarna.
+ */
+function upgradeProfile(game, clubId, p) {
+  const fresh = generateCoach(game.seed, clubId, { n: p.n ?? 0, boost: p.n ? 0.5 : 0, style: p.style, date: p.since ?? null });
+  if (fresh.name === p.name) p.a = fresh.a;
+  p.id ??= fresh.id; p.nat ??= 'POL'; p.from ??= p.n ? p.since : fresh.from; p.hist ??= [];
+  p.v = COACH_VERSION;
+}
+
 /** Wszystkie profile klubów ze stałą kadrą (zgodność wstecz: stary zapis bez trenerów). */
 export function ensureCoaches(game) {
   if (!game?.world?.clubs) return;
   for (const id of Object.keys(game.world.clubs)) if (id !== game.clubId) coachOf(game, id);
+}
+
+/**
+ * Styl gry trenera klubu (O ofensywny, S ostrożny, P pragmatyczny): w klubie AI styl trenera prowadzącego
+ * (nowy trener przynosi własny), w klubie gracza i bez profilu styl z danych klubu.
+ */
+export function coachStyle(game, clubId, club = null) {
+  if (game && clubId !== game.clubId) {
+    const p = coachOf(game, clubId, club);
+    if (p?.style) return p.style;
+  }
+  return clubInfo(clubId, club)?.coach ?? 'P';
 }
 
 /** Trener prowadzący: w klubie gracza profil gracza, w klubie AI imię i nazwisko z profilu. */
@@ -132,8 +193,9 @@ export function headCoachName(game, clubId) {
  * trener: 3,5 + 0,8 prestiżu, stąd 2 + 0,62 q). Bez tego asystent dużego klubu byłby lepszy od trenerów AI
  * i pasywny gracz miałby przewagę. Gracz sam jest trenerem, więc jego decyzje nie mają atrybutów.
  */
-export function assistantProfile(q) {
-  const v = clamp(Math.round(COACH.assistant.base + COACH.assistant.perQ * (q ?? 13.5)), 1, 20);
+export function assistantProfile(q, tier = 1) {
+  const A = COACH.assistant;
+  const v = clamp(Math.round(A.base + A.perQ * (q ?? 13.5) + (A.tier[tier] ?? 0)), 1, 20);
   return { name: 'Asystent', style: 'P', a: { TAK: v, SKL: v, MOT: v, TRE: v, PRE: v }, assistant: true };
 }
 
@@ -152,7 +214,8 @@ export function matchCoach(profile, { rank = 0, rng = null } = {}) {
   const form = rng ? clamp(rng.gauss(0, COACH.formSd), -COACH.formMax, COACH.formMax) : 0;
   const imp = importanceOf(rank);
   const press = imp * COACH.pressure * ((a.PRE ?? COACH.neutral) - COACH.neutral);
-  const eff = (k) => r3(skillOf((a[k] ?? COACH.neutral) + form + press));
+  const season = profile.boost ?? 0; // dopasowanie do kadry, chemia z szatnią, nowa miotła (sezon, coachMarket.js)
+  const eff = (k) => r3(skillOf((a[k] ?? COACH.neutral) + form + press + season));
   return { tak: eff('TAK'), skl: eff('SKL'), mot: eff('MOT'), pre: r3(skillOf((a.PRE ?? COACH.neutral) + form)), form: r1(form), imp, rank };
 }
 const r3 = (v) => Math.round(v * 1000) / 1000;
@@ -185,18 +248,24 @@ export function motivationSkill(game, clubId) {
 }
 
 /**
- * Zmiana trenera klubu AI (np. po presji kibiców, career/fans.js): nowy profil z kolejnym numerem. Zarząd szuka
- * lepszego trenera, ale nie zawsze go znajduje (średnia +0,5, ten sam rozrzut). Styl gry zostaje (filozofia klubu).
+ * Zmiana trenera klubu AI: zapisuje nowy profil (next) albo, bez niego, tworzy nowego trenera z kolejnym numerem
+ * (zarząd szuka lepszego, nie zawsze znajduje: średnia +0,5). Nowy trener przynosi własny styl gry (losowany
+ * z ziarna; rynek trenerów, src/career/coachMarket.js, podaje gotowy profil z puli wolnych trenerów).
+ * Wpis w game.coachLog. Zwraca nowy profil albo null (klub gracza, klub bez stałej kadry).
  */
-export function replaceCoach(game, clubId, date) {
+export function replaceCoach(game, clubId, date, next = null, why = null) {
   if (!stored(game, clubId) || clubId === game.clubId) return null;
   const old = coachOf(game, clubId);
   const n = (old?.n ?? 0) + 1;
-  const next = generateCoach(game.seed, clubId, { n, date, boost: 0.5 });
+  if (!next) {
+    const style = ['O', 'S', 'P'][new Rng(`trener-styl:${game.seed}:${clubId}:${n}`).int(0, 2)];
+    next = generateCoach(game.seed, clubId, { n, date, boost: 0.5, style });
+  }
+  next.n = n; next.since = date; next.from = date;
   game.coaches[clubId] = next;
   const log = (game.coachLog ??= []);
-  log.unshift({ date, club: clubId, out: old?.name ?? null, in: next.name });
-  game.coachLog = log.slice(0, 30);
+  log.unshift({ date, club: clubId, out: old?.name ?? null, in: next.name, ...(why ? { why } : {}), ...(next.caretaker ? { caretaker: true } : {}) });
+  game.coachLog = log.slice(0, 80);
   return next;
 }
 

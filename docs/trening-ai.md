@@ -129,3 +129,10 @@ o mniej niż 0,15).
 - Zgranie AI to nadal model zbiorczy (instrukcje, znajomość systemu i rytm jako jedna liczba), skalibrowany do gracza.
 - Urazy treningowe gracza bez obozu są nadal trochę częstsze niż AI (ok. +1 na sezon, w granicach szumu); część to kara
   za brak obozu (zamierzona).
+
+## Metodyka treningu trenera (Nov 12, 2026)
+
+Atrybut TRE trenera klubu AI (`docs/trener-ai-atrybuty.md`) mnoży bodziec rozwojowy x(1 + 0,3 s), ryzyko urazu
+na treningu x(1 - 0,25 s), przyrost ostrości x(1 + 0,15 s) i zgranie z zajęć x(1 + 0,15 s), gdzie
+s = (TRE - 10,5) / 9,5. Klub gracza bez zmian (trening ustala gracz). Efekt w jednym sezonie jest mały
+(+16 % miesięcznego przyrostu atrybutów młodych przy 16 wobec 8), widoczny po kilku sezonach.
