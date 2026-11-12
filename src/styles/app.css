@@ -735,3 +735,5 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
   .pp__cols > section > h3 { break-after: avoid; margin-top: 0; padding-top: var(--space-2); }
   .pp__cols > section > ul { break-inside: avoid; margin-bottom: var(--space-4); }
 }
+/* Data w nagłówku gry: czytelna czcionka zamiast kropkowanego LED */
+.led.hub__date { padding: 4px 12px; font: 700 var(--step-0)/1.2 var(--font-display); letter-spacing: .02em; text-shadow: none; font-variant-numeric: tabular-nums; }
