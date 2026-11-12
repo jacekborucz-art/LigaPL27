@@ -658,14 +658,91 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 @media (prefers-reduced-motion: reduce) { .draw-item.pop { animation: none; } }
 .stat-list li.is-me { background: color-mix(in srgb, var(--led) 22%, transparent); }
 .mail-tools { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
-.tt-head { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin-bottom: var(--space-3); }
-.tt-tones { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-2); }
-.tt-tone { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+/* ================= Kadra > Rozmowy (src/ui/talksView.js) =================
+   Kolory znaczeniowe: zielony dobrze, bursztyn ostrzeżenie, czerwony pilne, niebieski informacja.
+   Tony zebrania mają własne barwy, żeby różniły się na pierwszy rzut oka. */
+.tt { --tt-good: #2E8A4E; --tt-push: #C98A12; --tt-calm: #2D6A8F; --tt-unity: #6B4FB0; --tt-risk: #C23B3B;
+  display: grid; gap: var(--space-3); grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "head" "notice" "side" "players"; }
+.tt-head { grid-area: head; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); }
+.tt-notice { grid-area: notice; margin: 0; }
+.tt-players { grid-area: players; }
+.tt-side { grid-area: side; display: grid; gap: var(--space-3); align-content: start; min-width: 0; }
+.tt-kpi { --k: var(--text-muted); display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px 14px 12px; border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--k) 11%, var(--surface)); border: 1px solid color-mix(in srgb, var(--k) 30%, var(--line)); border-top: 4px solid var(--k); }
+.tt-kpi small { color: var(--text-muted); font-size: var(--step--1); }
+.tt-kpi b { font: 700 var(--step-2)/1.1 var(--font-display); color: color-mix(in srgb, var(--k) 55%, var(--text)); }
+.tt-kpi[data-m="top"], .tt-kpi[data-m="good"] { --k: var(--tt-good); }
+.tt-kpi[data-m="mid"] { --k: var(--tt-push); }
+.tt-kpi[data-m="low"], .tt-kpi[data-m="bad"] { --k: var(--tt-risk); }
+.tt-kpi[data-m="calm"] { --k: var(--tt-calm); }
+.tt-pips { display: flex; gap: 6px; margin-top: 4px; }
+.tt-pips i { width: 22px; height: 8px; border-radius: 4px; background: var(--tt-calm); }
+.tt-pips i.is-used { background: color-mix(in srgb, var(--text) 18%, transparent); }
+.tt-panel { min-width: 0; padding: 14px 16px 16px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--pt, var(--murawa)) 6%, var(--surface)); border: 1px solid color-mix(in srgb, var(--pt, var(--murawa)) 22%, var(--line)); }
+.tt-panel h3 { margin: 0 0 var(--space-1); font: 700 var(--step-1)/1.15 var(--font-display); }
+.tt-panel > .hint { margin: 0 0 var(--space-3); }
+.tt-players { --pt: var(--tt-calm); }
+.tt-meet { --pt: var(--tt-push); }
+.tt-log { --pt: var(--tt-unity); }
+.tt-group { display: flex; align-items: center; gap: 8px; margin: var(--space-3) 0 var(--space-2); font: 700 var(--step-0)/1 var(--font-display); color: var(--text-muted); }
+.tt-group span { padding: 2px 7px; border-radius: 999px; font-size: var(--step--1); background: color-mix(in srgb, var(--text) 10%, transparent); }
+.tt-group--rec { color: var(--text); }
+.tt-group--rec span { background: var(--tt-push); color: #1C1404; }
+.tt-ok { padding: 10px 12px; border-radius: var(--radius-s); background: color-mix(in srgb, var(--tt-good) 12%, transparent); }
+.tt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.tt-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 10px; align-items: center; padding: 8px 10px; border-radius: var(--radius-s); background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--line); }
+.tt-row.is-rec { border-left-color: var(--tt-push); background: color-mix(in srgb, var(--tt-push) 6%, var(--surface)); }
+.tt-row .pos { min-width: 38px; }
+.tt-who { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.tt-who > b { font-weight: 600; }
+.tt-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.tt-tag, .tt-mor { --c: var(--tt-calm); display: inline-block; padding: 2px 7px; border-radius: 999px; font-size: var(--step--1); line-height: 1.35;
+  color: color-mix(in srgb, var(--c) 70%, var(--text)); background: color-mix(in srgb, var(--c) 14%, transparent); }
+.tt-tag[data-k="bad"] { --c: var(--tt-risk); } .tt-tag[data-k="warn"] { --c: var(--tt-push); color: var(--warn-text); } .tt-tag[data-k="good"] { --c: var(--tt-good); }
+.tt-mor[data-m="top"], .tt-mor[data-m="good"] { --c: var(--tt-good); } .tt-mor[data-m="mid"] { --c: var(--text-muted); }
+.tt-mor[data-m="low"] { --c: var(--tt-push); } .tt-mor[data-m="bad"] { --c: var(--tt-risk); }
+.tt-act { grid-column: 1 / -1; display: flex; gap: 6px; align-items: center; min-width: 0; }
+.tt-act .pick-select { flex: 1; min-width: 0; max-width: 15rem; }
+.tt-go { background: var(--tt-push); color: #1C1404; border-color: transparent; font-weight: 700; }
+.tt-go:hover:not([disabled]) { filter: brightness(1.08); }
+.tt-tones { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-2); }
+.tt-tone { --h: var(--tt-calm); display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 10px 12px 12px; text-align: left; cursor: pointer; font: inherit; color: inherit;
+  border-radius: var(--radius-s); border: 1px solid color-mix(in srgb, var(--h) 35%, var(--line)); border-left: 5px solid var(--h); background: color-mix(in srgb, var(--h) 9%, var(--surface)); }
+.tt-tone strong { font: 700 var(--step-0)/1.1 var(--font-display); color: color-mix(in srgb, var(--h) 60%, var(--text)); }
+.tt-tone .tt-quote { font-style: italic; }
 .tt-tone small { color: var(--text-muted); }
+.tt-tone:hover:not([disabled]) { background: color-mix(in srgb, var(--h) 16%, var(--surface)); }
+.tt-tone:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .tt-tone[disabled] { opacity: .5; cursor: not-allowed; }
-.tt-row { flex-wrap: wrap; }
-.tt-act { display: flex; gap: 6px; align-items: center; margin-left: auto; }
-.tt-act .pick-select { max-width: 13rem; }
+.tt-tone[data-hue="good"] { --h: var(--tt-good); } .tt-tone[data-hue="push"] { --h: var(--tt-push); } .tt-tone[data-hue="calm"] { --h: var(--tt-calm); }
+.tt-tone[data-hue="unity"] { --h: var(--tt-unity); } .tt-tone[data-hue="risk"] { --h: var(--tt-risk); }
+.tt-react { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: grid; gap: 4px; }
+.tt-react li { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.tt-log ol { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: grid; gap: 8px; }
+.tt-log li { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; padding-left: 10px; border-left: 3px solid var(--tt-calm); font-size: var(--step--1); }
+.tt-log li[data-k="meet"] { border-left-color: var(--tt-push); }
+.tt-log time { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+@media (max-width: 559px) { .tt-head { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .tt-head .tt-kpi:last-child { grid-column: 1 / -1; } }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tt { --tt-push: #E0A21C; --tt-calm: #4A8FC4; --tt-unity: #8F74D6; --tt-risk: #E05A5A; --tt-good: #3FA463; } }
+:root[data-theme="dark"] .tt { --tt-push: #E0A21C; --tt-calm: #4A8FC4; --tt-unity: #8F74D6; --tt-risk: #E05A5A; --tt-good: #3FA463; }
+/* Tablet i PC: wiersz zawodnika w jednej linii */
+@media (min-width: 760px) {
+  .tt-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .tt-act { grid-column: auto; }
+}
+/* PC: lista zawodników po lewej, zebranie i historia w kolumnie po prawej (przyklejonej przy przewijaniu) */
+@media (min-width: 1200px) {
+  .hub__main:has(.tt) { max-width: 1440px; }
+  .tt { grid-template-columns: minmax(0, 1.55fr) minmax(340px, 1fr); grid-template-areas: "head head" "notice notice" "players side"; align-items: start; }
+  .tt-side { position: sticky; top: var(--space-3); }
+  .tt-tones { grid-template-columns: minmax(0, 1fr); }
+}
+@media (min-width: 1600px) {
+  .hub__main:has(.tt) { max-width: 1840px; }
+  .tt { grid-template-columns: minmax(0, 1.6fr) minmax(420px, 1fr); }
+  .tt-tones { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 /* Mecze pucharowe: drużyna, która awansowała */
 .fx__team--win { font-weight: 800; }
 .fx__team--win, .fx__team--h.fx__team--win { background: color-mix(in srgb, var(--led) 28%, transparent); border-radius: var(--radius-s); padding: 2px 6px; }

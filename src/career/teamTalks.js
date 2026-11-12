@@ -101,11 +101,11 @@ export function holdMeeting(game, tone) {
     out.push({ id: p.id, name: p.name, reaction: kind, label: REACTIONS[kind].label });
   }
   T.lastMeeting = game.date; T.tones = [...T.tones, tone].slice(-6);
-  logEngage(game, 'meeting'); // autorytet trenera (career/authority.js)
   const pos = out.filter((r) => r.reaction === 'zmotywowany' || r.reaction === 'spokojny').length;
   const neg = out.filter((r) => r.reaction === 'urazony' || r.reaction === 'zdenerwowany').length;
   const summary = pos >= out.length * 0.6 ? 'Drużyna dobrze przyjęła twoje słowa.' : neg >= out.length * 0.35 ? 'Część drużyny źle przyjęła zebranie. Atmosfera jest napięta.' : 'Reakcje są mieszane.';
   T.log = [{ date: game.date, kind: 'meeting', tone, summary }, ...T.log].slice(0, 20);
+  logEngage(game, pos >= out.length * 0.6 ? 'meetGood' : neg >= out.length * 0.35 ? 'meetBad' : 'meetMeh'); // trafność zebrania (career/authority.js)
   return { ok: true, situation: sit, players: out, summary, repeated: repeats > 0 };
 }
 
@@ -196,7 +196,7 @@ export function talkToPlayer(game, playerId, kind) {
   if (trustD) p.relations = { ...(p.relations ?? {}), [game.clubId]: applyTrust(p, trustD, `rozmowa:${kind}`, { clubId: game.clubId, date: game.date }) };
   p.morale = applyMorale(p.morale ?? 12, clamp(z, -2.5, 2.5));
   noteAttention(p, game.date);
-  logEngage(game, 'talk');
+  logEngage(game, z >= 0.8 ? 'talkGood' : z <= -0.5 ? 'talkBad' : 'talkMeh'); // trafność rozmowy (career/authority.js)
   const reaction = classifyReaction(z * 1.8, trustD);
   T.perPlayer[playerId] = [...hist, { date: game.date, kind }];
   T.log = [{ date: game.date, kind: 'talk', playerId, talk: kind, reaction, reply }, ...T.log].slice(0, 20);

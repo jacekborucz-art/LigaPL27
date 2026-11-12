@@ -228,3 +228,71 @@ test('Stary zapis: brak stanu analizy i rozmów działa, stan przechodzi przez J
   g.clubId = 'legia';
   assert.equal(userFamiliarity(g).fam, SCOUT.neutral);
 });
+
+// ------------------------------------------------------------ Runda 2: autorytet trenera (career/authority.js)
+import { AUTH, authorityWeek, authorityTerm, authorityOf, logEngage, engagement, squadFactor } from '../src/career/authority.js';
+import { holdMeeting } from '../src/career/teamTalks.js';
+
+function fakeMatches(g, from, weeks, kind = 'pressSkip') {
+  for (let k = 0; k < weeks * 2; k++) logEngage(g, kind, addDays(from, 3 * k));
+}
+
+test('Autorytet: trener, który nic nie robi, traci szatnię powoli i w granicach', () => {
+  const g = newGame();
+  const vals = [];
+  for (const d of mondays('2026-08-03', 12)) { fakeMatches(g, addDays(d, -7), 1); vals.push((authorityWeek(g, d), g.authority.v)); }
+  for (let k = 1; k < vals.length; k++) assert.ok(vals[k] <= vals[k - 1] + 1e-9);
+  assert.ok(vals[0] > 0.3 && vals[1] > 0.2, `nie od razu do dna: ${vals.slice(0, 3)}`);
+  assert.ok(vals.at(-1) < 0.2, `po 12 tygodniach: ${vals.at(-1)}`);
+  const t = authorityTerm(vals.at(-1));
+  assert.ok(t < -0.15 && t >= AUTH.min, `kara ${t}`);
+  assert.ok(g.inbox.length >= 0);
+});
+
+test('Autorytet: liczy się trafność, nie liczba kliknięć', () => {
+  const run = (kinds) => {
+    const g = newGame();
+    for (const d of mondays('2026-08-03', 10)) {
+      fakeMatches(g, addDays(d, -7), 1, 'pressGood');
+      for (const k of kinds) logEngage(g, k, addDays(d, -2));
+      authorityWeek(g, d);
+    }
+    return g.authority.v;
+  };
+  const good = run(['talkGood', 'talkGood', 'meetGood']);
+  const clicks = run(['talkBad', 'talkBad', 'talkBad', 'meetBad']);
+  const meh = run(['talkMeh', 'talkMeh', 'talkMeh']);
+  assert.ok(good > 0.75, `trafne rozmowy i zebrania: ${good}`);
+  assert.ok(clicks < meh && meh < good, `nietrafne ${clicks}, obojętne ${meh}, trafne ${good}`);
+  assert.ok(engagement({ engage: [], date: '2026-09-01' }).s === 0);
+});
+
+test('Autorytet: premia zależy od kadry, kara nie; kluby AI neutralne; stary zapis neutralny', () => {
+  assert.ok(squadFactor(12.6) > squadFactor(10) && squadFactor(8) === AUTH.squad.min);
+  assert.ok(authorityTerm(0.95, 12.6) > authorityTerm(0.95, 9.5));
+  assert.ok(authorityTerm(0.95, 12.6) <= AUTH.max);
+  assert.equal(authorityTerm(0.1, 12.6), authorityTerm(0.1, 8));
+  const g = newGame();
+  assert.equal(authorityOf(g, 'legia'), AUTH.start);
+  delete g.authority;
+  assert.equal(authorityOf(g, g.clubId), AUTH.start);
+  assert.equal(authorityTerm(AUTH.start), 0);
+});
+
+test('Zebranie: trafny ton powtarzany co tydzień słabnie, ale nie obniża zaufania ani morale', () => {
+  const g = newGame();
+  const sq = squadOf(g.world, g.clubId);
+  for (const p of sq) p.morale = 12;
+  const trust0 = sq.reduce((s, p) => s + (p.relations?.[g.clubId]?.trust ?? 50), 0);
+  const gains = [];
+  for (const d of mondays('2026-08-03', 6)) {
+    g.date = d;
+    const before = sq.reduce((s, p) => s + p.morale, 0);
+    holdMeeting(g, 'unity');
+    gains.push(sq.reduce((s, p) => s + p.morale, 0) - before);
+  }
+  assert.ok(gains.at(-1) < gains[0], `efekt słabnie: ${gains.map((x) => x.toFixed(1))}`);
+  assert.ok(gains.every((x) => x > -2), `powtórzenie nie szkodzi drużynie: ${gains.map((x) => x.toFixed(1))}`);
+  const trust1 = sq.reduce((s, p) => s + (p.relations?.[g.clubId]?.trust ?? 50), 0);
+  assert.ok(trust1 >= trust0 - sq.length * 0.5, 'zaufanie nie spada od samego powtarzania');
+});
