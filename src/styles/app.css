@@ -712,3 +712,21 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
   .tac { grid-template-columns: minmax(320px, 400px) minmax(380px, 1fr) minmax(480px, 1.15fr); }
   .tac__aside .tdet .tdet__groups { columns: 2; column-gap: var(--space-5); }
 }
+
+/* ================= Karta zawodnika (Kadra) na PC: panele obok siebie, cała szerokość ================= */
+@media (min-width: 1280px) {
+  .hub__main:has(.pp__layout) { max-width: 1320px; }
+  .pp__layout { display: grid; gap: var(--space-4); }
+  .pp__cols { gap: var(--space-4); }
+  .pp__cols > section, .pp__stats { padding: 14px 18px 18px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--pp-t, var(--murawa)) 7%, var(--surface)); border: 1px solid color-mix(in srgb, var(--pp-t, var(--murawa)) 25%, var(--line)); min-width: 0; }
+  .pp__cols > section:first-child { --pp-t: var(--murawa, #2E8A4E); }
+  .pp__cols > section:nth-child(2) { --pp-t: #C9962B; }
+  .pp__stats { --pp-t: #3E7CB1; }
+  .pp__cols > section > h3:first-child, .pp__cols > section > .attr-group:first-child h3 { margin-top: 0; }
+  .pp__stats .phst { margin-top: 0; padding-top: 0; border-top: 0; }
+}
+@media (min-width: 1600px) {
+  .hub__main:has(.pp__layout) { max-width: 1840px; }
+  .pp__layout { grid-template-columns: minmax(0, 2fr) minmax(0, 1.25fr); align-items: start; }
+  .pp__stats { position: sticky; top: var(--space-3); }
+}

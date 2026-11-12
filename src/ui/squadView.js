@@ -90,6 +90,7 @@ export function renderPlayerProfile(p, opts = {}) {
         <p class="muted">${esc(clubName)}, ${p.age} lat (ur. ${esc(fmtDate(p.birthDate))}), ${esc(NAT_NAMES[p.nat] ?? p.nat)}, noga: ${esc(footLabel[p.foot])}</p>
       </div>
     </header>
+    <div class="pp__layout">
     <div class="pp__cols">
       <section>
         ${attrGroupsHtml(p)}
@@ -99,8 +100,8 @@ export function renderPlayerProfile(p, opts = {}) {
         <ul class="plain-list">
           ${foreign ? '' : `<li><span class="k">Morale</span><span>${esc(moraleLabel(p.morale))}</span></li>`}
           <li><span class="k">Forma</span><span>${p.form.length ? esc(p.form.join(', ')) : 'Brak meczów w sezonie'}</span></li>
-          ${foreign ? '' : `<li><span class="k">Świeżość</span><span>${p.fresh}%</span></li>
-          <li><span class="k">Ostrość</span><span>${p.sharp}%</span></li>`}
+          ${foreign ? '' : `<li><span class="k">Świeżość</span><span>${Math.round(p.fresh ?? 95)}%</span></li>
+          <li><span class="k">Ostrość</span><span>${Math.round(p.sharp ?? 70)}%</span></li>`}
           <li><span class="k">Zdrowie</span><span>${p.injuryDays > 0 ? `Kontuzja, ok. ${p.injuryDays} dni` : 'Zdrowy'}</span></li>
           ${p.acclim ? `<li><span class="k">Aklimatyzacja</span><span>${Math.round(p.acclim.level)} %, pełna ok. ${esc(fmtDate(acclimEta(p, opts.date ?? p.acclim.since)))}. ${esc(p.acclim.reasons.join(', '))}</span></li>` : ''}
           ${p.callUp ? `<li><span class="k">Kadra</span><span>Na zgrupowaniu do ${esc(fmtDate(p.callUp.to))}</span></li>` : ''}
@@ -123,5 +124,6 @@ export function renderPlayerProfile(p, opts = {}) {
         </ul>
       </section>
     </div>
-    ${playerStatsHtml(p, opts.game)}`;
+    <div class="pp__stats">${playerStatsHtml(p, opts.game)}</div>
+    </div>`;
 }
