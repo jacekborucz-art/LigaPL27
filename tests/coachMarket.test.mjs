@@ -10,7 +10,7 @@ import { clubPlan } from '../src/career/finance.js';
 import { createSeason, applyResult, playQuick } from '../src/season/season.js';
 import { processDay, addDays } from '../src/core/gameLoop.js';
 import { createTactics } from '../src/engine/lineup.js';
-import { ensureCareer } from '../src/career/careerSystem.js';
+import { ensureCareer, switchClub } from '../src/career/careerSystem.js';
 import { runDecision } from '../src/core/decisions.js';
 import { applySeasonState } from '../src/season/rollover.js';
 import { ensureTraining, aiPlanFor } from '../src/training/index.js';
@@ -142,6 +142,17 @@ test('Zwolnienie: trener do puli, asystent tymczasowo, potem nowy trener z puli;
   const html = renderClubView(g, 'korona');
   assert.ok(html.includes('W klubie od') && html.includes('Historia'));
   assert.ok(html.includes('clv-owner') || html.includes('Właściciel'));
+});
+
+test('Zmiana pracy gracza: trener AI nowego klubu do puli, poprzedni klub gracza zatrudnia trenera z rynku', () => {
+  const g = newGame(12, 'gks-katowice');
+  const ai = coachOf(g, 'korona');
+  switchClub(g, 'korona', '2026-10-10');
+  assert.equal(g.clubId, 'korona');
+  assert.equal(g.coaches.korona, undefined, 'w nowym klubie trenerem jest gracz');
+  assert.ok(g.coachMarket.pool.some((c) => c.name === ai.name) || g.coaches['gks-katowice'].name === ai.name, 'w puli albo od razu w poprzednim klubie gracza');
+  const next = g.coaches['gks-katowice'];
+  assert.ok(next && next.n >= 1 && next.from === '2026-10-10' && !next.caretaker, 'poprzedni klub ma nowego trenera');
 });
 
 test('Sezon trenera: dopasowanie i chemia deterministyczne i ograniczone, nowa miotła wygasa, matchCoach ją widzi', () => {

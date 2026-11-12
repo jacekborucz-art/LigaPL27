@@ -77,7 +77,7 @@ export function ownerBlurb(o) {
   const tail = [];
   if (o.media >= 14) tail.push(o.type === 'miasto' ? 'wrażliwy na głos kibiców i lokalnej polityki' : 'wrażliwy na głos kibiców i mediów');
   if (o.zasobnosc >= 15) tail.push('ma pieniądze na drogiego trenera');
-  else if (o.zasobnosc <= 6) tail.push('liczy każdą złotówkę');
+  else if (o.zasobnosc <= 6) tail.push('nie dokłada dużych pieniędzy z własnej kieszeni');
   if (!parts.length && !tail.length) return 'Rozważny: ocenia trenera po całym sezonie, a nie po kilku meczach.';
   const head = parts.length ? parts.join(' i ').replace(/^./, (c) => c.toUpperCase()) : '';
   const s = head ? `${head}${tail.length ? `, ${tail.join(', ')}` : ''}.` : `${tail.join(', ').replace(/^./, (c) => c.toUpperCase())}.`;

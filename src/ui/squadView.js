@@ -8,6 +8,7 @@ import { moraleLabel } from '../career/morale.js';
 import { AGENT_TYPES, TRAIT_LABELS } from '../career/personality.js';
 import { formatZl } from '../career/negotiation.js';
 import { esc, fmtDate } from './dom.js';
+import { formChartHtml } from './formChart.js';
 import { playerStatsHtml } from './playerStatsView.js';
 
 export const SQUAD_FILTERS = [
@@ -99,7 +100,6 @@ export function renderPlayerProfile(p, opts = {}) {
         <h3>Stan</h3>
         <ul class="plain-list">
           ${foreign ? '' : `<li><span class="k">Morale</span><span>${esc(moraleLabel(p.morale))}</span></li>`}
-          <li><span class="k">Forma</span><span>${p.form.length ? esc(p.form.join(', ')) : 'Brak meczów w sezonie'}</span></li>
           ${foreign ? '' : `<li><span class="k">Świeżość</span><span>${Math.round(p.fresh ?? 95)}%</span></li>
           <li><span class="k">Ostrość</span><span>${Math.round(p.sharp ?? 70)}%</span></li>`}
           <li><span class="k">Zdrowie</span><span>${p.injuryDays > 0 ? `Kontuzja, ok. ${p.injuryDays} dni` : 'Zdrowy'}</span></li>
@@ -107,6 +107,7 @@ export function renderPlayerProfile(p, opts = {}) {
           ${p.callUp ? `<li><span class="k">Kadra</span><span>Na zgrupowaniu do ${esc(fmtDate(p.callUp.to))}</span></li>` : ''}
           ${p.intl?.caps || p.intlU21 ? `<li><span class="k">Reprezentacja</span><span>${p.intl?.caps ? `występy: ${p.intl.caps}, gole: ${p.intl.goals}` : ''}${p.intl?.caps && p.intlU21 ? '; ' : ''}${p.intlU21 ? `zgrupowania U21: ${p.intlU21}` : ''}</span></li>` : ''}
         </ul>
+        ${formChartHtml(p)}
         <h3>Kontrakt</h3>
         <ul class="plain-list">
           ${foreign ? '' : `<li><span class="k">Pensja</span><span>${esc(formatZl(p.contract.wage))} tygodniowo</span></li>`}

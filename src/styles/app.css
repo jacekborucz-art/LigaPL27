@@ -737,3 +737,36 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 }
 /* Data w nagłówku gry: czytelna czcionka zamiast kropkowanego LED */
 .led.hub__date { padding: 4px 12px; font: 700 var(--step-0)/1.2 var(--font-display); letter-spacing: .02em; text-shadow: none; font-variant-numeric: tabular-nums; }
+
+/* Wykres formy zawodnika (src/ui/formChart.js): mały panel, 10 ostatnich ocen */
+.fch { margin: var(--space-4) 0 var(--space-2); padding: var(--space-3) var(--space-3) var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--surface-stripe); max-width: 420px; }
+.fch__head { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
+.fch__head h3 { margin: 0 auto 0 0; font: 700 var(--step-0)/1.1 var(--font-display); }
+.pp__cols .fch__head h3 { margin: 0 auto 0 0; }
+.fch__meta { font-size: var(--step--1); color: var(--text-muted); }
+.fch__meta b { font: 700 var(--step-0)/1 var(--font-display); font-variant-numeric: tabular-nums; color: var(--text); }
+.fch__meta b[data-b="top"], .fch__meta b[data-b="good"] { color: var(--fch-up); }
+.fch__meta b[data-b="low"] { color: var(--bad-text); }
+.fch__trend { font: 600 var(--step--1)/1 var(--font-display); letter-spacing: .02em; padding: 3px 7px; border-radius: 999px; background: color-mix(in srgb, var(--text) 9%, transparent); }
+.fch__trend[data-t="up"] { color: var(--fch-up); background: color-mix(in srgb, #2E8A4E 15%, transparent); }
+.fch__trend[data-t="down"] { color: var(--bad-text); background: color-mix(in srgb, #D62839 13%, transparent); }
+.fch__svg { display: block; width: 100%; height: auto; margin-top: var(--space-2); overflow: visible; }
+.fch__zone--top { fill: color-mix(in srgb, var(--led) 13%, transparent); }
+.fch__zone--low { fill: color-mix(in srgb, var(--kartka-czerwona) 8%, transparent); }
+.fch__grid { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 3; }
+.fch__ax { fill: var(--text-muted); font: 600 11px var(--font-display); text-anchor: end; }
+.fch__area { fill: color-mix(in srgb, var(--murawa) 10%, transparent); }
+.fch__line { fill: none; stroke: var(--text); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.fch__pt circle { stroke: var(--surface-stripe); stroke-width: 1.5; fill: var(--text-muted); }
+.fch__pt[data-b="top"] circle { fill: var(--led); stroke: var(--trybuna); }
+.fch__pt[data-b="good"] circle { fill: var(--murawa-jasna); }
+.fch__pt[data-b="low"] circle { fill: var(--kartka-czerwona); }
+.fch__pt:focus-visible { outline: none; }
+.fch__pt:focus-visible circle, .fch__pt:hover circle { stroke: var(--focus); stroke-width: 2.5; }
+.fch__lbl { fill: var(--text); font: 700 14px var(--font-display); text-anchor: middle; font-variant-numeric: tabular-nums; }
+.fch__ga { fill: var(--text-muted); font: 700 10.5px var(--font-display); text-anchor: middle; }
+.fch__foot, .fch__none { margin: var(--space-1) 0 0; font-size: var(--step--1); color: var(--text-muted); }
+.tdet .fch { max-width: 440px; margin-top: var(--space-3); }
+.fch { --fch-up: #1E7A43; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .fch { --fch-up: #7BD69A; } }
+:root[data-theme="dark"] .fch { --fch-up: #7BD69A; }

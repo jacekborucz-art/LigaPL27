@@ -27,13 +27,13 @@ tych domen w ustawieniach sieci sesji.
   trener musi mieć licencję UEFA Pro, w 2 Lidze UEFA Pro albo UEFA A (źródła nie są zgodne), trenerzy krążą
   między ligami, a 2 Liga to zawodowcy z krótszym doświadczeniem i słabszym zapleczem, nie amatorzy.
 - **Słabszy od średniej trener to wciąż zawodowiec:** ujemna strona skali jest łagodniejsza (szczegóły w 1.5).
-  Błędy słabego taktyka w meczach 2 Ligi: było **1,29** na mecz (obie drużyny), jest **«E3_AFTER»** (przed
-  atrybutami 0, w Ekstraklasie dziś «E1_AFTER»).
+  Błędy słabego taktyka w meczach 2 Ligi: było **1,29** na mecz (obie drużyny), jest **0,63** (przed
+  atrybutami 0, w Ekstraklasie dziś 0,35).
 - **Zmiany trenerów w rzeczywistości:** Ekstraklasa ma ok. 8-11 zmian w trakcie sezonu i 3-5 latem [ŹR, WIEDZA];
   zdarzają się kluby z trzema trenerami w sezonie (Raków i Wieczysta jesienią 2026 [ŹR 3, 4]). 1 Liga podobnie,
   2 Liga trochę mniej [SZAC]. Najwięcej zwolnień jesienią (wrzesień-listopad), potem w przerwie zimowej i w marcu-kwietniu.
-- **W grze [SYM, 40 sezonów]:** Ekstraklasa **9,5** zmiany w trakcie sezonu (rozrzut 3-19) i **3,7** latem,
-  1 Liga 9,2 i 3,2, 2 Liga 6,6 i 3,5. Jesień (sierpień-listopad) to ok. 52 % zwolnień w trakcie sezonu.
+- **W grze [SYM, 40 sezonów]:** Ekstraklasa **8,7** zmiany w trakcie sezonu (od 3 do 19) i **3,7** latem,
+  1 Liga 8,6 i 3,5, 2 Liga 6,9 i 3,5. Jesień (sierpień-listopad) to ok. 51 % zwolnień w trakcie sezonu.
 - **Właściciel** ma pięć cech (cierpliwość, ambicja, temperament, wrażliwość na kibiców i media, zasobność),
   średnie zależą od typu (miliarder, prywatny, miasto, spółka, rezerwy), kilka klubów ma korekty z publicznie
   opisanej historii zmian trenerów. Gracz widzi jedno zdanie bez liczb.
@@ -111,17 +111,22 @@ Zmiany:
    żeby asystent klubu był średnio tak dobry jak trener AI tej ligi (bez tego pasywny gracz w 2 Lidze miałby gorszego
    „trenera” niż rywale).
 
-Pomiar w pełnym silniku [SYM, 1500 meczów AI kontra AI w danej lidze, trenerzy z generatora, odprawy AI]:
+Pomiar w pełnym silniku [SYM, 2000 meczów AI kontra AI w danej lidze (1500 dla kolumny c58f161 w Ekstraklasie), trenerzy z generatora, odprawy AI, kod bez zmian innych modułów]:
 
 | Liga | Statystyka | Przed atrybutami | Atrybuty (commit c58f161) | Teraz |
 |---|---|---|---|---|
-| 2 Liga | błędy słabego taktyka na mecz (obie drużyny) | 0 | 1,29 | «E3_AFTER» |
-| 2 Liga | chybiony plan przedmeczowy (na mecz, obie drużyny) | 0 | «P3_BEFORE» | «P3_AFTER» |
-| 2 Liga | okrzyki na mecz | «SH3_PLAIN» | 1,65 | «SH3_AFTER» |
-| Ekstraklasa | błędy słabego taktyka na mecz | 0 | 0,52 | «E1_AFTER» |
-| Ekstraklasa | gole na mecz | 2,75 | 2,77 | «G1_AFTER» |
+| 2 Liga | błędy słabego taktyka na mecz (obie drużyny) | 0 | 1,29 | 0,63 |
+| 2 Liga | chybiony plan przedmeczowy (na mecz, obie drużyny) | 0 | 0,34 | 0,15 |
+| 2 Liga | okrzyki na mecz | 2,03 | 1,65 | 1,89 |
+| Ekstraklasa | błędy słabego taktyka na mecz | 0 | 0,52 | 0,35 |
+| Ekstraklasa | gole na mecz | 2,75 | 2,77 | 2,79 |
 
-Wpływ na siłę trenera: dobry (16) kontra słaby (8) na tych samych kadrach daje teraz «GVB_SEASON» pkt w sezonie
+Słowami: w 2 Lidze jedna wątpliwa korekta w trakcie meczu wypada średnio na trzy mecze drużyny (wcześniej ponad
+jedna na dwa), w Ekstraklasie jedna na sześć. Trener tymczasowy, szczególnie słaby, nadal popełnia ich więcej.
+Trener UEFA Pro panelu: to poziom, który da się obronić (2 Liga gra prościej i z większą liczbą błędów niż Ekstraklasa),
+a mecze nie wyglądają już na prowadzone przez amatorów.
+
+Wpływ na siłę trenera: dobry (16) kontra słaby (8) na tych samych kadrach daje teraz 4,1 pkt w sezonie
 (było 4,4 przy pomiarze z c58f161, 4,9 w nowym pomiarze na stałym świecie), bo słaby trener mniej szkodzi.
 
 ## 2. Zmiany trenerów w rzeczywistości
@@ -246,9 +251,9 @@ pragmatycznych, 25 % ostrożnych [SZAC]). Ustawienie ulubione (rodzina formacji)
 - wstrząs: odpadnięcie z Pucharu Polski z niższą ligą 9 (z równą lub wyższą 6 x ambicja), z pucharów europejskich
   5 x ambicja, wygasa przez 35 dni;
 - kibice: heat (0-100) x 0,08 x media / 10;
-- nowy trener: pierwsze 6 meczów presja x 0,35-1.
+- nowy trener: przed 4. meczem bez zwolnienia, w pierwszych 8 meczach presja x 0,35-1.
 
-Próg: `25 + premia ligi (Ekstraklasa +1,5, 1 Liga -2,5, 2 Liga -1,3) + 1,1 (cierpliwość - 10) - 0,3 (temperament - 10)`,
+Próg: `23,5 + premia ligi (Ekstraklasa +1,5, 1 Liga -2,5, 2 Liga -1,3) + 1,1 (cierpliwość - 10) - 0,3 (temperament - 10)`,
 +5 gdy trener wykonał cel w poprzednim sezonie, +3 po 2 latach pracy; do tego los dnia (rozrzut 0,22 x temperament).
 Szansa zwolnienia po meczu: `0,4 x min(1, (C - próg) / 12)^1,5`, w ostatnich 4 kolejkach poza strefą spadkową x0,3,
 przed 3. kolejką i w ostatniej kolejce 0. W przerwie zimowej (18 grudnia) jeden przegląd wszystkich klubów z progiem
@@ -300,13 +305,13 @@ Pętla dni z rynkiem trenerów, gracz w 2 Lidze (Śląsk II, zaufanie zarządu 1
 
 | Liga | W trakcie sezonu | Rozrzut (min-max) | Latem | Cel z badań |
 |---|---|---|---|---|
-| Ekstraklasa | 9,5 | 3,2 (3-19) | 3,7 | 8-11 i 3-5 |
-| 1 Liga | 9,2 | 3,5 (2-18) | 3,2 | ok. 8-11 [SZAC] |
-| 2 Liga | 6,6 | 2,8 (1-14) | 3,5 | 6-8 [SZAC] |
+| Ekstraklasa | 8,7 | 3,2 (3-19) | 3,7 | 8-11 i 3-5 |
+| 1 Liga | 8,6 | 2,3 (4-15) | 3,5 | ok. 8-11 [SZAC] |
+| 2 Liga | 6,9 | 2,5 (2-12) | 3,5 | 6-8 [SZAC] |
 
-Zwolnienia w trakcie sezonu według miesięcy (wszystkie ligi, średnio na sezon): sierpień 0,8, wrzesień 3,5,
-październik 4,3, listopad 4,6, grudzień 2,7, styczeń 0,2, luty 1,3, marzec 3,2, kwiecień 3,3, maj 1,6.
-Po żądaniu kibiców: 0,3 na sezon. Trenerzy niższych lig podebrani przez wyższe: ok. 1 na sezon (od drugiego sezonu).
+Zwolnienia w trakcie sezonu według miesięcy (wszystkie ligi, średnio na sezon): sierpień 0,5, wrzesień 3,7,
+październik 3,8, listopad 4,4, grudzień 2,5, styczeń 0,2, luty 1,2, marzec 3,0, kwiecień 3,3, maj 1,7.
+Po żądaniu kibiców: 0,45 na sezon. Trenerzy niższych lig podebrani przez wyższe: ok. 1 na sezon (od drugiego sezonu).
 
 Wieloletnio (pętla dni z końcem sezonu, 3 sezony, ziarna «TEN_SEEDS»): «TENURE».
 

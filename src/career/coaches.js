@@ -264,7 +264,7 @@ export function replaceCoach(game, clubId, date, next = null, why = null) {
   next.n = n; next.since = date; next.from = date;
   game.coaches[clubId] = next;
   const log = (game.coachLog ??= []);
-  log.unshift({ date, club: clubId, out: old?.name ?? null, in: next.name, ...(why ? { why } : {}), ...(next.caretaker ? { caretaker: true } : {}) });
+  log.unshift({ date, club: clubId, out: old?.name ?? null, in: next.name, ...(why ? { why } : {}), ...(next.caretaker ? { caretaker: true } : {}), ...(old?.caretaker ? { outCt: true } : {}) });
   game.coachLog = log.slice(0, 80);
   return next;
 }

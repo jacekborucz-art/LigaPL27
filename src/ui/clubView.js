@@ -82,7 +82,7 @@ function coachHistoryHtml(game, clubId, c) {
   const own = (c.hist ?? []).filter((h) => h.club !== clubId || h.to).slice(0, 3)
     .map((h) => `<li>${esc(clubById(h.club)?.name ?? h.club)}: ${h.from ? `${esc(fmtDate(h.from))} - ` : 'do '}${esc(fmtDate(h.to))}, ${esc(WHY[h.why] ?? h.why ?? '')}</li>`);
   const club = (game.coachLog ?? []).filter((x) => x.club === clubId).slice(0, 4)
-    .map((x) => `<li>${esc(fmtDate(x.date))}: ${x.out ? `${esc(x.out)} odchodzi, ` : ''}${x.caretaker ? `tymczasowo ${esc(x.in)}` : x.why === 'na stałe' ? `${esc(x.in)} zostaje na stałe` : `trenerem zostaje ${esc(x.in)}`}</li>`);
+    .map((x) => `<li>${esc(fmtDate(x.date))}: ${x.outCt ? `po zastępstwie (${esc(x.out)}) ` : x.out ? `${esc(x.out)} odchodzi, ` : ''}${x.caretaker ? `tymczasowo ${esc(x.in)}` : x.why === 'na stałe' ? `${esc(x.in)} zostaje na stałe` : `trenerem zostaje ${esc(x.in)}`}</li>`);
   if (!own.length && !club.length) return '';
   return `<details class="clv-coach__hist"><summary>Historia</summary>
     ${own.length ? `<p>Wcześniej pracował:</p><ul>${own.join('')}</ul>` : ''}

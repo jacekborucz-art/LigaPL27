@@ -40,11 +40,12 @@ export const MARKET = {
   winlessW: 1.5, // mecze bez wygranej od piątego
   cupShock: 9, cupShockLower: 6, uefaShock: 5, shockDays: 35, // odpadnięcie z pucharu (od niższej ligi więcej), wygasa liniowo
   fansW: 8, // presja kibiców (heat 0-100) x 0,08 x media/10
-  honeyMatches: 6, // pierwsze mecze nowego trenera: presja x (0,35 + 0,65 x mecze/6)
-  thr: 25, thrPat: 1.1, thrTemper: 0.3, thrNoise: 0.22, // próg = 25 + 1,1 (cierpliwość - 10) - 0,3 (temperament - 10), los x temperament
+  honeyMatches: 8, // pierwsze mecze nowego trenera: presja x (0,35 + 0,65 x mecze/8)
+  minMatches: 4, // nowy trener nie jest zwalniany przed 4. meczem o punkty
+  thr: 23.5, thrPat: 1.1, thrTemper: 0.3, thrNoise: 0.22, // próg = 23,5 + 1,1 (cierpliwość - 10) - 0,3 (temperament - 10), los x temperament
   thrTier: { 1: 1.5, 2: -2.5, 3: -1.3 }, // 1 Liga: walka o awans i tani trenerzy, więcej zmian; Ekstraklasa ostrożniej (odprawy)
   winter: { date: '12-18', thr: -3 }, // przerwa zimowa: przegląd z niższym progiem (czas na nowego trenera przed obozem)
-  credit: 5, longTenure: 3, // kapitał: cel wykonany w poprzednim sezonie, staż ponad 2 lata
+  credit: 3, longTenure: 2, // kapitał: cel wykonany w poprzednim sezonie, staż ponad 2 lata
   span: 12, hMax: 0.4, hPow: 1.5, // szansa zwolnienia po meczu: 0,4 x ((C - próg) / 12)^1,5
   // Trener tymczasowy (dni) wg typu właściciela; wiosną część prowadzi zespół do końca sezonu
   caretaker: { miasto: [7, 20], spolka: [6, 16], klub: [10, 30], miliarder: [2, 8], prywatny: [3, 12] },
@@ -52,9 +53,9 @@ export const MARKET = {
   // Przegląd po sezonie (2 czerwca)
   summer: { relegated: 0.5, perGap: 0.07, gapFrom: 2, base: 0.11, poached: 0.1, caretaker: 0.75, promoted: 0.03 },
   // Zatrudnianie: poziom klubu + ambicja i pieniądze właściciela; ocena kandydata z błędem
-  hire: { ambition: 0.08, wealth: 0.1, reach: 2, judgeSd: 0.6, judgeTemper: 0.06, poachP: 0.3, rescueS: 0.7 },
+  hire: { ambition: 0.08, wealth: 0.1, reach: 1.2, over: 0.6, judgeSd: 0.6, judgeTemper: 0.06, poachP: 0.3, rescueS: 0.7, foreign: { 1: 0.5, 2: 0.15, 3: 0 } },
   // Pula wolnych trenerów
-  pool: { start: 44, perSeason: 12, mean: 8.4, sd: 1.6, attrSd: 1.6, foreign: 0.25, maxAge: 68, gone: 0.5 },
+  pool: { start: 44, perSeason: 12, mean: 8.4, sd: 1.6, attrSd: 1.6, foreign: 0.3, maxAge: 68, gone: 0.5 },
   // Odprawa: 3 miesięczne pensje; pensja trenera 2,5 % rocznych płac I drużyny, najmniej wg ligi (zł / mies.)
   pay: { share: 0.025, min: { 1: 30000, 2: 15000, 3: 8000 }, months: 3 },
   bounceMorale: 0.4, // nowa miotła: jednorazowo morale kadry
@@ -207,6 +208,7 @@ export function fireChance(game, clubId, pr, date, rng = null, shift = 0) {
   const o = ownerOf(game, clubId);
   const p = coachOf(game, clubId);
   if (pr.played < K.startRound) return 0;
+  if (p?.n && p.from && coachMatches(game, clubId, p) < K.minMatches) return 0;
   const thr = ownerThreshold(game, clubId, p, date) + shift + (rng ? rng.gauss(0, K.thrNoise * o.temperament) : 0);
   const x = (pr.C - thr) / K.span;
   if (x <= 0) return 0;
@@ -321,7 +323,10 @@ export function hireCoach(game, clubId, date, { rng = null, inDrop = false, quie
   const sd = H.judgeSd + H.judgeTemper * o.temperament;
   let best = null; let bestScore = -Infinity;
   for (const x of cands) {
-    const score = coachAvg(x.c) + rng.gauss(0, sd) + (inDrop && x.c.style === 'S' ? H.rescueS : 0) + (o.type === 'miliarder' && x.c.nat !== 'POL' ? 0.3 : 0) - (x.src ? 0.3 : 0);
+    // Lepszy trener niż poziom klubu jest drogi i rzadko chce przyjść: nadwyżka liczy się w ocenie tylko w 40 %
+    const avg = coachAvg(x.c);
+    const foreign = x.c.nat && x.c.nat !== 'POL' ? (H.foreign[t] ?? 0) + (o.type === 'miliarder' ? 0.3 : 0) : 0;
+    const score = avg - H.over * Math.max(0, avg - L) + rng.gauss(0, sd) + (inDrop && x.c.style === 'S' ? H.rescueS : 0) + foreign - (x.src ? 0.3 : 0);
     if (score > bestScore) { bestScore = score; best = x; }
   }
   const S = statsOf(game);

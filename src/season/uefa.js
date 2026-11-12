@@ -49,12 +49,12 @@ export const STRENGTH_SCALE = {
   eloPerL: 100, anchorElo: { lech: 1600 },
 };
 /** Korekta siły klubu zagranicznego (punkty L) względem L z pliku danych, kształt trapezu. */
+export const FOREIGN_ADJ_MAX = 0.3;
 export function foreignStrengthAdj(L) {
   if (L <= 9.5 || L >= 16.5) return 0;
-  if (L < 10.5) return 0.5 * (L - 9.5);
-  if (L <= 13.5) return 0.5;
-  if (L <= 15.5) return 0.5 - 0.15 * (L - 13.5);
-  return 0.2 * (16.5 - L);
+  if (L < 10.5) return FOREIGN_ADJ_MAX * (L - 9.5);
+  if (L <= 13.5) return FOREIGN_ADJ_MAX;
+  return FOREIGN_ADJ_MAX * (16.5 - L) / 3;
 }
 const strengthOf = (k) => Math.round((k.L + foreignStrengthAdj(k.L)) * 10) / 10;
 
@@ -162,7 +162,21 @@ function newMatch(U, m) {
 
 // ------------------------------------------------------------ Losowania
 /** Pary eliminacji i fazy pucharowej: rozstawieni vs nierozstawieni, bez klubów z jednego kraju. */
-export function drawPairs(teams, rng, { seeded = true } = {}) {
+// Ścieżka mistrzów w uproszczeniu: kluby z najsłabszych lig (współczynnik kraju poniżej progu) losujemy osobno,
+// jak w prawdziwych eliminacjach, gdzie mistrzowie małych federacji grają między sobą. Bez tego polskie kluby
+// w eliminacjach trafiały głównie na takie kluby, a do faz ligowych przechodziło ich za mało (docs/sila-lig-europy.md 5).
+export const MINNOW_COEF = 15;
+const isMinnow = (id) => (COUNTRY_COEF_2026[countryOf(id)] ?? 0) < MINNOW_COEF;
+
+/** Pary eliminacji: osobno kluby z małych federacji i reszta (gdy obie grupy mają co najmniej 2 drużyny). */
+export function drawPairs(teams, rng, { seeded = true, paths = true } = {}) {
+  if (paths) {
+    const small = teams.filter(isMinnow); const main = teams.filter((t) => !isMinnow(t));
+    if (small.length >= 2 && main.length >= 2) {
+      if (small.length % 2) { const s = [...small].sort((a, b) => coefOf(b) - coefOf(a))[0]; small.splice(small.indexOf(s), 1); main.push(s); }
+      return [...drawPairs(small, rng, { seeded, paths: false }), ...drawPairs(main, rng, { seeded, paths: false })];
+    }
+  }
   const list = [...teams].sort((a, b) => coefOf(b) - coefOf(a));
   const half = list.length / 2;
   const top = list.slice(0, half); const bottom = list.slice(half);
@@ -377,7 +391,8 @@ function doDraw(U, comp, r, date) {
   const draw = { comp, round: r, date, pairs: [], pots: null };
   if (['Q1', 'Q2', 'Q3', 'PO'].includes(r)) {
     R.teams = teamsFor(U, comp, r);
-    const pairs = drawPairs(R.teams, rng);
+    // Ścieżka mistrzów: cała LM i późne rundy LE/LK; w LK Q1-Q2 kluby z małych federacji grają z wszystkimi.
+    const pairs = drawPairs(R.teams, rng, { paths: comp === 'LM' || ['Q3', 'PO'].includes(r) });
     R.ties = pairs.map((p, i) => { const [a, b] = rng.chance(0.5) ? p : [p[1], p[0]]; return makeTie(U, comp, r, a, b, i); });
     draw.pairs = pairs.map(([s, u]) => ({ seeded: s, unseeded: u }));
     draw.seeded = pairs.map((p) => p[0]); draw.unseeded = pairs.map((p) => p[1]);

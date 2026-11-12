@@ -20,7 +20,7 @@ export const ATTN = {
   week: 0.45, // spadek morale w tygodniu przy pełnej potrzebie (dryf tygodniowy +0,3 znosi większość)
   floor: 9, // samo zaniedbanie nie obniża morale poniżej 9
   trustEvery: 4, trustD: -0.5, // co 4 tygodnie pełnego zaniedbania: mniejsze zaufanie do trenera
-  unhappyAfter: 10, unhappyP: 0.2, // ambitny rezerwowy po 10 tygodniach: szansa na niezadowolenie w tygodniu
+  unhappyAfter: 12, unhappyP: 0.08, // ambitny rezerwowy po 12 tygodniach: szansa na niezadowolenie w tygodniu
   meetingFactor: 2, // zebranie drużyny liczy się jak rozmowa sprzed dwa razy dłuższego czasu
   newcomerDays: 60, benchShare: 0.35, benchMinGames: 6,
   ai: { base: 0.3, mot: 0.2, min: 0.1, max: 0.5 }, // szansa, że trener AI porozmawia z zawodnikiem w tygodniu

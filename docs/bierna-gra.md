@@ -110,19 +110,89 @@ POMIAR_PRZED
 
 ### 4.1 Przewidywalność taktyczna (`src/training/scouting.js`)
 
-MODEL_SCOUT
+Odcisk taktyczny drużyny na start meczu: ustawienie i kluczowe instrukcje, z wagami podobieństwa: ustawienie 0,3
+(ta sama rodzina 4-4-2 połowa), pressing 0,15, podania 0,15, linia obrony 0,12, nastawienie 0,12 (sąsiednie
+nastawienie jedna trzecia), tempo 0,08, kontratak 0,08. Zmiany w trakcie meczu nie wchodzą do odcisku: przy
+„Pokaż wynik” robi je asystent tym samym kodem co trener AI, a analitycy przygotowują rywala na plan wyjściowy.
+
+| Krok | Wzór [SZAC] |
+|---|---|
+| Historia | ostatnie 8 meczów o stawkę klubu gracza (sparingi nie), waga meczu sprzed k spotkań 0,85^k; zapis w `game.scouting.log` |
+| Przewidywany schemat | odcisk z historii najbardziej podobny do pozostałych (suma wag x podobieństwo²) |
+| Powtarzalność c | średnia ważona podobieństwa² do przewidywanego schematu (stały schemat: 1; trzy plany na zmianę: ok. 0,5) |
+| Obraz rywala r | min(1, liczba meczów / 5): po 5 meczach pełny |
+| Trafienie m | podobieństwo² dzisiejszego planu do przewidywanego |
+| Znajomość schematu | 0,45 x (1 - r) + r x c x m (bez historii neutralna 0,45: nowa drużyna, nowy klub, stary zapis) |
+| Klub AI | 0,45 - 0,2 s(SKL) - 0,1 s(TAK), od 0,25 do 0,7 (trener AI dobiera plan pod rywala: aiPlan.js, coachTerm) |
+| Jakość analizy | (analityk - 1,5) / 13,5, x(1 + 0,25 s(SKL) + 0,1 s(TAK)) trenera klubu AI, od 0,15 do 1,3 |
+| Premia | 0,4 x jakość x (znajomość - 0,45), od -0,08 (zaskoczenie) do +0,3 punktu atrybutu na zawodnika w dniu meczu |
+
+Premia trafia do tego samego składnika co analiza wideo rywala (`trainingPrep`, `prepTerm` i `aiPrepToday`
+w `cohesion.js`), więc działa w pełnym silniku i w szybkiej symulacji. Ta sama reguła dla wszystkich par: klub AI
+analizujący gracza, gracz analizujący klub AI (premia do analizy gracza, gdy plan treningu ma analizę wideo) i dwa
+kluby AI w tle. Przeciętny trener AI ma znajomość 0,45, więc mecze AI kontra AI średnio się nie zmieniają, a słabsi
+trenerzy niższych lig są trochę łatwiejsi do rozpracowania (2 Liga: premia rywala ok. +0,01-0,04).
+
+Przykłady dla pasywnego gracza (stały schemat od 5 meczów): rywal z analitykiem 17 i dobrym trenerem (Legia, Lech)
+ok. +0,25, przeciętny rywal z Ekstraklasy (analityk 13) ok. +0,19, klub 2 Ligi (analityk 5) ok. +0,06. Dla porównania
+cała analiza wideo to 0,04 + 0,006 q (ok. 0,1), a 1 punkt atrybutu całej drużyny to ok. 14 pkt w sezonie
+(docs/balans.md). Ten sam gracz, który zmienia plan pod rywala (trzy plany), ma premię rywala bliską zera, a gdy
+po długiej rutynie nagle zagra inaczej, rywal traci do -0,08.
+
+Zmiana instrukcji kosztowała zgranie (instrukcje -7 za każdą zmienioną); przy planie granym w ostatnich 8 meczach
+koszt jest x0,3 (plan B jest przećwiczony), więc urozmaicenie nie jest karane podwójnie.
 
 ### 4.2 Rozmowy z zawodnikami, którzy ich potrzebują (`src/career/attention.js`)
 
-MODEL_ATTN
+Kto potrzebuje rozmowy (potrzeba 0-1): Wrażliwy 1, ambitny rezerwowy 1 (Ambitny albo ambicja lub potrzeba gry
+od 14, udział minut poniżej 35 % najczęściej grającego, od 6 meczów klubu, wiek od 20 lat), nowy w klubie 0,8
+(aklimatyzacja albo transfer w ostatnich 60 dniach). Pozostali (Spokojny, Lider, Narwaniec bez tych cech) nie
+potrzebują regularnych rozmów. Zawodnik z urazem dłuższym niż 60 dni jest pod opieką sztabu medycznego.
+
+| Element | Wartość [SZAC] |
+|---|---|
+| Karencja | 21 dni bez rozmowy bez skutków |
+| Narastanie | przez kolejne 28 dni do pełnego zaniedbania |
+| Morale | co poniedziałek -0,45 x potrzeba x narastanie (dryf tygodniowy do 12 daje +0,3, więc netto ok. -0,15 w tygodniu), nie poniżej 9 |
+| Zaufanie do trenera | co 4 tygodnie pełnego zaniedbania -0,5 (`applyTrust`, tag „zaniedbanie”) |
+| Ambitny rezerwowy | po 12 tygodniach zaniedbania szansa 8 % w tygodniu, że staje się niezadowolony |
+| Co liczy się jako uwaga | rozmowa w Kadra, Rozmowy (dowolny temat), rozmowa indywidualna na odprawie przed meczem, w przerwie albo po meczu; zebranie drużyny jak rozmowa sprzed dwa razy dłuższego czasu |
+| Rozmowa po długim czekaniu | „Podbuduj” działa lepiej (z = 1,2, Wrażliwy 1,6), bo zawodnik na nią czekał |
+| Kluby AI | trener rozmawia z każdym potrzebującym z szansą 0,3 + 0,2 s(MOT) w tygodniu (0,1-0,5), reszta reguły ta sama |
+
+Przypomnienie asystenta w poczcie (najwyżej 3 nazwiska, o tym samym zawodniku co 6 tygodni) i powód w Kadra,
+Rozmowy. Licznik startuje od pierwszego poniedziałku gry (`game.attStart`), stan zawodnika: `p.att = { t, m, w, h }`.
 
 ### 4.3 Prasa (`src/match/press.js`, korekta)
 
-MODEL_PRESS
+Pomiar przed zmianami pokazał, że prasa była największą dźwignią w obie strony: pasywny gracz, który pomijał
+konferencje, miał morale kadry ok. 12 (AI ok. 15), zaufanie zarządu spadało do ok. 25-35 i trener Widzewa czy Legii
+grający w okolicy celu bywał zwalniany; ten sam gracz, który chodził na konferencje i klikał domyślne odpowiedzi,
+miał morale ok. 18-19 (wyżej niż AI, które konferencji nie ma), relacje z mediami ok. 92 i zaufanie zarządu 100.
+Samo pojawienie się w sali z domyślnymi odpowiedziami dawało ok. +4 pkt w sezonie wobec pomijania.
+
+Korekta (ostrożna, kary za pomijanie bez zmian w szatni i w mediach):
+
+- dodatni wpływ prasy na morale ma nasycenie: pełny do morale 12, potem maleje liniowo do zera przy 19
+  (`pressMoraleDelta(..., morale)`, `PRESS_HEADROOM`); ujemny bez zmian;
+- limity jednej konferencji: po meczu od -1,5 do +0,7 (było +1,0), przed meczem od -0,8 do +0,4 (było +0,6);
+- ocena zarządu: pomijanie konferencji najwyżej -1,2 w miesiącu (było bez limitu w ramach łącznego -2,5);
+  relacje z mediami i klimat prasy liczą się jak dotąd. Unikanie mediów jest widoczne w ocenie, ale samo nie zwalnia
+  trenera, który realizuje cel.
 
 ### 4.4 Monotonia treningu (`src/training/variety.js`)
 
-MODEL_VARIETY
+| Element | Wartość [SZAC] |
+|---|---|
+| Licznik | co poniedziałek +1 tydzień tego samego akcentu planu; zmiana akcentu albo obóz zeruje, co najmniej 2 ręcznie zmienione dni w tygodniu zdejmują 2 tygodnie |
+| Znużenie | 0 przez pierwsze 4 tygodnie, potem rośnie do 1 po 12 tygodniach |
+| Skutki przy pełnym znużeniu | dodatnie morale z zajęć x0,5, -0,01 morale za dzień zajęć, bodziec rozwojowy x0,85 |
+| Wiadomość | raz na serię od znużenia 0,5 (8 tygodni): „Zawodnicy są znużeni treningiem” |
+| Kluby AI | trener zmienia akcent co 6 - 3 s(TRE) tygodni (3-10), na zmianę akcent swojego typu i drugi (zrównoważony albo taktyczny); ta sama reguła znużenia |
+
+Skutek celowo mały: przy stałym dryfie morale +0,3 w tygodniu w kierunku 12 znużenie przesuwa morale o ułamek punktu,
+a rozwój młodych o kilka procent. Pierwsza wersja (morale z zajęć x0,4 i -0,03 za dzień) obniżała morale pasywnej
+kadry o ok. 2,5 punktu w jednym sezonie [SYM] i została złagodzona.
 
 ## 5. Kalibracja po zmianach
 

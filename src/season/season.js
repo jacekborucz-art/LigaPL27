@@ -375,6 +375,7 @@ export function applyResult(game, f, res, rng) {
       ss.ratingSum = (ss.ratingSum ?? 0) + x.rating; ss.rating = Math.round((ss.ratingSum / ss.apps) * 100) / 100;
       if (x.motm) ss.motm++;
       p.form = [...(p.form ?? []), x.rating].slice(-5);
+      p.fh = [...(p.fh ?? []), [x.rating, f.date, s === 0 ? f.away : f.home, f.comp, x.g, x.a, s === 0 ? 1 : 0]].slice(-10); // wykres formy, src/ui/formChart.js
       p.fresh = clamp(Math.round((p.fresh ?? 95) - 28 * (x.minutes / 90)), 35, 100);
       p.matchDebt = Math.max(p.matchDebt ?? 0, Math.round(30 * (x.minutes / 90)));
       p.sharp = clamp(Math.round((p.sharp ?? 70) + 15 * (x.minutes / 90)), 0, 100);
