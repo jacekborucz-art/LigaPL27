@@ -24,7 +24,9 @@ test('Widok klubu: kadra, terminarz, trener i sztab, bez budżetu i płac', () =
   const html = renderClubView(g, 'legia');
   assert.ok(html.includes(headCoachName(g, 'legia')), 'trener prowadzący');
   assert.ok(html.includes('Sztab szkoleniowy'));
-  assert.equal((html.match(/data-act="extplayer"/g) ?? []).length, squadOf(g.world, 'legia').length, 'każdy zawodnik z linkiem do profilu');
+  assert.equal((html.match(/<tr data-pid=/g) ?? []).length, squadOf(g.world, 'legia').length, 'każdy zawodnik kadry w tabeli');
+  assert.ok(html.includes('Kluczowi zawodnicy') && html.includes('Forma') && html.includes('Absencje'));
+  assert.ok((html.match(/class="clv-keys"/g) ?? []).length === 1 && (html.split('class="clv-keys"')[1].split('</ol>')[0].match(/<li /g) ?? []).length <= 3, 'najwyżej 3 kluczowych');
   assert.ok(!/budżet|Budżet|płace|Płace/.test(html), 'bez budżetu i płac');
   assert.ok(clubFixtures(g, 'legia').length > 0 && clubFixtures(g, 'legia').every((r) => r.h === 'legia' || r.a === 'legia'));
 });

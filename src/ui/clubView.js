@@ -35,6 +35,46 @@ export function headCoachName(game, clubId) {
   return `${n.first} ${n.last}`;
 }
 
+const RES_WORD = { W: 'wygrana', R: 'remis', P: 'porażka' };
+const plural = (n, a, b, c) => (n === 1 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? b : c);
+
+/** Seria z ostatnich meczów, np. „3 mecze bez porażki” albo „2 porażki z rzędu”. */
+function streakText(played) {
+  if (!played.length) return 'Drużyna nie rozegrała jeszcze meczu w tym sezonie.';
+  const rev = [...played].reverse();
+  const run = (ok) => { let n = 0; for (const r of rev) { if (!ok(r)) break; n++; } return n; };
+  const w = run((r) => r.res === 'W'); const unbeaten = run((r) => r.res !== 'P'); const l = run((r) => r.res === 'P'); const nowin = run((r) => r.res !== 'W');
+  if (w >= 2) return `${w} ${plural(w, 'wygrana', 'wygrane', 'wygranych')} z rzędu.`;
+  if (unbeaten >= 3) return `${unbeaten} ${plural(unbeaten, 'mecz', 'mecze', 'meczów')} bez porażki.`;
+  if (l >= 2) return `${l} ${plural(l, 'porażka', 'porażki', 'porażek')} z rzędu.`;
+  if (nowin >= 3) return `${nowin} ${plural(nowin, 'mecz', 'mecze', 'meczów')} bez zwycięstwa.`;
+  return `Ostatni mecz: ${RES_WORD[rev[0].res]}.`;
+}
+
+/** Kluczowi zawodnicy (do 3): najlepszy strzelec, najwyższa średnia ocen, najwyższa ocena ogólna. */
+function keyPlayers(squad) {
+  const withS = squad.map((p) => ({ p, s: seasonLine(p) }));
+  const picks = [];
+  const add = (x, why) => { if (x && !picks.some((y) => y.p.id === x.p.id)) picks.push({ ...x, why }); };
+  const scorer = withS.filter((x) => x.s.g > 0).sort((a, b) => b.s.g - a.s.g || b.p.ovr - a.p.ovr)[0];
+  add(scorer, scorer ? `${scorer.s.g} ${plural(scorer.s.g, 'gol', 'gole', 'goli')} w sezonie` : '');
+  const rated = withS.filter((x) => x.s.apps >= 3 && x.s.avg != null).sort((a, b) => b.s.avg - a.s.avg)[0];
+  add(rated, rated ? `średnia ocen ${rated.s.avg.toFixed(2)}` : '');
+  for (const x of [...withS].sort((a, b) => b.p.ovr - a.p.ovr)) { if (picks.length >= 3) break; add(x, `ocena ogólna ${Math.round(x.p.ovr)}`); }
+  return picks.slice(0, 3);
+}
+
+/** Absencje: kontuzje (z liczbą dni) i pauzy za kartki. */
+function absences(squad) {
+  const out = [];
+  for (const p of squad) {
+    if (p.injuryDays > 0) out.push({ p, kind: 'inj', text: `${p.injury?.name ?? 'uraz'}, ok. ${p.injuryDays} ${plural(p.injuryDays, 'dzień', 'dni', 'dni')}` });
+    const games = Math.max(p.suspended ?? 0, ...Object.values(p.susp ?? {}).map(Number).filter(Number.isFinite), 0);
+    if (games > 0) out.push({ p, kind: 'sus', text: `pauza za kartki, ${games} ${plural(games, 'mecz', 'mecze', 'meczów')}` });
+  }
+  return out;
+}
+
 function seasonLine(p) {
   const st = sumStats(CLUB_GROUPS.map((g) => p.st?.[g]).filter(Boolean));
   return statObj(st);
@@ -80,6 +120,25 @@ export function renderClubView(game, clubId) {
     <ul class="clv-staff">${Object.keys(STAFF_ROLES).map((role) => staff[role]?.name ? `<li><span>${esc(STAFF_ROLES[role].name)}</span><b>${esc(staff[role].name)}</b></li>` : '').join('') || '<li class="hint">Brak danych o sztabie.</li>'}</ul>
   </section>`;
 
+  const played = rows.filter((r) => r.played);
+  const last = played.slice(-5);
+  const lr = recordOf(last);
+  const formP = `<section class="clv-p clv-p--form"><h3>Forma</h3>
+    <p class="clv-streak">${esc(streakText(played))}</p>
+    ${last.length ? `<p class="clv-sum">Ostatnie ${last.length} ${plural(last.length, 'mecz', 'mecze', 'meczów')}: ${lr.w}W ${lr.d}R ${lr.l}P, bramki ${lr.gf}:${lr.ga}</p>
+    <ol class="clv-last">${[...last].reverse().map((r) => `<li><b class="fchip fchip--${r.res}">${r.res}</b><span>${r.home ? 'u siebie' : r.venue === 'N' ? 'neutralnie' : 'wyjazd'}: ${esc(clubById(r.opp)?.name ?? r.opp)}</span><b class="clv-sc">${r.gf}:${r.ga}</b></li>`).join('')}</ol>` : ''}
+  </section>`;
+  const keys = keyPlayers(squad);
+  const keyP = `<section class="clv-p clv-p--key"><h3>Kluczowi zawodnicy</h3>
+    <ol class="clv-keys">${keys.map(({ p, s, why }) => `<li data-pid="${esc(p.id)}"><span class="pos" data-g="${GROUP[p.pos] ?? 'MID'}">${esc(p.pos)}</span>
+      <span class="clv-keys__n"><button class="clv-pl" data-act="extplayer" data-id="${esc(p.id)}">${esc(p.name)}</button><small>${esc(why)}${s.apps ? `, ${s.apps} ${plural(s.apps, 'mecz', 'mecze', 'meczów')}` : ''}${p.injuryDays > 0 ? `. <span class="clv-out">Kontuzja, ok. ${p.injuryDays} ${plural(p.injuryDays, 'dzień', 'dni', 'dni')}</span>` : (p.suspended > 0 || Object.values(p.susp ?? {}).some((v) => v > 0)) ? '. <span class="clv-out">Pauza za kartki</span>' : ''}</small></span>
+      <b class="clv-keys__o" title="Ocena ogólna 1-20">${Math.round(p.ovr)}</b></li>`).join('')}</ol>
+  </section>`;
+  const abs = absences(squad);
+  const absP = `<section class="clv-p clv-p--abs"><h3>Absencje <small>${abs.length ? `${abs.length} ${plural(abs.length, 'zawodnik', 'zawodników', 'zawodników')}` : ''}</small></h3>
+    ${abs.length ? `<ul class="clv-abs">${abs.map(({ p, kind, text }) => `<li class="is-${kind}" data-pid="${esc(p.id)}"><i class="clv-${kind === 'inj' ? 'inj' : 'sus'}" aria-hidden="true">${kind === 'inj' ? '+' : ''}</i><button class="clv-pl" data-act="extplayer" data-id="${esc(p.id)}">${esc(p.name)}</button><small>${esc(p.pos)}, ${esc(text)}</small></li>`).join('')}</ul>` : '<p class="hint">Wszyscy zawodnicy są do dyspozycji.</p>'}
+  </section>`;
+
   const fx = `<section class="clv-p clv-p--fx"><h3>Terminarz sezonu <small>${rows.length} ${rows.length === 1 ? 'mecz' : 'meczów'}</small></h3>
     <ol class="fxc fxc--clv">${rows.map((r) => fixtureRowHtml(r, { today: game.date })).join('') || '<li class="hint">Brak meczów w terminarzu.</li>'}</ol>
   </section>`;
@@ -104,6 +163,7 @@ export function renderClubView(game, clubId) {
   return `<div class="clv">
     <button class="btn btn--quiet" data-act="clubback">Wróć</button>
     ${head}
+    <div class="clv__top">${formP}${keyP}${absP}</div>
     <div class="clv__grid">${sq}${fx}${info}</div>
   </div>`;
 }
