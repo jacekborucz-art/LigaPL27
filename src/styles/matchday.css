@@ -1150,3 +1150,9 @@
   .pst { grid-template-rows: auto auto 1fr auto; }
   .pst__motm { align-self: start; min-height: 104px; }
 }
+/* Przyciski dnia meczowego z kolorem znaczenia (główna akcja zostaje zielona) */
+.actionbar .btn--lineup { background: #2F8F8A; border-color: #2F8F8A; color: #FFFFFF; }
+.actionbar .btn--lineup:hover { background: #267A76; border-color: #267A76; }
+.actionbar .btn--press { background: #2F6FB0; border-color: #2F6FB0; color: #FFFFFF; }
+.actionbar .btn--press:hover { background: #285F97; border-color: #285F97; }
+.actionbar .btn--lineup:focus-visible, .actionbar .btn--press:focus-visible { outline: 3px solid var(--focus, var(--led)); outline-offset: 2px; }

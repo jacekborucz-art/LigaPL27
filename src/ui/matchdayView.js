@@ -152,6 +152,8 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     </div>`;
   }
   const btn = (act, label, primary = true) => `<button class="btn ${primary ? 'btn--primary' : 'btn--quiet'}" data-md="${act}">${esc(label)}</button>`;
+  // Przyciski z własnym kolorem znaczenia: skład (morski jak instrukcje taktyczne), prasa (niebieski jak panel mediów)
+  const btnC = (act, label, cls) => `<button class="btn ${cls}" data-md="${act}">${esc(label)}</button>`;
 
   // ------------------------------------------------------------ Studio przedmeczowe
   function renderStudio() {
@@ -185,7 +187,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       <section class="sec"><h2>Absencje</h2>
         <ul class="plain-list"><li><span class="k">${esc(shortName(0))}</span><span>${esc(absH.join('; ') || 'Bez absencji')}</span></li><li><span class="k">${esc(shortName(1))}</span><span>${esc(absA.join('; ') || 'Bez absencji')}</span></li></ul>
       </section>
-      <section class="sec"><h2>Warunki</h2>
+      <section class="sec"><h2>Pogoda</h2>
         <ul class="plain-list">
           <li><span class="k">Pogoda</span><span>${esc(c.weather.label)}${c.weather.tempC != null ? `, ${c.weather.tempC}°C` : ''}${c.weather.notes.length ? `. ${esc(c.weather.notes.join(' '))}` : ''}</span></li>
           <li><span class="k">Murawa</span><span>${esc(c.pitch.label)}${c.pitch.note ? `. ${esc(c.pitch.note)}` : ''}</span></li>
@@ -297,11 +299,11 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
   function pressButtons(ph) {
     if (!MD.pressSetup(game, S, ph)) return '';
     const slot = slotOf(ph);
-    if (slot.result) return btn(`pressView:${ph}`, 'Podsumowanie konferencji', false);
-    return btn(`pressOpen:${ph}`, slot.conf?.answers?.length ? 'Wróć na konferencję' : ph === 'pre' ? 'Konferencja przedmeczowa' : 'Konferencja prasowa', false);
+    if (slot.result) return btnC(`pressView:${ph}`, 'Podsumowanie konferencji', 'btn--press');
+    return btnC(`pressOpen:${ph}`, slot.conf?.answers?.length ? 'Wróć na konferencję' : ph === 'pre' ? 'Konferencja przedmeczowa' : 'Konferencja prasowa', 'btn--press');
   }
   // Zmiana składu przed meczem: powrót do ekranu Skład i taktyka (tylko przed odprawą w szatni)
-  const lineupBtn = () => (onLineup && !S.briefings?.pre ? btn('toLineup', 'Zmień skład', false) : '');
+  const lineupBtn = () => (onLineup && !S.briefings?.pre ? btnC('toLineup', 'Zmień skład', 'btn--lineup') : '');
   const preActions = () => lineupBtn() + pressButtons('pre') + btn('toBriefing', 'Przejdź do odprawy');
   const postActions = () => pressButtons('post') + btn('exit', 'Dalej');
 
