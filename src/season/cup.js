@@ -72,10 +72,10 @@ export function winnerOf(f) {
   return null;
 }
 
-/** Superpuchar: mistrz vs zdobywca PP poprzedniego sezonu, u mistrza, przy remisie od razu karne. */
+/** Superpuchar: mistrz vs zdobywca PP poprzedniego sezonu, zawsze na PGE Narodowym w Warszawie (teren neutralny), przy remisie od razu karne. */
 export function superCupFixture(champion = 'lech', cupWinner = 'gornik-zabrze') {
   return {
     id: `SP-${DOMESTIC.superpuchar.date.slice(0, 4)}`, comp: 'super', round: 'F', date: DOMESTIC.superpuchar.date, time: '20:15',
-    home: champion, away: cupWinner, played: false, knockout: 'penaltiesOnly',
+    home: champion, away: cupWinner, played: false, knockout: 'penaltiesOnly', neutral: true, venue: 'PGE Narodowy',
   };
 }
