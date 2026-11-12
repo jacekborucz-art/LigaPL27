@@ -32,7 +32,7 @@ function tableView(game, comp) {
         const z = zoneOf(r.pos);
         return `<div class="tbl__row ${r.id === game.clubId ? 'is-me' : ''}" role="row" data-zone="${z?.kind ?? ''}">
           <span class="tbl__pos">${r.pos}</span>
-          <span class="tbl__club">${crest(r.id)}<span>${esc(name(r.id))}</span></span>
+          <span class="tbl__club">${crest(r.id)}<button class="club-link" data-act="club" data-club="${esc(r.id)}" title="Pokaż klub">${esc(name(r.id))}</button></span>
           <span>${r.played}</span><span class="w">${r.wins}</span><span class="w">${r.draws}</span><span class="w">${r.losses}</span>
           <span>${r.gf}:${r.ga}</span><b>${r.points}</b><span class="w2">${formDots(r.form)}</span>
         </div>`;

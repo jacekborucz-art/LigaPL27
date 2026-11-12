@@ -1,0 +1,53 @@
+/* Widok klubu (z tabeli): nagłówek, kadra ze statystykami, terminarz, informacje i sztab */
+.club-link { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.club-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.club-link:focus-visible { outline: 3px solid var(--focus, var(--led)); outline-offset: 2px; border-radius: 3px; }
+.clv { display: grid; gap: var(--space-4); }
+.clv > .btn { justify-self: start; }
+.clv__head { display: flex; align-items: center; gap: var(--space-4); padding: 16px 20px; border-radius: var(--radius-m); background: #0E1511; color: #F3F6F1; border-left: 8px solid var(--kit); }
+.clv__title h2 { margin: 0; font: 700 var(--step-3)/1.05 var(--font-display); }
+.clv__title p { margin: 4px 0 0; color: rgb(243 246 241 / .8); font-size: var(--step--1); }
+.clv__form { display: flex; gap: 4px; }
+.fchip { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 4px; font: 700 12px/1 var(--font-display); color: #fff; }
+.fchip--W { background: #2E8A4E; } .fchip--R { background: #7A8681; } .fchip--P { background: var(--kartka-czerwona); }
+.clv__grid { display: grid; gap: var(--space-4); }
+.clv-p { --t: var(--murawa, #2E8A4E); min-width: 0; padding: 14px 16px 16px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--t) 7%, var(--surface)); border: 1px solid color-mix(in srgb, var(--t) 25%, var(--line)); }
+.clv-p h3 { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; font: 700 var(--step-1)/1.1 var(--font-display); }
+.clv-p h3 small { font: 400 var(--step--1)/1.2 var(--font-body); color: var(--text-muted); }
+.clv-p--fx { --t: #3E7CB1; }
+.clv-p--info { --t: #C9962B; }
+.clv-p--info h3 + .clv-dl, .clv-p--info h3 + .clv-staff { margin-top: 0; }
+.clv-p--info .clv-dl + h3 { margin-top: var(--space-4); }
+.clv-dl { display: grid; gap: 0; margin: 0; }
+.clv-dl > div { display: grid; grid-template-columns: 100px 1fr; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.clv-dl dt { color: var(--text-muted); font-size: var(--step--1); }
+.clv-dl dd { margin: 0; font-weight: 600; }
+.clv-dl dd small { display: block; font-weight: 400; color: var(--text-muted); font-size: 12px; }
+.clv-staff { list-style: none; margin: 0; padding: 0; }
+.clv-staff li { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: var(--step--1); }
+.clv-staff li span { color: var(--text-muted); }
+.clv-sq { width: 100%; border-collapse: collapse; font-size: var(--step--1); font-variant-numeric: tabular-nums; }
+.clv-sq th { padding: 6px 6px; font: 700 12px/1.2 var(--font-display); color: var(--text-muted); text-align: center; border-bottom: 1px solid var(--line); }
+.clv-sq td { padding: 5px 6px; text-align: center; border-bottom: 1px solid var(--line); }
+.clv-sq .l { text-align: left; }
+.clv-sq td.n { color: var(--text-muted); font-weight: 700; }
+.clv-sq tbody tr:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
+.clv-pl { padding: 0; border: 0; background: none; color: var(--text); font: 600 var(--step--1)/1.3 var(--font-body); text-align: left; cursor: pointer; }
+.clv-pl:hover { text-decoration: underline; }
+.clv-pl:focus-visible { outline: 3px solid var(--focus, var(--led)); outline-offset: 2px; }
+.clv-inj { display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: var(--kartka-czerwona); color: #fff; font: 800 11px/1 var(--font-display); font-style: normal; }
+.clv-sus { display: inline-block; width: 8px; height: 11px; border-radius: 1px; background: var(--kartka-czerwona); }
+.fxc--clv { max-height: 640px; overflow: auto; }
+@media (max-width: 559px) {
+  .clv-sq th:nth-child(4), .clv-sq td:nth-child(4), .clv-sq th:nth-child(9), .clv-sq td:nth-child(9) { display: none; }
+  .clv__head { padding: 12px; gap: 12px; }
+}
+@media (min-width: 1024px) {
+  .hub__main:has(.clv) { max-width: 1320px; }
+  .clv__grid { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); grid-template-areas: "squad fx" "squad info"; align-items: start; }
+  .clv-p--squad { grid-area: squad; } .clv-p--fx { grid-area: fx; } .clv-p--info { grid-area: info; }
+}
+@media (min-width: 1600px) {
+  .hub__main:has(.clv) { max-width: 1840px; }
+  .clv__grid { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, .9fr); grid-template-areas: "squad fx info"; }
+}

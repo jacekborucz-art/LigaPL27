@@ -33,6 +33,7 @@ import { ensureTraining, trainingMatchInput, teamCohesion } from './training/ind
 import { renderTraining, handleTrainingAction, isTrainingAction } from './ui/trainingView.js';
 import { shirtNumbers, kitColors } from './career/shirts.js';
 import { playerStatsHtml } from './ui/playerStatsView.js';
+import { renderClubView, hasClubView } from './ui/clubView.js';
 import { renderTransfers, handleTransferAction, isTransferAction } from './ui/transfersView.js';
 import { renderTalks, handleTalkAction, isTalkAction } from './ui/talksView.js';
 import { ensureCareer } from './career/careerSystem.js';
@@ -235,6 +236,7 @@ function renderHub() {
 function renderTab(tab, g, club) {
   // Profil zawodnika innego klubu (z karty transferowej albo z menu): tylko podgląd, bez danych wewnętrznych klubu
   const ext = state.extPlayer && g.world.players[state.extPlayer.id];
+  if (!ext && state.extClub) return renderClubView(g, state.extClub);
   if (ext) {
     const extClub = ext.clubId ? clubById(ext.clubId) : null;
     return renderPlayerProfile(ext, { leagueOvrs: leagueOvrs(g, extClub?.tier ?? club.tier), clubName: extClub?.name ?? 'Wolny zawodnik', date: g.date, game: g, foreign: true, back: { act: 'extback', label: 'Wróć' } });
@@ -383,7 +385,7 @@ function dashTable(g, club, table) {
     const me = r.id === g.clubId;
     return `<tr class="${[me ? 'is-me' : '', tierCls(kOf(j))].filter(Boolean).join(' ')}"${z ? ` data-z="${z.kind}"` : ''}${me ? ' aria-current="true"' : ''}>
       <td class="dash-t__pos">${r.pos}</td>
-      <td class="dash-t__club"><span class="dash-t__cl">${crestHtml(c, { size: 20, clubsById })}<span>${esc(c.name)}</span></span></td>
+      <td class="dash-t__club"><span class="dash-t__cl">${crestHtml(c, { size: 20, clubsById })}<button class="club-link" data-act="club" data-club="${esc(c.id)}" title="Pokaż klub">${esc(c.name)}</button></span></td>
       <td>${r.played}</td><td>${r.goalDiff > 0 ? '+' : ''}${r.goalDiff}</td><td class="dash-t__pts">${r.points}</td>
     </tr>`;
   }).join('');
@@ -718,7 +720,7 @@ async function runDays() {
   }
   state.running = false;
   // Po Dalej zawsze Pulpit (nowe wiadomości i decyzje widać w panelu Poczta i w pasku decyzji na Pulpicie)
-  if (reason === 'message' || reason === 'decision') { state.tab = 'pulpit'; state.fx = null; state.extPlayer = null; state.mailOpen = null; }
+  if (reason === 'message' || reason === 'decision') { state.tab = 'pulpit'; state.fx = null; state.extPlayer = null; state.extClub = null; state.mailOpen = null; }
   await save();
   renderHub();
 }
@@ -1001,7 +1003,7 @@ async function dispatchAct(el, { root = app } = {}) {
       await new Promise((r) => setTimeout(r, matchMedia('(prefers-reduced-motion: reduce)').matches ? 150 : 450)); // podpis widoczny przed generowaniem świata
       await newGame(nc.slot, nc.clubId, profileOf(nc));
     }
-    if (act === 'tab') { state.tab = el.dataset.tab; state.mailOpen = null; state.playerOpen = null; state.fx = null; state.extPlayer = null; if (el.dataset.sub) state.tfTab = el.dataset.sub; render(); }
+    if (act === 'tab') { state.tab = el.dataset.tab; state.mailOpen = null; state.playerOpen = null; state.fx = null; state.extPlayer = null; state.extClub = null; if (el.dataset.sub) state.tfTab = el.dataset.sub; render(); }
     // Terminarz i wyniki (Pulpit > Pokaż wszystko): sezon, rozgrywki, miejsce meczu
     if (act === 'fixtures') { state.tab = 'pulpit'; state.fx = { season: null, comp: 'all', venue: 'all' }; render(); window.scrollTo({ top: 0 }); app.querySelector('.fxs h2')?.setAttribute('tabindex', '-1'); app.querySelector('.fxs h2')?.focus({ preventScroll: true }); }
     if (act === 'fxback') { state.fx = null; render(); app.querySelector('[data-act="fixtures"]')?.focus(); }
@@ -1022,7 +1024,7 @@ async function dispatchAct(el, { root = app } = {}) {
         await save();
         state.screen = a.match.home && a.match.away ? 'matchday' : 'match'; render();
       }
-      else if (a.kind === 'decide') { state.tab = 'pulpit'; state.fx = null; state.extPlayer = null; render(); }
+      else if (a.kind === 'decide') { state.tab = 'pulpit'; state.fx = null; state.extPlayer = null; state.extClub = null; render(); }
       else await runDays();
     }
     if (act === 'stop') state.running = false;
@@ -1054,6 +1056,13 @@ async function dispatchAct(el, { root = app } = {}) {
       render(); window.scrollTo({ top: 0 });
     }
     if (act === 'extback') { state.extPlayer = null; render(); }
+    if (act === 'club') {
+      const id = el.dataset.club;
+      if (id === state.game.clubId) { state.extClub = null; state.extPlayer = null; state.tab = 'kadra'; state.sqSub = 'players'; state.playerOpen = null; }
+      else if (hasClubView(state.game, id)) { state.extClub = id; state.extPlayer = null; }
+      render(); window.scrollTo({ top: 0 });
+    }
+    if (act === 'clubback') { state.extClub = null; state.extPlayer = null; render(); }
     if (act === 'tsub') { state.sqSub = el.dataset.s; state.tSel = null; state.tInfo = null; state.tMsg = ''; state.playerOpen = null; state.ttResult = null; state.ttMeeting = null; render(); }
     if (act === 'tcancel') { state.tSel = null; state.tMsg = ''; renderTacticsAfter('[data-act="tauto"]'); }
     if (act === 'tform') { g.tactics = changeFormation(g.tactics, mySquad(g), el.dataset.f); state.tSel = null; state.tMsg = ''; await save(); renderTacticsAfter(); }
