@@ -538,8 +538,11 @@ function dashMail(g) {
 function renderDashboard(g, club) {
   const tableOf = dashTables(g);
   const table = tableOf(club.tier);
+  const waiting = pendingDecisions(g.inbox);
+  const decideBar = waiting.length ? `<div class="dash-decide" role="status"><span><b>${waiting.length === 1 ? 'Czeka decyzja' : `Czekają decyzje (${waiting.length})`}:</b> ${esc(waiting[0].subject ?? '')}. Gra ruszy dalej po decyzji.</span><button class="btn btn--primary btn--sm" data-act="mail" data-id="${esc(waiting[0].id)}">Otwórz decyzję</button></div>` : '';
   return `<div class="dash">
     <h2 class="dash__title">Pulpit</h2>
+    ${decideBar}
     <div class="dash__grid">
       ${dashHero(g, club, nextFixture(g), tableOf)}
       ${dashFixtures(g)}
@@ -714,7 +717,8 @@ async function runDays() {
     if (r.reason !== 'limit') { reason = r.reason; break; }
   }
   state.running = false;
-  if (reason === 'message' || reason === 'decision') { state.tab = 'poczta'; state.mailOpen = null; state.mailCat = null; }
+  // Po Dalej zawsze Pulpit (nowe wiadomości i decyzje widać w panelu Poczta i w pasku decyzji na Pulpicie)
+  if (reason === 'message' || reason === 'decision') { state.tab = 'pulpit'; state.fx = null; state.extPlayer = null; state.mailOpen = null; }
   await save();
   renderHub();
 }
@@ -1018,7 +1022,7 @@ async function dispatchAct(el, { root = app } = {}) {
         await save();
         state.screen = a.match.home && a.match.away ? 'matchday' : 'match'; render();
       }
-      else if (a.kind === 'decide') { state.tab = 'poczta'; state.mailOpen = pendingDecisions(g.inbox)[0].id; render(); }
+      else if (a.kind === 'decide') { state.tab = 'pulpit'; state.fx = null; state.extPlayer = null; render(); }
       else await runDays();
     }
     if (act === 'stop') state.running = false;
