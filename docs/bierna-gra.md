@@ -15,7 +15,27 @@ Oznaczenia: [SZAC] szacunek projektowy bez źródła, [SYM] wynik symulacji w ty
 
 ## Odpowiedź w skrócie
 
-ODPOWIEDZ_W_SKROCIE
+- **Pomiar przed zmianami [SYM]** (pełna pętla dni, dzień meczowy jak w interfejsie, 4 kluby, 12-20 sezonów na klub):
+  całkiem pasywny gracz był średnio **2,8 pkt** pod tym samym klubem prowadzonym przez AI (błąd 1,6), a pasywny gracz,
+  który tylko chodził na konferencje z domyślnymi odpowiedziami, **1,3 pkt nad AI**. Wcześniejsza obserwacja
+  „4-7 pkt pod AI” pochodziła ze skryptu, który po meczu zawsze wybierał Pochwałę (interfejs od pewnego czasu zaznacza
+  przemowę zalecaną przez asystenta) i nie rozliczał pominiętej konferencji przedmeczowej; docs/balans.md
+  („różnica bliska zeru”) mierzył gracza z konferencjami. Obie liczby były prawdziwe dla swoich scenariuszy.
+- **Największa dźwignia przed zmianami to prasa:** pominięte konferencje dawały morale kadry ok. 12 (AI ok. 15)
+  i zaufanie zarządu ok. 25-35 przy wyniku w okolicy celu; konferencja z domyślnymi odpowiedziami dawała morale
+  ok. 18-19 i zaufanie 100. Taktyka, rozmowy i trening nie miały żadnego kosztu.
+- **Wdrożone (ograniczone, te same reguły dla AI):** przewidywalność taktyczna (rywale rozpracowują stały schemat,
+  jakość zależy od analityka i trenera rywala, do +0,3 pkt atrybutu dla rywala, zaskoczenie do -0,08),
+  rozmowy z zawodnikami, którzy ich potrzebują (wrażliwi, nowi, ambitni rezerwowi: powolny spadek morale nie niżej
+  niż 9, zaufanie, niezadowolenie), korekta prasy (nasycenie dodatniego morale z konferencji, limit kary zarządu
+  za pomijanie), mała monotonia treningu (ten sam akcent ponad 4 tygodnie). Wszystko jest wyjaśnione w grze
+  (studio, poczta, Rozmowy).
+- **Po zmianach [SYM]:** pasywny gracz **-6,9 pkt** wobec AI (błąd 1,8; cel panelu 6-10 [SZAC]), pasywny z konferencjami
+  -4,4, aktywny-lite (plan pod rywala, rozmowy z potrzebującymi, konferencje) **-0,7** (blisko AI). Wariant
+  „zaangażowany” w skrypcie (cotygodniowe zebranie, rozmowy na odprawach, rotacja akcentu) wypadł -3,6: więcej
+  aktywności nie jest automatycznie lepsze (powtarzane zebrania obniżają zaufanie, zmiana akcentu na fizyczny
+  i techniczny obniża zgranie). Przewagi zaangażowanego gracza nad AI ten pomiar nie pokazał (otwarte pytania).
+- Mechanika ma wyłącznik do pomiarów `PASSIVE` (`src/training/scouting.js`).
 
 ## 1. Jak to wygląda w prawdziwym futbolu
 
@@ -104,7 +124,57 @@ deterministyczne ziarna; stary zapis działa (brak historii to znajomość neutr
 
 ## 3. Pomiar przed zmianami
 
-POMIAR_PRZED
+Skrypt `harness.mjs` (katalog roboczy agenta, `passive/`): cały sezon 2026/27 od 1 lipca do 8 czerwca na prawdziwej
+pętli dni (`processDay`, `continueUntilStop`, decyzje odrzucane). Mecz gracza jak w interfejsie: `startMatchday`,
+przejście do odprawy (`leaveStudio`, czyli pominięta albo odbyta konferencja przedmeczowa), odprawa z tonem
+zalecanym przez asystenta, „Pokaż wynik” (`skip`, zmiany robi asystent), odprawa w przerwie z zaleceniem, druga
+połowa, `finishMatchday`, odprawa pomeczowa z tonem zalecanym (`postAdvice`, tak zaznacza formularz), konferencja
+albo Dalej (`closeMatchday`). Te same ziarna we wszystkich scenariuszach; różnica liczona parami (ten sam świat).
+
+| Scenariusz | Co robi gracz |
+|---|---|
+| a, pasywny | nic poza przyciskami: domyślna taktyka (4-2-3-1, instrukcje domyślne), bez rozmów, domyślny trening, konferencje pomijane |
+| b, pasywny z konferencjami | jak a, ale konferencje przed i po meczu z domyślnymi odpowiedziami |
+| c, aktywny-lite | jak b, plus plan pod rywala z szansy na wygraną w studiu (poniżej 30 %: nastawienie -1, niski pressing, niska linia; powyżej 55 %: nastawienie +1, wysoki pressing; inaczej domyślny), co tydzień do 3 rozmów z zawodnikami wskazanymi przez asystenta (niskie morale, niezadowolenie, mało gra, długo bez rozmowy), bez powtórki z tym samym zawodnikiem przez 3 tygodnie |
+| d, AI | ten sam klub prowadzi AI (graczem jest Śląsk II, klub z innej ligi) |
+| e, zaangażowany | jak c, plus zebranie co tydzień (ton do sytuacji), rozmowy na odprawie przedmeczowej wg asystenta, akcent treningu zmieniany co 3 tygodnie |
+
+Przed zmianami (kod z Nov 12, 2026 przed tą zmianą; a, b, d: 20 sezonów na klub, c, e: 12). Punkty w lidze, miejsce,
+różnica do AI parami (pkt na sezon), średnie morale całej kadry (środy) i wrażliwych, zgranie na koniec, zaufanie
+zarządu na koniec i najniższe, miesiące z decyzją o zwolnieniu (skrypt odrzuca oferty, więc trener zostaje),
+relacje z mediami.
+
+| Klub | Scenariusz | Pkt | Miejsce | Różnica do AI | Morale kadry | Morale wrażliwych | Zgranie | Zarząd (min) | Zwolnienia | Media |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Legia (EK, 1. siła) | d AI | 69,5 | 1,8 | | 16,3 | 16,0 | 95,8 | | | |
+| | a | 64,9 | 2,8 | -4,7 | 14,7 | 13,1 | 97,5 | 40 (28) | 1,9 | 10 |
+| | b | 67,3 | 2,4 | -2,2 | 18,4 | 18,4 | 97,2 | 100 (60) | 0 | 92 |
+| | c | 66,5 | 2,5 | -1,8 | 18,6 | 18,6 | 85,1 | 99 (60) | 0 | 92 |
+| Widzew (EK, 5.) | d AI | 54,5 | 6,2 | | 15,4 | 15,4 | 95,8 | | | |
+| | a | 51,0 | 7,5 | -3,5 | 12,4 | 10,7 | 97,2 | 43 (25) | 2,3 | 10 |
+| | b | 52,0 | 7,0 | -2,5 | 18,0 | 18,1 | 97,2 | 99 (60) | 0 | 90 |
+| | c | 51,3 | 7,1 | -2,3 | 18,3 | 18,3 | 84,8 | 100 (60) | 0 | 90 |
+| GKS Katowice (EK, 16.) | d AI | 35,5 | 13,4 | | 13,8 | 13,6 | 95,8 | | | |
+| | a | 34,5 | 14,3 | -0,9 | 10,1 | 8,5 | 97,4 | 55 (36) | 0,9 | 8 |
+| | b | 39,7 | 12,4 | +4,3 | 18,1 | 18,3 | 97,2 | 100 (60) | 0 | 92 |
+| | c | 35,8 | 13,8 | +4,1 | 18,3 | 18,5 | 85,4 | 100 (60) | 0 | 91 |
+| Polonia Warszawa (1 Liga, 9.) | d AI | 48,1 | 8,2 | | 13,8 | 13,4 | 95,8 | | | |
+| | a | 46,0 | 9,3 | -2,1 | 11,5 | 10,0 | 97,5 | 65 (37) | 0,7 | 10 |
+| | b | 53,8 | 5,5 | +5,7 | 17,7 | 17,8 | 97,6 | 100 (60) | 0 | 93 |
+| | c | 49,0 | 8,7 | +1,3 | 17,9 | 17,9 | 86,5 | 100 (60) | 0 | 92 |
+
+Średnio (parami, wszystkie kluby): a **-2,8** (błąd 1,6), b **+1,3** (1,4), c **+0,3** (1,9), e +0,3 (2,1).
+Odchylenie standardowe punktów klubu w sezonie to 8-10, więc pojedyncze kluby różnią się o kilka punktów w szumie.
+
+Wnioski panelu z pomiaru:
+
+1. Przed zmianami całkiem pasywny gracz tracił do AI mało i prawie wyłącznie przez pominięte konferencje
+   (b - a: +4,1 pkt; morale kadry 12 wobec 18). Stała taktyka, brak rozmów i ten sam trening nie kosztowały nic.
+2. Konferencja z domyślnymi odpowiedziami była za hojna: morale ok. 18-19, wyżej niż w klubach AI (ok. 15), które
+   konferencji nie mają. Pominięcie konferencji było za to drogie dla zarządu: pasywny trener Widzewa i Legii, który
+   kończy w okolicy celu, miewał zaufanie poniżej progu zwolnienia.
+3. Zmienianie instrukcji przed każdym meczem (c) kosztowało zgranie (85 wobec 97: instrukcje -7 za każdą zmianę),
+   więc gracz, który robi to, co robią dobrzy trenerzy, był karany, a pasywny nie.
 
 ## 4. Model
 
@@ -196,7 +266,56 @@ kadry o ok. 2,5 punktu w jednym sezonie [SYM] i została złagodzona.
 
 ## 5. Kalibracja po zmianach
 
-POMIAR_PO
+Ten sam skrypt i te same ziarna (1-12), kod po zmianie (z równoległymi zmianami innych agentów w trenerach AI,
+właścicielach i pucharach, więc baza AI też się trochę przesunęła). 12 sezonów na klub i scenariusz.
+
+| Klub | Scenariusz | Pkt | Miejsce | Różnica do AI | Morale kadry | Morale wrażliwych | Zgranie | Zarząd (min) | Zwolnienia | Media | Niezadowoleni |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Legia | d AI | 66,6 | 1,8 | | 15,9 | 15,8 | 95,8 | | | | 0,1 |
+| | a | 63,5 | 3,4 | -3,1 | 12,7 | 9,8 | 97,3 | 33 (20) | 2,0 | 9 | 4,1 |
+| | b | 64,5 | 2,4 | -2,1 | 16,7 | 15,9 | 97,4 | 100 (60) | 0 | 92 | 4,4 |
+| | c | 70,6 | 1,5 | +4,0 | 18,0 | 18,3 | 95,7 | 100 (60) | 0 | 93 | 0,1 |
+| | e | 71,3 | 1,8 | +4,7 | 17,4 | 17,5 | 93,2 | 100 (60) | 0 | 92 | 0 |
+| Widzew | d AI | 52,6 | 6,8 | | 15,0 | 14,6 | 95,8 | | | | 0,1 |
+| | a | 42,7 | 10,9 | -9,9 | 9,6 | 6,6 | 97,4 | 16 (10) | 4,0 | 9 | 3,9 |
+| | b | 43,8 | 10,0 | -8,8 | 15,1 | 14,1 | 97,4 | 99 (60) | 0 | 89 | 3,8 |
+| | c | 50,5 | 8,0 | -2,1 | 17,0 | 17,5 | 91,3 | 99 (60) | 0 | 90 | 0,1 |
+| | e | 46,1 | 9,2 | -6,5 | 14,4 | 14,7 | 87,0 | 99 (59) | 0 | 90 | 0 |
+| GKS Katowice | d AI | 33,7 | 14,7 | | 13,5 | 13,2 | 95,8 | | | | 0,1 |
+| | a | 30,8 | 15,9 | -2,9 | 8,2 | 6,7 | 97,2 | 43 (29) | 1,7 | 8 | 3,9 |
+| | b | 33,6 | 14,2 | -0,1 | 14,7 | 14,3 | 97,3 | 100 (60) | 0 | 91 | 4,2 |
+| | c | 33,2 | 14,8 | -0,5 | 15,7 | 16,6 | 92,6 | 100 (60) | 0 | 91 | 0 |
+| | e | 30,7 | 15,7 | -3,0 | 15,3 | 16,4 | 89,1 | 100 (60) | 0 | 90 | 0 |
+| Polonia Warszawa | d AI | 51,5 | 6,7 | | 14,4 | 13,9 | 95,8 | | | | 0,1 |
+| | a | 39,8 | 12,1 | -11,7 | 9,4 | 7,2 | 97,5 | 49 (29) | 1,3 | 8 | 3,6 |
+| | b | 44,8 | 10,2 | -6,8 | 15,1 | 14,3 | 97,6 | 100 (60) | 0 | 93 | 3,6 |
+| | c | 47,5 | 8,4 | -4,0 | 16,4 | 17,2 | 90,5 | 100 (60) | 0 | 93 | 0 |
+| | e | 41,8 | 11,8 | -9,7 | 13,5 | 14,1 | 85,6 | 100 (60) | 0 | 93 | 0 |
+
+Średnio (parami, 4 kluby, 48 sezonów na scenariusz):
+
+| Scenariusz | Przed | Po | Cel panelu [SZAC] |
+|---|---|---|---|
+| a, pasywny | -2,8 (błąd 1,6) | **-6,9** (1,8) | od -6 do -10 |
+| b, pasywny z konferencjami | +1,3 (1,4) | -4,4 (1,5) | pod AI, ale łagodniej niż a |
+| c, aktywny-lite | +0,3 (1,9) | **-0,7** (1,7) | ok. 0 |
+| e, zaangażowany (skrypt) | +0,3 (2,1) | -3,6 (1,8) | powyżej 0 (nie osiągnięte tym skryptem) |
+
+Rozbicie scenariusza a (Widzew i GKS, 24 sezony, duży szum): bez przewidywalności taktycznej -4,5 pkt wobec AI,
+bez rozmów i monotonii -3,4 pkt, z całością -6,4 pkt; czyli przewidywalność ok. -2 pkt, rozmowy i monotonia razem
+ok. -3 pkt (głównie przez morale wrażliwych i nowych), korekta prasy (b przed i po) ok. -2,5 pkt dla gracza
+z konferencjami.
+
+Co jeszcze widać:
+
+- Morale pasywnej kadry spada do ok. 8-13 (AI 13,5-16), wrażliwych do ok. 7-10; zaniedbanie samo zatrzymuje się
+  na 9, resztę dokładają porażki i nagonka prasy po pominiętych konferencjach. Pasywny gracz kończy sezon z ok. 4
+  niezadowolonymi ambitnymi rezerwowymi (aktywny: 0).
+- Zgranie gracza zmieniającego plan pod rywala: 90-96 (przed zmianą 85), bo przećwiczony plan B kosztuje mniej.
+- Zarząd: pasywny trener Widzewa (cel 6. miejsce, średnio 10,9.) ma w części sezonów zaufanie poniżej progu zwolnienia;
+  przed zmianą miał lepsze wyniki i rzadziej spadał pod próg. Gracz z konferencjami ma zaufanie 100.
+- Czas: system rozmów to ok. 3 ms na tydzień gry, premia analizy liczona raz na dzień; czas sezonu bez zmiany
+  w granicach pomiaru.
 
 ## 6. Co widzi gracz
 
@@ -213,11 +332,53 @@ POMIAR_PO
 
 ## 7. Kod i testy
 
-KOD_TESTY
+| Plik | Zmiana |
+|---|---|
+| `src/training/scouting.js` (nowy) | odcisk taktyczny, podobieństwo, dziennik meczów gracza, znajomość schematu (gracz i AI), jakość analizy, premia `scoutEdge`, notka w studiu, wiadomość analityka, plan przećwiczony, wyłącznik `PASSIVE` |
+| `src/training/cohesion.js` | `prepTerm` i `aiPrepToday`: premia za schemat rywala dla gracza i klubów AI (pamięć dnia z kluczem taktyki gracza); `syncTacticsChange`: plan B x0,3 |
+| `src/career/attention.js` (nowy) | potrzeba rozmowy, zaniedbanie, system tygodnia (gracz i kluby AI), przypomnienia asystenta |
+| `src/career/teamTalks.js` | rozmowa i zebranie zapisują uwagę; podpowiedź „długo bez rozmowy”; „Podbuduj” po długim czekaniu działa lepiej |
+| `src/training/variety.js` (nowy) | licznik tego samego akcentu, znużenie i jego skutki, rotacja akcentu trenera AI, notka |
+| `src/training/index.js`, `sessions.js`, `aiClubs.js` | krok tygodniowy znużenia (gracz i AI), wiadomość o znużeniu, skutki w zajęciach gracza i AI, akcent AI z rotacji |
+| `src/match/matchday.js` | zapis schematu po meczu o stawkę, wiadomość analityka, notka w studiu, rozmowy z odpraw jako uwaga, nasycenie morale z prasy |
+| `src/match/press.js` | `pressMoraleDelta(..., morale)` z nasyceniem, nowe limity konferencji, limit kary zarządu za pomijanie |
+| `src/ui/matchdayView.js` | notka o przygotowaniu rywala w raporcie asystenta (jedna linia) |
+| `src/ui/talksView.js` | licznik „czeka na rozmowę” i opis, kto potrzebuje rozmów |
+| `tests/passivePlay.test.mjs` (nowy) | 10 testów, niżej |
+| `tests/balance.test.mjs` | nowy strażnik „Gra bierna” (zamierzona różnica), reszta bez zmian |
+| `tests/training.test.mjs` | analiza wideo gracza zawiera małą premię za schemat rywala AI |
+| `docs/balans.md` | odnośnik do zamierzonej różnicy |
+
+Testy `tests/passivePlay.test.mjs`: powtarzany schemat podnosi premię rywala w granicach (i daje jedno ostrzeżenie
+analityka oraz notkę w studiu); urozmaicony plan daje premię wyraźnie niższą, nagła zmiana planu daje zaskoczenie
+w granicach; analityk i trener rywala skalują premię; ta sama reguła dla klubów AI i premia w dniu meczu
+(`prepTerm`); przećwiczony plan B kosztuje mniej zgrania; zaniedbany wrażliwy zawodnik traci morale powoli i od
+4. tygodnia, rozmowa zatrzymuje spadek; zaniedbanie nie schodzi poniżej progu, spokojny zawodnik rozmów nie
+potrzebuje; trenerzy AI rozmawiają z zawodnikami, wynik deterministyczny; znużenie treningiem rośnie powoli,
+jest ograniczone, znika po zmianie akcentu lub zmianach w planie, trener AI zmienia akcent; stary zapis bez stanu
+działa, stan przechodzi przez JSON, nowy klub zaczyna od neutralnej znajomości.
+
+Zapis gry: `game.scouting` (do 10 odcisków, ok. 1 KB), `game.attStart`, `game.attWeek`, `p.att` u zawodników
+z potrzebą rozmowy (kilka pól), `c.var` w stanie treningu klubu (2-3 pola).
 
 ## 8. Otwarte pytania do decyzji
 
-OTWARTE
+1. **Siła kary.** Pasywny gracz -6,9 pkt jest w dolnej części przedziału 6-10. Mocniej: `SCOUT.max` (0,4) albo
+   `ATTN.week` (0,45). Słabiej: `SCOUT.edgeMax` (0,3) albo próg `ATTN.floor` (9).
+2. **Zwolnienia pasywnego gracza.** W dużym klubie z wysokim celem (Widzew, Legia) pasywny gracz bywa pod progiem
+   zwolnienia już w pierwszym sezonie. To realistyczne w Ekstraklasie, ale dla gracza „na luzie” może być za ostre.
+   Możliwość: pierwszy sezon w klubie z łagodniejszym progiem albo ostrzeżenie zarządu przed decyzją.
+3. **Zaangażowany gracz nie wypadł lepiej niż AI** w skrypcie (cotygodniowe zebrania obniżają zaufanie zawodników,
+   akcent fizyczny i techniczny obniża zgranie). Czy zebranie raz w tygodniu ma być tak ryzykowne (istniejąca
+   mechanika powtórzeń w `teamTalks.js`)? Lepszy gracz w testach ręcznych powinien to sprawdzić.
+4. **Prasa a AI.** Kluby AI nie mają konferencji ani klimatu prasy. Po korekcie gracz z konferencjami ma morale
+   ok. 15-18, czyli w okolicy AI albo trochę wyżej. Pełna symetria wymagałaby prostego klimatu prasy dla klubów AI.
+5. **Odcisk taktyczny** to ustawienie i instrukcje na start meczu. Nie obejmuje wariantów stałych fragmentów ani
+   wykonawców (silnik ich nie różnicuje); gdy pojawią się w silniku, mogą wejść do odcisku z własną wagą.
+6. **Przewidywalność klubów AI** jest liczona z atrybutów trenera, a nie z dziennika ich meczów (mecze w tle nie
+   mają taktyki). Przy zmianie trenera (rynek trenerów innego agenta) wartość zmienia się od razu z nowym profilem.
+7. **Liczba niezadowolonych** u pasywnego gracza (ok. 4 na koniec sezonu) jest wyraźna; flaga nie zmienia siły
+   w meczu, ale może prowadzić do próśb o transfer. Do obserwacji w dłuższej karierze.
 
 ## Źródła
 

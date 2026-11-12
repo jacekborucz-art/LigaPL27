@@ -4,8 +4,9 @@
 // Sesja żyje w pamięci; wynik i jego skutki trafiają do gry dopiero po końcowym gwizdku.
 
 import { trainingMatchInput } from '../training/index.js';
-import { recordMatch, scoutingNote, scoutingWarning } from '../training/scouting.js';
+import { recordMatch, scoutingNote, scoutingWarning, similarity } from '../training/scouting.js';
 import { noteAttention } from '../career/attention.js';
+import { logEngage } from '../career/authority.js';
 import { stadiumCapacity } from '../career/finance.js';
 import { attendanceModifier } from '../career/fans.js';
 import { Rng } from '../core/rng.js';
@@ -267,7 +268,7 @@ export function doPreBriefing(game, S, tone, talks = []) {
 
 /** Rozmowa indywidualna na odprawie liczy się jako uwaga trenera (career/attention.js). */
 function markTalks(game, talks, date) {
-  for (const t of talks ?? []) noteAttention(game.world.players[t.id], date);
+  for (const t of talks ?? []) { noteAttention(game.world.players[t.id], date); logEngage(game, 'talk', date); }
 }
 
 function personaMix(squad) {
@@ -523,7 +524,9 @@ export function finishMatchday(game, S) {
   const inbox = [...postMatchMessages(post, { date: S.f.date, matchId: S.f.id }), ...preMatchMessages(S.pre, { date: S.f.date, matchId: S.f.id })];
   // Analitycy rywali widzą ten mecz: zapis schematu i ostrzeżenie, gdy staje się czytelny (docs/bierna-gra.md)
   if (S.f.comp !== 'friendly') {
-    recordMatch(game, S.f.id, S.f.date, S.startTactics ?? game.tactics);
+    const prevFp = game.scouting?.log?.at(-1)?.fp;
+    const st = recordMatch(game, S.f.id, S.f.date, S.startTactics ?? game.tactics);
+    if (prevFp && st.log.at(-1)?.id === S.f.id && similarity(prevFp, st.log.at(-1).fp) < 0.999) logEngage(game, 'tactic', S.f.date); // zmiana planu (autorytet)
     const warn = scoutingWarning(game);
     if (warn) inbox.push(createMessage({ date: S.f.date, category: 'staff', from: 'Analityk wideo', key: `schemat:${S.f.id}`, subject: warn.subject, body: warn.body }));
   }
@@ -786,6 +789,7 @@ function settlePress(game, S, eff, phase = 'post') {
   if (msgs.length) game.inbox = addMessages(game.inbox ?? [], msgs).inbox;
   slot.result = eff;
   slot.settled = true;
+  logEngage(game, eff.mode === 'skipped' ? 'pressSkip' : 'press', S.f.date); // obecność w mediach (career/authority.js)
   markDone(game, S.f.id, `press-${phase}`);
   return eff;
 }

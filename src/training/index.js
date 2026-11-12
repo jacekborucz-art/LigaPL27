@@ -24,6 +24,7 @@ import { legsTerm, overloadTerm } from './load.js';
 import { processAiDay, aiOverload, aiPlanFor } from './aiClubs.js';
 import { varietyWeek, editsLastWeek, aiAccentAt, staleNote, staleness } from './variety.js';
 import { campOn } from './camps.js';
+import { logEngage } from '../career/authority.js';
 
 // Forma bazowa po okresie przygotowawczym: jedna liczba na klub i dzień (pamięć podręczna, tanio w meczu)
 const campCache = new WeakMap();
@@ -71,7 +72,10 @@ export function weeklyStep(game, date) {
   const c = T.clubs[game.clubId];
   if (c) {
     // Monotonia treningu: ten sam akcent bez zmian w planie (docs/bierna-gra.md)
-    varietyWeek(c, { accent: T.settings?.accent ?? 'zrownowazony', edits: editsLastWeek(game, date), camp: !!campOn(game, lastWeek) });
+    const prevVar = c.var;
+    const edits = editsLastWeek(game, date); const camp = !!campOn(game, lastWeek); const accent = T.settings?.accent ?? 'zrownowazony';
+    varietyWeek(c, { accent, edits, camp });
+    if (prevVar && (prevVar.a !== accent || edits >= 2 || camp)) logEngage(game, 'train', lastWeek); // decyzja treningowa (career/authority.js)
     const sn = staleNote(c);
     if (sn && staleness(c) >= 0.5 && !c.var.warned) {
       c.var.warned = true;

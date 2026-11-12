@@ -12,7 +12,7 @@ import { staffQ } from './staff.js';
 import { coachOf, coachSkill } from '../career/coaches.js';
 
 /** Wyłącznik do pomiarów balansu (te same ziarna z mechaniką i bez niej). */
-export const PASSIVE = { enabled: true, scout: true, attention: true, variety: true };
+export const PASSIVE = { enabled: true, scout: true, attention: true, variety: true, authority: true };
 
 export const SCOUT = {
   window: 8, // ile ostatnich meczów o stawkę oglądają analitycy rywala
@@ -20,9 +20,9 @@ export const SCOUT = {
   ramp: 5, // po tylu meczach obraz drużyny jest pełny
   // Odcisk taktyczny: ustawienie i kluczowe instrukcje (wagi podobieństwa)
   w: { formation: 0.3, pressing: 0.15, passing: 0.15, line: 0.12, mentality: 0.12, tempo: 0.08, counter: 0.08 },
-  max: 0.4, // premia przy pełnej znajomości schematu i analizie jakości 1 (pkt atrybutu na zawodnika)
+  max: 0.5, // premia przy pełnej znajomości schematu i analizie jakości 1 (pkt atrybutu na zawodnika)
   neutral: 0.45, // znajomość, przy której premii nie ma (przeciętny trener AI zmienia plan tak często)
-  edgeMin: -0.08, edgeMax: 0.3, // zakres premii: zaskoczenie rywala do -0,08, rozpracowany schemat do +0,3
+  edgeMin: -0.08, edgeMax: 0.35, // zakres premii: zaskoczenie rywala do -0,08, rozpracowany schemat do +0,35
   qMin: 0.15, qMax: 1.3, // jakość analizy: analityk 3 -> ok. 0,15, analityk 15 -> 1, do 1,3 z dobrym trenerem
   aiFam: { base: 0.45, skl: 0.2, tak: 0.1, min: 0.25, max: 0.7 }, // przewidywalność klubu AI z trenera
   warnAt: 0.6, clearAt: 0.4, // wiadomość analityka: schemat rozpracowany / znów nieczytelny
