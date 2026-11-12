@@ -177,6 +177,57 @@ różnicy w rozwoju akademii dopiero po kilku sezonach.
 Typowa różnica między trenerami w lidze jest mniejsza niż 16 kontra 8: przeciętny trener ma średnią atrybutów
 w odchyleniu ok. 1,6 pkt od średniej dla swojego klubu, czyli ok. +-0,8 pkt w sezonie.
 
+### Stały punkt + los w skali sezonu (aktualizacja Nov 12, 2026)
+
+Zgłoszenie użytkownika: przewaga lepszego trenera nie może być stała i pewna; słabszy trener czasem trafi na
+zawodników, którzy „zrobią” mu dobry sezon, a czasem będzie miał dużo mniej niż lepszy. Panel: analityk polskiej piłki,
+trener UEFA Pro, matematyk (prawdopodobieństwo i rozrzut), programista.
+
+**Matematyk: „+4,4 pkt” to średnia, nie pewność.** Wcześniejsze „+4,4 (błąd 0,7)” to błąd średniej z 80 sezonów, czyli
+dokładność pomiaru, a nie rozrzut pojedynczego sezonu. Rozrzut sezonu zmierzyliśmy osobno [SYM]: stały świat (te same
+kadry startowe), 200 sezonów na pętli dni, w każdym sezonie losowo połowa klubów Ekstraklasy z trenerem 16, połowa
+z trenerem 8; dla każdego klubu porównanie każdego sezonu z dobrym trenerem z każdym sezonem ze słabym
+(178 tys. par). Bez zwolnień (rynek trenerów wyłączony na czas pomiaru).
+
+| | Przed (c58f161) | Teraz |
+|---|---|---|
+| średnia przewaga trenera 16 w sezonie | +4,9 pkt | +4,1 pkt |
+| rozrzut różnicy (odchylenie standardowe) | 12,6 pkt | 12,6 pkt |
+| rozrzut punktów jednego klubu z sezonu na sezon | 8,8 pkt | 8,8 pkt |
+| słabszy trener z większą liczbą punktów | 33 % sezonów | 36 % |
+| remis punktowy | 3 % | 3 % |
+| silniejszy lepszy o 10 pkt i więcej | 36 % | 34 % |
+| słabszy lepszy o 10 pkt i więcej | 13 % | 14 % |
+| 10. / 50. / 90. percentyl różnicy (16 minus 8) | -11 / +5 / +21 | -12 / +4 / +20 |
+
+Słowami, dla kogoś bez statystyki: ten sam klub, raz z trenerem 16, raz z trenerem 8. **Na 100 takich sezonów trener 8
+zdobędzie więcej punktów w ok. 36, tyle samo w ok. 3, mniej w ok. 61.** W 14 sezonach na 100 słabszy trener będzie
+lepszy o co najmniej 10 punktów, czyli o kilka miejsc w tabeli. Atrybuty ustalają prawdopodobieństwo (rzut lekko
+obciążoną monetą), a o wyniku sezonu decyduje los: forma dnia trenera, setki losowań w meczach, kontuzje, kartki,
+forma zawodników, chemia z szatnią. Lepszy trener wygrywa częściej, ale nigdy na pewno.
+
+**Analityk polskiej piłki i trener UEFA Pro: jak często słabszy trener ma świetny sezon.** Często. Przykłady z polskiej
+ligi: Śląsk Wrocław zdobył wicemistrzostwo 2023/24 z wynikami ponad liczby (analiza goli oczekiwanych, meczyki.pl:
+„Liczby nie kłamią. Śląsk Wrocław nie zasługiwał na wicemistrzostwo Polski”), a sezon wcześniej bronił się przed
+spadkiem z podobną kadrą; Jagiellonia zdobyła mistrzostwo 2024 z trenerem w pierwszym pełnym sezonie w Ekstraklasie.
+Powody: dopasowanie pomysłu trenera do zawodników, chemia w szatni, zdrowie kluczowych zawodników, kilka meczów
+rozstrzygniętych jednym golem, efekt nowej miotły (krótki i mały w badaniach, `docs/trenerzy-i-wlasciciele.md` 2.6).
+
+**Co doszło do modelu (programista, `src/career/coachMarket.js`, `profile.boost`):**
+
+| Składnik | Jak | Wielkość [SZAC] | Ziarno |
+|---|---|---|---|
+| dopasowanie stylu do kadry | ofensywny trener w kadrze technicznej i szybkiej zyskuje, w kadrze opartej na odbiorze i sile traci; ostrożny odwrotnie; pragmatyczny 0 | do +-0,75 pkt atrybutu | z kadry na start sezonu |
+| chemia z szatnią | losowana raz na sezon dla pary trener i klub | rozrzut 1,5 pkt, najwyżej +-3 | `trener-chemia:{ziarno}:{klub}:{trener}:{rok}` |
+| nowa miotła | po zatrudnieniu w trakcie sezonu, maleje do zera przez 6 tygodni; jednorazowo +0,4 morale kadry | +1,5 pkt atrybutu na start | data objęcia |
+| dyspozycja dnia (bez zmian) | raz na mecz | rozrzut 0,5 pkt, najwyżej +-1 | `trener-forma:...` |
+
+Suma sezonowa najwyżej +-3,5 pkt atrybutu, dodawana do taktyki, składu i motywacji w meczu (`matchCoach`). Średnia
+przewaga trenera dalej wynika z atrybutów; chemia dodaje tylko ok. 0,8 pkt rozrzutu w sezonie, bo głównym źródłem
+losu jest już sam sezon (rozrzut 8,8 pkt na klub). Matematyk: większa chemia rozmyłaby sens atrybutów, a nakładanie
+się wyników jest już realistyczne. Średnia przewaga spadła z 4,9 do 4,1 pkt, bo słabszy trener szkodzi mniej
+(łagodniejsza ujemna strona skali, `docs/trenerzy-i-wlasciciele.md` 1.5).
+
 ### Balans gracz kontra AI
 
 `sim.mjs` (pasywny gracz w pełnym dniu meczowym z „Pokaż wynik” i zalecanymi odprawami, bez konferencji),
@@ -199,17 +250,19 @@ Testy `tests/balance.test.mjs` przechodzą.
 - Średnia: `3,5 + 0,8 x prestiż + premia ligi (Ekstraklasa +1, 1 Liga 0, 2 Liga -1)`, wspólny talent trenera
   (odchylenie 1,3), rozrzut atrybutu (2,0), +1 w atrybucie stylu (ofensywny MOT, ostrożny SKL, pragmatyczny TAK),
   rezerwy jak w sztabie (prestiż pierwszej drużyny - 3). Średnia Ekstraklasy ok. 10,4 (punkt neutralny 10,5),
-  1 Liga ok. 8, 2 Liga ok. 6. Czołówka (Legia, Lech) średnio ok. 12,5, ale z rozrzutem: w jednym ziarnie trener
+  1 Liga ok. 9, 2 Liga ok. 8 (od Nov 12, 2026 premia ligi +1 / +0,9 / +1,15, wcześniej 1 Liga 8 i 2 Liga 6;
+  uzasadnienie i pomiar błędów w `docs/trenerzy-i-wlasciciele.md` 1.5). Ujemna strona skali łagodniejsza:
+  `s` ujemne do potęgi 1,35. Czołówka (Legia, Lech) średnio ok. 12,5, ale z rozrzutem: w jednym ziarnie trener
   Rakowa ma 4-8, w innym klub z dołu tabeli ma trenera 14.
 - Imię i nazwisko z tego samego ziarna co dawniej (`trener-glowny:{ziarno}:{klub}`): stary zapis pokazuje tego
   samego trenera. Stary zapis bez profili: `ensureCareer` tworzy je przy wczytaniu, a `coachOf` przy pierwszym użyciu.
-- Zmiana trenera: istniejący mechanizm kibiców (żądanie zwolnienia trenera klubu AI, `career/fans.js`) wywołuje
-  `replaceCoach`: nowy profil z kolejnym numerem, średnia +0,5 (zarząd szuka lepszego, nie zawsze znajduje),
-  ten sam styl (filozofia klubu), wpis w `game.coachLog` i w dzienniku kibiców.
+- Zmiana trenera: rynek trenerów (`career/coachMarket.js`, `docs/trenerzy-i-wlasciciele.md`): zwolnienia przez
+  pryzmat właściciela, trener tymczasowy, nowy trener z puli wolnych trenerów albo z niższej ligi. Nowy trener
+  przynosi własny styl gry (`coachStyle`); pierwsi trenerzy w grze mają styl klubu. Wpis w `game.coachLog`.
 - Po sezonie (`rollover.js`): trenerzy rok starsi; do 48 lat +1 w jednym atrybucie z szansą 45 %, od 62 lat -1
   z szansą 35 %.
-- Asystent gracza: `assistantProfile(q)` z jakości asystenta w sztabie przeliczonej na skalę trenera
-  (`2 + 0,62 q`: sztab ma wzór 3 + 1,3 prestiżu, trener 3,5 + 0,8 prestiżu). Działa przy „Pokaż wynik”
+- Asystent gracza: `assistantProfile(q, liga)` z jakości asystenta w sztabie przeliczonej na skalę trenera
+  (`2 + 0,62 q`, w 1 Lidze +0,7, w 2 Lidze +1,6: sztab ma wzór 3 + 1,3 prestiżu, trener 3,5 + 0,8 prestiżu). Działa przy „Pokaż wynik”
   (asystent przejmuje drużynę) i w podpowiedziach (czas rozpoznania zmian rywala). Decyzje gracza nie mają atrybutów.
 
 ## Gdzie są haki
@@ -263,19 +316,19 @@ co najmniej 25). Sama logika gry bez zmian.
 
 ## Otwarte pytania do decyzji
 
-1. **Siła wpływu trenera.** 16 kontra 8 to +4,4 pkt w sezonie, czyli górna granica zakładanego przedziału 2-4.
+1. **Siła wpływu trenera.** 16 kontra 8 to teraz średnio +4,1 pkt w sezonie (pomiar na stałym świecie, 200 sezonów),
+   z rozrzutem 12,6 pkt; słabszy trener ma więcej punktów w ok. 36 % sezonów (rozdział „Stały punkt + los w skali sezonu”).
    Zmniejszenie: `COACH.quick` i `COACH.plan` (decyzje meczowe) albo `COACH.postFx` (morale). Zwiększenie TRE
    dałoby się odczuć dopiero po kilku sezonach.
 2. **Liczby u rywala.** Czy dokładne atrybuty mają być widoczne od analityka 14, czy zawsze tylko przedziały?
-3. **Styl po zmianie trenera.** Nowy trener ma styl klubu (filozofia). Czy nowy trener ma móc zmienić styl?
-   Wymaga to czytania stylu z profilu w kilku miejscach (`club.coach` w treningu, odprawach, planie), plan jest prosty.
-4. **Trenerzy niższych lig są słabsi** (1 Liga ok. 8, 2 Liga ok. 6, jak sztab). Rywale gracza w 2 Lidze robią
-   więcej błędów niż dawne AI; asystent gracza w takim klubie też jest słabszy. Czy tak ma zostać, czy skala
-   trenera ma być względna wobec ligi?
+3. **Styl po zmianie trenera.** Rozstrzygnięte (Nov 12, 2026): nowy trener przynosi własny styl
+   (`docs/trenerzy-i-wlasciciele.md` 4.1).
+4. **Trenerzy niższych lig.** Rozstrzygnięte (Nov 12, 2026): skala bezwzględna, ale 1 Liga ok. 9, 2 Liga ok. 8
+   i łagodniejsza ujemna strona skali (`docs/trenerzy-i-wlasciciele.md` 1.5).
 5. **4-3-3 od początku daje w silniku +0,09 pkt na mecz** wobec 4-2-3-1, a krótkie podania +0,125. To pytanie
    do balansu silnika (docs/ai-trener.md, otwarte pytania 1-2); plan dobrego trenera używa krótkich podań i pressingu.
-6. **Dalsze kroki:** zwolnienia trenerów AI przez zarząd za wyniki (dziś tylko pod presją kibiców), rynek trenerów
-   (gracz mógłby zatrudnić asystenta jako przyszłego trenera), atrybut dyscypliny (kartki), rotacja składu wg
+6. **Dalsze kroki:** zwolnienia trenerów AI i rynek trenerów są już w grze (`docs/trenerzy-i-wlasciciele.md`);
+   dalej: gracz mógłby zatrudnić asystenta jako przyszłego trenera, atrybut dyscypliny (kartki), rotacja składu wg
    terminarza u dobrych selekcjonerów.
 7. **Balans pasywnego gracza** (obserwacja poza zakresem): w obecnym kodzie pasywny gracz w pełnym dniu meczowym
    zdobywa 4-7 pkt mniej niż ten sam klub pod AI także przed tą zmianą, a docs/balans.md podawał różnicę bliską zeru.

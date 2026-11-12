@@ -91,3 +91,9 @@
 .clv-bar b { border-radius: 4px; background: var(--c); }
 .clv-bar s { background: color-mix(in srgb, var(--c) 40%, transparent); text-decoration: none; }
 .clv-coach__note { margin: 6px 0 0; font-size: 12px; }
+.clv-coach__tenure { margin: 0 0 6px; font-size: var(--step--1); }
+.clv-coach__hist { margin-top: 8px; font-size: var(--step--1); }
+.clv-coach__hist summary { cursor: pointer; font-weight: 700; min-height: 32px; display: flex; align-items: center; }
+.clv-coach__hist p { margin: 6px 0 2px; color: var(--text-muted); font-size: 12px; }
+.clv-coach__hist ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
+.clv-dl .clv-owner { font-style: italic; }

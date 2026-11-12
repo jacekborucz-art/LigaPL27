@@ -22,7 +22,7 @@ import { aiSessionToClub } from './cohesion.js';
 import { fatigueMul, regenMul, trainingInjuryChance, overloadTerm } from './load.js';
 import { rollTrainingInjury } from './sessions.js';
 import { offsetsFor } from './development.js';
-import { trainingSkill, COACH } from '../career/coaches.js';
+import { trainingSkill, COACH, coachStyle } from '../career/coaches.js';
 
 const r2 = (v) => Math.round(v * 100) / 100;
 /** Liczba z cyfr napisu (bez tworzenia podnapisów). */
@@ -34,9 +34,9 @@ function digits(str, from, to) {
 const r3 = (v) => Math.round(v * 1000) / 1000;
 
 const planCache = new Map();
-/** Akcent i poziom obciążeń planu klubu AI (typ trenera z danych klubu). */
-export function aiPlanFor(clubId) {
-  const coach = clubById(clubId)?.coach ?? 'P';
+/** Akcent i poziom obciążeń planu klubu AI (styl trenera prowadzącego; bez gry: styl z danych klubu). */
+export function aiPlanFor(clubId, game = null) {
+  const coach = game ? coachStyle(game, clubId) : clubById(clubId)?.coach ?? 'P';
   return { clubId, accent: AI_PLAN.accent[coach] ?? 'zrownowazony', load: AI_PLAN.load };
 }
 
@@ -192,7 +192,8 @@ export function processAiDay(game, date) {
     const ac = aiCampFor(game, clubId, date, sets);
     const camp = ac.from && date >= ac.from && date <= ac.to ? { ...ac, half } : null;
     const ctx = dayContext(game, date, sets, camp);
-    const plan = planCache.get(clubId) ?? planCache.set(clubId, aiPlanFor(clubId)).get(clubId);
+    const pk = `${clubId}:${coachStyle(game, clubId)}`; // nowy trener przynosi własny styl (career/coachMarket.js)
+    const plan = planCache.get(pk) ?? planCache.set(pk, aiPlanFor(clubId, game)).get(pk);
     const day = autoDay(game, date, ctx, plan);
     c.legs = r3((c.legs ?? 0) * LOAD.legsDecay);
     if (day.kind === 'match' || day.kind === 'off') continue;

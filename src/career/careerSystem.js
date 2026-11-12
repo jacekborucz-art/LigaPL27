@@ -16,6 +16,7 @@ import { createFinance, financeDay, book, matchIncome, attendanceFill, uefaPrize
 import { createMarket, marketWeek, answerIncoming, aiRenewals, inWindow, windowOf, fmtZl, SEASON_END } from './transfers.js';
 import { ensureBoard, boardMonth, seasonGoalFor, trustLabel } from './board.js';
 import './squadLimitSystem.js'; // limit kadry i nacisk zarządu (docs/limit-kadry.md)
+import { ensureCoachMarket, fireCoach, hireCoach } from './coachMarket.js'; // rynek trenerów AI i właściciele (docs/trenerzy-i-wlasciciele.md)
 
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
 
@@ -27,6 +28,7 @@ export function ensureCareer(game) {
   if (!game.market) createMarket(game);
   ensureBoard(game);
   ensureCoaches(game); // trenerzy klubów AI z atrybutami (stary zapis: profile z ziarna gry, te same nazwiska)
+  ensureCoachMarket(game); // pula wolnych trenerów (stary zapis: tworzona z ziarna gry)
 }
 
 // ------------------------------------------------------------ Mecze: bilety i nagrody
@@ -108,8 +110,12 @@ registerDecision('incomingOffer', (game, m, action) => {
 /** Zmiana klubu (nowa praca). */
 export function switchClub(game, clubId, date) {
   const old = game.clubId;
+  // Trener AI nowego klubu odchodzi do puli wolnych trenerów (career/coachMarket.js)
+  if (game.coaches?.[clubId] && game.world?.clubs?.[clubId]) { fireCoach(game, clubId, date, { why: 'wyniki', quiet: true, direct: true }); delete game.coaches[clubId]; }
   game.manager.history = [...(game.manager.history ?? []).map((h) => (h.club === old && !h.to ? { ...h, to: date } : h)), { club: clubId, from: date }];
   game.clubId = clubId;
+  // Poprzedni klub gracza zatrudnia trenera z rynku
+  if (old && old !== clubId && game.world?.clubs?.[old]) hireCoach(game, old, date, { quiet: true });
   game.tactics = createTactics(squadOf(game.world, clubId), { benchSize: 12 });
   delete game.tacticsSubs; delete game.tacticsLast; // zastępstwa asystenta (match/matchday.js) dotyczyły starej kadry
   game.board = { trust: 55, fansMood: 55, reviews: [], goal: seasonGoalFor(clubById(clubId)), goalClub: clubId };

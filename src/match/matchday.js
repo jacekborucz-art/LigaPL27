@@ -24,7 +24,7 @@ import { standings } from '../season/standings.js';
 import { winnerOf } from '../season/cup.js';
 import { preMatchStudio, postMatchStudio, postMatchMessages, preMatchMessages, odds1X2, matchRank } from './studio.js';
 import { aiPlanTactics } from './aiPlan.js';
-import { coachOf, matchCoach, formRng, assistantProfile, coachBlurb, COACH } from '../career/coaches.js';
+import { coachOf, coachStyle, matchCoach, formRng, assistantProfile, coachBlurb, COACH } from '../career/coaches.js';
 import { staffQ } from '../training/staff.js';
 import {
   preMatchBriefing, halftimeBriefing, postMatchBriefing, assistantAdvice, aiBriefing, newSpeechMemory, closeMatchMemory,
@@ -155,7 +155,7 @@ export function startMatchday(game, f) {
   }).level;
   const oppCoach = coachOf(game, oppId, anyClub(oppId));
   const oppQ = comp === 'friendly' ? null : matchCoach(oppCoach, { rank: rank0, rng: formRng(game, f.id, oppId) });
-  const myQ = matchCoach(assistantProfile(staffQ(game, game.clubId, 'asystent')), { rank: rank0, rng: formRng(game, f.id, game.clubId) });
+  const myQ = matchCoach(assistantProfile(staffQ(game, game.clubId, 'asystent'), clubById(game.clubId)?.tier), { rank: rank0, rng: formRng(game, f.id, game.clubId) });
   const formation = aiPreMatchFormation(game, f, { userSide, mySquad, oppSquad, comp });
   const { tactics: oppTactics, plan: oppPlan } = aiPlanTactics(oppSquad, { formation, benchSize: matchBench, cq: oppQ, rng: new Rng(`ai-plan:${game.seed}:${f.id}`), oppSquad: mySquad });
   const weather = weatherFor(f.date, rng);
@@ -197,7 +197,7 @@ export function aiPreMatchFormation(game, f, { userSide, mySquad, oppSquad, comp
   const base = '4231';
   if (!oppSquad?.length || !mySquad?.length) return base;
   const oppSide = 1 - userSide;
-  const coach = anyClub(oppSide === 0 ? f.home : f.away)?.coach ?? 'P';
+  const coach = coachStyle(game, oppSide === 0 ? f.home : f.away); // styl trenera prowadzącego (nowy trener: własny)
   const userF = formationById(game.tactics?.formation ?? base).name;
   const ct = compInfo(f).type;
   const compType = ct === 'supercup' ? 'cup' : ct;
@@ -272,12 +272,12 @@ export function kickOff(game, S) {
   const oppSquad = squadFor(game, S.oppId, S.comp);
   const oppClub = anyClub(S.oppId);
   const oppQ = S.oppQ ?? null; // stary stan dnia meczowego (sprzed atrybutów trenerów): trener neutralny
-  const ai = aiBriefing({ coach: oppClub?.coach ?? 'P', personaMix: personaMix(oppSquad), mot: oppQ?.mot ?? 0 }, { phase: 'pre', pWin: 1 - (S.pre.forBriefing.pWin ?? 0.4), rank: S.pre.forBriefing.rank }, `${game.seed}:${S.f.id}:ai`);
+  const ai = aiBriefing({ coach: coachStyle(game, S.oppId), personaMix: personaMix(oppSquad), mot: oppQ?.mot ?? 0 }, { phase: 'pre', pWin: 1 - (S.pre.forBriefing.pWin ?? 0.4), rank: S.pre.forBriefing.rank }, `${game.seed}:${S.f.id}:ai`);
   // Wielki mecz: odporny trener uspokaja drużynę, nerwowy ją usztywnia (zaangażowanie na start, PRE)
   const nerves = oppQ ? oppQ.imp * COACH.nerves * oppQ.pre : 0;
   const zOpp = Object.fromEntries(oppSquad.map((p) => [p.id, (ai.zByPersona[p.persona] ?? ai.teamZ) + nerves]));
   const mine = { club: anyClub(game.clubId), squad: mySquad, tactics: matchTacticsFor(game, S), ai: false, coach: 'P', zStart: S.briefings.pre?.engine?.zStart ?? {}, assistantQ: S.myQ ?? null };
-  const theirs = { club: oppClub, squad: oppSquad, tactics: S.oppTactics, ai: true, coach: oppClub?.coach ?? 'P', zStart: zOpp, coachQ: oppQ };
+  const theirs = { club: oppClub, squad: oppSquad, tactics: S.oppTactics, ai: true, coach: coachStyle(game, S.oppId), zStart: zOpp, coachQ: oppQ };
   // Trening: spójność zespołu na start meczu i stałe fragmenty (src/training)
   Object.assign(mine, trainingMatchInput(game, game.clubId, mine));
   Object.assign(theirs, trainingMatchInput(game, S.oppId, theirs));

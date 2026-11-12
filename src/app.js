@@ -16,7 +16,7 @@ import { fixturesPanelBody, renderFixtures } from './ui/fixturesView.js';
 import { ensureHistory } from './season/history.js';
 import { createMatch, runToEnd } from './engine/match/match.js';
 import { Rng } from './core/rng.js';
-import { coachOf, matchCoach, formRng, assistantProfile } from './career/coaches.js';
+import { coachOf, coachStyle, matchCoach, formRng, assistantProfile } from './career/coaches.js';
 import { staffQ } from './training/staff.js';
 import { addDays } from './core/gameLoop.js';
 import { generateWorld, squadOf, academyOf } from './world/worldGen.js';
@@ -676,7 +676,7 @@ async function playMyMatch() {
   const oppSquad = squadFor(g, oppId, f.comp);
   const tierComp = LEAGUE_COMPS.includes(f.comp) ? f.comp : 'pucharPolski';
   const bench = COMPETITIONS[tierComp]?.benchSize ?? 12;
-  const cfgFor = (id, squad, tactics, ai) => ({ club: anyClub(id), squad, tactics, ai, coach: anyClub(id)?.coach ?? 'P' });
+  const cfgFor = (id, squad, tactics, ai) => ({ club: anyClub(id), squad, tactics, ai, coach: coachStyle(g, id) });
   const mine = cfgFor(g.clubId, mySquad(g), g.tactics, false);
   const theirs = cfgFor(oppId, oppSquad, createTactics(oppSquad, { benchSize: bench }), true);
   // Trener rywala z atrybutami i asystent gracza (docs/trener-ai-atrybuty.md)

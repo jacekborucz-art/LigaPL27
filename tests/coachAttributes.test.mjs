@@ -179,7 +179,7 @@ test('Zmiana trenera i nowy sezon: nowy profil z kolejnym numerem, starzenie i d
   const next = replaceCoach(g, 'lech', '2026-10-01');
   assert.equal(next.n, 1);
   assert.notEqual(next.name, old.name);
-  assert.equal(next.style, old.style, 'styl gry zostaje (filozofia klubu)');
+  assert.ok(['O', 'S', 'P'].includes(next.style), 'nowy trener przynosi własny styl gry (docs/trenerzy-i-wlasciciele.md)');
   assert.equal(g.coachLog[0].out, old.name);
   assert.equal(replaceCoach(g, 'widzew', '2026-10-01'), null, 'gracza nie da się wymienić');
   const g2 = { seed: 9, clubId: 'widzew', world: generateWorld(9) };
