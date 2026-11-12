@@ -45,7 +45,7 @@ export const MARKET = {
   thr: 23, thrPat: 1.1, thrTemper: 0.3, thrNoise: 0.22, // próg = 23 + 1,1 (cierpliwość - 10) - 0,3 (temperament - 10), los x temperament
   thrTier: { 1: 1.5, 2: -2.5, 3: -1.3 }, // 1 Liga: walka o awans i tani trenerzy, więcej zmian; Ekstraklasa ostrożniej (odprawy)
   winter: { date: '12-18', thr: -3 }, // przerwa zimowa: przegląd z niższym progiem (czas na nowego trenera przed obozem)
-  credit: 2, longTenure: 0, // kapitał: cel wykonany w poprzednim sezonie, staż ponad 2 lata
+  credit: 2, longTenure: 0, // kapitał: cel wykonany w poprzednim sezonie; premia za staż ponad 2 lata wyłączona (kalibracja wieloletnia)
   span: 12, hMax: 0.4, hPow: 1.5, // szansa zwolnienia po meczu: 0,4 x ((C - próg) / 12)^1,5
   // Trener tymczasowy (dni) wg typu właściciela; wiosną część prowadzi zespół do końca sezonu
   caretaker: { miasto: [7, 20], spolka: [6, 16], klub: [10, 30], miliarder: [2, 8], prywatny: [3, 12] },

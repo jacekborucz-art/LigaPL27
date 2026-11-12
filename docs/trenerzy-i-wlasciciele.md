@@ -32,8 +32,9 @@ tych domen w ustawieniach sieci sesji.
 - **Zmiany trenerów w rzeczywistości:** Ekstraklasa ma ok. 8-11 zmian w trakcie sezonu i 3-5 latem [ŹR, WIEDZA];
   zdarzają się kluby z trzema trenerami w sezonie (Raków i Wieczysta jesienią 2026 [ŹR 3, 4]). 1 Liga podobnie,
   2 Liga trochę mniej [SZAC]. Najwięcej zwolnień jesienią (wrzesień-listopad), potem w przerwie zimowej i w marcu-kwietniu.
-- **W grze [SYM, 40 sezonów]:** Ekstraklasa **8,7** zmiany w trakcie sezonu (od 3 do 19) i **3,7** latem,
-  1 Liga 8,6 i 3,5, 2 Liga 6,9 i 3,5. Jesień (sierpień-listopad) to ok. 51 % zwolnień w trakcie sezonu.
+- **W grze [SYM]:** pierwszy sezon (40 ziaren): Ekstraklasa **9,2** zmiany w trakcie sezonu (od 4 do 14) i **3,7**
+  latem, 1 Liga 10,0 i 3,3, 2 Liga 7,3 i 3,5; trzy sezony z rzędu (8 ziaren): Ekstraklasa 9,4 w trakcie sezonu
+  i 3,5 latem. Jesień (sierpień-listopad) to ok. połowa zwolnień w trakcie sezonu.
 - **Właściciel** ma pięć cech (cierpliwość, ambicja, temperament, wrażliwość na kibiców i media, zasobność),
   średnie zależą od typu (miliarder, prywatny, miasto, spółka, rezerwy), kilka klubów ma korekty z publicznie
   opisanej historii zmian trenerów. Gracz widzi jedno zdanie bez liczb.
@@ -251,10 +252,11 @@ pragmatycznych, 25 % ostrożnych [SZAC]). Ustawienie ulubione (rodzina formacji)
 - wstrząs: odpadnięcie z Pucharu Polski z niższą ligą 9 (z równą lub wyższą 6 x ambicja), z pucharów europejskich
   5 x ambicja, wygasa przez 35 dni;
 - kibice: heat (0-100) x 0,08 x media / 10;
-- nowy trener: przed 4. meczem bez zwolnienia, w pierwszych 8 meczach presja x 0,35-1.
+- nowy trener: przed 4. meczem bez zwolnienia; zatrudniony w trakcie sezonu ma w pierwszych 8 meczach presję
+  x 0,35-1 (latem trener ma okres przygotowawczy, więc bez tej ochrony).
 
-Próg: `23,5 + premia ligi (Ekstraklasa +1,5, 1 Liga -2,5, 2 Liga -1,3) + 1,1 (cierpliwość - 10) - 0,3 (temperament - 10)`,
-+5 gdy trener wykonał cel w poprzednim sezonie, +3 po 2 latach pracy; do tego los dnia (rozrzut 0,22 x temperament).
+Próg: `23 + premia ligi (Ekstraklasa +1,5, 1 Liga -2,5, 2 Liga -1,3) + 1,1 (cierpliwość - 10) - 0,3 (temperament - 10)`,
++2 gdy trener wykonał cel w poprzednim sezonie; do tego los dnia (rozrzut 0,22 x temperament).
 Szansa zwolnienia po meczu: `0,4 x min(1, (C - próg) / 12)^1,5`, w ostatnich 4 kolejkach poza strefą spadkową x0,3,
 przed 3. kolejką i w ostatniej kolejce 0. W przerwie zimowej (18 grudnia) jeden przegląd wszystkich klubów z progiem
 niższym o 3. Żądanie zwolnienia przez kibiców (`career/fans.js`, najwyższy szczebel protestu) idzie tą samą drogą.
@@ -266,11 +268,13 @@ niższym o 3. Żądanie zwolnienia przez kibiców (`career/fans.js`, najwyższy 
   Od 15 kwietnia w 35 % przypadków do końca sezonu. Po dobrych wynikach (1,8 pkt na mecz) 50 % szans, że zostaje
   na stałe, inaczej 15 % (przy słabych mniej).
 - Zatrudnienie: poziom klubu (średnia trenera dla prestiżu i ligi) + 0,08 x (ambicja - 10) + 0,1 x (zasobność - 10).
-  Kandydaci: wolni trenerzy do poziomu + 2, a z szansą 30 % także trenerzy niższej ligi, którzy wykonali cel
-  w poprzednim sezonie (klub traci trenera i szuka następcy). Właściciel ocenia kandydata z błędem (0,6 + 0,06 x
-  temperament), w strefie spadkowej woli trenera ostrożnego, miliarder lekko woli obcokrajowca. Zwolnionego trenera
-  ten sam klub nie zatrudnia ponownie.
-- Pula: 44 trenerów na start (średnia 8,4, rozrzut 1,6; 25 % obcokrajowców, średnio +0,5), co sezon 12 nowych
+  Kandydaci: wolni trenerzy do poziomu + 1,2, a z szansą 30 % także trenerzy niższej ligi, którzy wykonali cel
+  w poprzednim sezonie (klub traci trenera i szuka następcy). Lepszy od poziomu klubu trener jest drogi: nadwyżka
+  liczy się w ocenie w 40 %. Właściciel ocenia kandydata z błędem (0,6 + 0,06 x temperament), w strefie spadkowej
+  woli trenera ostrożnego; kluby Ekstraklasy chętniej sięgają po obcokrajowców (+0,5, miliarder +0,3 więcej,
+  1 Liga +0,15). Zwolnionego trenera ten sam klub nie zatrudnia ponownie. Bez tych zasad średnia trenerów rosła
+  z sezonu na sezon (zwolnienia usuwały słabych, zatrudnienia dobierały lepszych).
+- Pula: 44 trenerów na start (średnia 8,4, rozrzut 1,6; 30 % obcokrajowców, średnio +0,5), co sezon 12 nowych
   (33-46 lat, średnia 7,8), trenerzy od 68 lat odchodzą, po dwóch latach bez pracy połowa znika z rynku.
 
 ### 4.4 Po sezonie (2 czerwca)
@@ -278,7 +282,7 @@ niższym o 3. Żądanie zwolnienia przez kibiców (`career/fans.js`, najwyższy 
 Spadek: 50 % x niecierpliwość; sezon 2 i więcej miejsc poniżej oczekiwań: 7 % za miejsce (najwyżej 60 %);
 awans: 3 %; reszta: 11 % (koniec umowy, inny pomysł na drużynę); trener tymczasowy: 75 % nowy trener, inaczej zostaje.
 Trener 1 i 2 Ligi po sezonie 3 miejsca ponad oczekiwania odchodzi z szansą 10 % (lepsza oferta).
-Kapitał na kolejny sezon: trener, który wykonał cel, ma próg wyższy o 5.
+Kapitał na kolejny sezon: trener, który wykonał cel, ma próg wyższy o 2.
 
 ### 4.5 Sezon trenera i nowa miotła
 
@@ -305,15 +309,28 @@ Pętla dni z rynkiem trenerów, gracz w 2 Lidze (Śląsk II, zaufanie zarządu 1
 
 | Liga | W trakcie sezonu | Rozrzut (min-max) | Latem | Cel z badań |
 |---|---|---|---|---|
-| Ekstraklasa | 8,7 | 3,2 (3-19) | 3,7 | 8-11 i 3-5 |
-| 1 Liga | 8,6 | 2,3 (4-15) | 3,5 | ok. 8-11 [SZAC] |
-| 2 Liga | 6,9 | 2,5 (2-12) | 3,5 | 6-8 [SZAC] |
+| Ekstraklasa | 9,2 | 2,3 (4-14) | 3,7 | 8-11 i 3-5 |
+| 1 Liga | 10,0 | 2,7 (4-19) | 3,3 | ok. 8-11 [SZAC] |
+| 2 Liga | 7,3 | 2,4 (2-12) | 3,5 | 6-8 [SZAC] |
 
-Zwolnienia w trakcie sezonu według miesięcy (wszystkie ligi, średnio na sezon): sierpień 0,5, wrzesień 3,7,
-październik 3,8, listopad 4,4, grudzień 2,5, styczeń 0,2, luty 1,2, marzec 3,0, kwiecień 3,3, maj 1,7.
-Po żądaniu kibiców: 0,45 na sezon. Trenerzy niższych lig podebrani przez wyższe: ok. 1 na sezon (od drugiego sezonu).
+Zwolnienia w trakcie sezonu według miesięcy (wszystkie ligi, średnio na sezon): sierpień 0,8, wrzesień 3,6,
+październik 3,7, listopad 5,0, grudzień 2,9, styczeń 0,1, luty 1,1, marzec 3,6, kwiecień 3,8, maj 1,9.
+Po żądaniu kibiców: 0,3 na sezon. Średnio 4,3 wiadomości o trenerach w poczcie gracza na sezon. Trenerzy niższych lig podebrani przez wyższe: ok. 1 na sezon (od drugiego sezonu).
 
-Wieloletnio (pętla dni z końcem sezonu, 3 sezony, ziarna «TEN_SEEDS»): «TENURE».
+Wieloletnio [SYM, pętla dni z końcem sezonu, 2026/27-2028/29, ziarna 1-8]:
+
+| Sezon | Ekstraklasa w trakcie / latem | 1 Liga | 2 Liga |
+|---|---|---|---|
+| 2026/27 | 8,9 / 4,1 | 9,6 / 3,5 | 8,4 / 4,0 |
+| 2027/28 | 10,4 / 3,5 | 9,8 / 4,1 | 7,4 / 2,5 |
+| 2028/29 | 8,9 / 3,0 | 9,5 / 2,6 | 6,9 / 2,8 |
+
+Średnia atrybutów trenerów po trzech sezonach: Ekstraklasa 10,6 (start 10,4), 1 Liga 9,2 (start 9,0), 2 Liga 7,9
+(start 8,0), więc rynek nie podnosi poziomu trenerów z sezonu na sezon. Obcokrajowcy w Ekstraklasie po trzech
+sezonach: średnio 3-4 na 18 klubów (pierwsi trenerzy w grze są Polakami, obcokrajowcy przychodzą z rynku; to mniej
+niż ok. 40 % w rzeczywistości, pytanie 6). Staż obecnych trenerów na koniec: Ekstraklasa średnio ok. 710 dni.
+Prace zaczęte i zakończone w tych trzech sezonach trwały średnio ok. 165 dni (mediana ok. 110), bo okno pomiaru
+obcina długie prace.
 
 ## 6. Pliki i testy
 
@@ -342,6 +359,9 @@ Wieloletnio (pętla dni z końcem sezonu, 3 sezony, ziarna «TEN_SEEDS»): «TEN
 4. **Liczby dla 1 i 2 Ligi** są szacunkiem panelu; po dopuszczeniu 90minut.pl i Wikipedii warto policzyć tabele
    zmian z 3-4 sezonów i poprawić progi lig (`MARKET.thrTier`).
 5. **Zmiana właściciela** (sprzedaż klubu) nie jest modelowana.
+6. **Obcokrajowcy w Ekstraklasie.** Pierwsi trenerzy w grze mają polskie nazwiska (to samo ziarno co w starych
+   zapisach). Udział obcokrajowców rośnie tylko przez rynek (ok. 20 % po trzech sezonach). Można nadać części
+   pierwszych trenerów zagraniczne nazwiska w nowych grach, ale zmieni to nazwiska trenerów w starych zapisach.
 
 ## Źródła
 
