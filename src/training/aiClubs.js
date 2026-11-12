@@ -22,6 +22,7 @@ import { aiSessionToClub } from './cohesion.js';
 import { fatigueMul, regenMul, trainingInjuryChance, overloadTerm } from './load.js';
 import { rollTrainingInjury } from './sessions.js';
 import { offsetsFor } from './development.js';
+import { aiAccentAt, staleEffects } from './variety.js';
 import { trainingSkill, COACH, coachStyle } from '../career/coaches.js';
 
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -34,6 +35,13 @@ function digits(str, from, to) {
 const r3 = (v) => Math.round(v * 1000) / 1000;
 
 const planCache = new Map();
+const accentCache = new Map();
+/** Plan klubu AI z akcentem tygodnia (jeden obiekt na klub i akcent). */
+function withAccent(plan, accent) {
+  if (plan.accent === accent) return plan;
+  const k = `${plan.clubId}|${accent}|${plan.load}`;
+  return accentCache.get(k) ?? accentCache.set(k, { ...plan, accent }).get(k);
+}
 /** Akcent i poziom obciążeń planu klubu AI (styl trenera prowadzącego; bez gry: styl z danych klubu). */
 export function aiPlanFor(clubId, game = null) {
   const coach = game ? coachStyle(game, clubId) : clubById(clubId)?.coach ?? 'P';
@@ -194,7 +202,7 @@ export function processAiDay(game, date) {
     const ctx = dayContext(game, date, sets, camp);
     const pk = `${clubId}:${coachStyle(game, clubId)}`; // nowy trener przynosi własny styl (career/coachMarket.js)
     const plan = planCache.get(pk) ?? planCache.set(pk, aiPlanFor(clubId, game)).get(pk);
-    const day = autoDay(game, date, ctx, plan);
+    const day = autoDay(game, date, ctx, withAccent(plan, aiAccentAt(game, clubId, plan.accent, date))); // akcent zmieniany co kilka tygodni (variety.js)
     c.legs = r3((c.legs ?? 0) * LOAD.legsDecay);
     if (day.kind === 'match' || day.kind === 'off') continue;
     const campQ = camp?.q ?? 0;
@@ -226,6 +234,7 @@ export function processAiDay(game, date) {
     const subsList = ctx.role === 'MD+1' && team.length ? [sessionStim({ type: 'gierki', int: 'mid' }, campQ, !!camp), ...team.slice(1)] : null;
     const P = { out: prof(team, false), gk: prof(team, true), subsOut: subsList && prof(subsList, false), subsGk: subsList && prof(subsList, true) };
     const restMorale = day.kind === 'rest' ? 0.15 : 0;
+    const stale = staleEffects(c); // monotonia treningu: mniej morale z zajęć i słabszy bodziec
     const campMorale = camp ? CAMP.inCamp.morale * campQ : 0;
     for (const p of squadOf(game.world, clubId)) {
       const tr = p.aiTr ?? (p.aiTr = newAiTr(p, today));
@@ -252,11 +261,11 @@ export function processAiDay(game, date) {
         if (rtp) sharp = Math.min(100, sharp + 2);
         if (sharp < LOAD.sharpTrainCap && pr.sharp) sharp = Math.min(LOAD.sharpTrainCap, sharp + pr.sharp);
         p.sharp = sharp;
-        tr.dp = r2(tr.dp + pr.dp);
+        tr.dp = r2(tr.dp + pr.dp * stale.stimMul);
         load += pr.load;
         if (pr.dev && youthFocus && age <= AI_PLAN.focusMaxAge) { tr.dd++; fresh -= AI_PLAN.focusFresh; load += 5; }
         p.fresh = Math.round(clamp(fresh, 20, 100 - (p.matchDebt ?? 0)));
-        morale += pr.morale + campMorale;
+        morale += (pr.morale > 0 ? pr.morale * stale.moraleMul : pr.morale) - stale.boredom + campMorale;
         updateLoad(tr, today, load);
         const acwr = aiAcwr(tr);
         if (acwr > 1.5) morale -= 0.1; // przetrenowanie: zmęczenie psychiczne

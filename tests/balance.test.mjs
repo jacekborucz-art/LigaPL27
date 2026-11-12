@@ -164,3 +164,22 @@ test('Odprawa pomeczowa AI: kluby AI dostają morale z odprawy tym samym modelem
   const gain = xi.reduce((s, id) => s + g.world.players[id].morale - before.get(id), 0) / xi.length;
   assert.ok(gain > 1.5, `morale zwycięzców +${gain.toFixed(2)} (mecz + odprawa)`);
 });
+
+// Gra bierna (docs/bierna-gra.md): zamierzona różnica. Pasywny gracz (ta sama taktyka w każdym meczu) ma kończyć
+// sezon wyraźnie pod tym samym klubem prowadzonym przez AI (pomiar: ok. 6-10 pkt), a gracz zmieniający plan pod rywala
+// ma być blisko AI. Tani strażnik: premia rywala w dniu meczu za rozpracowany schemat, zaskoczenie przy zmianie planu.
+test('Gra bierna: rywale AI rozpracowują stały schemat gracza, urozmaicony plan jest blisko neutralnego', async () => {
+  const { recordMatch, scoutEdge, SCOUT } = await import('../src/training/scouting.js');
+  const g = newGame('widzew');
+  const opp = 'lech';
+  g.training.staff[opp].analityk.q = 13; // przeciętny analityk Ekstraklasy
+  for (let k = 0; k < 8; k++) recordMatch(g, `bal-${k}`, addDays('2026-07-20', 7 * k), g.tactics);
+  const passive = scoutEdge(g, opp, 'widzew');
+  assert.ok(passive >= 0.15 && passive <= SCOUT.edgeMax, `pasywny: premia rywala ${passive}`);
+  const h = newGame('widzew');
+  h.training.staff[opp].analityk.q = 13;
+  const plans = [{}, { pressing: 'high', mentality: '1' }, { pressing: 'low', line: 'low', mentality: '-1' }];
+  for (let k = 0; k < 8; k++) recordMatch(h, `bal-${k}`, addDays('2026-07-20', 7 * k), { ...h.tactics, instructions: { ...h.tactics.instructions, ...plans[k % 3] } });
+  const varied = scoutEdge(h, opp, 'widzew');
+  assert.ok(Math.abs(varied) < 0.06, `urozmaicony plan: premia rywala ${varied}`);
+});

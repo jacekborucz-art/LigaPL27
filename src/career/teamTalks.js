@@ -8,6 +8,7 @@ import { Rng, clamp } from '../core/rng.js';
 import { squadOf } from '../world/worldGen.js';
 import { applyMorale } from './morale.js';
 import { applyTrust, classifyReaction, REACTIONS } from '../match/briefings.js';
+import { noteAttention, attentionNeed, daysSinceAttention, ATTN } from './attention.js';
 
 export const MEETING_TONES = {
   praise: { label: 'Pochwała', quote: '„Dobra robota w ostatnich tygodniach. Tak trzymać.”', hint: 'Działa po dobrej serii. Przy słabych wynikach brzmi fałszywie.' },
@@ -92,6 +93,7 @@ export function holdMeeting(game, tone) {
     const trustD = z >= 1.6 ? 0.5 : z <= -1.2 ? -1 : 0;
     if (trustD) p.relations = { ...(p.relations ?? {}), [game.clubId]: applyTrust(p, trustD, `zebranie:${tone}`, { clubId: game.clubId, date: game.date }) };
     p.morale = applyMorale(p.morale ?? 12, clamp(z * 0.7, -2, 2));
+    noteAttention(p, game.date, 'meeting'); // zebranie liczy się w połowie jak rozmowa (career/attention.js)
     const kind = classifyReaction(z * 1.6, trustD);
     out.push({ id: p.id, name: p.name, reaction: kind, label: REACTIONS[kind].label });
   }
@@ -124,6 +126,11 @@ export function talkSuggestions(game) {
     if (form != null && form >= 7.2) reasons.push(['praise', 'Bardzo dobra forma']);
     if (form != null && form < 6.2 && (p.season?.apps ?? 0) >= 3) reasons.push(['demand', 'Słaba forma']);
     if ((p.season?.yc ?? 0) >= 4) reasons.push(['warn', 'Dużo kartek']);
+    // Długo bez rozmowy, a potrzebuje uwagi (wrażliwy, nowy, ambitny rezerwowy): docs/bierna-gra.md
+    const need = attentionNeed(p, game.date, { share, games: (game.fixtures ?? []).filter((f) => f.played && (f.home === game.clubId || f.away === game.clubId)).length });
+    if (need.need && daysSinceAttention(p, game.date, game.attStart ?? game.date) >= ATTN.grace) {
+      reasons.push([need.why === 'bench' ? 'role' : 'encourage', { sensitive: 'Wrażliwy, długo bez rozmowy', low: 'Długo bez rozmowy', new: 'Nowy w klubie, czeka na rozmowę', bench: 'Ambitny, mało gra' }[need.why] ?? 'Długo bez rozmowy']);
+    }
     if (reasons.length) out.push({ p, reasons });
   }
   return out.sort((a, b) => b.reasons.length - a.reasons.length);
@@ -144,13 +151,16 @@ export function talkToPlayer(game, playerId, kind) {
   const persona = p.persona ?? 'Spokojny';
   const trust = trustOf(p, game.clubId);
   let z = 0; let reply = '';
+  // Zawodnik, który długo czekał na rozmowę (career/attention.js), przyjmuje wsparcie lepiej
+  const games = (game.fixtures ?? []).filter((f) => f.played && (f.home === game.clubId || f.away === game.clubId)).length;
+  const waited = attentionNeed(p, game.date, { share, games }).need > 0 && daysSinceAttention(p, game.date, game.attStart ?? game.date) >= ATTN.grace;
   switch (kind) {
     case 'praise':
       z = form >= 7 ? 1.8 : form >= 6.6 ? 0.8 : -0.4;
       reply = form >= 7 ? 'Dziękuje i obiecuje, że utrzyma formę.' : 'Wygląda na zaskoczonego. Wie, że ostatnio nie grał najlepiej.';
       break;
     case 'encourage':
-      z = (p.morale ?? 12) <= 10 || form < 6.5 ? 1.6 + (persona === 'Wrażliwy' ? 0.8 : 0) : 0.4;
+      z = (p.morale ?? 12) <= 10 || form < 6.5 ? 1.6 + (persona === 'Wrażliwy' ? 0.8 : 0) : waited ? 1.2 + (persona === 'Wrażliwy' ? 0.4 : 0) : 0.4;
       reply = z >= 1.5 ? 'Uśmiecha się. Widać, że tego potrzebował.' : 'Kiwa głową. Nie bardzo wie, po co ta rozmowa.';
       break;
     case 'demand':
@@ -181,6 +191,7 @@ export function talkToPlayer(game, playerId, kind) {
   const trustD = z >= 1.4 ? 1 : z <= -0.8 ? -1.5 : 0;
   if (trustD) p.relations = { ...(p.relations ?? {}), [game.clubId]: applyTrust(p, trustD, `rozmowa:${kind}`, { clubId: game.clubId, date: game.date }) };
   p.morale = applyMorale(p.morale ?? 12, clamp(z, -2.5, 2.5));
+  noteAttention(p, game.date);
   const reaction = classifyReaction(z * 1.8, trustD);
   T.perPlayer[playerId] = [...hist, { date: game.date, kind }];
   T.log = [{ date: game.date, kind: 'talk', playerId, talk: kind, reaction, reply }, ...T.log].slice(0, 20);

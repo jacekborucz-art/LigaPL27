@@ -6,6 +6,7 @@ import { clamp } from '../core/rng.js';
 import { addDays } from '../core/gameLoop.js';
 import { createMessage } from '../core/inbox.js';
 import { applyMorale } from '../career/morale.js';
+import { staleEffects } from './variety.js';
 import { proficiency } from '../engine/positions.js';
 import { INJURY_TYPES } from '../engine/match/constants.js';
 import { squadOf } from '../world/worldGen.js';
@@ -143,6 +144,7 @@ export function processUserDay(game, date, rng) {
   const tac = staffMul.tac(staffQ(game, clubId, 'asystent'));
   const squad = squadOf(game.world, clubId);
   syncTacticsChange(game);
+  const stale = staleEffects(c); // monotonia treningu (variety.js): mniej morale z zajęć, słabszy bodziec
 
   // Mecze klubu od ostatniego dnia: zgranie formacji, instrukcji, rytm i znajomość systemu
   if (T.lastClubMatch == null) {
@@ -225,12 +227,13 @@ export function processUserDay(game, date, rng) {
       const sharp = p.sharp ?? 70;
       if (sharp < LOAD.sharpTrainCap) p.sharp = Math.min(LOAD.sharpTrainCap, sharp + I.sharp * def.sharp * modeMul * prep.sharpMul);
       const attrs = gkSwap ? GK_SESSION.attrs : def.attrs;
-      const dp = I.dev * (gkSwap ? GK_SESSION.dev : def.dev) * modeMul * (1 + CAMP.inCamp.dev * campQ) * (camp && def.group === 'phys' ? 1.1 : 1);
+      const dp = I.dev * (gkSwap ? GK_SESSION.dev : def.dev) * modeMul * (1 + CAMP.inCamp.dev * campQ) * (camp && def.group === 'phys' ? 1.1 : 1) * stale.stimMul;
       if (dp > 0 && attrs.length) {
         for (const a of attrs) stim[a] = r3((stim[a] ?? 0) + dp / attrs.length);
         if (def.dev >= 0.5) devDay = true;
       }
-      morale += def.morale + I.morale;
+      const sm = def.morale + I.morale;
+      morale += sm > 0 ? sm * stale.moraleMul : sm;
       if (def.know) t.know = Math.min(100, (t.know ?? COH.knowNew) + def.know * I.fam * tac * modeMul);
       if (x.type === 'taktyka') tactical = true;
     }
@@ -259,6 +262,7 @@ export function processUserDay(game, date, rng) {
         } else t.pos = null;
       } else if (t.pos) t.pos = null;
     }
+    if (sessions.length) morale -= stale.boredom;
     if (camp && sessions.length) { morale += CAMP.inCamp.morale * campQ; t.know = Math.min(100, (t.know ?? COH.knowNew) + CAMP.inCamp.know * campQ); }
     if (day.kind === 'rest') morale += 0.15;
     if (day.kind === 'off') load += LOAD.offDayLoad;

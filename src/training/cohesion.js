@@ -10,6 +10,7 @@ import { COH, SESSIONS, INTENSITY, CAMP, staffMul } from './config.js';
 import { staffQ } from './staff.js';
 import { aiClubZ } from './state.js';
 import { managerThreat, THREAT } from '../career/threat.js';
+import { scoutEdge, fpKey, rehearsed, SCOUT } from './scouting.js';
 
 const W = COH.weights;
 const r1 = (v) => Math.round(v * 10) / 10;
@@ -81,7 +82,8 @@ export function syncTacticsChange(game) {
   const snap = c.instrSnap ?? {};
   let changed = 0;
   for (const [k, v] of Object.entries(t.instructions ?? {})) if (snap[k] !== undefined && snap[k] !== v) changed++;
-  if (changed) c.instr = Math.max(COH.famMin, c.instr - COH.instrChange * changed);
+  // Plan grany w ostatnich meczach (przećwiczony plan B) kosztuje mniej zgrania niż zupełnie nowy (docs/bierna-gra.md)
+  if (changed) c.instr = Math.max(COH.famMin, c.instr - COH.instrChange * changed * (rehearsed(game, t) ? SCOUT.rehearsed : 1));
   c.instrSnap = { ...(t.instructions ?? {}) };
   return changed;
 }
@@ -137,8 +139,19 @@ export function aiSessionToClub(c, session, tac, campQ = 0) {
 export function prepTerm(game, p) {
   const c = game?.training?.clubs?.[p.clubId];
   if (!c) return 0;
-  if (p.clubId === game.clubId) return c.prep && c.prep.date === game.date ? c.prep.v : 0;
+  if (p.clubId === game.clubId) return c.prep && c.prep.date === game.date ? c.prep.v + userScoutToday(game, c.prep.opp) : 0;
   return aiPrepToday(game).get(p.clubId) ?? 0;
+}
+
+const userScoutCache = new WeakMap();
+/** Premia analizy gracza za przewidywalność rywala (scouting.js), liczona raz na dzień i rywala. */
+function userScoutToday(game, oppId) {
+  if (!oppId) return 0;
+  const hit = userScoutCache.get(game);
+  if (hit && hit.date === game.date && hit.opp === oppId) return hit.v;
+  const v = scoutEdge(game, game.clubId, oppId);
+  userScoutCache.set(game, { date: game.date, opp: oppId, v });
+  return v;
 }
 
 const AI_PREP_MIN_ANALYST = 5;
@@ -147,19 +160,23 @@ const aiPrepCache = new WeakMap();
 export function aiPrepToday(game) {
   const n = game.fixtures?.length ?? 0;
   const hit = aiPrepCache.get(game);
-  if (hit && hit.date === game.date && hit.n === n && hit.clubId === game.clubId) return hit.map;
+  // Premia za przewidywalność rywala zależy od taktyki gracza na dziś (klucz odcisku)
+  const tk = game.tactics ? fpKey(game.tactics) : '';
+  if (hit && hit.date === game.date && hit.n === n && hit.clubId === game.clubId && hit.tk === tk) return hit.map;
   const map = new Map();
   for (const f of game.fixtures ?? []) {
     if (f.date !== game.date || !f.home || !f.away) continue;
     for (const [id, opp] of [[f.home, f.away], [f.away, f.home]]) {
       if (id === game.clubId || !game.training?.clubs?.[id]) continue;
+      // Rozpracowany (albo nieczytelny) schemat rywala: docs/bierna-gra.md, ta sama reguła dla gracza i AI
+      const edge = scoutEdge(game, id, opp);
       const q = staffQ(game, id, 'analityk');
-      if (q < AI_PREP_MIN_ANALYST) continue;
+      if (q < AI_PREP_MIN_ANALYST) { if (edge) map.set(id, edge); continue; }
       const mul = opp === game.clubId ? 1 + THREAT.prepMul * managerThreat(game) : 1;
-      map.set(id, Math.round(staffMul.prep(q) * mul * 1000) / 1000);
+      map.set(id, Math.round((staffMul.prep(q) * mul + edge) * 1000) / 1000);
     }
   }
-  aiPrepCache.set(game, { date: game.date, n, clubId: game.clubId, map });
+  aiPrepCache.set(game, { date: game.date, n, clubId: game.clubId, tk, map });
   return map;
 }
 

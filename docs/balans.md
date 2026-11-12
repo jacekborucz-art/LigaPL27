@@ -210,3 +210,14 @@ Trenerzy klubów AI mają atrybuty 1-20 (`docs/trener-ai-atrybuty.md`). Średni 
 neutralnym (zachowanie AI sprzed zmiany), a asystent gracza przy „Pokaż wynik” ma jakość ze sztabu przeliczoną
 na skalę trenera, więc średnio jest tak dobry jak trener AI tego samego klubu. Pomiar `sim.mjs` przed i po
 (30 sezonów): różnica pasywny gracz kontra AI bez istotnej zmiany (Widzew -7,5 i -5,8 pkt, GKS -4,0 i -4,5 pkt).
+
+## Gra bierna: zamierzona różnica (Nov 12, 2026)
+
+Od tej wersji balans nie zakłada już, że całkiem pasywny gracz ma wynik zbliżony do AI. Pomiar na pełnej pętli dni
+w trybie zgodnym z interfejsem (zalecane odprawy, także pomeczowa, i pominięcie konferencji przed meczem) pokazał,
+że pasywny gracz był ok. 3 pkt pod AI, a ten sam gracz chodzący na konferencje z domyślnymi odpowiedziami ok. 1 pkt
+nad AI (morale kadry ok. 18 wobec 15). Docelowo [SZAC]: całkiem pasywny gracz 6-10 pkt w sezonie pod tym samym klubem
+pod AI, gracz zmieniający plan pod rywala i rozmawiający z potrzebującymi blisko AI, zaangażowany może być lepszy.
+Model (przewidywalność taktyczna, rozmowy, korekta prasy, monotonia treningu), pomiary przed i po i decyzje:
+`docs/bierna-gra.md`. Strażnik w `tests/balance.test.mjs` („Gra bierna”) sprawdza premię rywala za stały schemat
+i neutralność urozmaiconego planu; pozostałe testy balansu bez zmian.

@@ -6,6 +6,7 @@ import {
   MEETING_TONES, PLAYER_TALKS, TALKS_PER_WEEK, teamSituation, canHoldMeeting, holdMeeting, talkSuggestions, talkToPlayer, talksThisWeek,
 } from '../career/teamTalks.js';
 import { acclimLabel } from '../career/acclimatization.js';
+import { attentionNeed, daysSinceAttention, ATTN } from '../career/attention.js';
 
 export const isTalkAction = (act) => typeof act === 'string' && act.startsWith('tt-');
 
@@ -15,7 +16,9 @@ function moraleSummary(game) {
   const low = sq.filter((p) => (p.morale ?? 12) <= 8).length;
   const unhappy = sq.filter((p) => p.unhappy || p.transferRequest).length;
   const newcomers = sq.filter((p) => p.acclim).length;
-  return { avg, low, unhappy, newcomers };
+  // Długo bez rozmowy, a potrzebują uwagi (career/attention.js, docs/bierna-gra.md)
+  const waiting = sq.filter((p) => attentionNeed(p, game.date).need > 0 && daysSinceAttention(p, game.date, game.attStart ?? game.date) >= ATTN.grace).length;
+  return { avg, low, unhappy, newcomers, waiting };
 }
 
 export function renderTalks(game, ui = {}) {
@@ -31,7 +34,7 @@ export function renderTalks(game, ui = {}) {
   return `
     <section class="tt-head">
       <div class="kpi"><small>Atmosfera w drużynie</small><b>${esc(moraleLabel(m.avg))}</b><small>${esc(sit.label)}${sit.last.length ? `: ${sit.last.join(' ')}` : ''}</small></div>
-      <div class="kpi"><small>Wymaga uwagi</small><b>${m.low + m.unhappy}</b><small>${m.low} z niskim morale, ${m.unhappy} niezadowolonych${m.newcomers ? `, ${m.newcomers} nowych w aklimatyzacji` : ''}</small></div>
+      <div class="kpi"><small>Wymaga uwagi</small><b>${m.low + m.unhappy}</b><small>${m.low} z niskim morale, ${m.unhappy} niezadowolonych${m.newcomers ? `, ${m.newcomers} nowych w aklimatyzacji` : ''}${m.waiting ? `, ${m.waiting} czeka na rozmowę` : ''}</small></div>
     </section>
     ${res ? `<p class="notice" role="status">${esc(res)}</p>` : ''}
     <section class="stat-sec">
@@ -42,7 +45,7 @@ export function renderTalks(game, ui = {}) {
     </section>
     <section class="stat-sec">
       <h3>Rozmowy indywidualne</h3>
-      <p class="hint">Zostały ${left} z ${TALKS_PER_WEEK} rozmów w tym tygodniu. Asystent podpowiada, z kim warto porozmawiać.</p>
+      <p class="hint">Zostały ${left} z ${TALKS_PER_WEEK} rozmów w tym tygodniu. Asystent podpowiada, z kim warto porozmawiać. Wrażliwi, nowi w klubie i ambitni rezerwowi źle znoszą kilka tygodni bez rozmowy.</p>
       <ul class="players">${sq.map((p) => {
         const rs = reasonsOf.get(p.id) ?? [];
         const suggested = rs[0]?.[0] ?? 'encourage';

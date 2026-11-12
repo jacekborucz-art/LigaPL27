@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { scoutEdge } from '../src/training/scouting.js';
 import assert from 'node:assert/strict';
 import { Rng } from '../src/core/rng.js';
 import { generateWorld, squadOf, academyOf } from '../src/world/worldGen.js';
@@ -325,7 +326,10 @@ test('Analiza wideo rywala: mały bonus tylko w dniu najbliższego meczu', () =>
   const p = squadOf(g.world, 'widzew')[0];
   const saved = g.date;
   g.date = c.prep.date;
-  assert.equal(prepTerm(g, p), c.prep.v);
+  // Do analizy dochodzi premia za przewidywalność rywala AI (docs/bierna-gra.md, scouting.js), mała i ograniczona
+  const edge = scoutEdge(g, 'widzew', c.prep.opp);
+  assert.ok(Math.abs(edge) <= 0.08, `premia za schemat rywala ${edge}`);
+  assert.equal(prepTerm(g, p), c.prep.v + edge);
   g.date = addDays(c.prep.date, 1);
   assert.equal(prepTerm(g, p), 0);
   g.date = saved;

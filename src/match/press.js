@@ -7,6 +7,7 @@
 // Wartości balansowe oznaczone [SZAC].
 
 import { Rng, clamp } from '../core/rng.js';
+import { PASSIVE } from '../training/scouting.js';
 
 const r1 = (v) => Math.round(v * 10) / 10;
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -36,9 +37,9 @@ export const CLIMATES = {
 export const CLIMATE_IDS = Object.keys(CLIMATES);
 
 // Limity łącznych skutków jednej konferencji [SZAC]
-export const PRESS_LIMITS = { teamMorale: [-1.5, 1.0], board: [-5, 4], fans: [-6, 6], media: [-10, 8], player: [-2, 1.5] };
+export const PRESS_LIMITS = { teamMorale: [-1.5, 0.7], board: [-5, 4], fans: [-6, 6], media: [-10, 8], player: [-2, 1.5] };
 // Konferencja przedmeczowa: mniejszy wpływ (zapowiedź, nie recenzja meczu) [SZAC]
-export const PRESS_LIMITS_PRE = { teamMorale: [-0.8, 0.6], board: [-3, 3], fans: [-4, 4], media: [-8, 6] };
+export const PRESS_LIMITS_PRE = { teamMorale: [-0.8, 0.4], board: [-3, 3], fans: [-4, 4], media: [-8, 6] };
 
 /** Stan prasy w grze (leniwie: stare zapisy nie mają tego pola). */
 export function pressState(game) {
@@ -723,12 +724,17 @@ export function walkOut(conf) {
 }
 
 /** Morale jednego zawodnika z presji prasy: mnożnik osobowości. [SZAC] */
-export function pressMoraleDelta(teamDelta, persona) {
+export function pressMoraleDelta(teamDelta, persona, morale = null) {
   const neg = { Wrażliwy: 1.5, Narwaniec: 1.2, Ambitny: 1, Lider: 0.6, Spokojny: 0.6 };
   const pos = { Wrażliwy: 1.2 };
   const mul = teamDelta < 0 ? (neg[persona] ?? 1) : (pos[persona] ?? 1);
-  return r2(teamDelta * mul);
+  // Dobra prasa podbudowuje, ale nie bez końca: im wyższe morale, tym mniej daje (docs/bierna-gra.md) [SZAC]
+  const head = teamDelta > 0 && morale != null && PASSIVE.enabled ? clamp((PRESS_HEADROOM.top - morale) / PRESS_HEADROOM.span, 0, 1) : 1;
+  return r2(teamDelta * mul * head);
 }
+
+/** Nasycenie dodatniego wpływu prasy na morale: pełny do morale 12, zero przy 19. */
+export const PRESS_HEADROOM = { top: 19, span: 7 };
 
 function playerRef(c, who) {
   return { worst: c.worst, star: c.star, redUser: c.redUser, rumour: c.rumour, injured: c.injured }[who] ?? null;
@@ -989,6 +995,9 @@ export function decideCase(c, history = [], date = c.date, seed = 'komisja') {
  * Składnik miesięcznej oceny zarządu z klimatu prasy (ostatnie 31 dni) i relacji z mediami.
  * Zwraca { delta, notes }. Limit od -2,5 do +1,5 punktu zaufania [SZAC].
  */
+/** Składnik oceny zarządu za pomijanie konferencji: najwyżej -1,2 w miesiącu (docs/bierna-gra.md). */
+export const PRESS_BOARD = { skipMax: 1.2 };
+
 export function pressBoardTerm(state, date) {
   if (!state || !date) return { delta: 0, notes: [] };
   const t = Date.parse(`${date}T00:00:00Z`);
@@ -998,7 +1007,7 @@ export function pressBoardTerm(state, date) {
   let v = 0;
   for (const e of post) v += e.climate === 'agresywna' ? -0.8 : e.climate === 'pozytywna' ? 0.6 : 0;
   const skips = [...post, ...pre].filter((e) => e.mode === 'skipped' || e.mode === 'walkout').length;
-  v -= 0.3 * skips;
+  v -= PASSIVE.enabled ? Math.min(PRESS_BOARD.skipMax, 0.3 * skips) : 0.3 * skips; // unikanie mediów: odczuwalne, ale nie zwalnia trenera grającego na miarę celu
   v += ((state.relation ?? 50) - 50) * 0.02;
   const delta = r1(clamp(v, -2.5, 1.5));
   const notes = [];
