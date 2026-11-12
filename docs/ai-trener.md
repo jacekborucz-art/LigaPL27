@@ -228,3 +228,10 @@ jak AI. Testy `tests/balance.test.mjs` przechodzą bez zmian.
 - Przerwa na schłodzenie jako okazja do przekazania uwag taktycznych
   ([Edge Hill University, Jul 1, 2026](https://www.edgehill.ac.uk/?p=330086), [IFAB: cooling-off periods](https://www.theifab.com/trials/cooling-off-periods)).
 - Wartości instrukcji w silniku: pomiary [SYM] skryptami poza repozytorium (te same ziarna, zmiana w danej minucie).
+
+## Atrybuty trenera (Nov 12, 2026)
+
+Od tej wersji trener AI ma atrybuty 1-20 (taktyka w meczu, skład i plan, motywacja, trening, wielkie mecze),
+które przesuwają szanse reakcji, upór, czas rozpoznania, próg zmęczenia, okrzyki i dodają błędy słabego taktyka.
+Średni trener (10,5) i drużyna bez profilu zachowują się dokładnie jak opisano wyżej. Szczegóły, liczby
+i kalibracja: `docs/trener-ai-atrybuty.md`.

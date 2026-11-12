@@ -71,3 +71,23 @@
 .clv-abs li.is-sus { border-left: 4px solid var(--kartka-zolta); }
 @media (min-width: 1024px) { .clv__top { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; } }
 .clv-out { color: var(--kartka-czerwona); font-weight: 700; }
+
+/* Karta trenera klubu AI (docs/trener-ai-atrybuty.md) */
+.clv-p--info .clv-dl + h3, .clv-p--info .clv-coach + h3 { margin-top: var(--space-4); }
+.clv-coach__name { display: flex; flex-direction: column; gap: 2px; margin: 0 0 6px; }
+.clv-coach__name b { font: 700 var(--step-0)/1.2 var(--font-body); }
+.clv-coach__name small { color: var(--text-muted); font-size: var(--step--1); }
+.clv-coach__blurb { margin: 0 0 8px; font-style: italic; font-size: var(--step--1); }
+.clv-attrs { list-style: none; margin: 0; padding: 0; }
+.clv-attrs li { --c: #C9962B; display: grid; grid-template-columns: 72px minmax(0, 1fr) 4.2em; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: var(--step--1); }
+.clv-attrs li.is-hi { --c: var(--murawa-jasna); }
+.clv-attrs li.is-lo { --c: var(--kartka-czerwona); }
+.clv-attrs li span { color: var(--text-muted); }
+.clv-attrs li em { font-style: normal; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.clv-attrs--vague li em { font-weight: 600; font-size: 12px; }
+.clv-attrs--vague li { grid-template-columns: 72px minmax(0, 1fr) 6.6em; }
+.clv-bar { position: relative; display: block; height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--text) 12%, transparent); overflow: hidden; }
+.clv-bar b, .clv-bar s { position: absolute; top: 0; bottom: 0; left: 0; }
+.clv-bar b { border-radius: 4px; background: var(--c); }
+.clv-bar s { background: color-mix(in srgb, var(--c) 40%, transparent); text-decoration: none; }
+.clv-coach__note { margin: 6px 0 0; font-size: 12px; }

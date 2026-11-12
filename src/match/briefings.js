@@ -12,6 +12,9 @@ import { Rng, clamp } from '../core/rng.js';
 import { personalityOf } from '../career/personality.js';
 import { relationWith, currentGrudge } from '../career/negotiation.js';
 import { applyMorale, EVENT_DELTA, MORALE } from '../career/morale.js';
+import { COACH } from '../career/coaches.js';
+
+const AI_TALK = { best: COACH.talkBest, miss: COACH.talkMiss, fx: COACH.talkFx };
 
 const r1 = (v) => Math.round(v * 10) / 10;
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -840,16 +843,35 @@ export function aiChooseSpeech(coach, ctx = {}) {
 
 /**
  * Uproszczona odprawa AI: zamiast 18 zawodników liczy efekt dla 5 typów osobowości i waży ich udziałem w kadrze.
- * team: { coach:'O'|'S'|'P', personaMix:{Spokojny:n,...} }. Zwraca { tone, zByPersona, teamZ, memory }.
+ * team: { coach:'O'|'S'|'P', personaMix:{Spokojny:n,...}, mot?: motywacja trenera s (od -1 do 1) }.
+ * Zwraca { tone, zByPersona, teamZ, memory }.
  */
 export function aiBriefing(team, ctx = {}, seed = 'ai') {
   const phase = ctx.phase || 'pre';
-  const tone = aiChooseSpeech(team.coach || 'P', ctx);
+  let tone = aiChooseSpeech(team.coach || 'P', ctx);
   if (phase === 'post') return { tone, memory: remember(ctx.memory, `post:${tone}`) };
   const sit = phase === 'pre'
     ? preSituation(ctx)
     : halfSituation({ ...ctx, score: { for: Math.max(0, ctx.diff ?? 0), against: Math.max(0, -(ctx.diff ?? 0)) }, xgFor: Math.max(0, ctx.xgDiff ?? 0), xgAgainst: Math.max(0, -(ctx.xgDiff ?? 0)) });
   const mix = team.personaMix || { Spokojny: 1 };
+  // Motywacja trenera (team.mot, s od -1 do 1, docs/trener-ai-atrybuty.md): dobry trener częściej wybiera ton
+  // najlepszy dla tej szatni (ta sama ocena co podpowiedź asystenta gracza), słaby czasem źle czyta szatnię i mówi
+  // coś gorszego niż zwykle; siła odprawy x(1 + 0,2 s) dla pozytywnej reakcji, negatywna słabnie u dobrego
+  // i rośnie u słabego trenera
+  const mot = team.mot ?? 0;
+  if (mot) {
+    const pick = new Rng(`${seed}|ai|ton|${phase}`);
+    const val = (t) => PERSONAS.reduce((a, persona) => { const sp = speechParts({ id: `ai-${persona}`, persona, traits: {} }, t, sit, ctx.memory); return a + (sp.pos + sp.neg) * (mix[persona] || 0); }, 0);
+    if (mot > 0 && pick.chance(AI_TALK.best * mot)) {
+      let best = -Infinity;
+      for (const t of TONE_KEYS) { const v = val(t); if (v > best) { best = v; tone = t; } }
+    } else if (mot < 0 && pick.chance(AI_TALK.miss * -mot)) {
+      const v0 = val(tone);
+      const worse = TONE_KEYS.filter((t) => val(t) < v0);
+      if (worse.length) tone = pick.pick(worse);
+    }
+  }
+  const zFx = (z) => (!mot ? z : z > 0 ? z * (1 + AI_TALK.fx * mot) : z * (1 - AI_TALK.fx * mot));
   const zByPersona = {};
   let sum = 0;
   let n = 0;
@@ -857,7 +879,7 @@ export function aiBriefing(team, ctx = {}, seed = 'ai') {
   for (const persona of PERSONAS) {
     const p = { id: `ai-${persona}`, persona, traits: {} };
     const sp = speechParts(p, tone, sit, ctx.memory);
-    const z = r1(clamp(sp.pos + sp.neg + rng.gauss(0, 0.5), -10, 10));
+    const z = r1(clamp(zFx(sp.pos + sp.neg + rng.gauss(0, 0.5)), -10, 10));
     zByPersona[persona] = z;
     const w = mix[persona] || 0;
     sum += z * w;

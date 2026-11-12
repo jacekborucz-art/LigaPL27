@@ -21,6 +21,7 @@ import { standings } from '../season/standings.js';
 import { winnerOf } from '../season/cup.js';
 import { book, FIN } from './finance.js';
 import { applyMorale } from './morale.js';
+import { replaceCoach } from './coaches.js';
 
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
 const COMP_TIER = { ekstraklasa: 1, liga1: 2, liga2: 3 };
@@ -356,7 +357,8 @@ function escalate(game, C, clubId, date, rng, msgs, rise = true) {
   // Klub AI: przy żądaniu zwolnienia zarząd często zmienia trenera i presja spada [SZAC]
   if (clubId !== game.clubId && next >= 7 && rng.chance(0.45)) {
     C.heat = Math.round(C.heat * 0.3); C.level = levelFor(C.heat, P); C.season.coachChanges++;
-    log(game, { date, club: clubId, kind: 'coachChange', text: `${anyClub(clubId)?.name ?? clubId}: zmiana trenera po presji kibiców` });
+    const next = replaceCoach(game, clubId, date); // nowy trener: nowy profil atrybutów (career/coaches.js)
+    log(game, { date, club: clubId, kind: 'coachChange', text: `${anyClub(clubId)?.name ?? clubId}: zmiana trenera po presji kibiców${next ? `, nowy trener: ${next.name}` : ''}` });
   }
 }
 

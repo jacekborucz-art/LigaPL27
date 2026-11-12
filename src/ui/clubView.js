@@ -1,13 +1,14 @@
 // Widok innego klubu (z tabeli i terminarzy): podstawowe informacje bez budżetu, trener i sztab, terminarz
 // klubu w sezonie oraz kadra ze statystykami sezonu. Kliknięcie zawodnika otwiera jego profil (podgląd).
+// Trener klubu AI: profil z atrybutami (career/coaches.js, docs/trener-ai-atrybuty.md); dokładność ocen jak
+// w raportach sztabu zależy od analityka klubu gracza.
 
-import { Rng } from '../core/rng.js';
 import { CLUBS_PL, LEAGUE_NAMES, clubById } from '../data/clubs_pl.js';
-import { randomName } from '../data/names.js';
 import { squadOf } from '../world/worldGen.js';
+import { coachOf, headCoachName, coachBlurb, coachSeen, coachBand, COACH_ATTRS, COACH_KEYS, COACH_STYLES } from '../career/coaches.js';
 import { GROUP } from '../career/squad.js';
 import { shirtNumbers, kitColors } from '../career/shirts.js';
-import { staffOf } from '../training/staff.js';
+import { staffOf, staffQ } from '../training/staff.js';
 import { STAFF_ROLES } from '../training/config.js';
 import { standings } from '../season/standings.js';
 import { clubFixtures, recordOf, statObj, sumStats, CLUB_GROUPS } from '../season/history.js';
@@ -18,21 +19,47 @@ import { esc, fmtDate } from './dom.js';
 
 const clubsById = Object.fromEntries(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (club, size) => crestHtml(club, { size, clubsById });
-const COACH_TYPE = { O: 'ofensywny', S: 'ostrożny', P: 'pragmatyczny' };
 const LEAGUE_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
 const POS_ORDER = ['BR', 'BO', 'ŚO', 'WB', 'DP', 'ŚP', 'OP', 'SP', 'SN', 'NAP'];
 
 /** Czy klub ma widok (polski klub z kadrą w świecie gry). */
 export const hasClubView = (game, id) => !!(clubById(id) && game?.world?.clubs?.[id]);
 
-/** Trener prowadzący klubu AI: stałe imię i nazwisko z ziarna gry (w klubie gracza: profil gracza). */
-export function headCoachName(game, clubId) {
+export { headCoachName };
+
+const plYears = (n) => `${n} ${n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'lata' : 'lat'}`;
+
+/**
+ * Karta trenera: imię, styl, wiek, jedno zdanie o mocnych i słabych stronach, atrybuty z paskami. Dokładność jak
+ * w raportach sztabu: analityk od 14 pokazuje liczby, 8-13 przedziały, poniżej 8 tylko słowa.
+ */
+export function coachCardHtml(game, clubId) {
   if (clubId === game.clubId) {
-    const pr = game.manager?.profile;
-    return pr ? `${pr.firstName} ${pr.lastName}` : 'Ty';
+    return `<div class="clv-coach"><p class="clv-coach__name"><b>${esc(headCoachName(game, clubId))}</b><small>To ty prowadzisz drużynę.</small></p></div>`;
   }
-  const n = randomName('POL', new Rng(`trener-glowny:${game.seed}:${clubId}`));
-  return `${n.first} ${n.last}`;
+  const c = coachOf(game, clubId);
+  if (!c) return '';
+  const q = staffQ(game, game.clubId, 'analityk');
+  const prec = q >= 14 ? 'exact' : q >= 8 ? 'approx' : 'vague';
+  const rows = COACH_KEYS.map((k) => {
+    const v = c.a[k];
+    const seen = coachSeen(v, q);
+    const band = v >= 14 ? 'hi' : v >= 8 ? 'mid' : 'lo';
+    const lo = ((seen.lo - 1) / 19) * 100; const hi = ((seen.hi - 1) / 19) * 100; const mid = ((seen.mid - 1) / 19) * 100;
+    const bar = prec === 'approx'
+      ? `<b style="width:${lo.toFixed(1)}%"></b><s style="left:${lo.toFixed(1)}%;width:${Math.max(4, hi - lo).toFixed(1)}%"></s>`
+      : `<b style="width:${Math.max(4, mid).toFixed(1)}%"></b>`;
+    return `<li class="is-${band}" title="${esc(COACH_ATTRS[k].text)}"><span>${esc(COACH_ATTRS[k].short)}</span>
+      <i class="clv-bar" role="img" aria-label="${esc(`${COACH_ATTRS[k].name}: ${prec === 'vague' ? coachBand(v) : `${seen.text} na 20`}`)}">${bar}</i><em>${esc(seen.text)}</em></li>`;
+  }).join('');
+  const since = c.since && c.n ? `, w klubie od ${fmtDate(c.since)}` : '';
+  const note = prec === 'exact' ? 'Oceny od analityka wideo (skala 1-20).' : prec === 'approx' ? 'Oceny przybliżone: lepszy analityk wideo poda dokładne liczby.' : 'Analityk wideo ocenia trenera tylko ogólnie.';
+  return `<div class="clv-coach">
+    <p class="clv-coach__name"><b>${esc(c.name)}</b><small>styl: ${esc(COACH_STYLES[c.style] ?? 'pragmatyczny')}, ${esc(plYears(c.age))}${esc(since)}</small></p>
+    <p class="clv-coach__blurb">${esc(coachBlurb(c))}</p>
+    <ul class="clv-attrs clv-attrs--${prec}">${rows}</ul>
+    <p class="hint clv-coach__note">${esc(note)}</p>
+  </div>`;
 }
 
 const RES_WORD = { W: 'wygrana', R: 'remis', P: 'porażka' };
@@ -95,7 +122,6 @@ export function renderClubView(game, clubId) {
   const squad = [...squadOf(game.world, clubId)].sort((a, b) => POS_ORDER.indexOf(a.pos) - POS_ORDER.indexOf(b.pos) || b.ovr - a.ovr);
   const nums = shirtNumbers(game, clubId, squad);
   const staff = staffOf(game, clubId);
-  const mine = clubId === game.clubId;
 
   const head = `<header class="clv__head" style="--kit:${kit.shirt};--kit-ink:${kit.ink}">
     ${crest(club, 72)}
@@ -108,7 +134,6 @@ export function renderClubView(game, clubId) {
 
   const info = `<section class="clv-p clv-p--info"><h3>O klubie</h3>
     <dl class="clv-dl">
-      <div><dt>Trener</dt><dd>${esc(headCoachName(game, clubId))}${mine ? '' : `<small>styl: ${esc(COACH_TYPE[club.coach] ?? 'zrównoważony')}</small>`}</dd></div>
       <div><dt>Siła kadry</dt><dd>${esc(facts.strength)}</dd></div>
       ${facts.europe ? `<div><dt>Puchary</dt><dd>${esc(facts.europe.comp)}</dd></div>` : ''}
       <div><dt>Stadion</dt><dd>${facts.cap ? `${facts.cap.toLocaleString('pl-PL')} miejsc${facts.capEst ? ' (szacunek)' : ''}` : 'brak danych'}</dd></div>
@@ -116,6 +141,8 @@ export function renderClubView(game, clubId) {
       ${facts.owner ? `<div><dt>Właściciel</dt><dd>${esc(facts.owner)}${facts.ownerType ? `<small>${esc(facts.ownerType)}</small>` : ''}</dd></div>` : ''}
       ${facts.rivals?.length ? `<div><dt>Rywale</dt><dd>${facts.rivals.map((r) => esc(r.c.name)).join(', ')}</dd></div>` : ''}
     </dl>
+    <h3>Trener</h3>
+    ${coachCardHtml(game, clubId)}
     <h3>Sztab szkoleniowy</h3>
     <ul class="clv-staff">${Object.keys(STAFF_ROLES).map((role) => staff[role]?.name ? `<li><span>${esc(STAFF_ROLES[role].name)}</span><b>${esc(staff[role].name)}</b></li>` : '').join('') || '<li class="hint">Brak danych o sztabie.</li>'}</ul>
   </section>`;

@@ -131,6 +131,8 @@ export function buildTeam(side, cfg, rng, ctx) {
   const params = tacticParams(formation, cfg.tactics.instructions);
   return {
     side, club: cfg.club, ai: !!cfg.ai, coach: cfg.coach ?? 'P',
+    // Umiejętności trenera w tym meczu (career/coaches.js matchCoach) i asystenta gracza; brak: zachowanie neutralne
+    cq: cfg.coachQ ?? null, assistantCq: cfg.assistantQ ?? null,
     tactics: { ...cfg.tactics }, formation, players, bench,
     subsUsed: 0, windowsUsed: 0, windowMinute: null, subsLimit: 5, windowsLimit: 3,
     S: clamp(cfg.cohesion ?? 85, 30, 100), lastTacChange: -99,

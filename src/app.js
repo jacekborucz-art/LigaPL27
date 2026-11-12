@@ -16,6 +16,8 @@ import { fixturesPanelBody, renderFixtures } from './ui/fixturesView.js';
 import { ensureHistory } from './season/history.js';
 import { createMatch, runToEnd } from './engine/match/match.js';
 import { Rng } from './core/rng.js';
+import { coachOf, matchCoach, formRng, assistantProfile } from './career/coaches.js';
+import { staffQ } from './training/staff.js';
 import { addDays } from './core/gameLoop.js';
 import { generateWorld, squadOf, academyOf } from './world/worldGen.js';
 import { renderSquadList, renderPlayerProfile } from './ui/squadView.js';
@@ -675,6 +677,10 @@ async function playMyMatch() {
   const cfgFor = (id, squad, tactics, ai) => ({ club: anyClub(id), squad, tactics, ai, coach: anyClub(id)?.coach ?? 'P' });
   const mine = cfgFor(g.clubId, mySquad(g), g.tactics, false);
   const theirs = cfgFor(oppId, oppSquad, createTactics(oppSquad, { benchSize: bench }), true);
+  // Trener rywala z atrybutami i asystent gracza (docs/trener-ai-atrybuty.md)
+  const rank = f.comp === 'pp' ? (f.round === 'F' ? 3 : 1) : f.comp === 'super' ? 3 : f.comp === 'uefa' ? 2 : 0;
+  if (f.comp !== 'friendly') theirs.coachQ = matchCoach(coachOf(g, oppId, oppClub), { rank, rng: formRng(g, f.id, oppId) });
+  mine.assistantQ = matchCoach(assistantProfile(staffQ(g, g.clubId, 'asystent')), { rank, rng: formRng(g, f.id, g.clubId) });
   Object.assign(mine, trainingMatchInput(g, g.clubId, mine));
   Object.assign(theirs, trainingMatchInput(g, oppId, theirs));
   const M = createMatch({

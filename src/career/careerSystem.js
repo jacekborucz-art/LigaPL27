@@ -1,5 +1,6 @@
 // Kariera w pętli dni (etap 9): finanse, rynek transferowy, oferty, zarząd, praca trenera.
 import { attendanceModifier } from './fans.js';
+import { ensureCoaches } from './coaches.js';
 import { registerDailySystem } from '../core/gameLoop.js';
 import { createMessage } from '../core/inbox.js';
 import { registerDecision } from '../core/decisions.js';
@@ -25,6 +26,7 @@ export function ensureCareer(game) {
   for (const [id, c] of Object.entries(game.finance.clubs)) if (!c.plan && clubById(id)) { c.plan = clubPlan(clubById(id)); c.tier = c.plan.tier; }
   if (!game.market) createMarket(game);
   ensureBoard(game);
+  ensureCoaches(game); // trenerzy klubów AI z atrybutami (stary zapis: profile z ziarna gry, te same nazwiska)
 }
 
 // ------------------------------------------------------------ Mecze: bilety i nagrody

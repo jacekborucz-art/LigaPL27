@@ -171,7 +171,7 @@ export function runToBreak(M, { assistantFor = [] } = {}) {
 
 /** Drużyna gracza przechodzi pod asystenta: jego punktem wyjścia są obecne instrukcje gracza. */
 function handOver(T) {
-  if (!T.ai) { T.ai = true; T.assistant = true; T.baseInstr = { ...T.tactics.instructions }; }
+  if (!T.ai) { T.ai = true; T.assistant = true; T.baseInstr = { ...T.tactics.instructions }; T.cq = T.assistantCq ?? null; }
 }
 
 // ------------------------------------------------------------ Zmiany zaplanowane przed sparingiem

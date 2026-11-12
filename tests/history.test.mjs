@@ -132,9 +132,11 @@ test('Koniec sezonu: historia meczów zostaje, statystyki do p.history z podzia�
   completeTransfer(g, { playerId: loaned.id, to: 'legia', kind: 'loan', loanShare: 100 });
   playTo(g, '2027-07-03');
   const played26 = g.history.m['2026/27'];
-  assert.ok(played26.length >= 34, `mecze sezonu: ${played26.length}`);
+  // Pełny sezon w jednym klubie: co najmniej 34 mecze; po zmianie pracy zimą mniej (nowy klub ma swój terminarz)
+  assert.ok(played26.length >= (g.manager.history.length === 1 ? 34 : 25), `mecze sezonu: ${played26.length}`);
   // Każdy mecz w historii to mecz klubu, który trener wtedy prowadził (także po zmianie pracy w trakcie sezonu)
-  const ledAt = (club, d) => (g.manager.history ?? []).some((h) => h.club === club && h.from <= d && (!h.to || d < h.to));
+  // Dzień zwolnienia włącznie: mecz tego dnia gra jeszcze stary klub (decyzja o nowej pracy przychodzi po meczu)
+  const ledAt = (club, d) => (g.manager.history ?? []).some((h) => h.club === club && h.from <= d && (!h.to || d <= h.to));
   for (const r of played26) assert.ok(r.s && (r.h === r.me || r.a === r.me) && ledAt(r.me, r.d), `${r.id} ${r.me} ${r.d}`);
   if (g.manager.history.length === 1) assert.equal(played26.filter((r) => r.c === 'ekstraklasa' || r.c === 'liga1' || r.c === 'liga2').length, 34);
   assert.deepEqual(historySeasons(g).slice(0, 2), ['2027/28', '2026/27']);

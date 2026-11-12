@@ -101,12 +101,12 @@ function pickScorers(team, goals, rng) {
 
 /**
  * Jeden mecz w tle.
- * home/away: { squad, qsMul?, tableTerm? }; ctx: { neutral, refStrict (0.7-1.4), aggression [h,a] }
+ * home/away: { squad, qsMul?, tableTerm?, coachTerm? (decyzje trenera, punkty atrybutu) }; ctx: { neutral, refStrict (0.7-1.4), aggression [h,a] }
  * Zwraca wynik, statystyki wynikające z modelu i rozbicie sił (do raportu i testów).
  */
 export function quickMatch(home, away, ctx, rng) {
-  const H = { ...teamRating(home.squad, { tableTerm: home.tableTerm }), qsMul: home.qsMul };
-  const A = { ...teamRating(away.squad, { tableTerm: away.tableTerm }), qsMul: away.qsMul };
+  const H = { ...teamRating(home.squad, { tableTerm: home.tableTerm, coachTerm: home.coachTerm }), qsMul: home.qsMul };
+  const A = { ...teamRating(away.squad, { tableTerm: away.tableTerm, coachTerm: away.coachTerm }), qsMul: away.qsMul };
   const { lH, lA, dH, dA } = expectedGoals(H, A, ctx);
   const [gH, gA] = sampleScore(lH, lA, rng);
 
