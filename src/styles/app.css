@@ -725,8 +725,13 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
   .pp__cols > section > h3:first-child, .pp__cols > section > .attr-group:first-child h3 { margin-top: 0; }
   .pp__stats .phst { margin-top: 0; padding-top: 0; border-top: 0; }
 }
-@media (min-width: 1600px) {
+/* Szeroki PC: u góry dwa panele obok siebie (atrybuty i stan/kontrakt/charakter), każdy w dwóch kolumnach;
+   pod nimi statystyki i historia na całą szerokość */
+@media (min-width: 1440px) {
   .hub__main:has(.pp__layout) { max-width: 1840px; }
-  .pp__layout { grid-template-columns: minmax(0, 2fr) minmax(0, 1.25fr); align-items: start; }
-  .pp__stats { position: sticky; top: var(--space-3); }
+  .pp__layout { grid-template-columns: minmax(0, 1fr); }
+  .pp__cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; }
+  .pp__cols > section { columns: 2; column-gap: var(--space-5); }
+  .pp__cols > section > h3 { break-after: avoid; margin-top: 0; padding-top: var(--space-2); }
+  .pp__cols > section > ul { break-inside: avoid; margin-bottom: var(--space-4); }
 }
