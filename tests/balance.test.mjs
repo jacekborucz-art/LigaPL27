@@ -183,3 +183,17 @@ test('Gra bierna: rywale AI rozpracowują stały schemat gracza, urozmaicony pla
   const varied = scoutEdge(h, opp, 'widzew');
   assert.ok(Math.abs(varied) < 0.06, `urozmaicony plan: premia rywala ${varied}`);
 });
+
+// Runda 2 (docs/bierna-gra.md, rozdz. 9): trener, który nic nie robi, traci szatnię; trafna praca daje lekką premię,
+// większą w mocniejszej kadrze; trener AI neutralny. Pomiar sezonów: pasywny średnio ponad 10 pkt pod AI.
+test('Gra bierna: autorytet trenera w granicach zamierzonego balansu', async () => {
+  const { AUTH, authorityTerm, authorityOf, authorityWeek, logEngage } = await import('../src/career/authority.js');
+  const g = newGame('widzew');
+  for (let k = 0; k < 12; k++) { const d = addDays('2026-08-03', 7 * k); logEngage(g, 'pressSkip', addDays(d, -3)); authorityWeek(g, d); }
+  const passive = authorityTerm(authorityOf(g, 'widzew'), clubById('widzew').L);
+  assert.ok(passive <= -0.2 && passive >= AUTH.min, `pasywny: ${passive}`);
+  const engaged = authorityTerm(0.9, clubById('widzew').L);
+  assert.ok(engaged > 0.1 && engaged <= AUTH.max, `zaangażowany: ${engaged}`);
+  assert.ok(authorityTerm(0.9, clubById('legia').L) > authorityTerm(0.9, clubById('gks-katowice').L));
+  assert.equal(authorityTerm(authorityOf(g, 'legia')), 0, 'trener AI neutralny');
+});

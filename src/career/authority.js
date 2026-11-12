@@ -28,8 +28,8 @@ export const AUTH = {
   talkFull: 4, meetingFull: 2, meh: 0.3, pressBad: 0.6,
   // Premia x kadra: 0,5 + (L klubu - 9) / 6, od 0,5 do 1,2 (Legia ok. 1,1, środek Ekstraklasy ok. 0,8, 2 Liga 0,5)
   squad: { base: 0.5, from: 9, per: 6, min: 0.5, max: 1.2 },
-  // Wpływ na siłę w meczu (pkt atrybutu na zawodnika): poniżej 0,5 x0,6 (do -0,25), powyżej x0,35 (do +0,15)
-  neg: 0.6, pos: 0.35, min: -0.25, max: 0.15,
+  // Wpływ na siłę w meczu (pkt atrybutu na zawodnika): poniżej 0,5 x0,75 (do -0,3), powyżej x0,45 x kadra (do +0,2)
+  neg: 0.75, pos: 0.45, min: -0.3, max: 0.2,
   lowAt: 0.3, highAt: 0.75, // wiadomości asystenta
 };
 

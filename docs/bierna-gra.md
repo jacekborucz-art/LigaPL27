@@ -15,6 +15,11 @@ Oznaczenia: [SZAC] szacunek projektowy bez źródła, [SYM] wynik symulacji w ty
 
 ## Odpowiedź w skrócie
 
+**Runda 2 (rozdz. 9):** trener, który niczego nie robi, nie może mieć dobrych wyników; po zmianach pasywny gracz
+jest średnio ok. 12 pkt pod AI (lepszy sezon w 15 % przypadków), zaangażowany i trafny ok. +2,5 (55 %), zajęty, ale
+podejmujący złe decyzje, ok. -9 (25 %). Poniżej opis rundy 1.
+
+
 - **Pomiar przed zmianami [SYM]** (pełna pętla dni, dzień meczowy jak w interfejsie, 4 kluby, 12-20 sezonów na klub):
   całkiem pasywny gracz był średnio **2,8 pkt** pod tym samym klubem prowadzonym przez AI (błąd 1,6), a pasywny gracz,
   który tylko chodził na konferencje z domyślnymi odpowiedziami, **1,3 pkt nad AI**. Wcześniejsza obserwacja
@@ -380,6 +385,127 @@ z potrzebą rozmowy (kilka pól), `c.var` w stanie treningu klubu (2-3 pola).
 7. **Liczba niezadowolonych** u pasywnego gracza (ok. 4 na koniec sezonu) jest wyraźna; flaga nie zmienia siły
    w meczu, ale może prowadzić do próśb o transfer. Do obserwacji w dłuższej karierze.
 
+## 9. Runda 2: czy trener, który nic nie robi, może osiągać dobre wyniki
+
+Stan na Nov 12, 2026. Uwaga użytkownika po pierwszej rundzie: 6-9 pkt straty za całkowitą bierność to za mało, a praca
+w klubie ma się opłacać lekko, ale odczuwalnie. Druga uwaga: nagrodą ma być wyższe prawdopodobieństwo lepszego sezonu,
+a nie gwarantowane punkty; efekt zależy od klubu, kadry, trafności decyzji i losu.
+
+### 9.1 Pytanie do ekspertów i odpowiedź
+
+**Czy trener, który pozornie nic nie robi i oddaje wszystko asystentowi, może mieć dobre wyniki?**
+
+**Trener UEFA Pro.** Delegowanie to nie nieobecność. Alex Ferguson przez lata nie prowadził treningów, robili to
+asystenci, ale sam wybierał skład, podejmował kluczowe decyzje meczowe i trzymał organizację klubu w ręku [ŹR E1].
+Carlo Ancelotti planuje zajęcia razem ze sztabem i deleguje wykonanie, bo ufa ludziom, których dobrał [ŹR E2]. Obaj
+byli w klubie obecni każdego dnia: rozmowy, decyzje, media. Przykładów trenera, który niczego nie robi i odnosi
+sukcesy, nie znam; w polskich realiach taki trener nie dotrwałby do końca rundy. Gra „Pokaż wynik” to w praktyce
+trener, który oddał ławkę asystentowi, a do tego nie rozmawia z zawodnikami i nie przychodzi na konferencje.
+
+**Psycholog sportu.** Brak trenera szatnia odbiera jako brak przywództwa. Zawodnicy pytają asystenta, kto decyduje,
+liderzy szatni przejmują ster, tworzą się grupy. Najczęściej opisywany przypadek z ostatnich lat to Manchester United
+w okresie przejściowym 2021/22: relacje prasowe mówiły o podzielonej szatni, braku wiary i grupach wpływu [ŹR E3]
+(to doniesienia ze źródeł anonimowych, nie fakty). Badania nad stylami przywództwa trenera wiążą wsparcie,
+informację zwrotną i demokratyczny styl z lepszą spójnością i satysfakcją zawodników [ŹR E4]; stylu „zostawiam
+wszystko” w tych przeglądach praktycznie nie ma, bo w zawodowym sporcie prawie się nie zdarza.
+
+**Matematyk (pomiar).** Najlepsze dane o wartości trenera pochodzą z Bundesligi: trener z 80. percentyla umiejętności
+zdobywa średnio o ok. 0,30 pkt na mecz więcej niż trener z 20. percentyla (ok. 18 % średniej punktów), a z 75.
+wobec 25. percentyla o ok. 0,25 pkt [ŹR E5]. W sezonie 34 kolejek to ok. 10 i 8,5 pkt. Zmiana trenera przez zwolnienie
+daje małą, ale istotną poprawę [ŹR E6]. Trener AI w grze to trener przeciętny (punkt neutralny atrybutów), więc:
+
+- trener, który nie wykonuje żadnej części pracy, powinien wypaść co najmniej jak trener z dolnych 20 % plus utrata
+  szatni, czyli ok. 0,3-0,4 pkt na mecz pod przeciętnym: **ok. 10-14 pkt w sezonie pod tym samym klubem pod AI** [SZAC];
+- dobry, zaangażowany trener to ok. 60-75. percentyl: **średnio ok. +2-4 pkt**, ale przy odchyleniu sezonu 8-10 pkt
+  oznacza to tylko większą szansę, nie pewność [SZAC];
+- gracz aktywny „po łebkach” między nimi, a gracz bardzo zajęty, ale podejmujący złe decyzje, blisko pasywnego.
+
+**Wniosek panelu.** Trener może oddać asystentom wykonanie (trening, analizy, część ławki), ale nie może oddać decyzji,
+ludzi i reprezentowania klubu. Kto oddaje wszystko, traci szatnię. Cele dla gry [SZAC]:
+
+| Scenariusz | Średnio wobec AI | Szansa na sezon lepszy niż AI |
+|---|---|---|
+| a, nic nie robi | od -10 do -14 | ok. 10-20 % |
+| b, nic nie robi, ale chodzi na konferencje | między a i c | ok. 25-35 % |
+| c, aktywny-lite | ok. -2 do 0 | ok. 40-50 % |
+| e, zaangażowany, trafne decyzje | ok. +2 do +4 | ok. 55-65 % |
+| f, zajęty, ale złe decyzje | blisko a | ok. 15-30 % |
+
+Ograniczenie: klub z czołówki nie spada z ligi z samej bierności (Legia pasywna dalej kończy w pierwszej piątce).
+
+### 9.2 Co się zmieniło
+
+1. **Autorytet trenera** (`src/career/authority.js`, nowy). Wartość 0-1, nowy trener 0,5. Co poniedziałek zbliża się
+   o 35 % do celu `0,1 + 0,85 x aktywność` z ostatnich 4 tygodni (długa przerwa bez meczów niczego nie zmienia).
+   Aktywność liczy **trafność**, nie kliknięcia: trafne rozmowy indywidualne minus nietrafione (waga 0,45, pełna przy 4
+   w 4 tygodnie; obojętne liczą się w 30 %), zebrania dobrze przyjęte minus źle przyjęte (0,2, pełna przy 2),
+   konferencje (0,35: spokojna 1, szkodliwa 0,6, pominięta 0). Rozmowy na odprawach liczą się według reakcji
+   zawodnika. Wpływ w meczu: poniżej 0,5 do -0,3 pkt atrybutu na zawodnika (utrata szatni, bez zależności od kadry),
+   powyżej 0,5 do +0,2 i razy siła kadry (`0,5 + (L - 9) / 6`, od 0,5 do 1,2: lepsza kadra lepiej wykorzystuje dobrą
+   atmosferę). Kluby AI: trener AI jest w klubie obecny, autorytet 0,5, premia 0; różnice trenerów AI są w atrybutach.
+   Wiadomości asystenta: „Szatnia czuje brak trenera” (poniżej 0,3) i „Drużyna czuje rękę trenera” (powyżej 0,75).
+   Dane do widoku Kadra, Rozmowy: `authoritySummary(game)` (etykieta, poziom, składniki, podpowiedź).
+2. **Zebranie bez kary za samo powtarzanie** (`teamTalks.js`). Wcześniej ten sam ton trzy tygodnie z rzędu odejmował
+   0,6 za każde powtórzenie, więc trafny ton powtarzany co tydzień zaczynał obniżać morale i zaufanie. To była główna
+   przyczyna wyniku -3,6 „zaangażowanego” skryptu w rundzie 1 (zaufanie zawodników 28-67 wobec ok. 90). Teraz dodatni
+   efekt maleje do 25 % (powtórzenie działa słabiej), a szkodzi tylko ton źle dobrany do sytuacji i osobowości.
+3. **Mocniejsza przewidywalność** (`scouting.js`): premia przy pełnej znajomości schematu 0,6 (było 0,4), najwyżej +0,4
+   (było +0,3).
+4. **Skrypt zaangażowanego gracza** (pomiar): w rundzie 1 robił rzeczy, których dobry trener nie robi (zebranie co tydzień
+   z tym samym tonem, akcent fizyczny i techniczny bez zajęć taktycznych). Teraz: zebranie co 2 tygodnie w tonie do
+   wyników, rozmowy z tymi, których wskazuje asystent (bez powtórki z tym samym przez 3 tygodnie), rozmowy na odprawie
+   z rady asystenta, plan pod rywala (z równym rywalem u siebie wysoki pressing), akcent zmieniany co 3 tygodnie
+   (zrównoważony, taktyczny, zrównoważony, stałe fragmenty), obozy letni i zimowy, konferencje.
+5. **Nowy scenariusz f: zajęty, ale źle** (pomiar): plany odwrotne do sytuacji (z faworytem zamurowanie, ze słabszym
+   wszystko do ataku i wysoka linia, długie piłki), rozmowy z przypadkowymi zawodnikami nie na temat (wrażliwym
+   „wymagaj”), zebrania w złym tonie (krytyka po dobrej serii), akcent fizyczny i techniczny, konferencje z trzecią
+   odpowiedzią. Pokazuje, że sama aktywność się nie opłaca.
+
+### 9.3 Pomiar przed i po (te same ziarna 1-20, 4 kluby, różnica parami do tego samego klubu pod AI)
+
+„Przed” to kod z commita 15e636b (runda 1), „po” to runda 2. Ten sam skrypt w obu (także ulepszony scenariusz e i nowy f).
+
+BEFORE_R2
+
+Po zmianach, szczegółowo (punkty sezonu gracza minus punkty tego samego klubu pod AI w tym samym świecie):
+
+AFTER_R2
+
+AFTER_AGG
+
+Jak to czytać:
+
+- **Pasywny (a)**: średnio -12,0 pkt (błąd 1,3), lepszy sezon niż AI w 15 % przypadków, w 73 % gorszy o 5 i więcej.
+  Los dalej działa: 10 % najlepszych sezonów pasywnej Legii to +3 pkt nad AI. Legia pasywna kończy średnio na 4,8.
+  miejscu, nie spada.
+- **Zaangażowany (e)**: średnio +2,5 pkt (1,5), lepszy niż AI w 55 % sezonów, gorszy o 5 i więcej w 28 %.
+  Rozrzut jest szeroki (od -11 do +17 między 10. i 90. percentylem), więc praca zwiększa szansę, a nie gwarantuje wyniku.
+- **Aktywny-lite (c)**: -1,2 pkt, 41 % sezonów lepszych niż AI: pomiędzy.
+- **Zajęty, ale źle (f)**: -9,3 pkt, 25 %: blisko pasywnego. Złe plany kosztują w silniku, nietrafione rozmowy
+  i zebrania nie budują autorytetu, a monotonia i analiza rywala działają tak samo.
+- **Zależność od klubu.** Przewaga zaangażowanego gracza była największa w Polonii (+7,3) i GKS (+4,9), mniejsza
+  w Widzewie (0,1) i Legii (-2,4). Błąd średniej jednego klubu to 2-3 pkt, więc różnice między klubami poniżej ok. 5 pkt
+  są w szumie. Część różnicy to obozy: duże kluby AI jeżdżą na dobre obozy same, słabsze rzadziej, więc obóz
+  zarezerwowany przez gracza daje więcej w słabszym klubie. Premia za autorytet rośnie z kadrą (Legia x1,1, GKS x0,8).
+
+### 9.4 Testy
+
+- `tests/passivePlay.test.mjs`: 4 nowe testy (autorytet spada powoli i w granicach u trenera, który nic nie robi;
+  liczy się trafność, nie kliknięcia: trafne rozmowy i zebrania budują, nietrafione obniżają; premia zależy od kadry,
+  kara nie, kluby AI i stary zapis neutralne; trafne zebranie powtarzane co tydzień słabnie, ale nie szkodzi).
+- `tests/balance.test.mjs`: strażnik autorytetu (pasywny od -0,3 do -0,2, zaangażowany powyżej +0,1, większa premia
+  w mocniejszej kadrze, AI 0); strażnik przewidywalności z rundy 1 bez zmian.
+
+### 9.5 Otwarte pytania (runda 2)
+
+1. Widok Kadra, Rozmowy jest w przebudowie u koordynatora: do pokazania autorytet słowami
+   (`authoritySummary(game).label`), poziom i podpowiedź, co go buduje (`tip`), oraz liczba zawodników czekających
+   na rozmowę (dotychczasowy licznik z `attentionNeed` i `daysSinceAttention`).
+2. Pasywny trener dużego klubu często spada pod próg zwolnienia (zaufanie zarządu na koniec sezonu: Widzew ok. 6,
+   Legia ok. 24, minimum w sezonie). Próg dla pierwszego sezonu i prasa klubów AI zostają bez zmian do decyzji użytkownika.
+3. Zaangażowany gracz zyskuje częściowo przez obozy (istniejąca mechanika). Bez obozów jego przewaga byłaby mniejsza;
+   osobnego pomiaru bez obozów nie robiłem.
+
 ## Źródła
 
 - A1. M. Kędziorek, „Wykorzystanie analizy w procesie treningowym na podstawie doświadczeń własnych” (Wielkopolski ZPN, 2015), PDF: https://wielkopolskizpn.pl/files/document/397/wykorzystanie-analizy-w-procesie-treningowym-na-podstawie-doswiadczen-wlasnych-maciej-kedziorek-2015.pdf (znam z opisu wyszukiwarki; host niedostępny z sesji, w której powstał dokument).
@@ -394,7 +520,13 @@ z potrzebą rozmowy (kilka pól), `c.var` w stanie treningu klubu (2-3 pola).
 - C1. Regulamin medialny Ekstraklasy 2020/21 (kopia na stronie Stali Mielec): https://stalmielec.com/wp-content/uploads/2020/08/Regulamin-medialny-1.pdf
 - C2. Regulamin medialny Ekstraklasy 2025/26 (kopia na stronie Wisły Płock): https://wisla-plock.pl/userfiles_2020/Regulamin%20medialny%20ESA%202025-2026.pdf ; Lechia Gdańsk, regulamin medialny 2022/23: https://lechia.pl/wp-content/uploads/2022/06/Regulamin-Mediowy-2022_23.pdf
 - D1. C. Foster, „Monitoring training in athletes with reference to overtraining syndrome”, Medicine & Science in Sports & Exercise 30(7), 1164-1168 (Jul 1, 1998), DOI 10.1097/00005768-199807000-00023: https://scinapse.io/papers/2029047988
+- E1. Champions Journal, „Second team” (wypowiedź Mircei Lucescu o tym, jak Alex Ferguson delegował treningi): https://champions-journal.com/500/second-team
+- E2. C. Ancelotti, „Quiet Leadership” (fragmenty o planowaniu treningu ze sztabem i delegowaniu): https://manhattan.institute/article/a-look-inside-the-quiet-genius-of-carlo-ancelotti ; https://wsc.co.uk/?p=7146
+- E3. Sports Mole (za The Times), „Man United players have lost faith in Ralf Rangnick”: https://sportsmole.co.uk/football/man-utd/news/man-united-players-have-lost-faith-in-ralf-rangnick_484247.html ; Planet Football o przeciekach z szatni: https://www.planetfootball.com/quick-reads/the-leaks-about-man-utd-under-ralf-rangnick-and-how-the-players-responded
+- E4. Metaanaliza stylów przywództwa trenera a spójność i satysfakcja (Frontiers in Psychology, 2024): https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11232180/ ; metaanaliza z 2016: https://lida.sport-iat.de/twm/Record/4041723
+- E5. G. Muehlheusser, S. Schneemann (Hentschel), D. Sliwka, N. Wallmeier, „The Contribution of Managers to Organizational Success: Evidence from German Soccer”, Journal of Sports Economics 19(6), 786-819 (2018); wersja robocza IZA DP 8560: https://iza.org/publications/dp/8560 ; https://econpapers.repec.org/RePEc:sae:jospec:v:19:y:2018:i:6:p:786-819
+- E6. A. Bryson, B. Buraimo, A. Farnell, R. Simmons, „Special Ones? The Effect of Head Coaches on Football Team Performance”, Scottish Journal of Political Economy 71(3), 295-322 (2024): https://www.iza.org/publications/dp/14104/imprint
 - D2. J. Afonso i in., przegląd badań nad periodyzacją, Journal of Sports Science and Medicine 16(1): https://jssm.org/16-1-27.p_d_f
 
-Uwaga: źródła A1, B1, B3, C1, C2 i D1 znam z wyników wyszukiwarki (opisy i fragmenty); pełnych tekstów nie otwierałem.
+Uwaga: źródła A1, B1, B3, C1, C2, D1 i E1-E6 znam z wyników wyszukiwarki (liczby E5 z opisów wersji roboczej; strony IZA i Uniwersytetu Hamburskiego nie otwierały się z sesji) (opisy i fragmenty); pełnych tekstów nie otwierałem.
 Liczby modelu są szacunkami projektowymi skalibrowanymi symulacją, a nie wartościami z badań.
