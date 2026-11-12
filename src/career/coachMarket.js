@@ -42,10 +42,10 @@ export const MARKET = {
   fansW: 8, // presja kibiców (heat 0-100) x 0,08 x media/10
   honeyMatches: 8, // pierwsze mecze nowego trenera: presja x (0,35 + 0,65 x mecze/8)
   minMatches: 4, // nowy trener nie jest zwalniany przed 4. meczem o punkty
-  thr: 23.5, thrPat: 1.1, thrTemper: 0.3, thrNoise: 0.22, // próg = 23,5 + 1,1 (cierpliwość - 10) - 0,3 (temperament - 10), los x temperament
+  thr: 23, thrPat: 1.1, thrTemper: 0.3, thrNoise: 0.22, // próg = 23 + 1,1 (cierpliwość - 10) - 0,3 (temperament - 10), los x temperament
   thrTier: { 1: 1.5, 2: -2.5, 3: -1.3 }, // 1 Liga: walka o awans i tani trenerzy, więcej zmian; Ekstraklasa ostrożniej (odprawy)
   winter: { date: '12-18', thr: -3 }, // przerwa zimowa: przegląd z niższym progiem (czas na nowego trenera przed obozem)
-  credit: 3, longTenure: 2, // kapitał: cel wykonany w poprzednim sezonie, staż ponad 2 lata
+  credit: 2, longTenure: 0, // kapitał: cel wykonany w poprzednim sezonie, staż ponad 2 lata
   span: 12, hMax: 0.4, hPow: 1.5, // szansa zwolnienia po meczu: 0,4 x ((C - próg) / 12)^1,5
   // Trener tymczasowy (dni) wg typu właściciela; wiosną część prowadzi zespół do końca sezonu
   caretaker: { miasto: [7, 20], spolka: [6, 16], klub: [10, 30], miliarder: [2, 8], prywatny: [3, 12] },
@@ -181,8 +181,10 @@ export function coachPressure(game, clubId, tables, date, p = coachOf(game, club
   parts.fans = (game.fans?.clubs?.[clubId]?.heat ?? 0) * K.fansW / 100 * o.media / 10;
   let C = Object.values(parts).reduce((s, v) => s + v, 0);
   // Nowy trener: okres ochronny (porywczy właściciel krótszy)
+  // Okres ochronny tylko dla zatrudnionych w trakcie sezonu (latem trener ma okres przygotowawczy)
   const cm = coachMatches(game, clubId, p);
-  if (cm < K.honeyMatches) C *= Math.min(1, 0.35 + 0.65 * cm / K.honeyMatches + 0.02 * Math.max(0, o.temperament - 10));
+  const summerHire = p?.from && ['06', '07'].includes(p.from.slice(5, 7));
+  if (cm < K.honeyMatches && !summerHire) C *= Math.min(1, 0.35 + 0.65 * cm / K.honeyMatches + 0.02 * Math.max(0, o.temperament - 10));
   return { C: r1(C), parts, pos, size, target: r1(target), played, left: total - played, inDrop: pos >= dropFrom, goal };
 }
 

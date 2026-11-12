@@ -2,7 +2,7 @@
   "meta": {
     "sezon": "2026/27",
     "dataOpracowania": "Nov 10, 2026",
-    "opis": "Prawdziwe nazwy klubów, bez herbów i zawodników. L w skali 1-20. rozgrywki2026: LM, LE, LK (faza ligowa), ELIM (odpadł w eliminacjach), BRAK (rezerwa do przyszłych sezonów).",
+    "opis": "Prawdziwe nazwy klubów, bez herbów i zawodników. L w skali 1-20. rozgrywki2026: LM, LE, LK (faza ligowa), ELIM (odpadł w eliminacjach), BRAK (rezerwa do przyszłych sezonów). wejscie2026: runda wejścia w strukturze gry (np. LM:Q2, LE:PO, LK:league), odwzorowanie prawdziwej drogi 2026/27; null = rezerwa (docs/sila-lig-europy.md, rozdz. 5).",
     "zrodla": [
       "https://rsssf.org/tablesp/pol2026.html",
       "https://www.eska.pl/news/sport/ekstraklasa-przed-nowym-sezonem-kto-obroni-miejsce-na-podium-aa-8jYt-ZJVJ-UKZv.html",

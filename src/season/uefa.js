@@ -40,8 +40,9 @@ function shortOf(name) {
 // L z pliku danych powstało ze współczynnika klubowego UEFA (5 sezonów). Współczynnik zaniża kluby ze środka
 // Europy, które rzadko grają w fazach ligowych, a polskie kluby mają go zawyżonego ostatnimi sezonami w LK.
 // Porównanie z Elo (rozdz. 3.3) i z wynikami polskich klubów 2021-2026 (rozdz. 2) daje dla klubów zagranicznych
-// z przedziału L 10.5-13.5 niedoszacowanie ok. 0.5; elita i najsłabsze kluby są na miejscu. Korekta niżej
-// dotyczy tylko klubów zagranicznych (polskie L zostają, liga krajowa się nie zmienia).
+// z przedziału L 10.5-13.5 niedoszacowanie 0.3-1.0; elita i najsłabsze kluby są na miejscu. Korekta niżej
+// (+0.3, dobrana do bilansu dwumeczów polskich klubów z ligami równymi) dotyczy tylko klubów zagranicznych:
+// polskie L zostają, liga krajowa się nie zmienia.
 export const STRENGTH_SCALE = {
   top: { league: 'ENG', avgL: 14.6, bestL: 16.6, note: 'Premier League: przeciętny klub i czołówka' },
   ekstraklasa: { league: 'POL', avgL: 11.5, topL: 12.6, note: 'Ekstraklasa: średnia ligi i czołowe kluby' },
@@ -161,14 +162,17 @@ function newMatch(U, m) {
 }
 
 // ------------------------------------------------------------ Losowania
-/** Pary eliminacji i fazy pucharowej: rozstawieni vs nierozstawieni, bez klubów z jednego kraju. */
 // Ścieżka mistrzów w uproszczeniu: kluby z najsłabszych lig (współczynnik kraju poniżej progu) losujemy osobno,
-// jak w prawdziwych eliminacjach, gdzie mistrzowie małych federacji grają między sobą. Bez tego polskie kluby
-// w eliminacjach trafiały głównie na takie kluby, a do faz ligowych przechodziło ich za mało (docs/sila-lig-europy.md 5).
+// jak w prawdziwych eliminacjach, gdzie mistrzowie małych federacji grają między sobą. Bez tego rozstawione polskie
+// kluby w późnych rundach eliminacji trafiały zbyt często na takie kluby i za łatwo wchodziły do faz ligowych,
+// a w fazie ligowej LK brakowało słabych mistrzów (docs/sila-lig-europy.md, rozdz. 5).
 export const MINNOW_COEF = 15;
 const isMinnow = (id) => (COUNTRY_COEF_2026[countryOf(id)] ?? 0) < MINNOW_COEF;
 
-/** Pary eliminacji: osobno kluby z małych federacji i reszta (gdy obie grupy mają co najmniej 2 drużyny). */
+/**
+ * Pary eliminacji i fazy pucharowej: rozstawieni vs nierozstawieni, bez klubów z jednego kraju.
+ * paths: osobno kluby z małych federacji i reszta (gdy obie grupy mają co najmniej 2 drużyny).
+ */
 export function drawPairs(teams, rng, { seeded = true, paths = true } = {}) {
   if (paths) {
     const small = teams.filter(isMinnow); const main = teams.filter((t) => !isMinnow(t));
