@@ -9,6 +9,7 @@ import { squadOf } from '../world/worldGen.js';
 import { applyMorale } from './morale.js';
 import { applyTrust, classifyReaction, REACTIONS } from '../match/briefings.js';
 import { noteAttention, attentionNeed, daysSinceAttention, ATTN } from './attention.js';
+import { logEngage } from './authority.js';
 
 export const MEETING_TONES = {
   praise: { label: 'Pochwała', quote: '„Dobra robota w ostatnich tygodniach. Tak trzymać.”', hint: 'Działa po dobrej serii. Przy słabych wynikach brzmi fałszywie.' },
@@ -88,7 +89,9 @@ export function holdMeeting(game, tone) {
     let z = MEET_BASE[tone][sit.key] + (PERSONA[tone][p.persona] ?? 0);
     if (tone === 'unity' && unhappy >= 3) z += 0.5;
     z += (trustOf(p, game.clubId) - 50) / 50; // szacunek do trenera wzmacnia przekaz
-    z -= repeats * 0.6; // ta sama przemowa po raz kolejny działa słabiej
+    // Ta sama przemowa po raz kolejny działa słabiej, ale trafny ton nie zaczyna szkodzić od samego powtarzania
+    // (docs/bierna-gra.md, runda 2): dodatni efekt maleje do 25 %, ujemny (zły ton) zostaje bez zmian
+    if (z > 0) z *= Math.max(0.25, 1 - 0.3 * repeats);
     z += rng.gauss(0, 0.5);
     const trustD = z >= 1.6 ? 0.5 : z <= -1.2 ? -1 : 0;
     if (trustD) p.relations = { ...(p.relations ?? {}), [game.clubId]: applyTrust(p, trustD, `zebranie:${tone}`, { clubId: game.clubId, date: game.date }) };
@@ -102,6 +105,7 @@ export function holdMeeting(game, tone) {
   const neg = out.filter((r) => r.reaction === 'urazony' || r.reaction === 'zdenerwowany').length;
   const summary = pos >= out.length * 0.6 ? 'Drużyna dobrze przyjęła twoje słowa.' : neg >= out.length * 0.35 ? 'Część drużyny źle przyjęła zebranie. Atmosfera jest napięta.' : 'Reakcje są mieszane.';
   T.log = [{ date: game.date, kind: 'meeting', tone, summary }, ...T.log].slice(0, 20);
+  logEngage(game, pos >= out.length * 0.6 ? 'meetGood' : neg >= out.length * 0.35 ? 'meetBad' : 'meetMeh'); // trafność zebrania (career/authority.js)
   return { ok: true, situation: sit, players: out, summary, repeated: repeats > 0 };
 }
 
@@ -192,6 +196,7 @@ export function talkToPlayer(game, playerId, kind) {
   if (trustD) p.relations = { ...(p.relations ?? {}), [game.clubId]: applyTrust(p, trustD, `rozmowa:${kind}`, { clubId: game.clubId, date: game.date }) };
   p.morale = applyMorale(p.morale ?? 12, clamp(z, -2.5, 2.5));
   noteAttention(p, game.date);
+  logEngage(game, z >= 0.8 ? 'talkGood' : z <= -0.5 ? 'talkBad' : 'talkMeh'); // trafność rozmowy (career/authority.js)
   const reaction = classifyReaction(z * 1.8, trustD);
   T.perPlayer[playerId] = [...hist, { date: game.date, kind }];
   T.log = [{ date: game.date, kind: 'talk', playerId, talk: kind, reaction, reply }, ...T.log].slice(0, 20);

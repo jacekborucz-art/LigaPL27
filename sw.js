@@ -80,6 +80,7 @@ const SHELL = [
   './src/app.js',
   './src/career/acclimatization.js',
   './src/career/attention.js',
+  './src/career/authority.js',
   './src/career/board.js',
   './src/career/careerSystem.js',
   './src/career/coachMarket.js',

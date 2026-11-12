@@ -6,6 +6,7 @@
 import { trainingMatchInput } from '../training/index.js';
 import { recordMatch, scoutingNote, scoutingWarning } from '../training/scouting.js';
 import { noteAttention } from '../career/attention.js';
+import { logEngage } from '../career/authority.js';
 import { stadiumCapacity } from '../career/finance.js';
 import { attendanceModifier } from '../career/fans.js';
 import { Rng } from '../core/rng.js';
@@ -256,7 +257,7 @@ export function doPreBriefing(game, S, tone, talks = []) {
   const res = preMatchBriefing({ players: matchSquadPlayers(game, S), tone, talks, memory: S.memory, ctx: { ...S.pre.forBriefing, clubId: game.clubId, date: S.f.date }, seed: `${game.seed}:${S.f.id}:pre` });
   S.memory = res.memory;
   S.briefings.pre = res;
-  markTalks(game, talks, S.f.date);
+  markTalks(game, talks, S.f.date, res);
   // Skutki dla morale tylko raz na mecz (powtórzona odprawa po ponownym wejściu w dzień meczowy działa tylko w meczu)
   if (!mdDone(game, S.f.id, 'pre-speech')) {
     for (const p of matchSquadPlayers(game, S)) { const w = game.world.players[p.id]; if (w) Object.assign(w, applyBriefing(w, res)); }
@@ -266,8 +267,13 @@ export function doPreBriefing(game, S, tone, talks = []) {
 }
 
 /** Rozmowa indywidualna na odprawie liczy się jako uwaga trenera (career/attention.js). */
-function markTalks(game, talks, date) {
-  for (const t of talks ?? []) noteAttention(game.world.players[t.id], date);
+function markTalks(game, talks, date, res = null) {
+  for (const t of talks ?? []) {
+    noteAttention(game.world.players[t.id], date);
+    // Autorytet liczy trafność rozmowy, nie samą rozmowę (career/authority.js)
+    const r = res?.players?.find((x) => x.id === t.id)?.reaction;
+    logEngage(game, r === 'zmotywowany' || r === 'spokojny' ? 'talkGood' : r === 'urazony' || r === 'zdenerwowany' ? 'talkBad' : 'talkMeh', date);
+  }
 }
 
 function personaMix(squad) {
@@ -354,7 +360,7 @@ export function doHalfBriefing(game, S, tone, talks = []) {
   const res = halftimeBriefing({ players: onPitchPlayers(S), tone, talks, memory: S.memory, ctx: { ...h, clubId: game.clubId, rank: S.pre.forBriefing.rank, pWin: S.pre.forBriefing.pWin, date: S.f.date }, seed: `${game.seed}:${S.f.id}:half` });
   S.memory = res.memory;
   S.briefings.half = res;
-  markTalks(game, talks, S.f.date);
+  markTalks(game, talks, S.f.date, res);
   const T = S.M.teams[S.userSide];
   for (const x of [...T.players, ...T.bench]) if (res.engine.zStart[x.id] != null) x.Z = res.engine.zStart[x.id];
   // AI rywala też ma odprawę
@@ -571,7 +577,7 @@ export function doPostBriefing(game, S, tone, talks = []) {
   const res = postMatchBriefing({ players, tone, talks, memory: S.memory, ctx: S.post.forBriefing, seed: `${game.seed}:${S.f.id}:post` });
   S.memory = res.memory;
   S.briefings.post = res;
-  markTalks(game, talks, S.f.date);
+  markTalks(game, talks, S.f.date, res);
   for (const p of players) { const w = game.world.players[p.id]; if (w) Object.assign(w, applyBriefing(w, res)); }
   return res;
 }
@@ -786,6 +792,8 @@ function settlePress(game, S, eff, phase = 'post') {
   if (msgs.length) game.inbox = addMessages(game.inbox ?? [], msgs).inbox;
   slot.result = eff;
   slot.settled = true;
+  // Obecność w mediach i jej jakość (career/authority.js): pominięcie i wyjście z sali to brak trenera
+  logEngage(game, eff.mode === 'answered' ? (eff.teamMorale >= 0 && eff.board >= 0 ? 'pressGood' : 'press') : 'pressSkip', S.f.date);
   markDone(game, S.f.id, `press-${phase}`);
   return eff;
 }
