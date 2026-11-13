@@ -133,8 +133,11 @@ test('Czerwona po wykorzystaniu wszystkich zmian i kontuzja bez zmian: gra w 10 
     assert.ok(['442def', '541'].includes(T.formation.id), `ustawienie ${T.formation.id}`);
     assert.equal(M.events.slice(from).find((e) => e.type === 'red').second, true);
   }
-  {
-    const { M, T, from } = setup('injall', { min: 85 });
+  // Kontuzja bez zmian: trener reorganizuje drużynę z prawdopodobieństwem ok. 0,95 (zależnie od umiejętności),
+  // więc sprawdzamy serię meczów zamiast jednego ziarna
+  let reorganized = 0; const runs = 12;
+  for (let i = 0; i < runs; i++) {
+    const { M, T, from } = setup(`injall${i}`, { min: 85 });
     T.subsUsed = T.subsLimit;
     const x = T.players.find((y) => y.on && y.slot.pos === 'ŚO');
     const before = fieldPlayers(T).length; // wcześniejsza czerwona w tym ziarnie jest możliwa
@@ -144,8 +147,9 @@ test('Czerwona po wykorzystaniu wszystkich zmian i kontuzja bez zmian: gra w 10 
     assert.equal(inj.canContinue, false);
     assert.equal(inj.severity, 'severe');
     assert.equal(fieldPlayers(T).length, before - 1);
-    assert.ok(M.events.slice(from).some((e) => e.type === 'tactic' && e.side === 0 && e.patch.drop));
+    if (M.events.slice(from).some((e) => e.type === 'tactic' && e.side === 0 && e.patch.drop)) reorganized++;
   }
+  assert.ok(reorganized >= runs - 2, `reorganizacja w ${reorganized} z ${runs} meczów`);
 });
 
 test('Zmiany AI są pozycyjnie sensowne: kontuzjowanego środkowego obrońcę zastępuje obrońca', () => {

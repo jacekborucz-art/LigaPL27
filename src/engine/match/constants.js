@@ -88,6 +88,23 @@ export const INJURY_TYPES = {
 // Lekkie urazy: gra z bólem (docs/taktyka-i-urazy.md) [SZAC]. Typ z nazwy urazu grywalnego (INJURY_TYPES.light).
 // pen: kara do formy w meczu (x OVR), agg: szansa pogłębienia na minutę gry z urazem, ext: dni przerwy więcej
 // za każde pełne 30 min gry z urazem, worse: uraz po pogłębieniu [nazwa, min dni, max dni] (zejście z boiska).
+/**
+ * Skutki zmęczenia w meczu (oprócz ogólnej kary -0,04 za punkt kondycji poniżej 85, teams.js/core.js).
+ * Zmęczony zawodnik jest wolniejszy (kontry, pojedynki szybkościowe), zmęczeni i grający poza pozycją
+ * obrońcy częściej popełniają błędy prowadzące do strzału, zmęczeni częściej faulują.
+ * Wszystko liczone względem stanu z początku meczu, więc przy świeżych składach nic się nie zmienia.
+ * Te same zasady dla gracza i AI. Wartości balansowe [SZAC], pomiar w docs/zmeczenie.md.
+ */
+export const FATIGUE = {
+  speedFrom: 85, speedLoss: 0.007, // szybkość x (1 - 0,007 za punkt kondycji poniżej 85): 60 -> -17,5 %
+  paceK: 0.12, paceCap: 3, // różnica szybkości atak-obrona względem początku meczu, w punktach atrybutu (maks. +-0,36)
+  errBase: 0.06, // błąd obrony przy wygranej piłce: 0,06 x (czynnik błędów - 1)
+  errFrom: 75, errPerPt: 0.02, // zmęczenie obrońcy: +2 % ryzyka błędu za punkt kondycji poniżej 75
+  errXg: [0.12, 0.35], // błąd przy wyprowadzeniu: dobra sytuacja
+  foulFrom: 70, foulPerPt: 0.025, // zmęczony fauluje częściej: +2,5 % wagi za punkt kondycji poniżej 70
+  tacFoulTired: 0.5, // spóźniony obrońca: faul taktyczny przy kontrze do +50 % (cała obrona zmęczona)
+};
+
 export const KNOCK = {
   types: {
     contusion: { name: 'stłuczenie', pen: 0.03, agg: 0.0010, ext: 0, worse: ['krwiak mięśnia po stłuczeniu', 8, 16] },
