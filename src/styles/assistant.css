@@ -1,0 +1,112 @@
+/* Raport asystenta o zawodniku (src/ui/assistantReportView.js). Telefon najpierw, tokeny z tokens.css.
+   Kolory znaczeniowe jak na ekranie Trening: zielony dobrze, bursztyn uwaga, czerwony źle, niebieski informacja,
+   fiolet ocena ukryta i rozwój. Karta: lekko zabarwione tło i kolorowy pasek u góry. */
+
+.arep {
+  --ar-good: #2E8A4E; --ar-warn: #C98A12; --ar-bad: var(--kartka-czerwona); --ar-info: #2D6A8F; --ar-misc: #6B4FB0;
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); align-content: start;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .arep { --ar-good: #3FA463; --ar-warn: #E0A21C; --ar-bad: #E05A5A; --ar-info: #4A8FC4; --ar-misc: #8F74D6; } }
+:root[data-theme="dark"] .arep { --ar-good: #3FA463; --ar-warn: #E0A21C; --ar-bad: #E05A5A; --ar-info: #4A8FC4; --ar-misc: #8F74D6; }
+
+.arep > * { min-width: 0; }
+.arep > .btn { justify-self: start; }
+.arep [data-t="good"] { --t: var(--ar-good); }
+.arep [data-t="warn"] { --t: var(--ar-warn); }
+.arep [data-t="bad"] { --t: var(--ar-bad); }
+.arep [data-t="info"] { --t: var(--ar-info); }
+.arep [data-t="misc"] { --t: var(--ar-misc); }
+
+/* Nagłówek: pozycja, nazwisko, pewność oceny */
+.arep__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); }
+.arep__pos { min-width: 44px; min-height: 44px; font-size: var(--step-0); }
+.arep__who { flex: 1 1 200px; min-width: 0; }
+.arep__kicker { margin: 0; font: 700 var(--step--1)/1.2 var(--font-display); letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
+.arep__name { margin: 0; font-size: var(--step-3); line-height: 1.05; overflow-wrap: anywhere; }
+.arep__who .muted { margin: 2px 0 0; font-size: var(--step--1); }
+.arep__conf {
+  --t: var(--ar-info);
+  display: grid; gap: 2px; min-width: 0; padding: 8px 12px; border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--t) 8%, var(--surface)); border: 1px solid color-mix(in srgb, var(--t) 30%, var(--line));
+}
+.arep__conf[data-prec="exact"] { --t: var(--ar-good); }
+.arep__conf[data-prec="approx"] { --t: var(--ar-warn); }
+.arep__conf[data-prec="vague"] { --t: var(--ar-bad); }
+.arep__conf-k { font: 600 12px/1.2 var(--font-body); color: var(--text-muted); }
+.arep__conf-v { display: flex; align-items: center; gap: 10px; }
+.arep__conf-v b { font: 700 var(--step-1)/1 var(--font-display); text-transform: capitalize; }
+.arep__conf small { font-size: 12px; color: var(--text-muted); }
+.arep__dots { display: inline-flex; gap: 4px; }
+.arep__dots i { width: 18px; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--t) 22%, var(--line)); }
+.arep__dots i.on { background: var(--t); }
+
+.arep__summary {
+  margin: 0; padding: 12px 14px; border-radius: var(--radius-m); background: var(--surface);
+  border-left: 4px solid var(--accent); font-size: var(--step-0); line-height: 1.45;
+}
+
+/* Karty: zalecenia na całą szerokość, pozostałe w kolumnach gazetowych (karty różnej wysokości bez dziur) */
+.arep__grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+.arep-card {
+  --t: var(--ar-info);
+  display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; margin: 0;
+  padding: 12px 14px 14px; border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--t) 6%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--t) 24%, var(--line)); border-top: 4px solid var(--t);
+}
+.arep-card__head { display: flex; align-items: center; justify-content: space-between; gap: 6px 10px; flex-wrap: wrap; }
+.arep-card__head h3 { margin: 0; font: 700 var(--step-1)/1.15 var(--font-display); }
+.arep-card__badge {
+  padding: 2px 9px; border-radius: 999px; font: 700 var(--step--1)/1.35 var(--font-display); white-space: nowrap;
+  background: color-mix(in srgb, var(--t) 20%, transparent); color: color-mix(in srgb, var(--t) 55%, var(--text));
+}
+.arep-card__body { display: grid; gap: var(--space-2); min-width: 0; }
+.arep-card__body p { margin: 0; }
+.arep-card h4 { margin: var(--space-1) 0 0; font: 700 var(--step-0)/1.2 var(--font-display); }
+.arep-note { font-size: 12.5px; color: var(--text-muted); }
+
+/* Zalecenia */
+.arep-recs { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.arep-rec {
+  display: grid; grid-template-columns: 12px minmax(0, 1fr); gap: 6px 10px; align-items: start;
+  padding: 10px 12px; border-radius: var(--radius-s); background: var(--surface); border: 1px solid color-mix(in srgb, var(--t) 30%, var(--line));
+}
+.arep-rec__dot { width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; background: var(--t); }
+.arep-rec__text { display: grid; gap: 2px; min-width: 0; }
+.arep-rec__text b { font-weight: 600; }
+.arep-rec__text small { font-size: 12.5px; color: var(--text-muted); }
+.arep-rec__go { grid-column: 2; justify-self: start; border-color: color-mix(in srgb, var(--t) 50%, var(--line)); }
+.arep-rec__go:hover { background: color-mix(in srgb, var(--t) 12%, var(--surface)); }
+
+/* Cechy ukryte, strony, pozycje, listy klucz-wartość */
+.arep-hid, .arep-sides, .arep-poslist { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.arep-hid li { display: grid; grid-template-columns: minmax(0, 42%) minmax(0, 1fr); gap: 8px; align-items: baseline; padding-bottom: 6px; border-bottom: 1px dashed var(--line); }
+.arep-hid li:last-child { border-bottom: 0; padding-bottom: 0; }
+.arep-hid__k { font-size: var(--step--1); color: var(--text-muted); }
+.arep-hid__v { font-weight: 600; }
+.arep-hid li[data-t="good"] .arep-hid__v, .arep-hid li[data-t="bad"] .arep-hid__v { color: color-mix(in srgb, var(--t) 70%, var(--text)); }
+.arep-hid__v small { font-weight: 400; color: var(--text-muted); }
+.arep-sides li { display: grid; gap: 1px; }
+.arep-sides b { font: 600 12px/1.2 var(--font-body); color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.arep-poslist li { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.arep-poslist small { color: var(--text-muted); }
+.arep-pos { display: inline-grid; place-items: center; min-width: 38px; padding: 2px 6px; border-radius: var(--radius-s); background: var(--surface-stripe); font: 700 12px/1.3 var(--font-display); }
+.arep-kv { display: grid; gap: 6px; margin: 0; }
+.arep-kv > div { display: grid; grid-template-columns: minmax(0, 40%) minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.arep-kv dt { font-size: var(--step--1); color: var(--text-muted); }
+.arep-kv dd { margin: 0; overflow-wrap: anywhere; }
+.arep-kv > div[data-t="bad"] dd, .arep-kv > div[data-t="warn"] dd { color: color-mix(in srgb, var(--t) 70%, var(--text)); font-weight: 600; }
+
+@media (min-width: 720px) {
+  .arep__grid { display: block; columns: 2; column-gap: var(--space-3); }
+  .arep__grid > .arep-card { break-inside: avoid; margin-bottom: var(--space-3); }
+  .arep-recs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1280px) {
+  .hub__main:has(.arep) { max-width: 1320px; }
+  .arep__grid { columns: 3; }
+  .arep-recs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 1600px) {
+  .hub__main:has(.arep) { max-width: 1600px; }
+}

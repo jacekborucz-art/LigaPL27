@@ -57,6 +57,8 @@ export const NAV = {
   training: (id) => ({ steps: [{ act: 'tab', tab: 'trening' }, { act: 'tr-tab', tab: 'zawodnicy' }, { act: 'tr-player', id }], focus: '[data-act="tr-pback"]' }),
   report: () => ({ steps: [{ act: 'tab', tab: 'trening' }, { act: 'tr-tab', tab: 'rozwoj' }], focus: '[data-act="tr-tab"][data-tab="rozwoj"]' }),
   card: (id, own) => ({ steps: [{ act: 'tab', tab: 'transfery', sub: own ? 'kontrakty' : 'rynek' }, { act: 'tf-open', id }], focus: '[data-act="tf-close"]' }),
+  // Raport asystenta o zawodniku (src/ui/assistantReportView.js): otwiera się w bieżącej zakładce, „Wróć” wraca na ekran
+  assistant: (id) => ({ steps: [{ act: 'arep', id }], focus: '[data-act="arepback"]' }),
 };
 const withSteps = (nav, extra, more = {}) => ({ ...nav, steps: [...nav.steps, ...extra], ...more });
 
@@ -319,8 +321,9 @@ export function playerMenu(game, pid, { view, ui = {}, why = null, lineup = null
   const academy = !!game.world.clubs?.[game.clubId]?.academy?.includes(p.id);
   const profile = item('Profil zawodnika', NAV.profile(p.id), { primary: view === 'squad', hint: 'Atrybuty, stan, kontrakt, charakter' });
   const stats = item('Statystyki i historia', NAV.stats(p.id), { hint: 'Mecze, gole, asysty i oceny w rozgrywkach, kluby' });
+  const report = ui.repOpen === p.id ? null : item('Raport asystenta', NAV.assistant(p.id), { hint: 'Ukryte cechy, stan, zalecenia' });
   if (academy) {
-    return { ...head, note: 'Akademia', items: tidy([view === 'profile' ? null : profile, SEP, ...trainingItems(p, { inEditor: view === 'training' && ui.trPlayer === p.id })]) };
+    return { ...head, note: 'Akademia', items: tidy([view === 'profile' ? null : profile, report, SEP, ...trainingItems(p, { inEditor: view === 'training' && ui.trPlayer === p.id })]) };
   }
   const inLineup = !!L?.byId?.has(p.id);
   const lineupNav = inLineup ? item('Pokaż w składzie', NAV.lineup(locKey(locOf(L.tactics, p.id))), { hint: 'Skład i taktyka, zawodnik wybrany' }) : null;
@@ -335,21 +338,21 @@ export function playerMenu(game, pid, { view, ui = {}, why = null, lineup = null
       items = [
         ...lineupItems(p, L ?? { tactics: null, byId: new Map() }, { inTactics: true, ui }),
         ui.tInfo === p.id ? null : item('Atrybuty', { steps: [{ act: 'tinfo', id: p.id }] }, { hint: 'Panel atrybutów i stanu' }),
-        SEP, profile, talk, training, contractSub,
+        SEP, profile, report, talk, training, contractSub,
       ];
       break;
     case 'talks':
-      items = [talkMenu(game, p, 'Porozmawiaj'), SEP, profile, training, lineupNav, contractSub];
+      items = [talkMenu(game, p, 'Porozmawiaj'), SEP, profile, report, training, lineupNav, contractSub];
       break;
     case 'training': {
       const inEditor = ui.trPlayer === p.id;
       const tr = trainingItems(p, { inEditor }).map((x) => (x.label === 'Ustawienia treningu' ? { ...x, primary: true } : x));
-      items = [...tr, ui.trTab === 'rozwoj' ? null : item('Raport rozwoju', NAV.report(), { hint: 'Kto rośnie, a kto spada' }), SEP, profile, talk, contractSub];
+      items = [...tr, ui.trTab === 'rozwoj' ? null : item('Raport rozwoju', NAV.report(), { hint: 'Kto rośnie, a kto spada' }), SEP, profile, report, talk, contractSub];
       break;
     }
     case 'transfers': {
       const cardOpen = ui.tfPlayer === p.id;
-      items = [cardOpen ? null : item('Karta transferowa', NAV.card(p.id, true), { primary: true, hint: 'Kontrakt, lista, rozwiązanie' }), profile, SEP, ...contract, SEP, talk, training];
+      items = [cardOpen ? null : item('Karta transferowa', NAV.card(p.id, true), { primary: true, hint: 'Kontrakt, lista, rozwiązanie' }), profile, report, SEP, ...contract, SEP, talk, training];
       break;
     }
     case 'dashboard': {
@@ -360,17 +363,17 @@ export function playerMenu(game, pid, { view, ui = {}, why = null, lineup = null
       const future = item('Rozmowa o przyszłości', { steps: [{ act: 'tt-talk', id: p.id, kind: 'future' }], toast: true }, {
         disabled: talkBlockedText(game, p.id),
       });
-      if (why === 'inj' || (!why && lp.injuryDays > 0)) items = [ret, profile, training, lineupNav, SEP, talk];
-      else if (why === 'susp' || why === 'call') items = [lineupNav && { ...lineupNav, primary: true, hint: 'Znajdź zastępcę na najbliższy mecz' }, profile, SEP, talk];
-      else if (why === 'contract') items = [{ ...contract[0], primary: true }, future, SEP, profile, ...contract.slice(1)];
-      else items = [profile, stats, lineupNav, talk, training, contractSub];
+      if (why === 'inj' || (!why && lp.injuryDays > 0)) items = [ret, profile, report, training, lineupNav, SEP, talk];
+      else if (why === 'susp' || why === 'call') items = [lineupNav && { ...lineupNav, primary: true, hint: 'Znajdź zastępcę na najbliższy mecz' }, profile, report, SEP, talk];
+      else if (why === 'contract') items = [{ ...contract[0], primary: true }, future, SEP, profile, report, ...contract.slice(1)];
+      else items = [profile, report, stats, lineupNav, talk, training, contractSub];
       break;
     }
     case 'profile':
-      items = [stats, lineupNav, inLineup ? sub('Skład meczowy', lineupItems(p, L)) : null, talk, training, SEP, ...contract];
+      items = [stats, report, lineupNav, inLineup ? sub('Skład meczowy', lineupItems(p, L)) : null, talk, training, SEP, ...contract];
       break;
     default: // squad
-      items = [profile, stats, inLineup ? sub('Skład meczowy', [...lineupItems(p, L), SEP, lineupNav]) : null, talk, training, SEP, ...contract];
+      items = [profile, report, stats, inLineup ? sub('Skład meczowy', [...lineupItems(p, L), SEP, lineupNav]) : null, talk, training, SEP, ...contract];
   }
   return { ...head, items: tidy(items) };
 }

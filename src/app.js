@@ -50,6 +50,8 @@ import { runDecision } from './core/decisions.js';
 import { startNegotiation, renderNegotiation, handleNegotiationAction, isNegotiationAction, readNegotiationForm, refreshNegotiationHints } from './ui/negotiationView.js';
 import { bindContextTrigger, openMenu, showToast } from './ui/contextMenu.js';
 import { playerMenu } from './ui/playerMenus.js';
+import { renderAssistantReport } from './ui/assistantReportView.js';
+import { ensureAssistantReport } from './career/assistantReport.js';
 import { renderMenu, renderCareer, newCareerState, maybePlayIntro, readTheme, applyTheme, nextTheme, nameError, ageError, profileOf, randomCoach, updateCoachPreview, setFieldError, isNationality, managerName, AGE_MIN, AGE_MAX } from './ui/menuView.js';
 
 const app = document.getElementById('app');
@@ -123,6 +125,7 @@ function ensureGameShape(g) {
   ensureTraining(g);
   ensureCareer(g);
   ensureHistory(g); // historia meczów drużyny gracza (stare zapisy: bieżący sezon z terminarza)
+  ensureAssistantReport(g); // raport asystenta: częstotliwość i dziennik urazów (stare zapisy: co 2 tygodnie)
   if (!g.inbox.length) {
     g.inbox = [];
     const today = g.date;
@@ -239,6 +242,8 @@ function renderHub() {
 }
 
 function renderTab(tab, g, club) {
+  // Raport asystenta o zawodniku (menu zawodnika): pełna strona w bieżącej zakładce
+  if (state.repOpen && g.world.players[state.repOpen]?.clubId === g.clubId) return renderAssistantReport(g, state.repOpen);
   // Profil zawodnika innego klubu (z karty transferowej albo z menu): tylko podgląd, bez danych wewnętrznych klubu
   const ext = state.extPlayer && g.world.players[state.extPlayer.id];
   if (!ext && state.extClub) return renderClubView(g, state.extClub);
@@ -931,6 +936,7 @@ async function newGame(slot, clubId, profile = null) {
   state.game = game;
   state.slot = slot;
   state.nc = null;
+  state.repOpen = null;
   await save();
   state.screen = 'hub';
   state.tab = 'pulpit'; // po podpisaniu kontraktu start na Pulpicie
@@ -1046,7 +1052,7 @@ async function dispatchAct(el, { root = app } = {}) {
       await new Promise((r) => setTimeout(r, matchMedia('(prefers-reduced-motion: reduce)').matches ? 150 : 450)); // podpis widoczny przed generowaniem świata
       await newGame(nc.slot, nc.clubId, profileOf(nc));
     }
-    if (act === 'tab') { state.tab = el.dataset.tab; state.mailOpen = null; state.playerOpen = null; state.fx = null; state.extPlayer = null; state.extClub = null; if (el.dataset.sub) state.tfTab = el.dataset.sub; render(); }
+    if (act === 'tab') { state.tab = el.dataset.tab; state.mailOpen = null; state.playerOpen = null; state.repOpen = null; state.fx = null; state.extPlayer = null; state.extClub = null; if (el.dataset.sub) state.tfTab = el.dataset.sub; render(); }
     // Terminarz i wyniki (Pulpit > Pokaż wszystko): sezon, rozgrywki, miejsce meczu
     if (act === 'fixtures') { state.tab = 'pulpit'; state.fx = { season: null, comp: 'all', venue: 'all' }; render(); window.scrollTo({ top: 0 }); app.querySelector('.fxs h2')?.setAttribute('tabindex', '-1'); app.querySelector('.fxs h2')?.focus({ preventScroll: true }); }
     if (act === 'fxback') { state.fx = null; render(); app.querySelector('[data-act="fixtures"]')?.focus(); }
@@ -1094,6 +1100,8 @@ async function dispatchAct(el, { root = app } = {}) {
     if (act === 'sqsort') { const k = el.dataset.k; state.sqSort = state.sqSort?.k === k ? { k, dir: state.sqSort.dir === 'desc' ? 'asc' : 'desc' } : { k, dir: k === 'name' || k === 'pos' ? 'asc' : 'desc' }; render(); }
     if (act === 'player') { state.playerOpen = el.dataset.id; render(); window.scrollTo({ top: 0 }); }
     if (act === 'squadback') { state.playerOpen = null; render(); }
+    if (act === 'arep') { state.repOpen = el.dataset.id; render(); window.scrollTo({ top: 0 }); }
+    if (act === 'arepback') { state.repOpen = null; render(); }
     if (act === 'extplayer') {
       const id = el.dataset.id; const pl = state.game?.world.players[id];
       if (pl && pl.clubId === state.game.clubId) { state.extPlayer = null; state.tab = 'kadra'; state.sqSub = 'players'; state.playerOpen = id; }
@@ -1146,7 +1154,7 @@ async function dispatchAct(el, { root = app } = {}) {
     if (act === 'load' || act === 'continue') {
       const rec = await store.loadSlot(slot);
       if (!rec) throw new Error('Ten slot jest pusty.');
-      state.game = ensureGameShape(rec.game); state.slot = slot; state.screen = 'hub'; state.tab = 'pulpit'; state.confirmDel = null; render();
+      state.game = ensureGameShape(rec.game); state.slot = slot; state.screen = 'hub'; state.tab = 'pulpit'; state.confirmDel = null; state.repOpen = null; render();
     }
     // Usunięcie zapisu: potwierdzenie w wierszu slotu (bez okna przeglądarki)
     if (act === 'delete') { state.confirmDel = slot; state.menuFocus = `[data-act="deleteNo"][data-slot="${slot}"]`; render(); }
