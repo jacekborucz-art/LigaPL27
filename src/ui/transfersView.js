@@ -356,7 +356,7 @@ function contractsView(game, ui) {
   const L = limitStatus(game);
   const rows = squadOf(game.world, game.clubId).map((p) => ({ p, ml: monthsLeft(game, p) }));
   const val = (x, k) => (k === 'pos' ? POS_ORDER.indexOf(x.p.pos) : k === 'name' ? x.p.name : k === 'ovr' ? x.p.ovr : k === 'wage' ? x.p.contract.wage
-    : k === 'until' ? x.ml : k === 'age' ? x.p.age : k === 'value' ? x.p.value ?? 0 : k === 'share' ? x.p.contract.wage / Math.max(1, bill) : 0);
+    : k === 'until' ? x.p.contract.until : k === 'age' ? x.p.age : k === 'value' ? x.p.value ?? 0 : k === 'share' ? x.p.contract.wage / Math.max(1, bill) : 0);
   const sorted = sortBy(rows, sort, val);
   const head = `<tr>${th('c', 'pos', 'Poz.', sort, { cls: 'xl__pos', first: 'asc' })}${th('c', 'name', 'Zawodnik', sort, { cls: 'xl__nm', first: 'asc' })}${th('c', 'ovr', 'OVR', sort)}
     ${th('c', 'until', 'Kontrakt do', sort, { first: 'asc' })}${th('c', 'wage', 'Pensja', sort, { title: 'Pensja tygodniowo', cls: 'tf-num' })}${th('c', 'share', 'Udział w płacach', sort, { cls: 'tf-l' })}
@@ -414,6 +414,9 @@ function offersView(game) {
     const [txt, k] = t.accepted ? [`przyjęta: ${fmtZl(t.accepted)}`, 'good'] : t.until ? [`przerwa do ${fmtDate(t.until)}`, 'bad'] : t.counter ? [`klub chce ${fmtZl(t.counter)}`, 'warn'] : ['odrzucona', 'bad'];
     return `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${esc(p.name)}<em>${esc(clubById(p.clubId)?.name ?? 'bez klubu')}</em></span><small data-k="${k}">${esc(txt)}</small></button></li>`;
   }).join('')}</ul>` : '<p class="tf-p__txt">Nie prowadzisz rozmów. Ofertę złożysz z karty zawodnika na Rynku.</p>';
+  const listedOwn = Object.entries(game.market.userListed).map(([id, price]) => ({ p: game.world.players[id], price })).filter((x) => x.p && x.p.clubId === game.clubId);
+  const ownListed = listedOwn.length ? `<ul class="tf-mini">${listedOwn.map(({ p, price }) => `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${esc(p.name)}<em>OVR ${ovrTxt(p)}, wartość ${fmtZl(p.value)}</em></span><small>${fmtZl(price)}</small></button></li>`).join('')}</ul>`
+    : '<p class="tf-p__txt">Nikogo nie wystawiłeś. Zrobisz to w karcie zawodnika (zakładka Kontrakty).</p>';
   const ownMoves = hist.length ? `<ul class="tf-mini tf-mini--moves">${hist.map((h) => {
     const sold = h.from === game.clubId;
     return `<li${game.world.players[h.playerId] ? ` data-pid="${esc(h.playerId)}"` : ''}><div><span class="tf-dir" data-k="${sold ? 'out' : 'in'}">${sold ? 'Odszedł' : 'Przyszedł'}</span><span>${esc(h.name)}<em>${esc(sold ? `do ${h.to ? clubById(h.to)?.name ?? '' : 'bez klubu'}` : `z ${h.from ? clubById(h.from)?.name ?? '' : 'wolny'}`)}, ${esc(shortDate(h.date))}</em></span><b>${esc(terms(h))}</b></div></li>`;
@@ -426,6 +429,7 @@ function offersView(game) {
   return `<div class="tf-grid tf-grid--offers">
       <div class="tf-main tf-stack">
         ${panel('Oferty za twoich zawodników', open.length ? 'warn' : 'info', incoming, { count: open.length })}
+        ${panel('Twoi zawodnicy na liście transferowej', 'warn', ownListed, { count: listedOwn.length })}
         ${panel('Twoje rozmowy z klubami', 'info', talks, { count: mine.length })}
         ${panel('Transfery twojego klubu', 'good', ownMoves, { count: hist.length })}
       </div>
@@ -476,12 +480,18 @@ function financeView(game) {
       ${kpi('Wynik sezonu', `<span class="${s.net < 0 ? 'neg' : ''}">${s.net >= 0 ? '+' : ''}${fmtZl(s.net)}</span>`, `przychody ${fmtZl(s.income)}, koszty ${fmtZl(s.expense)}`, s.net < 0 ? 'bad' : 'good')}
     </div>
     <div class="tf-fin">
-      ${panel('Przychody w sezonie', 'good', moneyBars(s.in), { cls: 'tf-fin__in' })}
-      ${panel('Koszty w sezonie', 'bad', moneyBars(s.out), { cls: 'tf-fin__out' })}
-      ${panel('Miesiąc po miesiącu', 'info', monthsChart(c), { cls: 'tf-fin__chart' })}
-      ${panel(`Ten miesiąc (${monthName})`, 'misc', `<div class="tf-month"><div><h4>Przychody</h4>${moneyBars(m.in)}</div><div><h4>Koszty</h4>${moneyBars(m.out)}</div></div>
-        <p class="tf-sum tf-sum--net"><span>Wynik miesiąca</span><b class="${m.net < 0 ? 'neg' : ''}">${m.net >= 0 ? '+' : ''}${fmtZl(m.net)}</b></p>`, { cls: 'tf-fin__month' })}
-      ${panel('Ostatnie operacje', 'info', `<ul class="tf-log">${c.log.slice(0, 15).map((l) => `<li><time>${esc(shortDate(l.date))}</time><span>${esc(l.note)}</span><b data-k="${l.dir}">${l.dir === 'out' ? '-' : '+'}${fmtZl(l.amount)}</b></li>`).join('') || '<li><span>Brak.</span></li>'}</ul>`, { cls: 'tf-fin__log' })}
+      <div class="tf-stack">
+        ${panel('Przychody w sezonie', 'good', moneyBars(s.in))}
+        ${panel('Koszty w sezonie', 'bad', moneyBars(s.out))}
+      </div>
+      <div class="tf-stack">
+        ${panel('Miesiąc po miesiącu', 'info', monthsChart(c))}
+        ${panel(`Ten miesiąc (${monthName})`, 'misc', `<div class="tf-month"><div><h4>Przychody</h4>${moneyBars(m.in)}</div><div><h4>Koszty</h4>${moneyBars(m.out)}</div></div>
+          <p class="tf-sum tf-sum--net"><span>Wynik miesiąca</span><b class="${m.net < 0 ? 'neg' : ''}">${m.net >= 0 ? '+' : ''}${fmtZl(m.net)}</b></p>`)}
+      </div>
+      <div class="tf-stack">
+        ${panel('Ostatnie operacje', 'info', `<ul class="tf-log">${c.log.slice(0, 15).map((l) => `<li><time>${esc(shortDate(l.date))}</time><span>${esc(l.note)}</span><b data-k="${l.dir}">${l.dir === 'out' ? '-' : '+'}${fmtZl(l.amount)}</b></li>`).join('') || '<li><span>Brak.</span></li>'}</ul>`)}
+      </div>
     </div>`;
 }
 
@@ -526,7 +536,7 @@ export function renderTransfers(game, ui = {}) {
   const tabs = `<div class="subtabs subtabs--5" role="tablist">${TF_TABS.map(([k, l]) => `<button role="tab" data-act="tf-tab" data-t="${k}" aria-selected="${tab === k}">${l}</button>`).join('')}</div>`;
   const p = ui.tfPlayer && game.world.players[ui.tfPlayer];
   let body;
-  if (p && (tab === 'rynek' || tab === 'kontrakty')) body = playerCard(game, p, ui);
+  if (p && (tab === 'rynek' || tab === 'kontrakty' || tab === 'oferty')) body = playerCard(game, p, ui);
   else if (tab === 'oferty') body = offersView(game);
   else if (tab === 'kontrakty') body = contractsView(game, ui);
   else if (tab === 'finanse') body = financeView(game);

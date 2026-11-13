@@ -134,7 +134,7 @@ function campBanner(game, tab) {
     </div>
     <div class="tr-campbar__when">
       <span class="tr-campbar__dates"><span>${esc(fmtDate(b.from))}</span><i aria-hidden="true">&rarr;</i><span>${esc(fmtDate(b.to))}</span></span>
-      <small>od ${esc(weekday(b.from))} do ${esc(weekday(b.to))}</small>
+      <small>Wyjazd: ${esc(weekday(b.from))}, powrót: ${esc(weekday(b.to))}</small>
     </div>
     <span class="tr-campbar__status" data-on="${on}">${esc(status)}</span>
     ${tab !== 'obozy' ? '<button class="btn tr-mini tr-campbar__go" data-act="tr-tab" data-tab="obozy">Szczegóły obozu</button>' : ''}
@@ -190,10 +190,17 @@ function dashCamp(game) {
   const b = activeCamp(game);
   if (b) {
     const on = game.date >= b.from;
+    const pv = campPreview(game, b.half, b.dest, b.days);
+    const frs = clubFriendlies(game).filter((f) => f.date >= b.from && f.date <= b.to).length;
     const body = `<p class="tr-big">${esc(b.place)}</p>
       <p class="tr-dates"><b>${esc(fmtDate(b.from))}</b> <span>do</span> <b>${esc(fmtDate(b.to))}</b></p>
-      <p class="muted">${esc(HALF_NAMES[b.half])}, ${b.days} dni, warunki ${pct(b.q)}, koszt ${esc(formatZl(b.cost))}.</p>
-      ${campDays(game, b)}`;
+      <dl class="tr-facts tr-facts--2">
+        <div><dt>Długość</dt><dd>${b.days} dni, warunki ${pct(b.q)}</dd></div>
+        <div><dt>Koszt</dt><dd>${esc(formatZl(b.cost))}</dd></div>
+        <div><dt>Forma bazowa (szacunek)</dt><dd>${pct(pv.base)}, bez obozu ${pct(pv.none)}</dd></div>
+        <div><dt>Sparingi na obozie</dt><dd>${frs || 'brak'}</dd></div>
+      </dl>
+      <p class="muted">${on ? 'Drużyna jest na obozie: szybszy rozwój i zgranie, mniej urazów.' : 'Na obozie drużyna szybciej się rozwija i zgrywa. Sparingi w tym terminie umówisz w zakładce Sparingi.'}</p>`;
     return card('misc', 'Obóz', body, { badge: on ? 'trwa' : inDays(daysBetween(game.date, b.from)), foot: tabBtn('obozy', 'Szczegóły obozu') });
   }
   const half = halfOf(game.date);
@@ -282,7 +289,7 @@ function dashCohesion(game) {
   const tone = zTone(coh.z);
   const body = `<p class="tr-bignum"><b>${num(coh.z, 0)}</b><span>${esc(coh.label)}<small>w meczu ${signed(coh.term ?? 0, 2)} pkt</small></span></p>
     <ul class="tr-bars">${parts.map(([k, v]) => { const x = Math.round(v ?? 0); return `<li><span>${esc(k)}</span>${meter(x, 100, meterTone[zTone(x)])}<b>${x}</b></li>`; }).join('')}</ul>
-    <p class="muted">Analiza rywala: ${c.prep && c.prep.date >= game.date ? `+${num(c.prep.v, 3)} pkt na mecz ${esc(shortDate(c.prep.date))}` : 'brak'}.</p>`;
+    <p class="muted">Analiza rywala: ${c.prep && c.prep.date >= game.date ? `+${num(c.prep.v, 3)} pkt na mecz ${esc(shortDate(c.prep.date))}` : 'brak'}. Znane formacje: ${Object.entries(c.fam).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([f, v]) => `${esc(f)} ${Math.round(v)}`).join(', ')}.</p>`;
   return card(tone, 'Zgranie', body, { badge: game.tactics?.formation ?? '', foot: tabBtn('rozwoj', 'Zgranie i rozwój') });
 }
 
@@ -572,7 +579,7 @@ function staffTab(game) {
 // ------------------------------------------------------------ Rozwój i zgranie
 /** Wiersz raportu rozwoju; prec: dokładność raportu (exact, approx, vague) zależna od asystenta. */
 function repRow(x, prec) {
-  return `<li data-pid="${esc(x.id)}"><span class="pos" data-g="${GROUP[x.pos]}">${esc(x.pos)}</span><span class="tr-rep__name">${esc(x.name)}${x.academy ? ' <small>(akademia)</small>' : ''}<small>${prec === 'exact' ? esc(x.attrs.map(([a, v]) => `${a} ${v > 0 ? '+' : ''}${v}`).join(', ')) : ''}</small></span>
+  return `<li data-pid="${esc(x.id)}"><span class="pos" data-g="${GROUP[x.pos]}">${esc(x.pos)}</span><span class="tr-rep__name"><span>${esc(x.name)}${x.academy ? ' <small>(akademia)</small>' : ''}</span><small>${prec === 'exact' ? esc(x.attrs.map(([a, v]) => `${a} ${v > 0 ? '+' : ''}${v}`).join(', ')) : ''}</small></span>
     <b data-trend="${x.d > 0 || (x.d === 0 && x.trend > 0) ? 'up' : 'down'}">${prec === 'vague' ? (x.d > 0 || x.trend > 0 ? 'rośnie' : 'spada') : prec === 'approx' ? (x.d > 0 || x.trend > 0 ? '▲' : '▼') : signed(x.d)}</b></li>`;
 }
 /** Raport rozwoju: kto rośnie, kto spada (pełne listy). */
@@ -779,7 +786,7 @@ function friendliesTab(game, ui) {
   return `<div class="tr-cols tr-cols--fr">
     <div class="tr-col">
       <section class="tr-card" data-t="info">
-        <header class="tr-card__head"><h3>Zaplanowane</h3><span class="tr-card__badge">${list.filter((f) => !f.played).length} przed nami</span></header>
+        <header class="tr-card__head"><h3>Zaplanowane</h3><span class="tr-card__badge">${list.filter((f) => !f.played).length ? `przed nami: ${list.filter((f) => !f.played).length}` : 'brak w planie'}</span></header>
         <ul class="tr-frlist">${planned || '<li class="muted">Brak sparingów.</li>'}</ul>
         <p class="muted">Sparing to mecz bez punktów: buduje ostrość i zgranie (połowę tego co mecz o punkty), ale męczy. Limity: ${FRIENDLY.limits.lato} latem, ${FRIENDLY.limits.zima} zimą i ${FRIENDLY.limits.fifa} na przerwę reprezentacyjną. Między meczami muszą być 2 dni przerwy.</p>
       </section>

@@ -158,6 +158,8 @@
 .tf-dir { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: #fff; background: var(--tf-good); }
 .tf-dir[data-k="out"] { background: var(--tf-bad); }
 .tf-xl--hist { max-height: none; }
+.tf-xl--hist .xl__nm { left: 0; }
+.tf-xl .xl tfoot td, .tf-xl .xl tfoot th { z-index: 4; }
 
 /* Finanse */
 .tf-fin, .tf-board { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); align-items: start; }
@@ -233,8 +235,6 @@
   .tf-month { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tf-incoming { grid-template-columns: minmax(0, 1fr) auto auto; }
   .tf-btns { grid-column: auto; justify-content: flex-end; }
-  .tf-fin { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .tf-fin__chart, .tf-fin__month, .tf-fin__log { grid-column: 1 / -1; }
 }
 @media (min-width: 1024px) {
   .tf-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -256,10 +256,9 @@
   .tf-xl .xl__nm button, .tf-nm { max-width: 240px; }
   .tf-xl { max-height: calc(100dvh - 330px); }
   .tf-xl--hist { max-height: none; }
+.tf-xl--hist .xl__nm { left: 0; }
+.tf-xl .xl tfoot td, .tf-xl .xl tfoot th { z-index: 4; }
   .tf-fin { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .tf-fin__chart { grid-column: auto; }
-  .tf-fin__month { grid-column: span 1; }
-  .tf-fin__log { grid-column: span 2; }
   .tf-month { grid-template-columns: minmax(0, 1fr); }
   .tf-board { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
   .tf-board__rev { grid-row: span 2; }
