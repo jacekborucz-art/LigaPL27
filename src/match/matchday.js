@@ -8,7 +8,7 @@ import { recordMatch, scoutingNote, scoutingWarning } from '../training/scouting
 import { noteAttention } from '../career/attention.js';
 import { logEngage } from '../career/authority.js';
 import { stadiumCapacity } from '../career/finance.js';
-import { attendanceModifier } from '../career/fans.js';
+import { attendanceModifier, rivalry } from '../career/fans.js';
 import { Rng } from '../core/rng.js';
 import { CLUBS_PL, clubById } from '../data/clubs_pl.js';
 import { formationById } from '../data/formations.js';
@@ -25,13 +25,13 @@ import { createTactics, refreshTactics } from '../engine/lineup.js';
 import { squadFor, anyClub, applyResult, fromEngineResult, walkoverScore, LEAGUE_COMPS, compLabel } from '../season/season.js';
 import { standings } from '../season/standings.js';
 import { winnerOf } from '../season/cup.js';
-import { preMatchStudio, postMatchStudio, postMatchMessages, preMatchMessages, odds1X2, matchRank } from './studio.js';
+import { preMatchStudio, postMatchStudio, postMatchMessages, preMatchMessages, odds1X2, matchRank, boardExpectation } from './studio.js';
 import { aiPlanTactics } from './aiPlan.js';
 import { coachOf, coachStyle, matchCoach, formRng, assistantProfile, coachBlurb, COACH } from '../career/coaches.js';
 import { staffQ } from '../training/staff.js';
 import {
   preMatchBriefing, halftimeBriefing, postMatchBriefing, assistantAdvice, aiBriefing, newSpeechMemory, closeMatchMemory,
-  applyBriefing, POST_TONES,
+  applyBriefing, POST_TONES, briefingContext, toneQuotes,
 } from './briefings.js';
 import {
   pressState, pickClimate, openConference, answerQuestion, walkOut as pressWalkOutConf, currentQuestion,
@@ -68,12 +68,107 @@ export function engineWeather(w, pitch) {
 }
 
 function compInfo(f) {
-  if (LEAGUE_COMPS.includes(f.comp)) return { type: 'league', name: COMPETITIONS[f.comp].name, stage: 'main' };
-  if (f.comp === 'pp') return { type: 'cup', name: 'Puchar Polski', stage: f.round === 'F' ? 'final' : 'main' };
-  if (f.comp === 'super') return { type: 'supercup', name: 'Superpuchar Polski', stage: 'final' };
-  if (f.comp === 'uefa') return { type: 'uefa', name: compLabel(f), stage: f.round === 'F' ? 'final' : 'main' };
-  if (f.comp === 'friendly') return { type: 'friendly', name: 'Sparing', stage: 'main' };
-  return { type: 'cup', name: compLabel(f), stage: f.round === 'F' ? 'final' : 'main' };
+  // round, leg, ucomp i playoff: dane dla kontekstu odprawy i oczekiwań zarządu (docs/odprawy-kontekst.md)
+  const more = { round: f.round ?? null, leg: f.leg ?? null, ucomp: f.ucomp ?? null, playoff: String(f.comp).startsWith('playoff') };
+  if (LEAGUE_COMPS.includes(f.comp)) return { type: 'league', name: COMPETITIONS[f.comp].name, stage: 'main', ...more };
+  if (f.comp === 'pp') return { type: 'cup', name: 'Puchar Polski', stage: f.round === 'F' ? 'final' : 'main', ...more };
+  if (f.comp === 'super') return { type: 'supercup', name: 'Superpuchar Polski', stage: 'final', ...more };
+  if (f.comp === 'uefa') return { type: 'uefa', name: compLabel(f), stage: f.round === 'F' ? 'final' : 'main', ...more };
+  if (f.comp === 'friendly') return { type: 'friendly', name: 'Sparing', stage: 'main', ...more };
+  return { type: 'cup', name: compLabel(f), stage: f.round === 'F' ? 'final' : 'main', ...more };
+}
+
+/**
+ * Kontekst odprawy (briefings.js briefingContext): rodzaj meczu, stawka w tabeli, różnica sił, derby, dwumecz.
+ * Liczony leniwie i zapamiętany w sesji (S.talkCtx), więc działa też dla dnia meczowego zapisanego wcześniej.
+ * Zmienia tylko teksty odpraw; efekty przemów są te same.
+ */
+export function talkContext(game, S) {
+  if (S.talkCtx) return S.talkCtx;
+  const f = S.f;
+  const u = S.userSide;
+  const ci = compInfo(f);
+  const odds = S.pre?.odds;
+  const pWin = S.pre?.forBriefing?.pWin ?? (odds ? (u === 0 ? odds.home : odds.away) : 0.4);
+  const pLose = odds ? (u === 0 ? odds.away : odds.home) : null;
+  const fl = f.knockout?.firstLeg;
+  let table = null;
+  if (LEAGUE_COMPS.includes(f.comp)) {
+    const cfg = COMPETITIONS[f.comp];
+    const rows = standings(game.fixtures.filter((x) => x.comp === f.comp), CLUBS_PL.filter((c) => c.tier === cfg.tier).map((c) => c.id));
+    const me = rows.find((r) => r.id === game.clubId);
+    const opp = rows.find((r) => r.id === S.oppId);
+    const size = rows.length;
+    const ptsAt = (pos) => rows[Math.min(size, Math.max(1, pos)) - 1]?.points ?? 0;
+    // pierwsze miejsce zagrożone: baraż o utrzymanie albo spadek bezpośredni; cel w górze tabeli: puchary (Ekstraklasa) albo baraże
+    const relFrom = cfg.relegationPlayoff?.places?.[0] ?? (size - (cfg.relegationDirect ?? 2) + 1);
+    const targetTo = cfg.tier === 1 ? 4 : (cfg.promotionPlayoff?.places?.[1] ?? cfg.promotionDirect ?? 2);
+    if (me) {
+      table = {
+        tier: cfg.tier, pos: me.pos, points: me.points, oppPos: opp?.pos ?? null, oppPoints: opp?.points ?? null, played: me.played,
+        total: 2 * (size - 1), leaderPts: ptsAt(1), secondPts: ptsAt(2), relFrom, dropPts: ptsAt(relFrom), targetTo, targetPts: ptsAt(targetTo),
+      };
+    }
+  }
+  const c = briefingContext({
+    type: ci.type, title: compLabel(f), round: f.round ?? null, ucomp: f.ucomp ?? null, leg: f.leg ?? null, playoff: ci.playoff, stage: ci.stage,
+    firstLeg: Array.isArray(fl) ? [fl[u], fl[1 - u]] : null, venue: f.neutral ? 'neutral' : u === 0 ? 'home' : 'away',
+    pWin, pLose, tags: S.pre?.preview?.rank?.tags ?? [], rivalry: rivalry(game.clubId, S.oppId), last5: S.pre?.forBriefing?.last5 ?? [], table,
+  });
+  c.board = boardExpectation(pWin, ci);
+  S.talkCtx = c;
+  return c;
+}
+
+/** Rozstrzygnięcie meczu pucharowego dla tekstów po meczu: awans, odpadnięcie, trofeum, awans do wyższej ligi. */
+function postOutcome(S, c) {
+  if (!c.knockout || !S.result || c.leg?.n === 1) return null;
+  const u = S.userSide;
+  let us = S.result.score[u];
+  let them = S.result.score[1 - u];
+  if (c.leg?.n === 2 && c.leg.first) { us += c.leg.first[0]; them += c.leg.first[1]; }
+  let won = us > them ? true : us < them ? false : null;
+  const so = S.result.shootout?.goals;
+  if (won === null && so) won = so[u] > so[1 - u];
+  if (won === null) return null;
+  if (c.kind === 'playoffFinal') return won ? 'promoted' : 'pout';
+  if (c.kind === 'playoffSemi') return won ? 'padv' : 'pout';
+  if (c.final) return won ? 'trophy' : 'lostFinal';
+  return won ? 'adv' : 'out';
+}
+
+/** Kontekst odprawy pomeczowej: kontekst meczu i rozstrzygnięcie (wymaga S.result). */
+export function postTalkContext(game, S) {
+  const c = talkContext(game, S);
+  return { ...c, outcome: postOutcome(S, c) };
+}
+
+/**
+ * Cytaty przemów na ekranie odprawy, te same co w wyniku odprawy (to samo ziarno i kontekst).
+ * Zwraca { ton: { label, quote } }.
+ */
+export function talkQuotes(game, S, phase) {
+  const seed = `${game.seed}:${S.f.id}:${phase}`;
+  if (phase === 'pre') return toneQuotes('pre', talkContext(game, S), { seed });
+  if (phase === 'half') {
+    const u = S.userSide;
+    return toneQuotes('half', talkContext(game, S), { seed, score: { for: S.M.score[u], against: S.M.score[1 - u] } });
+  }
+  const { for: gf, against: ga } = S.post.forBriefing.score;
+  return toneQuotes('post', postTalkContext(game, S), { seed, result: gf > ga ? 'W' : gf === ga ? 'D' : 'L' });
+}
+
+/** Zdanie kontekstu nad przemowami (rodzaj meczu, stawka, oczekiwanie zarządu; w przerwie wynik i dwumecz). */
+export function talkContextText(game, S, phase) {
+  const c = talkContext(game, S);
+  if (phase === 'pre') return [c.label, c.board].filter(Boolean).join('. ').replace(/\.\./g, '.');
+  if (phase === 'half') {
+    const u = S.userSide;
+    const gf = S.M.score[u]; const ga = S.M.score[1 - u];
+    const agg = c.leg?.n === 2 && c.leg.first ? ` W dwumeczu ${gf + c.leg.first[0]}:${ga + c.leg.first[1]}.` : '';
+    return `Przerwa przy ${S.M.score[0]}:${S.M.score[1]}.${agg} Zmiany w przerwie nie zużywają okna.`;
+  }
+  return `${S.post.result.label} ${S.post.result.score}. ${S.post.reactions.board.text}`;
 }
 
 function teamCtx(game, clubId, comp, table, tactics) {
@@ -249,12 +344,12 @@ export function matchSquadPlayers(game, S) {
 }
 
 export function preAdvice(game, S) {
-  return assistantAdvice('pre', matchSquadPlayers(game, S), { ...S.pre.forBriefing, clubId: game.clubId, date: S.f.date }, S.memory);
+  return assistantAdvice('pre', matchSquadPlayers(game, S), { ...S.pre.forBriefing, clubId: game.clubId, date: S.f.date, context: talkContext(game, S) }, S.memory);
 }
 
 /** Odprawa przedmeczowa gracza; zwraca reakcje do pokazania (bez liczb). */
 export function doPreBriefing(game, S, tone, talks = []) {
-  const res = preMatchBriefing({ players: matchSquadPlayers(game, S), tone, talks, memory: S.memory, ctx: { ...S.pre.forBriefing, clubId: game.clubId, date: S.f.date }, seed: `${game.seed}:${S.f.id}:pre` });
+  const res = preMatchBriefing({ players: matchSquadPlayers(game, S), tone, talks, memory: S.memory, ctx: { ...S.pre.forBriefing, clubId: game.clubId, date: S.f.date, context: talkContext(game, S) }, seed: `${game.seed}:${S.f.id}:pre` });
   S.memory = res.memory;
   S.briefings.pre = res;
   markTalks(game, talks, S.f.date, res);
@@ -346,7 +441,7 @@ export function halfInfo(S) {
 
 export function halfAdvice(game, S) {
   const h = halfInfo(S);
-  return assistantAdvice('half', onPitchPlayers(S), { ...h, clubId: game.clubId, rank: S.pre.forBriefing.rank, pWin: S.pre.forBriefing.pWin }, S.memory);
+  return assistantAdvice('half', onPitchPlayers(S), { ...h, clubId: game.clubId, rank: S.pre.forBriefing.rank, pWin: S.pre.forBriefing.pWin, context: talkContext(game, S) }, S.memory);
 }
 
 function onPitchPlayers(S) {
@@ -357,7 +452,7 @@ function onPitchPlayers(S) {
 /** Odprawa w przerwie: nowy poziom zaangażowania na 2. połowę. */
 export function doHalfBriefing(game, S, tone, talks = []) {
   const h = halfInfo(S);
-  const res = halftimeBriefing({ players: onPitchPlayers(S), tone, talks, memory: S.memory, ctx: { ...h, clubId: game.clubId, rank: S.pre.forBriefing.rank, pWin: S.pre.forBriefing.pWin, date: S.f.date }, seed: `${game.seed}:${S.f.id}:half` });
+  const res = halftimeBriefing({ players: onPitchPlayers(S), tone, talks, memory: S.memory, ctx: { ...h, clubId: game.clubId, rank: S.pre.forBriefing.rank, pWin: S.pre.forBriefing.pWin, date: S.f.date, context: talkContext(game, S) }, seed: `${game.seed}:${S.f.id}:half` });
   S.memory = res.memory;
   S.briefings.half = res;
   markTalks(game, talks, S.f.date, res);
@@ -559,22 +654,24 @@ function toStudioEvent(e) {
 export function postAdvice(game, S) {
   const ids = new Set(S.result.ratings.filter((x) => x.side === S.userSide).map((x) => x.id));
   const players = squadFor(game, game.clubId, S.comp).filter((p) => ids.has(p.id));
+  const pctx = postTalkContext(game, S);
   const scored = Object.keys(POST_TONES).map((tone, i) => {
-    const r = postMatchBriefing({ players, tone, talks: [], memory: S.memory, ctx: S.post.forBriefing, seed: `${game.seed}:${S.f.id}:post` });
+    const r = postMatchBriefing({ players, tone, talks: [], memory: S.memory, ctx: { ...S.post.forBriefing, context: pctx }, seed: `${game.seed}:${S.f.id}:post` });
     const vals = Object.values(r.morale).map((m) => m.delta);
     const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
     return { tone, v: avg - i * 1e-6 };
   }).sort((a, b) => b.v - a.v);
   const tone = scored[0].tone;
   const { for: gf, against: ga } = S.post.forBriefing.score;
-  const res = gf > ga ? 'Po wygranej' : gf === ga ? 'Po remisie' : 'Po porażce';
+  const byOutcome = { trophy: 'Po zdobyciu trofeum', lostFinal: 'Po przegranym finale', adv: 'Po awansie', padv: 'Po awansie do finału baraży', promoted: 'Po awansie do wyższej ligi', out: 'Po odpadnięciu', pout: 'Po odpadnięciu z baraży' };
+  const res = byOutcome[pctx.outcome] ?? (gf > ga ? 'Po wygranej' : gf === ga ? 'Po remisie' : 'Po porażce');
   return { tone, toneLabel: POST_TONES[tone].label, text: `${res} ta przemowa najlepiej podziała na szatnię.` };
 }
 
 export function doPostBriefing(game, S, tone, talks = []) {
   const ids = new Set(S.result.ratings.filter((x) => x.side === S.userSide).map((x) => x.id));
   const players = squadFor(game, game.clubId, S.comp).filter((p) => ids.has(p.id));
-  const res = postMatchBriefing({ players, tone, talks, memory: S.memory, ctx: S.post.forBriefing, seed: `${game.seed}:${S.f.id}:post` });
+  const res = postMatchBriefing({ players, tone, talks, memory: S.memory, ctx: { ...S.post.forBriefing, context: postTalkContext(game, S) }, seed: `${game.seed}:${S.f.id}:post` });
   S.memory = res.memory;
   S.briefings.post = res;
   markTalks(game, talks, S.f.date, res);

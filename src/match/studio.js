@@ -86,8 +86,10 @@ export function matchRank(ctx) {
     if (late && nearDrop(home.position, home.points) && nearDrop(away.position, away.points)) bump(2, 'relegation');
     if (late && home.position <= 2 && away.position <= 2 && Math.abs((home.points ?? 0) - (away.points ?? 0)) <= 4) bump(2, 'title');
   }
-  const LABELS = { final: 'Finał', uefa: 'Mecz w pucharach UEFA', derby: 'Derby', klasyk: 'Klasyk', relegation: 'Mecz o utrzymanie', title: 'Mecz o mistrzostwo', cup: 'Mecz pucharowy' };
-  const label = tags.length ? tags.map((x) => LABELS[x]).join(', ') : 'Mecz ligowy';
+  const LABELS = { final: 'Finał', uefa: 'Mecz w pucharach UEFA', derby: 'Derby', klasyk: 'Klasyk', relegation: 'Mecz o utrzymanie', title: 'Mecz o mistrzostwo', cup: comp.playoff ? 'Baraż o awans' : 'Mecz pucharowy' };
+  // Sparing nie jest meczem ligowym (wcześniej etykieta „Mecz ligowy” trafiała też do sparingów)
+  const fallback = comp.type === 'friendly' ? 'Sparing' : 'Mecz ligowy';
+  const label = tags.length ? tags.map((x) => LABELS[x]).join(', ') : fallback;
   return { level, label, tags };
 }
 
@@ -444,14 +446,44 @@ export function assistantReport({ user, opp, comp = 'league', stage = 'main', us
 
 // ================================================================ Oczekiwania zarządu i kibiców
 
-export function expectations({ pWin, pDraw, rank, board = {}, fans = {}, userForm, comp = 'league' }) {
+/** Czy w tych rozgrywkach gra się o punkty (liga i faza ligowa UEFA). Puchar, finał, baraż i sparing: nie. */
+export function hasPoints(competition = {}) {
+  const t = competition.type || 'league';
+  return t === 'league' || (t === 'uefa' && competition.round === 'league');
+}
+
+/**
+ * Oczekiwanie zarządu przed meczem, zależne od rozgrywek (docs/odprawy-kontekst.md). Wcześniej każdy mecz poza
+ * Pucharem Polski dostawał tekst ligowy („Zarząd liczy na trzy punkty”), także sparing, Superpuchar i dwumecz UEFA.
+ * competition: { type, stage, round, leg, playoff } jak compInfo w matchday.js.
+ */
+export function boardExpectation(pWin, competition = {}) {
+  const t = competition.type || 'league';
+  const fav = pWin >= 0.5;
+  if (t === 'friendly') return 'Zarząd nie rozlicza sparingów z wyniku. Liczy się przygotowanie drużyny.';
+  if (competition.playoff) {
+    if (competition.stage === 'final') return fav ? 'Zarząd oczekuje awansu do wyższej ligi.' : 'Zarząd liczy na walkę o awans do wyższej ligi.';
+    return fav ? 'Zarząd oczekuje awansu do finału baraży.' : 'Zarząd liczy na walkę o finał baraży.';
+  }
+  if (t === 'supercup' || competition.stage === 'final') return fav ? 'Zarząd oczekuje zdobycia trofeum.' : 'Zarząd liczy na walkę o trofeum.';
+  if (t === 'uefa') {
+    if (competition.round === 'league') return pWin >= 0.55 ? 'Zarząd liczy na komplet punktów w fazie ligowej.' : pWin >= 0.3 ? 'Zarząd liczy na punkty w fazie ligowej.' : 'Zarząd chce zobaczyć walkę z mocnym rywalem.';
+    if (competition.leg === 1) return fav ? 'Zarząd liczy na zaliczkę przed rewanżem.' : 'Zarząd liczy na wynik, który zostawi szanse w rewanżu.';
+    return fav ? 'Zarząd oczekuje awansu.' : 'Zarząd liczy na walkę o awans.';
+  }
+  if (t === 'cup') {
+    if (competition.round === 'SF') return fav ? 'Zarząd oczekuje awansu do finału.' : 'Zarząd liczy na walkę o finał.';
+    return fav ? 'Zarząd oczekuje awansu do kolejnej rundy.' : 'Zarząd liczy na walkę o awans.';
+  }
+  if (pWin >= 0.6) return 'Zarząd oczekuje pewnego zwycięstwa.';
+  if (pWin >= 0.45) return 'Zarząd liczy na trzy punkty.';
+  if (pWin >= 0.3) return 'Zarząd przyjmie remis, ale liczy na więcej.';
+  return 'Zarząd nie wymaga punktów, chce zobaczyć walkę.';
+}
+
+export function expectations({ pWin, pDraw, rank, board = {}, fans = {}, userForm, comp = 'league', competition = null }) {
   const lines = [];
-  let boardText;
-  if (comp === 'cup') boardText = pWin >= 0.5 ? 'Zarząd oczekuje awansu do kolejnej rundy.' : 'Zarząd liczy na walkę o awans.';
-  else if (pWin >= 0.6) boardText = 'Zarząd oczekuje pewnego zwycięstwa.';
-  else if (pWin >= 0.45) boardText = 'Zarząd liczy na trzy punkty.';
-  else if (pWin >= 0.3) boardText = 'Zarząd przyjmie remis, ale liczy na więcej.';
-  else boardText = 'Zarząd nie wymaga punktów, chce zobaczyć walkę.';
+  const boardText = boardExpectation(pWin, competition ?? { type: comp });
   if (rank?.tags?.includes('derby')) lines.push('Derbów się nie przegrywa. Zarząd i kibice mówią to jednym głosem.');
   if ((board.trust ?? 60) < 25) lines.push('Twoja posada jest zagrożona. Porażka może zakończyć pracę w klubie.');
   else if ((board.trust ?? 60) < 40) lines.push('Zarząd traci cierpliwość. Potrzebny jest dobry wynik.');
@@ -471,7 +503,7 @@ const HEADLINES = [
   // ---- przed meczem
   ['pre-derby-1', 'pre', 'derby', 'Derby! {home} i {away} grają o coś więcej niż trzy punkty'],
   ['pre-derby-2', 'pre', 'derby', 'Miasto żyje jednym meczem: {home} kontra {away}'],
-  ['pre-derby-3', 'pre', 'derby', 'Przed derbami: kto będzie rządził w mieście?'],
+  ['pre-derby-3', 'pre', 'derby', 'Przed derbami: kto tym razem będzie górą?'],
   ['pre-klasyk-1', 'pre', 'klasyk', 'Klasyk polskiej piłki: {home} kontra {away}'],
   ['pre-final-1', 'pre', 'final', 'Finał {comp}: {home} i {away} o krok od trofeum'],
   ['pre-final-2', 'pre', 'final', 'Jeden mecz, jedno trofeum. {home} i {away} gotowe na finał'],
@@ -551,7 +583,7 @@ const HEADLINES = [
   ['post-upw-2', 'post', 'upsetWin', 'Niespodzianka kolejki: {user} górą'],
   ['post-upl-1', 'post', 'upsetLoss', 'Wpadka faworyta. {user} traci punkty'],
   ['post-upl-2', 'post', 'upsetLoss', 'Blamaż! {opp} ogrywa faworyta'],
-  ['post-dw-1', 'post', 'derbyWin', 'Derby wygrane! {user} rządzi w mieście'],
+  ['post-dw-1', 'post', 'derbyWin', 'Derby wygrane! Kibice {user} świętują'],
   ['post-dw-2', 'post', 'derbyWin', 'Święto na trybunach: derby dla drużyny {user}'],
   ['post-dl-1', 'post', 'derbyLoss', 'Porażka w derbach boli podwójnie'],
   ['post-dl-2', 'post', 'derbyLoss', 'Derby dla rywala. {user} musi przełknąć gorycz'],
@@ -586,6 +618,8 @@ const HEADLINE_PRIORITY = {
 const prio = (h) => HEADLINE_PRIORITY[h.flag] ?? 3;
 export const HEADLINE_MEMORY = 5; // nagłówek nie wraca przez 5 meczów
 
+const NO_POINTS_RE = /punkt|kolejk/i;
+
 function fill(text, vars) {
   return text.replace(/\{(\w+)\}/g, (_, k) => vars[k]);
 }
@@ -597,11 +631,13 @@ function canFill(text, vars) {
  * Wybór nagłówków bez powtórzeń. history: tablica tablic id (ostatnie mecze), exclude: id użyte w tym meczu.
  * Najpierw nagłówki dopasowane do sytuacji (waga 3), potem ogólne (waga 1).
  */
-export function pickHeadlines(phase, flags, vars, { history = [], exclude = [], seed = 'media', n = 3 } = {}) {
+export function pickHeadlines(phase, flags, vars, { history = [], exclude = [], seed = 'media', n = 3, points = true } = {}) {
   const recent = new Set([...history.slice(-HEADLINE_MEMORY).flat(), ...exclude]);
   const rng = new Rng(`${seed}|naglowki|${phase}`);
   const flagSet = new Set([...flags, 'any']);
-  let pool = HEADLINES.filter((h) => h.phase === phase && flagSet.has(h.flag) && !recent.has(h.id) && canFill(h.text, vars));
+  // Puchar, finał, baraż, sparing: bez nagłówków o punktach i kolejce (points: false)
+  const fits = (h) => points || !NO_POINTS_RE.test(h.text);
+  let pool = HEADLINES.filter((h) => h.phase === phase && flagSet.has(h.flag) && !recent.has(h.id) && canFill(h.text, vars) && fits(h));
   const out = [];
   while (out.length < n && pool.length) {
     // nagłówek dnia: z najważniejszej dostępnej sytuacji; kolejne losowane z wagą ważności
@@ -620,7 +656,7 @@ export function pickHeadlines(phase, flags, vars, { history = [], exclude = [], 
   if (out.length < n) {
     const old = history.flat().filter((id, i, a) => a.indexOf(id) === i);
     for (const id of old) {
-      const h = HEADLINES.find((x) => x.id === id && x.phase === phase && canFill(x.text, vars) && !exclude.includes(x.id));
+      const h = HEADLINES.find((x) => x.id === id && x.phase === phase && canFill(x.text, vars) && fits(x) && !exclude.includes(x.id));
       if (h && !out.includes(h)) out.push(h);
       if (out.length >= n) break;
     }
@@ -673,7 +709,7 @@ export function preMatchStudio(ctx) {
     user, opp, comp: compType, stage, userStrength: userIsHome ? strH : strA, oppStrength: userIsHome ? strA : strH,
   });
   const exp = expectations({
-    pWin, pDraw: odds.draw, rank, board: ctx.board, fans: ctx.fans, userForm: userIsHome ? formH : formA, comp: compType,
+    pWin, pDraw: odds.draw, rank, board: ctx.board, fans: ctx.fans, userForm: userIsHome ? formH : formA, comp: compType, competition: ctx.competition ?? null,
   });
 
   // flagi nagłówków
@@ -696,7 +732,7 @@ export function preMatchStudio(ctx) {
     home: home.name, away: away.name, user: user.name, opp: opp.name, comp: ctx.competition?.name ?? 'Pucharu',
     ref: ctx.referee?.name, oppStar: oppKey[0]?.name, h2hLeader: h2h.leader === home.id ? home.name : h2h.leader === away.id ? away.name : null,
   };
-  const headlines = pickHeadlines('pre', flags, vars, { history: ctx.headlineHistory || [], seed: `${ctx.seed ?? 'studio'}|${home.id}|${away.id}|${ctx.date}`, n: 2 });
+  const headlines = pickHeadlines('pre', flags, vars, { history: ctx.headlineHistory || [], seed: `${ctx.seed ?? 'studio'}|${home.id}|${away.id}|${ctx.date}`, n: 2, points: hasPoints(ctx.competition) });
 
   const lineupView = (lu) => lu.map(({ player, group }) => ({ id: player.id, name: nameOf(player), pos: player.pos, group, outOfPosition: GROUP[player.pos] !== group }));
   return {
@@ -951,7 +987,7 @@ export function postMatchStudio(ctx) {
     scorer: scorerName, motm: motm?.name, redPlayer: redE?.name, ref: ctx.referee?.name, hatTrick, winner: res === 'W' ? names[us] : null,
   };
   const headlines = pickHeadlines('post', flags, vars, {
-    history: ctx.headlineHistory || [], exclude: ctx.pre?.headlineIds || [], seed: `${ctx.seed ?? 'studio'}|${home.id}|${away.id}|${ctx.date}`, n: 3,
+    history: ctx.headlineHistory || [], exclude: ctx.pre?.headlineIds || [], seed: `${ctx.seed ?? 'studio'}|${home.id}|${away.id}|${ctx.date}`, n: 3, points: hasPoints(ctx.competition),
   });
   const matchIds = [...(ctx.pre?.headlineIds || []), ...headlines.map((x) => x.id)];
   const view = (t) => ({ ...t, xg: r2(t.xg) });

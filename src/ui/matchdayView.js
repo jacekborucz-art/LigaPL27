@@ -257,9 +257,15 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     if (!ui.adv) { try { ui.adv = phase === 'pre' ? MD.preAdvice(game, S) : phase === 'half' ? MD.halfAdvice(game, S) : MD.postAdvice(game, S); } catch { ui.adv = null; } }
     const chosen = done?.tone ?? ui.sel.tone ?? ui.adv?.tone ?? Object.keys(tones)[0];
     const talks = Object.entries(TALKS).filter(([, t]) => t.phases.includes(phase));
-    const ctxText = phase === 'pre' ? `${S.pre.preview.rank.label}. ${S.pre.expectations.board}`
-      : phase === 'half' ? `Przerwa przy ${S.M.score[0]}:${S.M.score[1]}. Zmiany w przerwie nie zużywają okna.`
-        : `${S.post.result.label} ${S.post.result.score}. ${S.post.reactions.board.text}`;
+    // Cytaty i zdanie kontekstu dopasowane do meczu (puchar, finał, sparing, derby, dwumecz): docs/odprawy-kontekst.md
+    let quotes = null;
+    try { quotes = MD.talkQuotes(game, S, phase); } catch { quotes = null; }
+    let ctxText;
+    try { ctxText = MD.talkContextText(game, S, phase); } catch {
+      ctxText = phase === 'pre' ? `${S.pre.preview.rank.label}. ${S.pre.expectations.board}`
+        : phase === 'half' ? `Przerwa przy ${S.M.score[0]}:${S.M.score[1]}. Zmiany w przerwie nie zużywają okna.`
+          : `${S.post.result.label} ${S.post.result.score}. ${S.post.reactions.board.text}`;
+    }
     const reactionOf = (id) => done?.players.find((r) => r.id === id);
     const title = { pre: 'Odprawa przedmeczowa', half: 'Odprawa w przerwie', post: 'Odprawa pomeczowa' }[phase];
     const rating = (id) => (phase === 'post' ? S.result.ratings.find((x) => x.id === id)?.rating : null);
@@ -275,7 +281,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
         <h2>Przemowa do drużyny</h2>
         <fieldset class="tones" ${done ? 'disabled' : ''}>
           <legend class="hint">Wybierz ton. Ta sama przemowa powtarzana mecz po meczu działa słabiej.</legend>
-          ${Object.entries(tones).map(([id, t]) => `<label class="tone"><input type="radio" name="tone" value="${id}" ${id === chosen ? 'checked' : ''} data-md-tone="${id}"><div><strong>${esc(t.label)}${ui.adv?.tone === id && !done ? ' (zalecana)' : ''}</strong><span>${esc(t.quote)}</span></div></label>`).join('')}
+          ${Object.entries(tones).map(([id, t]) => `<label class="tone"><input type="radio" name="tone" value="${id}" ${id === chosen ? 'checked' : ''} data-md-tone="${id}"><div><strong>${esc(t.label)}${ui.adv?.tone === id && !done ? ' (zalecana)' : ''}</strong><span>${esc(done?.tone === id && done.quote ? done.quote : quotes?.[id]?.quote ?? t.quote)}</span></div></label>`).join('')}
         </fieldset>
       </section>
       <section class="tpanel tpanel--talks">

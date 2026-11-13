@@ -189,7 +189,7 @@ const OPENING = {
   a: (c) => (c.res === 'W' ? [
     { tone: 'spokojny', text: 'Gratuluję drużynie i dziękuję kibicom. Zrobiliśmy swoje, ale jutro wracamy do pracy.', morale: 0.2 },
     { tone: 'pewny', text: 'Byliśmy lepsi od pierwszej do ostatniej minuty i tak to wyglądało.', fans: 1, morale: 0.2, media: c.xgFor < c.xgAgainst ? -1 : 0 },
-    { tone: 'dyplomatyczny', text: `Szacunek dla drużyny ${c.oppName}, postawiła trudne warunki. Cieszą trzy punkty.` },
+    { tone: 'dyplomatyczny', text: `Szacunek dla drużyny ${c.oppName}, postawiła trudne warunki. ${isLeagueCtx(c) ? 'Cieszą trzy punkty.' : c.comp === 'friendly' ? 'Cieszy dobry sprawdzian.' : 'Cieszy zwycięstwo.'}` },
   ] : c.res === 'R' ? [
     { tone: 'spokojny', text: 'Punkt szanujemy, ale wiemy, że stać nas na więcej.' },
     { tone: 'pewny', text: 'Mieliśmy ten mecz pod kontrolą. Zabrakło kropki nad i.', fans: 1 },
@@ -302,7 +302,7 @@ const BANK = [
     a: (c) => (c.res === 'W' ? [
       { tone: 'pewny', text: 'Miasto ma jednego gospodarza.', fans: 4, board: -1, morale: 0.3, h: { neu: '{coach}: „Miasto ma jednego gospodarza”', agr: '{coach} prowokuje rywala zza miedzy' } },
       { tone: 'spokojny', text: 'To mecz dla kibiców. Zostawiliśmy na boisku wszystko.', fans: 2 },
-      { tone: 'dyplomatyczny', text: 'To tylko trzy punkty, jak w każdym meczu.', fans: -3 },
+      { tone: 'dyplomatyczny', text: isLeagueCtx(c) ? 'To tylko trzy punkty, jak w każdym meczu.' : 'To tylko jeden mecz, jak każdy inny.', fans: -3 },
     ] : [
       { tone: 'spokojny', text: 'Przepraszamy kibiców. Wiemy, ile znaczą derby.', fans: 2 },
       { tone: 'pewny', text: 'Rewanż będzie nasz. Mówię to kibicom wprost.', fans: 2, morale: 0.2 },
@@ -498,6 +498,8 @@ const BANK = [
     ],
   },
 ];
+// Mecz o punkty (liga): w pucharach, sparingach i Superpucharze odpowiedzi nie mówią o punktach (docs/odprawy-kontekst.md)
+const isLeagueCtx = (c) => ['ekstraklasa', 'liga1', 'liga2'].includes(c?.comp);
 // Pytania przed meczem (konferencja przedmeczowa, dzień przed meczem w prawdziwym kalendarzu)
 const PRE_BANK = [
   {
@@ -505,8 +507,8 @@ const PRE_BANK = [
     q: (c) => (c.favourite ? { neu: 'Jesteście faworytem meczu z drużyną {opp}. Czego się pan spodziewa?', agr: 'Wszyscy oczekują zwycięstwa z drużyną {opp}. Udźwigniecie tę presję?' }
       : c.underdog ? { neu: 'Drużyna {opp} jest faworytem. Na co stać pana zespół?', agr: 'Czy z drużyną {opp} macie w ogóle szanse?', pos: 'Ostatnio gracie dobrze. Stać was na niespodziankę z drużyną {opp}?' }
         : { neu: 'Czego spodziewa się pan po meczu z drużyną {opp}?', agr: 'Kolejny mecz, który trzeba wygrać. Czuje pan presję?' }),
-    a: () => [
-      { tone: 'pewny', text: 'Gramy o trzy punkty i wygramy ten mecz.', fans: 1, morale: 0.2, promise: 'winNext', h: { neu: '{coach} przed meczem: wygramy', agr: '{coach} zapowiada zwycięstwo. Trzymamy za słowo' } },
+    a: (c) => [
+      { tone: 'pewny', text: isLeagueCtx(c) ? 'Gramy o trzy punkty i wygramy ten mecz.' : c.comp === 'friendly' ? 'To sparing, ale wychodzimy, żeby wygrać.' : c.comp === 'super' ? 'Gramy o trofeum i wygramy ten mecz.' : 'Gramy o awans i wygramy ten mecz.', fans: 1, morale: 0.2, promise: 'winNext', h: { neu: '{coach} przed meczem: wygramy', agr: '{coach} zapowiada zwycięstwo. Trzymamy za słowo' } },
       { tone: 'spokojny', text: 'Szanujemy rywala, ale skupiamy się na sobie.', morale: 0.1 },
       { tone: 'dyplomatyczny', text: 'To będzie wyrównany mecz. Zdecydują detale.', fans: -1 },
     ],
