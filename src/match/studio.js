@@ -39,7 +39,7 @@ function ycOf(p, comp = 'league') {
   if (p.yc && typeof p.yc === 'object') return p.yc[comp] ?? 0;
   return typeof p.yc === 'number' ? p.yc : 0;
 }
-const isAvailable = (p, comp) => !(injuryDaysOf(p) > 0 && !injuryPlayable(p)) && !(suspOf(p, comp) > 0) && !p.callUp && !p.onLoanOut;
+const isAvailable = (p, comp) => !(injuryDaysOf(p) > 0 && !injuryPlayable(p)) && !(suspOf(p, comp) > 0) && !p.callUp && !p.onLoanOut && !p.transfer?.hold;
 const nameOf = (p) => p.name ?? String(p.id);
 /** Polska odmiana liczebników: 1 gol, 2 gole, 5 goli, 22 gole. */
 export function plural(n, one, few, many) {

@@ -20,7 +20,8 @@ export const SQUAD_SIZE = { min: 22, target: 25, max: 30 };
 export const MATCH_MIN = { total: 16, GK: 2, DEF: 5, MID: 5, ATT: 2 };
 
 const groupOf = (p) => GROUP[p.pos] || 'MID';
-export const isAvailable = (p) => !(p.injuryDays > 0) && !(p.suspended > 0) && !p.onLoanOut && !p.callUp;
+// transfer.hold: zawodnik po testach medycznych w nowym klubie nie gra (src/career/transferDeals.js)
+export const isAvailable = (p) => !(p.injuryDays > 0) && !(p.suspended > 0) && !p.onLoanOut && !p.callUp && !p.transfer?.hold;
 
 function countBy(players, fn = () => true) {
   const out = { GK: 0, DEF: 0, MID: 0, ATT: 0 };

@@ -21,6 +21,8 @@ import './squadLimitSystem.js'; // limit kadry i nacisk zarządu (docs/limit-kad
 import './boardRequests.js'; // prośby do zarządu, warunki i budżety klubów AI (docs/finanse.md)
 import { ensureCoachMarket, fireCoach, hireCoach } from './coachMarket.js'; // rynek trenerów AI i właściciele (docs/trenerzy-i-wlasciciele.md)
 import { ensureInfra } from './infrastructure.js'; // stadion, baza, akademia (docs/infrastruktura.md)
+import { ensureTransferState } from './transferSystem.js'; // transakcje w toku, prekontrakty, prośby o transfer, zagranica (docs/transfery.md)
+import { foreignOfferMessage } from './foreignMarket.js';
 
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
 
@@ -31,6 +33,7 @@ export function ensureCareer(game) {
   for (const [id, c] of Object.entries(game.finance.clubs)) if (!c.plan && clubById(id)) { c.plan = clubPlan(clubById(id)); c.tier = c.plan.tier; }
   ensureInfra(game); // stary zapis: poziomy startowe; nowe plany sezonu: pojemność, przychód z widza, utrzymanie
   if (!game.market) createMarket(game);
+  ensureTransferState(game);
   ensureBoard(game);
   ensureCoaches(game); // trenerzy klubów AI z atrybutami (stary zapis: profile z ziarna gry, te same nazwiska)
   ensureCoachMarket(game); // pula wolnych trenerów (stary zapis: tworzona z ziarna gry)
@@ -93,7 +96,7 @@ function matchMoney(game, date) {
 const msg = (date, o) => createMessage({ date, category: 'board', from: 'Zarząd', priority: 'info', ...o });
 
 function offerMessage(game, o, date) {
-  const p = game.world.players[o.playerId]; const buyer = clubById(o.from);
+  const p = game.world.players[o.playerId]; const buyer = clubById(o.from) ?? { name: o.foreign?.name ?? 'Klub zagraniczny' };
   return createMessage({
     date, key: `oferta:${o.id}:${o.fee}`, category: 'transfers', from: buyer.name, priority: 'important',
     subject: `Oferta za ${p.name}: ${fmtZl(o.fee)}`,
@@ -107,6 +110,7 @@ registerDecision('incomingOffer', (game, m, action) => {
   const r = answerIncoming(game, m.refs.offerId, action);
   const o = game.market.offers.find((x) => x.id === m.refs.offerId);
   const out = [createMessage({ date: game.date, category: 'transfers', from: 'Dyrektor sportowy', priority: 'info', subject: 'Odpowiedź na ofertę', body: r.text })];
+  if (r.reopen && o?.foreign) { out.push(foreignOfferMessage(game, o, game.date)); return out; }
   if (r.reopen && o) out.push(offerMessage(game, o, game.date));
   return out;
 });
@@ -189,7 +193,7 @@ registerDailySystem({
       if (date >= `${SEASON_YEAR + 1}-01-01` && date <= `${SEASON_YEAR + 1}-06-01`) aiRenewals(game, date);
       if (date === `${SEASON_YEAR + 1}-01-01`) {
         const exp = squadOf(game.world, game.clubId).filter((p) => p.contract?.until === SEASON_END && !p.loan);
-        if (exp.length) messages.push(createMessage({ date, key: `kontrakty:${SEASON_YEAR + 1}`, category: 'transfers', from: 'Dyrektor sportowy', priority: 'important', subject: `Kontrakty kończące się w czerwcu (${exp.length})`, body: `${exp.map((p) => `${p.name} (${p.pos}, ${p.age} lat)`).join(', ')}.\n\nPrzedłuż ważnych zawodników w zakładce Transfery, Kontrakty. Od 1 stycznia mogą rozmawiać z innymi klubami.` }));
+        if (exp.length) messages.push(createMessage({ date, key: `kontrakty:${SEASON_YEAR + 1}`, category: 'transfers', from: 'Dyrektor sportowy', priority: 'important', subject: `Kontrakty kończące się w czerwcu (${exp.length})`, body: `${exp.map((p) => `${p.name} (${p.pos}, ${p.age} lat)`).join(', ')}.\n\nPrzedłuż ważnych zawodników w zakładce Transfery, Kontrakty. Od 1 stycznia mogą rozmawiać z innymi klubami i podpisać umowę od 1 lipca (prekontrakt). Kluby muszą nas o tym informować.` }));
       }
     }
     if (w && date === w.to) messages.push(createMessage({ date, key: `okno-koniec:${date}`, category: 'transfers', from: 'Rynek transferowy', priority: 'info', subject: 'Dziś zamyka się okno transferowe', body: 'Po dzisiejszym dniu transfery będą możliwe dopiero w kolejnym oknie. Wolnych zawodników można podpisywać zawsze.' }));

@@ -40,7 +40,9 @@ import { renderTransfers, handleTransferAction, isTransferAction } from './ui/tr
 import { renderClubHub, handleClubAction, isClubAction } from './ui/klubView.js';
 import { renderTalks, handleTalkAction, isTalkAction } from './ui/talksView.js';
 import { ensureCareer } from './career/careerSystem.js';
-import { completeTransfer, fmtZl } from './career/transfers.js';
+import { fmtZl } from './career/transfers.js';
+import { startDeal, expectedRegistration } from './career/transferDeals.js'; // transfer jako proces (docs/transfery.md)
+import { signUserPre } from './career/preContracts.js';
 import { trustLabel } from './career/board.js';
 import { spendable, wageBill, monthSummary } from './career/finance.js';
 import { teamMorale, moraleLabel } from './career/morale.js';
@@ -756,6 +758,8 @@ async function runDays() {
   const g = state.game;
   state.running = true;
   renderHub();
+  const squadKey = () => (g.world?.clubs?.[g.clubId]?.squad ?? []).join(',');
+  const squadBefore = squadKey(); // transakcje w toku kończą się w pętli dni (career/transferDeals.js)
   let reason = 'limit';
   for (let i = 0; i < 120 && state.running; i++) {
     const r = continueUntilStop(g, { maxDays: 1 });
@@ -770,6 +774,7 @@ async function runDays() {
     if (r.reason !== 'limit') { reason = r.reason; break; }
   }
   state.running = false;
+  if (squadKey() !== squadBefore) afterSquadChange(g);
   // Po Dalej zawsze Pulpit (nowe wiadomości i decyzje widać w panelu Poczta i w pasku decyzji na Pulpicie)
   if (reason === 'message' || reason === 'decision') { state.tab = 'pulpit'; state.fx = null; state.extPlayer = null; state.extClub = null; state.mailOpen = null; }
   await save();
@@ -988,11 +993,13 @@ async function dispatchAct(el, { root = app } = {}) {
   if (isNegotiationAction(act) && state.game && state.ng) {
     const r = handleNegotiationAction(state.game, state.ng, act, el.dataset, readNegotiationForm(app));
     const d = r.done;
-    if (d?.accepted && d.kind === 'sign') {
+    if (d?.accepted && d.kind === 'sign' && d.pre) {
+      state.tfMsg = signUserPre(state.game, d.playerId, d.contract).text; // umowa od 1 lipca (career/preContracts.js)
+    } else if (d?.accepted && d.kind === 'sign') {
       const p = state.game.world.players[d.playerId];
-      completeTransfer(state.game, { playerId: d.playerId, to: state.game.clubId, fee: d.fee ?? 0, contract: d.contract, kind: d.fromClub ? 'transfer' : 'free' });
-      afterSquadChange(state.game);
-      state.tfMsg = `${p.name} podpisał kontrakt.`;
+      // Po rozmowach: testy medyczne i zgłoszenie (zakładka Transfery, W toku)
+      const deal = startDeal(state.game, { playerId: d.playerId, to: state.game.clubId, fee: d.fee ?? 0, contract: d.contract, kind: d.fromClub ? 'transfer' : 'free', stage: 'medical' });
+      state.tfMsg = deal ? `${p.name} zgodził się na warunki. Teraz testy medyczne, zgłoszenie spodziewane ${fmtDate(expectedRegistration(deal))}.` : `${p.name} jest już w trakcie innej transakcji.`;
     } else if (d?.accepted) state.tfMsg = 'Kontrakt przedłużony.';
     state.ng = r.ng; // null = powrót do Transferów
     if (r.save || d) await save();
@@ -1158,7 +1165,7 @@ async function dispatchAct(el, { root = app } = {}) {
       g.inbox = resolveMessage(g.inbox, el.dataset.id, el.dataset.a);
       const extra = runDecision(g, m, el.dataset.a);
       if (extra.length) g.inbox = addMessages(g.inbox, extra).inbox;
-      if (m?.refs?.kind === 'incomingOffer' || m?.refs?.kind === 'jobOffer') afterSquadChange(g);
+      if (m?.refs?.kind === 'incomingOffer' || m?.refs?.kind === 'jobOffer' || m?.refs?.kind === 'moveWish') afterSquadChange(g);
       await save(); render();
     }
     if (act === 'load' || act === 'continue') {
