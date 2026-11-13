@@ -19,6 +19,7 @@ import { fansSummary } from '../career/fans.js';
 import { canSign, YOUTH_EXEMPT_AGE, KEEP_MAX, PRESSURE_DAYS } from '../career/squadLimit.js';
 import { limitStatus, toggleKeep, ageWord } from '../career/squadLimitSystem.js';
 import { boardCaps, appealStatus } from '../career/boardRequests.js';
+import { loanInForm, loanOutPanel, loanedInPanel, loanedOutPanels, loansSection, loanInAction, handleLoanAction, isLoanAction, isLoanedOut } from './loansView.js'; // wypożyczenia (docs/wypozyczenia.md)
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size = 20) => (clubById(id) ? crestHtml(clubById(id), { size, clubsById }) : '');
@@ -219,7 +220,7 @@ function marketView(game, ui) {
 function marketHelp(list) {
   const t = {
     transfer: 'Zawodnicy wystawieni przez kluby. Cena jest punktem wyjścia: klub przyjmie ofertę bliską cenie, przy niższej złoży kontrofertę. Po zgodzie klubu rozmawiasz z zawodnikiem o kontrakcie.',
-    loan: 'Kluby chętnie wypożyczają młodych i rezerwowych do końca sezonu. Ty ustalasz, jaką część pensji pokrywasz.',
+    loan: 'Kluby chętnie wypożyczają młodych i rezerwowych na rundę, sezon albo rok. Ty ustalasz część pensji, którą pokrywasz, i dodatkowe warunki: opcję albo obowiązek wykupu, prawo pierwokupu.',
     free: 'Wolni zawodnicy nie kosztują odstępnego. Podpiszesz ich także poza oknem transferowym.',
     search: 'Szukasz w kadrach wszystkich klubów. Trzech najlepszych zawodników klubu nie jest na sprzedaż, chyba że mają klauzulę odstępnego.',
   }[list];
@@ -253,6 +254,7 @@ const fact = (k, v, m = '') => `<li${m ? ` data-m="${m}"` : ''}><small>${esc(k)}
 function playerCard(game, p, ui) {
   const mine = p.clubId === game.clubId;
   if (mine) return ownCard(game, p, ui);
+  if (isLoanedOut(p, game.clubId)) return loanedOutCard(game, p, ui);
   const listed = game.market.listed[p.id];
   const price = askingPrice(game, p);
   const will = playerWillingness(game, p);
@@ -263,16 +265,14 @@ function playerCard(game, p, ui) {
   const open = inWindow(game.date);
   const actions = [];
   if (free) actions.push(`<p class="tf-p__txt">Wolny zawodnik: bez odstępnego, rozmawiasz od razu o kontrakcie.</p><button class="btn btn--primary" data-act="tf-negotiate" data-id="${esc(p.id)}">Rozmawiaj o kontrakcie</button>`);
+  else if (p.loan) actions.push(`<p class="tf-p__txt">Wypożyczony z ${esc(clubById(p.loan.from)?.name ?? '')} do ${esc(fmtDate(p.loan.until))}. Klub wypożyczający nie może go sprzedać ani wypożyczyć dalej; o transferze porozmawiasz po jego powrocie.</p>`);
   else if (talk?.accepted) actions.push(`<p class="notice">Klub przyjął ofertę ${fmtZl(talk.accepted)}.</p><button class="btn btn--primary" data-act="tf-negotiate" data-id="${esc(p.id)}">Rozmawiaj z zawodnikiem</button>`);
   else if (!nfs) {
     actions.push(`<div class="tf-offer"><label>Oferta odstępnego (zł)<input id="tfFee" type="number" min="0" step="10000" value="${talk?.counter ?? Math.round(price * 0.9 / 10000) * 10000}"></label>
       <button class="btn btn--primary" data-act="tf-offer" data-id="${esc(p.id)}" ${open ? '' : 'disabled'}>Złóż ofertę</button></div>
       <p class="hint">Cena klubu: ${fmtZl(price)}.${talk?.counter ? ` Kontroferta klubu: ${fmtZl(talk.counter)}.` : ''}${open ? '' : ' Okno transferowe jest zamknięte.'}</p>`);
   } else actions.push('<p class="tf-p__txt">Klub nie chce sprzedać tego zawodnika (jeden z trzech najlepszych w kadrze, bez klauzuli odstępnego).</p>');
-  if (!free && (listed?.kind === 'loan' || (p.age <= 21 && !nfs))) {
-    actions.push(`<div class="tf-offer tf-offer--loan"><label>Wypożyczenie: część pensji<select id="tfShare">${[50, 75, 100].map((s) => `<option value="${s}">${s} %</option>`).join('')}</select></label>
-      <button class="btn btn--quiet" data-act="tf-loan" data-id="${esc(p.id)}" ${open ? '' : 'disabled'}>Wypożycz do końca sezonu</button></div>`);
-  }
+  if (!free && !p.loan && (listed?.kind === 'loan' || (p.age <= 21 && !nfs))) actions.push(loanInForm(game, p, open));
   const blocked = will.verdict === 'odmowa' || !cap.ok;
   const appeal = game.board?.requests?.vetoes?.some((v) => v.playerId === p.id && v.status === 'open') ? appealStatus(game, p.id) : null; // weto zarządu
   const deal = `${ui.tfMsg ? `<p class="notice">${esc(ui.tfMsg)}</p>` : ''}
@@ -345,10 +345,26 @@ function ownCard(game, p, ui) {
         ${limitNote}
       </div>
       <aside class="tf-side tf-actions">
+        ${p.loan ? loanedInPanel(game, p) : ''}
         ${panel('Przedłużenie kontraktu', canRenew ? 'good' : 'info', renew)}
+        ${p.loan ? '' : loanOutPanel(game, p)}
         ${p.loan ? '' : panel('Lista transferowa', 'warn', sell)}
         ${p.loan ? '' : panel('Rozwiązanie kontraktu', 'bad', release)}
       </aside>
+    </div>`;
+}
+
+/** Karta zawodnika wypożyczonego z klubu gracza (gra w innym klubie, kontrakt u nas). */
+function loanedOutCard(game, p, ui) {
+  const L = loanedOutPanels(game, p);
+  return `<div class="tf-back"><button class="btn btn--quiet btn--sm" data-act="tf-close">Wróć do listy</button></div>
+    <div class="tf-grid tf-card">
+      <div class="tf-main">
+        ${cardHead(game, p, `<p class="tf-tags">${tag(`wypożyczony do ${clubById(p.clubId)?.name ?? ''}`, 'info')}</p>`)}
+        ${ui.tfMsg ? `<p class="notice">${esc(ui.tfMsg)}</p>` : ''}
+        ${L.main}
+      </div>
+      <aside class="tf-side tf-actions">${L.side}</aside>
     </div>`;
 }
 
@@ -392,8 +408,10 @@ function contractsView(game, ui) {
   return `${moneyStrip(game)}
     <div class="tf-grid tf-grid--table">
       <div class="tf-main">
+        ${ui.tfMsg ? `<p class="notice">${esc(ui.tfMsg)}</p>` : ''}
         <p class="xl-note">Płace ${fmtZl(bill)} tygodniowo z budżetu ${fmtZl(c.wageBudget)}. Kontrakty kończące się w ciągu 6 miesięcy na czerwono, w ciągu roku na bursztynowo. Kliknij nazwisko, żeby przedłużyć, wystawić albo rozwiązać kontrakt.</p>
         <div class="xl-wrap tf-xl" tabindex="0" aria-label="Kontrakty zawodników, tabela przewijana w poziomie"><table class="xl"><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table></div>
+        ${loansSection(game)}
       </div>
       <aside class="tf-side" aria-label="Kontrakty i limit kadry">${endPanel}${limitPanel(game)}</aside>
     </div>`;
@@ -592,6 +610,7 @@ export function negotiationLimits(game, kind, p) {
  * Zwraca { ui, save, negotiate?: { kind, playerId, fromClub, fee, limits }, resolveOffer?: offerId }.
  */
 export function handleTransferAction(game, act, ds = {}, root = null) {
+  if (isLoanAction(act)) return handleLoanAction(game, act, ds, root);
   const val = (sel, d) => root?.querySelector(sel)?.value ?? d;
   const p = ds.id ? game.world.players[ds.id] : null;
   switch (act) {
@@ -614,10 +633,7 @@ export function handleTransferAction(game, act, ds = {}, root = null) {
       const r = offerForPlayer(game, p.id, fee);
       return { ui: { tfMsg: r.text }, save: true };
     }
-    case 'tf-loan': {
-      const r = loanIn(game, p.id, Number(val('#tfShare', ds.share)) || 50);
-      return { ui: { tfMsg: r.text, ...(r.ok ? { tfPlayer: null, tfTab: 'kontrakty' } : {}) }, save: r.ok, squadChanged: r.ok };
-    }
+    case 'tf-loan': return loanInAction(game, p, ds, root); // warunki wypożyczenia: src/ui/loansView.js
     case 'tf-negotiate': {
       const t = game.market.talks[p.id];
       const fee = p.clubId ? t?.accepted ?? 0 : 0;

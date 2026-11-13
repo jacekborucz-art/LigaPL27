@@ -196,7 +196,7 @@ export function processUserDay(game, date, rng) {
     }
 
     // Zajęcia zawodnika: plan drużyny z wyjątkami (powołanie, rezerwowi po meczu, tryb, program powrotu)
-    let sessions = p.callUp || p.onLoanOut ? [] : day.sessions;
+    let sessions = p.callUp ? [] : day.sessions;
     if (day.auto && ctx.role === 'MD+1' && p.lastMatch !== yesterday && sessions.length) {
       sessions = [{ type: 'gierki', int: 'mid' }, ...sessions.slice(1)]; // trening uzupełniający dla rezerwowych
     }

@@ -25,6 +25,7 @@ import { FIFA_WINDOWS_ALL } from './national.js';
 import { initClub, seasonSummary, FIN } from '../career/finance.js';
 import { academyMods } from '../career/infrastructure.js';
 import { addFreeAgents } from '../career/transfers.js';
+import { returnLoansAtRollover } from '../career/loans.js';
 import { boardGoal, jobOffers, ensureBoard } from '../career/board.js';
 import { coachesNewSeason } from '../career/coaches.js';
 import { coachMarketNewSeason } from '../career/coachMarket.js';
@@ -92,17 +93,7 @@ function ageOn(p, date) {
 
 function processPlayers(game, oldEnd, newStart, rng, report) {
   const W = game.world;
-  const mineBefore = new Set(W.clubs[game.clubId]?.squad ?? []);
-  // Powroty z wypożyczeń
-  for (const p of Object.values(W.players)) {
-    if (!p.loan) continue;
-    const from = p.loan.from;
-    if (W.clubs[p.clubId]) W.clubs[p.clubId].squad = W.clubs[p.clubId].squad.filter((id) => id !== p.id);
-    if (W.clubs[from]) { W.clubs[from].squad.push(p.id); p.clubId = from; } else { p.clubId = null; }
-    p.contract = { ...p.contract, wage: p.loan.wage }; p.wage = p.contract.wage;
-    if (mineBefore.has(p.id)) report.loansBack.push(p.name);
-    delete p.loan;
-  }
+  // Powroty z wypożyczeń: wcześniej, przed rozwiązaniem kadr spadkowiczów do III ligi (returnLoansAtRollover)
   // Statystyki sezonu wyzerowane (historia wyżej), kartki zerowane, wiek
   for (const p of Object.values(W.players)) {
     p.season = { apps: 0, subs: 0, min: 0, g: 0, a: 0, yc: 0, rc: 0, rating: 0, motm: 0, cs: 0 };
@@ -238,6 +229,9 @@ export function rolloverSeason(game) {
   const polishEurope = europe.spots.map(({ club, comp, entry, path, via }) => ({ club, comp, entry, ...(path ? { path } : {}), via }));
   setSeasonYear(year, { windows: FIFA_WINDOWS_ALL, polishEurope });
   applyLeagueState(game);
+  // Powroty z wypożyczeń kończących się 30 czerwca i z udziałem klubów spadających do III ligi; obowiązek albo opcja
+  // wykupu zamienia wypożyczenie w transfer (src/career/loans.js). Wypożyczenia na rok trwają dalej.
+  const loansBack = returnLoansAtRollover(game, oldEnd, newStart);
   // Spadkowicze do III ligi (nie symulowanej) tracą stałą kadrę: lepsi zawodnicy trafiają do wolnych
   for (const c of CLUBS_PL) {
     if (c.tier <= 3 || !game.world.clubs[c.id] || c.id === game.clubId) continue;
@@ -261,7 +255,7 @@ export function rolloverSeason(game) {
   for (const c of CLUBS_PL) if (c.tier === 4 && c.weight == null) c.weight = 5;
 
   // Zawodnicy i kadry
-  const report = { expired: [], retired: [], loansBack: [], promotedYouth: [], newYouth: [], signed: [] };
+  const report = { expired: [], retired: [], loansBack, promotedYouth: [], newYouth: [], signed: [] };
   processPlayers(game, oldEnd, newStart, rng.fork('zawodnicy'), report);
   processAcademy(game, newStart, rng.fork('akademia'), report);
   for (const p of Object.values(game.world.players)) if (p.clubId) p.value = marketValue(p, { tier: Math.min(3, clubById(p.clubId)?.tier ?? 3), date: newStart });

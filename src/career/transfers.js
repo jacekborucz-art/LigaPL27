@@ -17,6 +17,7 @@ import { book, spendable, wageRoom, wageBill } from './finance.js';
 import { squadCount, canSign, boardTargets } from './squadLimit.js';
 import { spellsOf, syncSpell } from '../season/history.js';
 import { boardCaps, clubBoardData, feeIssues, checkUserFee } from './boardRequests.js'; // weto zarządu (docs/finanse.md)
+import { makeLoan, dropLoanIndex, requestLoanIn, firstRefusal } from './loans.js'; // wypożyczenia (docs/wypozyczenia.md)
 
 export { SEASON_END };
 const round = (x, step = 5000) => Math.round(x / step) * step;
@@ -110,6 +111,7 @@ export function offerForPlayer(game, playerId, fee) {
   const t = game.market.talks[playerId] ?? { rounds: 0, until: null };
   if (t.until && date < t.until) return { result: 'reject', text: `Klub nie chce rozmawiać do ${t.until}.` };
   if (recentlyMoved(p, date)) return { result: 'reject', text: 'Zawodnik dopiero dołączył do klubu. Klub nie sprzeda go w tym oknie.' };
+  if (p.loan) return { result: 'reject', text: `Zawodnik jest wypożyczony z ${clubById(p.loan.from)?.name ?? 'innego klubu'}. Klub wypożyczający nie może go sprzedać, a macierzysty sprzeda go po powrocie.` };
   const cap = canSign(game);
   if (!cap.ok) return { result: 'reject', text: cap.text };
   if (spendable(game.finance, game.clubId) < fee) return { result: 'reject', text: 'Kwota przekracza budżet transferowy albo saldo klubu.' };
@@ -130,9 +132,10 @@ export function offerForPlayer(game, playerId, fee) {
 // ------------------------------------------------------------ Przeprowadzenie transferu
 /**
  * Przenosi zawodnika. kind: 'transfer' | 'free' | 'loan'. contract: { wage, until, ... } (z negocjacji).
+ * loan: warunki wypożyczenia (src/career/loans.js loanTerms); bez nich wypożyczenie do końca sezonu.
  * Księguje odstępne, premię za podpis i prowizję. Zwraca wpis historii.
  */
-export function completeTransfer(game, { playerId, to, fee = 0, contract, kind = 'transfer', date = game.date, loanShare = 0 }) {
+export function completeTransfer(game, { playerId, to, fee = 0, contract, kind = 'transfer', date = game.date, loanShare = 0, loan = null }) {
   const W = game.world; const p = W.players[playerId];
   const from = p.clubId;
   spellsOf(p); // historia klubowa: okres w dotychczasowym klubie (leniwie), zamknięcie niżej
@@ -140,10 +143,11 @@ export function completeTransfer(game, { playerId, to, fee = 0, contract, kind =
   if (kind === 'free') game.market.free = game.market.free.filter((id) => id !== playerId);
   W.clubs[to].squad.push(playerId);
   if (kind === 'loan') {
-    p.loan = { from, until: SEASON_END, share: loanShare, wage: p.contract.wage };
-    p.contract = { ...p.contract, wage: Math.round(p.contract.wage * loanShare / 10000) * 100 };
+    p.loan = makeLoan(game, p, { ...(loan ?? {}), share: loan?.share ?? loanShare, from, to, date });
+    p.contract = { ...p.contract, wage: Math.round(p.loan.wage * p.loan.share / 10000) * 100 };
   } else {
     p.contract = { ...contract, signedOn: date };
+    if (p.loan) dropLoanIndex(W, p);
     delete p.loan;
   }
   p.clubId = to; p.free = false; p.wage = p.contract.wage; p.squad = 'A'; p.lastMove = date;
@@ -160,20 +164,9 @@ export function completeTransfer(game, { playerId, to, fee = 0, contract, kind =
   return entry;
 }
 
-/** Wypożyczenie do końca sezonu: gracz płaci część pensji (50-100 %). Klub zgadza się na młodych z małą liczbą minut. */
-export function loanIn(game, playerId, share) {
-  const p = game.world.players[playerId];
-  if (!p || !isAi(game, p.clubId)) return { ok: false, text: 'Tego zawodnika nie można wypożyczyć.' };
-  if (!inWindow(game.date)) return { ok: false, text: 'Okno transferowe jest zamknięte.' };
-  const cap = canSign(game);
-  if (!cap.ok) return { ok: false, text: cap.text };
-  const listed = game.market.listed[playerId]?.kind === 'loan';
-  if (!listed && (p.age > 21 || notForSale(game, p))) return { ok: false, text: `${clubById(p.clubId).name} nie wypożycza tego zawodnika.` };
-  if (share < (listed ? 50 : 75)) return { ok: false, text: `${clubById(p.clubId).name} chce, żebyś płacił co najmniej ${listed ? 50 : 75} % pensji.` };
-  if (Math.round(p.contract.wage * share / 100) > wageRoom(game.finance, game.world, game.clubId)) return { ok: false, text: 'Brakuje miejsca w budżecie płac.' };
-  if (playerWillingness(game, p).verdict === 'odmowa') return { ok: false, text: `${p.name} nie chce przejść na wypożyczenie do twojego klubu.` };
-  completeTransfer(game, { playerId, to: game.clubId, kind: 'loan', loanShare: share });
-  return { ok: true, text: `${p.name} dołącza na wypożyczenie do końca sezonu. Płacisz ${share} % pensji.` };
+/** Wypożyczenie do klubu gracza (src/career/loans.js): terms to część pensji w % albo warunki (rodzaj, opcja, obowiązek...). */
+export function loanIn(game, playerId, terms) {
+  return requestLoanIn(game, playerId, terms);
 }
 
 /** Rozwiązanie kontraktu za porozumieniem: połowa pozostałej pensji. Zawodnik trafia do wolnych. */
@@ -236,7 +229,7 @@ export function refreshListings(game, date) {
     const squad = squadOf(game.world, c.id).map((p) => playerView(p, date));
     const wb = game.finance.clubs[c.id]?.wageBudget;
     for (const x of transferListCandidates(squad, { L: c.L, rep: clubReputation(c), wageBudget: wb }, { date, inWindow: true, seasonEnd: SEASON_END })) {
-      if (recentlyMoved(game.world.players[x.id], date)) continue;
+      if (recentlyMoved(game.world.players[x.id], date) || game.world.players[x.id]?.loan) continue; // wypożyczonego nie wystawia klub wypożyczający
       if (!M.listed[x.id]) M.listed[x.id] = { kind: x.kind, reasons: x.reasons, since: date, club: c.id };
     }
   }
@@ -269,7 +262,7 @@ function aiBuy(game, club, date, rng, log) {
       if (c.tier !== club.tier + 1 && !(c.tier === club.tier && rng.chance(0.3))) continue;
       if (c.id === club.id || c.id === game.clubId || !W.clubs[c.id] || c.parent === club.id) continue;
       for (const p of squadOf(W, c.id)) {
-        if (groupOf(p) !== g || p.ovr <= bar + 0.3 || recentlyMoved(p, date) || notForSale(game, p) || breaksMinimum(game, p) || game.market.listed[p.id]) continue;
+        if (groupOf(p) !== g || p.ovr <= bar + 0.3 || p.loan || recentlyMoved(p, date) || notForSale(game, p) || breaksMinimum(game, p) || game.market.listed[p.id]) continue;
         const fee = askingPrice(game, p);
         if (fee <= money * 0.7) pool.push({ p, fee });
       }
@@ -286,6 +279,7 @@ function aiBuy(game, club, date, rng, log) {
   const caps = boardCaps(game, club.id, p, 'sign', cb);
   const neg = aiNegotiate({ kind: 'sign', player: { ...p, contract: p.contract ?? { wage: p.askWage, until: date } }, club: { ...club, name: club.name }, fromClub: p.clubId ? clubById(p.clubId) : null, date, rng, budget: { wage: Math.min(Math.max(500, room), caps.wage), maxYears: caps.years, total: caps.total } });
   if (neg.result !== 'signed') return null;
+  if (p.clubId && firstRefusal(game, p, club.id, pick.fee, date, neg.contract).blocked) return null; // prawo pierwokupu (loans.js)
   const entry = completeTransfer(game, { playerId: p.id, to: club.id, fee: pick.fee, contract: neg.contract, kind: pick.fee || p.clubId ? 'transfer' : 'free', date });
   log.push(entry);
   return entry;
@@ -371,6 +365,8 @@ export function answerIncoming(game, offerId, action) {
   const caps = boardCaps(game, o.from, p, 'sign');
   const neg = aiNegotiate({ kind: 'sign', player: p, club: buyer, fromClub: clubById(game.clubId), date: game.date, rng, budget: { wage: Math.min(caps.wage, Math.max(p.contract.wage * 1.6, wageRoom(game.finance, game.world, o.from) + p.contract.wage)), maxYears: caps.years, total: caps.total } });
   if (neg.result !== 'signed') { o.status = 'failed'; return { text: `${p.name} nie dogadał się z ${buyer.name}. Zostaje w klubie.` }; }
+  const rofr = firstRefusal(game, p, o.from, o.fee, game.date, neg.contract); // prawo pierwokupu klubu, w którym był wypożyczony (loans.js)
+  if (rofr.blocked) { o.status = 'accepted'; return { text: rofr.text ?? `${p.name}: transfer czeka na decyzję klubu z prawem pierwokupu.`, sold: !!rofr.matched }; }
   completeTransfer(game, { playerId: p.id, to: o.from, fee: o.fee, contract: neg.contract, kind: 'transfer' });
   o.status = 'accepted';
   return { text: `${p.name} przechodzi do ${buyer.name} za ${fmtZl(o.fee)}.`, sold: true };
