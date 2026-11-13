@@ -1,0 +1,40 @@
+/* Zakładka Klub (src/ui/klubView.js). Sponsorzy (src/ui/sponsorsView.js): lista umów, oferty w trzech wariantach,
+   historia zdarzeń. Barwy i panele z transfers.css (tf-p, tf-kpi, tf-tag, tf-meter, tf-log). Telefon: jedna kolumna. */
+.sp-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); align-items: start; }
+
+/* Umowy */
+.sp-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.sp-c { --c: var(--tf-info); padding: 10px 12px; border-radius: var(--radius-m); background: var(--surface); border: 1px solid color-mix(in srgb, var(--c) 22%, var(--line)); border-left: 4px solid var(--c); }
+.sp-c__head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-2); }
+.sp-c__head > span { display: flex; flex-direction: column; min-width: 0; }
+.sp-c__head small { color: var(--text-muted); font-size: var(--step--1); line-height: 1.3; }
+.sp-c__head b { font: 700 var(--step-0)/1.25 var(--font-display); overflow-wrap: anywhere; }
+.sp-c__money { align-items: flex-end; text-align: right; flex: none; }
+.sp-c__money b { font-variant-numeric: tabular-nums; white-space: nowrap; color: color-mix(in srgb, var(--tf-good) 55%, var(--text)); }
+.sp-c__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 2px 0 0; font-size: var(--step--1); color: var(--text-muted); }
+.sp-c__cl { margin: 6px 0 0; font-size: var(--step--1); line-height: 1.45; }
+
+/* Oferty: trzy warianty obok siebie od szerokości tabletu */
+.sp-o + .sp-o { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--line); }
+.sp-o__head { display: flex; flex-direction: column; margin: 0 0 var(--space-2); }
+.sp-o__head b { font: 700 var(--step-0)/1.25 var(--font-display); }
+.sp-o__head small { color: var(--text-muted); font-size: var(--step--1); line-height: 1.35; }
+.sp-vars { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+.sp-v { --c: var(--tf-info); display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px 12px; border-radius: var(--radius-m);
+  background: var(--surface); border: 1px solid color-mix(in srgb, var(--c) 28%, var(--line)); border-top: 3px solid var(--c); }
+.sp-v[data-v="bonus"] { --c: var(--tf-warn); }
+.sp-v[data-v="long"] { --c: var(--tf-misc); }
+.sp-v h4 { margin: 0; font: 700 var(--step--1)/1.2 var(--font-display); color: color-mix(in srgb, var(--c) 60%, var(--text)); }
+.sp-v__sum { font: 700 var(--step-1)/1.15 var(--font-display); font-variant-numeric: tabular-nums; }
+.sp-v small { color: var(--text-muted); font-size: var(--step--1); }
+.sp-v ul { margin: 4px 0 8px; padding-left: 1.1em; font-size: var(--step--1); line-height: 1.4; flex: 1; }
+.sp-v .btn { align-self: flex-start; }
+
+@media (min-width: 640px) {
+  .sp-vars { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+/* PC: umowy po lewej, oferty i historia po prawej */
+@media (min-width: 1280px) {
+  .sp-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: var(--space-4); }
+  .sp-side { position: sticky; top: var(--space-3); }
+}
