@@ -18,7 +18,6 @@ import { CLUBS_PL, clubById } from '../data/clubs_pl.js';
 import { KIBICE, RIVALRIES } from '../data/kibice.js';
 import { anyClub } from '../season/season.js';
 import { standings } from '../season/standings.js';
-import { winnerOf } from '../season/cup.js';
 import { book, FIN } from './finance.js';
 import { applyMorale } from './morale.js';
 import { fansSackCoach, fansSackP } from './coachMarket.js';
@@ -462,25 +461,39 @@ function incident(game, f, side, riv, rng, date, msgs) {
 
 // ------------------------------------------------------------ Po meczu
 
+const DECISIVE = new Set(['pp', 'super']);
+/** Zwycięzca rozstrzygnięcia: dwumecz (f.knockout.firstLeg: gole obecnego gospodarza i gościa w 1. meczu), dogrywka, seria karnych. */
+export function tieWinner(f) {
+  const r = f.result;
+  if (!r) return null;
+  const fl = Array.isArray(f.knockout?.firstLeg) ? f.knockout.firstLeg : [0, 0];
+  const a = r.score[0] + fl[0]; const b = r.score[1] + fl[1];
+  if (a !== b) return a > b ? f.home : f.away;
+  const so = Array.isArray(r.shootout) ? r.shootout : r.shootout?.goals;
+  if (so) return so[0] > so[1] ? f.home : f.away;
+  return null;
+}
+
 function reaction(game, C, f, side, riv, rng, date, msgs) {
   const me = side === 0 ? f.home : f.away;
   const opp = side === 0 ? f.away : f.home;
   const P = fanProfile(me);
   const [g0, g1] = f.result.score;
   const gf = side === 0 ? g0 : g1; const ga = side === 0 ? g1 : g0;
-  const res = gf > ga ? 'W' : gf < ga ? 'L' : 'D';
+  // Mecz rozstrzygający (puchar, Superpuchar, baraż, rewanż w pucharach UEFA): liczy się awans albo trofeum,
+  // także po serii rzutów karnych i w dwumeczu, a nie sam wynik tego meczu
+  const decisive = DECISIVE.has(f.comp) || String(f.comp).startsWith('playoff') || (f.comp === 'uefa' && (f.knockout || f.leg === 2));
+  const w = decisive ? tieWinner(f) : null;
+  const res = w ? (w === me ? 'W' : 'L') : gf > ga ? 'W' : gf < ga ? 'L' : 'D';
   const pts = res === 'W' ? 3 : res === 'D' ? 1 : 0;
   let s = pts - (expectedPoints(me, opp, side === 0, !!f.neutral) + P.expBias);
   if (riv) s += (res === 'W' ? 0.6 : res === 'L' ? -0.6 : 0) * riv;
   if (ga - gf >= 3) s -= 0.5;
-  const decisive = f.comp === 'pp' || (f.comp === 'uefa' && (f.knockout || f.leg === 2));
-  if (decisive) {
-    const w = winnerOf(f);
-    if (w && w !== me) {
-      const gap = tierOfClub(opp) - tierOfClub(me); // rywal z niższej ligi = kompromitacja (zagraniczny ma tier 0)
-      s -= gap > 0 ? 0.8 * Math.min(gap, 3) : 0.3;
-    }
+  if (w && w !== me) {
+    const gap = tierOfClub(opp) - tierOfClub(me); // rywal z niższej ligi = kompromitacja (zagraniczny ma tier 0)
+    s -= gap > 0 ? 0.8 * Math.min(gap, 3) : 0.3;
   }
+  if (w === me && (f.round === 'F' || f.comp === 'super')) s += 1; // trofeum albo awans w finale baraży [SZAC]
   if (me !== game.clubId) C.mood = Math.round(clamp(C.mood + clamp(s * 2.5, -7, 6) + (55 - C.mood) * 0.04, 0, 100) * 10) / 10;
   C.heat = s < 0 ? C.heat - s * FANS.LOSS_K * P.sens : C.heat - Math.max(s * FANS.WIN_K, res === 'W' ? 3 : 0); // każda wygrana trochę uspokaja
   C.heat = Math.round(clamp(C.heat * FANS.DECAY, 0, 100) * 10) / 10;

@@ -400,3 +400,25 @@ test('Dzień meczowy z konferencją przedmeczową, decyzja komisji po kilku dnia
   const r = boardMonth(g, addDays(g.date, 1));
   assert.ok(r.review.notes.some((n) => /suchej nitki|krytyczna/.test(n)), r.review.notes.join(' | '));
 });
+
+test('Konferencja po meczu pucharowym: pytania o rozstrzygnięcie, nie o remis (Superpuchar po karnych, odpadnięcie, pierwszy mecz dwumeczu)', () => {
+  const KO = { ...BASE, knockout: true, points: false, resScore: 'R', gf: 1, ga: 1, margin: 0 };
+  const cases = [
+    [{ ...KO, comp: 'super', res: 'W', outcome: 'trophy', so: 'W', pens: '4:3', final: true, kind: 'supercup', title: 'Superpuchar Polski' }, 'ko-trophy'],
+    [{ ...KO, comp: 'pp', res: 'W', outcome: 'adv', so: 'W', pens: '5:4', kind: 'cupQF', title: 'Puchar Polski' }, 'ko-shootout'],
+    [{ ...KO, comp: 'pp', res: 'P', outcome: 'out', so: 'P', pens: '2:4', kind: 'cupSemi', title: 'Puchar Polski' }, 'ko-shootout'],
+    [{ ...KO, comp: 'pp', res: 'P', outcome: 'lostFinal', so: null, gf: 0, ga: 1, final: true, kind: 'cupFinal', title: 'Puchar Polski' }, 'ko-final-lost'],
+    [{ ...KO, comp: 'uefa', res: 'R', outcome: null, leg: 1, kind: 'uefaKO', title: 'Liga Konferencji' }, 'ko-leg1'],
+  ];
+  for (const [ctx, first] of cases) {
+    for (let i = 0; i < 25; i++) {
+      const conf = openConference(ctx, {}, null, `ko${i}`);
+      const qs = conf.queue.filter((q) => !q.officer);
+      assert.equal(qs[0].id, first, `${ctx.kind} ${ctx.outcome}: ${qs.map((q) => q.id)}`);
+      assert.ok(!qs.some((q) => ['draw', 'win-key', 'win-big', 'win-lucky', 'loss-why', 'loss-heavy', 'loss-unlucky'].includes(q.id)), qs.map((q) => q.id).join());
+      const opening = conf.queue[0];
+      assert.ok(opening.officer && !opening.answers.some((a) => /punkt|remis/i.test(a.text)), opening.answers.map((a) => a.text).join(' | '));
+      for (const q of qs) assert.ok(!/\{\w+\}/.test(q.text) && !/punkt/i.test(q.text), q.text);
+    }
+  }
+});

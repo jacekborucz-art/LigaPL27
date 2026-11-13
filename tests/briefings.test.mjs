@@ -365,3 +365,27 @@ test('Studio pomeczowe: statystyki ze zdarzeń, VAR, zawodnik meczu, kontrowersj
   assert.ok(msgs.every((m) => CATEGORIES[m.category]));
   assert.deepEqual(msgs.map((m) => m.category).sort(), ['board', 'media', 'staff']);
 });
+
+test('Studio po meczu pucharowym: zarząd i kibice rozpoznają trofeum i awans po karnych, rangę i szanse przed meczem', () => {
+  const ctx = studioCtx();
+  const pre = preMatchStudio(ctx);
+  const events = [{ min: 20, type: 'goal', side: 0, player: 'w13', name: 'W Gracz13', xg: 0.3 }, { min: 70, type: 'goal', side: 1, player: 'c13', name: 'C Gracz13', xg: 0.3 }];
+  const run = (tie) => postMatchStudio({ ...ctx, competition: { type: 'supercup', name: 'Superpuchar Polski', stage: 'final' }, events, pre: pre.forPost, ratings: [], tie });
+  const tie = { kind: 'supercup', final: true, knockout: true, points: false, leg: null, title: 'Superpuchar Polski' };
+  const trophy = run({ ...tie, outcome: 'trophy', won: true, shootout: [4, 3], pAdv: 0.45 });
+  assert.ok(trophy.reactions.board.delta >= 4 && trophy.reactions.fans.delta >= 5, JSON.stringify(trophy.reactions));
+  assert.match(trophy.reactions.board.text, /trofeum/);
+  assert.equal(trophy.result.label, 'Zwycięstwo po rzutach karnych');
+  assert.equal(trophy.result.score, '1:1, k. 4:3');
+  assert.equal(trophy.result.decided, 'W');
+  assert.ok(!trophy.headlines.some((h) => /remis|punkt/i.test(h.text)), trophy.headlines.map((h) => h.text).join(' | '));
+  // Odpadnięcie faworyta po karnych w ćwierćfinale PP: rozczarowanie, ale nie jak po kompromitacji; przegrany finał jako słabszy: łagodnie
+  const cup = { kind: 'cupQF', final: false, knockout: true, points: false, leg: null, title: 'Puchar Polski' };
+  const outFav = run({ ...cup, outcome: 'out', won: false, shootout: [3, 4], pAdv: 0.8 });
+  const outDog = run({ ...cup, outcome: 'out', won: false, shootout: [3, 4], pAdv: 0.3 });
+  assert.ok(outFav.reactions.board.delta < outDog.reactions.board.delta && outFav.reactions.board.delta < 0);
+  assert.match(outFav.reactions.fans.text, /rzutach karnych/);
+  const advDog = run({ ...cup, outcome: 'adv', won: true, shootout: [5, 4], pAdv: 0.3 });
+  assert.ok(advDog.reactions.board.delta > 0 && advDog.reactions.fans.delta > 0);
+  assert.doesNotMatch(advDog.reactions.board.text, /wściekły|rozczarowany/);
+});

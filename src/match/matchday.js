@@ -122,19 +122,43 @@ export function talkContext(game, S) {
 
 /** Rozstrzygnięcie meczu pucharowego dla tekstów po meczu: awans, odpadnięcie, trofeum, awans do wyższej ligi. */
 function postOutcome(S, c) {
-  if (!c.knockout || !S.result || c.leg?.n === 1) return null;
-  const u = S.userSide;
-  let us = S.result.score[u];
-  let them = S.result.score[1 - u];
+  return S.result ? tieOutcome(S.result, S.userSide, c) : null;
+}
+function tieOutcome(result, u, c) {
+  if (!c.knockout || !result || c.leg?.n === 1) return null;
+  let us = result.score[u];
+  let them = result.score[1 - u];
   if (c.leg?.n === 2 && c.leg.first) { us += c.leg.first[0]; them += c.leg.first[1]; }
   let won = us > them ? true : us < them ? false : null;
-  const so = S.result.shootout?.goals;
+  const so = result.shootout?.goals;
   if (won === null && so) won = so[u] > so[1 - u];
   if (won === null) return null;
   if (c.kind === 'playoffFinal') return won ? 'promoted' : 'pout';
   if (c.kind === 'playoffSemi') return won ? 'padv' : 'pout';
   if (c.final) return won ? 'trophy' : 'lostFinal';
   return won ? 'adv' : 'out';
+}
+
+export const TIE_WON = new Set(['trophy', 'adv', 'padv', 'promoted']);
+/**
+ * Ranga i rozstrzygnięcie meczu dla studia, zarządu, kibiców, nagłówków i konferencji (jedno źródło, jak w odprawach):
+ * rodzaj meczu, finał, dwumecz, wynik serii rzutów karnych (z perspektywy gracza), awans albo odpadnięcie
+ * i szansa na awans przed meczem (pAdv). result: wynik silnika (score, shootout).
+ */
+export function tieInfo(game, S, result) {
+  const c = talkContext(game, S);
+  const u = S.userSide;
+  const so = result?.shootout?.goals;
+  const pWin = S.pre?.forPost?.pWin ?? S.pre?.forBriefing?.pWin ?? 0.4;
+  const pDraw = S.pre?.forPost?.pDraw ?? 0.27;
+  let pAdv = pWin + pDraw / 2;
+  if (c.leg?.state === 'ahead') pAdv += 0.25; else if (c.leg?.state === 'behind') pAdv -= 0.25;
+  const outcome = tieOutcome(result, u, c);
+  return {
+    kind: c.kind, final: !!c.final, knockout: !!c.knockout, points: !!c.points, leg: c.leg?.n ?? null, title: c.title ?? compLabel(S.f),
+    outcome, won: outcome ? TIE_WON.has(outcome) : null, shootout: so ? [so[u], so[1 - u]] : null,
+    pAdv: Math.round(Math.min(0.95, Math.max(0.05, pAdv)) * 100) / 100,
+  };
 }
 
 /** Kontekst odprawy pomeczowej: kontekst meczu i rozstrzygnięcie (wymaga S.result). */
@@ -614,7 +638,7 @@ export function finishMatchday(game, S) {
     home: { id: S.f.home, name: anyClub(S.f.home).name }, away: { id: S.f.away, name: anyClub(S.f.away).name },
     competition: S.preCtx.competition, events: events.map(toStudioEvent), ratings: r.ratings, pre: S.pre.forPost,
     board: { trust: game.board.trust }, headlineHistory: game.headlineHistory ?? [], date: S.f.date, seed: `${game.seed}`,
-    userClubId: game.clubId, referee: S.referee, tableBefore,
+    userClubId: game.clubId, referee: S.referee, tableBefore, tie: S.tie = tieInfo(game, S, r),
   });
   if (S.f.comp !== 'friendly') { // sparing nie zmienia ocen zarządu i kibiców
     game.board.trust = Math.max(0, Math.min(100, game.board.trust + post.reactions.board.delta));
@@ -689,9 +713,13 @@ export function pressCtx(game, S) {
   const club = anyClub(clubId);
   const u = S.userSide;
   const { for: gf, against: ga } = S.post.forBriefing.score;
-  const res = gf > ga ? 'W' : gf === ga ? 'R' : 'P';
-  const pts = res === 'W' ? 3 : res === 'R' ? 1 : 0;
+  // Mecz pucharowy rozstrzygnięty (także w serii rzutów karnych): wynik dla prasy to awans albo odpadnięcie, nie remis
+  const tie = S.tie ?? (S.result ? tieInfo(game, S, S.result) : null);
+  const resScore = gf > ga ? 'W' : gf === ga ? 'R' : 'P';
+  const res = tie?.outcome ? (tie.won ? 'W' : 'P') : resScore;
   const pWin = S.pre?.forPost?.pWin ?? 0.4; const pDraw = S.pre?.forPost?.pDraw ?? 0.27;
+  const pts = tie?.outcome ? (tie.won ? 3 : 0) : res === 'W' ? 3 : res === 'R' ? 1 : 0;
+  const expPts = tie?.outcome ? 3 * tie.pAdv : 3 * pWin + pDraw;
   const results = (game.fixtures || []).filter((x) => x.played && x.result && x.comp !== 'friendly' && (x.home === clubId || x.away === clubId))
     .sort((a, b) => a.date.localeCompare(b.date)).map((x) => resOf(x, clubId));
   const streak = (r) => { let n = 0; for (let i = results.length - 1; i >= 0 && results[i] === r; i--) n++; return n; };
@@ -711,7 +739,10 @@ export function pressCtx(game, S) {
     gameSeed: `${game.seed}`, clubId, clubName: club?.name ?? clubId, oppName: anyClub(S.oppId)?.name ?? '', region: club?.region,
     prestige: club?.prestige ?? 5, tier: club?.tier ?? 1, coach: game.manager?.profile?.lastName || 'Trener',
     userHome: u === 0, neutral: !!S.f.neutral, date: S.f.date, season: game.season, matchId: S.f.id, comp: S.comp,
-    res, gf, ga, margin: gf - ga, pts, expPts: Math.round((3 * pWin + pDraw) * 100) / 100,
+    res, resScore, gf, ga, margin: gf - ga, pts, expPts: Math.round(expPts * 100) / 100,
+    outcome: tie?.outcome ?? null, so: tie?.shootout ? (tie.shootout[0] > tie.shootout[1] ? 'W' : 'P') : null,
+    pens: tie?.shootout ? `${tie.shootout[0]}:${tie.shootout[1]}` : null, knockout: !!tie?.knockout, final: !!tie?.final,
+    kind: tie?.kind ?? null, leg: tie?.leg ?? null, title: tie?.title ?? '', points: tie ? tie.points : null,
     xgFor: S.post.forBriefing.xgFor ?? 0, xgAgainst: S.post.forBriefing.xgAgainst ?? 0,
     derby: !!S.post.forBriefing.press?.derby, controversy: (S.post.controversies ?? []).length > 0,
     againstUs: ev.some((e) => (e.type === 'red' && e.side === u) || (e.type === 'penalty' && e.side !== u) || (e.type === 'varOverturn' && e.side === u && e.cancelGoal)),

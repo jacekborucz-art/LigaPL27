@@ -183,15 +183,53 @@ const NO_COMMENT = { tone: 'bezkomentarza', text: 'Bez komentarza.' };
 
 const ambition = (c) => (c.tier === 1 ? { text: 'mistrzostwo', target: 1 } : { text: 'awans', target: 2 });
 
+// Słowo wstępne po meczu pucharowym: rozstrzygnięcie (trofeum, awans, odpadnięcie, seria karnych, pierwszy mecz dwumeczu)
+function openingKo(c) {
+  const pens = c.so ? ' po rzutach karnych' : '';
+  if (c.outcome === 'trophy') return [
+    { tone: 'spokojny', text: c.so ? 'Rzuty karne to nerwy do ostatniej chwili. Zawodnicy wytrzymali presję i to trofeum należy do nich.' : 'To trofeum należy do zawodników i kibiców. Zasłużyli na nie.', morale: 0.3 },
+    { tone: 'pewny', text: 'Przyjechaliśmy po trofeum i je zdobyliśmy. Ta drużyna chce więcej.', fans: 2, morale: 0.2 },
+    { tone: 'dyplomatyczny', text: `Szacunek dla drużyny ${c.oppName}. Taki mecz zostaje w pamięci na lata.` },
+  ];
+  if (c.outcome === 'promoted') return [
+    { tone: 'spokojny', text: `Awans do wyższej ligi${pens}. To nagroda za cały sezon pracy.`, morale: 0.3 },
+    { tone: 'pewny', text: 'Nie przyszliśmy tu na wycieczkę. Ta drużyna zasłużyła na wyższą ligę.', fans: 2, morale: 0.2 },
+    { tone: 'dyplomatyczny', text: `Szacunek dla drużyny ${c.oppName}. Baraże zawsze są loterią nerwów.` },
+  ];
+  if (c.outcome === 'adv' || c.outcome === 'padv') return [
+    { tone: 'spokojny', text: c.so ? 'Awans po rzutach karnych smakuje podwójnie. Brawo zawodnicy za zimną krew.' : 'Zrobiliśmy swoje. Jesteśmy w kolejnej rundzie i tylko to się liczy.', morale: 0.2 },
+    { tone: 'pewny', text: 'Awans był celem i go zrealizowaliśmy. Chcemy zajść jak najdalej.', fans: 1, morale: 0.2 },
+    { tone: 'dyplomatyczny', text: `Szacunek dla drużyny ${c.oppName}, postawiła trudne warunki. Cieszy awans.` },
+  ];
+  if (c.outcome === 'lostFinal') return [
+    { tone: 'spokojny', text: `Gratuluję zwycięzcom. Przegraliśmy finał${pens}, ale droga do niego była dużym krokiem dla klubu.`, board: 1 },
+    { tone: 'pewny', text: 'Wrócimy do finału i wtedy trofeum będzie nasze.', fans: 1, morale: 0.3 },
+    { tone: 'dyplomatyczny', text: 'Nie szukam wymówek. W finale decydują detale i dziś były po stronie rywala.', fans: 1 },
+  ];
+  if (c.outcome === 'out' || c.outcome === 'pout') return [
+    { tone: 'spokojny', text: c.so ? 'Rzuty karne bywają okrutne. Drużyna dała z siebie wszystko.' : 'Gratuluję rywalowi awansu. Przeanalizujemy ten mecz na chłodno.', morale: 0.2 },
+    { tone: 'pewny', text: 'Odpadamy, ale ta drużyna jeszcze pokaże swoją wartość.', morale: 0.3 },
+    { tone: 'dyplomatyczny', text: 'Biorę odpadnięcie na siebie. Zawiedliśmy kibiców.', fans: 1, morale: 0.3 },
+  ];
+  // pierwszy mecz dwumeczu
+  return [
+    { tone: 'spokojny', text: 'To dopiero połowa dwumeczu. Wszystko rozstrzygnie się w rewanżu.', morale: 0.1 },
+    { tone: 'pewny', text: c.res === 'P' ? 'Strata jest do odrobienia. W rewanżu zobaczycie inną drużynę.' : 'Mamy dobrą pozycję przed rewanżem i nie zamierzamy jej oddać.', fans: 1, morale: 0.2 },
+    { tone: 'dyplomatyczny', text: `Szacunek dla drużyny ${c.oppName}. Rewanż będzie trudny dla obu stron.` },
+  ];
+}
+// Mecz pucharowy rozstrzygnięty albo pierwszy mecz dwumeczu: pytania o wynik meczu zastępują pytania o rozstrzygnięcie
+const koCtx = (c) => !!(c.knockout && (c.outcome || c.leg === 1));
+
 const OPENING = {
   id: 'opening', officer: true,
   q: { neu: 'Panie trenerze, prosimy o krótki komentarz do meczu.' },
-  a: (c) => (c.res === 'W' ? [
+  a: (c) => (koCtx(c) ? openingKo(c) : c.res === 'W' ? [
     { tone: 'spokojny', text: 'Gratuluję drużynie i dziękuję kibicom. Zrobiliśmy swoje, ale jutro wracamy do pracy.', morale: 0.2 },
     { tone: 'pewny', text: 'Byliśmy lepsi od pierwszej do ostatniej minuty i tak to wyglądało.', fans: 1, morale: 0.2, media: c.xgFor < c.xgAgainst ? -1 : 0 },
     { tone: 'dyplomatyczny', text: `Szacunek dla drużyny ${c.oppName}, postawiła trudne warunki. ${isLeagueCtx(c) ? 'Cieszą trzy punkty.' : c.comp === 'friendly' ? 'Cieszy dobry sprawdzian.' : 'Cieszy zwycięstwo.'}` },
   ] : c.res === 'R' ? [
-    { tone: 'spokojny', text: 'Punkt szanujemy, ale wiemy, że stać nas na więcej.' },
+    { tone: 'spokojny', text: isLeagueCtx(c) || c.points ? 'Punkt szanujemy, ale wiemy, że stać nas na więcej.' : 'Remis szanujemy, ale wiemy, że stać nas na więcej.' },
     { tone: 'pewny', text: 'Mieliśmy ten mecz pod kontrolą. Zabrakło kropki nad i.', fans: 1 },
     { tone: 'dyplomatyczny', text: 'Remis jest sprawiedliwy. Obie drużyny miały swoje momenty.', fans: -1 },
   ] : [
@@ -246,6 +284,84 @@ const BANK = [
       { tone: 'spokojny', text: 'Zabrakło skuteczności. Pracujemy dalej, nie panikujemy.', morale: 0.2 },
       { tone: 'dyplomatyczny', text: 'Zawiedliśmy wszyscy, zaczynając ode mnie.', fans: 2, morale: 0.4 },
       { tone: 'konfrontacyjny', text: 'Niektórzy zawodnicy nie dali dziś z siebie wszystkiego.', media: 2, morale: -0.8, follow: 'who-blame', h: { agr: '{coach} grzmi: nie wszyscy dali z siebie wszystko', neu: '{coach}: „Niektórzy nie dali z siebie wszystkiego”' } },
+    ],
+  },
+  {
+    id: 'ko-trophy', w: (c) => (c.outcome === 'trophy' ? 10 : 0), by: ['dziennik', 'lokalne', 'portal', 'klubowa'],
+    q: (c) => (c.so ? { neu: 'Trofeum po serii rzutów karnych. Co pan czuł przy decydującym strzale?', pos: 'Rzuty karne, nerwy i trofeum. To najpiękniejszy wieczór w pana karierze?', agr: 'Trofeum wygrane dopiero w serii jedenastek. Czy gra w regulaminowym czasie pana zadowoliła?' }
+      : { neu: 'Trofeum jest wasze: {title}. Co znaczy dla pana ten sukces?', pos: 'Trofeum! Jak będziecie świętować?', agr: 'Trofeum zdobyte. To początek czegoś większego czy szczyt możliwości tej drużyny?' }),
+    a: (c) => [
+      { tone: 'spokojny', text: c.so ? 'Karne trenowaliśmy cały tydzień. Zawodnicy wytrzymali presję i to trofeum należy do nich.' : 'To trofeum należy do zawodników i kibiców. Zasłużyli na nie.', morale: 0.3, fans: 1 },
+      { tone: 'pewny', text: 'To dopiero pierwsze trofeum. Ta drużyna chce więcej.', fans: 3, morale: 0.2, h: { neu: '{coach}: „To dopiero pierwsze trofeum”', pos: '{coach}: „To dopiero pierwsze trofeum”', agr: '{coach} zapowiada kolejne trofea' } },
+      { tone: 'humor', text: c.so ? 'Przy ostatnim strzale nie patrzyłem. Kibice powiedzieli mi, że wygraliśmy.' : 'Dziś pozwolę zawodnikom na wszystko. No, prawie na wszystko.', media: 1 },
+    ],
+  },
+  {
+    id: 'ko-final-lost', w: (c) => (c.outcome === 'lostFinal' ? 10 : 0), by: ['dziennik', 'tabloid', 'lokalne'],
+    q: (c) => (c.so ? { neu: 'Finał przegrany dopiero w rzutach karnych. Jak to przeżyć?', agr: 'Seria karnych nie dla was. Czy drużyna była na nią przygotowana?' }
+      : { neu: 'Przegrany finał. Czego zabrakło?', agr: 'Wielki mecz i wielkie rozczarowanie. Drużyna nie udźwignęła finału?', pos: 'Mimo porażki droga do finału była piękna. Co z niej zostanie?' }),
+    sensitive: true,
+    a: (c) => [
+      { tone: 'spokojny', text: 'Gratuluję zwycięzcom. Dojście do finału to duży krok dla tego klubu.', board: 1 },
+      { tone: 'pewny', text: 'Wrócimy do finału i wtedy trofeum będzie nasze.', fans: 2, morale: 0.3, h: { neu: '{coach}: „Wrócimy do finału”', agr: '{coach} obiecuje rewanż w finale' } },
+      c.so ? { tone: 'dyplomatyczny', text: 'Seria karnych to loteria nerwów. Nie będę z nikogo robił winnego.', morale: 0.3 }
+        : { tone: 'konfrontacyjny', text: 'Zabrakło zimnej krwi w kluczowych momentach. Porozmawiamy o tym w szatni.', media: 2, morale: -0.3, h: { agr: '{coach} rozczarowany drużyną po finale', neu: '{coach}: „Zabrakło zimnej krwi”' } },
+    ],
+  },
+  {
+    id: 'ko-shootout', w: (c) => (c.so && !c.final ? 9 : 0), by: ['kanal', 'portal', 'tabloid'],
+    q: (c) => (c.so === 'W' ? { neu: 'Awans po rzutach karnych. Trenowaliście jedenastki przed meczem?', pos: 'Zimna krew w serii rzutów karnych. Kto był dziś bohaterem?', agr: 'Awans, ale dopiero po rzutach karnych. Czy to nie za mało jak na ambicje tego klubu?' }
+      : { neu: 'Odpadacie po rzutach karnych. Loteria czy zabrakło przygotowania?', agr: 'Odpadnięcie po rzutach karnych. Kto zawiódł w serii?', pos: 'Odpadnięcie po rzutach karnych boli. Jak podnieść drużynę?' }),
+    sensitive: true,
+    a: (c) => (c.so === 'W' ? [
+      { tone: 'spokojny', text: 'Trenowaliśmy karne cały tydzień. Zawodnicy wytrzymali presję.', morale: 0.3 },
+      { tone: 'pewny', text: 'Wiedziałem, że w serii mamy przewagę. Ufam swoim strzelcom.', fans: 1, morale: 0.2 },
+      { tone: 'humor', text: 'Przy rzutach karnych postarzałem się o pięć lat.', media: 1 },
+    ] : [
+      { tone: 'spokojny', text: 'Rzuty karne bywają okrutne. Drużyna dała z siebie wszystko.', morale: 0.3 },
+      { tone: 'dyplomatyczny', text: 'Biorę to na siebie. To ja ustalałem kolejność strzelców.', fans: 1, morale: 0.3 },
+      { tone: 'konfrontacyjny', text: 'Niektórzy nie wytrzymali presji przy jedenastce.', media: 3, morale: -0.5, h: { agr: '{coach} wini strzelców po serii karnych', neu: '{coach}: „Niektórzy nie wytrzymali presji”' } },
+    ]),
+  },
+  {
+    id: 'ko-adv', w: (c) => ((c.outcome === 'adv' || c.outcome === 'padv') && !c.so ? 8 : 0), by: ['dziennik', 'portal', 'lokalne'],
+    q: (c) => (c.outcome === 'padv' ? { neu: 'Jesteście w finale baraży. Jak przygotować drużynę na mecz o awans?' }
+      : { neu: 'Awans do kolejnej rundy. Na kogo chciałby pan trafić?', pos: 'Pewny awans. Jak daleko może zajść ta drużyna?', agr: 'Awans jest, ale czy gra przekonała?' }),
+    a: (c) => [
+      { tone: 'spokojny', text: c.outcome === 'padv' ? 'Odpoczynek, analiza i pełna koncentracja. Został jeden mecz.' : 'Cieszy awans. Każdego rywala przyjmiemy z szacunkiem.', morale: 0.1 },
+      { tone: 'pewny', text: 'Nikogo się nie boimy. Chcemy zajść jak najdalej.', fans: 2, morale: 0.2, h: { neu: '{coach}: „Chcemy zajść jak najdalej”' } },
+      { tone: 'humor', text: 'Najchętniej na drużynę, która nie ma napastników.' },
+    ],
+  },
+  {
+    id: 'ko-out', w: (c) => ((c.outcome === 'out' || c.outcome === 'pout') && !c.so ? 8 : 0), by: ['dziennik', 'tabloid', 'kanal'],
+    q: (c) => (c.outcome === 'pout' ? { neu: 'Baraże przegrane. Co dalej z drużyną?', agr: 'Awans był na wyciągnięcie ręki. Kto za to odpowiada?' }
+      : { neu: 'Odpadacie z rozgrywek: {title}. Co poszło nie tak?', agr: 'Kolejne rozczarowanie w pucharach. Kto za to odpowiada?', pos: 'Odpadnięcie boli. Co drużyna wyniesie z tego meczu?' }),
+    sensitive: true,
+    a: (c) => [
+      { tone: 'dyplomatyczny', text: 'Biorę to na siebie. Zawiedliśmy kibiców.', fans: 2, morale: 0.3 },
+      { tone: 'spokojny', text: c.outcome === 'pout' ? 'Wyciągniemy wnioski i za rok spróbujemy znowu.' : 'Teraz pełne skupienie na lidze.', board: 1 },
+      { tone: 'konfrontacyjny', text: 'Rywal był lepszy, ale nie wszyscy zagrali na swoim poziomie.', media: 2, morale: -0.5, h: { agr: '{coach} krytykuje zawodników po odpadnięciu', neu: '{coach}: „Nie wszyscy zagrali na swoim poziomie”' } },
+    ],
+  },
+  {
+    id: 'ko-promoted', w: (c) => (c.outcome === 'promoted' ? 10 : 0), by: ['lokalne', 'dziennik', 'klubowa'],
+    q: { neu: 'Awans do wyższej ligi! Co pan czuje?', pos: 'Miasto świętuje awans. Co pan powie kibicom?', agr: 'Awans jest, ale czy ta kadra wytrzyma wyższą ligę?' },
+    a: () => [
+      { tone: 'spokojny', text: 'Ogromną radość i wdzięczność dla zawodników. To ich sukces.', morale: 0.3, fans: 1 },
+      { tone: 'pewny', text: 'W wyższej lidze też będziemy groźni. Zobaczycie.', fans: 2, morale: 0.2, h: { neu: '{coach}: „W wyższej lidze też będziemy groźni”' } },
+      { tone: 'dyplomatyczny', text: 'Teraz czas na rozmowy z zarządem o wzmocnieniach.', board: 1 },
+    ],
+  },
+  {
+    id: 'ko-leg1', w: (c) => (c.knockout && c.leg === 1 ? 8 : 0), by: ['dziennik', 'portal', 'tygodnik'],
+    q: (c) => (c.res === 'W' ? { neu: 'Zaliczka przed rewanżem. Czy to wystarczy?', agr: 'Zaliczka jest, ale czy nie za mała?' }
+      : c.res === 'R' ? { neu: 'Remis w pierwszym meczu. Kto jest faworytem rewanżu?' }
+        : { neu: 'Strata przed rewanżem. Wierzy pan w odrobienie strat?', agr: 'Czy po takim wyniku rewanż to tylko formalność?' }),
+    a: (c) => [
+      { tone: 'spokojny', text: 'To dopiero połowa dwumeczu. Wszystko rozstrzygnie się w rewanżu.', morale: 0.1 },
+      { tone: 'pewny', text: c.res === 'P' ? 'Odrobimy straty. W rewanżu zobaczycie inną drużynę.' : 'W rewanżu przypieczętujemy awans.', fans: 1, morale: 0.2, promise: 'winNext', h: { neu: '{coach} zapowiada awans w rewanżu', agr: '{coach} obiecuje awans. Trzymamy za słowo' } },
+      { tone: 'humor', text: 'Do przerwy jest remis. Mówię o dwumeczu.' },
     ],
   },
   {
@@ -315,7 +431,7 @@ const BANK = [
     sensitive: true,
     a: (c) => [
       { tone: 'dyplomatyczny', text: 'Nie komentuję pracy sędziów.' },
-      ...(c.res !== 'W' ? [{ tone: 'konfrontacyjny', text: 'Te decyzje kosztowały nas punkty.', fans: 3, board: -1, morale: 0.3, ref: 1, follow: 'ref-bias', h: { agr: '{coach} atakuje sędziego!', neu: '{coach}: „Decyzje sędziego kosztowały nas punkty”', pos: '{coach} rozczarowany sędziowaniem' } }]
+      ...(c.res !== 'W' ? [{ tone: 'konfrontacyjny', text: c.outcome ? (c.final ? 'Te decyzje kosztowały nas trofeum.' : 'Te decyzje kosztowały nas awans.') : isLeagueCtx(c) || c.points ? 'Te decyzje kosztowały nas punkty.' : 'Te decyzje kosztowały nas zwycięstwo.', fans: 3, board: -1, morale: 0.3, ref: 1, follow: 'ref-bias', h: { agr: '{coach} atakuje sędziego!', neu: '{coach}: „Decyzje sędziego kosztowały nas punkty”', pos: '{coach} rozczarowany sędziowaniem' } }]
         : [{ tone: 'konfrontacyjny', text: 'Wygraliśmy mimo sędziego. To mówi wszystko.', fans: 2, board: -1, ref: 1, h: { agr: '{coach} drwi z sędziego', neu: '{coach}: „Wygraliśmy mimo sędziego”' } }]),
       { tone: 'humor', text: 'Może sędzia też miał dziś słabszy dzień. Jak my wszyscy.' },
     ],
@@ -644,7 +760,10 @@ export function openConference(ctx, state = {}, climateRes = null, seed = 'konfe
   const harsh = new Set(['job', 'board-goal', 'fans', 'rumour', 'red', 'promise-broken', 'promise-season', 'skipped', 'streak-loss', 'loss-heavy', 'win-lucky', 'referee']);
   harsh.add('pre-job'); harsh.add('pre-crisis'); harsh.add('pre-referee');
   const soft = new Set(['star', 'win-big', 'win-key', 'streak-win', 'promise-kept', 'fans-thanks', 'table-top', 'injury', 'pre-streak', 'pre-tip']);
+  const SCORELINE = new Set(['win-key', 'win-big', 'win-lucky', 'draw', 'loss-why', 'loss-heavy', 'loss-unlucky']);
+  const ko = !pre && koCtx(c);
   const weight = (d) => {
+    if (ko && SCORELINE.has(d.id)) return 0;
     let w = d.w(c);
     if (!w) return 0;
     if (climate === 'agresywna' && harsh.has(d.id)) w *= 1.5;
@@ -660,7 +779,8 @@ export function openConference(ctx, state = {}, climateRes = null, seed = 'konfe
     pool = pool.filter((x) => x !== d);
   }
   // Pytanie o wynik pada zawsze i jako pierwsze (tak jest w prawdziwej sali), reszta wg wagi
-  const RESULT = pre ? new Set(['pre-expect', 'pre-derby']) : new Set(['win-key', 'win-big', 'win-lucky', 'draw', 'loss-why', 'loss-heavy', 'loss-unlucky', 'derby']);
+  const RESULT = pre ? new Set(['pre-expect', 'pre-derby']) : new Set(['win-key', 'win-big', 'win-lucky', 'draw', 'loss-why', 'loss-heavy', 'loss-unlucky', 'derby',
+    'ko-trophy', 'ko-final-lost', 'ko-shootout', 'ko-adv', 'ko-out', 'ko-promoted', 'ko-leg1']);
   if (!picked.some((d) => RESULT.has(d.id))) {
     const best = bank.filter((d) => RESULT.has(d.id) && weight(d) > 0).sort((a, b) => weight(b) - weight(a))[0];
     if (best) picked.splice(Math.max(0, picked.length - 1), 1, best);
