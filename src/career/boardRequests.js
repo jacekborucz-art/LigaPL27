@@ -333,8 +333,10 @@ export function askBoard(game, type, amount = 0, date = game.date) {
   let note = '';
   let cover = 0;
   if (type === 'shift') {
-    verdict = sc.W <= REQ.W_MAX ? 'yes' : 'no'; share = verdict === 'yes' ? 1 : 0;
-    if (verdict === 'no') note = `Po przesunięciu płace pochłonęłyby ${pct(sc.W)} przychodów klubu, a limit to ${pct(REQ.W_MAX)}.`;
+    // Pieniądze już są w budżecie transferowym: zgoda, gdy budżet płac mieści się w limicie albo płace pokrywa bogaty właściciel
+    const rich = (ownerOf(game, game.clubId)?.zasobnosc ?? 0) >= REQ.OWNER_COVER_WEALTH;
+    verdict = sc.W <= REQ.W_MAX || rich ? 'yes' : 'no'; share = verdict === 'yes' ? 1 : 0;
+    if (verdict === 'no') note = `Budżet płac po przesunięciu to ${pct(sc.W)} przychodów klubu bez dopłat właściciela, a limit to ${pct(REQ.W_MAX)}.`;
   } else if (type === 'goal') {
     verdict = sc.S >= REQ.GOAL_YES ? 'yes' : 'no'; share = verdict === 'yes' ? 1 : 0;
   } else if (type === 'wage' && sc.W > REQ.W_MAX && verdict !== 'no' && verdict !== 'cond') {

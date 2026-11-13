@@ -82,12 +82,13 @@ export function boardRequestsPanel(game, ui = {}) {
   const month = game.date.slice(0, 7);
   const used = R.log.filter((x) => x.date.slice(0, 7) === month).length;
   const W = wageRatio(game, game.clubId);
+  const WB = wageRatio(game, game.clubId, Math.max(c?.wageBudget ?? 0, 0)); // tak liczy zarząd przy prośbach o płace
   const wTone = W > REQ.W_MAX ? 'bad' : W > REQ.W_HIGH ? 'warn' : 'good';
   const season = Number(game.date.slice(5, 7)) >= 7 ? Number(game.date.slice(0, 4)) : Number(game.date.slice(0, 4)) - 1;
   const appeals = R.appeals.season === season ? R.appeals.count : 0;
   const kpis = `<div class="tf-kpis br-kpis">
     ${kpi('Prośby w tym miesiącu', `${used}<em>/${REQ.PER_MONTH}</em>`, 'najwyżej jedna w tygodniu', used >= REQ.PER_MONTH ? 'warn' : 'info')}
-    ${kpi('Płace do przychodów', pctTxt(W), `limit zarządu ${pctTxt(REQ.W_MAX)}`, wTone, meter(W * 100, wTone))}
+    ${kpi('Płace do przychodów', pctTxt(W), `przy pełnym budżecie płac ${pctTxt(WB)}, limit zarządu ${pctTxt(REQ.W_MAX)}`, wTone, meter(W * 100, wTone))}
     ${kpi('Odwołania od weta', `${appeals}<em>/${REQ.APPEALS_PER_SEASON}</em>`, 'w tym sezonie', appeals >= REQ.APPEALS_PER_SEASON ? 'warn' : 'info')}
   </div>`;
   const types = Object.keys(REQ_TYPES).map((t) => typeCard(game, t, c)).join('');
