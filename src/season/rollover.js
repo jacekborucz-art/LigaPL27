@@ -23,6 +23,7 @@ import { allocateEuropeanSpots } from './europeAccess.js';
 import { COUNTRY_COEF_2026, UCOMP_NAMES } from './uefa.js';
 import { FIFA_WINDOWS_ALL } from './national.js';
 import { initClub, seasonSummary, FIN } from '../career/finance.js';
+import { academyMods } from '../career/infrastructure.js';
 import { addFreeAgents } from '../career/transfers.js';
 import { boardGoal, jobOffers, ensureBoard } from '../career/board.js';
 import { coachesNewSeason } from '../career/coaches.js';
@@ -157,10 +158,13 @@ function processAcademy(game, newStart, rng, report) {
         if (cid === game.clubId) report.promotedYouth.push(`${p.name} (${p.pos})`);
       } else delete W.players[id];
     }
-    const n = rng.int(3, 5);
+    // Akademia klubu (career/infrastructure.js): liczba i jakość juniorów, szansa na talent względem poziomu startowego
+    const am = academyMods(game, cid);
+    const n = Math.max(1, rng.int(3, 5) + am.extra);
     for (let i = 0; i < n; i++) {
       const [pos, side] = rng.pick(SQUAD_LAYOUT);
-      const p = genPlayer(rng, { id: `${cid}-a${SEASON_YEAR}-${i + 1}`, L: c.L, pos, age: rng.int(16, 17), slotOffset: -1.0, nat: 'POL', tier: Math.min(3, c.tier), side: side ?? null, club: c, date: newStart });
+      const p = genPlayer(rng, { id: `${cid}-a${SEASON_YEAR}-${i + 1}`, L: c.L, pos, age: rng.int(16, 17), slotOffset: -1.0 + am.offset, nat: 'POL', tier: Math.min(3, c.tier), side: side ?? null, club: c, date: newStart });
+      if (am.talent > 0 && p.hidden && new Rng(`talent:${game.seed}:${p.id}`).next() < am.talent) p.hidden.POT = Math.min(20, Math.round((p.hidden.POT + 1.5) * 10) / 10);
       p.squad = 'Y';
       W.players[p.id] = p; club.academy.push(p.id);
       if (cid === game.clubId) report.newYouth.push(`${p.name} (${p.pos}, ${p.age} lat)`);

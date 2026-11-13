@@ -64,4 +64,79 @@
 @media (min-width: 1280px) {
   .sp-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: var(--space-4); }
   .sp-side { position: sticky; top: var(--space-3); }
+
+/* Zakładka Klub (src/ui/klubView.js). Reguły podzakładek z własnym prefiksem:
+   .inf- infrastruktura (src/ui/infraView.js). Kolory znaczeniowe i panele z transfers.css (.tfx, .tf-p, .tf-kpi). */
+
+/* ---------- Infrastruktura: układ (telefon jedna kolumna, PC karty + prawa kolumna) ---------- */
+.inf-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); align-items: start; }
+.inf-main, .inf-side { display: grid; gap: var(--space-3); min-width: 0; align-content: start; }
+.inf-card { display: flex; flex-direction: column; gap: var(--space-2); }
+.inf-card h3 { margin-bottom: 0; }
+.inf-now { margin: 0; font: 700 var(--step-1)/1.2 var(--font-display); color: color-mix(in srgb, var(--c) 45%, var(--text)); }
+.inf-h { margin: var(--space-2) 0 0; font: 700 var(--step-0)/1.25 var(--font-display); }
+.inf-note { margin: 0; font-size: var(--step--1); color: var(--text-muted); }
+
+/* Drabina poziomów: 10 pól, obecny poziom wyróżniony, po polskim szczycie przerywana ramka */
+.inf-steps { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 3px; margin: 0; padding: 0; list-style: none; }
+.inf-steps li { position: relative; display: grid; place-items: center; min-height: 30px; border-radius: var(--radius-s);
+  font: 700 var(--step--1)/1 var(--font-display); font-variant-numeric: tabular-nums; color: var(--text-muted);
+  background: color-mix(in srgb, var(--line) 45%, var(--surface)); border: 1px solid transparent; }
+.inf-steps li[data-s="done"] { color: var(--text); background: color-mix(in srgb, var(--c) 30%, var(--surface)); }
+.inf-steps li[data-s="cur"] { color: #FFFFFF; background: var(--c); box-shadow: 0 0 0 2px color-mix(in srgb, var(--c) 40%, transparent); }
+.inf-steps li[data-world="1"] { border: 1px dashed color-mix(in srgb, var(--text-muted) 60%, transparent); }
+.inf-steps li[data-pl="1"]::after { content: ""; position: absolute; right: -3px; top: -4px; bottom: -4px; width: 2px; border-radius: 1px; background: var(--tf-warn); }
+.inf-steps__key { display: flex; justify-content: space-between; gap: var(--space-2); margin: 0; font-size: var(--step--1); color: var(--text-muted); }
+.inf-steps__key span:last-child::before { content: ""; display: inline-block; width: 2px; height: 0.9em; margin-right: 6px; vertical-align: -1px; background: var(--tf-warn); }
+
+/* Lista nazw poziomów */
+.inf-levels summary { cursor: pointer; font-size: var(--step--1); font-weight: 600; color: var(--text-muted); min-height: 32px; display: flex; align-items: center; }
+.inf-levels ol { margin: var(--space-1) 0 0; padding: 0; list-style: none; display: grid; gap: 0; }
+.inf-levels li { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 8px; padding: 5px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); font-size: var(--step--1); align-items: baseline; }
+.inf-levels li:last-child { border-bottom: 0; }
+.inf-levels li[aria-current="true"] { font-weight: 700; color: color-mix(in srgb, var(--c) 45%, var(--text)); }
+.inf-levels li span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.inf-levels li small { color: var(--text-muted); font-weight: 400; }
+.inf-levels li em { font-style: normal; font-variant-numeric: tabular-nums; color: var(--text-muted); white-space: nowrap; }
+.inf-levels .inf-tag { color: var(--warn-text, var(--tf-warn)); font-weight: 600; }
+
+/* Efekty i wycena */
+.inf-fx { margin: 0; padding-left: 1.1em; font-size: var(--step--1); display: grid; gap: 2px; }
+.inf-dl div { grid-template-columns: 104px minmax(0, 1fr); }
+.inf-ask { display: grid; gap: var(--space-2); padding: 10px 12px; border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--c) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--c) 40%, var(--line)); }
+.inf-ask p { margin: 0; font-size: var(--step--1); }
+.inf-ask__btns, .inf-alt { display: flex; flex-wrap: wrap; gap: 6px; }
+.inf-card > .btn { align-self: flex-start; }
+
+/* Budowa w toku */
+.inf-run { display: grid; gap: 4px; padding: 10px 12px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--c) 10%, var(--surface)); }
+.inf-run__head { display: flex; justify-content: space-between; gap: var(--space-2); margin: 0; font-size: var(--step--1); }
+.inf-run__head span { font-variant-numeric: tabular-nums; font-weight: 700; }
+
+/* Prawa kolumna: oś czasu inwestycji i licencja */
+.inf-time { margin: 0; padding: 0 0 0 14px; list-style: none; display: grid; gap: var(--space-3); border-left: 2px solid color-mix(in srgb, var(--line) 85%, transparent); }
+.inf-time li { position: relative; display: grid; gap: 2px; font-size: var(--step--1); }
+.inf-time li::before { content: ""; position: absolute; left: -20px; top: 3px; width: 10px; height: 10px; border-radius: 50%; background: var(--c, var(--tf-info)); }
+.inf-time li[data-track="stadium"] { --c: var(--tf-good); }
+.inf-time li[data-track="training"] { --c: var(--tf-info); }
+.inf-time li[data-track="academy"] { --c: var(--tf-misc); }
+.inf-time time, .inf-time small { color: var(--text-muted); }
+.inf-lic { width: 100%; border-collapse: collapse; font-size: var(--step--1); margin-bottom: var(--space-2); }
+.inf-lic th, .inf-lic td { padding: 5px 4px; text-align: left; border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.inf-lic thead th { color: var(--text-muted); font-weight: 600; }
+.inf-lic td span { margin-left: 4px; padding: 0 6px; border-radius: 999px; font-weight: 600; }
+.inf-lic tr[data-ok="1"] td span { background: color-mix(in srgb, var(--tf-good) 18%, transparent); }
+.inf-lic tr[data-ok="0"] td span { background: color-mix(in srgb, var(--tf-bad) 18%, transparent); }
+
+@media (min-width: 760px) {
+  .inf-main { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1280px) {
+  .inf-grid { grid-template-columns: minmax(0, 1fr) 360px; gap: var(--space-4); }
+  .inf-side { position: sticky; top: var(--space-3); }
+}
+@media (min-width: 1600px) {
+  .inf-main { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .inf-grid { grid-template-columns: minmax(0, 1fr) 400px; }
 }

@@ -363,3 +363,13 @@ Gdzie działa: `negotiationLimits` (src/ui/transfersView.js) zwraca progi w polu
 Odwołanie: raz na zawodnika w oknie (poza oknem: do otwarcia następnego), najwyżej dwa w sezonie; przycisk na ekranie rozmów, w karcie zawodnika na rynku i w panelu "Weta zarządu". Decyzja z tego samego S, w którym zamiast składnika kwoty jest -25 x przekroczenie progu (największe względne), a koszt to odstępne albo koszt kontraktu; zgoda od S >= 10. Zgoda kosztuje 3 punkty zaufania i zatwierdza dokładnie zawetowane warunki do końca okna (poza oknem na 30 dni), odmowa kosztuje 5.
 
 Kluby AI: te same progi wieku, długości, pensji i kosztu kontraktu w `aiNegotiate` (budżet `{ wage, maxYears, total }`: oferta i przyjmowana kontroferta skracane do progu), przy zakupach (`aiBuy`: odstępne ponad progi wypada z listy kandydatów), przedłużeniach (`aiRenewals`) i kupnie zawodnika gracza (`answerIncoming`). Domyślna oferta AI (4/3/2/1 rok wg wieku) już mieści się w progach, więc zmienia się głównie przyjmowanie kontrofert i pensje najlepiej opłacanych.
+
+## Infrastruktura
+
+Stadion, baza treningowa i akademia mają poziomy 1-10 (pełny opis, skala, źródła i wzory: docs/infrastruktura.md). Efekty liczą się względem poziomu startowego klubu, więc pierwszy dzień gry jest taki sam jak w modelu z rozdz. 3:
+
+- przychód z widza = naKibica x M(L) / M(L_start), pojemność = pojemność z danych + dobudowane miejsca (w czasie budowy mniej);
+- utrzymanie obiektów zastępuje część kosztów klubu: kredyt = min(utrzymanie na starcie, 0,5 x ops); co miesiąc księgowane są (ops - kredyt) / 12 jako `ops` i (kredyt + przyrost utrzymania) / 12 jako `upkeep` („Utrzymanie obiektów”) [SZAC];
+- inwestycje gracza: 20 % udziału klubu na start, reszta w ratach co miesiąc (`infra`, „Inwestycje w obiekty”); miasto i bogaty właściciel dokładają według typu właściciela [SZAC];
+- kluby AI kierują połowę corocznej kwoty `invest` (rozdz. 3.4) na projekty: licencja, baza, akademia, stadion (tylko przy zapełnieniu od 92 %), nie wyżej niż poziom 8 [SZAC];
+- licencja (Ekstraklasa: stadion od 4 i 4 500 miejsc, baza od 3, akademia od 3; 1 Liga: stadion od 3, akademia od 2; 2 Liga: stadion od 2): sezon na rozpoczęcie inwestycji, potem kara 1 mln zł (`fines`) [SZAC].
