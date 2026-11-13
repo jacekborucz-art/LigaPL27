@@ -16,7 +16,7 @@ import { onPitch } from '../engine/match/teams.js';
 import { shirtNumbers } from '../career/shirts.js';
 import * as TEAMS from '../engine/match/teams.js';
 import { substitute, changeTactics, shout, canShout, assistantSuggest, applySuggestion, playerStates, previewShape } from '../engine/match/match.js';
-import { proficiency, byPosition } from '../engine/positions.js';
+import { proficiency, byPosition, posEff } from '../engine/positions.js';
 import { openMenu, closeMenu, bindContextTrigger, showToast as menuToast } from './contextMenu.js';
 import { SHOUTS, SHOUT_COOLDOWN, SHOUT_DURATION } from '../engine/match/constants.js';
 import { TONES, TALKS, POST_TONES, MAX_TALKS } from '../match/briefings.js';
@@ -1001,6 +1001,34 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     // Pozycja po zatwierdzeniu: slot z podglądu (zaplanowany zmiennik zajmuje miejsce schodzącego)
     const slotOfId = new Map((pv.ok ? pv.slots : []).filter((sl) => sl.playerId).map((sl) => [sl.playerId, sl]));
     const fitOf = (p, sl) => (p && sl ? proficiency(p, sl.pos, sl.side) : 100);
+    // Podpowiedzi po kliknięciu zawodnika: najlepsi kandydaci do zmiany (biegłość na miejscu, jakość, świeżość, kartka, uraz)
+    const sugg = new Map();
+    {
+      const condPen = (c) => (c < 85 ? 0.04 * (85 - c) : 0);
+      const offPen = (prof) => (prof < 85 ? 0.04 * (85 - prof) : 0); // gra poza pozycją: także ryzyko błędów w obronie
+      const effAt = (x, sl) => (x.p.ovr ?? 10) * posEff(fitOf(x.p, sl)) - condPen(x.cond ?? 100) - offPen(fitOf(x.p, sl));
+      const outPen = (x) => (x.injury && !x.injury.playable ? 6 : x.knock && !x.knock.aggravated ? 1.2 : 0) + (x.yc ? 0.6 : 0);
+      if (sel?.kind === 'on') {
+        const out = T.players.find((y) => y.id === sel.id);
+        const sl = out ? slotOfId.get(out.id) ?? out.slot : null;
+        if (sl) {
+          const base = effAt(out, sl) - outPen(out);
+          T.bench.filter((b) => !inIds.has(b.id) && !(b.injury && !b.injury.playable) && !(b.p.pos === 'BR') === !(sl.pos === 'BR'))
+            .map((b) => ({ b, gain: effAt(b, sl) - base, prof: fitOf(b.p, sl) })).filter((c) => c.prof >= 60).sort((a, z) => z.gain - a.gain).slice(0, 3)
+            .forEach((c, i) => sugg.set(`bench:${c.b.id}`, { rank: i + 1, text: `${i === 0 ? 'Najlepsza zmiana' : 'Dobra opcja'}: ${sl.pos} ${c.prof}%${c.gain > 0.3 ? `, +${c.gain.toFixed(1)}` : ''}` }));
+        }
+      } else if (sel?.kind === 'bench') {
+        const inc = T.bench.find((y) => y.id === sel.id);
+        if (inc) {
+          T.players.filter((x) => x.on && !x.sentOff && !outIds.has(x.id)).map((x) => {
+            const sl = slotOfId.get(x.id) ?? x.slot;
+            if (!sl || (sl.pos === 'BR') !== (inc.p.pos === 'BR')) return null;
+            return { x, gain: effAt(inc, sl) - (effAt(x, sl) - outPen(x)), prof: fitOf(inc.p, sl), pos: sl.pos };
+          }).filter((c) => c && c.prof >= 60).sort((a, z) => z.gain - a.gain).slice(0, 3)
+            .forEach((c, i) => sugg.set(`on:${c.x.id}`, { rank: i + 1, text: `${i === 0 ? 'Najlepiej zmienić' : 'Można zmienić'}: ${inc.p.name.split(' ').slice(-1)[0]} na ${c.pos} ${c.prof}%` }));
+        }
+      }
+    }
     const row = (x, kind) => {
       const planned = kind === 'on' ? outIds.has(x.id) : inIds.has(x.id);
       const isSel = sel && sel.kind === kind && sel.id === x.id;
@@ -1012,11 +1040,12 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       const k = x.knock && !x.knock.aggravated;
       const back = kind === 'bench' && x.rolledOff > 0 ? `może wrócić, grał ${x.prevMins ?? 0} min` : '';
       const note = [kind === 'on' && pos !== x.p.pos ? `nominalnie ${x.p.pos}${band !== 'ok' ? `, ${prof}% na tej pozycji` : ''}` : '', x.injury && !x.injury.playable ? 'uraz' : k ? `gra z bólem (${x.knock.name})` : '', x.yc ? 'żółta kartka' : '', back, kind === 'bench' ? `OVR ${Math.round(x.p.ovr)}` : ''].filter(Boolean).join(', ');
-      return `<li class="sub-row ${planned ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${back ? 'is-back' : ''} ${x.injury && !x.injury.playable ? 'is-hurt' : ''} ${band !== 'ok' ? `is-off is-off--${band}` : ''}" data-sdrop="${kind}:${esc(x.id)}">
+      const sg = sugg.get(`${kind}:${x.id}`);
+      return `<li class="sub-row ${planned ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${sg ? `is-sugg is-sugg--${sg.rank}` : ''} ${back ? 'is-back' : ''} ${x.injury && !x.injury.playable ? 'is-hurt' : ''} ${band !== 'ok' ? `is-off is-off--${band}` : ''}" data-sdrop="${kind}:${esc(x.id)}">
         <button class="sub-row__main" data-md="subPick:${kind}|${esc(x.id)}" data-sdrag="${kind}:${esc(x.id)}" data-name="${esc(x.p.name)}" aria-pressed="${isSel}" ${planned ? 'disabled' : ''}>
           <span class="sub-handle" data-shandle aria-hidden="true"></span>
           <span class="pos" data-g="${GROUP[pos] ?? 'MID'}">${esc(pos)}</span>
-          <span class="sub-name"><span class="sub-name__l"><span class="sub-name__t">${esc(x.p.name)}</span>${x.yc ? ICON.yellow : ''}${k ? ICON.knock : ''}</span>${note ? `<small>${esc(note)}</small>` : ''}</span>
+          <span class="sub-name"><span class="sub-name__l"><span class="sub-name__t">${esc(x.p.name)}</span>${x.yc ? ICON.yellow : ''}${k ? ICON.knock : ''}</span>${sg ? `<span class="sub-sugg">${esc(sg.text)}</span>` : ''}${note ? `<small>${esc(note)}</small>` : ''}</span>
           <span class="sub-cond" title="Kondycja"><i style="width:${cond}%" class="${condCls(cond)}"></i></span><b>${cond}%</b>
         </button></li>`;
     };
@@ -1035,7 +1064,8 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       const isSel = sel && sel.kind === 'on' && sel.id === x.id;
       const prof = fitOf(who.p, sl); const band = fitBand(prof);
       const k = who.knock && !who.knock.aggravated;
-      return `<button class="mm-tok ${sl.pos === 'BR' ? 'is-gk' : ''} ${pl ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${x.injury && !x.injury.playable ? 'is-hurt' : ''}" style="--x:${sl.x};--y:${sl.y};--cond:${cond}" data-c="${condCls(cond)}" data-fit="${band}"
+      const sgT = sugg.get(`on:${x.id}`);
+      return `<button class="mm-tok ${sl.pos === 'BR' ? 'is-gk' : ''} ${pl ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${sgT ? `is-sugg is-sugg--${sgT.rank}` : ''} ${x.injury && !x.injury.playable ? 'is-hurt' : ''}" style="--x:${sl.x};--y:${sl.y};--cond:${cond}" data-c="${condCls(cond)}" data-fit="${band}"
         data-sdrop="on:${esc(x.id)}" data-sdrag="on:${esc(x.id)}" data-shandle data-name="${esc(x.p.name)}" data-md="tokPick:${esc(x.id)}" ${pl ? 'disabled' : ''} title="${esc(`${who.p.name}, ${sl.pos}${band !== 'ok' ? ` (nominalnie ${who.p.pos}, ${prof}%)` : ''}, kondycja ${cond}%`)}">
         <span class="mm-tok__dot"><span>${esc(sl.pos)}</span></span>${who.yc ? '<i class="mm-tok__yc" aria-label="żółta kartka"></i>' : ''}${x.injury && !x.injury.playable ? '<i class="mm-tok__inj" aria-label="uraz">+</i>' : k ? `<i class="mm-tok__knock" aria-label="gra z bólem">${ICON.knock}</i>` : ''}
         <span class="mm-tok__name">${inc ? `↑ ${esc(last(inc.p.name))}` : esc(last(x.p.name))}</span></button>`;
