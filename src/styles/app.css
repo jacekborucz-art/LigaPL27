@@ -1025,12 +1025,7 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 @media (min-width: 1280px) {
   .hub__main:has(.eu) { max-width: 1840px; }
 }
-@media (min-width: 1680px) {
-  .eu .ufxlist:not(.ufxlist--compact) { display: grid; grid-template-columns: 1fr 1fr; }
-  .eu .ufxlist:not(.ufxlist--compact) > .ufx:nth-child(odd) { border-right: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
-  .eu .ufxlist > .ufx:nth-last-child(2):nth-child(odd) { border-bottom: 0; }
-  .eu .ufxlist:has(> .ufx:only-child) { grid-template-columns: 1fr; }
-}
+/* Puchary europejskie: przebieg i mecze zawsze w jednej kolumnie (czytelniej niż dwie kolumny na szerokim ekranie) */
 .eu .ufxlist { margin-bottom: var(--space-4); }
 .eu .seu .ufxlist { margin-bottom: var(--space-2); }
 
