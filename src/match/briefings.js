@@ -113,6 +113,15 @@ const PRE_CTX = {
   crisis: { shout: 2, praise: -2, calm: 1, demand: 1 },
   goodRun: { praise: 1, shout: -1 },
   highStakes: { demand: 1, calm: -1, noPressure: -1 },
+  // Mecze pucharowe (panel psycholog + trener) [SZAC]: mecz o wszystko, stan dwumeczu przed rewanżem, finał, pułapka
+  singleKO: { calm: 0.5, demand: 1, noPressure: -1, defend: -1 },
+  aggLead1: { calm: 1, demand: 0.5, shout: -1, noPressure: -1, defend: 0.5 },
+  aggLead2plus: { calm: 1, praise: -1, demand: 1, shout: -1, noPressure: -1, defend: -0.5 },
+  aggLevel: { calm: 1, demand: 0.5, shout: -0.5 },
+  aggBehind1: { calm: 1, demand: 1, shout: -1, noPressure: 0.5, defend: -2 },
+  aggBehind2plus: { demand: 1, noPressure: 2, defend: -3 },
+  final: { calm: 1, praise: 0.5, shout: -1.5, noPressure: -1 },
+  trap: { calm: -0.5, praise: -1, demand: 1.5, noPressure: -1 },
 };
 
 // Sytuacja w przerwie (wynik kontra xG) [SZAC]
@@ -147,6 +156,15 @@ export function preSituation(ctx = {}) {
   if ((lastTwo.length === 2 && lastTwo.every((x) => x === 'P')) || (last5.length >= 4 && pts <= 3)) flags.push('crisis');
   else if (last5.length >= 3 && pts >= 10) flags.push('goodRun');
   if (ctx.boardExpectation === 'win' || (ctx.boardTrust ?? 60) < 30) flags.push('highStakes');
+  // ko: { decider, agg (bilans 1. meczu z naszej strony, rewanż), single, final, playoff, trap } z koBrief (matchday.js)
+  const ko = ctx.ko;
+  if (ko) {
+    if (ko.final) flags.push('final');
+    else if (ko.agg != null) flags.push(ko.agg >= 2 ? 'aggLead2plus' : ko.agg === 1 ? 'aggLead1' : ko.agg === 0 ? 'aggLevel' : ko.agg === -1 ? 'aggBehind1' : 'aggBehind2plus');
+    else if (ko.single) flags.push('singleKO');
+    if (ko.playoff && !flags.includes('highStakes')) flags.push('highStakes');
+    if (ko.trap) flags.push('trap');
+  }
   return { phase: 'pre', stateIdx: 1, behindBy: 0, rank: ctx.rank ?? 0, flags, pWin, clubId: ctx.clubId };
 }
 
@@ -155,6 +173,9 @@ export function halfSituation(ctx = {}) {
   const gf = ctx.score?.for ?? 0;
   const ga = ctx.score?.against ?? 0;
   const diff = gf - ga;
+  // Rewanż: stan (prowadzimy, remis, przegrywamy) liczy się z dwumeczu, opis gry (klucz) z tego meczu [SZAC]
+  const agg = ctx.ko?.agg ?? null;
+  const aggDiff = agg != null ? diff + agg : diff;
   const xgd = (ctx.xgFor ?? 0) - (ctx.xgAgainst ?? 0);
   let key = 'wyrownany';
   if ((diff < 0 && xgd >= 0.5) || (diff === 0 && xgd >= 0.8)) key = 'pechowo';
@@ -163,15 +184,18 @@ export function halfSituation(ctx = {}) {
   else if (diff > 0 && xgd >= 0.5) key = 'pewnePrzod';
   return {
     phase: 'half',
-    stateIdx: diff > 0 ? 0 : diff === 0 ? 1 : 2,
-    behindBy: Math.max(0, -diff),
+    stateIdx: aggDiff > 0 ? 0 : aggDiff === 0 ? 1 : 2,
+    behindBy: Math.max(0, -aggDiff),
     diff,
+    aggDiff,
+    etLooming: !!ctx.ko?.decider && aggDiff === 0, // remis w meczu rozstrzygającym: w perspektywie dogrywka
+    calmGame: !!ctx.ko?.decider && Math.abs(aggDiff) >= 3, // dwumecz rozstrzygnięty: emocje słabsze
     xgd: r2(xgd),
     key,
     label: HALF_SITUATIONS[key],
     momentum: ctx.momentum ?? 0,
     possession: ctx.possession ?? 50,
-    rank: ctx.rank ?? 0,
+    rank: ctx.ko?.decider && Math.abs(aggDiff) >= 3 ? 0 : ctx.rank ?? 0,
     flags: [],
     pWin: ctx.pWin ?? 0.4,
     clubId: ctx.clubId,
@@ -215,11 +239,17 @@ function speechParts(p, tone, sit, memory, rating) {
   parts.push(PERSONA_MOD[tone][tr.persona] || 0);
   if (tone === 'noPressure' && (sit.pWin ?? 0.4) <= 0.25) parts.push(sit.phase === 'pre' ? 0 : 2); // wobec faworyta rywala
   // 2. kontekst fazy
-  if (sit.phase === 'pre') for (const f of sit.flags) parts.push(PRE_CTX[f]?.[tone] || 0);
+  if (sit.phase === 'pre') {
+    for (const f of sit.flags) parts.push(PRE_CTX[f]?.[tone] || 0);
+    const ko = sit.flags.includes('singleKO') || sit.flags.includes('final');
+    if (ko && tone === 'noPressure' && sit.flags.includes('underdog')) parts.push(2); // słabszy w meczu o wszystko: „nie macie nic do stracenia”
+    if (sit.flags.includes('final') && tone === 'calm' && tr.persona === 'Wrażliwy') parts.push(1);
+  }
   if (sit.phase === 'half') {
     parts.push(HALF_CTX[sit.key]?.[tone] || 0);
     if (sit.momentum <= -30) parts.push({ calm: 1, defend: 1 }[tone] || 0);
     if (sit.momentum >= 30) parts.push({ praise: 1, demand: 0.5 }[tone] || 0);
+    if (sit.etLooming) parts.push({ calm: 1, shout: -1, demand: 0.5, defend: (sit.pWin ?? 0.4) < 0.5 ? 0.5 : 0 }[tone] || 0); // „nie wszystko naraz”
   }
   // 3. cechy indywidualne [SZAC]
   const form = avgForm(p);
@@ -248,6 +278,7 @@ function speechParts(p, tone, sit, memory, rating) {
     if (tr.persona === 'Wrażliwy' && rank >= 2 && tr.waz < 14) neg -= 2;
     else if (pos > 0) pos += RANK_BONUS[rank] + (rank >= 2 ? 0.1 * (tr.waz - 10) : 0);
   }
+  if (sit.calmGame) { pos *= 0.5; neg *= 0.5; }
   // 5. zaufanie mnoży część pozytywną; niskie zaufanie buntuje przy krzyku i wymaganiach
   const trust = getTrust(p, sit.clubId);
   pos *= 1 + 0.04 * trust;
@@ -722,12 +753,14 @@ export function postMatchBriefing({ players, tone, talks = [], memory, ctx = {},
   validateTalks(talks, 'post', players);
   const gf = ctx.score?.for ?? 0;
   const ga = ctx.score?.against ?? 0;
-  const res = gf > ga ? 0 : gf === ga ? 1 : 2;
+  // ctx.decided ('W'|'D'|'L'): mecz rozstrzygający (awans, trofeum, odpadnięcie, także po karnych i w dwumeczu) liczy się wg rozstrzygnięcia
+  const res = ctx.decided ? { W: 0, D: 1, L: 2 }[ctx.decided] : gf > ga ? 0 : gf === ga ? 1 : 2;
   const xgd = (ctx.xgFor ?? 0) - (ctx.xgAgainst ?? 0);
   const playedWell = xgd >= 0.5;
   const playedBadly = xgd <= -0.5;
   const rank = ctx.rank ?? 0;
-  const rankMul = rank >= 2 ? 1.5 : 1; // derby i wielkie mecze: emocje mocniejsze [SZAC]
+  // derby, puchary i finały: emocje mocniejsze; pierwszy mecz dwumeczu niczego nie rozstrzyga [SZAC, panel psycholog + trener]
+  const rankMul = [1, 1.15, 1.4, 1.6][Math.min(3, Math.max(0, rank))] * (ctx.firstLeg ? 0.8 : 1);
   const ratings = ctx.ratings || {};
   const memKey = `post:${tone}`;
   const reps = repeatCount(memory, memKey);
@@ -1552,7 +1585,8 @@ export function aiChooseSpeech(coach, ctx = {}) {
  */
 export function aiBriefing(team, ctx = {}, seed = 'ai') {
   const phase = ctx.phase || 'pre';
-  let tone = aiChooseSpeech(team.coach || 'P', ctx);
+  // rewanż: trener AI wybiera ton wg stanu dwumeczu, jak szatnia gracza
+  let tone = aiChooseSpeech(team.coach || 'P', phase === 'half' && ctx.ko?.agg != null ? { ...ctx, diff: (ctx.diff ?? 0) + ctx.ko.agg } : ctx);
   if (phase === 'post') return { tone, memory: remember(ctx.memory, `post:${tone}`) };
   const sit = phase === 'pre'
     ? preSituation(ctx)

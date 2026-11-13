@@ -17,6 +17,7 @@ import { createMessage } from '../core/inbox.js';
 import { CLUBS_PL, clubById } from '../data/clubs_pl.js';
 import { KIBICE, RIVALRIES } from '../data/kibice.js';
 import { anyClub } from '../season/season.js';
+import { isDecider, tieWinner } from '../season/cup.js';
 import { standings } from '../season/standings.js';
 import { book, FIN } from './finance.js';
 import { applyMorale } from './morale.js';
@@ -461,18 +462,7 @@ function incident(game, f, side, riv, rng, date, msgs) {
 
 // ------------------------------------------------------------ Po meczu
 
-const DECISIVE = new Set(['pp', 'super']);
-/** Zwycięzca rozstrzygnięcia: dwumecz (f.knockout.firstLeg: gole obecnego gospodarza i gościa w 1. meczu), dogrywka, seria karnych. */
-export function tieWinner(f) {
-  const r = f.result;
-  if (!r) return null;
-  const fl = Array.isArray(f.knockout?.firstLeg) ? f.knockout.firstLeg : [0, 0];
-  const a = r.score[0] + fl[0]; const b = r.score[1] + fl[1];
-  if (a !== b) return a > b ? f.home : f.away;
-  const so = Array.isArray(r.shootout) ? r.shootout : r.shootout?.goals;
-  if (so) return so[0] > so[1] ? f.home : f.away;
-  return null;
-}
+export { tieWinner };
 
 function reaction(game, C, f, side, riv, rng, date, msgs) {
   const me = side === 0 ? f.home : f.away;
@@ -482,8 +472,7 @@ function reaction(game, C, f, side, riv, rng, date, msgs) {
   const gf = side === 0 ? g0 : g1; const ga = side === 0 ? g1 : g0;
   // Mecz rozstrzygający (puchar, Superpuchar, baraż, rewanż w pucharach UEFA): liczy się awans albo trofeum,
   // także po serii rzutów karnych i w dwumeczu, a nie sam wynik tego meczu
-  const decisive = DECISIVE.has(f.comp) || String(f.comp).startsWith('playoff') || (f.comp === 'uefa' && (f.knockout || f.leg === 2));
-  const w = decisive ? tieWinner(f) : null;
+  const w = isDecider(f) ? tieWinner(f) : null;
   const res = w ? (w === me ? 'W' : 'L') : gf > ga ? 'W' : gf < ga ? 'L' : 'D';
   const pts = res === 'W' ? 3 : res === 'D' ? 1 : 0;
   let s = pts - (expectedPoints(me, opp, side === 0, !!f.neutral) + P.expBias);

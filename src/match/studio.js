@@ -6,6 +6,7 @@
 // Studio nie przegląda świata: dostaje tylko dwie drużyny, ich kadry, tabelę i listę zdarzeń meczu.
 // Wartości balansowe oznaczone [SZAC]. Opis: docs/odprawy-studio.md.
 
+import { compRank } from '../season/cup.js';
 import { Rng, clamp } from '../core/rng.js';
 import { assessLineup } from '../engine/positions.js';
 import { expectedGoals, outcomeProbs, QS } from '../engine/quickSim.js';
@@ -86,6 +87,9 @@ export function matchRank(ctx) {
     if (late && nearDrop(home.position, home.points) && nearDrop(away.position, away.points)) bump(2, 'relegation');
     if (late && home.position <= 2 && away.position <= 2 && Math.abs((home.points ?? 0) - (away.points ?? 0)) <= 4) bump(2, 'title');
   }
+  // Puchary: ranga wg rundy i stanu dwumeczu (compRank, ta sama skala co mecze w tle i odprawa AI), derby co najmniej 2
+  const cr = comp.comp ? compRank({ comp: comp.comp, round: comp.round, ucomp: comp.ucomp, knockout: comp.firstLeg ? { firstLeg: comp.firstLeg } : null }) : null;
+  if (cr != null) level = Math.max(cr, tags.includes('derby') || tags.includes('klasyk') ? 2 : 0);
   const LABELS = { final: 'Finał', uefa: 'Mecz w pucharach UEFA', derby: 'Derby', klasyk: 'Klasyk', relegation: 'Mecz o utrzymanie', title: 'Mecz o mistrzostwo', cup: comp.playoff ? 'Baraż o awans' : 'Mecz pucharowy' };
   // Sparing nie jest meczem ligowym (wcześniej etykieta „Mecz ligowy” trafiała też do sparingów)
   const fallback = comp.type === 'friendly' ? 'Sparing' : 'Mecz ligowy';
@@ -1092,6 +1096,8 @@ export function postMatchStudio(ctx) {
     // dane dla odprawy pomeczowej i konferencji (briefings.js)
     forBriefing: {
       score: { for: gU, against: gO },
+      decided: tie ? (tieWon ? 'W' : 'L') : null, // rozstrzygnięcie (awans, trofeum, odpadnięcie) dla efektu odprawy pomeczowej
+      firstLeg: !!(ctx.tie?.knockout && ctx.tie.leg === 1),
       xgFor: xgU,
       xgAgainst: xgO,
       rank: rank.level ?? 0,

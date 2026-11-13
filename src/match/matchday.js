@@ -69,7 +69,7 @@ export function engineWeather(w, pitch) {
 
 function compInfo(f) {
   // round, leg, ucomp i playoff: dane dla kontekstu odprawy i oczekiwań zarządu (docs/odprawy-kontekst.md)
-  const more = { round: f.round ?? null, leg: f.leg ?? null, ucomp: f.ucomp ?? null, playoff: String(f.comp).startsWith('playoff') };
+  const more = { comp: f.comp, round: f.round ?? null, leg: f.leg ?? null, ucomp: f.ucomp ?? null, playoff: String(f.comp).startsWith('playoff'), firstLeg: Array.isArray(f.knockout?.firstLeg) ? [...f.knockout.firstLeg] : null };
   if (LEAGUE_COMPS.includes(f.comp)) return { type: 'league', name: COMPETITIONS[f.comp].name, stage: 'main', ...more };
   if (f.comp === 'pp') return { type: 'cup', name: 'Puchar Polski', stage: f.round === 'F' ? 'final' : 'main', ...more };
   if (f.comp === 'super') return { type: 'supercup', name: 'Superpuchar Polski', stage: 'final', ...more };
@@ -137,6 +137,26 @@ function tieOutcome(result, u, c) {
   if (c.kind === 'playoffSemi') return won ? 'padv' : 'pout';
   if (c.final) return won ? 'trophy' : 'lostFinal';
   return won ? 'adv' : 'out';
+}
+
+/**
+ * Kontekst pucharowy odprawy (preSituation/halfSituation: ko) dla strony side (domyślnie gracza): mecz rozstrzygający,
+ * bilans pierwszego meczu przed rewanżem, mecz o wszystko, finał, baraż, pułapka (faworyt z rywalem z niższej ligi).
+ * Ta sama funkcja dla gracza i trenera AI rywala.
+ */
+export function koBrief(game, S, side = S.userSide) {
+  const c = talkContext(game, S);
+  if (!c.knockout || c.leg?.n === 1) return null;
+  const mine = side === S.userSide;
+  const fl = c.leg?.n === 2 && c.leg.first ? c.leg.first[0] - c.leg.first[1] : null; // z perspektywy gracza
+  const pWinUser = S.pre?.forBriefing?.pWin ?? 0.4;
+  const pWin = mine ? pWinUser : 1 - pWinUser;
+  const me = anyClub(mine ? game.clubId : S.oppId); const opp = anyClub(mine ? S.oppId : game.clubId);
+  const lower = (opp?.tier ?? 1) > (me?.tier ?? 1) && (opp?.tier ?? 0) > 0;
+  return {
+    decider: true, agg: fl == null ? null : mine ? fl : -fl, single: !c.leg, final: !!c.final, playoff: !!c.playoff,
+    trap: pWin >= 0.65 && lower,
+  };
 }
 
 export const TIE_WON = new Set(['trophy', 'adv', 'padv', 'promoted']);
@@ -368,12 +388,12 @@ export function matchSquadPlayers(game, S) {
 }
 
 export function preAdvice(game, S) {
-  return assistantAdvice('pre', matchSquadPlayers(game, S), { ...S.pre.forBriefing, clubId: game.clubId, date: S.f.date, context: talkContext(game, S) }, S.memory);
+  return assistantAdvice('pre', matchSquadPlayers(game, S), { ...S.pre.forBriefing, ko: koBrief(game, S), clubId: game.clubId, date: S.f.date, context: talkContext(game, S) }, S.memory);
 }
 
 /** Odprawa przedmeczowa gracza; zwraca reakcje do pokazania (bez liczb). */
 export function doPreBriefing(game, S, tone, talks = []) {
-  const res = preMatchBriefing({ players: matchSquadPlayers(game, S), tone, talks, memory: S.memory, ctx: { ...S.pre.forBriefing, clubId: game.clubId, date: S.f.date, context: talkContext(game, S) }, seed: `${game.seed}:${S.f.id}:pre` });
+  const res = preMatchBriefing({ players: matchSquadPlayers(game, S), tone, talks, memory: S.memory, ctx: { ...S.pre.forBriefing, ko: koBrief(game, S), clubId: game.clubId, date: S.f.date, context: talkContext(game, S) }, seed: `${game.seed}:${S.f.id}:pre` });
   S.memory = res.memory;
   S.briefings.pre = res;
   markTalks(game, talks, S.f.date, res);
@@ -407,7 +427,10 @@ export function kickOff(game, S) {
   const oppSquad = squadFor(game, S.oppId, S.comp);
   const oppClub = anyClub(S.oppId);
   const oppQ = S.oppQ ?? null; // stary stan dnia meczowego (sprzed atrybutów trenerów): trener neutralny
-  const ai = aiBriefing({ coach: coachStyle(game, S.oppId), personaMix: personaMix(oppSquad), mot: oppQ?.mot ?? 0 }, { phase: 'pre', pWin: 1 - (S.pre.forBriefing.pWin ?? 0.4), rank: S.pre.forBriefing.rank }, `${game.seed}:${S.f.id}:ai`);
+  // Trener AI: ta sama sytuacja co gracz (forma, oczekiwania zarządu, kontekst pucharowy), z perspektywy rywala
+  const oppPWin = 1 - (S.pre.forBriefing.pWin ?? 0.4);
+  const oppLast5 = S.preCtx?.[S.userSide === 0 ? 'away' : 'home']?.last5 ?? [];
+  const ai = aiBriefing({ coach: coachStyle(game, S.oppId), personaMix: personaMix(oppSquad), mot: oppQ?.mot ?? 0 }, { phase: 'pre', pWin: oppPWin, rank: S.pre.forBriefing.rank, last5: oppLast5, boardExpectation: oppPWin >= 0.55 ? 'win' : 'any', ko: koBrief(game, S, 1 - S.userSide) }, `${game.seed}:${S.f.id}:ai`);
   // Wielki mecz: odporny trener uspokaja drużynę, nerwowy ją usztywnia (zaangażowanie na start, PRE)
   const nerves = oppQ ? oppQ.imp * COACH.nerves * oppQ.pre : 0;
   const zOpp = Object.fromEntries(oppSquad.map((p) => [p.id, (ai.zByPersona[p.persona] ?? ai.teamZ) + nerves]));
@@ -465,7 +488,7 @@ export function halfInfo(S) {
 
 export function halfAdvice(game, S) {
   const h = halfInfo(S);
-  return assistantAdvice('half', onPitchPlayers(S), { ...h, clubId: game.clubId, rank: S.pre.forBriefing.rank, pWin: S.pre.forBriefing.pWin, context: talkContext(game, S) }, S.memory);
+  return assistantAdvice('half', onPitchPlayers(S), { ...h, ko: koBrief(game, S), clubId: game.clubId, rank: S.pre.forBriefing.rank, pWin: S.pre.forBriefing.pWin, context: talkContext(game, S) }, S.memory);
 }
 
 function onPitchPlayers(S) {
@@ -476,7 +499,7 @@ function onPitchPlayers(S) {
 /** Odprawa w przerwie: nowy poziom zaangażowania na 2. połowę. */
 export function doHalfBriefing(game, S, tone, talks = []) {
   const h = halfInfo(S);
-  const res = halftimeBriefing({ players: onPitchPlayers(S), tone, talks, memory: S.memory, ctx: { ...h, clubId: game.clubId, rank: S.pre.forBriefing.rank, pWin: S.pre.forBriefing.pWin, date: S.f.date, context: talkContext(game, S) }, seed: `${game.seed}:${S.f.id}:half` });
+  const res = halftimeBriefing({ players: onPitchPlayers(S), tone, talks, memory: S.memory, ctx: { ...h, ko: koBrief(game, S), clubId: game.clubId, rank: S.pre.forBriefing.rank, pWin: S.pre.forBriefing.pWin, date: S.f.date, context: talkContext(game, S) }, seed: `${game.seed}:${S.f.id}:half` });
   S.memory = res.memory;
   S.briefings.half = res;
   markTalks(game, talks, S.f.date, res);
@@ -484,7 +507,7 @@ export function doHalfBriefing(game, S, tone, talks = []) {
   for (const x of [...T.players, ...T.bench]) if (res.engine.zStart[x.id] != null) x.Z = res.engine.zStart[x.id];
   // AI rywala też ma odprawę
   const O = S.M.teams[1 - S.userSide];
-  const ai = aiBriefing({ coach: O.coach, personaMix: personaMix(O.players.map((x) => x.p)), mot: O.cq?.mot ?? 0 }, { phase: 'half', diff: -h.score.for + h.score.against, xgDiff: h.xgAgainst - h.xgFor, pWin: 1 - (S.pre.forBriefing.pWin ?? 0.4) }, `${game.seed}:${S.f.id}:aihalf`);
+  const ai = aiBriefing({ coach: O.coach, personaMix: personaMix(O.players.map((x) => x.p)), mot: O.cq?.mot ?? 0 }, { phase: 'half', diff: -h.score.for + h.score.against, xgDiff: h.xgAgainst - h.xgFor, pWin: 1 - (S.pre.forBriefing.pWin ?? 0.4), rank: S.pre.forBriefing.rank, ko: koBrief(game, S, 1 - S.userSide) }, `${game.seed}:${S.f.id}:aihalf`); // ranga i dwumecz jak u gracza
   for (const x of O.players) x.Z = ai.zByPersona[x.p.persona] ?? ai.teamZ;
   for (const p of onPitchPlayers(S)) { const w = game.world.players[p.id]; if (w) Object.assign(w, applyBriefing(w, res)); }
   return res;
