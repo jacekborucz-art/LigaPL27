@@ -1193,3 +1193,4 @@
   .mcard__attrs h4 { break-after: avoid; }
   .mcard__attrs .attrs { break-inside: avoid; }
 }
+.mcard__side .pmap { max-width: none; margin-top: var(--space-3); }

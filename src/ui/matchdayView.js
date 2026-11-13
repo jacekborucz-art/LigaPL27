@@ -25,6 +25,7 @@ import { CLIMATES, currentQuestion, progress, effectWords } from '../match/press
 import { friendlyRuleTags, friendlyRulesOf } from '../training/friendlies.js';
 import { attrGroupsHtml } from './squadView.js';
 import { formChartHtml } from './formChart.js';
+import { positionMapHtml } from './positionMap.js';
 import { NAT_NAMES } from '../data/names.js';
 import { POS_NAMES } from '../data/attributes.js';
 import { moraleLabel } from '../career/morale.js';
@@ -1343,7 +1344,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       <dl class="mcard__facts">${facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(String(v))}</dd></div>`).join('')}</dl>
       <div class="mcard__body">
         <section class="mcard__attrs">${attrGroupsHtml(p, { heading: 'h4' })}</section>
-        <section class="mcard__side">${formChartHtml(p)}</section>
+        <section class="mcard__side">${formChartHtml(p)}${positionMapHtml(p)}</section>
       </div>
       <p>${btn('closeDlg', 'Zamknij', false)}</p>`;
     if (!dlg.open) dlg.showModal();

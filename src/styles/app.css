@@ -1019,3 +1019,6 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 .pmap__legend li::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--no); }
 .pmap__legend li[data-b="opt"]::before { background: var(--opt); } .pmap__legend li[data-b="ok"]::before { background: var(--ok); } .pmap__legend li[data-b="weak"]::before { background: var(--weak); }
 .pmap__note { margin: var(--space-1) 0 0; font-size: 11px; color: var(--text-muted); }
+/* Mapa pozycji i forma w karcie na ekranie Skład i taktyka: obok siebie, gdy jest miejsce */
+.tdet__vis { display: grid; gap: 0 var(--space-3); grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); align-items: start; }
+.tdet__vis .pmap { max-width: 380px; }
