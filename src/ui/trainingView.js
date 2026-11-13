@@ -1,4 +1,4 @@
-// Ekran „Trening”: plan tygodnia (kalendarz dni z rolą względem meczu), edycja dnia (rodzaj zajęć i intensywność),
+// Ekran „Trening”: pulpit (najważniejsze informacje i skróty do zakładek), baner zaplanowanego obozu, plan tygodnia (kalendarz dni z rolą względem meczu), edycja dnia (rodzaj zajęć i intensywność),
 // trening indywidualny (akcent, nowa pozycja, programy, tryb obciążenia), obciążenia (ACWR), sztab i raport rozwoju.
 // renderTraining(game, ui) zwraca HTML; handleTrainingAction(game, act, dataset) obsługuje kliknięcia
 // (data-act z prefiksem „tr-”) i zwraca { ui: zmiany stanu ekranu, save: czy zapisać grę }.
@@ -28,9 +28,11 @@ import { baseFactor, baseTerm } from '../training/camps.js';
 import { setFriendlyRules, friendlyRulesOf, friendlyRuleTags, FRIENDLY_RULE_TEXT } from '../training/friendlies.js';
 import { FRIENDLY_DEFAULTS } from '../engine/match/rules.js';
 import { legsTerm, overloadTerm } from '../training/load.js';
+import { staleNote } from '../training/variety.js';
+import { daysBetween } from '../training/state.js';
 
 const WD = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
-const TABS = [['tydzien', 'Tydzień'], ['obozy', 'Obozy'], ['sparingi', 'Sparingi'], ['zawodnicy', 'Zawodnicy'], ['obciazenia', 'Obciążenia'], ['sztab', 'Sztab'], ['rozwoj', 'Rozwój']];
+const TABS = [['pulpit', 'Pulpit'], ['tydzien', 'Tydzień'], ['obozy', 'Obozy'], ['sparingi', 'Sparingi'], ['zawodnicy', 'Zawodnicy'], ['obciazenia', 'Obciążenia'], ['sztab', 'Sztab'], ['rozwoj', 'Rozwój']];
 const POS_ORDER = ['BR', 'ŚO', 'BO', 'WB', 'DP', 'ŚP', 'OP', 'SP', 'SN', 'NAP'];
 const shortDate = (iso) => fmtDate(iso).replace(/, \d{4}$/, '');
 const num = (v, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toFixed(d).replace('.', ',');
@@ -48,25 +50,277 @@ function intDot(int) {
   return `<span class="tr-int" data-int="${esc(int)}" title="Intensywność: ${esc(INTENSITY[int]?.name ?? '')}">${esc(INTENSITY[int]?.short ?? '')}</span>`;
 }
 
-// ------------------------------------------------------------ Nagłówek
-function header(game, week) {
-  const coh = teamCohesion(game);
+// ------------------------------------------------------------ Wspólne: tony kolorów, karty, dane drużyny
+// Kolory znaczeniowe (training.css): good zielony, warn bursztyn, bad czerwony, info niebieski, misc fiolet.
+const zTone = (z) => (z >= 72 ? 'good' : z >= 58 ? 'warn' : 'bad');
+const freshTone = (f) => (f >= 85 ? 'good' : f >= 70 ? 'warn' : 'bad');
+const ACWR_TONE = { ok: 'good', low: 'info', warn: 'warn', bad: 'bad' };
+const meterTone = { good: 'ok', warn: 'mid', bad: 'bad', info: 'ok', misc: 'ok' };
+const dayNum = (iso) => Number(iso.slice(8, 10));
+const wdShort = (iso) => WD[(new Date(`${iso}T12:00:00Z`).getUTCDay() + 6) % 7];
+const plural = (n, one, few, many) => (n === 1 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? few : many);
+const inDays = (n) => (n <= 0 ? 'dziś' : n === 1 ? 'jutro' : `za ${n} dni`);
+
+/** Karta pulpitu z kolorowym paskiem u góry. title, badge: tekst; body, foot: HTML. */
+function card(tone, title, body, { badge = '', foot = '', cls = '' } = {}) {
+  return `<section class="tr-card${cls ? ` ${cls}` : ''}" data-t="${tone}">
+    <header class="tr-card__head"><h3>${esc(title)}</h3>${badge ? `<span class="tr-card__badge">${esc(badge)}</span>` : ''}</header>
+    <div class="tr-card__body">${body}</div>
+    ${foot ? `<div class="tr-card__foot">${foot}</div>` : ''}
+  </section>`;
+}
+const tabBtn = (tab, label) => `<button class="btn btn--quiet tr-mini" data-act="tr-tab" data-tab="${tab}">${esc(label)}</button>`;
+
+function squadNumbers(game) {
   const squad = squadOf(game.world, game.clubId);
   const fit = squad.filter((p) => !(p.injuryDays > 0));
   const avgFresh = fit.length ? Math.round(fit.reduce((s, p) => s + (p.fresh ?? 95), 0) / fit.length) : 0;
   const avgAcwr = fit.length ? fit.reduce((s, p) => s + (p.training?.acwr ?? 1), 0) / fit.length : 1;
-  const injured = squad.length - fit.length;
+  return { squad, fit, avgFresh, avgAcwr, injured: squad.length - fit.length };
+}
+
+function nextFixture(game) {
+  const f = (game.fixtures || []).filter((x) => !x.played && x.date >= game.date && (x.home === game.clubId || x.away === game.clubId)).sort((a, b) => a.date.localeCompare(b.date))[0];
+  if (!f) return null;
+  const opp = anyClub(f.home === game.clubId ? f.away : f.home);
+  return { f, opp, where: f.neutral ? 'teren neutralny' : f.home === game.clubId ? 'u siebie' : 'na wyjeździe', friendly: f.comp === 'friendly' };
+}
+
+// ------------------------------------------------------------ Nagłówek
+function header(game) {
+  const coh = teamCohesion(game);
+  const { avgFresh, avgAcwr, injured } = squadNumbers(game);
   const today = dayContext(game, game.date);
-  const nextFix = (game.fixtures || []).filter((f) => !f.played && f.date >= game.date && (f.home === game.clubId || f.away === game.clubId)).sort((a, b) => a.date.localeCompare(b.date))[0];
-  const opp = nextFix && anyClub(nextFix.home === game.clubId ? nextFix.away : nextFix.home);
+  const nx = nextFixture(game);
   const lbl = acwrLabel(avgAcwr);
+  const zt = zTone(coh.z);
+  const ft = freshTone(avgFresh);
   return `
   <div class="tr-head">
-    <div class="tr-stat"><span class="muted">Okres</span><b>${esc(PHASES[today.phase])}</b><small>${esc(ROLE_LABELS[today.role] ?? '')}</small></div>
-    <div class="tr-stat"><span class="muted">Zgranie</span><b>${num(coh.z, 0)}</b>${meter(coh.z, 100, coh.z >= 72 ? 'ok' : coh.z >= 58 ? 'mid' : 'bad')}<small>${esc(coh.label)}, ${signed(coh.term ?? 0, 2)} pkt</small></div>
-    <div class="tr-stat"><span class="muted">Świeżość</span><b>${avgFresh} %</b>${meter(avgFresh, 100, avgFresh >= 85 ? 'ok' : avgFresh >= 70 ? 'mid' : 'bad')}<small>${injured ? `kontuzjowani: ${injured}` : 'bez kontuzji'}</small></div>
-    <div class="tr-stat"><span class="muted">Obciążenie (ACWR)</span><b>${num(avgAcwr, 2)}</b><small data-acwr="${lbl.id}">${esc(lbl.text)}</small></div>
-    <div class="tr-stat tr-stat--wide"><span class="muted">Następny mecz</span><b>${nextFix ? esc(opp?.name ?? 'Rywal z losowania') : 'Brak'}</b><small>${nextFix ? `${esc(weekday(nextFix.date))}, ${esc(fmtDate(nextFix.date))}` : ''}</small></div>
+    <div class="tr-stat" data-t="info"><span class="tr-stat__k">Okres</span><b>${esc(PHASES[today.phase])}</b><small>${esc(ROLE_LABELS[today.role] ?? '')}</small></div>
+    <div class="tr-stat" data-t="${zt}"><span class="tr-stat__k">Zgranie</span><b>${num(coh.z, 0)}</b>${meter(coh.z, 100, meterTone[zt])}<small>${esc(coh.label)}, ${signed(coh.term ?? 0, 2)} pkt</small></div>
+    <div class="tr-stat" data-t="${ft}"><span class="tr-stat__k">Świeżość</span><b>${avgFresh} %</b>${meter(avgFresh, 100, meterTone[ft])}<small>${injured ? `kontuzjowani: ${injured}` : 'bez kontuzji'}</small></div>
+    <div class="tr-stat" data-t="${ACWR_TONE[lbl.id]}"><span class="tr-stat__k">Obciążenie (ACWR)</span><b>${num(avgAcwr, 2)}</b><small data-acwr="${lbl.id}">${esc(lbl.text)}</small></div>
+    <div class="tr-stat tr-stat--wide" data-t="misc"><span class="tr-stat__k">Następny mecz${nx ? `, ${esc(inDays(daysBetween(game.date, nx.f.date)))}` : ''}</span><b>${nx ? esc(nx.opp?.name ?? 'Rywal z losowania') : 'Brak'}</b><small>${nx ? `${esc(weekday(nx.f.date))}, ${esc(fmtDate(nx.f.date))}, ${esc(nx.where)}` : ''}</small></div>
+  </div>`;
+}
+
+// ------------------------------------------------------------ Obóz: baner z datami (na każdej zakładce)
+/** Najbliższy zarezerwowany obóz gracza, który jeszcze się nie skończył (trwający albo przyszły), albo null. */
+function activeCamp(game) {
+  return (game.training?.camps ?? []).filter((c) => !c.cancelled && c.to >= game.date).sort((a, b) => a.from.localeCompare(b.from))[0] ?? null;
+}
+
+/** Pasek dni obozu: każdy dzień z dniem tygodnia, sparingi na obozie zaznaczone. */
+function campDays(game, b) {
+  const fr = new Set(clubFriendlies(game).filter((f) => f.date >= b.from && f.date <= b.to).map((f) => f.date));
+  const cells = [];
+  for (let d = b.from, i = 0; d <= b.to && i < 21; d = addDays(d, 1), i++) {
+    const st = d < game.date ? 'past' : d === game.date ? 'today' : '';
+    cells.push(`<li${st ? ` data-st="${st}"` : ''}${fr.has(d) ? ' data-fr="1"' : ''} title="${esc(`${weekday(d)}, ${fmtDate(d)}${fr.has(d) ? ', sparing' : ''}`)}"><small>${esc(wdShort(d))}</small><b>${dayNum(d)}</b>${fr.has(d) ? '<i>sparing</i>' : ''}</li>`);
+  }
+  return `<ol class="tr-campdays" aria-label="Dni obozu">${cells.join('')}</ol>`;
+}
+
+function campBanner(game, tab) {
+  const b = activeCamp(game);
+  if (!b) return '';
+  const on = game.date >= b.from;
+  const status = on ? `Trwa: dzień ${daysBetween(b.from, game.date) + 1} z ${b.days}` : `Wyjazd ${inDays(daysBetween(game.date, b.from))}`;
+  return `<section class="tr-campbar" aria-label="Zaplanowany obóz">
+    <div class="tr-campbar__what">
+      <span class="tr-campbar__k">${esc(HALF_NAMES[b.half] ?? 'Obóz')}, ${b.days} dni</span>
+      <b class="tr-campbar__place">${esc(b.place)}</b>
+    </div>
+    <div class="tr-campbar__when">
+      <span class="tr-campbar__dates"><span>${esc(fmtDate(b.from))}</span><i aria-hidden="true">&rarr;</i><span>${esc(fmtDate(b.to))}</span></span>
+      <small>Wyjazd: ${esc(weekday(b.from))}, powrót: ${esc(weekday(b.to))}</small>
+    </div>
+    <span class="tr-campbar__status" data-on="${on}">${esc(status)}</span>
+    ${tab !== 'obozy' ? '<button class="btn tr-mini tr-campbar__go" data-act="tr-tab" data-tab="obozy">Szczegóły obozu</button>' : ''}
+    ${campDays(game, b)}
+  </section>`;
+}
+
+// ------------------------------------------------------------ Pulpit: najważniejsze informacje z każdej zakładki
+function dashWeek(game) {
+  const monday = mondayOf(game.date);
+  const week = weekPlan(game, monday);
+  const T = game.training;
+  const c = T.clubs[game.clubId];
+  const nx = nextFixture(game);
+  const today = week.find((d) => d.today) ?? week.find((d) => d.date === game.date);
+  const cells = week.map((d) => {
+    let what;
+    if (d.kind === 'match') {
+      const f = d.match;
+      const opp = f && anyClub(f.home === game.clubId ? f.away : f.home);
+      what = `<b class="tr-wk__match">${f?.comp === 'friendly' ? 'Sparing' : 'Mecz'}</b><small>${esc(opp?.short ?? opp?.name ?? 'rywal')}</small>`;
+    } else if (d.kind === 'rest' || d.kind === 'off') {
+      what = `<b class="tr-wk__rest">${d.kind === 'off' ? 'Urlop' : 'Wolne'}</b>`;
+    } else {
+      const x = d.sessions[0];
+      what = x ? `<span class="tr-sess" data-g="${esc(SESSIONS[x.type].group)}">${intDot(x.int)}${esc(SESSIONS[x.type].name)}</span>${d.sessions.length > 1 ? `<small>+${d.sessions.length - 1} ${plural(d.sessions.length - 1, 'zajęcia', 'zajęcia', 'zajęć')}</small>` : ''}` : '<b class="tr-wk__rest">Wolne</b>';
+    }
+    return `<li><button class="tr-wk" data-act="tr-go" data-tab="tydzien" data-date="${esc(d.date)}" data-kind="${esc(d.kind)}"${d.today ? ' data-today="1"' : ''}${d.past ? ' data-past="1"' : ''}${d.ctx?.camp ? ' data-camp="1"' : ''} aria-label="${esc(`${weekday(d.date)}, ${fmtDate(d.date)}`)}">
+      <span class="tr-wk__day"><b>${esc(wdShort(d.date))}</b><small>${dayNum(d.date)}</small></span>
+      <span class="tr-role">${esc(d.role === 'OBOZ' ? 'Obóz' : d.role === 'URLOP' ? 'Urlop' : d.role)}</span>
+      <span class="tr-wk__what">${what}</span>
+    </button></li>`;
+  }).join('');
+  const todayText = !today ? '' : today.kind === 'match' ? 'dzień meczowy' : today.kind === 'rest' || today.kind === 'off' ? 'dzień wolny' : today.sessions.map((x) => SESSIONS[x.type].name.toLowerCase()).join(', ');
+  const stale = staleNote(c);
+  const own = week.filter((d) => !d.auto && d.editable).length;
+  const body = `
+    <p class="tr-lead">Dziś: <b>${esc(todayText || 'brak zajęć')}</b>${nx ? `. Następny mecz ${esc(inDays(daysBetween(game.date, nx.f.date)))}: <b>${esc(nx.opp?.name ?? 'rywal z losowania')}</b>, ${esc(nx.where)}` : ''}.</p>
+    <ol class="tr-wkstrip">${cells}</ol>
+    <dl class="tr-facts">
+      <div><dt>Akcent tygodnia</dt><dd>${esc(ACCENTS[T.settings.accent]?.name ?? 'Zrównoważony')}</dd></div>
+      <div><dt>Poziom obciążeń</dt><dd>${esc(LOAD_LEVELS[T.settings.load]?.name ?? 'Normalna')}</dd></div>
+      <div><dt>Plan</dt><dd>${own ? `Twoje zmiany: ${own} ${plural(own, 'dzień', 'dni', 'dni')}` : 'Asystent'}</dd></div>
+    </dl>
+    ${stale ? `<p class="tr-flag" data-t="warn">${esc(stale)}</p>` : ''}`;
+  return card('info', 'Ten tydzień', body, {
+    badge: `${shortDate(monday)} do ${shortDate(addDays(monday, 6))}`, cls: 'tr-card--week',
+    foot: tabBtn('tydzien', 'Plan tygodnia'),
+  });
+}
+
+function dashCamp(game) {
+  const b = activeCamp(game);
+  if (b) {
+    const on = game.date >= b.from;
+    const pv = campPreview(game, b.half, b.dest, b.days);
+    const frs = clubFriendlies(game).filter((f) => f.date >= b.from && f.date <= b.to).length;
+    const body = `<p class="tr-big">${esc(b.place)}</p>
+      <p class="tr-dates"><b>${esc(fmtDate(b.from))}</b> <span>do</span> <b>${esc(fmtDate(b.to))}</b></p>
+      <dl class="tr-facts tr-facts--2">
+        <div><dt>Długość</dt><dd>${b.days} dni, warunki ${pct(b.q)}</dd></div>
+        <div><dt>Koszt</dt><dd>${esc(formatZl(b.cost))}</dd></div>
+        <div><dt>Forma bazowa (szacunek)</dt><dd>${pct(pv.base)}, bez obozu ${pct(pv.none)}</dd></div>
+        <div><dt>Sparingi na obozie</dt><dd>${frs || 'brak'}</dd></div>
+      </dl>
+      <p class="muted">${on ? 'Drużyna jest na obozie: szybszy rozwój i zgranie, mniej urazów.' : 'Na obozie drużyna szybciej się rozwija i zgrywa. Sparingi w tym terminie umówisz w zakładce Sparingi.'}</p>`;
+    return card('misc', 'Obóz', body, { badge: on ? 'trwa' : inDays(daysBetween(game.date, b.from)), foot: tabBtn('obozy', 'Szczegóły obozu') });
+  }
+  const half = halfOf(game.date);
+  const w = campWindow(game, half);
+  const c = game.training.clubs[game.clubId];
+  const open = w.to > game.date && w.length >= CAMP.minDays && game.date < w.start;
+  let body; let tone = 'info'; let badge = 'brak';
+  if (open) {
+    const left = daysBetween(game.date, w.from);
+    tone = left <= 45 ? 'warn' : 'info';
+    badge = 'niezarezerwowany';
+    body = `<p class="tr-big">${esc(HALF_NAMES[half])}</p>
+      <p>Wolny termin bez meczów o punkty:</p>
+      <p class="tr-dates"><b>${esc(fmtDate(w.from))}</b> <span>do</span> <b>${esc(fmtDate(w.to))}</b></p>
+      <p class="muted">Pierwszy mecz rundy: ${esc(fmtDate(w.start))}. Bez obozu drużyna zaczyna rundę słabsza.</p>`;
+  } else if (c.cb?.key === halfKey(half)) {
+    const f = baseFactor(c.cb.start, game.date);
+    tone = c.cb.base >= 0.95 ? 'good' : c.cb.base >= 0.75 ? 'warn' : 'bad';
+    badge = 'po obozie';
+    body = `<p>Forma bazowa na start rundy</p><p class="tr-big">${pct(c.cb.base)}</p>
+      <p class="muted">${f > 0 ? `Teraz w meczach ${signed(baseTerm(c.cb.base, f), 2)} pkt na zawodnika.` : 'Efekt okresu przygotowawczego już wygasł.'}</p>`;
+  } else {
+    body = `<p class="muted">${game.date >= w.start ? 'Runda trwa. Kolejny obóz zaplanujesz przed następną przerwą.' : 'W tej przerwie nie ma terminu na obóz bez kolizji z meczami o punkty.'}</p>`;
+  }
+  return card(tone, 'Obóz', body, { badge, foot: tabBtn('obozy', open ? 'Zaplanuj obóz' : 'Obozy') });
+}
+
+function dashFriendlies(game) {
+  const all = clubFriendlies(game).sort((a, b) => a.date.localeCompare(b.date));
+  const next = all.filter((f) => !f.played && f.date >= game.date).slice(0, 3);
+  const last = all.filter((f) => f.played && f.result?.score).pop();
+  const nameOf = (f) => anyClub(f.home === game.clubId ? f.away : f.home)?.name ?? 'rywal';
+  let body = next.length
+    ? `<ul class="tr-dlist">${next.map((f) => `<li><span class="tr-dlist__date"><b>${dayNum(f.date)}</b><small>${esc(fmtDate(f.date).slice(0, 3))}</small></span>
+        <span class="tr-dlist__txt"><b>${esc(nameOf(f))}</b><small>${esc(weekday(f.date))}, ${f.neutral ? 'na obozie' : f.home === game.clubId ? 'u siebie' : 'na wyjeździe'}, ${esc(inDays(daysBetween(game.date, f.date)))}</small></span></li>`).join('')}</ul>`
+    : '<p class="muted">Brak zaplanowanych sparingów.</p>';
+  if (!next.length) {
+    const free = friendlyDates(game, { days: 120, limit: 1 })[0];
+    if (free) body += `<p>Najbliższy wolny termin: <b>${esc(fmtDate(free.date))}</b> (${esc(free.period.name.toLowerCase())}, ${free.used} z ${free.period.limit}).</p>`;
+  }
+  if (last) body += `<p class="muted">Ostatni: ${esc(nameOf(last))} ${last.result.score[0]}:${last.result.score[1]}${pens(last.result.shootout)}, ${esc(shortDate(last.date))}.</p>`;
+  return card('info', 'Sparingi', body, { badge: next.length ? `${next.length} ${plural(next.length, 'zaplanowany', 'zaplanowane', 'zaplanowanych')}` : '', foot: tabBtn('sparingi', next.length ? 'Sparingi' : 'Umów sparing') });
+}
+
+function dashLoad(game) {
+  const { fit, avgFresh } = squadNumbers(game);
+  const zones = { low: 0, ok: 0, warn: 0, bad: 0 };
+  for (const p of fit) zones[acwrLabel(p.training?.acwr ?? 1).id]++;
+  const risk = fit.map((p) => ({ p, a: p.training?.acwr ?? 1, f: p.fresh ?? 95 }))
+    .filter((x) => x.a > 1.3 || x.f < 75)
+    .sort((x, y) => (y.a > 1.3) - (x.a > 1.3) || y.a - x.a || x.f - y.f).slice(0, 5);
+  const tone = zones.bad ? 'bad' : zones.warn || avgFresh < 80 ? 'warn' : 'good';
+  const zoneTiles = [['ok', 'Optymalne'], ['low', 'Za małe'], ['warn', 'Ryzyko'], ['bad', 'Przeciążeni']]
+    .map(([k, l]) => `<li data-acwr="${k}"><b>${zones[k]}</b><small>${esc(l)}</small></li>`).join('');
+  const rows = risk.map(({ p, a, f }) => {
+    const lbl = acwrLabel(a);
+    return `<li><button class="tr-plink" data-act="tr-go" data-tab="zawodnicy" data-id="${esc(p.id)}" data-pid="${esc(p.id)}">
+      <span class="pos" data-g="${GROUP[p.pos]}">${esc(p.pos)}</span><span class="tr-plink__nm">${esc(p.name)}</span>
+      <span class="tr-badge" data-acwr="${lbl.id}" title="ACWR: ${esc(lbl.text)}">${num(a, 2)}</span><small data-fresh="${freshTone(f)}">${f} %</small></button></li>`;
+  }).join('');
+  const body = `<ul class="tr-zones">${zoneTiles}</ul>
+    <p class="tr-lead">Średnia świeżość <b>${avgFresh} %</b></p>
+    ${risk.length ? `<p class="tr-sub">Uważaj na obciążenie</p><ul class="tr-plinks">${rows}</ul>` : '<p class="tr-flag" data-t="good">Obciążenia w normie, nikt nie jest przemęczony.</p>'}`;
+  return card(tone, 'Obciążenia i zmęczenie', body, { badge: zones.bad ? `przeciążeni: ${zones.bad}` : zones.warn ? `ryzyko: ${zones.warn}` : 'w normie', foot: tabBtn('obciazenia', 'Tabela obciążeń') });
+}
+
+function dashInjuries(game) {
+  const squad = squadOf(game.world, game.clubId);
+  const inj = squad.filter((p) => p.injuryDays > 0).sort((a, b) => b.injuryDays - a.injuryDays);
+  const back = squad.filter((p) => !(p.injuryDays > 0) && p.training?.rtp > 0);
+  const row = (p, txt, k) => `<li><button class="tr-plink" data-act="tr-go" data-tab="zawodnicy" data-id="${esc(p.id)}" data-pid="${esc(p.id)}">
+    <span class="pos" data-g="${GROUP[p.pos]}">${esc(p.pos)}</span><span class="tr-plink__nm">${esc(p.name)}<small>${esc(txt)}</small></span>
+    <span class="tr-badge" data-acwr="${k}">${k === 'bad' ? `${p.injuryDays} d` : `${p.training.rtp} d`}</span></button></li>`;
+  const body = inj.length || back.length
+    ? `<ul class="tr-plinks">${inj.slice(0, 6).map((p) => row(p, `${p.injury?.name ?? 'uraz'}${p.injury?.training ? ', na treningu' : ''}`, 'bad')).join('')}
+       ${back.slice(0, 3).map((p) => row(p, 'program powrotu po urazie', 'warn')).join('')}</ul>
+       ${inj.length > 6 ? `<p class="muted">I jeszcze ${inj.length - 6}.</p>` : ''}`
+    : '<p class="tr-flag" data-t="good">Wszyscy zawodnicy są zdrowi.</p>';
+  return card(inj.length ? 'bad' : back.length ? 'warn' : 'good', 'Urazy', body, { badge: inj.length ? `${inj.length} ${plural(inj.length, 'zawodnik', 'zawodników', 'zawodników')}` : 'brak', foot: tabBtn('zawodnicy', 'Zawodnicy') });
+}
+
+function dashCohesion(game) {
+  const coh = teamCohesion(game);
+  const c = game.training.clubs[game.clubId];
+  const parts = [['Formacja', coh.parts?.fam], ['Instrukcje', coh.parts?.instr], ['Znajomość systemu', coh.parts?.know], ['Rytm', coh.parts?.rhythm], ['Stałe fragmenty', c.sp]];
+  const tone = zTone(coh.z);
+  const body = `<p class="tr-bignum"><b>${num(coh.z, 0)}</b><span>${esc(coh.label)}<small>w meczu ${signed(coh.term ?? 0, 2)} pkt</small></span></p>
+    <ul class="tr-bars">${parts.map(([k, v]) => { const x = Math.round(v ?? 0); return `<li><span>${esc(k)}</span>${meter(x, 100, meterTone[zTone(x)])}<b>${x}</b></li>`; }).join('')}</ul>
+    <p class="muted">Analiza rywala: ${c.prep && c.prep.date >= game.date ? `+${num(c.prep.v, 3)} pkt na mecz ${esc(shortDate(c.prep.date))}` : 'brak'}. Znane formacje: ${Object.entries(c.fam).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([f, v]) => `${esc(f)} ${Math.round(v)}`).join(', ')}.</p>`;
+  return card(tone, 'Zgranie', body, { badge: game.tactics?.formation ?? '', foot: tabBtn('rozwoj', 'Zgranie i rozwój') });
+}
+
+function dashStaff(game) {
+  const st = staffOf(game, game.clubId);
+  const list = Object.entries(STAFF_ROLES).map(([k, r]) => ({ k, r, s: st[k] ?? { q: 10, name: 'Brak' } }));
+  const avg = list.reduce((a, x) => a + x.s.q, 0) / list.length;
+  const weak = list.filter((x) => x.s.q < 8);
+  const body = `<ul class="tr-bars tr-bars--staff">${list.map(({ r, s }) => `<li><span>${esc(r.name)}<small>${esc(s.name ?? '')}</small></span>${meter(s.q, 20, s.q >= 14 ? 'ok' : s.q >= 8 ? 'mid' : 'bad')}<b>${s.q}</b></li>`).join('')}</ul>
+    ${weak.length ? `<p class="tr-flag" data-t="warn">Słabe ogniwo: ${esc(weak.map((x) => x.r.name.toLowerCase()).join(', '))}.</p>` : ''}`;
+  return card('info', 'Sztab', body, { badge: `średnio ${num(avg, 1)} / 20`, foot: tabBtn('sztab', 'Sztab') });
+}
+
+function dashDev(game) {
+  const reports = game.training.reports ?? [];
+  const r = reports[0];
+  const prec = reportPrecision(staffOf(game, game.clubId).asystent?.q ?? 10);
+  if (!r) return card('misc', 'Rozwój', '<p class="muted">Pierwszy raport rozwoju pojawi się 1. dnia kolejnego miesiąca.</p>', { foot: tabBtn('rozwoj', 'Rozwój') });
+  const { up, down } = repSplit(r);
+  const body = `<p class="muted">Raport z ${esc(fmtDate(r.date))}.</p>
+    ${r.spurts.length ? `<p class="tr-flag" data-t="good">Skok rozwojowy: ${esc(r.spurts.map((s) => s.name).join(', '))}.</p>` : ''}
+    <p class="tr-sub">Rosną najszybciej</p><ul class="tr-replist tr-replist--sm">${up.slice(0, 3).map((x) => repRow(x, prec)).join('') || '<li class="muted">Nikt</li>'}</ul>
+    ${down.length ? `<p class="tr-sub">Spadają</p><ul class="tr-replist tr-replist--sm">${down.slice(0, 2).map((x) => repRow(x, prec)).join('')}</ul>` : ''}`;
+  return card('misc', 'Rozwój', body, { badge: `rośnie: ${up.length}`, foot: tabBtn('rozwoj', 'Pełny raport') });
+}
+
+function dashboardTab(game) {
+  return `<div class="tr-dash">
+    ${dashWeek(game)}${dashCamp(game)}
+    ${dashLoad(game)}${dashInjuries(game)}${dashFriendlies(game)}
+    ${dashCohesion(game)}${dashStaff(game)}${dashDev(game)}
   </div>`;
 }
 
@@ -86,10 +340,11 @@ function dayCard(d, game, sel) {
   }
   const injuries = d.hist?.inj?.length ? `<small class="tr-day__inj">urazy: ${d.hist.inj.length}</small>` : '';
   return `<button class="tr-day" data-act="tr-day" data-date="${esc(d.date)}" aria-pressed="${sel === d.date}" aria-label="${esc(label)}"
-    ${d.past ? 'data-past="1"' : ''} ${d.today ? 'data-today="1"' : ''} data-kind="${esc(d.kind)}">
+    ${d.past ? 'data-past="1"' : ''} ${d.today ? 'data-today="1"' : ''} ${d.ctx?.camp ? 'data-camp="1"' : ''} data-kind="${esc(d.kind)}">
     <span class="tr-day__top"><b>${WD[(new Date(`${d.date}T12:00:00Z`).getUTCDay() + 6) % 7]}</b><small>${esc(shortDate(d.date))}</small></span>
     <span class="tr-role">${esc(d.role === 'OBOZ' ? 'Obóz' : d.role === 'URLOP' ? 'Urlop' : d.role)}</span>
     <span class="tr-day__body">${body}</span>
+    ${d.today ? '<small class="tr-day__tag">Dziś</small>' : ''}${d.ctx?.camp ? `<small class="tr-day__camp">Obóz: ${esc(d.ctx.camp.place)}</small>` : ''}
     ${!d.auto ? '<small class="tr-day__own">Twój plan</small>' : ''}${injuries}
   </button>`;
 }
@@ -171,6 +426,13 @@ function weekTab(game, ui) {
   const accents = Object.entries(ACCENTS).map(([k, a]) => `<button class="chip" data-act="tr-accent" data-v="${k}" aria-pressed="${T.settings.accent === k}">${esc(a.name)}</button>`).join('');
   const loads = Object.entries(LOAD_LEVELS).map(([k, l]) => `<button class="chip" data-act="tr-load" data-v="${k}" aria-pressed="${T.settings.load === k}">${esc(l.name)}</button>`).join('');
   const own = week.some((d) => !d.auto && d.editable);
+  const legend = `<section class="tr-card tr-legend" data-t="info"><header class="tr-card__head"><h3>Wybierz dzień</h3></header>
+      <p class="muted">Dotknij dnia, żeby zobaczyć skutki albo zmienić zajęcia.</p>
+      <ul class="tr-legend__list">
+        <li><span class="tr-sess" data-g="phys">Fizyczne</span></li><li><span class="tr-sess" data-g="tech">Techniczne</span></li>
+        <li><span class="tr-sess" data-g="mental">Taktyka i głowa</span></li><li><span class="tr-sess" data-g="mixed">Mieszane</span></li>
+        ${INT_ORDER.map((k) => `<li>${intDot(k)} ${esc(INTENSITY[k].name)} intensywność</li>`).join('')}
+      </ul></section>`;
   return `
     <div class="tr-weeknav">
       <button class="btn btn--quiet" data-act="tr-week" data-w="${off - 1}" aria-label="Poprzedni tydzień">&lsaquo;</button>
@@ -179,14 +441,18 @@ function weekTab(game, ui) {
       <button class="btn btn--quiet" data-act="tr-week" data-w="${off + 1}" aria-label="Następny tydzień">&rsaquo;</button>
     </div>
     <div class="tr-week">${week.map((d) => dayCard(d, game, ui.trDay)).join('')}</div>
-    ${sel ? dayEditor(game, sel) : '<p class="muted tr-hint">Dotknij dnia, żeby zobaczyć skutki albo zmienić zajęcia.</p>'}
-    <section class="panel">
-      <h3>Plan asystenta</h3>
-      <p class="muted">Akcent tygodnia</p><div class="chips">${accents}</div>
-      <p class="muted">Poziom obciążeń</p><div class="chips">${loads}</div>
-      <p class="muted">Asystent układa mikrocykl od terminarza: dzień po meczu regeneracja, 4 i 3 dni przed meczem najcięższe zajęcia, dzień przed meczem rozruch i analiza rywala. Przy dwóch meczach w tygodniu zostaje tylko regeneracja, taktyka i rozruch.</p>
-      ${own ? `<button class="btn btn--quiet" data-act="tr-resetweek" data-date="${esc(monday)}">Przywróć cały tydzień asystenta</button>` : ''}
-    </section>
+    <div class="tr-cols tr-cols--week">
+      <div class="tr-col">${sel ? dayEditor(game, sel) : legend}</div>
+      <aside class="tr-col">
+        <section class="panel tr-plan">
+          <h3>Plan asystenta</h3>
+          <p class="muted">Akcent tygodnia</p><div class="chips tr-chips">${accents}</div>
+          <p class="muted">Poziom obciążeń</p><div class="chips tr-chips">${loads}</div>
+          <p class="muted">Asystent układa mikrocykl od terminarza: dzień po meczu regeneracja, 4 i 3 dni przed meczem najcięższe zajęcia, dzień przed meczem rozruch i analiza rywala. Przy dwóch meczach w tygodniu zostaje tylko regeneracja, taktyka i rozruch.</p>
+          ${own ? `<button class="btn btn--quiet" data-act="tr-resetweek" data-date="${esc(monday)}">Przywróć cały tydzień asystenta</button>` : ''}
+        </section>
+      </aside>
+    </div>
     ${catalogTable(game)}`;
 }
 
@@ -226,10 +492,11 @@ function playerEditor(game, p) {
   const hist = (t.ovrHist ?? []).map((v) => num(v)).join(', ');
   const term = legsTerm(t) + overloadTerm(t);
   const lbl = acwrLabel(sum.acwr);
-  return `<section class="panel tr-editor">
-    <div class="tr-editor__head" data-pid="${esc(p.id)}"><h3>${esc(p.name)}</h3><button class="btn btn--quiet tr-mini" data-act="tr-pback">Wróć do listy</button></div>
-    <p class="muted">${esc(POS_NAMES[p.pos])}, ${age} lat, OVR ${num(p.ovr)}</p>
-    <dl class="tr-dl">
+  return `<section class="panel tr-editor tr-editor--player">
+    <div class="tr-editor__head" data-pid="${esc(p.id)}"><h3><span class="pos" data-g="${GROUP[p.pos]}">${esc(p.pos)}</span> ${esc(p.name)}</h3><button class="btn btn--quiet tr-mini" data-act="tr-pback">Wróć do listy</button></div>
+    <p class="muted">${esc(POS_NAMES[p.pos])}, ${age} lat, OVR ${num(p.ovr)}${p.injuryDays > 0 ? `, uraz: ${p.injuryDays} dni` : ''}</p>
+    <div class="tr-pgrid"><div class="tr-pcol">
+    <dl class="tr-dl tr-dl--boxed">
       <div><dt>Świeżość</dt><dd>${p.fresh ?? 95} %</dd></div><div><dt>Ostrość</dt><dd>${Math.round(p.sharp ?? 70)} %</dd></div>
       <div><dt>Obciążenie 7 dni</dt><dd>${sum.acute} AU</dd></div><div><dt>Średnio na tydzień (28 dni)</dt><dd>${sum.chronic} AU</dd></div>
       <div><dt>ACWR</dt><dd data-acwr="${lbl.id}">${num(sum.acwr, 2)}, ${esc(lbl.text.toLowerCase())}</dd></div>
@@ -238,12 +505,14 @@ function playerEditor(game, p) {
       ${hist ? `<div class="tr-dl__wide"><dt>OVR co miesiąc</dt><dd>${esc(hist)}</dd></div>` : ''}
     </dl>
     <h4>Tryb treningu</h4><div class="seg2">${modes}</div>
+    <h4>Programy</h4><div class="chips tr-chips">${progs}<button class="chip" data-act="tr-prog" data-id="${esc(p.id)}" data-v="" aria-pressed="${!t.prog}">Bez programu</button></div>
+    ${t.prog ? `<p class="muted">${esc(PROGRAMS[t.prog].text)}</p>` : ''}
+    </div><div class="tr-pcol">
     <h4>Akcent indywidualny</h4>
     <p class="muted">Dodatkowe 20 minut po zajęciach: bodziec +0,4 na wybrane atrybuty w każdym dniu treningu, świeżość -2. Akcent poza profilem pozycji wolniej podnosi OVR.</p>
-    <div class="chips">${focusChips}</div><div class="tr-attrs">${attrBtns}</div>
+    <div class="chips tr-chips">${focusChips}</div><div class="tr-attrs">${attrBtns}</div>
     <h4>Nowa pozycja</h4><p class="muted">Biegłość rośnie ok. 1-2 punkty na tydzień (szybciej przy treningu taktycznym i lepszym asystencie), najwyżej do 90.</p>${posBtns}
-    <h4>Programy</h4><div class="chips">${progs}<button class="chip" data-act="tr-prog" data-id="${esc(p.id)}" data-v="" aria-pressed="${!t.prog}">Bez programu</button></div>
-    ${t.prog ? `<p class="muted">${esc(PROGRAMS[t.prog].text)}</p>` : ''}
+    </div></div>
   </section>`;
 }
 
@@ -252,9 +521,11 @@ function playersTab(game, ui) {
   const p = ui.trPlayer && game.world.players[ui.trPlayer];
   if (p && p.training) return playerEditor(game, p);
   const academy = sortSquad(academyOf(game.world, game.clubId));
+  const withPlan = squad.filter((x) => x.training?.focus || x.training?.pos || x.training?.prog || (x.training?.mode && x.training.mode !== 'normal')).length;
   return `<p class="muted">Dotknij zawodnika, żeby ustawić akcent, naukę pozycji, program albo lżejszy trening.</p>
+    <h3 class="tr-sechead">Pierwsza drużyna <small>${squad.length} zawodników, plan indywidualny: ${withPlan}</small></h3>
     <div class="tr-plist">${squad.map((x) => playerRow(x, game)).join('')}</div>
-    <h3>Akademia</h3><p class="muted">Juniorzy trenują z trenerem młodzieży według planu akademii. Akcent indywidualny działa także u nich.</p>
+    <h3 class="tr-sechead">Akademia <small>${academy.length} juniorów</small></h3><p class="muted">Juniorzy trenują z trenerem młodzieży według planu akademii. Akcent indywidualny działa także u nich.</p>
     <div class="tr-plist">${academy.map((x) => playerRow(x, game)).join('') || '<p class="muted">Brak juniorów.</p>'}</div>`;
 }
 
@@ -268,11 +539,20 @@ function loadTab(game) {
     return `<tr data-pid="${esc(p.id)}"><th scope="row"><span class="pos" data-g="${GROUP[p.pos]}">${esc(p.pos)}</span> ${esc(p.last ?? p.name)}</th>
       <td>${sum.acute}</td><td>${sum.chronic}</td><td data-acwr="${lbl.id}">${num(sum.acwr, 2)}</td><td>${p.injuryDays > 0 ? `uraz ${p.injuryDays} d` : `${p.fresh ?? 95} %`}</td><td>${num(t.legs ?? 0, 2)}</td></tr>`;
   }).join('');
-  return `<section class="panel">
-    <p>ACWR to stosunek obciążenia z ostatnich 7 dni do średniego tygodnia z 28 dni. Strefa 0,7-1,3 jest bezpieczna. Powyżej 1,3 rośnie ryzyko urazu (x1,5), powyżej 1,5 dwa do czterech razy i spada forma (do -0,3 pkt). Mecz 90 minut to 100 AU.</p>
-    <p class="muted">Na obozie przygotowawczym organizm lepiej znosi skoki obciążeń (ryzyko x0,75). Po urazie dłuższym niż 14 dni trener przygotowania fizycznego prowadzi 10-dniowy program powrotu.</p>
-  </section>
-  <div class="tr-scroll"><table class="tr-table"><thead><tr><th>Zawodnik</th><th>7 dni</th><th>Tydzień (28 dni)</th><th>ACWR</th><th>Świeżość</th><th>Nogi</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  const zones = { low: 0, ok: 0, warn: 0, bad: 0 };
+  for (const p of squad) if (!(p.injuryDays > 0)) zones[acwrLabel(loadSummary(p.training ?? {}).acwr).id]++;
+  const tiles = [['ok', 'Optymalne', '0,7-1,3', 'good'], ['low', 'Za małe', 'poniżej 0,7', 'info'], ['warn', 'Podwyższone ryzyko', '1,3-1,5', 'warn'], ['bad', 'Przeciążenie', 'powyżej 1,5', 'bad']]
+    .map(([k, l, r, t]) => `<div class="tr-stat" data-t="${t}"><span class="tr-stat__k">${esc(l)}</span><b>${zones[k]}</b><small>ACWR ${esc(r)}</small></div>`).join('');
+  return `<div class="tr-cols tr-cols--side">
+    <div class="tr-col">
+      <div class="tr-head tr-head--4">${tiles}</div>
+      <div class="tr-scroll tr-tablebox"><table class="tr-table"><thead><tr><th>Zawodnik</th><th>7 dni</th><th>Tydzień (28 dni)</th><th>ACWR</th><th>Świeżość</th><th>Nogi</th></tr></thead><tbody>${rows}</tbody></table></div>
+    </div>
+    <aside class="tr-col"><section class="tr-card" data-t="info"><header class="tr-card__head"><h3>Jak czytać ACWR</h3></header>
+      <p>ACWR to stosunek obciążenia z ostatnich 7 dni do średniego tygodnia z 28 dni. Strefa 0,7-1,3 jest bezpieczna. Powyżej 1,3 rośnie ryzyko urazu (x1,5), powyżej 1,5 dwa do czterech razy i spada forma (do -0,3 pkt). Mecz 90 minut to 100 AU.</p>
+      <p class="muted">Na obozie przygotowawczym organizm lepiej znosi skoki obciążeń (ryzyko x0,75). Po urazie dłuższym niż 14 dni trener przygotowania fizycznego prowadzi 10-dniowy program powrotu.</p>
+    </section></aside>
+  </div>`;
 }
 
 // ------------------------------------------------------------ Sztab
@@ -287,8 +567,8 @@ function staffTab(game) {
   };
   return `<div class="tr-staff">${Object.entries(STAFF_ROLES).map(([k, r]) => {
     const s = st[k] ?? { q: 10, name: 'Brak' };
-    return `<section class="panel tr-staffcard">
-      <p class="muted">${esc(r.name)}</p>
+    return `<section class="tr-card tr-staffcard" data-t="${s.q >= 14 ? 'good' : s.q >= 8 ? 'info' : 'warn'}">
+      <p class="tr-sub">${esc(r.name)}</p>
       <p class="panel__lead">${esc(s.name ?? '')}</p>
       <div class="tr-q"><b>${s.q}</b>${meter(s.q, 20, s.q >= 14 ? 'ok' : s.q >= 8 ? 'mid' : 'bad')}<small>${esc(staffLabel(s.q))}</small></div>
       <p>${esc(eff[k](s.q))}</p>
@@ -297,6 +577,19 @@ function staffTab(game) {
 }
 
 // ------------------------------------------------------------ Rozwój i zgranie
+/** Wiersz raportu rozwoju; prec: dokładność raportu (exact, approx, vague) zależna od asystenta. */
+function repRow(x, prec) {
+  return `<li data-pid="${esc(x.id)}"><span class="pos" data-g="${GROUP[x.pos]}">${esc(x.pos)}</span><span class="tr-rep__name"><span>${esc(x.name)}${x.academy ? ' <small>(akademia)</small>' : ''}</span><small>${prec === 'exact' ? esc(x.attrs.map(([a, v]) => `${a} ${v > 0 ? '+' : ''}${v}`).join(', ')) : ''}</small></span>
+    <b data-trend="${x.d > 0 || (x.d === 0 && x.trend > 0) ? 'up' : 'down'}">${prec === 'vague' ? (x.d > 0 || x.trend > 0 ? 'rośnie' : 'spada') : prec === 'approx' ? (x.d > 0 || x.trend > 0 ? '▲' : '▼') : signed(x.d)}</b></li>`;
+}
+/** Raport rozwoju: kto rośnie, kto spada (pełne listy). */
+function repSplit(r) {
+  return {
+    up: r.rows.filter((x) => x.d > 0 || (x.d === 0 && x.trend > 0)),
+    down: r.rows.filter((x) => x.d < 0 || (x.d === 0 && x.trend < 0)).sort((a, b) => a.d - b.d || a.trend - b.trend),
+  };
+}
+
 function devTab(game, ui) {
   const T = game.training;
   const reports = T.reports ?? [];
@@ -304,16 +597,16 @@ function devTab(game, ui) {
   const r = reports[i];
   const prec = reportPrecision(staffOf(game, game.clubId).asystent?.q ?? 10);
   const chips = reports.map((x, k) => `<button class="chip" data-act="tr-report" data-i="${k}" aria-pressed="${k === i}">${esc(fmtDate(x.date))}</button>`).join('');
-  const fmtRow = (x) => `<li data-pid="${esc(x.id)}"><span class="pos" data-g="${GROUP[x.pos]}">${esc(x.pos)}</span><span class="tr-rep__name">${esc(x.name)}${x.academy ? ' <small>(akademia)</small>' : ''}<small>${prec === 'exact' ? esc(x.attrs.map(([a, v]) => `${a} ${v > 0 ? '+' : ''}${v}`).join(', ')) : ''}</small></span>
-    <b data-trend="${x.d > 0 || (x.d === 0 && x.trend > 0) ? 'up' : 'down'}">${prec === 'vague' ? (x.d > 0 || x.trend > 0 ? 'rośnie' : 'spada') : prec === 'approx' ? (x.d > 0 || x.trend > 0 ? '▲' : '▼') : signed(x.d)}</b></li>`;
-  const up = r ? r.rows.filter((x) => x.d > 0 || (x.d === 0 && x.trend > 0)).slice(0, 8) : [];
-  const down = r ? r.rows.filter((x) => x.d < 0 || (x.d === 0 && x.trend < 0)).sort((a, b) => a.d - b.d || a.trend - b.trend).slice(0, 8) : [];
+  const { up: upAll, down: downAll } = r ? repSplit(r) : { up: [], down: [] };
+  const fmtRow = (x) => repRow(x, prec);
+  const up = upAll.slice(0, 8);
+  const down = downAll.slice(0, 8);
   const c = T.clubs[game.clubId];
   const coh = teamCohesion(game);
   const fams = Object.entries(c.fam).sort((a, b) => b[1] - a[1]).slice(0, 5);
-  return `
-    <section class="panel">
-      <h3>Zgranie drużyny: ${num(coh.z, 0)} (${esc(coh.label.toLowerCase())})</h3>
+  return `<div class="tr-cols tr-cols--dev"><div class="tr-col">
+    <section class="tr-card" data-t="${zTone(coh.z)}">
+      <header class="tr-card__head"><h3>Zgranie drużyny: ${num(coh.z, 0)} (${esc(coh.label.toLowerCase())})</h3></header>
       <dl class="tr-dl">
         <div><dt>Formacja ${esc(game.tactics?.formation ?? '')}</dt><dd>${Math.round(coh.parts?.fam ?? 0)} / 100</dd></div>
         <div><dt>Instrukcje</dt><dd>${Math.round(coh.parts?.instr ?? 0)} / 100</dd></div>
@@ -324,14 +617,16 @@ function devTab(game, ui) {
         <div><dt>Analiza rywala</dt><dd>${c.prep && c.prep.date >= game.date ? `+${num(c.prep.v, 3)} pkt na mecz ${esc(fmtDate(c.prep.date))}` : 'brak'}</dd></div>
       </dl>
       <p class="muted">Znane formacje: ${fams.map(([f, v]) => `${esc(f)} ${Math.round(v)}`).join(', ')}. Zmiana formacji zaczyna od jej zgrania, a każda zmiana instrukcji obniża ich znajomość o 7. Rotacja składu obniża rytm.</p>
-    </section>
+    </section></div>
+    <div class="tr-col">
     <h3>Raport rozwoju</h3>
     ${reports.length ? `<div class="chips">${chips}</div>
       <p class="muted">Za miesiąc przed ${esc(fmtDate(r.date))}. ${prec === 'exact' ? 'Raport dokładny.' : prec === 'approx' ? 'Raport przybliżony: lepszy asystent poda liczby.' : 'Raport ogólny: słaby asystent widzi tylko kierunek.'}</p>
       ${r.spurts.length ? `<p class="notice">Skok rozwojowy: ${esc(r.spurts.map((s) => s.name).join(', '))}.</p>` : ''}
       <div class="tr-rep"><div><h4>Rosną</h4><ul class="tr-replist">${up.map(fmtRow).join('') || '<li class="muted">Nikt</li>'}</ul></div>
       <div><h4>Spadają</h4><ul class="tr-replist">${down.map(fmtRow).join('') || '<li class="muted">Nikt</li>'}</ul></div></div>`
-    : '<p class="muted">Pierwszy raport pojawi się 1. dnia kolejnego miesiąca.</p>'}`;
+    : '<p class="muted">Pierwszy raport pojawi się 1. dnia kolejnego miesiąca.</p>'}
+    </div></div>`;
 }
 
 // ------------------------------------------------------------ Obozy
@@ -346,7 +641,9 @@ function campStatus(game, half) {
   if (b) {
     const state = game.date < b.from ? 'zaplanowany' : game.date <= b.to ? 'trwa' : 'zakończony';
     rows.push(`<p class="panel__lead">${esc(b.place)}</p>
+      <p class="tr-dates"><b>${esc(fmtDate(b.from))}</b> <span>do</span> <b>${esc(fmtDate(b.to))}</b></p>
       <p>Od ${esc(fmtDate(b.from))} do ${esc(fmtDate(b.to))} (${b.days} dni), koszt ${esc(formatZl(b.cost))}, warunki ${pct(b.q)}. Obóz ${state}.</p>
+      ${campDays(game, b)}
       ${game.date < b.from ? `<button class="btn btn--quiet" data-act="tr-camp-cancel" data-key="${esc(key)}">Odwołaj obóz</button>` : ''}`);
   }
   if (c.prepPts?.key === key && game.date >= w.open) {
@@ -387,13 +684,13 @@ function campsTab(game, ui) {
     const dests = Object.entries(CAMP.dests).map(([id, d]) => `<button class="tr-camp" data-act="tr-camp-dest" data-v="${id}" aria-pressed="${dest === id}">
       <b>${esc(d.name)}</b><small>Warunki ${pct(d.q[half])}, ${esc(formatZl(campPreview(game, half, id, len).cost))}</small><small>${esc(d.text)}</small></button>`).join('');
     planner = `
-      <h3>Zaplanuj obóz</h3>
+      <h3 class="tr-sechead">Zaplanuj obóz</h3>
       <p class="muted">Wolne od meczów o punkty: od ${esc(fmtDate(w.from))} do ${esc(fmtDate(w.to))}. Pierwszy mecz rundy: ${esc(fmtDate(w.start))}.</p>
       <div class="tr-camps">${dests}</div>
-      <p class="muted">Długość</p><div class="chips">${lengths.map((d) => `<button class="chip" data-act="tr-camp-len" data-v="${d}" aria-pressed="${d === len}">${d} dni</button>`).join('')}</div>
-      <p class="muted">Wyjazd</p><div class="chips">${starts.map((d) => `<button class="chip" data-act="tr-camp-start" data-date="${esc(d)}" aria-pressed="${d === start}">${esc(shortDate(d))}</button>`).join('') || '<span class="muted">Brak wolnego terminu.</span>'}</div>
-      <section class="panel">
-        <h4>Skutki</h4>
+      <p class="muted">Długość</p><div class="chips tr-chips">${lengths.map((d) => `<button class="chip" data-act="tr-camp-len" data-v="${d}" aria-pressed="${d === len}">${d} dni</button>`).join('')}</div>
+      <p class="muted">Wyjazd</p><div class="chips tr-chips">${starts.map((d) => `<button class="chip" data-act="tr-camp-start" data-date="${esc(d)}" aria-pressed="${d === start}">${esc(shortDate(d))}</button>`).join('') || '<span class="muted">Brak wolnego terminu.</span>'}</div>
+      <section class="tr-card" data-t="info">
+        <header class="tr-card__head"><h3>Skutki</h3></header>
         <dl class="tr-dl">
           <div><dt>Koszt</dt><dd>${esc(formatZl(pv.cost))}</dd></div>
           <div><dt>Forma bazowa (szacunek)</dt><dd>${pct(pv.base)}, bez obozu ${pct(pv.none)}</dd></div>
@@ -404,17 +701,23 @@ function campsTab(game, ui) {
           <div><dt>Na obozie: zmęczenie</dt><dd>x${num(pv.inCamp.fatigue, 2)}</dd></div>
           <div><dt>Morale</dt><dd>+${num(pv.inCamp.morale, 2)} dziennie</dd></div>
         </dl>
-        ${start ? `<button class="btn btn--primary" data-act="tr-camp-book" data-half="${half}" data-dest="${esc(dest)}" data-len="${len}" data-date="${esc(start)}">Zarezerwuj: od ${esc(fmtDate(start))} do ${esc(fmtDate(addDays(start, len - 1)))}</button>` : ''}
+        ${start ? `<button class="btn btn--primary tr-book" data-act="tr-camp-book" data-half="${half}" data-dest="${esc(dest)}" data-len="${len}" data-date="${esc(start)}">Zarezerwuj: od ${esc(fmtDate(start))} do ${esc(fmtDate(addDays(start, len - 1)))}</button>` : ''}
       </section>`;
   } else if (!booked) {
     planner = `<p class="muted">${game.date >= w.start ? 'Ta runda już trwa. Kolejny obóz zaplanujesz przed następną przerwą.' : 'W tej przerwie nie ma terminu na obóz bez kolizji z meczami o punkty.'}</p>`;
   }
-  return `<div class="chips">${chips}</div>
-    <section class="panel">${status || `<p>Obóz nie jest zarezerwowany.</p>`}
-      <p class="muted">Bez obozu albo po krótkim obozie w zimnym kraju drużyna zaczyna rundę z niższą formą bazową: przez 3 tygodnie słabsza (do -0,28 pkt), wolniej łapie ostrość i częściej łapie urazy na treningu. Potem efekt wygasa przez kolejne 3 tygodnie.</p>
-      <p class="muted">Rywale z ligi: ${esc(aiCampsLine(game, half))}.</p>
-    </section>
-    ${planner}`;
+  return `<div class="tr-cols tr-cols--camps${planner ? '' : ' tr-cols--one'}">
+    <div class="tr-col">
+      <div class="chips">${chips}</div>
+      <section class="tr-card" data-t="${booked ? 'misc' : open ? 'warn' : 'info'}">
+        <header class="tr-card__head"><h3>${esc(HALF_NAMES[half])}</h3><span class="tr-card__badge">${booked ? (game.date < booked.from ? 'zaplanowany' : game.date <= booked.to ? 'trwa' : 'zakończony') : 'niezarezerwowany'}</span></header>
+        ${status || '<p>Obóz nie jest zarezerwowany.</p>'}
+        <p class="muted">Bez obozu albo po krótkim obozie w zimnym kraju drużyna zaczyna rundę z niższą formą bazową: przez 3 tygodnie słabsza (do -0,28 pkt), wolniej łapie ostrość i częściej łapie urazy na treningu. Potem efekt wygasa przez kolejne 3 tygodnie.</p>
+        <p class="muted">Rywale z ligi: ${esc(aiCampsLine(game, half))}.</p>
+      </section>
+    </div>
+    ${planner ? `<div class="tr-col">${planner}</div>` : ''}
+  </div>`;
 }
 
 // ------------------------------------------------------------ Sparingi
@@ -473,44 +776,54 @@ function friendliesTab(game, ui) {
     const list2 = friendlyOpponents(game, sel);
     const rules = draftRules(ui);
     const rd = `data-decider="${rules.decider}" data-subs="${rules.subs}" data-rotation="${rules.rotation}"`;
-    opps = `<section class="panel"><h4>Zasady sparingu</h4>
+    opps = `<section class="tr-card" data-t="misc"><header class="tr-card__head"><h3>Nowy sparing: ${esc(fmtDate(sel))}</h3></header><h4>Zasady sparingu</h4>
       <p class="muted">Kluby uzgadniają je z sędzią przed meczem. Zmienisz je do dnia meczu.</p>
       ${rulesEditor(rules, 'tr-fr-rule')}
       <h4>Rywale na ${esc(fmtDate(sel))}</h4>
       <ul class="tr-frlist">${list2.map((o) => `<li class="tr-fr"><span><b>${esc(o.name)}</b><small>${esc(o.where)}, ${esc(o.level.toLowerCase())}${o.neutral ? ', mecz na obozie' : ''}</small></span>
         <button class="btn btn--primary tr-mini" data-act="tr-fr-add" data-date="${esc(sel)}" data-opp="${esc(o.id)}" ${rd}>Umów</button></li>`).join('') || '<li class="muted">Nikt nie ma wolnego terminu.</li>'}</ul></section>`;
   }
-  return `<section class="panel">
-      <p>Sparing to mecz bez punktów: buduje ostrość i zgranie (połowę tego co mecz o punkty), ale męczy. Limity: ${FRIENDLY.limits.lato} latem, ${FRIENDLY.limits.zima} zimą i ${FRIENDLY.limits.fifa} na przerwę reprezentacyjną. Między meczami muszą być 2 dni przerwy.</p>
-    </section>
-    <h3>Zaplanowane</h3>
-    <ul class="tr-frlist">${planned || '<li class="muted">Brak sparingów.</li>'}</ul>
-    <h3>Wolne terminy</h3>
-    ${dateChips || '<p class="muted">W najbliższych miesiącach nie ma wolnych terminów na sparing.</p>'}
-    ${opps}`;
+  return `<div class="tr-cols tr-cols--fr">
+    <div class="tr-col">
+      <section class="tr-card" data-t="info">
+        <header class="tr-card__head"><h3>Zaplanowane</h3><span class="tr-card__badge">${list.filter((f) => !f.played).length ? `przed nami: ${list.filter((f) => !f.played).length}` : 'brak w planie'}</span></header>
+        <ul class="tr-frlist">${planned || '<li class="muted">Brak sparingów.</li>'}</ul>
+        <p class="muted">Sparing to mecz bez punktów: buduje ostrość i zgranie (połowę tego co mecz o punkty), ale męczy. Limity: ${FRIENDLY.limits.lato} latem, ${FRIENDLY.limits.zima} zimą i ${FRIENDLY.limits.fifa} na przerwę reprezentacyjną. Między meczami muszą być 2 dni przerwy.</p>
+      </section>
+    </div>
+    <div class="tr-col">
+      <h3 class="tr-sechead">Wolne terminy</h3>
+      ${dateChips || '<p class="muted">W najbliższych miesiącach nie ma wolnych terminów na sparing.</p>'}
+      ${opps}
+    </div>
+  </div>`;
 }
 
-/** Ekran „Trening” (HTML). ui: { trTab, trWeek, trDay, trPlayer, trReport }. */
+const TAB_BODY = {
+  pulpit: (g) => dashboardTab(g), tydzien: weekTab, obozy: campsTab, sparingi: friendliesTab, zawodnicy: playersTab,
+  obciazenia: (g) => loadTab(g), sztab: (g) => staffTab(g), rozwoj: devTab,
+};
+
+/** Ekran „Trening” (HTML). ui: { trTab, trWeek, trDay, trPlayer, trReport }. Domyślna zakładka: Pulpit. */
 export function renderTraining(game, ui = {}) {
   ensureTraining(game);
   attachTraining(game);
-  const tab = ui.trTab ?? 'tydzien';
-  const monday = addDays(mondayOf(game.date), Number(ui.trWeek ?? 0) * 7);
-  const week = weekPlan(game, monday);
+  const tab = TAB_BODY[ui.trTab] ? ui.trTab : 'pulpit';
   const tabs = TABS.map(([k, v]) => `<button role="tab" data-act="tr-tab" data-tab="${k}" aria-selected="${tab === k}">${esc(v)}</button>`).join('');
   const notice = ui.trNotice ? `<p class="notice" role="status">${esc(ui.trNotice)}</p>` : '';
-  const body = tab === 'obozy' ? campsTab(game, ui) : tab === 'sparingi' ? friendliesTab(game, ui) : tab === 'zawodnicy' ? playersTab(game, ui) : tab === 'obciazenia' ? loadTab(game) : tab === 'sztab' ? staffTab(game) : tab === 'rozwoj' ? devTab(game, ui) : weekTab(game, ui);
-  return `<div class="tr">
+  return `<div class="tr tr-view" data-tab="${tab}">
     <h2>Trening</h2>
-    ${header(game, week)}
-    <div class="subtabs tr-tabs" role="tablist">${tabs}</div>
-    ${notice}${body}
+    ${campBanner(game, tab)}
+    ${header(game)}
+    <div class="subtabs tr-tabs" role="tablist" aria-label="Widoki treningu">${tabs}</div>
+    ${notice}${TAB_BODY[tab](game, ui)}
   </div>`;
 }
 
 /**
  * Kliknięcie na ekranie treningu. dataset: el.dataset przycisku.
- * Zwraca { ui: { trTab?, trWeek?, trDay?, trPlayer?, trReport? }, save: boolean }.
+ * Zwraca { ui: { trTab?, trWeek?, trDay?, trPlayer?, trReport? }, save: boolean }. Akcja „tr-go” (pulpit)
+ * otwiera zakładkę od razu z dniem (data-date) albo zawodnikiem (data-id).
  */
 export function handleTrainingAction(game, act, ds = {}) {
   ensureTraining(game);
@@ -520,6 +833,11 @@ export function handleTrainingAction(game, act, ds = {}) {
   const pt = player?.training;
   switch (act) {
     case 'tr-tab': return { ui: { trTab: ds.tab, trDay: null, trPlayer: null, trNotice: null }, save: false };
+    // Skrót z pulpitu: zakładka z wybranym dniem (bieżący tydzień) albo zawodnikiem
+    case 'tr-go': {
+      const tab = TABS.some(([k]) => k === ds.tab) ? ds.tab : 'pulpit';
+      return { ui: { trTab: tab, trDay: ds.date ?? null, trPlayer: ds.id ?? null, trNotice: null, ...(ds.date ? { trWeek: 0 } : {}) }, save: false };
+    }
     case 'tr-week': return { ui: { trWeek: Math.max(-8, Math.min(8, Number(ds.w) || 0)), trDay: null }, save: false };
     case 'tr-day': return { ui: { trDay: ds.date }, save: false };
     case 'tr-close': return { ui: { trDay: null }, save: false };
