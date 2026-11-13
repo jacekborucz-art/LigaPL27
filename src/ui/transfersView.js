@@ -22,7 +22,8 @@ import { limitStatus, toggleKeep, ageWord } from '../career/squadLimitSystem.js'
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size = 20) => (clubById(id) ? crestHtml(clubById(id), { size, clubsById }) : '');
 const groupOf = (p) => GROUP[p.pos] ?? 'MID';
-export const TF_TABS = [['rynek', 'Rynek'], ['oferty', 'Oferty'], ['kontrakty', 'Kontrakty'], ['finanse', 'Finanse'], ['zarzad', 'Zarząd']];
+// Finanse i Zarząd są w zakładce Klub (src/ui/klubView.js); funkcje widoków eksportowane stąd
+export const TF_TABS = [['rynek', 'Rynek'], ['oferty', 'Oferty'], ['kontrakty', 'Kontrakty']];
 const LISTS = [['transfer', 'Lista transferowa'], ['loan', 'Do wypożyczenia'], ['free', 'Wolni'], ['search', 'Wyszukaj']];
 const POS_FILTERS = [['all', 'Wszyscy'], ['GK', 'Bramkarze'], ['DEF', 'Obrońcy'], ['MID', 'Pomocnicy'], ['ATT', 'Napastnicy']];
 export const isTransferAction = (act) => typeof act === 'string' && act.startsWith('tf-');
@@ -89,14 +90,14 @@ const posBadge = (p) => `<span class="pos" data-g="${groupOf(p)}">${esc(p.pos)}<
 const clubCell = (id) => (id ? `<span class="tf-club">${crest(id, 16)}<span>${esc(clubById(id)?.name ?? '')}</span></span>` : '<span class="tf-club tf-club--none">bez klubu</span>');
 
 /** Kafelek liczby z barwą znaczeniową (m: good, warn, bad, info, misc). */
-function kpi(label, value, sub = '', m = 'info', extra = '') {
+export function kpi(label, value, sub = '', m = 'info', extra = '') {
   return `<div class="tf-kpi" data-m="${m}"><small>${esc(label)}</small><b>${value}</b>${extra}${sub ? `<small>${sub}</small>` : ''}</div>`;
 }
 /** Panel z odcieniem i kolorowym paskiem u góry. */
-function panel(title, tone, body, { count = null, cls = '', attrs = '' } = {}) {
+export function panel(title, tone, body, { count = null, cls = '', attrs = '' } = {}) {
   return `<section class="tf-p${cls ? ` ${cls}` : ''}" data-t="${tone}" ${attrs}><h3>${esc(title)}${count != null ? ` <span>${count}</span>` : ''}</h3>${body}</section>`;
 }
-const meter = (pct, tone) => `<span class="tf-meter" data-t="${tone}" aria-hidden="true"><i style="width:${Math.max(0, Math.min(100, Math.round(pct)))}%"></i></span>`;
+export const meter = (pct, tone) => `<span class="tf-meter" data-t="${tone}" aria-hidden="true"><i style="width:${Math.max(0, Math.min(100, Math.round(pct)))}%"></i></span>`;
 
 /** Nagłówek kolumny tabeli z sortowaniem; kolejny kierunek zapisany w data-dir (handler nie zna stanu ekranu). */
 function th(scope, k, label, sort, { title = '', cls = '', first = 'desc' } = {}) {
@@ -464,7 +465,7 @@ function monthsChart(c) {
     }).join('')}</ol>`;
 }
 
-function financeView(game) {
+export function financeView(game) {
   const c = game.finance.clubs[game.clubId];
   const s = seasonSummary(c);
   const m = monthSummary(c, game.date.slice(0, 7));
@@ -495,7 +496,7 @@ function financeView(game) {
     </div>`;
 }
 
-function boardView(game) {
+export function boardView(game) {
   const B = game.board; const M = game.manager;
   const t = tablePos(game, game.clubId);
   const trustM = B.trust >= 55 ? 'good' : B.trust >= 40 ? 'info' : B.trust >= 25 ? 'warn' : 'bad';
@@ -532,15 +533,13 @@ function fansPanel(game) {
 
 // ------------------------------------------------------------ Wejście
 export function renderTransfers(game, ui = {}) {
-  const tab = ui.tfTab ?? 'rynek';
-  const tabs = `<div class="subtabs subtabs--5" role="tablist">${TF_TABS.map(([k, l]) => `<button role="tab" data-act="tf-tab" data-t="${k}" aria-selected="${tab === k}">${l}</button>`).join('')}</div>`;
+  const tab = TF_TABS.some(([k]) => k === ui.tfTab) ? ui.tfTab : 'rynek';
+  const tabs = `<div class="subtabs" role="tablist">${TF_TABS.map(([k, l]) => `<button role="tab" data-act="tf-tab" data-t="${k}" aria-selected="${tab === k}">${l}</button>`).join('')}</div>`;
   const p = ui.tfPlayer && game.world.players[ui.tfPlayer];
   let body;
   if (p && (tab === 'rynek' || tab === 'kontrakty' || tab === 'oferty')) body = playerCard(game, p, ui);
   else if (tab === 'oferty') body = offersView(game);
   else if (tab === 'kontrakty') body = contractsView(game, ui);
-  else if (tab === 'finanse') body = financeView(game);
-  else if (tab === 'zarzad') body = boardView(game);
   else body = marketView(game, ui);
   return `<div class="tfx" data-tab="${esc(tab)}"><div class="tfx__head"><h2>Transfery</h2>${windowBadge(game)}</div>${tabs}${body}</div>`;
 }

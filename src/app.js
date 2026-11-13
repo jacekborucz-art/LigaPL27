@@ -37,6 +37,7 @@ import { shirtNumbers, kitColors } from './career/shirts.js';
 import { playerStatsHtml } from './ui/playerStatsView.js';
 import { renderClubView, hasClubView } from './ui/clubView.js';
 import { renderTransfers, handleTransferAction, isTransferAction } from './ui/transfersView.js';
+import { renderClubHub, handleClubAction, isClubAction } from './ui/klubView.js';
 import { renderTalks, handleTalkAction, isTalkAction } from './ui/talksView.js';
 import { ensureCareer } from './career/careerSystem.js';
 import { completeTransfer, fmtZl } from './career/transfers.js';
@@ -81,6 +82,7 @@ const TABS = [
   { id: 'rozgrywki', label: 'Rozgrywki' },
   { id: 'poczta', label: 'Poczta' },
   { id: 'transfery', label: 'Transfery' },
+  { id: 'klub', label: 'Klub' },
   { id: 'trening', label: 'Trening' },
 ];
 
@@ -255,6 +257,7 @@ function renderTab(tab, g, club) {
   if (tab === 'poczta') return renderMail(g);
   if (tab === 'trening') return renderTraining(g, state);
   if (tab === 'transfery') return state.ng ? renderNegotiation(g, state.ng) : renderTransfers(g, state);
+  if (tab === 'klub') return renderClubHub(g, state);
   if (tab === 'rozgrywki') return renderCompetitions(g, { comp: state.cComp ?? ['ekstraklasa', 'liga1', 'liga2'][club.tier - 1], view: state.cView, round: state.cRound, filter: state.uFilter, draw: state.uDraw });
   if (tab === 'kadra') {
     const sub = `<div class="subtabs" role="tablist"><button role="tab" data-act="tsub" data-s="players" aria-selected="${state.sqSub === 'players'}">Zawodnicy</button><button role="tab" data-act="tsub" data-s="tactics" aria-selected="${state.sqSub === 'tactics'}">Skład i taktyka</button><button role="tab" data-act="tsub" data-s="talks" aria-selected="${state.sqSub === 'talks'}">Rozmowy</button></div>`;
@@ -434,7 +437,7 @@ function dashBoard(g, table) {
       ${rev ? `<li><span>Ostatnia ocena, ${esc(shortDate(rev.date))}</span><b data-sign="${rev.delta > 0 ? 'up' : rev.delta < 0 ? 'down' : ''}">${rev.delta > 0 ? '+' : ''}${esc(String(rev.delta).replace('.', ','))}</b></li>` : '<li><span>Pierwsza ocena zarządu</span><b>1. dnia miesiąca</b></li>'}
       ${fans ? `<li><span>Kibice</span><b>${esc(fans)}</b></li>` : ''}
     </ul>`;
-  return dashPanel('board', 'board', 'Zarząd', body, dashLink('transfery', 'Zarząd', 'zarzad'));
+  return dashPanel('board', 'board', 'Zarząd', body, dashLink('klub', 'Zarząd', 'zarzad'));
 }
 
 function dashFinance(g) {
@@ -457,7 +460,7 @@ function dashFinance(g) {
       <small>${bill > c.wageBudget ? `ponad budżet ${esc(fmtZl(c.wageBudget))}` : `z budżetu ${esc(fmtZl(c.wageBudget))}`}</small>
     </div>
     <p class="dash-note">Bilans miesiąca: <span data-sign="${month.net > 0 ? 'up' : month.net < 0 ? 'down' : ''}">${esc(signedZl(month.net))}</span></p>`;
-  return dashPanel('fin', 'fin', 'Finanse', body, dashLink('transfery', 'Finanse', 'finanse'));
+  return dashPanel('fin', 'fin', 'Finanse', body, dashLink('klub', 'Finanse', 'finanse'));
 }
 
 function dashWindow(g) {
@@ -962,6 +965,13 @@ async function dispatchAct(el, { root = app } = {}) {
     render();
     return;
   }
+  if (isClubAction(act) && state.game) {
+    const r = handleClubAction(state.game, act, el.dataset, root);
+    Object.assign(state, r.ui ?? {});
+    if (r.save) await save();
+    render();
+    return;
+  }
   if (isTransferAction(act) && state.game) {
     const r = handleTransferAction(state.game, act, el.dataset, root);
     Object.assign(state, r.ui ?? {});
@@ -1052,7 +1062,7 @@ async function dispatchAct(el, { root = app } = {}) {
       await new Promise((r) => setTimeout(r, matchMedia('(prefers-reduced-motion: reduce)').matches ? 150 : 450)); // podpis widoczny przed generowaniem świata
       await newGame(nc.slot, nc.clubId, profileOf(nc));
     }
-    if (act === 'tab') { state.tab = el.dataset.tab; state.mailOpen = null; state.playerOpen = null; state.repOpen = null; state.fx = null; state.extPlayer = null; state.extClub = null; if (el.dataset.sub) state.tfTab = el.dataset.sub; render(); }
+    if (act === 'tab') { state.tab = el.dataset.tab; state.mailOpen = null; state.playerOpen = null; state.repOpen = null; state.fx = null; state.extPlayer = null; state.extClub = null; if (el.dataset.sub) { if (state.tab === 'klub') state.kTab = el.dataset.sub; else state.tfTab = el.dataset.sub; } render(); }
     // Terminarz i wyniki (Pulpit > Pokaż wszystko): sezon, rozgrywki, miejsce meczu
     if (act === 'fixtures') { state.tab = 'pulpit'; state.fx = { season: null, comp: 'all', venue: 'all' }; render(); window.scrollTo({ top: 0 }); app.querySelector('.fxs h2')?.setAttribute('tabindex', '-1'); app.querySelector('.fxs h2')?.focus({ preventScroll: true }); }
     if (act === 'fxback') { state.fx = null; render(); app.querySelector('[data-act="fixtures"]')?.focus(); }

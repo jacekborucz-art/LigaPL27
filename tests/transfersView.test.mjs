@@ -106,12 +106,13 @@ test('Oferty: przychodząca oferta ma przyciski tf-answer, karta zawodnika otwie
   G.market.offers.pop(); delete G.market.userListed[own.id];
 });
 
-test('Finanse i Zarząd: kafelki z barwą znaczeniową i panele', () => {
-  const fin = renderTransfers(G, { tfTab: 'finanse' });
+test('Klub > Finanse i Zarząd: kafelki z barwą znaczeniową i panele', async () => {
+  const { renderClubHub } = await import('../src/ui/klubView.js');
+  const fin = renderClubHub(G, { kTab: 'finanse' });
   assert.equal(count(fin, /class="tf-kpi" data-m="/g), 4);
   assert.match(fin, /Przychody w sezonie/);
   assert.match(fin, /Miesiąc po miesiącu/);
-  const board = renderTransfers(G, { tfTab: 'zarzad' });
+  const board = renderClubHub(G, { kTab: 'zarzad' });
   assert.equal(count(board, /class="tf-kpi" data-m="/g), 4);
   assert.match(board, /Oceny zarządu/);
   assert.match(board, /Kibice/);

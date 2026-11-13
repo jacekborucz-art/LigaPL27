@@ -129,7 +129,8 @@
   inset: auto 0 0 0;
   z-index: 10;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-auto-flow: column; /* wszystkie zakładki w jednym rzędzie (7 z zakładką Klub) */
+  grid-auto-columns: minmax(0, 1fr);
   height: calc(var(--nav-h) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
   background: var(--surface);
@@ -149,6 +150,7 @@
   cursor: pointer;
 }
 .nav__btn .ico { width: 24px; height: 24px; }
+@media (max-width: 420px) { .nav__btn { font-size: 10px; letter-spacing: -0.01em; } .nav__btn .ico { width: 22px; height: 22px; } }
 .nav__btn[aria-current="page"] { color: var(--accent); }
 .nav__btn[data-tab="mecz"] .ico {
   width: 40px;
