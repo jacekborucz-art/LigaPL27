@@ -21,7 +21,8 @@ export const MATCH_MIN = { total: 16, GK: 2, DEF: 5, MID: 5, ATT: 2 };
 
 const groupOf = (p) => GROUP[p.pos] || 'MID';
 // loanBlock: wypożyczony z zakazem gry przeciwko klubowi macierzystemu w dniu meczu z nim (src/career/loans.js)
-export const isAvailable = (p) => !(p.injuryDays > 0) && !(p.suspended > 0) && !p.loanBlock && !p.callUp;
+// transfer.hold: zawodnik po testach medycznych w nowym klubie nie gra (src/career/transferDeals.js)
+export const isAvailable = (p) => !(p.injuryDays > 0) && !(p.suspended > 0) && !p.loanBlock && !p.callUp && !p.transfer?.hold;
 /** Zawodnik klubu clubId wypożyczony do innego klubu (kontrakt w clubId, gra w kadrze klubu wypożyczającego). */
 export function isLoanedOut(p, clubId) { return !!p?.loan && p.loan.from === clubId && p.clubId !== clubId; }
 

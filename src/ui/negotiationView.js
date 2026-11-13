@@ -191,7 +191,7 @@ export function offerSummary(o) {
  * save: true, gdy odmowa zmieniła zawodnika (odmowa przedłużenia zapisuje renewRefused).
  */
 export function startNegotiation(game, opts = {}) {
-  const { kind = 'sign', playerId, limits = {}, fee = 0, rival = null, relegationRisk } = opts;
+  const { kind = 'sign', playerId, limits = {}, fee = 0, rival = null, relegationRisk, pre = false, stayBonus = 0 } = opts;
   const player = game.world?.players?.[playerId];
   if (!player) return { ok: false, reason: 'noPlayer', text: 'Nie ma takiego zawodnika.', save: false };
   const club = resolveClub(game.clubId);
@@ -202,6 +202,7 @@ export function startNegotiation(game, opts = {}) {
 
   const fromClub = kind === 'sign' ? resolveClub(opts.fromClub ?? null) : null;
   const ctx = negotiationContext(game, { kind, player, club, fromClub, rival, relegationRisk });
+  if (stayBonus) { ctx.stayBonus = stayBonus; ctx.forceRenew = true; } // podwyżka przy prośbie o transfer (career/moveWish.js)
   const rng = new Rng(`${game.seed}:ng:${playerId}:${game.date}`);
   const r = openNegotiation({ kind, player, club, fromClub, date: game.date, rng, mode: 'player', ctx });
   if (!r.ok) {
@@ -214,7 +215,7 @@ export function startNegotiation(game, opts = {}) {
   const L = emptyLimits(limits);
   const hasAgent = s.d.agentType !== 'brak';
   const ng = {
-    kind, playerId, fromClub: fromClub?.id ?? null, fromClubName: fromClub?.name ?? null, fee: Math.max(0, fee || 0),
+    kind, playerId, fromClub: fromClub?.id ?? null, fromClubName: fromClub?.name ?? null, fee: pre ? 0 : Math.max(0, fee || 0), pre: !!pre,
     clubId: club.id, clubName: club.name, date: game.date,
     session: s, limits: L, hasAgent,
     draft: defaultDraft(player, view, L, hasAgent, club),
@@ -341,7 +342,7 @@ function finish(game, ng) {
   ng.demand = null;
   ng.done = {
     accepted: !!outcome?.accepted, outcome, contract: outcome?.contract ?? null,
-    kind: ng.kind, playerId: ng.playerId, fromClub: ng.fromClub, fee: ng.fee,
+    kind: ng.kind, playerId: ng.playerId, fromClub: ng.fromClub, fee: ng.fee, pre: !!ng.pre,
   };
   return { ng, done: ng.done, save: true };
 }
@@ -399,8 +400,9 @@ function header(game, ng, player, view) {
   const c = player.contract;
   const contractLine = ng.kind === 'renew'
     ? (c ? `Obecny kontrakt: ${formatZl(c.wage)} tygodniowo do ${fmtDate(c.until)}` : 'Bez kontraktu')
-    : ng.fromClub && c ? `Kontrakt w obecnym klubie: ${formatZl(c.wage)} tygodniowo do ${fmtDate(c.until)}` : 'Wolny zawodnik: bez kwoty odstępnego';
-  const title = ng.kind === 'renew' ? 'Przedłużenie kontraktu' : 'Rozmowy o transferze';
+    : ng.pre && c ? `Kontrakt w obecnym klubie kończy się ${fmtDate(c.until)}. Nowa umowa od ${fmtDate(`${c.until.slice(0, 4)}-07-01`)}, bez kwoty odstępnego.`
+      : ng.fromClub && c ? `Kontrakt w obecnym klubie: ${formatZl(c.wage)} tygodniowo do ${fmtDate(c.until)}` : 'Wolny zawodnik: bez kwoty odstępnego';
+  const title = ng.kind === 'renew' ? 'Przedłużenie kontraktu' : ng.pre ? 'Umowa od 1 lipca (prekontrakt)' : 'Rozmowy o transferze';
   return `
   <header class="panel ng-head">
     <div class="ng-who">
@@ -531,7 +533,8 @@ function outcomePanel(ng) {
   if (accepted && contract) {
     const note = ng.kind === 'renew'
       ? 'Nowy kontrakt obowiązuje od dziś. Zawodnik pamięta obietnicę roli.'
-      : 'Zawodnik zgodził się na warunki. Transfer domyka klub.';
+      : ng.pre ? 'Zawodnik zgodził się na warunki. Umowa zacznie obowiązywać 1 lipca, do tego czasu gra w swoim klubie.'
+        : 'Zawodnik zgodził się na warunki. Transfer domyka klub.';
     return `<section class="panel ng-result" data-result="ok" aria-label="Wynik rozmów">
       <h3>Porozumienie</h3>
       <p>${esc(note)}</p>

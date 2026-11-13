@@ -31,7 +31,7 @@ export const ROLE_LABELS = {
   perspektywiczny: 'perspektywiczny zawodnik',
   rezerwowy: 'rezerwowy',
 };
-const ROLE_RANK = { kluczowy: 4, podstawowy: 3, rotacja: 2, perspektywiczny: 1.5, rezerwowy: 1 };
+export const ROLE_RANK = { kluczowy: 4, podstawowy: 3, rotacja: 2, perspektywiczny: 1.5, rezerwowy: 1 };
 /** Minimalny udział w minutach, przy którym obietnica roli jest dotrzymana (miesięcznie). [SZAC] */
 export const ROLE_MIN_SHARE = { kluczowy: 0.7, podstawowy: 0.55, rotacja: 0.3, perspektywiczny: 0.15, rezerwowy: 0.05 };
 const ROLE_EXP_SHARE = { kluczowy: 0.85, podstawowy: 0.7, rotacja: 0.45, perspektywiczny: 0.25, rezerwowy: 0.15 }; // [SZAC]
@@ -344,9 +344,10 @@ export function openNegotiation(opts) {
   let publicDemand;
   if (kind === 'sign') {
     const from = fromClub ?? { prestige: 0, rep: clamp(rep - 5, 0, 100), tier: club.tier ?? 1 };
-    const baseWage = curWage > 0 ? curWage : mWage;
+    // Wolny zawodnik długo bez klubu obniża żądanie (D_free, src/career/mindset.js): max(0,6 rynku, rynek x (1 - 0,45 D_free))
+    const baseWage = curWage > 0 ? curWage : Math.max(0.6 * mWage, mWage * (1 - 0.45 * (player.stepDownFree ?? 0)));
     const wctx = {
-      player: { rep, age, persona: player.persona, wage: baseWage, monthsLeft: fromClub ? monthsLeft : 0, unhappy: !!player.unhappy },
+      player: { rep, age, persona: player.persona, wage: baseWage, monthsLeft: fromClub ? monthsLeft : 0, unhappy: !!player.unhappy, stepDown: player.stepDown ?? 0, free: !fromClub },
       from, to: club, fromTier: from.tier ?? 1, toTier: club.tier ?? 1, toEurope: ctx.toEurope, fromEurope: ctx.fromEurope,
     };
     const w = willingnessToJoin(wctx);
@@ -359,8 +360,9 @@ export function openNegotiation(opts) {
     publicDemand = w.wageDemand;
     target = w.wageDemand * (1 + 0.35 * (0.55 - willScore)); // niechęć podnosi cenę, chęć ją obniża [SZAC]
   } else {
+    if (player.preContract) return { ...fail('preContract', 'refusedAlready'), text: 'Zawodnik podpisał już umowę z innym klubem od 1 lipca. Nie przedłuży kontraktu.' };
     if (player.renewRefused) return fail('refused', 'refusedAlready');
-    if (monthsLeft > RENEW_WINDOW_MONTHS) return fail('tooEarly', 'tooEarly', { monthsLeft });
+    if (monthsLeft > RENEW_WINDOW_MONTHS && !ctx.forceRenew) return fail('tooEarly', 'tooEarly', { monthsLeft });
     if (monthsLeft <= 0) return fail('expired', 'tooEarly', { monthsLeft });
     const w = willingnessToJoin({
       player: { rep, age, persona: player.persona, wage: curWage || mWage, unhappy: false },
@@ -370,7 +372,7 @@ export function openNegotiation(opts) {
     // Chęć pozostania [SZAC]
     const stay = 0.2 + 0.6 * w.score + 0.025 * (t.loyalty - 10) + 0.006 * (trust - 50) - 0.12 * broken - 0.003 * grudge
       + 0.01 * (t.homeTies - 10) - (mindset.key === 'zagranica' ? 0.25 : 0) - rivalPull
-      - (player.unhappy ? 0.3 : 0) - (player.transferRequest ? 0.3 : 0) + rng.gauss(0, 0.04);
+      - (player.unhappy ? 0.3 : 0) - (player.transferRequest ? 0.3 : 0) + (ctx.stayBonus ?? 0) + rng.gauss(0, 0.04); // stayBonus: podwyżka przy prośbie o transfer
     if (w.score === 0 || stay < 0.35) {
       const outcome = {
         kind, mode, playerId: player.id, clubId: club.id, date, accepted: false, refused: true, reason: 'refuseRenew',
@@ -752,7 +754,7 @@ export function applyOutcome(player, out) {
   if (out.transferRequest) { player.transferRequest = true; player.unhappy = true; }
   if (out.accepted && out.contract) {
     player.contract = { ...out.contract, bonus: { ...out.contract.bonus }, promise: { ...out.contract.promise } };
-    if (out.kind === 'renew') player.renewRefused = false;
+    if (out.kind === 'renew') { player.renewRefused = false; delete player.moveWish; player.transferRequest = false; } // nowy kontrakt kończy prośbę o transfer
   }
   return player;
 }

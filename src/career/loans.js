@@ -20,7 +20,7 @@ import { squadCount, canSign } from './squadLimit.js';
 import { marketWage, aiNegotiate } from './negotiation.js';
 import { boardCaps, clubBoardData, feeIssues, checkUserFee } from './boardRequests.js';
 import { spellsOf, syncSpell } from '../season/history.js';
-import { completeTransfer, playerWillingness, askingPrice, notForSale, windowOf, fmtZl } from './transfers.js';
+import { completeTransfer, playerWillingness, askingPrice, notForSale, windowOf, fmtZl, breaksMinimum as breaksMinimumShared } from './transfers.js';
 import { fmtDate } from '../ui/dom.js';
 
 export { isLoanedOut };
@@ -219,10 +219,8 @@ const groupMedian = (game, clubId, g, skip = null) => {
   return xs.length ? xs[Math.floor(xs.length / 2)] : 0;
 };
 /** Odejście zostawiłoby klub poniżej minimum grupy pozycji albo kadry. */
-function breaksMinimum(game, p) {
-  const sq = squadOf(game.world, p.clubId);
-  return sq.filter((x) => groupOf(x) === groupOf(p)).length - 1 < SQUAD_TARGETS[groupOf(p)].min || sq.length - 1 < SQUAD_SIZE.min;
-}
+// Minimum kadry: wspólne sprawdzenie z transfers.js (liczy też zawodników w trakcie transferu, transferDeals.js)
+const breaksMinimum = (game, p) => breaksMinimumShared(game, p);
 
 /** Nastawienie do wypożyczenia: jak do transferu, a młody rezerwowy (do 21 lat) chętniej (+0,3). */
 export function loanWillingness(game, p, to) {

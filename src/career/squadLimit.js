@@ -59,7 +59,9 @@ export function squadLimitOf(game, clubId) {
 export function squadCount(game, clubId) {
   const squad = squadOf(game.world, clubId).filter(Boolean);
   const exempt = squad.filter(isExempt);
-  const counted = squad.length - exempt.length;
+  // Zawodnicy w drodze do klubu (transakcja w toku, src/career/transferDeals.js) liczą się już do limitu
+  const incoming = (game.market?.deals ?? []).filter((d) => d.to === clubId && !d.end).length;
+  const counted = squad.length - exempt.length + incoming;
   const lim = squadLimitOf(game, clubId);
   return { ...lim, counted, exempt, total: squad.length, over: Math.max(0, counted - lim.soft), room: Math.max(0, lim.hard - counted), full: counted >= lim.hard };
 }
