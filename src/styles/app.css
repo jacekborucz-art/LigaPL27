@@ -1103,8 +1103,9 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
   .nt-grid--pol > .stat-sec:first-of-type { grid-row: span 3; }
 }
 @media (min-width: 1680px) {
-  .comp .cgrid__main > .ufxlist, .comp .ccard .ufxlist { display: grid; grid-template-columns: 1fr 1fr; }
-  .comp .cgrid__main > .ufxlist > .ufx:nth-child(odd), .comp .ccard .ufxlist > .ufx:nth-child(odd) { border-right: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+  /* Terminarz ligi: kolejka zawsze w jednej kolumnie; dwie kolumny tylko w długich listach rund Pucharu Polski */
+  .comp .ccard .ufxlist { display: grid; grid-template-columns: 1fr 1fr; }
+  .comp .ccard .ufxlist > .ufx:nth-child(odd) { border-right: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
   .comp .ccard .ufxlist:has(> .ufx:only-child) { grid-template-columns: 1fr; }
   .stat-list--cols { columns: 3; }
 }
