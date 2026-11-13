@@ -27,7 +27,7 @@ test('Każda podzakładka renderuje się w opakowaniu .tfx z zakładkami i bez d
     const html = renderTransfers(G, { tfTab: k });
     assert.match(html, /^<div class="tfx" data-tab="/);
     assert.equal(count(html, /data-act="tf-tab"/g), TF_TABS.length);
-    assert.ok(!html.includes('—'), `długi myślnik w zakładce ${k}`);
+    assert.ok(!html.includes('\u2014'), `długi myślnik w zakładce ${k}`);
     assert.ok(!html.includes('undefined') && !html.includes('NaN'), `undefined/NaN w zakładce ${k}`);
   }
 });

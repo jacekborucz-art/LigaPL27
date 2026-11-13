@@ -423,7 +423,8 @@
   .tr-day { grid-template-columns: 1fr; align-content: start; align-items: start; gap: 6px; min-height: 160px; }
   .tr-day__body { flex-direction: column; }
   .tr-day__own, .tr-day__inj, .tr-day__tag, .tr-day__camp { grid-column: auto; }
-  .tr-day__tag { grid-row: 1; justify-self: end; align-self: start; grid-column: 1; }
+  .tr-day { position: relative; }
+  .tr-day__tag { position: absolute; top: 8px; right: 8px; }
   .tr-dl { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .tr-staff { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .tr-camps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -445,7 +446,7 @@
   .tr-card--week { grid-column: span 2; }
   .tr-dash > .tr-card:last-child { grid-column: auto; }
   .tr-wk { min-height: 112px; padding: 8px 6px; }
-  .tr-wk__what .tr-sess { font-size: var(--step--1); }
+  .tr-wk__what .tr-sess { font-size: 12px; }
   .tr-cols--week { grid-template-columns: minmax(0, 1.7fr) minmax(320px, 1fr); }
   .tr-cols--camps { grid-template-columns: minmax(320px, 0.9fr) minmax(0, 2fr); }
   .tr-cols--camps.tr-cols--one { grid-template-columns: minmax(0, 1fr); max-width: 980px; }

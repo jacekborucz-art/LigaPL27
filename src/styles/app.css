@@ -1098,10 +1098,7 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
   .nt-grid--pol > .stat-sec:first-of-type { grid-row: span 3; }
 }
 @media (min-width: 1680px) {
-  /* Terminarz ligi: kolejka zawsze w jednej kolumnie; dwie kolumny tylko w długich listach rund Pucharu Polski */
-  .comp .ccard .ufxlist { display: grid; grid-template-columns: 1fr 1fr; }
-  .comp .ccard .ufxlist > .ufx:nth-child(odd) { border-right: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
-  .comp .ccard .ufxlist:has(> .ufx:only-child) { grid-template-columns: 1fr; }
+  /* Terminarz, Puchar Polski i puchary europejskie: wyniki zawsze w jednej kolumnie */
   .stat-list--cols { columns: 3; }
 }
 /* Wąska lista w panelu bocznym: zawsze układ telefonu (drużyny jedna pod drugą) */
@@ -1112,3 +1109,11 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 .ufxlist--compact .ufx.is-open .ufx__mid { display: block; grid-area: 2 / 2 / 4 / 3; }
 .ufxlist--compact .ufx__sub { justify-content: flex-start; }
 .ufxlist--compact .ufx__sub:empty { display: none; }
+
+/* Tabele reprezentacji (Liga Narodów, eliminacje Euro): bez kolumny formy, nazwa drużyny zawsze widoczna */
+.tbl--nt .tbl__row { grid-template-columns: 28px minmax(110px, 1fr) 30px 30px 30px 30px 52px 38px !important; column-gap: 6px; }
+.tbl--nt .tbl__club { min-width: 0; }
+.tbl--nt .tbl__club span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 759px) {
+  .tbl--nt .tbl__row { grid-template-columns: 26px minmax(0, 1fr) 30px 52px 36px !important; }
+}

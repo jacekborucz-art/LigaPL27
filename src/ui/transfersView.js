@@ -208,7 +208,7 @@ function marketView(game, ui) {
   const rows = needWill ? sorted : sorted.map(withWill);
   const table = all.length ? marketTable(game, rows, list, sort, all.length) : `<p class="tf-empty">${list === 'search' ? 'Brak zawodników dla tych filtrów.' : 'Lista jest pusta.'}</p>`;
   return `${moneyStrip(game)}
-    <div class="tf-grid">
+    <div class="tf-grid tf-grid--market">
       <div class="tf-main">${chips}${form}${table}</div>
       <aside class="tf-side" aria-label="Kadra i budżet">${limitPanel(game)}${marketHelp(list)}</aside>
     </div>`;

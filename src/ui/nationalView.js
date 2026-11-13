@@ -22,7 +22,7 @@ function ntRow(m) {
 }
 
 function table(rows, title, zones = () => '') {
-  return `<section class="stat-sec"><h3>${esc(title)}</h3><div class="tbl" role="table">
+  return `<section class="stat-sec"><h3>${esc(title)}</h3><div class="tbl tbl--nt" role="table">
     <div class="tbl__row tbl__head" role="row"><span>#</span><span>Drużyna</span><span>M</span><span class="w">W</span><span class="w">R</span><span class="w">P</span><span>Bramki</span><span>Pkt</span></div>
     ${rows.map((r) => `<div class="tbl__row ${r.id === 'POL' ? 'is-me' : ''}" role="row" data-zone="${zones(r.pos, rows.length)}"><span class="tbl__pos">${r.pos}</span><span class="tbl__club"><span>${esc(ntName(r.id))}</span></span><span>${r.p}</span><span class="w">${r.w}</span><span class="w">${r.d}</span><span class="w">${r.l}</span><span>${r.gf}:${r.ga}</span><b>${r.pts}</b></div>`).join('')}
   </div></section>`;
