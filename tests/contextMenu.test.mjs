@@ -11,7 +11,6 @@ import { ensureTraining } from '../src/training/index.js';
 import { completeTransfer, notForSale } from '../src/career/transfers.js';
 import { squadCount, SQUAD_LIMITS } from '../src/career/squadLimit.js';
 import { ensureSquadLimit, limitStatus } from '../src/career/squadLimitSystem.js';
-import { TALKS_PER_WEEK } from '../src/career/teamTalks.js';
 import { handleTransferAction, isTransferAction } from '../src/ui/transfersView.js';
 import { handleTalkAction, isTalkAction } from '../src/ui/talksView.js';
 import { handleTrainingAction, isTrainingAction } from '../src/ui/trainingView.js';
@@ -210,7 +209,7 @@ test('Limit kadry: osłona przed zarządem tylko w sprawie zarządu i tylko dla 
   assert.match(find(menu(g, t.id, 'squad'), 'Osłoń przed decyzją zarządu').disabled, /Osłonięci już 3 z 3/);
 });
 
-test('Rozmowy: limit tygodniowy wyłącza rozmowę; menu przekazuje temat, którego handler używa bez formularza', () => {
+test('Rozmowy: po rozmowie z zawodnikiem kolejna za tydzień, z innymi bez limitu; menu przekazuje temat, którego handler używa bez formularza', () => {
   const g = newGame();
   const p = g.tactics.xi[3];
   const m = menu(g, p, 'talks');
@@ -219,8 +218,9 @@ test('Rozmowy: limit tygodniowy wyłącza rozmowę; menu przekazuje temat, któr
   assert.deepEqual(praise.run.steps, [{ act: 'tt-talk', id: p, kind: 'praise' }]);
   const r = handleTalkAction(g, 'tt-talk', { id: p, kind: 'praise' }, null);
   assert.ok(r.save && /pochwała za formę/.test(r.ui.ttResult));
-  for (let i = 1; i < TALKS_PER_WEEK; i++) handleTalkAction(g, 'tt-talk', { id: g.tactics.xi[i + 4], kind: 'encourage' }, null);
-  assert.equal(find(menu(g, p, 'squad'), 'Rozmowa indywidualna').disabled, `Limit rozmów w tym tygodniu (${TALKS_PER_WEEK} z ${TALKS_PER_WEEK})`);
+  for (let i = 1; i < 6; i++) handleTalkAction(g, 'tt-talk', { id: g.tactics.xi[i + 4], kind: 'encourage' }, null);
+  assert.match(find(menu(g, p, 'squad'), 'Rozmowa indywidualna').disabled, /Kolejna za 7 dni/, 'z tym samym zawodnikiem raz w tygodniu');
+  assert.equal(find(menu(g, g.tactics.xi[1], 'squad'), 'Rozmowa indywidualna').disabled, null, 'z innym zawodnikiem bez limitu');
 });
 
 test('Trening: akcent, obciążenie i nauka pozycji jako opcje wyboru; akcje działają w handlerze treningu', () => {

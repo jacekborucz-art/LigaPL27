@@ -28,7 +28,9 @@ export const PLAYER_TALKS = {
   warn: { label: 'Ostrzeżenie (dyscyplina)', quote: '„Za dużo kartek i nerwów. Musisz się kontrolować.”' },
 };
 
-export const TALKS_PER_WEEK = 3;
+// Rozmowy indywidualne: bez wspólnego limitu dla kadry, z jednym zawodnikiem raz w tygodniu (decyzja użytkownika).
+// Zebranie drużyny: raz w tygodniu (canHoldMeeting).
+export const TALK_COOLDOWN = 7;
 const DAY = 86400000;
 const daysBetween = (a, b) => Math.round((new Date(`${b}T12:00:00Z`) - new Date(`${a}T12:00:00Z`)) / DAY);
 const avg = (xs) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : null);
@@ -110,6 +112,20 @@ export function holdMeeting(game, tone) {
 }
 
 // ------------------------------------------------------------ Rozmowy indywidualne
+/** Ile dni do kolejnej rozmowy z zawodnikiem (0: można rozmawiać). */
+export function talkCooldown(game, playerId) {
+  const h = state(game).perPlayer[playerId] ?? [];
+  const last = h.length ? h[h.length - 1].date : null;
+  return last ? Math.max(0, TALK_COOLDOWN - daysBetween(last, game.date)) : 0;
+}
+const dniWord = (n) => (n === 1 ? 'dzień' : 'dni');
+/** Tekst blokady rozmowy z zawodnikiem (null: można rozmawiać). */
+export function talkBlockedText(game, playerId) {
+  const n = talkCooldown(game, playerId);
+  return n > 0 ? `Rozmowa w tym tygodniu już była. Kolejna za ${n} ${dniWord(n)}` : null;
+}
+
+/** Liczba rozmów indywidualnych w ostatnich 7 dniach (informacja, bez limitu). */
 export function talksThisWeek(game) {
   const T = state(game);
   return T.log.filter((x) => x.kind === 'talk' && daysBetween(x.date, game.date) < 7).length;
@@ -146,7 +162,8 @@ export function talkToPlayer(game, playerId, kind) {
   const p = game.world.players[playerId];
   if (!p || p.clubId !== game.clubId) return { ok: false, text: 'To nie jest zawodnik twojej drużyny.' };
   if (!PLAYER_TALKS[kind]) throw new Error(`Nieznana rozmowa: ${kind}`);
-  if (talksThisWeek(game) >= TALKS_PER_WEEK) return { ok: false, text: `W tym tygodniu odbyłeś już ${TALKS_PER_WEEK} rozmowy. Kolejne za kilka dni.` };
+  const blocked = talkBlockedText(game, playerId);
+  if (blocked) return { ok: false, text: `${p.name}: ${blocked.toLowerCase()}.` };
   const rng = new Rng(`rozmowa:${game.seed}:${game.date}:${playerId}:${kind}`);
   const hist = (T.perPlayer[playerId] ?? []).filter((x) => daysBetween(x.date, game.date) < 21);
   const same = hist.filter((x) => x.kind === kind).length;
