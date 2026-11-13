@@ -61,6 +61,7 @@ function matchMoney(game, date) {
       for (const [s, id] of [[0, f.home], [1, f.away]]) {
         if (!F.clubs[id]) continue;
         if (first) book(F, id, f.date, 'in', 'prize', uefaPrize(f.ucomp, f.round), `${f.label}: udział`);
+        if (f.ucomp === 'SEU' && winnerOf(f) === id) book(F, id, f.date, 'in', 'prize', uefaPrize('SEU', 'W'), 'Superpuchar Europy: zwycięstwo');
         if (f.round === 'league') {
           const [g0, g1] = f.result.score; const me = s === 0 ? g0 : g1; const op = s === 0 ? g1 : g0;
           if (me > op) book(F, id, f.date, 'in', 'prize', uefaPrize(f.ucomp, 'win')); else if (me === op) book(F, id, f.date, 'in', 'prize', uefaPrize(f.ucomp, 'draw'));

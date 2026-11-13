@@ -28,7 +28,7 @@ import { createTactics, changeFormation, setInstruction, refreshTactics, removeF
 import { COMPETITIONS } from './config/competitions.js';
 import { mountMatchday } from './ui/matchdayView.js';
 import { mountDrawAnimation } from './ui/europeView.js';
-import { ensureUefa } from './season/europe.js';
+import { ensureUefa, syncSuperCupEU } from './season/europe.js';
 import { ensureNational } from './season/nationalSystem.js';
 import { applySeasonState } from './season/rollover.js';
 import { ensureTraining, trainingMatchInput, teamCohesion } from './training/index.js';
@@ -118,6 +118,7 @@ function ensureGameShape(g) {
   }
   if (g.season?.fixtures && g.fixtures && g.season.fixtures !== g.fixtures) g.season.fixtures = g.fixtures; // po imporcie z pliku JSON
   ensureUefa(g); // zapis sprzed etapu 8: puchary UEFA nadrobione w tle
+  syncSuperCupEU(g); // zapis sprzed Superpucharu Europy: mecz sezonu (rozegrany w tle, jeśli termin minął)
   ensureNational(g);
   ensureTraining(g);
   ensureCareer(g);

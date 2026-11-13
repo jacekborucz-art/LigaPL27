@@ -150,6 +150,7 @@ const SHELL = [
   './src/season/schedule.js',
   './src/season/season.js',
   './src/season/standings.js',
+  './src/season/superCupEU.js',
   './src/season/uefa.js',
   './src/styles/app.css',
   './src/styles/base.css',

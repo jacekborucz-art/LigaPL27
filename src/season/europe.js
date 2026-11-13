@@ -10,9 +10,10 @@ import { SEASON, GAME_START, DOMESTIC } from '../config/calendar2026.js';
 import { COMPETITIONS } from '../config/competitions.js';
 import { fmtDate } from '../ui/dom.js';
 import {
-  createUefa, uefaDay, UCOMP_NAMES, ROUND_NAMES, firstLegFor, recordResult, ORDER, COUNTRY_NAMES, countryOf, leagueTable,
+  createUefa, uefaDay, UCOMP_NAMES, ROUND_NAMES, firstLegFor, recordResult, ORDER, COUNTRY_NAMES, countryOf, leagueTable, uefaL, simByStrength,
 } from './uefa.js';
 import { anyClub, rescheduleAround, restOk, playQuick, applyResult } from './season.js';
+import { createSuperCupEU, superCupEUFixture, simulateSuperCupEU, settleSuperCupEU, superCupEULine, venueLabel, HOLDERS_2026 } from './superCupEU.js';
 
 const isPolish = (id) => !!clubById(id);
 const SCORE_W = { NAP: 3, SN: 2, OP: 2, SP: 1.4, ŚP: 1, DP: 0.6, WB: 0.5, BO: 0.4, ŚO: 0.35, BR: 0 };
@@ -195,10 +196,45 @@ function syncFromFixtures(game, date, messages) {
   }
 }
 
+/** Superpuchar Europy w starym zapisie: mecz sezonu tworzony przy pierwszym dniu po aktualizacji. */
+function ensureSuperCupEU(game, date) {
+  const S = game.season;
+  if (S.superCupEU !== undefined) return S.superCupEU;
+  const year = Number(String(S.seasonId ?? SEASON).slice(0, 4));
+  const prev = (game.archive ?? []).at(-1)?.uefa;
+  const sc = createSuperCupEU(year, year === 2026 ? HOLDERS_2026 : prev ?? {});
+  S.superCupEU = sc ?? null;
+  if (sc && (isPolish(sc.home) || isPolish(sc.away)) && sc.date >= date && !game.fixtures.some((f) => f.id === sc.id)) {
+    game.fixtures.push(superCupEUFixture(sc));
+    game.fixtures.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  }
+  return S.superCupEU;
+}
+
+/** Superpuchar Europy: mecz w tle (bez polskich klubów) albo wynik z terminarza (polski klub). */
+function superCupEUDay(game, date, messages) {
+  const sc = ensureSuperCupEU(game, date);
+  if (!sc || sc.played || date < sc.date) return;
+  const f = game.fixtures.find((x) => x.id === sc.id);
+  if (f) { if (!f.played) return; settleSuperCupEU(sc, f.result); }
+  else settleSuperCupEU(sc, simulateSuperCupEU(sc, uefaL, simByStrength));
+  if (messages) {
+    messages.push(createMessage({ date, key: `seu:${sc.id}`, category: 'competitions', from: 'UEFA', priority: sc.home === game.clubId || sc.away === game.clubId ? 'important' : 'info',
+      subject: `Superpuchar Europy: ${cname(sc.winner)} zwycięzcą`,
+      body: `${superCupEULine(sc)}. ${venueLabel(sc.venue)} (${sc.venue.country}), ${fmtDate(sc.date)}. Zwycięzca Ligi Mistrzów zagrał ze zwycięzcą Ligi Europy.` }));
+  }
+}
+
+/** Stary zapis: Superpuchar Europy sezonu (utworzony i, jeśli termin minął, rozegrany bez wiadomości). */
+export function syncSuperCupEU(game) {
+  if (game.season?.uefa && game.date) superCupEUDay(game, game.date, null);
+}
+
 /** Jeden dzień pucharów UEFA w grze. */
 export function europeDay(game, date, { silent = false } = {}) {
   if (!game.season?.uefa) return [];
   const messages = [];
+  superCupEUDay(game, date, silent ? null : messages);
   syncFromFixtures(game, date, silent ? null : messages);
   const { draws } = uefaDay(game.season.uefa, date, { isPolish, scorersFor });
   for (const d of draws) {

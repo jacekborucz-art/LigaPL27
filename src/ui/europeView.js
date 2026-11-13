@@ -65,7 +65,24 @@ function pathView(game, comp, ui) {
   });
   const champion = C.champion ? `<p class="panel__lead champ">${crest(C.champion, 32)} ${esc(name(C.champion))} wygrywa ${esc(UCOMP_NAMES[comp])}.</p>` : '';
   const next = pending ? `<p class="hint">Następna runda: ${esc(ROUND_NAMES[pending])}. Losowanie po zakończeniu poprzednich rund.</p>` : '';
-  return `${drawPanel(game, ui)}${champion}${next}${sections.join('') || '<p class="hint">Losowania jeszcze się nie odbyły.</p>'}`;
+  const seu = comp === 'LM' || comp === 'LE' ? superCupEUPanel(game) : '';
+  return `${seu}${drawPanel(game, ui)}${champion}${next}${sections.join('') || '<p class="hint">Losowania jeszcze się nie odbyły.</p>'}`;
+}
+
+/** Superpuchar Europy sezonu: zwycięzca LM kontra zwycięzca LE poprzedniego sezonu, duży stadion, sierpień. */
+function superCupEUPanel(game) {
+  const sc = game.season.superCupEU;
+  if (!sc) return '';
+  const r = sc.result;
+  const win = (id) => (sc.winner === id ? ' fx__team--win' : sc.winner ? ' fx__team--out' : '');
+  return `<section class="stat-sec seu"><div class="sec-head"><h3>Superpuchar Europy ${sc.year}</h3></div>
+    <p class="hint">${esc(sc.venue.stadium)}, ${esc(sc.venue.city)} (${esc(sc.venue.country)}), ok. ${Math.round(sc.venue.cap / 1000)} tys. miejsc. ${esc(fmtDate(sc.date))}, ${esc(sc.time)}. Zwycięzca Ligi Mistrzów kontra zwycięzca Ligi Europy, przy remisie od razu rzuty karne.</p>
+    <ul class="fxlist"><li class="fx tie${isPolish(sc.home) || isPolish(sc.away) ? ' is-pl' : ''}">
+      <span class="fx__date">${esc(shortDay(sc.date))}${sc.winner ? ` <span class="tag-up">zdobywca: ${esc(name(sc.winner))}</span>` : ''}</span>
+      <span class="fx__team fx__team--h${win(sc.home)}">${flag(sc.home)}${esc(name(sc.home))}${crest(sc.home)}</span>
+      <span class="fx__mid">${r ? `<b class="fx__score">${r.score[0]}:${r.score[1]}</b>` : '<span class="fx__time">vs</span>'}<small>${r?.shootout ? `k. ${r.shootout[0]}:${r.shootout[1]}` : ''}</small></span>
+      <span class="fx__team${win(sc.away)}">${crest(sc.away)}${esc(name(sc.away))}${flag(sc.away)}</span>
+    </li></ul></section>`;
 }
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 

@@ -216,7 +216,7 @@ export function rolloverSeason(game) {
   for (const p of Object.values(game.world.players)) archivePlayerSeason(p, oldSeason);
   // Archiwum sezonu
   game.archive = [...(game.archive ?? []), {
-    season: oldSeason, champion: res.tables[1][0], cup: res.cup.winner, uefa: res.uefa,
+    season: oldSeason, champion: res.tables[1][0], cup: res.cup.winner, uefa: res.uefa, superCupEU: game.season.superCupEU?.winner ?? null,
     tables: Object.fromEntries([1, 2, 3].map((t) => [t, res.rows[t].map((r) => ({ id: r.id, pts: r.points, gd: r.gf - r.ga }))])),
     user: { club: game.clubId, tier: userTier, pos: userPos }, promoted: moves.promoted, relegated: moves.relegated, polandRank: europe.rank,
   }].slice(-15);
@@ -312,7 +312,7 @@ export function rolloverSeason(game) {
   Object.assign(game.market, { listed: {}, talks: {}, offers: [], userListed: {}, history: game.market.history.slice(0, 150) });
   const champion = res.tables[1][0];
   const cupWinner = res.cup.winner && res.cup.winner !== champion ? res.cup.winner : res.tables[1][1];
-  game.season = createSeason(`${game.seed}:${year}`, { playerClub: game.clubId, superCup: [champion, cupWinner], holder: res.uefa.LM ?? undefined });
+  game.season = createSeason(`${game.seed}:${year}`, { playerClub: game.clubId, superCup: [champion, cupWinner], holder: res.uefa.LM ?? undefined, uefaHolders: res.uefa });
   game.season.polishEurope = polishEurope;
   game.fixtures = game.season.fixtures;
   game.tactics = createTactics(squadOf(game.world, game.clubId), { benchSize: 12, formation: game.tactics?.formation, instructions: game.tactics?.instructions });

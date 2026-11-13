@@ -9,7 +9,8 @@ import { CLUBS_PL, clubById, LEAGUE_NAMES } from '../data/clubs_pl.js';
 import { CLUBS_L3 } from '../data/clubs_l3.js';
 import { CLUBS_L4 } from '../data/clubs_l4.js';
 import { COMPETITIONS } from '../config/competitions.js';
-import { DOMESTIC, FIFA_WINDOWS, UEFA, POLISH_EUROPE_2026, SEASON, GAME_START } from '../config/calendar2026.js';
+import { DOMESTIC, FIFA_WINDOWS, UEFA, POLISH_EUROPE_2026, SEASON, SEASON_YEAR, GAME_START } from '../config/calendar2026.js';
+import { createSuperCupEU, superCupEUFixture, HOLDERS_2026 } from './superCupEU.js';
 import { roundDates, buildLeague } from './schedule.js';
 import { standings } from './standings.js';
 import { createCup, drawRound, winnerOf, superCupFixture, PP_ROUNDS, PP_NAMES } from './cup.js';
@@ -48,7 +49,7 @@ function busyFactory(superCup) {
   return (club, date) => (busy.get(club) ?? []).some((d) => near(d, date));
 }
 
-export function createSeason(seed, { playerClub = null, superCup = ['lech', 'gornik-zabrze'], holder } = {}) {
+export function createSeason(seed, { playerClub = null, superCup = ['lech', 'gornik-zabrze'], holder, uefaHolders = HOLDERS_2026 } = {}) {
   const rng = new Rng(`sezon:${seed}`);
   const busy = busyFactory(superCup);
   const fixtures = [];
@@ -67,10 +68,13 @@ export function createSeason(seed, { playerClub = null, superCup = ['lech', 'gor
   fixtures.push(superCupFixture(...superCup));
   const cup = createCup(CLUBS_PL.filter((c) => c.tier <= 3), lowerTierClubs(), CLUBS_L4, rng.fork('pp:uczestnicy'));
   fixtures.push(...drawRound(cup, 'PRE', tierOf, rng.fork('pp:PRE')));
+  // Superpuchar Europy (src/season/superCupEU.js): polski klub z kadrą w grze dostaje mecz w terminarzu
+  const superCupEU = createSuperCupEU(SEASON_YEAR, uefaHolders);
+  if (superCupEU && (clubById(superCupEU.home) || clubById(superCupEU.away))) fixtures.push(superCupEUFixture(superCupEU));
   void playerClub;
   fixtures.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
   // Puchary UEFA: losowania i mecze dzień po dniu (src/season/europe.js)
-  return { fixtures, cup, playoffs: {}, seasonId: SEASON, superCup, uefa: createUefa(seed, holder ? { holder } : {}) };
+  return { fixtures, cup, playoffs: {}, seasonId: SEASON, superCup, superCupEU, uefa: createUefa(seed, holder ? { holder } : {}) };
 }
 
 /** Czy klub ma co najmniej 2 dni przerwy od innych meczów w danym dniu. */
