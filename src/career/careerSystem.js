@@ -12,7 +12,9 @@ import { anyClub } from '../season/season.js';
 import { SEASON_START, SEASON_YEAR } from '../config/calendar2026.js';
 import { winnerOf } from '../season/cup.js';
 import { standings } from '../season/standings.js';
-import { createFinance, financeDay, book, matchIncome, attendanceFill, uefaPrize, PP_PRIZE, stadiumCapacity, meritTv, clubPlan, FIN } from './finance.js';
+import { createFinance, financeDay, book, matchIncome, attendanceFill, uefaPrize, stadiumCapacity, meritTv, clubPlan, FIN } from './finance.js';
+import { bookCupPrize, bookUefaWinner, uefaSolidarity } from './prizes.js'; // nagrody PP, UEFA (docs/finanse.md)
+import './sponsors.js'; // umowy sponsorskie (docs/finanse.md, Sponsorzy)
 import { createMarket, marketWeek, answerIncoming, aiRenewals, inWindow, windowOf, fmtZl, SEASON_END } from './transfers.js';
 import { ensureBoard, boardMonth, seasonGoalFor, trustLabel } from './board.js';
 import './squadLimitSystem.js'; // limit kadry i nacisk zarządu (docs/limit-kadry.md)
@@ -53,10 +55,7 @@ function matchMoney(game, date) {
     const h = h0 * mul; const a = a0 * mul;
     book(F, f.home, f.date, 'in', 'tickets', h);
     if (a) book(F, f.away, f.date, 'in', 'tickets', a);
-    if (f.comp === 'pp') {
-      const w = winnerOf(f);
-      book(F, w, f.date, 'in', 'prize', f.round === 'F' ? PP_PRIZE.W : PP_PRIZE[f.round] ?? 20000, `Puchar Polski: ${f.round === 'F' ? 'zwycięstwo' : 'awans'}`);
-    }
+    if (f.comp === 'pp') bookCupPrize(F, game.fixtures, f); // kwota według najdalszej rundy, także dla przegranego
     if (f.comp === 'uefa') {
       const first = f.leg === 1 || f.round === 'F' || (f.round === 'league' && f.md === 1);
       for (const [s, id] of [[0, f.home], [1, f.away]]) {
@@ -68,10 +67,11 @@ function matchMoney(game, date) {
           if (me > op) book(F, id, f.date, 'in', 'prize', uefaPrize(f.ucomp, 'win')); else if (me === op) book(F, id, f.date, 'in', 'prize', uefaPrize(f.ucomp, 'draw'));
         }
       }
+      bookUefaWinner(F, f); // finał LM, LE, LK: premia dla zdobywcy
     }
   }
   // Premia za miejsce z centralnego podziału ligi po ostatniej kolejce (Ekstraklasa SA 2025/26: mistrz 22,6 mln zł,
-  // dalej coraz mniej; spadkowicze z Ekstraklasy dostają rekompensatę). 1 i 2 Liga [SZAC]. Model: docs/finanse.md.
+  // część liniowa i premia za podium; spadkowicze z Ekstraklasy dostają rekompensatę). 1 i 2 Liga [SZAC]. Model: docs/finanse.md.
   for (const comp of Object.values(TIER_COMP)) {
     F.merit = F.merit ?? {};
     if (F.merit[comp]) continue;
@@ -157,6 +157,7 @@ registerDailySystem({
       }
     }
     matchMoney(game, date);
+    uefaSolidarity(game, date); // 15 grudnia: wypłaty solidarnościowe UEFA (src/career/prizes.js)
     const dow = new Date(`${date}T12:00:00Z`).getUTCDay();
     const w = windowOf(date);
     // Okno transferowe: otwarcie, tygodniowy rynek, oferty

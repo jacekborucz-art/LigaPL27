@@ -21,10 +21,20 @@ export const FIN = {
   STAFF: 0.5, // pozostałe pensje (sztab, administracja, rezerwy, młodzież) do płac zawodników; GT 2025/26: 78/14/8 % [SZAC]
   OTHER_COSTS: { 1: 0.3, 2: 0.25, 3: 0.25, 4: 0.25 }, // koszty stadionu, meczów, podróży, akademii do przychodów krajowych [SZAC]
   SPONSOR_SHARE: 0.75, // część komercji od sponsorów, reszta to koszulki, catering i inne [SZAC]
-  // Centralny podział ligi (Ekstraklasa SA 2025/26: 8 222 700 zł części stałej, mistrz 22,6 mln za wynik, 4,4 mln za ranking)
-  TV_FIXED: { 1: 8.22 * M, 2: 2.0 * M, 3: 0.4 * M, 4: 0 }, // 1 i 2 Liga [SZAC]
+  // Centralny podział ligi (Ekstraklasa SA 2025/26: 301,1 mln zł, część stała 50 %, wynik sportowy 33,5 %, ranking
+  // historyczny 14 %, Młodzieżowiec 2,5 %; 8 222 700 zł części stałej, mistrz 22,6 mln za wynik, 4,4 mln za ranking).
+  // 1 Liga: PZPN dzieli ok. 27 mln zł z praw TV i marketingowych, średnio 1,5 mln zł na klub. 2 Liga [SZAC].
+  TV_FIXED: { 1: 8.22 * M, 2: 1.5 * M, 3: 0.4 * M, 4: 0 },
   TV_RANKING: 4.4 * M, // ranking historyczny dla prestiżu 10, skala (prestiż/10)^1,5 [SZAC]
-  MERIT: { 1: [22.6 * M, 0.82], 2: [1.5 * M, 0.85], 3: [0.3 * M, 0.85] }, // [premia mistrza, spadek na miejsce] [SZAC poza mistrzem EK]
+  // Wynik sportowy: część liniowa (1. miejsce first, co miejsce mniej o step, najmniej min) plus premia za podium
+  // (top). Ekstraklasa: 5,7 mln - 0,3 mln na miejsce (najmniej 0,6), premia 17 / 13,5 / 10 / 2,5 mln za miejsca 1-4
+  // [SZAC: rozkład; zgodne z wypłatami 2025/26: mistrz 22,6 mln]. 1 i 2 Liga: bez premii za miejsce w źródłach,
+  // tu mała premia za podium [SZAC].
+  MERIT: {
+    1: { first: 5.7 * M, step: 0.3 * M, min: 0.6 * M, top: [17 * M, 13.5 * M, 10 * M, 2.5 * M] },
+    2: { first: 0, step: 0, min: 0, top: [0.3 * M, 0.2 * M, 0.1 * M] },
+    3: { first: 0, step: 0, min: 0, top: [0.15 * M, 0.1 * M, 0.05 * M] },
+  },
   RELEGATION_COMP: 1.0 * M, // rekompensata dla spadkowiczów z Ekstraklasy (2025/26)
   // Zmiana ligi względem danych klubu: komercja, frekwencja, ceny, płace [SZAC]
   K_KOM: { 1: 1, 2: 0.55, 3: 0.3, 4: 0.15 },
@@ -45,17 +55,23 @@ export const FIN = {
 
 // Nagrody UEFA w mln EUR. Faza ligowa i premie za mecz: cykl 2024-27 (LM 18,62 + 2,1 za wygraną i 0,7 za remis,
 // LE 4,31 + 0,45/0,15, LK 3,17 + 0,4/0,133). Eliminacje: 175 tys. EUR za rozegraną rundę (2025/26) plus kwota
-// za odpadnięcie (LK: Q1 0,15, Q2 0,35, Q3 0,55, PO 0,75), rozłożone na rundy. Fazy pucharowe w LE i LK [SZAC].
+// za odpadnięcie (LK: Q1 0,15, Q2 0,35, Q3 0,55, PO 0,75), rozłożone na rundy. Fazy pucharowe LE i LK 2025/26
+// (finał LE 7, zdobywca LE dodatkowo 6, zdobywca LK dodatkowo 3). W: premia dla zwycięzcy finału (LM 6,5
+// niezweryfikowane). SOL: wypłata solidarnościowa raz w sezonie, Q dla odpadających w eliminacjach, NP dla
+// klubów Ekstraklasy bez pucharów [SZAC] (src/career/prizes.js).
 const UEFA_PRIZE = {
-  LM: { Q1: 0.5, Q2: 0.6, Q3: 0.7, PO: 1.0, league: 18.62, win: 2.1, draw: 0.7, KPO: 1.0, R16: 11, QF: 12.5, SF: 15, F: 18.5 },
-  LE: { Q1: 0.33, Q2: 0.38, Q3: 0.5, PO: 0.6, league: 4.31, win: 0.45, draw: 0.15, KPO: 0.3, R16: 1.75, QF: 2.5, SF: 4, F: 6 },
-  LK: { Q1: 0.33, Q2: 0.38, Q3: 0.38, PO: 0.38, league: 3.17, win: 0.4, draw: 0.133, KPO: 0.2, R16: 0.8, QF: 1.3, SF: 2.5, F: 4 },
+  LM: { Q1: 0.5, Q2: 0.6, Q3: 0.7, PO: 1.0, league: 18.62, win: 2.1, draw: 0.7, KPO: 1.0, R16: 11, QF: 12.5, SF: 15, F: 18.5, W: 6.5 },
+  LE: { Q1: 0.33, Q2: 0.38, Q3: 0.5, PO: 0.6, league: 4.31, win: 0.45, draw: 0.15, KPO: 0.3, R16: 1.75, QF: 2.5, SF: 4, F: 7, W: 6 },
+  LK: { Q1: 0.33, Q2: 0.38, Q3: 0.38, PO: 0.38, league: 3.17, win: 0.4, draw: 0.133, KPO: 0.2, R16: 0.8, QF: 1.3, SF: 2.5, F: 4, W: 3 },
   SEU: { F: 4, W: 1 }, // Superpuchar Europy: finalista 4 mln, zdobywca 5 mln euro (stała kwota UEFA od 2024)
+  SOL: { Q: 0.26, NP: 0.1 }, // NP [SZAC]
 };
 export const uefaPrize = (comp, key) => Math.round((UEFA_PRIZE[comp]?.[key] ?? 0) * 1e6 * FIN.EUR * FIN.ECON / 1000) * 1000;
-// Puchar Polski: premia dla zwycięzcy meczu danej rundy (zł). PZPN 2025/26: pula 10 mln zł, zdobywca 5 mln zł
-// (tu 1 mln za awans do finału i 4 mln za wygranie finału), finalista 1 mln zł. Wcześniejsze rundy [SZAC].
-export const PP_PRIZE = { PRE: 30000, R64: 60000, R32: 100000, R16: 170000, QF: 300000, SF: 1000000, W: 4000000 };
+// Puchar Polski 2026/27 (PZPN): kwota łączna według najdalszej osiągniętej rundy (zł netto). Odpadnięcie w I rundzie
+// (w grze 1/32 finału) 15 tys., w 1/16 45 tys., w 1/8 90 tys., w ćwierćfinale 190 tys., w półfinale 380 tys.,
+// finalista 1 mln, zdobywca 5 mln. Runda wstępna jak I runda [SZAC]. Wypłata przyrostowa: src/career/prizes.js.
+// Superpuchar Polski 2026: bez stałej nagrody.
+export const PP_PRIZE = { PRE: 15000, R64: 15000, R32: 45000, R16: 90000, QF: 190000, SF: 380000, F: 1000000, W: 5000000 };
 
 const tierOf = (club) => Math.min(4, Math.max(1, club?.tier ?? 3));
 const ratio = (K, t, t0) => (K[t] ?? K[4]) / (K[t0] ?? K[4]);
@@ -74,7 +90,9 @@ export function stadiumCapacity(club) {
 /** Premia z centralnego podziału za miejsce w lidze (zł). */
 export function meritTv(tier, pos) {
   const m = FIN.MERIT[tier];
-  return m ? Math.round(m[0] * m[1] ** (pos - 1) / 1000) * 1000 : 0;
+  if (!m) return 0;
+  const lin = m.first ? Math.max(m.min, m.first - m.step * (pos - 1)) : 0;
+  return Math.round((lin + (m.top[pos - 1] ?? 0)) / 1000) * 1000;
 }
 const meritAvg = (tier, n = 18) => Array.from({ length: n }, (_, i) => meritTv(tier, i + 1)).reduce((a, b) => a + b, 0) / n;
 
@@ -211,7 +229,7 @@ export function financeDay(F, world, date) {
     if (date.endsWith('-01')) {
       const p = c.plan ?? { tv: c.base * 0.3, sponsor: c.base * 0.27, other: c.base * 0.18, owner: 0, ops: c.base * 0.17 };
       book(F, id, date, 'in', 'tv', p.tv / 12);
-      book(F, id, date, 'in', 'sponsor', p.sponsor / 12);
+      if (!F.sponsorContracts) book(F, id, date, 'in', 'sponsor', p.sponsor / 12); // z umowami: src/career/sponsors.js
       book(F, id, date, 'in', 'other', p.other / 12);
       book(F, id, date, 'in', 'owner', p.owner / 12);
       book(F, id, date, 'out', 'ops', p.ops / 12);
