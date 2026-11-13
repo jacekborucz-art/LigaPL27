@@ -1158,7 +1158,7 @@ async function dispatchAct(el, { root = app } = {}) {
       g.inbox = resolveMessage(g.inbox, el.dataset.id, el.dataset.a);
       const extra = runDecision(g, m, el.dataset.a);
       if (extra.length) g.inbox = addMessages(g.inbox, extra).inbox;
-      if (m?.refs?.kind === 'incomingOffer' || m?.refs?.kind === 'jobOffer') afterSquadChange(g);
+      if (m?.refs?.kind === 'incomingOffer' || m?.refs?.kind === 'jobOffer' || m?.refs?.kind?.startsWith('loan')) afterSquadChange(g); // loan*: wypożyczenia (career/loans.js)
       await save(); render();
     }
     if (act === 'load' || act === 'continue') {

@@ -96,7 +96,13 @@ export function meritTv(tier, pos) {
 }
 const meritAvg = (tier, n = 18) => Array.from({ length: n }, (_, i) => meritTv(tier, i + 1)).reduce((a, b) => a + b, 0) / n;
 
-const wageBill = (world, clubId) => (world.clubs[clubId]?.squad ?? []).reduce((s, id) => s + (world.players[id]?.contract?.wage ?? 0), 0);
+// Płace klubu: kadra (wypożyczeni do klubu z częścią pensji z umowy wypożyczenia) i reszta pensji zawodników
+// wypożyczonych z klubu (lista world.clubs[id].loaned, src/career/loans.js): bez podwójnego liczenia, razem pełna pensja.
+const loanOutWages = (world, clubId) => (world.clubs[clubId]?.loaned ?? []).reduce((s, id) => {
+  const p = world.players[id];
+  return s + (p?.loan?.from === clubId && p.clubId !== clubId ? Math.max(0, (p.loan.wage ?? 0) - (p.contract?.wage ?? 0)) : 0);
+}, 0);
+const wageBill = (world, clubId) => (world.clubs[clubId]?.squad ?? []).reduce((s, id) => s + (world.players[id]?.contract?.wage ?? 0), 0) + loanOutWages(world, clubId);
 const monthKey = (iso) => iso.slice(0, 7);
 const r1000 = (x) => Math.round(x / 1000) * 1000;
 

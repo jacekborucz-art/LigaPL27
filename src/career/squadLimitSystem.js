@@ -23,6 +23,7 @@ import { spendable, wageRoom } from './finance.js';
 import { aiNegotiate } from './negotiation.js';
 import { clubReputation } from './reputation.js';
 import { completeTransfer, releasePlayer, releaseCost, playerWillingness, inWindow, fmtZl } from './transfers.js';
+import { canLoanTo } from './loans.js'; // limity PZPN liczby wypożyczeń (docs/wypozyczenia.md)
 import {
   squadCount, boardTargets, YOUTH_EXEMPT_AGE, PRESSURE_DAYS, LISTING_DAYS, EXTENSION_DAYS, KEEP_MAX,
   BOARD_LIST_PRICE, CUT_PRICE, LOAN_MAX_AGE,
@@ -136,7 +137,7 @@ function aiClubs(game) {
 function tryLoan(game, p, date) {
   const tier = clubById(game.clubId)?.tier ?? 1;
   const wage = p.contract?.wage ?? 0;
-  const cands = aiClubs(game).filter((c) => { const s = squadCount(game, c.id); return c.tier >= tier && s.counted < s.soft && wageRoom(game.finance, game.world, c.id) >= wage; })
+  const cands = aiClubs(game).filter((c) => { const s = squadCount(game, c.id); return c.tier >= tier && s.counted < s.soft && wageRoom(game.finance, game.world, c.id) >= wage && canLoanTo(game, p, c.id, date); })
     .sort((a, b) => Math.abs(a.L - p.ovr) - Math.abs(b.L - p.ovr) || a.id.localeCompare(b.id));
   for (const c of cands.slice(0, 6)) {
     if (playerWillingness(game, p, c.id).verdict === 'odmowa') continue;

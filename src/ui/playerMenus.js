@@ -67,7 +67,7 @@ function offText(p) {
   if (p.injuryDays > 0) return `Kontuzja, ${p.injuryDays} ${p.injuryDays === 1 ? 'dzień' : 'dni'}`;
   if (p.suspended > 0) return 'Zawieszony';
   if (p.callUp) return 'Zgrupowanie reprezentacji';
-  if (p.onLoanOut) return 'Wypożyczony do innego klubu';
+  if (p.loanBlock) return 'Mecz z klubem macierzystym: zakaz gry w umowie wypożyczenia';
   return isAvailable(p) ? null : 'Niedostępny';
 }
 

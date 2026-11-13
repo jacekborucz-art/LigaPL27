@@ -21,6 +21,7 @@ import './squadLimitSystem.js'; // limit kadry i nacisk zarządu (docs/limit-kad
 import './boardRequests.js'; // prośby do zarządu, warunki i budżety klubów AI (docs/finanse.md)
 import { ensureCoachMarket, fireCoach, hireCoach } from './coachMarket.js'; // rynek trenerów AI i właściciele (docs/trenerzy-i-wlasciciele.md)
 import { ensureInfra } from './infrastructure.js'; // stadion, baza, akademia (docs/infrastruktura.md)
+import { ensureLoans } from './loans.js'; // wypożyczenia: systemy dnia i stare zapisy (docs/wypozyczenia.md)
 
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
 
@@ -31,6 +32,7 @@ export function ensureCareer(game) {
   for (const [id, c] of Object.entries(game.finance.clubs)) if (!c.plan && clubById(id)) { c.plan = clubPlan(clubById(id)); c.tier = c.plan.tier; }
   ensureInfra(game); // stary zapis: poziomy startowe; nowe plany sezonu: pojemność, przychód z widza, utrzymanie
   if (!game.market) createMarket(game);
+  ensureLoans(game);
   ensureBoard(game);
   ensureCoaches(game); // trenerzy klubów AI z atrybutami (stary zapis: profile z ziarna gry, te same nazwiska)
   ensureCoachMarket(game); // pula wolnych trenerów (stary zapis: tworzona z ziarna gry)

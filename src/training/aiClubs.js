@@ -252,7 +252,7 @@ export function processAiDay(game, date) {
       if (tr.m == null || min < tr.m) tr.m = min;
       else if (min > tr.m) { load += LOAD.matchLoad * (min - tr.m) / 90; tr.m = min; }
       const gk = p.pos === 'BR';
-      const pr = !team.length || p.callUp || p.onLoanOut ? null
+      const pr = !team.length || p.callUp ? null
         : subsList && p.lastMatch !== yesterday ? (gk ? P.subsGk : P.subsOut) : (gk ? P.gk : P.out);
       let morale = restMorale;
       if (pr) {
