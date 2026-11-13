@@ -289,3 +289,20 @@ W sezonie 2026/27 nie ma potwierdzonych sparingów Polski. Okna IX/X i XI 2026 w
 - https://www.unionesarda.it/en/italy39-s-under-21-team-crushes-poland-6-2-and-qualifies-for-euro-2027-e5lycqix
 - https://www.flashscore.pl/wiadomosci/kadra-u21-jedzie-na-euro-grekom-brak-o-jednej-bramki-by-stracic-nas-do-barazy/4nvAjWdk/
 - https://insideworldfootball.com/?p=159101
+
+## Reprezentacje spoza Europy: CONMEBOL, CONCACAF, OFC (Nov 13, 2026)
+
+Plik danych `src/data/reprezentacje_swiat.json` (generator `tools/federacje_gen.cjs`), w pamięci gry `src/season/worldNations.js`: `FEDERATIONS`, `WORLD_NT`, `worldTeam(kod)`, `federationTeams(konf, { zone, onlyFifa })`, `topTeams(konf, n)`. `ntName` i `ntTeam` w `national.js` znają też te reprezentacje. Podstawa pod mistrzostwa kontynentalne w tle (Copa América, Złoty Puchar CONCACAF, Liga Narodów CONCACAF, Puchar Narodów Oceanii).
+
+- **CONMEBOL (10):** wszyscy członkowie.
+- **CONCACAF (41):** strefa północnoamerykańska NAFU (3), środkowoamerykańska UNCAF (7), karaibska CFU (31). Gwadelupa, Martynika, Gujana Francuska, Saint-Martin, Sint Maarten i Bonaire należą do CONCACAF, ale nie do FIFA (`czlonekFIFA: false`).
+- **OFC (13):** 11 członków FIFA i 2 członków stowarzyszonych spoza FIFA (Kiribati, Tuvalu). Australia gra w AFC od 2006 roku.
+- **Siła:** wzór L z rozdz. 2 (ta sama skala co Europa). Elo to szacunki (eloratings.net niedostępne), z wyjątkiem krajów obecnych już w `reprezentacje.json` (Argentyna, Brazylia, Kolumbia, Ekwador, Urugwaj, Paragwaj, Wenezuela, Chile, Meksyk, USA, Kanada, Panama), które mają te same Elo i L. Gwiazdka oznacza członka spoza FIFA.
+
+| Federacja | L od najsilniejszej |
+|---|---|
+| CONMEBOL | Argentyna 16,7; Brazylia 16,1; Kolumbia 15,8; Ekwador 15,4; Urugwaj 15,3; Paragwaj 14,9; Wenezuela 13,9; Peru 13,7; Chile 13,6; Boliwia 12,8 |
+| CONCACAF | Meksyk 14,9; USA 14,7; Kanada 14,3; Panama 13,9; Kostaryka 13,4; Jamajka 13,3; Curaçao 13,0; Honduras 12,9; Haiti 12,9; Surinam 12,6; Gwatemala 12,4; Trynidad i Tobago 12,4; Salwador 12,1; Nikaragua 11,3; Martynika* 11,3; Gwadelupa* 11,2; Dominikana 11,0; Gujana 10,8; Kuba 10,7; Bermudy 10,4; Gujana Francuska* 10,2; Portoryko 10,2; Saint Kitts i Nevis 10,0; Grenada 9,9; Antigua i Barbuda 9,7; Belize 9,6; Saint Lucia 9,6; Saint Vincent i Grenadyny 9,5; Barbados 9,2; Aruba 8,9; Dominika 8,8; Saint-Martin* 8,6; Kajmany 8,4; Bahamy 8,1; Sint Maarten* 8,1; Montserrat 8,0; Bonaire* 7,7; Turks i Caicos 7,3; Brytyjskie Wyspy Dziewicze 7,2; Wyspy Dziewicze Stanów Zjednoczonych 6,9; Anguilla 6,5 |
+| OFC | Nowa Zelandia 13,1; Nowa Kaledonia 10,2; Wyspy Salomona 9,8; Fidżi 9,5; Tahiti 9,4; Vanuatu 9,0; Papua-Nowa Gwinea 8,6; Samoa 7,3; Tonga 7,0; Wyspy Cooka 6,9; Samoa Amerykańskie 6,5; Kiribati* 6,5; Tuvalu* 6,5 |
+
+Do weryfikacji przy dostępie do źródeł: aktualne Elo (eloratings.net) i ranking FIFA nowych reprezentacji (pole `rankingFIFA: null`), terminy kolejnych edycji Copa América i Pucharu Narodów Oceanii.

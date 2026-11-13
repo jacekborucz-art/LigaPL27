@@ -1,0 +1,842 @@
+{
+  "meta": {
+    "stan": "2026-11-13",
+    "opis": "Reprezentacje federacji CONMEBOL, CONCACAF i OFC do mistrzostw kontynentalnych w tle. Siła L jak w reprezentacje.json.",
+    "wzorL": "L = 7 + (Elo - 860) / 125; powyżej 16,5 miękki sufit 16,5 + 0,25 x nadwyżka; minimum 6,5",
+    "liczby": {
+      "CONMEBOL": 10,
+      "CONCACAF": 41,
+      "OFC": 13
+    }
+  },
+  "federacje": {
+    "CONMEBOL": {
+      "nazwa": "Konfederacja Południowoamerykańska (CONMEBOL)",
+      "region": "Ameryka Południowa",
+      "siedziba": "Luque, Paragwaj",
+      "czlonkowie": [
+        "ARG",
+        "BRA",
+        "URU",
+        "COL",
+        "ECU",
+        "PAR",
+        "VEN",
+        "CHI",
+        "PER",
+        "BOL"
+      ],
+      "turnieje": [
+        {
+          "nazwa": "Copa América",
+          "format": "16 drużyn (10 z CONMEBOL i 6 zaproszonych z CONCACAF), 4 grupy po 4, ćwierćfinały",
+          "cykl": "zwykle co 4 lata [do weryfikacji terminu kolejnej edycji]"
+        },
+        {
+          "nazwa": "Eliminacje do mistrzostw świata",
+          "format": "jedna liga, 10 drużyn, mecz i rewanż (18 kolejek)",
+          "cykl": "co 4 lata"
+        }
+      ]
+    },
+    "CONCACAF": {
+      "nazwa": "Konfederacja Piłkarska Ameryki Północnej, Środkowej i Karaibów (CONCACAF)",
+      "region": "Ameryka Północna, Środkowa i Karaiby",
+      "siedziba": "Miami, USA",
+      "czlonkowie": [
+        "MEX",
+        "USA",
+        "CAN",
+        "PAN",
+        "CRC",
+        "HON",
+        "GUA",
+        "SLV",
+        "NCA",
+        "BLZ",
+        "JAM",
+        "HAI",
+        "CUW",
+        "SUR",
+        "TRI",
+        "GLP",
+        "MTQ",
+        "DOM",
+        "GUF",
+        "CUB",
+        "GUY",
+        "BER",
+        "PUR",
+        "SKN",
+        "GRN",
+        "ATG",
+        "LCA",
+        "VIN",
+        "BRB",
+        "ARU",
+        "DMA",
+        "SMN",
+        "CAY",
+        "BAH",
+        "SMA",
+        "MSR",
+        "BOE",
+        "TCA",
+        "VGB",
+        "VIR",
+        "AIA"
+      ],
+      "strefy": {
+        "NAFU": "Strefa północnoamerykańska",
+        "UNCAF": "Strefa środkowoamerykańska",
+        "CFU": "Strefa karaibska"
+      },
+      "turnieje": [
+        {
+          "nazwa": "Złoty Puchar CONCACAF",
+          "format": "16 drużyn, 4 grupy po 4, faza pucharowa",
+          "cykl": "co 2 lata (lata nieparzyste)"
+        },
+        {
+          "nazwa": "Liga Narodów CONCACAF",
+          "format": "dywizje A, B, C z awansami i spadkami, finały czterech najlepszych",
+          "cykl": "co 2 lata"
+        }
+      ]
+    },
+    "OFC": {
+      "nazwa": "Konfederacja Piłkarska Oceanii (OFC)",
+      "region": "Oceania",
+      "siedziba": "Auckland, Nowa Zelandia",
+      "czlonkowie": [
+        "NZL",
+        "NCL",
+        "SOL",
+        "FIJ",
+        "TAH",
+        "VAN",
+        "PNG",
+        "SAM",
+        "TGA",
+        "COK",
+        "ASA",
+        "KIR",
+        "TUV"
+      ],
+      "uwagi": "Australia od 2006 roku gra w AFC (Azja), dlatego jej tu nie ma (jest w reprezentacje.json jako AFC).",
+      "turnieje": [
+        {
+          "nazwa": "Puchar Narodów Oceanii (OFC Nations Cup)",
+          "format": "8 drużyn, 2 grupy po 4, półfinały i finał",
+          "cykl": "zwykle co 4 lata [do weryfikacji]"
+        }
+      ]
+    }
+  },
+  "reprezentacje": [
+    {
+      "kod": "ARG",
+      "nazwa": "Argentyna",
+      "konfederacja": "CONMEBOL",
+      "strefa": null,
+      "czlonekFIFA": true,
+      "rankingFIFA": 2,
+      "elo": 2140,
+      "L": 16.7,
+      "eloZrodlo": "reprezentacje.json (ten sam szacunek)"
+    },
+    {
+      "kod": "BRA",
+      "nazwa": "Brazylia",
+      "konfederacja": "CONMEBOL",
+      "strefa": null,
+      "czlonekFIFA": true,
+      "rankingFIFA": 6,
+      "elo": 2000,
+      "L": 16.1,
+      "eloZrodlo": "reprezentacje.json (ten sam szacunek)"
+    },
+    {
+      "kod": "URU",
+      "nazwa": "Urugwaj",
+      "konfederacja": "CONMEBOL",
+      "strefa": null,
+      "czlonekFIFA": true,
+      "rankingFIFA": 20,
+      "elo": 1900,
+      "L": 15.3,
+      "eloZrodlo": "reprezentacje.json (ten sam szacunek)"
+    },
+    {
+      "kod": "COL",
+      "nazwa": "Kolumbia",
+      "konfederacja": "CONMEBOL",
+      "strefa": null,
+      "czlonekFIFA": true,
+      "rankingFIFA": 11,
+      "elo": 1960,
+      "L": 15.8,
+      "eloZrodlo": "reprezentacje.json (ten sam szacunek)"
+    },
+    {
+      "kod": "ECU",
+      "nazwa": "Ekwador",
+      "konfederacja": "CONMEBOL",
+      "strefa": null,
+      "czlonekFIFA": true,
+      "rankingFIFA": 25,
+      "elo": 1910,
+      "L": 15.4,
+      "eloZrodlo": "reprezentacje.json (ten sam szacunek)"
+    },
+    {
+      "kod": "PAR",
+      "nazwa": "Paragwaj",
+      "konfederacja": "CONMEBOL",
+      "strefa": null,
+      "czlonekFIFA": true,
+      "rankingFIFA": 34,
+      "elo": 1850,
+      "L": 14.9,
+      "eloZrodlo": "reprezentacje.json (ten sam szacunek)"
+    },
+    {
+      "kod": "VEN",
+      "nazwa": "Wenezuela",
+      "konfederacja": "CONMEBOL",
+      "strefa": null,
+      "czlonekFIFA": true,
+      "rankingFIFA": 49,
+      "elo": 1720,
+      "L": 13.9,
+      "eloZrodlo": "reprezentacje.json (ten sam szacunek)"
+    },
+    {
+      "kod": "CHI",
+      "nazwa": "Chile",
+      "konfederacja": "CONMEBOL",
+      "strefa": null,
+      "czlonekFIFA": true,
+      "rankingFIFA": 50,
+      "elo": 1690,
+      "L": 13.6,
+      "eloZrodlo": "reprezentacje.json (ten sam szacunek)"
+    },
+    {
+      "kod": "PER",
+      "nazwa": "Peru",
+      "konfederacja": "CONMEBOL",
+      "strefa": null,
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1700,
+      "L": 13.7,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "BOL",
+      "nazwa": "Boliwia",
+      "konfederacja": "CONMEBOL",
+      "strefa": null,
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1580,
+      "L": 12.8,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "MEX",
+      "nazwa": "Meksyk",
+      "konfederacja": "CONCACAF",
+      "strefa": "NAFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": 10,
+      "elo": 1850,
+      "L": 14.9,
+      "eloZrodlo": "reprezentacje.json (ten sam szacunek)"
+    },
+    {
+      "kod": "USA",
+      "nazwa": "USA",
+      "konfederacja": "CONCACAF",
+      "strefa": "NAFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": 16,
+      "elo": 1820,
+      "L": 14.7,
+      "eloZrodlo": "reprezentacje.json (ten sam szacunek)"
+    },
+    {
+      "kod": "CAN",
+      "nazwa": "Kanada",
+      "konfederacja": "CONCACAF",
+      "strefa": "NAFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": 30,
+      "elo": 1770,
+      "L": 14.3,
+      "eloZrodlo": "reprezentacje.json (ten sam szacunek)"
+    },
+    {
+      "kod": "PAN",
+      "nazwa": "Panama",
+      "konfederacja": "CONCACAF",
+      "strefa": "UNCAF",
+      "czlonekFIFA": true,
+      "rankingFIFA": 46,
+      "elo": 1720,
+      "L": 13.9,
+      "eloZrodlo": "reprezentacje.json (ten sam szacunek)"
+    },
+    {
+      "kod": "CRC",
+      "nazwa": "Kostaryka",
+      "konfederacja": "CONCACAF",
+      "strefa": "UNCAF",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1660,
+      "L": 13.4,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "HON",
+      "nazwa": "Honduras",
+      "konfederacja": "CONCACAF",
+      "strefa": "UNCAF",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1600,
+      "L": 12.9,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "GUA",
+      "nazwa": "Gwatemala",
+      "konfederacja": "CONCACAF",
+      "strefa": "UNCAF",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1540,
+      "L": 12.4,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "SLV",
+      "nazwa": "Salwador",
+      "konfederacja": "CONCACAF",
+      "strefa": "UNCAF",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1500,
+      "L": 12.1,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "NCA",
+      "nazwa": "Nikaragua",
+      "konfederacja": "CONCACAF",
+      "strefa": "UNCAF",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1400,
+      "L": 11.3,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "BLZ",
+      "nazwa": "Belize",
+      "konfederacja": "CONCACAF",
+      "strefa": "UNCAF",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1190,
+      "L": 9.6,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "JAM",
+      "nazwa": "Jamajka",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1650,
+      "L": 13.3,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "HAI",
+      "nazwa": "Haiti",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1600,
+      "L": 12.9,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "CUW",
+      "nazwa": "Curaçao",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1610,
+      "L": 13,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "SUR",
+      "nazwa": "Surinam",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1560,
+      "L": 12.6,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "TRI",
+      "nazwa": "Trynidad i Tobago",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1540,
+      "L": 12.4,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "GLP",
+      "nazwa": "Gwadelupa",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": false,
+      "rankingFIFA": null,
+      "elo": 1380,
+      "L": 11.2,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "MTQ",
+      "nazwa": "Martynika",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": false,
+      "rankingFIFA": null,
+      "elo": 1400,
+      "L": 11.3,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "DOM",
+      "nazwa": "Dominikana",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1360,
+      "L": 11,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "GUF",
+      "nazwa": "Gujana Francuska",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": false,
+      "rankingFIFA": null,
+      "elo": 1260,
+      "L": 10.2,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "CUB",
+      "nazwa": "Kuba",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1320,
+      "L": 10.7,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "GUY",
+      "nazwa": "Gujana",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1330,
+      "L": 10.8,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "BER",
+      "nazwa": "Bermudy",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1290,
+      "L": 10.4,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "PUR",
+      "nazwa": "Portoryko",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1260,
+      "L": 10.2,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "SKN",
+      "nazwa": "Saint Kitts i Nevis",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1240,
+      "L": 10,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "GRN",
+      "nazwa": "Grenada",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1220,
+      "L": 9.9,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "ATG",
+      "nazwa": "Antigua i Barbuda",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1200,
+      "L": 9.7,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "LCA",
+      "nazwa": "Saint Lucia",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1190,
+      "L": 9.6,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "VIN",
+      "nazwa": "Saint Vincent i Grenadyny",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1170,
+      "L": 9.5,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "BRB",
+      "nazwa": "Barbados",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1140,
+      "L": 9.2,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "ARU",
+      "nazwa": "Aruba",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1100,
+      "L": 8.9,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "DMA",
+      "nazwa": "Dominika",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1080,
+      "L": 8.8,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "SMN",
+      "nazwa": "Saint-Martin",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": false,
+      "rankingFIFA": null,
+      "elo": 1060,
+      "L": 8.6,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "CAY",
+      "nazwa": "Kajmany",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1040,
+      "L": 8.4,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "BAH",
+      "nazwa": "Bahamy",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1000,
+      "L": 8.1,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "SMA",
+      "nazwa": "Sint Maarten",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": false,
+      "rankingFIFA": null,
+      "elo": 1000,
+      "L": 8.1,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "MSR",
+      "nazwa": "Montserrat",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 990,
+      "L": 8,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "BOE",
+      "nazwa": "Bonaire",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": false,
+      "rankingFIFA": null,
+      "elo": 950,
+      "L": 7.7,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "TCA",
+      "nazwa": "Turks i Caicos",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 900,
+      "L": 7.3,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "VGB",
+      "nazwa": "Brytyjskie Wyspy Dziewicze",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 880,
+      "L": 7.2,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "VIR",
+      "nazwa": "Wyspy Dziewicze Stanów Zjednoczonych",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 850,
+      "L": 6.9,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "AIA",
+      "nazwa": "Anguilla",
+      "konfederacja": "CONCACAF",
+      "strefa": "CFU",
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 800,
+      "L": 6.5,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "NZL",
+      "nazwa": "Nowa Zelandia",
+      "konfederacja": "OFC",
+      "strefa": null,
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1620,
+      "L": 13.1,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "NCL",
+      "nazwa": "Nowa Kaledonia",
+      "konfederacja": "OFC",
+      "strefa": null,
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1260,
+      "L": 10.2,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "SOL",
+      "nazwa": "Wyspy Salomona",
+      "konfederacja": "OFC",
+      "strefa": null,
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1210,
+      "L": 9.8,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "FIJ",
+      "nazwa": "Fidżi",
+      "konfederacja": "OFC",
+      "strefa": null,
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1170,
+      "L": 9.5,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "TAH",
+      "nazwa": "Tahiti",
+      "konfederacja": "OFC",
+      "strefa": null,
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1160,
+      "L": 9.4,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "VAN",
+      "nazwa": "Vanuatu",
+      "konfederacja": "OFC",
+      "strefa": null,
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1110,
+      "L": 9,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "PNG",
+      "nazwa": "Papua-Nowa Gwinea",
+      "konfederacja": "OFC",
+      "strefa": null,
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 1060,
+      "L": 8.6,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "SAM",
+      "nazwa": "Samoa",
+      "konfederacja": "OFC",
+      "strefa": null,
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 900,
+      "L": 7.3,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "TGA",
+      "nazwa": "Tonga",
+      "konfederacja": "OFC",
+      "strefa": null,
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 860,
+      "L": 7,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "COK",
+      "nazwa": "Wyspy Cooka",
+      "konfederacja": "OFC",
+      "strefa": null,
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 850,
+      "L": 6.9,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "ASA",
+      "nazwa": "Samoa Amerykańskie",
+      "konfederacja": "OFC",
+      "strefa": null,
+      "czlonekFIFA": true,
+      "rankingFIFA": null,
+      "elo": 780,
+      "L": 6.5,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "KIR",
+      "nazwa": "Kiribati",
+      "konfederacja": "OFC",
+      "strefa": null,
+      "czlonekFIFA": false,
+      "rankingFIFA": null,
+      "elo": 650,
+      "L": 6.5,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    },
+    {
+      "kod": "TUV",
+      "nazwa": "Tuvalu",
+      "konfederacja": "OFC",
+      "strefa": null,
+      "czlonekFIFA": false,
+      "rankingFIFA": null,
+      "elo": 640,
+      "L": 6.5,
+      "eloZrodlo": "szacunek (eloratings.net niedostępne; do podmiany)"
+    }
+  ]
+}
