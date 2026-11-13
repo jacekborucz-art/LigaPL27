@@ -41,12 +41,12 @@ export function rowLabel(row) {
   return compLabel({ comp: row.c, round: row.r, label: row.lb });
 }
 function shortTag(row) {
-  if (row.c === 'uefa') return row.u === 'LK' ? 'LKE' : (row.u ?? 'UEFA');
+  if (row.c === 'uefa') return row.u === 'LK' ? 'LKE' : row.u === 'SEU' ? 'SPE' : (row.u ?? 'UEFA');
   if (row.c?.startsWith('playoff')) return 'Baraż';
   return SHORT[row.c] ?? row.c;
 }
 function tagFull(row) {
-  if (row.c === 'uefa') return UCOMP_NAMES[row.u] ?? 'Puchary europejskie';
+  if (row.c === 'uefa') return row.u === 'SEU' ? 'Superpuchar Europy' : UCOMP_NAMES[row.u] ?? 'Puchary europejskie';
   if (row.c === 'pp') return `Puchar Polski${row.r && PP_NAMES[row.r] ? `, ${PP_NAMES[row.r]}` : ''}`;
   return rowLabel(row);
 }

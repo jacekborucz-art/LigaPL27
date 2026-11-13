@@ -50,6 +50,7 @@ const UEFA_PRIZE = {
   LM: { Q1: 0.5, Q2: 0.6, Q3: 0.7, PO: 1.0, league: 18.62, win: 2.1, draw: 0.7, KPO: 1.0, R16: 11, QF: 12.5, SF: 15, F: 18.5 },
   LE: { Q1: 0.33, Q2: 0.38, Q3: 0.5, PO: 0.6, league: 4.31, win: 0.45, draw: 0.15, KPO: 0.3, R16: 1.75, QF: 2.5, SF: 4, F: 6 },
   LK: { Q1: 0.33, Q2: 0.38, Q3: 0.38, PO: 0.38, league: 3.17, win: 0.4, draw: 0.133, KPO: 0.2, R16: 0.8, QF: 1.3, SF: 2.5, F: 4 },
+  SEU: { F: 4, W: 1 }, // Superpuchar Europy: finalista 4 mln, zdobywca 5 mln euro (stała kwota UEFA od 2024)
 };
 export const uefaPrize = (comp, key) => Math.round((UEFA_PRIZE[comp]?.[key] ?? 0) * 1e6 * FIN.EUR * FIN.ECON / 1000) * 1000;
 // Puchar Polski: premia dla zwycięzcy meczu danej rundy (zł). PZPN 2025/26: pula 10 mln zł, zdobywca 5 mln zł

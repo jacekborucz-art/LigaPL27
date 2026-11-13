@@ -465,13 +465,74 @@ Ograniczenie: klub z czołówki nie spada z ligi z samej bierności (Legia pasyw
 
 „Przed” to kod z commita 15e636b (runda 1), „po” to runda 2. Ten sam skrypt w obu (także ulepszony scenariusz e i nowy f).
 
-BEFORE_R2
+| Scenariusz | Przed: lepszy niż AI | Przed: p10 / p50 / p90 | Przed: średnia (błąd) | Po: lepszy niż AI | Po: lepszy o 5+ | Po: gorszy o 5+ | Po: p10 / p50 / p90 | Po: średnia (błąd) |
+|---|---|---|---|---|---|---|---|---|
+| a, nic nie robi | 34% | -22,1 / -4,5 / 11,1 | -5,3 (1,5) | 15% | 9% | 73% | -26,1 / -13,0 / 3,1 | -12,0 (1,3) |
+| b, nic + konferencje | 44% | -19,1 / -2,5 / 11,1 | -3,3 (1,4) | 31% | 18% | 50% | -19,1 / -4,5 / 11,0 | -4,5 (1,3) |
+| c, aktywny-lite | 40% | -15,1 / -2,0 / 12,2 | -1,8 (1,4) | 41% | 34% | 44% | -14,1 / -4,0 / 12,1 | -1,2 (1,3) |
+| e, zaangażowany | 51% | -16,2 / 1,5 / 20,0 | 2,6 (1,6) | 55% | 44% | 28% | -11,3 / 2,5 / 17,1 | 2,5 (1,5) |
+| f, zajęty, ale źle | 23% | -25,2 / -10,5 / 6,1 | -10,5 (1,5) | 25% | 15% | 61% | -27,2 / -9,5 / 7,0 | -9,3 (1,4) |
+
+Wniosek z porównania: ulepszony skrypt zaangażowanego gracza (zebrania co 2 tygodnie, spójny trening, obozy) już na
+kodzie rundy 1 daje +2,6 pkt; wynik -3,6 z rundy 1 był więc głównie skutkiem złych decyzji starego skryptu (to samo
+pokazuje scenariusz f) i kary za samo powtarzanie zebrania. Zmiany rundy 2 przede wszystkim powiększyły stratę gracza,
+który nic nie robi (z -5,3 do -12,0, szansa na lepszy sezon z 34 % do 15 %), i lekko podniosły szansę zaangażowanego
+(z 51 % do 55 %). Gracz zajęty, ale podejmujący złe decyzje, zostaje blisko pasywnego w obu wersjach.
 
 Po zmianach, szczegółowo (punkty sezonu gracza minus punkty tego samego klubu pod AI w tym samym świecie):
 
-AFTER_R2
+| Klub, scenariusz | n | lepszy niż AI | lepszy o 5+ | gorszy o 5+ | p10 / p50 / p90 | średnia (błąd) |
+|---|---|---|---|---|---|---|
+| Legia, a | 20 | 15% | 10% | 65% | -25,2 / -10,5 / 3,3 | -10,8 (2,4) |
+| Widzew, a | 20 | 10% | 5% | 85% | -26,2 / -16,5 / 0,4 | -15,7 (2,5) |
+| GKS Katowice, a | 20 | 20% | 10% | 65% | -29,1 / -9,5 / 1,6 | -10,7 (2,7) |
+| Polonia Warszawa, a | 20 | 15% | 10% | 75% | -23,2 / -11,0 / 3,2 | -11,0 (2,8) |
+| **wszystkie, a** | 80 | 15% | 9% | 73% | -26,1 / -13,0 / 3,1 | -12,0 (1,3) |
+| Legia, b | 20 | 20% | 5% | 50% | -21,3 / -6,5 / 1,3 | -8,1 (2,1) |
+| Widzew, b | 20 | 15% | 15% | 65% | -21,2 / -6,5 / 11,0 | -8,5 (2,9) |
+| GKS Katowice, b | 20 | 50% | 30% | 45% | -13,3 / 0,0 / 16,2 | 0,0 (2,6) |
+| Polonia Warszawa, b | 20 | 40% | 20% | 40% | -11,6 / -1,0 / 10,4 | -1,5 (2,4) |
+| **wszystkie, b** | 80 | 31% | 18% | 50% | -19,1 / -4,5 / 11,0 | -4,5 (1,3) |
+| Legia, c | 20 | 45% | 45% | 30% | -10,2 / 0,0 / 10,5 | 1,4 (2,2) |
+| Widzew, c | 20 | 45% | 30% | 50% | -20,9 / -4,0 / 11,1 | -4,8 (3,0) |
+| GKS Katowice, c | 20 | 40% | 30% | 55% | -11,3 / -5,5 / 14,0 | -0,3 (2,4) |
+| Polonia Warszawa, c | 20 | 35% | 30% | 40% | -14,2 / -4,0 / 11,9 | -1,2 (2,4) |
+| **wszystkie, c** | 80 | 41% | 34% | 44% | -14,1 / -4,0 / 12,1 | -1,2 (1,3) |
+| Legia, e | 20 | 40% | 35% | 40% | -21,2 / -1,0 / 14,2 | -2,4 (3,0) |
+| Widzew, e | 20 | 50% | 35% | 35% | -15,5 / 0,5 / 16,3 | 0,1 (3,1) |
+| GKS Katowice, e | 20 | 55% | 50% | 15% | -10,0 / 4,5 / 17,6 | 4,9 (2,4) |
+| Polonia Warszawa, e | 20 | 75% | 55% | 20% | -10,1 / 7,0 / 21,1 | 7,3 (2,9) |
+| **wszystkie, e** | 80 | 55% | 44% | 28% | -11,3 / 2,5 / 17,1 | 2,5 (1,5) |
+| Legia, f | 20 | 5% | 0% | 70% | -30,2 / -14,5 / 0,0 | -14,6 (2,5) |
+| Widzew, f | 20 | 20% | 5% | 70% | -29,1 / -15,0 / 2,2 | -13,2 (2,7) |
+| GKS Katowice, f | 20 | 40% | 35% | 55% | -20,1 / -9,0 / 9,2 | -5,0 (2,7) |
+| Polonia Warszawa, f | 20 | 35% | 20% | 50% | -17,2 / -4,5 / 5,2 | -4,3 (2,9) |
+| **wszystkie, f** | 80 | 25% | 15% | 61% | -27,2 / -9,5 / 7,0 | -9,3 (1,4) |
 
-AFTER_AGG
+Wskaźniki sezonu (po zmianach, 20 sezonów na klub; autorytet na koniec sezonu, zarząd: najniższe zaufanie w sezonie):
+
+| Klub | Scenariusz | Pkt | Miejsce | Morale kadry | Zgranie | Zarząd (min) | Niezadowoleni | Autorytet |
+|---|---|---|---|---|---|---|---|---|
+| gks-katowice | d AI | 35,0 | 14,1 | 13,2 | 95,8 |  | 0,0 | 0,5 (neutralny) |
+| gks-katowice | a | 24,3 | 16,8 | 6,4 | 97,3 | 18,4 | 3,8 | 0,1 |
+| gks-katowice | b | 35,0 | 14,2 | 14,6 | 97,3 | 60,0 | 3,7 | 0,4 |
+| gks-katowice | c | 34,6 | 14,2 | 15,9 | 90,8 | 60,0 | 0,0 | 0,8 |
+| gks-katowice | e | 39,9 | 12,3 | 17,7 | 87,3 | 60,0 | 0,0 | 0,9 |
+| legia | d AI | 68,8 | 2,0 | 16,2 | 95,8 |  | 0,1 | 0,5 (neutralny) |
+| legia | a | 58,0 | 4,8 | 12,3 | 97,4 | 24,3 | 3,9 | 0,1 |
+| legia | b | 60,8 | 3,3 | 16,6 | 97,4 | 59,8 | 3,9 | 0,4 |
+| legia | c | 70,3 | 1,7 | 18,0 | 94,8 | 59,7 | 0,0 | 0,8 |
+| legia | e | 66,5 | 2,7 | 18,6 | 94,4 | 59,9 | 0,0 | 0,9 |
+| polonia-warszawa | d AI | 48,2 | 8,5 | 13,9 | 95,8 |  | 0,0 | 0,5 (neutralny) |
+| polonia-warszawa | a | 37,2 | 13,7 | 8,7 | 97,3 | 32,8 | 3,1 | 0,1 |
+| polonia-warszawa | b | 46,7 | 9,1 | 15,2 | 97,3 | 60,0 | 3,3 | 0,4 |
+| polonia-warszawa | c | 47,0 | 8,8 | 16,4 | 89,2 | 60,0 | 0,0 | 0,8 |
+| polonia-warszawa | e | 55,5 | 5,2 | 18,1 | 86,5 | 60,0 | 0,0 | 0,9 |
+| widzew | d AI | 54,0 | 6,9 | 15,1 | 95,8 |  | 0,0 | 0,5 (neutralny) |
+| widzew | a | 38,4 | 12,6 | 8,8 | 97,3 | 5,7 | 3,3 | 0,1 |
+| widzew | b | 45,5 | 9,7 | 15,2 | 97,4 | 59,8 | 3,5 | 0,4 |
+| widzew | c | 49,2 | 8,4 | 16,8 | 91,4 | 58,9 | 0,0 | 0,8 |
+| widzew | e | 54,1 | 6,0 | 18,2 | 85,8 | 59,9 | 0,0 | 0,9 |
 
 Jak to czytać:
 

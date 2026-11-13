@@ -3,10 +3,10 @@
 
 import { formationById, FORMATIONS } from '../../data/formations.js';
 import { INSTRUCTIONS } from '../../data/instructions.js';
-import { proficiency, posEff, goalkeeperSlotModifiers } from '../positions.js';
+import { proficiency, posEff, goalkeeperSlotModifiers, errorMul } from '../positions.js';
 import { evaluate } from '../modifiers.js';
 import { clamp } from '../../core/rng.js';
-import { K, ROLE_SHARE, ZONE_N, FATIGUE_ROLE, KNOCK } from './constants.js';
+import { K, ROLE_SHARE, ZONE_N, FATIGUE_ROLE, KNOCK, FATIGUE } from './constants.js';
 
 const a = (p, k) => p.attr?.[k] ?? p.ovr ?? 10;
 
@@ -171,6 +171,31 @@ function eff(x, zone) {
   return posEff(prof) * x.R[zone] + x.base + 0.035 * x.Z + condPen;
 }
 
+const ATT_LINE = new Set(['NAP', 'SN', 'SP', 'OP']);
+const DEF_LINE = new Set(['ŚO', 'BO', 'WB']);
+/** Mnożnik szybkości od bieżącej kondycji (FATIGUE.speedLoss za punkt poniżej 85). */
+export const condSpeed = (cond) => (cond >= FATIGUE.speedFrom ? 1 : Math.max(0.5, 1 - FATIGUE.speedLoss * (FATIGUE.speedFrom - cond)));
+/** Szybkość zawodnika w tej minucie (atrybut SZY razy kondycja). */
+export const paceOf = (x) => a(x.p, 'SZY') * condSpeed(x.cond);
+/** Ryzyko błędu obrońcy: gra poza pozycją (errorMul) razy zmęczenie. 1 = brak dodatkowego ryzyka. */
+export function errFactor(x) {
+  const tired = x.cond < FATIGUE.errFrom ? 1 + FATIGUE.errPerPt * (FATIGUE.errFrom - x.cond) : 1;
+  return errorMul(proficiency(x.p, x.slot.pos, x.slot.side), true) * tired;
+}
+const avgOf = (xs, f, dflt) => (xs.length ? xs.reduce((s, x) => s + f(x), 0) / xs.length : dflt);
+
+/** Szybkość linii i ryzyko błędów obrony (co minutę). Używane w core.js: kontry, tempo akcji, błędy, faule. */
+function updatePace(T, xs) {
+  const team = avgOf(xs.filter((x) => x.slot.pos !== 'BR'), paceOf, 10);
+  const att = xs.filter((x) => ATT_LINE.has(x.slot.pos));
+  const def = xs.filter((x) => DEF_LINE.has(x.slot.pos) || x.slot.pos === 'DP');
+  const raw = (x) => a(x.p, 'SZY');
+  const teamRaw = avgOf(xs.filter((x) => x.slot.pos !== 'BR'), raw, 10);
+  T.pace = { team, att: avgOf(att, paceOf, team), def: avgOf(def, paceOf, team), attRaw: avgOf(att, raw, teamRaw), defRaw: avgOf(def, raw, teamRaw) };
+  T.errF = avgOf(def, errFactor, 1);
+  T.defTired = def.length ? def.filter((x) => x.cond < FATIGUE.foulFrom).length / def.length : 0;
+}
+
 /** Przeliczenie stref drużyny (co minutę, tanio: 11 zawodników). */
 export function updateZones(T, M) {
   const w = T.tac.adapt ? Math.min(1, (M.minute - T.tac.t0) / T.tac.adapt) : 1;
@@ -211,6 +236,7 @@ export function updateZones(T, M) {
   zones.SPD = 0.7 * (defA.reduce((s, v) => s + v, 0) / Math.max(1, defA.length)) + 0.3 * (gk ? a(gk.p, 'WYJ') : 4) + T.P.setPieceD;
   T.zones = zones;
   T.central = xs.filter((x) => ['DP', 'ŚP', 'OP'].includes(x.slot.pos)).length;
+  updatePace(T, xs);
   T.avg = (k) => xs.reduce((s, x) => s + a(x.p, k), 0) / Math.max(1, xs.length);
 }
 

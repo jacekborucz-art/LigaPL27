@@ -16,7 +16,7 @@ import { RENEW_WINDOW_MONTHS } from '../career/negotiation.js';
 import { canSign, KEEP_MAX } from '../career/squadLimit.js';
 import { limitStatus } from '../career/squadLimitSystem.js';
 import { askingPrice, notForSale, playerWillingness, inWindow, releaseCost, fmtZl } from '../career/transfers.js';
-import { PLAYER_TALKS, TALKS_PER_WEEK, talksThisWeek, talkSuggestions } from '../career/teamTalks.js';
+import { PLAYER_TALKS, talkBlockedText, talkSuggestions } from '../career/teamTalks.js';
 import { PROGRAMS, MODES } from '../training/config.js';
 import { locKey, playerAt, resolveMove, resolveTap, sameLoc } from './tacticsMoves.js';
 import { monthsLeft, compareText } from './transfersView.js';
@@ -148,15 +148,15 @@ function lineupItems(p, L, { inTactics = false, ui = {} } = {}) {
 
 // ------------------------------------------------------------ Rozmowy
 function talkMenu(game, p, label = 'Rozmowa indywidualna') {
-  const left = TALKS_PER_WEEK - talksThisWeek(game);
+  const blocked = talkBlockedText(game, p.id);
   const why = new Map();
   for (const [k, text] of talkSuggestions(game).find((x) => x.p.id === p.id)?.reasons ?? []) if (!why.has(k)) why.set(k, text);
   const items = Object.entries(PLAYER_TALKS).map(([k, t]) => item(t.label, { steps: [{ act: 'tt-talk', id: p.id, kind: k }], toast: true }, {
     hint: why.has(k) ? `Sugestia asystenta: ${why.get(k).toLowerCase()}` : null,
   }));
   return sub(label, items, {
-    disabled: left <= 0 ? `Limit rozmów w tym tygodniu (${TALKS_PER_WEEK} z ${TALKS_PER_WEEK})` : null,
-    hint: left > 0 ? `Pozostało: ${left} z ${TALKS_PER_WEEK} w tym tygodniu` : null,
+    disabled: blocked,
+    hint: blocked ? null : 'Z każdym zawodnikiem raz w tygodniu',
   });
 }
 
@@ -358,7 +358,7 @@ export function playerMenu(game, pid, { view, ui = {}, why = null, lineup = null
         primary: true, disabled: p.training.prog === 'powrot' ? 'Już w programie powrotu' : null, hint: '10 dni stopniowego powrotu, mniejsze ryzyko urazu',
       }) : null;
       const future = item('Rozmowa o przyszłości', { steps: [{ act: 'tt-talk', id: p.id, kind: 'future' }], toast: true }, {
-        disabled: TALKS_PER_WEEK - talksThisWeek(game) <= 0 ? `Limit rozmów w tym tygodniu (${TALKS_PER_WEEK} z ${TALKS_PER_WEEK})` : null,
+        disabled: talkBlockedText(game, p.id),
       });
       if (why === 'inj' || (!why && lp.injuryDays > 0)) items = [ret, profile, training, lineupNav, SEP, talk];
       else if (why === 'susp' || why === 'call') items = [lineupNav && { ...lineupNav, primary: true, hint: 'Znajdź zastępcę na najbliższy mecz' }, profile, SEP, talk];

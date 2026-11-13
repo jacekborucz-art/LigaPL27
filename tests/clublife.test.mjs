@@ -9,7 +9,7 @@ import { evaluate } from '../src/engine/modifiers.js';
 import { ensureCareer } from '../src/career/careerSystem.js';
 import { completeTransfer, addFreeAgents } from '../src/career/transfers.js';
 import { acclimPlan } from '../src/career/acclimatization.js';
-import { holdMeeting, canHoldMeeting, talkToPlayer, TALKS_PER_WEEK } from '../src/career/teamTalks.js';
+import { holdMeeting, canHoldMeeting, talkToPlayer, TALK_COOLDOWN } from '../src/career/teamTalks.js';
 import '../src/season/dailySystems.js';
 
 function newGame(clubId, seed) {
@@ -96,11 +96,13 @@ test('Zebranie drużyny: raz w tygodniu, pochwała po dobrej serii działa lepie
   assert.ok(run('W') > run('L'));
 });
 
-test('Rozmowy indywidualne: limit tygodniowy, krytyka rani wrażliwego bardziej niż ambitnego', () => {
+test('Rozmowy indywidualne: bez limitu dla kadry, z jednym zawodnikiem raz w tygodniu; krytyka rani wrażliwego bardziej', () => {
   const g = newGame('widzew', 45);
   const sq = squadOf(g.world, 'widzew');
-  for (let i = 0; i < TALKS_PER_WEEK; i++) assert.ok(talkToPlayer(g, sq[i].id, 'encourage').ok);
-  assert.equal(talkToPlayer(g, sq[5].id, 'encourage').ok, false);
+  for (let i = 0; i < 10; i++) assert.ok(talkToPlayer(g, sq[i].id, 'encourage').ok, `rozmowa ${i + 1}`);
+  assert.equal(talkToPlayer(g, sq[0].id, 'encourage').ok, false, 'ten sam zawodnik w tym samym tygodniu');
+  const d = new Date(`${g.date}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + TALK_COOLDOWN); g.date = d.toISOString().slice(0, 10);
+  assert.ok(talkToPlayer(g, sq[0].id, 'encourage').ok, 'po tygodniu znowu można');
   const g2 = newGame('widzew', 46);
   const a = squadOf(g2.world, 'widzew')[3]; const b = squadOf(g2.world, 'widzew')[4];
   a.persona = 'Wrażliwy'; b.persona = 'Ambitny'; a.morale = 12; b.morale = 12;

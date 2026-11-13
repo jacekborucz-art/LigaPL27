@@ -3,11 +3,12 @@ import { esc, fmtDate } from './dom.js';
 import { squadOf } from '../world/worldGen.js';
 import { moraleLabel } from '../career/morale.js';
 import {
-  MEETING_TONES, PLAYER_TALKS, TALKS_PER_WEEK, teamSituation, canHoldMeeting, holdMeeting, talkSuggestions, talkToPlayer, talksThisWeek,
+  MEETING_TONES, PLAYER_TALKS, teamSituation, canHoldMeeting, holdMeeting, talkSuggestions, talkToPlayer, talksThisWeek, talkCooldown,
 } from '../career/teamTalks.js';
 import { acclimLabel } from '../career/acclimatization.js';
 import { GROUP } from '../career/squad.js';
 import { attentionNeed, daysSinceAttention, ATTN } from '../career/attention.js';
+import { authoritySummary } from '../career/authority.js';
 
 export const isTalkAction = (act) => typeof act === 'string' && act.startsWith('tt-');
 
@@ -33,7 +34,7 @@ const reasonKind = (r) => REASON_KIND[r] ?? 'info';
 const PRIO = { bad: 3, warn: 2, info: 1, good: 1 };
 const moraleBand = (v) => (v >= 17 ? 'top' : v >= 14 ? 'good' : v >= 10 ? 'mid' : v >= 6 ? 'low' : 'bad');
 
-function talkRow(p, rs, left, recommended) {
+function talkRow(p, rs, cd, recommended) {
   const suggested = rs[0]?.[0] ?? 'encourage';
   const mor = p.morale ?? 12;
   return `<li class="tt-row${recommended ? ' is-rec' : ''}" data-pid="${esc(p.id)}">
@@ -41,7 +42,7 @@ function talkRow(p, rs, left, recommended) {
     <span class="tt-who"><b>${esc(p.name)}</b>
       <span class="tt-tags"><span class="tt-mor" data-m="${moraleBand(mor)}">Morale: ${esc(moraleLabel(mor).toLowerCase())}</span>${p.acclim ? `<span class="tt-tag" data-k="info">Aklimatyzacja ${esc(acclimLabel(p.acclim.level))}</span>` : ''}${rs.map((r) => `<span class="tt-tag" data-k="${reasonKind(r[1])}">${esc(r[1])}</span>`).join('')}</span></span>
     <span class="tt-act"><select class="pick-select" id="tt-${esc(p.id)}" aria-label="Temat rozmowy z: ${esc(p.name)}">${Object.entries(PLAYER_TALKS).map(([k, t]) => `<option value="${k}" ${k === suggested ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}</select>
-    <button class="btn btn--sm ${recommended ? 'tt-go' : 'btn--quiet'}" data-act="tt-talk" data-id="${esc(p.id)}" ${left > 0 ? '' : 'disabled'}>Porozmawiaj</button></span>
+    <button class="btn btn--sm ${recommended ? 'tt-go' : 'btn--quiet'}" data-act="tt-talk" data-id="${esc(p.id)}" ${cd > 0 ? `disabled title="Rozmowa w tym tygodniu już była"` : ''}>${cd > 0 ? `Za ${cd} ${cd === 1 ? 'dzień' : 'dni'}` : 'Porozmawiaj'}</button></span>
   </li>`;
 }
 
@@ -51,7 +52,6 @@ export function renderTalks(game, ui = {}) {
   const T = game.talks ?? { log: [] };
   const meetingOk = canHoldMeeting(game);
   const used = talksThisWeek(game);
-  const left = TALKS_PER_WEEK - used;
   const res = ui.ttResult;
   const sugg = talkSuggestions(game);
   const reasonsOf = new Map(sugg.map((x) => [x.p.id, x.reasons]));
@@ -63,19 +63,20 @@ export function renderTalks(game, ui = {}) {
   const recIds = new Set(rec.map((p) => p.id));
   const rest = sq.filter((p) => !recIds.has(p.id)).sort((a, b) => (a.morale ?? 12) - (b.morale ?? 12));
   const need = m.low + m.unhappy;
-  const pips = Array.from({ length: TALKS_PER_WEEK }, (_, i) => `<i class="${i < used ? 'is-used' : ''}"></i>`).join('');
+  const auth = authoritySummary(game);
   return `<div class="tt">
     <section class="tt-head" aria-label="Stan drużyny">
       <div class="tt-kpi" data-m="${moraleBand(m.avg)}"><small>Atmosfera w drużynie</small><b>${esc(moraleLabel(m.avg))}</b><small>${esc(sit.label)}${sit.last.length ? `: ${sit.last.join(' ')}` : ''}</small></div>
       <div class="tt-kpi" data-m="${need + m.waiting > 0 ? 'low' : 'good'}"><small>Wymaga uwagi</small><b>${need + m.waiting}</b><small>${m.low} z niskim morale, ${m.unhappy} niezadowolonych${m.newcomers ? `, ${m.newcomers} nowych w aklimatyzacji` : ''}${m.waiting ? `, ${m.waiting} czeka na rozmowę` : ''}</small></div>
-      <div class="tt-kpi" data-m="${left > 0 ? 'calm' : 'mid'}"><small>Rozmowy w tym tygodniu</small><b>${left} z ${TALKS_PER_WEEK}</b><span class="tt-pips" aria-hidden="true">${pips}</span></div>
+      <div class="tt-kpi tt-kpi--auth" data-m="${auth.level === 'high' ? 'good' : auth.level === 'low' ? 'bad' : 'mid'}"><small>Autorytet trenera</small><b>${esc(auth.label)}</b><small>${esc(auth.tip)}</small></div>
+      <div class="tt-kpi" data-m="calm"><small>Rozmowy w tym tygodniu</small><b>${used}</b><small>Z każdym zawodnikiem raz w tygodniu, bez limitu dla kadry</small></div>
     </section>
     ${res ? `<p class="notice tt-notice" role="status">${esc(res)}</p>` : ''}
     <section class="tt-panel tt-players" aria-labelledby="tt-h-players">
       <h3 id="tt-h-players">Rozmowy indywidualne</h3>
-      <p class="hint">Asystent podpowiada, z kim porozmawiać, i ustawia temat. Wrażliwi, nowi w klubie i ambitni rezerwowi źle znoszą kilka tygodni bez rozmowy.</p>
-      ${rec.length ? `<h4 class="tt-group tt-group--rec">Asystent poleca <span>${rec.length}</span></h4><ul class="tt-list">${rec.map((p) => talkRow(p, reasonsOf.get(p.id) ?? [], left, true)).join('')}</ul>` : '<p class="tt-ok">Nikt teraz pilnie nie potrzebuje rozmowy.</p>'}
-      ${rest.length ? `<h4 class="tt-group">Pozostali zawodnicy <span>${rest.length}</span></h4><ul class="tt-list tt-list--rest">${rest.map((p) => talkRow(p, reasonsOf.get(p.id) ?? [], left, false)).join('')}</ul>` : ''}
+      <p class="hint">Z każdym zawodnikiem możesz porozmawiać raz w tygodniu. Asystent podpowiada, z kim porozmawiać, i ustawia temat. Wrażliwi, nowi w klubie i ambitni rezerwowi źle znoszą kilka tygodni bez rozmowy.</p>
+      ${rec.length ? `<h4 class="tt-group tt-group--rec">Asystent poleca <span>${rec.length}</span></h4><ul class="tt-list">${rec.map((p) => talkRow(p, reasonsOf.get(p.id) ?? [], talkCooldown(game, p.id), true)).join('')}</ul>` : '<p class="tt-ok">Nikt teraz pilnie nie potrzebuje rozmowy.</p>'}
+      ${rest.length ? `<h4 class="tt-group">Pozostali zawodnicy <span>${rest.length}</span></h4><ul class="tt-list tt-list--rest">${rest.map((p) => talkRow(p, reasonsOf.get(p.id) ?? [], talkCooldown(game, p.id), false)).join('')}</ul>` : ''}
     </section>
     <aside class="tt-side">
       <section class="tt-panel tt-meet" aria-labelledby="tt-h-meet">

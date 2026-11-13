@@ -3,8 +3,8 @@
 // wynik, statystyki, oceny, relacja i momentum liczą się tylko z dziennika.
 
 import { Rng, clamp } from '../../core/rng.js';
-import { K, SHOOT_W, FOUL_W, INJURY_TYPES, RED_REASONS, KNOCK } from './constants.js';
-import { buildTeam, updateZones, updateCondition, onPitch, goalkeeper, fieldPlayers, slotFit, makeKnock } from './teams.js';
+import { K, SHOOT_W, FOUL_W, INJURY_TYPES, RED_REASONS, KNOCK, FATIGUE } from './constants.js';
+import { buildTeam, updateZones, updateCondition, onPitch, goalkeeper, fieldPlayers, slotFit, makeKnock, errFactor } from './teams.js';
 import { matchRules, unlimitedSubs, UNLIMITED } from './rules.js';
 
 // Haki trenera (src/engine/match/coach.js rejestruje się przy imporcie). Silnik nie zna AI,
@@ -128,11 +128,11 @@ function phaseFoul(M) {
   const rankFoul = M.ctx.rank >= 2 ? 1.1 : 1;
   const tw = M.teams.map((T) => (T.P.timewasting && M.score[T.side] > M.score[1 - T.side]));
   const baseFoul = K.foulTick * (M.ctx.weather.foul ?? 1) * rankFoul * (1.1 - 0.1 * r);
-  if (M.rng.next() < baseFoul * avgFoulMul(M)) {
+  if (M.rng.next() < baseFoul * avgFoulMul(M) * tiredFoulRate(M)) {
     const fi = M.rng.next() < K.foulDefShare ? 1 - ai : ai;
     const ft = M.teams[fi];
     const xs = onPitch(ft, M.minute);
-    const x = pickWeighted(M, xs, (y) => (FOUL_W[y.slot.pos] ?? 1) * (attr(y, 'AGR') / 10) * (y.yc ? K.bookedFoulMul : 1));
+    const x = pickWeighted(M, xs, (y) => (FOUL_W[y.slot.pos] ?? 1) * (attr(y, 'AGR') / 10) * (y.yc ? K.bookedFoulMul : 1) * tiredFoul(y));
     x.fouls++;
     emit(M, 'foul', fi, x);
     emit(M, 'freeKick', 1 - fi, null);
@@ -313,7 +313,7 @@ function phaseAction(M) {
   const smA = shoutMods(A, M); const smD = shoutMods(D, M);
   // Obrona broniącej drużyny: instrukcje (nastawienie, agresja), stan meczu od 65', okrzyk
   const dD = D.P.D + gsD.D + (smD.D ?? 0);
-  const delta = (0.55 * A.zones.ATT + 0.45 * A.zones.MID) - (0.65 * D.zones.DEF + 0.35 * D.zones.MID) - dD;
+  const delta = (0.55 * A.zones.ATT + 0.45 * A.zones.MID) - (0.65 * D.zones.DEF + 0.35 * D.zones.MID) - dD + paceTerm(M, ai, A, D);
   const mom = momentumAvg(M, ai);
   const pAct = K.pAction * (M.hfa ? (ai === 0 ? K.homeCreate : K.awayCreate) ** M.hfa : 1) * A.P.pActMul * D.P.oppPActMul
     * gsA.act * (smA.actMul ?? 1) * (1 + K.lateRamp * Math.max(0, M.minute - 55)) * Math.exp(K.kCreate * delta)
@@ -342,6 +342,7 @@ function phaseAction(M) {
   } else if (M.rng.next() < K.failOffside[type]) {
     offside(M, A);
   } else {
+    if (defError(M, ai, A, D)) return;
     const xs = onPitch(D, M.minute).filter((y) => y.slot.pos !== 'BR');
     const x = pickWeighted(M, xs, (y) => attr(y, 'ODB') + attr(y, 'UST'));
     x.tk++; rateEv(x, 0.08);
@@ -381,7 +382,8 @@ function tacticalFoul(M, A, D) {
   const clean = xs.filter((y) => !y.yc);
   const pool = clean.length ? clean : xs;
   const leadingLate = M.score[D.side] > M.score[A.side] && M.minute >= 70;
-  const p = K.tacFoul * (D.P.tackling === 'hard' ? 1.3 : D.P.tackling === 'soft' ? 0.5 : 1) * (leadingLate ? 1.5 : 1) * (clean.length ? 1 : 0.25);
+  const p = K.tacFoul * (D.P.tackling === 'hard' ? 1.3 : D.P.tackling === 'soft' ? 0.5 : 1) * (leadingLate ? 1.5 : 1) * (clean.length ? 1 : 0.25)
+    * (1 + FATIGUE.tacFoulTired * (D.defTired ?? 0)); // zmęczona obrona nie nadąża i częściej przerywa faulem
   if (M.rng.next() >= p) return false;
   const x = pickWeighted(M, pool, (y) => attr(y, 'AGR') * (y.slot.pos === 'DP' ? 1.5 : 1));
   x.fouls++;
@@ -389,6 +391,40 @@ function tacticalFoul(M, A, D) {
   emit(M, 'freeKick', A.side, null);
   if (M.rng.next() < K.tacFoulDogso) straightRed(M, D, x, 'dogso');
   else if (M.rng.next() < K.tacFoulYellow * Math.sqrt(M.ctx.refStrict)) card(M, D, x, 'faul taktyczny, przerwanie kontry');
+  return true;
+}
+
+// ------------------------------------------------------------ Zmęczenie (FATIGUE w constants.js)
+/** Waga zawodnika przy losowaniu faulującego: zmęczony częściej się spóźnia. */
+function tiredFoul(y) { return y.cond < FATIGUE.foulFrom ? 1 + FATIGUE.foulPerPt * (FATIGUE.foulFrom - y.cond) : 1; }
+/** Częstość fauli: średnie zmęczenie obu drużyn (przy świeżych składach 1). */
+function tiredFoulRate(M) {
+  let s = 0; let n = 0;
+  for (const T of M.teams) for (const y of onPitch(T, M.minute)) { s += tiredFoul(y); n++; }
+  return n ? 1 + 0.5 * (s / n - 1) : 1;
+}
+/**
+ * Szybkość ataku wobec obrony, tylko część wynikająca ze zmęczenia: zmęczeni obrońcy nie nadążają
+ * za świeżym napastnikiem (także świeżym zmiennikiem), zmęczeni napastnicy tracą przewagę.
+ * Świeże składy: 0 (różnica szybkości z samych atrybutów działa jak dotąd w kontrach).
+ */
+function paceTerm(M, ai, A, D) {
+  if (!A.pace || !D.pace) return 0;
+  const lost = (D.pace.defRaw - D.pace.def) - (A.pace.attRaw - A.pace.att); // przewaga ataku z samego zmęczenia
+  return FATIGUE.paceK * clamp(lost, -FATIGUE.paceCap, FATIGUE.paceCap);
+}
+/** Błąd obrony przy wyprowadzeniu piłki (zmęczenie, gra poza pozycją): strata i dobra sytuacja rywala. */
+function defError(M, ai, A, D) {
+  const p = FATIGUE.errBase * Math.max(0, (D.errF ?? 1) - 1);
+  if (p <= 0 || M.rng.next() >= p) return false;
+  const xs = onPitch(D, M.minute).filter((y) => ['ŚO', 'BO', 'WB', 'DP'].includes(y.slot.pos));
+  if (!xs.length) return false;
+  const x = pickWeighted(M, xs, (y) => Math.max(0.01, errFactor(y) - 1));
+  rateEv(x, -0.3);
+  emit(M, 'defError', D.side, x, { text: `Błąd w obronie: ${last(x)} traci piłkę${x.cond < FATIGUE.errFrom ? ', widać zmęczenie' : ''}.` });
+  A.threat += 3;
+  const [lo, hi] = FATIGUE.errXg;
+  shot(M, ai, lo + M.rng.next() * (hi - lo), 'POZ', false);
   return true;
 }
 
@@ -414,7 +450,7 @@ function counterBonus(M, A, D, type) {
   if (D.P.pressing === 'high' && A.P.passing === 'short') b += tecA >= 12 ? 0.35 * Math.min(1, (tecA - 12) / 3) : -0.3 * Math.min(1, (12 - tecA) / 3);
   if (type === 'SKR') b += 0.25 * (A.P.W - D.P.W);
   if (type === 'KON' && A.P.konVsAttack > 1 && (D.P.line === 'high' || D.P.mentality >= 1)) {
-    b += 0.4 * clamp((A.avg('SZY') - D.avg('SZY') + 3) / 6, 0, 1);
+    b += 0.4 * clamp(((A.pace?.team ?? A.avg('SZY')) - (D.pace?.team ?? D.avg('SZY')) + 3) / 6, 0, 1); // szybkość z kondycją
   }
   if (D.P.tackling === 'hard' && A.avg('DRY') >= 13) b -= 0.2;
   if (D.P.tackling === 'soft') b += 0.2 * clamp((A.avg('DRY') - 11) / 4, 0, 1);
