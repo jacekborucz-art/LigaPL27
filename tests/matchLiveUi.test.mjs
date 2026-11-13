@@ -2,7 +2,7 @@
 // (warianty 4-4-2), nazwy formacji w studiu, zalecana przemowa pomeczowa.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scoreboardLines } from '../src/ui/matchdayView.js';
+import { scoreboardLines, dramaStages } from '../src/ui/matchdayView.js';
 import { aiPreMatchFormation, postAdvice, startMatchday, kickOff, skip, finishMatchday } from '../src/match/matchday.js';
 import { assistantReport, formationShape, FORMATIONS as STUDIO_F } from '../src/match/studio.js';
 import { postMatchBriefing, POST_TONES } from '../src/match/briefings.js';
@@ -106,4 +106,32 @@ test('Odprawa pomeczowa: asystent zaleca ton z najlepszym wpływem na morale', (
   assert.ok(Math.abs(avg(adv.tone) - best) < 1e-9);
   const { for: gf, against: ga } = S.post.forBriefing.score;
   if (gf < ga) assert.notEqual(adv.tone, 'praise');
+});
+
+test('Dramaturgia VAR i karnego: etapy po kolei, wynik tymczasowy, zwykła minuta bez etapów', () => {
+
+  assert.deepEqual(dramaStages([{ type: 'pass' }, { type: 'goal', side: 0, score: [1, 0], text: 'GOL! Kowalski' }], [0, 0]), []);
+  // gol, analiza VAR, gol nieuznany: wynik 1:0 na etapie gola, 0:0 po werdykcie
+  const cancelled = dramaStages([
+    { type: 'goal', side: 0, provisional: true, text: 'GOL! Kowalski' },
+    { type: 'varCheck', side: 0, decision: 'goalDisallowed', text: 'VAR sprawdza bramkę.' },
+    { type: 'varOverturn', side: 0, cancelGoal: true, decision: 'goalDisallowed', text: 'Gol nieuznany po analizie VAR (spalony).' },
+  ], [0, 0]);
+  assert.deepEqual(cancelled.map((s) => [s.kind, s.title, s.score.join(':')]), [['goal', 'GOL', '1:0'], ['check', 'VAR', '1:0'], ['verdict', 'GOL NIEUZNANY', '0:0']]);
+  // protest, analiza, karny po VAR (bez drugiego banera karnego), obroniony
+  const pen = dramaStages([
+    { type: 'penaltyClaim', side: 1, text: 'Protest w polu karnym' },
+    { type: 'varCheck', side: 1, decision: 'handCheck', text: 'VAR analizuje' },
+    { type: 'varOverturn', side: 1, decision: 'penaltyAwarded', text: 'Karny' },
+    { type: 'foul', side: 0 },
+    { type: 'penalty', side: 1, byVar: true, text: 'Rzut karny!' },
+    { type: 'shotOn', side: 1, penalty: true, text: 'Broni!' },
+    { type: 'save', side: 0 },
+  ], [2, 2]);
+  assert.deepEqual(pen.map((s) => s.kind), ['claim', 'check', 'verdict', 'penmiss']);
+  assert.equal(pen.at(-1).side, '0');
+  assert.equal(pen.at(-1).end, 6);
+  // karny sędziego: najpierw baner RZUT KARNY, potem GOL z nowym wynikiem
+  const kick = dramaStages([{ type: 'penalty', side: 0, text: 'Rzut karny!' }, { type: 'goal', side: 0, how: 'PEN', score: [1, 0], text: 'GOL! Nowak' }], [0, 0]);
+  assert.deepEqual(kick.map((s) => [s.title, s.score.join(':')]), [['RZUT KARNY', '0:0'], ['GOL', '1:0']]);
 });

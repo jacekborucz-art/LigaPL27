@@ -76,18 +76,20 @@ Najważniejsze błędy znalezione przed zmianą:
 
 | # | Sytuacja | Przepisy i zachowanie | Silnik przed | Przed | Silnik teraz | Teraz |
 |---|---|---|---|---|---|---|
-| 41 | Gol anulowany | Spalony, faul lub ręka w ataku | `varOverturn { cancelGoal }` bez powodu | CZĘŚCIOWO | `decision: 'goalDisallowed'`, `varReason` (spalony 60 %, faul 25 %, ręka 15 % [SZAC]) | OK |
-| 42 | Gol sprawdzony i uznany | Widoczne sprawdzenie, gol stoi | Brak | BRAK | `varCheck { confirmed: true, decision: 'goalConfirmed' }` po ok. 10 % goli | OK |
-| 43 | Karny odwołany | VAR | Tak, bez kodu decyzji | CZĘŚCIOWO | `decision: 'penaltyCancelled'` | OK |
-| 44 | Karny podyktowany po VAR | Przeoczony faul lub ręka w polu | Stała istniała, nieużywana | BRAK | `decision: 'penaltyAwarded'`, potem `penalty { byVar: true }` | OK |
+| 41 | Gol anulowany | Spalony, faul lub ręka w ataku | `varOverturn { cancelGoal }` bez powodu | CZĘŚCIOWO | `decision: 'goalDisallowed'`, `varReason` (spalony 60 %, faul 25 %, ręka 15 % [SZAC]). Gol z rzutu karnego nigdy nie jest odwoływany | OK |
+| 42 | Gol sprawdzony i uznany | Widoczne sprawdzenie, gol stoi | Brak | BRAK | Analiza `varCheck { decision: 'goalCheck' }`, potem werdykt `varCheck { confirmed: true, decision: 'goalConfirmed' }` po ok. 10 % goli z gry | OK |
+| 43 | Karny odwołany | VAR | Tak, bez kodu decyzji | CZĘŚCIOWO | Usunięte (Nov 13, 2026): karny podyktowany przez sędziego zostaje, VAR analizuje tylko sytuacje, w których sędzia nie gwizdał. `penPerAction` obniżone o 10 %, liczba karnych bez zmian (0,30 na mecz) | OK |
+| 44 | Karny podyktowany po VAR | Przeoczony faul lub ręka w polu | Stała istniała, nieużywana | BRAK | `penaltyClaim { hand }` (protest, sędzia gra dalej, 0,08 na mecz), w połowie przypadków analiza `varCheck` (`handCheck`/`penaltyCheck`), potem `penaltyAwarded` (37,5 %) albo werdykt `noPenalty` | OK |
 | 45 | Czerwona dodana po VAR | Rażący faul ukarany żółtą | Stała istniała, nieużywana | BRAK | `decision: 'redCard'`, potem `red` (kod `rażący`) | OK |
-| 46 | Czerwona zamieniona na żółtą | On-field review | Brak | BRAK | `decision: 'redCancelled'`, potem `yellow` (albo druga żółta) | OK |
+| 46 | Czerwona zamieniona na żółtą | On-field review | Brak | BRAK | `decision: 'redCancelled'`, potem `yellow` (albo druga żółta). Czerwona sprawdzona i utrzymana: `redCheck`, potem `redConfirmed` (12 % bezpośrednich czerwonych [SZAC]) | OK |
 | 47 | Druga żółta cofnięta | IFAB 2026/27: VAR przy ewidentnie błędnej drugiej żółtej | Brak | BRAK | `decision: 'secondYellowCancelled'`, bez kartki | OK |
 | 48 | Pomyłka tożsamości | VAR koryguje ukaranego | Brak | BRAK | Brak (bardzo rzadkie, bez wpływu na wynik) | BRAK |
 | 49 | Spalony przy golu po VAR | Liczy się w statystyce spalonych zawodnika | Brak | CZĘŚCIOWO | Spalony dopisany strzelcowi | OK |
 | 50 | Brak VAR w 1L i 2L | ekspert_sedzia A4 | `ctx.var` | OK | Bez zmian | OK |
 | 51 | Doliczony czas za VAR | Ok. 1-2 min za analizę | Tak | OK | Bez zmian | OK |
 | 52 | Błędnie przyznany rzut rożny (VAR 2026/27, opcja) | Korekta natychmiast | Brak | BRAK | Brak (bez znaczenia dla gry) | BRAK |
+
+Na ekranie meczu minuta z karnym albo analizą VAR jest odgrywana etapami (`dramaStages` w `src/ui/matchdayView.js`): gra staje, baner na boisku pokazuje kolejno gol z wynikiem tymczasowym, protest, analizę VAR z paskiem postępu, werdykt (GOL UZNANY, GOL NIEUZNANY, DECYZJA UTRZYMANA, NIE MA KARNEGO, RZUT KARNY), rzut karny i jego wynik. Pauza, zmiana tempa i „Pokaż wynik” kończą etapy od razu.
 
 ## D. Stałe fragmenty gry
 

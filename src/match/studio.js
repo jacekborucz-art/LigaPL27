@@ -777,7 +777,8 @@ function normEvent(e) {
 const VAR_TEXT = {
   goalDisallowed: 'VAR anuluje gola',
   penaltyAwarded: 'Po analizie VAR sędzia dyktuje rzut karny',
-  penaltyCancelled: 'VAR odwołuje rzut karny',
+  penaltyCancelled: 'VAR odwołuje rzut karny', // tylko w starych zapisach: karnego sędziego VAR już nie odwołuje
+  secondYellowCancelled: 'VAR anuluje drugą żółtą kartkę',
   redCard: 'Po analizie VAR czerwona kartka',
   redCancelled: 'VAR zamienia czerwoną kartkę na żółtą',
 };
@@ -902,6 +903,7 @@ export function postMatchStudio(ctx) {
   for (const e of events) {
     const doubt = e.wrong ? '. Powtórki sugerują błąd sędziego' : '';
     if (e.type === 'varOverturn') controversies.push({ min: e.min, kind: 'var', text: `${minLabel(e)} ${varText(e)}${doubt}.` });
+    if (e.type === 'varCheck' && e.decision === 'noPenalty') controversies.push({ min: e.min, kind: 'var', text: `${minLabel(e)} Protest w polu karnym drużyny ${names[e.side]}: VAR nie dopatrzył się przewinienia.` });
     if (e.type === 'red') controversies.push({ min: e.min, kind: 'red', text: `${minLabel(e)} ${e.name} (${names[e.side]}) wyrzucony z boiska${e.reason === 'przemoc' ? ' za brutalny faul' : e.second ? ' po drugiej żółtej kartce' : ''}${doubt}.` });
     if (e.type === 'penalty') controversies.push({ min: e.min, kind: 'penalty', text: `${minLabel(e)} Rzut karny dla drużyny ${names[e.side]}${e.wrong ? ', decyzja mocno dyskusyjna' : ''}.` });
   }

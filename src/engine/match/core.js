@@ -238,6 +238,11 @@ function straightRed(M, T, x, code) {
     return;
   }
   sendOff(M, T, x, code);
+  if (M.ctx.var && M.rng.next() < K.varRedCheck) {
+    M.halfCounts.var += 0.5;
+    emit(M, 'varCheck', T.side, x, { decision: 'redCheck', text: `VAR sprawdza czerwoną kartkę dla ${last(x)}.`, pause: 2 });
+    emit(M, 'varCheck', T.side, x, { confirmed: true, decision: 'redConfirmed', text: 'Po analizie VAR: czerwona kartka utrzymana.' });
+  }
 }
 
 /**
@@ -322,12 +327,8 @@ function phaseAction(M) {
   A.threat += 1;
   const type = pickType(M, A, D);
   // Rzut karny
+  // Karny podyktowany przez sędziego zostaje (VAR sprawdza tylko sytuacje, w których sędzia nie gwizdał)
   if (M.rng.next() < K.penPerAction * D.P.penMul * (0.85 + 0.15 * M.ctx.refStrict) * dribblePen(A)) {
-    if (M.ctx.var && M.rng.next() < K.varPenCancel) {
-      const fouled = pickWeighted(M, onPitch(A, M.minute), (y) => SHOOT_W[y.slot.pos] ?? 1);
-      varReview(M, ai, fouled, 'penaltyCancelled', `Sędzia wskazał na wapno (padał ${last(fouled)}), ale po analizie VAR odwołuje rzut karny.`, { cancelPenalty: true });
-      return;
-    }
     awardPenalty(M, ai);
     return;
   }
@@ -348,26 +349,36 @@ function phaseAction(M) {
     x.tk++; rateEv(x, 0.08);
     const kind = type === 'SKR' && M.rng.next() < 0.5 ? 'clearance' : M.rng.next() < 0.55 ? 'tackle' : 'interception';
     emit(M, kind, 1 - ai, x);
-    // VAR: przeoczony faul lub ręka w polu karnym, karny podyktowany po analizie
-    if (M.ctx.var && type !== 'DYS' && M.rng.next() < K.varPenAdd) {
+    // Sytuacja w polu karnym bez gwizdka (faul albo ręka): zawodnicy protestują, sędzia gra dalej
+    // albo VAR analizuje i dyktuje karnego lub potwierdza, że przewinienia nie było
+    if (type !== 'DYS' && M.rng.next() < K.penClaim) {
       const fouled = pickWeighted(M, onPitch(A, M.minute), (y) => SHOOT_W[y.slot.pos] ?? 1);
-      varReview(M, ai, fouled, 'penaltyAwarded', 'Po analizie VAR sędzia dyktuje rzut karny.');
-      awardPenalty(M, ai, { culprit: x, fouled, byVar: true });
-      return;
+      const hand = M.rng.next() < 0.4;
+      emit(M, 'penaltyClaim', ai, fouled, { hand, culpritId: x.id, text: `Protest w polu karnym: ${hand ? `zagranie ręką (${last(x)})?` : `faul na ${last(fouled)}?`} Sędzia nie przerywa gry.` });
+      if (M.ctx.var && M.rng.next() < K.penClaimReview) {
+        M.halfCounts.var++;
+        emit(M, 'varCheck', ai, fouled, { decision: hand ? 'handCheck' : 'penaltyCheck', text: `VAR analizuje sytuację w polu karnym: ${hand ? 'zagranie ręką' : 'faul'}.`, pause: 2 });
+        if (M.rng.next() < K.penClaimAward) {
+          emit(M, 'varOverturn', ai, fouled, { decision: 'penaltyAwarded', text: `Po analizie VAR sędzia dyktuje rzut karny${hand ? ' za zagranie ręką' : ''}.` });
+          awardPenalty(M, ai, { culprit: x, fouled, byVar: true, hand });
+          return;
+        }
+        emit(M, 'varCheck', ai, fouled, { confirmed: true, decision: 'noPenalty', text: 'Po analizie VAR: przewinienia nie było, gra toczy się dalej.' });
+      }
     }
     if (M.rng.next() < K.goalKickOnFail) emit(M, 'goalKick', 1 - ai, null);
   }
 }
 
 /** Rzut karny: faul obrońcy (czasem z kartką), wykonanie (z powtórką i dobitką). */
-function awardPenalty(M, ai, { culprit = null, fouled = null, byVar = false } = {}) {
+function awardPenalty(M, ai, { culprit = null, fouled = null, byVar = false, hand = false } = {}) {
   const A = M.teams[ai]; const D = M.teams[1 - ai];
   const fouler = culprit ?? pickWeighted(M, onPitch(D, M.minute).filter((y) => y.slot.pos !== 'BR'), (y) => FOUL_W[y.slot.pos] ?? 1);
   const victim = fouled ?? pickWeighted(M, onPitch(A, M.minute), (y) => SHOOT_W[y.slot.pos] ?? 1);
   rateEv(fouler, -0.6); rateEv(victim, 0.3);
   fouler.fouls++;
   emit(M, 'foul', 1 - ai, fouler);
-  emit(M, 'penalty', ai, victim, { byVar, foulerId: fouler.id, text: `Rzut karny! Faul: ${last(fouler)}, poszkodowany: ${last(victim)}.` });
+  emit(M, 'penalty', ai, victim, { byVar, hand, foulerId: fouler.id, pause: 3, text: hand ? `Rzut karny! Zagranie ręką: ${last(fouler)}.` : `Rzut karny! Faul: ${last(fouler)}, poszkodowany: ${last(victim)}.` });
   if (M.rng.next() < 0.1 * M.ctx.refStrict) card(M, D, fouler, 'faul w polu karnym');
   penaltyKick(M, ai);
 }
@@ -606,10 +617,9 @@ function penaltyKick(M, ai, retake = false) {
 function goal(M, ai, s, assister, xg, how) {
   const A = M.teams[ai]; const D = M.teams[1 - ai];
   // VAR może anulować gola (spalony, faul, ręka)
-  if (M.ctx.var && how !== 'OG' && M.rng.next() < K.varGoalCancel) {
+  if (M.ctx.var && how !== 'OG' && how !== 'PEN' && M.rng.next() < K.varGoalCancel) {
     M.halfCounts.var++;
-    const varReason = how === 'PEN' ? 'wejście w pole karne przed strzałem'
-      : M.rng.weighted(['spalony', 'faul w ataku', 'ręka'], (k) => ({ spalony: 0.6, 'faul w ataku': 0.25, ręka: 0.15 })[k]);
+    const varReason = M.rng.weighted(['spalony', 'faul w ataku', 'ręka'], (k) => ({ spalony: 0.6, 'faul w ataku': 0.25, ręka: 0.15 })[k]);
     emit(M, 'goal', ai, s, { xg: round2(xg ?? 0), how, aid: assister?.id ?? null, text: `GOL! ${s ? last(s) : ''}`, provisional: true, pause: 3 });
     emit(M, 'varCheck', ai, s, { decision: 'goalDisallowed', text: 'VAR sprawdza bramkę.', pause: 2 });
     emit(M, 'varOverturn', ai, s, { cancelGoal: true, decision: 'goalDisallowed', varReason, xg: round2(xg ?? 0), text: `Gol nieuznany po analizie VAR (${varReason}).` });
@@ -640,9 +650,10 @@ function goal(M, ai, s, assister, xg, how) {
     : how === 'PEN' ? `GOL! ${last(s)} pewnie z rzutu karnego.`
       : `GOL! ${last(s)}${how === 'HEAD' ? ' strzałem głową' : how === 'DYS' ? ' strzałem z dystansu' : how === 'FK' ? ' z rzutu wolnego' : ''}${assister ? `, asysta: ${last(assister)}` : ''}.`;
   emit(M, 'goal', ai, s, { xg: round2(xg ?? 0), how, aid: assister?.id ?? null, ownGoal: how === 'OG', ogId: ogBy?.id ?? null, text, pause: 3, score: [...M.score] });
-  if (M.ctx.var && M.rng.next() < K.varGoalConfirm) {
+  if (M.ctx.var && how !== 'PEN' && M.rng.next() < K.varGoalConfirm) {
     M.halfCounts.var += 0.3;
-    emit(M, 'varCheck', ai, s, { confirmed: true, decision: 'goalConfirmed', text: 'VAR sprawdzał bramkę: gol uznany.', pause: 2 });
+    emit(M, 'varCheck', ai, s, { decision: 'goalCheck', text: 'VAR sprawdza bramkę.', pause: 2 });
+    emit(M, 'varCheck', ai, s, { confirmed: true, decision: 'goalConfirmed', text: 'Po analizie VAR: gol uznany.' });
   }
   for (const T of M.teams) T.react.push({ kind: 'goal', tick: M.tick });
 }

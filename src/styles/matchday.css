@@ -361,6 +361,17 @@
 @keyframes gol-flash { 50% { background: var(--gc-ink); color: var(--gc); box-shadow: 0 0 0 3px var(--gc), 0 10px 30px rgb(0 0 0 / .45); } }
 @keyframes gol-in { from { transform: scale(.7); } }
 @media (prefers-reduced-motion: reduce) { .goal b { animation: none; } }
+/* Dramaturgia: rzut karny, protest, analiza VAR i werdykt. Dłuższe napisy mniejszym krojem, analiza z paskiem postępu */
+.goal--long b { font-size: clamp(1.9rem, 9cqi, 3.6rem); letter-spacing: .03em; text-align: center; }
+.goal[data-kind="check"] b, .goal[data-kind="claim"] b, .goal[data-kind="penalty"] b { animation: gol-in .25s ease-out; }
+.goal[data-kind="check"] b { animation: var-pulse 1.1s ease-in-out infinite; }
+.goal[data-kind="verdict"] b { animation: gol-in .25s ease-out; }
+.goal__bar { display: none; width: min(260px, 70cqi); height: 6px; border-radius: 3px; background: rgb(243 246 241 / .18); overflow: hidden; }
+.goal[data-kind="check"] .goal__bar { display: block; }
+.goal__bar::after { content: ""; display: block; height: 100%; width: 100%; background: #6FA8FF; transform-origin: left; animation: var-progress var(--stage-ms, 3s) linear forwards; }
+@keyframes var-pulse { 50% { box-shadow: 0 0 0 3px var(--gc-ink), 0 0 0 9px rgb(111 168 255 / .35), 0 10px 30px rgb(0 0 0 / .45); } }
+@keyframes var-progress { from { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { .goal[data-kind] b { animation: none; } .goal__bar::after { animation-duration: 0s; } }
 
 /* Relacja: pasek w barwach klubu, gospodarze z lewej, goście z prawej */
 .feed li[data-side] { --c: var(--home); --ci: var(--home-ink); box-shadow: inset 5px 0 0 var(--c), inset 6px 0 0 color-mix(in srgb, var(--text) 22%, transparent); padding-left: 14px; }

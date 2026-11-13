@@ -9,6 +9,7 @@ export const EVENT_TYPES = [
   // Zdarzenia sytuacyjne bez wpływu na liczniki statystyk (relacja, popupy UI, studio): docs/sytuacje-meczowe.md
   'gkSwitch', 'gkUp', 'tactic', 'shout', 'penaltyRetake', 'staffCard', 'coolingBreak', 'abandoned', 'shootoutKick',
   'addedTime', 'kickoff', 'half', 'end',
+  'penaltyClaim', // protest w polu karnym bez gwizdka (VAR czasem analizuje)
   'defError', // błąd obrony (zmęczenie, gra poza pozycją); strzał po nim liczy się osobnym zdarzeniem
 ];
 
