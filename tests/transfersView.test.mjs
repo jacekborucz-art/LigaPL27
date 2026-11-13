@@ -113,7 +113,7 @@ test('Klub > Finanse i Zarząd: kafelki z barwą znaczeniową i panele', async (
   assert.match(fin, /Przychody w sezonie/);
   assert.match(fin, /Miesiąc po miesiącu/);
   const board = renderClubHub(G, { kTab: 'zarzad' });
-  assert.equal(count(board, /class="tf-kpi" data-m="/g), 4);
+  assert.equal(count(board.split('<aside class="klub-side br">')[0], /class="tf-kpi" data-m="/g), 4); // bez panelu próśb do zarządu
   assert.match(board, /Oceny zarządu/);
   assert.match(board, /Kibice/);
 });

@@ -16,6 +16,7 @@ import { createFinance, financeDay, book, matchIncome, attendanceFill, uefaPrize
 import { createMarket, marketWeek, answerIncoming, aiRenewals, inWindow, windowOf, fmtZl, SEASON_END } from './transfers.js';
 import { ensureBoard, boardMonth, seasonGoalFor, trustLabel } from './board.js';
 import './squadLimitSystem.js'; // limit kadry i nacisk zarządu (docs/limit-kadry.md)
+import './boardRequests.js'; // prośby do zarządu, warunki i budżety klubów AI (docs/finanse.md)
 import { ensureCoachMarket, fireCoach, hireCoach } from './coachMarket.js'; // rynek trenerów AI i właściciele (docs/trenerzy-i-wlasciciele.md)
 
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };

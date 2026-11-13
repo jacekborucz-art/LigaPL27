@@ -816,7 +816,7 @@ export function applyPromiseCheck(player, clubId, dateIso, minutesShare) {
 /**
  * Klub AI negocjuje tą samą logiką w trybie uproszczonym: oferta rynkowa, ewentualnie przyjęcie kontroferty
  * mieszczącej się w budżecie. Zawsze najwyżej 2 rundy.
- * budget: { wage (maks. pensja tygodniowa), signOn }.
+ * budget: { wage (maks. pensja tygodniowa), signOn, maxYears, total (maks. koszt całego kontraktu: progi zarządu) }.
  * Zwraca { result: 'signed'|'failed'|'refused', rounds, contract, outcome, reason? }.
  */
 export function aiNegotiate({ kind = 'sign', player, club, fromClub = null, date, rng, ctx = {}, budget = {} }) {
@@ -829,17 +829,24 @@ export function aiNegotiate({ kind = 'sign', player, club, fromClub = null, date
   const age = player.age ?? 25;
   const wage = Math.min(maxWage, roundTo(d.publicDemand * 0.97, 100));
   const goalBonus = { ATT: 0.1, MID: 0.06, DEF: 0.04, GK: 0 }[GROUP[player.pos] || 'MID'];
-  const offer = {
+  // Progi zarządu (src/career/boardRequests.js): długość z wieku i koszt całego kontraktu
+  const fit = (o) => {
+    if (!budget.maxYears && !budget.total) return o;
+    const x = { ...o, years: Math.max(1, Math.min(o.years, budget.maxYears ?? MAX_YEARS)) };
+    while (x.years > 1 && budget.total && x.wage * 52 * x.years + (x.signOn || 0) + (x.agentFee || 0) > budget.total) x.years--;
+    return x;
+  };
+  const offer = fit({
     wage,
     years: age <= 23 ? 4 : age <= 29 ? 3 : age <= 32 ? 2 : 1,
     role: d.roleExp,
     bonus: { goal: roundTo(wage * goalBonus, 100), app: roundTo(wage * 0.02, 50) },
     agentFee: roundTo(0.07 * wage * 52, 1000), // rynkowy standard prowizji
-  };
+  });
   let resp = s.propose(offer);
   if (resp.type !== 'accept' && s.status === 'open') {
     const c = resp.counter;
-    if (c && c.wage <= maxWage && c.signOn <= maxSignOn) resp = s.propose(c);
+    if (c && c.wage <= maxWage && c.signOn <= maxSignOn) resp = s.propose(fit(c));
     else s.propose({ ...offer, wage: Math.min(maxWage, roundTo(offer.wage * 1.1, 100)) });
   }
   return { result: s.status === 'accepted' ? 'signed' : 'failed', rounds: d.st.round, contract: s.contract, outcome: s.outcome() };
