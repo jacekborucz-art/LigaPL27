@@ -66,7 +66,7 @@ test('AI wybiera warianty 4-4-2 w sensownych sytuacjach (pogoń, obrona wyniku, 
   T.tactics.formation = '442off';
   assert.equal(variant442(T, st({ diff: 0, minute: 75, str: 0 }))?.formation, '442', 'po wyrównaniu powrót do równowagi');
   // Integracja: drużyna AI w 4-4-2 w pogoni i przy prowadzeniu
-  let chase = 0; let protect = 0; const n = 20;
+  let chase = 0; let protect = 0; const n = 40; // 40 meczów: mniejsza wrażliwość na przebieg losowania
   for (let i = 0; i < n; i++) {
     for (const [score, from, to] of [[[0, 1], 64, 80], [[1, 0], 70, 90]]) {
       const M2 = createMatch({ seed: `v442${i}`, home: side('legia', { tactics: tacF('legia', '442'), coach: 'P' }), away: side('lech'), ctx: {} });
