@@ -724,6 +724,33 @@
   .prs-fx .voice { grid-template-columns: 78px 1fr; }
 }
 
+/* Konferencja po meczu jako osobny krok dnia meczowego (ekran, nie okno). PC: cała szerokość, trzy kolumny:
+   sala, pytanie i odpowiedzi, zapis konferencji albo nagłówki dnia. Telefon: jedna kolumna. */
+.prs.prs--page { display: grid; grid-template-rows: auto minmax(0, 1fr); width: auto; height: auto; min-height: calc(100dvh - 210px); border: 1px solid var(--line); }
+.prs__body--page { grid-template-columns: minmax(0, 1fr); }
+.prs__side { padding: 16px 20px 24px; background: var(--surface); border-top: 1px solid var(--line); min-width: 0; }
+.prs__side h3, .prs__log--empty h3 { margin: 0 0 8px; font: 700 var(--step-0)/1.2 var(--font-display); color: var(--text-muted); }
+.prs__side .prs__log { margin-top: 0; border-top: 0; padding-top: 0; max-width: none; }
+.prs__side .headlines { margin: 0; }
+.prs__lobby h3 { margin: 0 0 8px; font: 700 var(--step-3)/1.08 var(--font-display); }
+.prs__lobby > p { margin: 0 0 16px; max-width: 60ch; color: var(--text-muted); }
+.prs__opts { display: grid; gap: 10px; margin: 0; }
+.prs__opts div { padding: 12px 14px; border: 1.5px solid var(--line); border-left: 6px solid var(--murawa); border-radius: var(--radius-m); background: var(--surface); }
+.prs__opts div + div { border-left-color: var(--text-muted); }
+.prs__opts dt { font: 700 var(--step-1)/1.15 var(--font-display); }
+.prs__opts dd { margin: 4px 0 0; color: var(--text-muted); max-width: 70ch; }
+@media (min-width: 1100px) {
+  .md__main:has(.prs--page) { max-width: 1840px; padding-left: var(--space-5, 24px); padding-right: var(--space-5, 24px); }
+  .prs__body--page { grid-template-columns: 260px minmax(0, 1fr) minmax(320px, 420px); }
+  .prs__body--page .prs__main { padding: 28px 40px; }
+  .prs__body--page .prs__stage { max-width: 900px; }
+  .prs__side { border-top: 0; border-left: 1px solid var(--line); overflow: auto; }
+  .prs--page .prs__q { max-width: 40ch; }
+}
+@media (max-width: 699px) {
+  .prs.prs--page { width: auto; height: auto; min-height: 0; border-radius: var(--radius-m); }
+}
+
 /* ================= Mecz na żywo v3: składy po bokach, zdarzenia na tablicy =================
    Tablica jak grafika telewizyjna: pełne nazwy (telefon: skróty), pod nimi strzelcy i czerwone kartki.
    PC od 1280 px: składy obu drużyn przy liniach bocznych (gospodarze z lewej, goście z prawej, jak na tablicy),

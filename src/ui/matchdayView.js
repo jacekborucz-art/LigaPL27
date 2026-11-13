@@ -32,8 +32,8 @@ import { moraleLabel } from '../career/morale.js';
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size) => (anyClub(id) ? crestHtml(anyClub(id), { size, clubsById }) : '');
-const STEPS = [['studio', 'Studio'], ['odprawa', 'Odprawa'], ['live1', '1. połowa'], ['break', 'Przerwa'], ['odprawa2', 'Odprawa w przerwie'], ['live2', '2. połowa'], ['studio2', 'Studio pomeczowe'], ['odprawa3', 'Odprawa pomeczowa']];
-const STEP_INDEX = { studio: 0, odprawa: 1, live1: 2, break: 3, odprawa2: 4, live2: 5, etbreak: 5, shootoutPrep: 5, shootout: 5, fulltime: 5, studio2: 6, odprawa3: 7, press: 7 };
+const STEPS = [['studio', 'Studio'], ['odprawa', 'Odprawa'], ['live1', '1. połowa'], ['break', 'Przerwa'], ['odprawa2', 'Odprawa w przerwie'], ['live2', '2. połowa'], ['studio2', 'Studio pomeczowe'], ['odprawa3', 'Odprawa pomeczowa'], ['press', 'Konferencja prasowa']];
+const STEP_INDEX = { studio: 0, odprawa: 1, live1: 2, break: 3, odprawa2: 4, live2: 5, etbreak: 5, shootoutPrep: 5, shootout: 5, fulltime: 5, studio2: 6, odprawa3: 7, press: 8 };
 const STAT_ROWS = [['possession', 'Posiadanie %'], ['shots', 'Strzały'], ['onTarget', 'Celne'], ['xg', 'xG'], ['passes', 'Podania'], ['passAccuracy', 'Celność podań %'], ['corners', 'Rożne'], ['throwIns', 'Auty'], ['fouls', 'Faule'], ['offsides', 'Spalone'], ['yellow', 'Żółte kartki'], ['red', 'Czerwone kartki'], ['saves', 'Obrony']];
 
 function luminance(hex) {
@@ -304,7 +304,6 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     const rating = (id) => (phase === 'post' ? S.result.ratings.find((x) => x.id === id)?.rating : null);
     shell(`
       <h1>${title}</h1>
-      ${phase === 'post' ? renderPressDoor('post', !!done) : ''}
       <div class="talk-grid talk-grid--${phase}">
       <section class="tpanel tpanel--speech">
         <p class="talk-ctx">${esc(ctxText)}</p>
@@ -383,7 +382,8 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
   // Zmiana składu przed meczem: powrót do ekranu Skład i taktyka (tylko przed odprawą w szatni)
   const lineupBtn = () => (onLineup && !S.briefings?.pre ? btnC('toLineup', 'Zmień skład', 'btn--lineup') : '');
   const preActions = () => lineupBtn() + pressButtons('pre') + btn('toBriefing', 'Przejdź do odprawy');
-  const postActions = () => pressButtons('post') + btn('exit', 'Dalej');
+  // Po odprawie pomeczowej tylko „Dalej”: konferencja prasowa ma własny ekran (krok 9), sparing kończy dzień od razu
+  const postActions = () => btn(MD.pressSetup(game, S, 'post') ? 'toPress' : 'exit', 'Dalej');
 
   /** Ścianka za stołem: herb klubu i znak ligi na przemian (dekoracja, ukryta przed czytnikiem ekranu). */
   function wallTiles() {
@@ -413,9 +413,8 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     return dlg;
   }
 
-  function renderPressDialog() {
-    const dlg = pressDialog();
-    const ph = ui.prsPhase ?? 'post';
+  /** Konferencja w trakcie albo po zakończeniu: ścianka, sala, scena (pytanie, wyjście, podsumowanie), zapis. page: ekran zamiast okna. */
+  function pressInner(ph, page) {
     const pre = ph === 'pre';
     const slot = slotOf(ph);
     const conf = slot.conf;
@@ -438,7 +437,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
           ${conf.room.map((j) => `<li class="prs__p ${q?.by?.id === j.id ? 'is-now' : askedBy.has(j.id) ? 'is-done' : ''}"><b>${esc(j.name)}</b><span>${esc(j.outlet)}</span></li>`).join('')}
         </ol>
       </aside>`;
-    const transcript = conf.answers.length ? `<details class="prs__log" ${slot.settled ? '' : 'open'}><summary>Zapis konferencji</summary><ol>${conf.answers.map((a) => {
+    const transcript = conf.answers.length ? `<details class="prs__log" ${slot.settled && !page ? '' : 'open'}><summary>Zapis konferencji</summary><ol>${conf.answers.map((a) => {
       const by = conf.room.find((j) => j.id === a.by);
       return `<li><p class="prs__lq"><b>${esc(by ? `${by.name}, ${by.outlet}` : conf.officer.name)}:</b> ${esc(a.question)}</p><p class="prs__la">${esc(a.text)}</p></li>`;
     }).join('')}</ol></details>` : '';
@@ -472,16 +471,67 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
         </div>
       </section>`;
     }
+    if (page) {
+      const side = transcript || `<section class="prs__log prs__log--empty"><h3>Nagłówki dnia</h3><ul class="headlines">${(S.post?.headlines ?? []).map((h) => `<li>${esc(h.text)}</li>`).join('')}</ul></section>`;
+      const actions = slot.settled ? btn('exit', 'Dalej') : ui.prsConfirm ? '' : conf.answers.length ? btn('pressOut', 'Wyjdź z sali', false) : btn('exit', 'Wyślij asystenta', false);
+      return { cl, html: `${header}<div class="prs__body prs__body--page">${room}<div class="prs__main">${stage}</div><aside class="prs__side" aria-label="Zapis konferencji">${side}</aside></div>`, actions };
+    }
     const back = pre ? 'Wróć do studia' : 'Wróć do odprawy';
     const foot = slot.settled ? `${btn('pressClose', back, false)}${pre ? btn('toBriefing', 'Przejdź do odprawy') : btn('exit', 'Dalej')}`
       : ui.prsConfirm ? '' : `${conf.answers.length ? btn('pressOut', 'Wyjdź z sali', false) : btn('pressClose', back, false)}`;
+    return { cl, html: `${header}<div class="prs__body">${room}<div class="prs__main">${stage}${transcript}</div></div>${foot ? `<footer class="prs__foot">${foot}</footer>` : ''}` };
+  }
+
+  function renderPressDialog() {
+    const dlg = pressDialog();
+    const ph = ui.prsPhase ?? 'post';
+    const { cl, html } = pressInner(ph, false);
     dlg.dataset.c = cl;
-    dlg.innerHTML = `${header}<div class="prs__body">${room}<div class="prs__main">${stage}${transcript}</div></div>${foot ? `<footer class="prs__foot">${foot}</footer>` : ''}`;
+    dlg.innerHTML = html;
     if (!dlg.open) dlg.showModal();
     dlg.querySelector('#prsQ, #prsAfter, #prsConf')?.focus({ preventScroll: false });
     dlg.querySelector('.prs__p.is-now')?.scrollIntoView({ inline: 'center', block: 'nearest' });
     dlg.querySelector('.prs__main')?.scrollTo?.({ top: 0 });
   }
+
+  /** Konferencja po meczu na własnym ekranie (krok 9). Przed salą: Udziel wywiadu albo Wyślij asystenta (= Dalej). */
+  function renderPressPage() {
+    const room = MD.pressSetup(game, S, 'post');
+    if (!room) return renderTalk('post');
+    ui.prsPhase = 'post';
+    const slot = slotOf('post');
+    if (slot.conf || slot.settled) {
+      const { cl, html, actions } = pressInner('post', true);
+      shell(`<div class="prs prs--page" data-c="${cl}">${html}</div>`, actions);
+      app.querySelector('#prsQ, #prsAfter, #prsConf')?.focus({ preventScroll: true });
+      return;
+    }
+    const cl = room.climate.climate;
+    const people = MD.pressRoomPreview(game, S, 'post');
+    const header = `<header class="prs__wall" data-c="${cl}">${wallTiles()}
+        <div class="prs__bar">
+          <div><h2 id="prsTitle">Konferencja prasowa</h2><p class="prs__match">${esc(sideName(0))} ${esc(S.post.result.score)} ${esc(sideName(1))}</p></div>
+          ${climateChip(cl)}
+        </div>
+        <p class="prs__mood">${esc(CLIMATES[cl].mood)} <span>${esc(room.climate.reasons.join('. '))}.</span></p>
+      </header>`;
+    const roomList = `<aside class="prs__room" aria-label="Na sali"><h3>Na sali</h3><ol class="prs__people">${people.map((j) => `<li class="prs__p"><b>${esc(j.name ?? j.outlet)}</b><span>${esc(j.outlet)}</span></li>`).join('')}</ol></aside>`;
+    const stage = `<section class="prs__stage prs__lobby" aria-labelledby="prsLobby">
+        <h3 id="prsLobby" tabindex="-1">Dziennikarze czekają na sali</h3>
+        <p>Możesz udzielić wywiadu i sam odpowiadać na pytania albo wysłać na salę asystenta.</p>
+        <dl class="prs__opts">
+          <div><dt>Udziel wywiadu</dt><dd>Odpowiadasz na ${conf3(cl)} pytania. Ton odpowiedzi wpływa na zarząd, kibiców, media i morale drużyny.</dd></div>
+          <div><dt>Wyślij asystenta</dt><dd>${esc(CLIMATES[cl].skip.replace(/^Jeśli pominiesz konferencję, /, '').replace(/^./, (x) => x.toUpperCase()))}</dd></div>
+        </dl>
+      </section>`;
+    const side = `<section class="prs__log prs__log--empty"><h3>Nagłówki dnia</h3><ul class="headlines">${(S.post?.headlines ?? []).map((h) => `<li>${esc(h.text)}</li>`).join('')}</ul></section>`;
+    shell(`<div class="prs prs--page" data-c="${cl}">${header}<div class="prs__body prs__body--page">${roomList}<div class="prs__main">${stage}</div><aside class="prs__side" aria-label="Nagłówki">${side}</aside></div></div>`,
+      btn('exit', 'Wyślij asystenta', false) + btn('pressStart', 'Udziel wywiadu'));
+    app.querySelector('#prsLobby')?.focus({ preventScroll: true });
+  }
+  const conf3 = (cl) => (cl === 'agresywna' ? 'cztery' : 'trzy');
+  /** Odświeżenie konferencji: ekran po meczu albo okno przed meczem. */
+  function renderPress() { if (S.step === 'press' && ui.prsPhase !== 'pre') renderPressPage(); else renderPressDialog(); }
 
   // ------------------------------------------------------------ Mecz na żywo
   const SPEEDS = [[1, 'x1'], [2.5, 'x2,5'], [5, 'x5']];
@@ -1803,6 +1853,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     if (S.step === 'fulltime') { MD.finishMatchday(game, S); save(); return renderPost(); }
     if (S.step === 'studio2') return renderPost();
     if (S.step === 'odprawa3') return renderTalk('post');
+    if (S.step === 'press') return renderPressPage();
     return null;
   }
 
@@ -1890,10 +1941,12 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     if (act === 'soEnd') { clearTimeout(ui.soTimer); MD.endShootout(S); route(); }
     if (act === 'toPostTalk') { S.step = 'odprawa3'; ui.sel = {}; ui.adv = null; route(); }
     if (act === 'pressOpen' || act === 'pressView') { ui.prsPhase = arg === 'pre' ? 'pre' : 'post'; MD.pressOpen(game, S, ui.prsPhase); ui.prsConfirm = false; renderPressDialog(); }
-    if (act === 'pressAns') { MD.pressAnswer(game, S, Number(arg), ui.prsPhase); if (slotOf(ui.prsPhase).settled) await save(); renderPressDialog(); }
-    if (act === 'pressOut') { ui.prsConfirm = true; renderPressDialog(); }
-    if (act === 'pressOutNo') { ui.prsConfirm = false; renderPressDialog(); }
-    if (act === 'pressOutYes') { ui.prsConfirm = false; MD.pressWalkOut(game, S, ui.prsPhase); await save(); renderPressDialog(); }
+    if (act === 'toPress') { S.step = 'press'; ui.prsPhase = 'post'; ui.prsConfirm = false; await save(); route(); }
+    if (act === 'pressStart') { ui.prsPhase = 'post'; MD.pressOpen(game, S, 'post'); renderPressPage(); }
+    if (act === 'pressAns') { MD.pressAnswer(game, S, Number(arg), ui.prsPhase); if (slotOf(ui.prsPhase).settled) await save(); renderPress(); }
+    if (act === 'pressOut') { ui.prsConfirm = true; renderPress(); }
+    if (act === 'pressOutNo') { ui.prsConfirm = false; renderPress(); }
+    if (act === 'pressOutYes') { ui.prsConfirm = false; MD.pressWalkOut(game, S, ui.prsPhase); await save(); renderPress(); }
     if (act === 'pressClose') app.querySelector('#mdPress')?.close();
     if (act === 'exit') { stop(); MD.closeMatchday(game, S); app.querySelector('#mdPress')?.remove(); cleanup(); await save(); onExit(); }
   }
