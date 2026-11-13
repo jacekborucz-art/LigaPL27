@@ -193,6 +193,7 @@ const SHELL = [
   './src/ui/negotiationView.js',
   './src/ui/playerMenus.js',
   './src/ui/playerStatsView.js',
+  './src/ui/positionMap.js',
   './src/ui/squadView.js',
   './src/ui/tacticsDrag.js',
   './src/ui/tacticsMoves.js',

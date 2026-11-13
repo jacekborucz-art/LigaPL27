@@ -990,3 +990,32 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 }
 .eu .ufxlist { margin-bottom: var(--space-4); }
 .eu .seu .ufxlist { margin-bottom: var(--space-2); }
+
+/* ================= Mapa pozycji w karcie zawodnika (src/ui/positionMap.js) ================= */
+.pmap { --opt: #1E8A47; --ok: #8CC152; --weak: #E0A21C; --no: #7C8780;
+  margin: var(--space-3) 0 var(--space-2); padding: var(--space-3); max-width: 340px; border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--surface-stripe); break-inside: avoid; }
+.pmap__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; margin-bottom: var(--space-2); }
+.pmap__head h3 { margin: 0; font: 700 var(--step-0)/1.1 var(--font-display); }
+.pp__cols .pmap__head h3 { margin: 0; padding: 0; }
+.pmap__nat { font-size: var(--step--1); color: var(--text-muted); }
+.pmap__nat b { color: var(--text); font-weight: 600; }
+.pmap__svg { display: block; width: 100%; height: auto; }
+.pmap__grass { fill: #1F6E3B; }
+.pmap__stripe { fill: #237A42; }
+.pmap__lines * { fill: none; stroke: rgba(243, 246, 241, .55); stroke-width: 1.2; }
+.pmap__dot { fill: var(--no); stroke: rgba(14, 21, 17, .55); stroke-width: 1.2; }
+.pmap__spot[data-b="opt"] .pmap__dot { fill: var(--opt); stroke: #F3F6F1; stroke-width: 1.6; }
+.pmap__spot[data-b="ok"] .pmap__dot { fill: var(--ok); }
+.pmap__spot[data-b="weak"] .pmap__dot { fill: var(--weak); }
+.pmap__spot[data-b="no"] { opacity: .78; }
+.pmap__ring { fill: none; stroke: var(--led); stroke-width: 3; }
+.pmap__v { font: 700 11.5px var(--font-display); text-anchor: middle; fill: #fff; font-variant-numeric: tabular-nums; }
+.pmap__spot[data-b="ok"] .pmap__v, .pmap__spot[data-b="weak"] .pmap__v { fill: #14211A; }
+.pmap__pos { font: 700 8.5px var(--font-display); text-anchor: middle; fill: rgba(243, 246, 241, .92); letter-spacing: .03em; paint-order: stroke; stroke: rgba(14, 21, 17, .55); stroke-width: 2px; }
+.pmap__spot:focus-visible { outline: none; }
+.pmap__spot:focus-visible .pmap__dot, .pmap__spot:hover .pmap__dot { stroke: var(--focus); stroke-width: 2.5; }
+.pmap__legend { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 12px; margin: var(--space-2) 0 0; padding: 0; font-size: 11px; color: var(--text-muted); }
+.pmap__legend li { display: inline-flex; align-items: center; gap: 5px; }
+.pmap__legend li::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--no); }
+.pmap__legend li[data-b="opt"]::before { background: var(--opt); } .pmap__legend li[data-b="ok"]::before { background: var(--ok); } .pmap__legend li[data-b="weak"]::before { background: var(--weak); }
+.pmap__note { margin: var(--space-1) 0 0; font-size: 11px; color: var(--text-muted); }

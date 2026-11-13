@@ -9,6 +9,7 @@ import { AGENT_TYPES, TRAIT_LABELS } from '../career/personality.js';
 import { formatZl } from '../career/negotiation.js';
 import { esc, fmtDate } from './dom.js';
 import { formChartHtml, formHistory, formBand } from './formChart.js';
+import { positionMapHtml } from './positionMap.js';
 import { playerStatsHtml } from './playerStatsView.js';
 
 export const SQUAD_FILTERS = [
@@ -243,6 +244,7 @@ export function renderPlayerProfile(p, opts = {}) {
           ${p.intl?.caps || p.intlU21 ? `<li><span class="k">Reprezentacja</span><span>${p.intl?.caps ? `występy: ${p.intl.caps}, gole: ${p.intl.goals}` : ''}${p.intl?.caps && p.intlU21 ? '; ' : ''}${p.intlU21 ? `zgrupowania U21: ${p.intlU21}` : ''}</span></li>` : ''}
         </ul>
         ${formChartHtml(p)}
+        ${positionMapHtml(p)}
         <h3>Kontrakt</h3>
         <ul class="plain-list">
           ${foreign ? '' : `<li><span class="k">Pensja</span><span>${esc(formatZl(p.contract.wage))} tygodniowo</span></li>`}
