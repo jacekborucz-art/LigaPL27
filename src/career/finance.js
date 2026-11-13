@@ -56,8 +56,8 @@ export const FIN = {
 // Nagrody UEFA w mln EUR. Faza ligowa i premie za mecz: cykl 2024-27 (LM 18,62 + 2,1 za wygraną i 0,7 za remis,
 // LE 4,31 + 0,45/0,15, LK 3,17 + 0,4/0,133). Eliminacje: 175 tys. EUR za rozegraną rundę (2025/26) plus kwota
 // za odpadnięcie (LK: Q1 0,15, Q2 0,35, Q3 0,55, PO 0,75), rozłożone na rundy. Fazy pucharowe LE i LK 2025/26
-// (finał LE 7, zdobywca LE dodatkowo 6, zdobywca LK dodatkowo 3). W: premia dla zwycięzcy finału (LM 6,5
-// niezweryfikowane). SOL: wypłata solidarnościowa raz w sezonie, Q dla odpadających w eliminacjach, NP dla
+// (finał LE 7, zdobywca LE dodatkowo 6, zdobywca LK dodatkowo 3). LM: faza ligowa 18,62, 1/8 11, ćwierćfinał 12,5,
+// półfinał 15, finał 18,5, zdobywca dodatkowo 6,5 (potwierdzone, docs/finanse.md). W: premia dla zwycięzcy finału. SOL: wypłata solidarnościowa raz w sezonie, Q dla odpadających w eliminacjach, NP dla
 // klubów Ekstraklasy bez pucharów [SZAC] (src/career/prizes.js).
 const UEFA_PRIZE = {
   LM: { Q1: 0.5, Q2: 0.6, Q3: 0.7, PO: 1.0, league: 18.62, win: 2.1, draw: 0.7, KPO: 1.0, R16: 11, QF: 12.5, SF: 15, F: 18.5, W: 6.5 },
