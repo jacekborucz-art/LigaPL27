@@ -11,41 +11,55 @@ const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const isPolish = (id) => clubsById.has(id);
 const crest = (id, size = 22) => { const c = anyClub(id); return c ? crestHtml(c, { size, clubsById }) : ''; };
 const name = (id) => anyClub(id)?.name ?? id;
-const flag = (id) => (isPolish(id) ? '' : `<small class="cc">${esc(countryOf(id))}</small>`);
+const flag = (id) => (isPolish(id) ? '' : `<small class="ctry" title="${esc(COUNTRY_NAMES[countryOf(id)] ?? countryOf(id))}">${esc(countryOf(id))}</small>`);
 const shortDay = (iso) => `${weekday(iso).slice(0, 3)} ${fmtDate(iso).replace(/, \d{4}$/, '')}`;
 export const EUROPE_TABS = [['LM', 'Liga Mistrzów'], ['LE', 'Liga Europy'], ['LK', 'Liga Konferencji']];
 export const EUROPE_VIEWS = [['path', 'Przebieg'], ['league', 'Tabela'], ['fixtures', 'Mecze'], ['scorers', 'Strzelcy'], ['ranking', 'Kraje']];
 
-function score(m) {
-  if (!m?.played) return `<span class="fx__time">${esc(m?.time ?? '')}</span>`;
-  const r = m.result;
-  return `<b class="fx__score">${r.score[0]}:${r.score[1]}</b>${r.shootout ? `<small>k. ${r.shootout[0]}:${r.shootout[1]}</small>` : r.extraTime ? '<small>po dogr.</small>' : ''}`;
+/**
+ * Wiersz meczu w pucharach (wyniki w tle, przebieg, Superpuchar Europy).
+ * PC: data | gospodarz (do środka) | wynik | gość | dopisek. Telefon: drużyny jedna pod drugą, wynik po prawej.
+ */
+function ufxRow({ cls = '', date = '', home, away, sh = null, sa = null, time = '', sub = '', winner = null }) {
+  const w = (id) => (winner ? (winner === id ? ' is-win' : ' is-out') : '');
+  const team = (id, side) => `<span class="ufx__t ufx__t--${side}${w(id)}">${crest(id)}<span class="ufx__nm">${esc(name(id))}</span>${flag(id)}</span>`;
+  const played = sh != null;
+  return `<li class="ufx ${cls}${played ? '' : ' is-open'}">
+    <span class="ufx__date">${date}</span>
+    ${team(home, 'h')}
+    <b class="ufx__s ufx__s--h${w(home)}">${played ? sh : ''}</b>
+    <span class="ufx__mid">${played ? ':' : esc(time || 'vs')}</span>
+    <b class="ufx__s ufx__s--a${w(away)}">${played ? sa : ''}</b>
+    ${team(away, 'a')}
+    <small class="ufx__sub">${sub}</small>
+  </li>`;
 }
+const winnerOfMatch = (m) => {
+  if (!m?.played) return null;
+  const [a, b] = m.result.score;
+  if (a !== b) return a > b ? m.home : m.away;
+  return m.result.shootout ? (m.result.shootout[0] > m.result.shootout[1] ? m.home : m.away) : null;
+};
 
 function matchRow(m, game) {
   const mine = m.home === game.clubId || m.away === game.clubId;
   const pol = isPolish(m.home) || isPolish(m.away);
-  return `<li class="fx ${mine ? 'is-me' : pol ? 'is-pl' : ''}">
-    <span class="fx__date">${esc(shortDay(m.date))}${m.leg ? `, ${m.leg === 1 ? '1. mecz' : 'rewanż'}` : ''}${m.md ? `, ${m.md}. kolejka` : ''}${m.neutral ? ', stadion neutralny' : ''}</span>
-    <span class="fx__team fx__team--h">${flag(m.home)}${esc(name(m.home))}${crest(m.home)}</span>
-    <span class="fx__mid">${score(m)}</span>
-    <span class="fx__team">${crest(m.away)}${esc(name(m.away))}${flag(m.away)}</span>
-  </li>`;
+  const r = m.played ? m.result : null;
+  const info = [m.leg ? (m.leg === 1 ? '1. mecz' : 'rewanż') : '', m.md ? `${m.md}. kolejka` : '', m.neutral ? 'teren neutralny' : ''].filter(Boolean).join(', ');
+  const sub = [r?.shootout ? `karne ${r.shootout[0]}:${r.shootout[1]}` : r?.extraTime ? 'po dogrywce' : '', info].filter(Boolean).join(' · ');
+  return ufxRow({ cls: mine ? 'is-me' : pol ? 'is-pl' : '', date: esc(shortDay(m.date)), home: m.home, away: m.away,
+    sh: r ? r.score[0] : null, sa: r ? r.score[1] : null, time: m.time, sub: esc(sub), winner: winnerOfMatch(m) });
 }
 
 function tieRow(t, U, game) {
   const ms = t.legs.map((id) => U.matches[id]);
   const mine = t.a === game.clubId || t.b === game.clubId;
   const pol = isPolish(t.a) || isPolish(t.b);
-  const legTxt = ms.map((m) => (m.played ? `${m.home === t.a ? m.result.score[0] : m.result.score[1]}:${m.home === t.a ? m.result.score[1] : m.result.score[0]}` : '-:-')).join(', ');
-  const win = (id) => (t.winner === id ? ' tie--win fx__team--win' : t.winner ? ' tie--out fx__team--out' : '');
-  const tag = t.winner ? ` <span class="tag-up">${t.round === 'F' ? 'zdobywca' : 'awans'}: ${esc(name(t.winner))}</span>` : '';
-  return `<li class="fx tie ${mine ? 'is-me' : pol ? 'is-pl' : ''}">
-    <span class="fx__date">${esc(ms.map((m) => shortDay(m.date)).join(' i '))}${tag}</span>
-    <span class="fx__team fx__team--h${win(t.a)}">${flag(t.a)}${esc(name(t.a))}${crest(t.a)}</span>
-    <span class="fx__mid">${t.agg ? `<b class="fx__score">${t.agg[0]}:${t.agg[1]}</b>` : '<span class="fx__time">vs</span>'}<small>${esc(ms.length > 1 ? legTxt : '')}${t.shootout ? ` k. ${t.shootout[0]}:${t.shootout[1]}` : ''}</small></span>
-    <span class="fx__team${win(t.b)}">${crest(t.b)}${esc(name(t.b))}${flag(t.b)}</span>
-  </li>`;
+  const legTxt = ms.length > 1 ? ms.map((m) => (m.played ? `${m.home === t.a ? m.result.score[0] : m.result.score[1]}:${m.home === t.a ? m.result.score[1] : m.result.score[0]}` : '–')).join(', ') : '';
+  const tag = t.winner ? `<span class="ufx__tag">${t.round === 'F' ? 'zdobywca' : 'awans'}</span>` : '';
+  const sub = [legTxt ? esc(legTxt) : '', t.shootout ? `karne ${t.shootout[0]}:${t.shootout[1]}` : ''].filter(Boolean).join(' · ');
+  return ufxRow({ cls: `tie ${mine ? 'is-me' : pol ? 'is-pl' : ''}`, date: esc(ms.map((m) => shortDay(m.date)).join(' i ')), home: t.a, away: t.b,
+    sh: t.agg ? t.agg[0] : null, sa: t.agg ? t.agg[1] : null, time: 'vs', sub: `${sub}${tag}`, winner: t.winner ?? null });
 }
 
 function pathView(game, comp, ui) {
@@ -61,7 +75,7 @@ function pathView(game, comp, ui) {
       const pol = C.league.teams.filter(isPolish);
       return `<section class="stat-sec">${head}<p class="hint">36 drużyn, ${C.league.pots[0].length * 0 + C.league.matches.length} meczów. ${pol.length ? `Polskie kluby: ${pol.map(name).join(', ')}.` : 'Bez polskich klubów.'} Tabela w zakładce Tabela.</p></section>`;
     }
-    return `<section class="stat-sec">${head}<ul class="fxlist">${R.ties.map((t) => tieRow(t, U, game)).join('')}</ul></section>`;
+    return `<section class="stat-sec">${head}<ul class="ufxlist">${R.ties.map((t) => tieRow(t, U, game)).join('')}</ul></section>`;
   });
   const champion = C.champion ? `<p class="panel__lead champ">${crest(C.champion, 32)} ${esc(name(C.champion))} wygrywa ${esc(UCOMP_NAMES[comp])}.</p>` : '';
   const next = pending ? `<p class="hint">Następna runda: ${esc(ROUND_NAMES[pending])}. Losowanie po zakończeniu poprzednich rund.</p>` : '';
@@ -74,15 +88,10 @@ function superCupEUPanel(game) {
   const sc = game.season.superCupEU;
   if (!sc) return '';
   const r = sc.result;
-  const win = (id) => (sc.winner === id ? ' fx__team--win' : sc.winner ? ' fx__team--out' : '');
   return `<section class="stat-sec seu"><div class="sec-head"><h3>Superpuchar Europy ${sc.year}</h3></div>
     <p class="hint">${esc(sc.venue.stadium)}, ${esc(sc.venue.city)} (${esc(sc.venue.country)}), ok. ${Math.round(sc.venue.cap / 1000)} tys. miejsc. ${esc(fmtDate(sc.date))}, ${esc(sc.time)}. Zwycięzca Ligi Mistrzów kontra zwycięzca Ligi Europy, przy remisie od razu rzuty karne.</p>
-    <ul class="fxlist"><li class="fx tie${isPolish(sc.home) || isPolish(sc.away) ? ' is-pl' : ''}">
-      <span class="fx__date">${esc(shortDay(sc.date))}${sc.winner ? ` <span class="tag-up">zdobywca: ${esc(name(sc.winner))}</span>` : ''}</span>
-      <span class="fx__team fx__team--h${win(sc.home)}">${flag(sc.home)}${esc(name(sc.home))}${crest(sc.home)}</span>
-      <span class="fx__mid">${r ? `<b class="fx__score">${r.score[0]}:${r.score[1]}</b>` : '<span class="fx__time">vs</span>'}<small>${r?.shootout ? `k. ${r.shootout[0]}:${r.shootout[1]}` : ''}</small></span>
-      <span class="fx__team${win(sc.away)}">${crest(sc.away)}${esc(name(sc.away))}${flag(sc.away)}</span>
-    </li></ul></section>`;
+    <ul class="ufxlist">${ufxRow({ cls: isPolish(sc.home) || isPolish(sc.away) ? 'is-pl' : '', date: esc(shortDay(sc.date)), home: sc.home, away: sc.away,
+      sh: r ? r.score[0] : null, sa: r ? r.score[1] : null, time: sc.time, sub: r?.shootout ? `karne ${r.shootout[0]}:${r.shootout[1]}` : '', winner: sc.winner })}</ul></section>`;
 }
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
@@ -109,7 +118,7 @@ function leagueView(game, comp, md) {
       <span>${cur}. kolejka</span>
       <button class="btn btn--quiet" data-act="cround" data-r="${Math.min(nMd, cur + 1)}" ${cur >= nMd ? 'disabled' : ''} aria-label="Następna kolejka">›</button>
     </div>
-    <ul class="fxlist">${ms.filter((m) => m.md === cur).sort((a, b) => (isPolish(b.home) || isPolish(b.away)) - (isPolish(a.home) || isPolish(a.away))).map((m) => matchRow(m, game)).join('')}</ul>`;
+    <ul class="ufxlist">${ms.filter((m) => m.md === cur).sort((a, b) => (isPolish(b.home) || isPolish(b.away)) - (isPolish(a.home) || isPolish(a.away))).map((m) => matchRow(m, game)).join('')}</ul>`;
 }
 
 function fixturesView(game, comp, filter) {
@@ -119,7 +128,7 @@ function fixturesView(game, comp, filter) {
   const days = [...new Set(all.map((m) => m.date))];
   const chips = `<div class="chips chips--sm">${[['pl', 'Polskie kluby'], ['all', 'Wszystkie mecze']].map(([k, l]) => `<button class="chip" data-act="ufilter" data-f="${k}" aria-pressed="${filter === k}">${l}</button>`).join('')}</div>`;
   if (!days.length) return `${chips}<p class="hint">${filter === 'all' ? 'Brak meczów po losowaniach.' : 'Polskie kluby nie mają jeszcze wylosowanych meczów w tych rozgrywkach.'}</p>`;
-  return `${chips}${days.map((d) => `<section class="stat-sec"><h3>${esc(shortDay(d))}, ${esc(ROUND_SHORT[all.find((m) => m.date === d).round])}</h3><ul class="fxlist">${all.filter((m) => m.date === d).map((m) => matchRow(m, game)).join('')}</ul></section>`).join('')}`;
+  return `${chips}${days.map((d) => `<section class="stat-sec"><h3>${esc(shortDay(d))}, ${esc(ROUND_SHORT[all.find((m) => m.date === d).round])}</h3><ul class="ufxlist">${all.filter((m) => m.date === d).map((m) => matchRow(m, game)).join('')}</ul></section>`).join('')}`;
 }
 
 function scorersView(game, comp) {
@@ -188,6 +197,6 @@ export function renderEurope(game, comp, { view = 'path', round = null, filter =
   const views = `<div class="subtabs subtabs--5" role="tablist">${EUROPE_VIEWS.map(([k, l]) => `<button role="tab" data-act="cview" data-v="${k}" aria-selected="${v === k}">${l}</button>`).join('')}</div>`;
   if (!game.season?.uefa) return `${views}<p class="hint">Puchary pojawią się po wczytaniu gry.</p>`;
   const body = v === 'league' ? leagueView(game, comp, round) : v === 'fixtures' ? fixturesView(game, comp, filter) : v === 'scorers' ? scorersView(game, comp) : v === 'ranking' ? rankingView(game) : pathView(game, comp, { draw });
-  return `${views}${body}`;
+  return `<div class="eu">${views}${body}</div>`;
 }
 export { uefaClub };
