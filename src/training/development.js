@@ -9,6 +9,7 @@ import { Rng, clamp } from '../core/rng.js';
 import { OFF, VARIANTS, OUTFIELD_ATTRS, GK_ATTRS, ATTRS, ovrAt } from '../data/attributes.js';
 import { DEV, staffMul } from './config.js';
 import { staffOf } from './staff.js';
+import { developmentMods } from '../career/infrastructure.js';
 import { ageAt } from './state.js';
 import { squadOf, academyOf } from '../world/worldGen.js';
 import { aiStimFor, resetAiStim } from './aiClubs.js';
@@ -87,7 +88,8 @@ export function developPlayer(p, ctx) {
   const staffDev = gk ? staffMul.gk(st.bramkarze) : staffMul.dev((st.asystent + st.fizyczny) / 2);
   const youthMul = youth ? staffMul.youth(st.mlodziez) : 1;
   const progMul = youth && prog === 'mlodzi' ? 1.1 + 0.01 * st.mlodziez : 1;
-  const g = DEV.rate(age) * Math.max(0, pot - p.ovr) / 12 * minMul * (0.8 + 0.02 * prf) * staffDev * youthMul * trainMul * progMul;
+  const infraMul = ctx.infra ? ctx.infra.dev * (youth ? ctx.infra.youth : 1) : 1; // baza treningowa i akademia (career/infrastructure.js)
+  const g = DEV.rate(age) * Math.max(0, pot - p.ovr) / 12 * minMul * (0.8 + 0.02 * prf) * staffDev * youthMul * trainMul * progMul * infraMul;
 
   const delta = {};
   if (g > 0) {
@@ -170,6 +172,7 @@ export function monthlyDevelopment(game, date) {
   const report = { month: date.slice(0, 7), date, rows: [], spurts: [] };
   for (const clubId of Object.keys(game.world.clubs)) {
     const st = qOf(staffOf(game, clubId));
+    const infra = developmentMods(game, clubId);
     const mine = clubId === game.clubId;
     const games = counts[clubId] ?? 0;
     for (const p of [...squadOf(game.world, clubId), ...academyOf(game.world, clubId)]) {
@@ -180,7 +183,7 @@ export function monthlyDevelopment(game, date) {
       if (p.aiTr) { if (mine) delete p.aiTr; else { p.aiTr.dp = 0; p.aiTr.dd = 0; } }
       const minShare = academy ? 0.5 : games ? (p.season?.min ?? 0) / (90 * games) : 0.6;
       const before = mine ? { ...p.attr } : null;
-      const r = developPlayer(p, { date, staff: st, stim, minShare, rng });
+      const r = developPlayer(p, { date, staff: st, stim, minShare, rng, infra });
       if (t) {
         t.stim = {};
         t.ovrHist = [...(t.ovrHist ?? []), p.ovr].slice(-13);

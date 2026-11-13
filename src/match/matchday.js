@@ -311,7 +311,7 @@ export function startMatchday(game, f) {
     home: teamCtx(game, f.home, comp, table, userSide === 0 ? game.tactics : oppTactics),
     away: teamCtx(game, f.away, comp, table, userSide === 1 ? game.tactics : oppTactics),
     competition: compInfo(f), neutral: !!f.neutral, h2h, referee, weather, pitch, var: hasVar,
-    stadium: { capacity: f.neutral ? 58000 : stadiumCapacity(anyClub(f.home)) },
+    stadium: { capacity: f.neutral ? 58000 : game.finance?.clubs?.[f.home]?.plan?.cap ?? stadiumCapacity(anyClub(f.home)) },
     board: { trust: game.board.trust }, fans: { mood: game.board.fansMood }, headlineHistory: game.headlineHistory ?? [],
     date: f.date, seed: `${game.seed}`, userClubId: game.clubId,
     table: table ? { roundsPlayed: Math.max(...table.map((r) => r.played)), roundsTotal: 34, size: table.length } : null,

@@ -19,6 +19,7 @@ import { staffQ } from './staff.js';
 import { shiftLog, addLoad, loadSummary, fatigueMul, regenMul, trainingInjuryChance } from './load.js';
 import { applySessionToClub, applyClubMatch, syncTacticsChange } from './cohesion.js';
 import { focusAttrs } from './development.js';
+import { trainingMods } from '../career/infrastructure.js';
 
 const r1 = (v) => Math.round(v * 10) / 10;
 const r3 = (v) => Math.round(v * 1000) / 1000;
@@ -30,10 +31,11 @@ export function sessionPreview(game, type, int, clubId = game.clubId) {
   const I = INTENSITY[def.noIntensity ? 'low' : int];
   const fitQ = staffQ(game, clubId, 'fizyczny');
   const tac = staffMul.tac(staffQ(game, clubId, 'asystent'));
+  const im = trainingMods(game, clubId); // baza treningowa (career/infrastructure.js)
   return {
-    fresh: def.recover ? r1(staffMul.recover(fitQ)) : -r1(I.fat * def.fat),
+    fresh: def.recover ? r1(staffMul.recover(fitQ) + im.rec) : -r1(I.fat * def.fat),
     load: Math.round(I.load * def.load),
-    injury: Math.round(LOAD.injBase * I.inj * def.inj * staffMul.inj(fitQ) * 10000) / 100, // % na zawodnika
+    injury: Math.round(LOAD.injBase * I.inj * def.inj * staffMul.inj(fitQ) * im.inj * 10000) / 100, // % na zawodnika
     dev: r1(I.dev * def.dev),
     sharp: r1(I.sharp * def.sharp),
     legs: r1(Math.max(0, I.legs * def.legs)),
@@ -142,6 +144,7 @@ export function processUserDay(game, date, rng) {
   const prep = trackPreparation(game, date, sets.official, ctx, day, messages);
   const fitQ = staffQ(game, clubId, 'fizyczny');
   const tac = staffMul.tac(staffQ(game, clubId, 'asystent'));
+  const im = trainingMods(game, clubId); // baza treningowa: regeneracja i urazy (career/infrastructure.js)
   const squad = squadOf(game.world, clubId);
   syncTacticsChange(game);
   const stale = staleEffects(c); // monotonia treningu (variety.js): mniej morale z zajęć, słabszy bodziec
@@ -217,7 +220,7 @@ export function processUserDay(game, date, rng) {
       const I = INTENSITY[x.int] ?? INTENSITY.mid;
       const gkSwap = p.pos === 'BR' && !GK_JOIN.has(x.type);
       if (def.recover) {
-        fresh += staffMul.recover(fitQ) * regenMul(p, age);
+        fresh += (staffMul.recover(fitQ) + im.rec) * regenMul(p, age);
         t.legs = Math.max(0, t.legs + def.legs);
       } else {
         fresh -= I.fat * def.fat * fatigueMul(p, age) * modeMul * (1 - CAMP.inCamp.fatigue * campQ) * (gkSwap ? 0.7 : 1);
@@ -277,7 +280,7 @@ export function processUserDay(game, date, rng) {
     // Uraz na treningu
     if (sessions.length) {
       const chance = trainingInjuryChance(p, {
-        sessions, age, acwr: sum.acwr, fitQ, campQ, baseMul: prep.injuryMul, rtp: t.rtp > 0, fresh: p.fresh, mode: t.mode,
+        sessions, age, acwr: sum.acwr, fitQ, campQ, baseMul: prep.injuryMul * im.inj, rtp: t.rtp > 0, fresh: p.fresh, mode: t.mode,
         returning: t.returnedAt && daysBetween(t.returnedAt, date) <= 14,
       });
       if (chance > 0 && rng.next() < chance) {

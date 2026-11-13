@@ -17,6 +17,7 @@ import { createMarket, marketWeek, answerIncoming, aiRenewals, inWindow, windowO
 import { ensureBoard, boardMonth, seasonGoalFor, trustLabel } from './board.js';
 import './squadLimitSystem.js'; // limit kadry i nacisk zarządu (docs/limit-kadry.md)
 import { ensureCoachMarket, fireCoach, hireCoach } from './coachMarket.js'; // rynek trenerów AI i właściciele (docs/trenerzy-i-wlasciciele.md)
+import { ensureInfra } from './infrastructure.js'; // stadion, baza, akademia (docs/infrastruktura.md)
 
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
 
@@ -25,6 +26,7 @@ export function ensureCareer(game) {
   if (!game.finance) game.finance = createFinance(game.world);
   // Zapis sprzed kalibracji finansów (docs/finanse.md): plan sezonu z danych klubu
   for (const [id, c] of Object.entries(game.finance.clubs)) if (!c.plan && clubById(id)) { c.plan = clubPlan(clubById(id)); c.tier = c.plan.tier; }
+  ensureInfra(game); // stary zapis: poziomy startowe; nowe plany sezonu: pojemność, przychód z widza, utrzymanie
   if (!game.market) createMarket(game);
   ensureBoard(game);
   ensureCoaches(game); // trenerzy klubów AI z atrybutami (stary zapis: profile z ziarna gry, te same nazwiska)
@@ -46,7 +48,7 @@ function matchMoney(game, date) {
     f.fin = true;
     // Kibice: nastroje, bojkoty, zamknięte sektory i mecze bez publiczności (src/career/fans.js)
     const fill = attendanceFill(f, rowOf(f.home), anyClub(f.away), f.neutral ? null : F.clubs[f.home]) * attendanceModifier(game, f.home, f);
-    f.attendance = Math.round((f.neutral ? 58000 : stadiumCapacity(clubById(f.home) ?? anyClub(f.home))) * fill / 100) * 100;
+    f.attendance = Math.round((f.neutral ? 58000 : F.clubs[f.home]?.plan?.cap ?? stadiumCapacity(clubById(f.home) ?? anyClub(f.home))) * fill / 100) * 100;
     const [h0, a0] = matchIncome(F, f, fill);
     const mul = f.comp === 'friendly' ? 0.12 : 1; // sparing: bilety symboliczne
     const h = h0 * mul; const a = a0 * mul;

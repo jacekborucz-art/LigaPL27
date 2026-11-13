@@ -250,3 +250,13 @@ Po 10 sezonach (lipiec 2036) salda w Ekstraklasie: Legia 183,9, Lech 113,7, Widz
 ## Limit kadry
 
 Odprawy i sprzedaże zarządu przy zbyt dużej kadrze (docs/limit-kadry.md) trafiają do księgi jako `release` (odprawa, zdejmowana też z budżetu transferowego) i `sales` (sprzedaż za 60 % wartości). Kluby AI płacą odprawy tylko wtedy, gdy stać je na nie (`spendable`), poza przekroczeniem maksimum kadry.
+
+## Infrastruktura
+
+Stadion, baza treningowa i akademia mają poziomy 1-10 (pełny opis, skala, źródła i wzory: docs/infrastruktura.md). Efekty liczą się względem poziomu startowego klubu, więc pierwszy dzień gry jest taki sam jak w modelu z rozdz. 3:
+
+- przychód z widza = naKibica x M(L) / M(L_start), pojemność = pojemność z danych + dobudowane miejsca (w czasie budowy mniej);
+- utrzymanie obiektów zastępuje część kosztów klubu: kredyt = min(utrzymanie na starcie, 0,5 x ops); co miesiąc księgowane są (ops - kredyt) / 12 jako `ops` i (kredyt + przyrost utrzymania) / 12 jako `upkeep` („Utrzymanie obiektów”) [SZAC];
+- inwestycje gracza: 20 % udziału klubu na start, reszta w ratach co miesiąc (`infra`, „Inwestycje w obiekty”); miasto i bogaty właściciel dokładają według typu właściciela [SZAC];
+- kluby AI kierują połowę corocznej kwoty `invest` (rozdz. 3.4) na projekty: licencja, baza, akademia, stadion (tylko przy zapełnieniu od 92 %), nie wyżej niż poziom 8 [SZAC];
+- licencja (Ekstraklasa: stadion od 4 i 4 500 miejsc, baza od 3, akademia od 3; 1 Liga: stadion od 3, akademia od 2; 2 Liga: stadion od 2): sezon na rozpoczęcie inwestycji, potem kara 1 mln zł (`fines`) [SZAC].
