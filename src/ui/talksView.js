@@ -8,6 +8,7 @@ import {
 import { acclimLabel } from '../career/acclimatization.js';
 import { GROUP } from '../career/squad.js';
 import { attentionNeed, daysSinceAttention, ATTN } from '../career/attention.js';
+import { authoritySummary } from '../career/authority.js';
 
 export const isTalkAction = (act) => typeof act === 'string' && act.startsWith('tt-');
 
@@ -63,11 +64,13 @@ export function renderTalks(game, ui = {}) {
   const recIds = new Set(rec.map((p) => p.id));
   const rest = sq.filter((p) => !recIds.has(p.id)).sort((a, b) => (a.morale ?? 12) - (b.morale ?? 12));
   const need = m.low + m.unhappy;
+  const auth = authoritySummary(game);
   const pips = Array.from({ length: TALKS_PER_WEEK }, (_, i) => `<i class="${i < used ? 'is-used' : ''}"></i>`).join('');
   return `<div class="tt">
     <section class="tt-head" aria-label="Stan drużyny">
       <div class="tt-kpi" data-m="${moraleBand(m.avg)}"><small>Atmosfera w drużynie</small><b>${esc(moraleLabel(m.avg))}</b><small>${esc(sit.label)}${sit.last.length ? `: ${sit.last.join(' ')}` : ''}</small></div>
       <div class="tt-kpi" data-m="${need + m.waiting > 0 ? 'low' : 'good'}"><small>Wymaga uwagi</small><b>${need + m.waiting}</b><small>${m.low} z niskim morale, ${m.unhappy} niezadowolonych${m.newcomers ? `, ${m.newcomers} nowych w aklimatyzacji` : ''}${m.waiting ? `, ${m.waiting} czeka na rozmowę` : ''}</small></div>
+      <div class="tt-kpi tt-kpi--auth" data-m="${auth.level === 'high' ? 'good' : auth.level === 'low' ? 'bad' : 'mid'}"><small>Autorytet trenera</small><b>${esc(auth.label)}</b><small>${esc(auth.tip)}</small></div>
       <div class="tt-kpi" data-m="${left > 0 ? 'calm' : 'mid'}"><small>Rozmowy w tym tygodniu</small><b>${left} z ${TALKS_PER_WEEK}</b><span class="tt-pips" aria-hidden="true">${pips}</span></div>
     </section>
     ${res ? `<p class="notice tt-notice" role="status">${esc(res)}</p>` : ''}
