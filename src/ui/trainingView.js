@@ -439,8 +439,8 @@ function weekTab(game, ui) {
       <aside class="tr-col">
         <section class="panel tr-plan">
           <h3>Plan asystenta</h3>
-          <p class="muted">Akcent tygodnia</p><div class="chips chips--wrap">${accents}</div>
-          <p class="muted">Poziom obciążeń</p><div class="chips chips--wrap">${loads}</div>
+          <p class="muted">Akcent tygodnia</p><div class="chips tr-chips">${accents}</div>
+          <p class="muted">Poziom obciążeń</p><div class="chips tr-chips">${loads}</div>
           <p class="muted">Asystent układa mikrocykl od terminarza: dzień po meczu regeneracja, 4 i 3 dni przed meczem najcięższe zajęcia, dzień przed meczem rozruch i analiza rywala. Przy dwóch meczach w tygodniu zostaje tylko regeneracja, taktyka i rozruch.</p>
           ${own ? `<button class="btn btn--quiet" data-act="tr-resetweek" data-date="${esc(monday)}">Przywróć cały tydzień asystenta</button>` : ''}
         </section>
@@ -498,12 +498,12 @@ function playerEditor(game, p) {
       ${hist ? `<div class="tr-dl__wide"><dt>OVR co miesiąc</dt><dd>${esc(hist)}</dd></div>` : ''}
     </dl>
     <h4>Tryb treningu</h4><div class="seg2">${modes}</div>
-    <h4>Programy</h4><div class="chips chips--wrap">${progs}<button class="chip" data-act="tr-prog" data-id="${esc(p.id)}" data-v="" aria-pressed="${!t.prog}">Bez programu</button></div>
+    <h4>Programy</h4><div class="chips tr-chips">${progs}<button class="chip" data-act="tr-prog" data-id="${esc(p.id)}" data-v="" aria-pressed="${!t.prog}">Bez programu</button></div>
     ${t.prog ? `<p class="muted">${esc(PROGRAMS[t.prog].text)}</p>` : ''}
     </div><div class="tr-pcol">
     <h4>Akcent indywidualny</h4>
     <p class="muted">Dodatkowe 20 minut po zajęciach: bodziec +0,4 na wybrane atrybuty w każdym dniu treningu, świeżość -2. Akcent poza profilem pozycji wolniej podnosi OVR.</p>
-    <div class="chips chips--wrap">${focusChips}</div><div class="tr-attrs">${attrBtns}</div>
+    <div class="chips tr-chips">${focusChips}</div><div class="tr-attrs">${attrBtns}</div>
     <h4>Nowa pozycja</h4><p class="muted">Biegłość rośnie ok. 1-2 punkty na tydzień (szybciej przy treningu taktycznym i lepszym asystencie), najwyżej do 90.</p>${posBtns}
     </div></div>
   </section>`;
@@ -680,8 +680,8 @@ function campsTab(game, ui) {
       <h3 class="tr-sechead">Zaplanuj obóz</h3>
       <p class="muted">Wolne od meczów o punkty: od ${esc(fmtDate(w.from))} do ${esc(fmtDate(w.to))}. Pierwszy mecz rundy: ${esc(fmtDate(w.start))}.</p>
       <div class="tr-camps">${dests}</div>
-      <p class="muted">Długość</p><div class="chips chips--wrap">${lengths.map((d) => `<button class="chip" data-act="tr-camp-len" data-v="${d}" aria-pressed="${d === len}">${d} dni</button>`).join('')}</div>
-      <p class="muted">Wyjazd</p><div class="chips chips--wrap">${starts.map((d) => `<button class="chip" data-act="tr-camp-start" data-date="${esc(d)}" aria-pressed="${d === start}">${esc(shortDate(d))}</button>`).join('') || '<span class="muted">Brak wolnego terminu.</span>'}</div>
+      <p class="muted">Długość</p><div class="chips tr-chips">${lengths.map((d) => `<button class="chip" data-act="tr-camp-len" data-v="${d}" aria-pressed="${d === len}">${d} dni</button>`).join('')}</div>
+      <p class="muted">Wyjazd</p><div class="chips tr-chips">${starts.map((d) => `<button class="chip" data-act="tr-camp-start" data-date="${esc(d)}" aria-pressed="${d === start}">${esc(shortDate(d))}</button>`).join('') || '<span class="muted">Brak wolnego terminu.</span>'}</div>
       <section class="tr-card" data-t="info">
         <header class="tr-card__head"><h3>Skutki</h3></header>
         <dl class="tr-dl">

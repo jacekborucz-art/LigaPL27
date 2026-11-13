@@ -98,7 +98,7 @@ test('Trening: zaplanowany obóz z datami widać na każdej zakładce (baner) i 
     clean(html, tab);
   }
   act('tr-tab', { tab: 'pulpit' });
-  assert.match(renderTraining(g, ui), /<h3>Obóz<\/h3><span class="tr-card__badge">za \d+ dni<\/span>/);
+  assert.match(renderTraining(g, ui), /<h3>Obóz<\/h3><span class="tr-card__badge">(jutro|za \d+ dni)<\/span>/);
   // W trakcie obozu: status „Trwa”, dni obozu w planie tygodnia
   playUntil(g, b.from);
   let html = renderTraining(g, ui);
