@@ -833,7 +833,8 @@ export function aiNegotiate({ kind = 'sign', player, club, fromClub = null, date
   const fit = (o) => {
     if (!budget.maxYears && !budget.total) return o;
     const x = { ...o, years: Math.max(1, Math.min(o.years, budget.maxYears ?? MAX_YEARS)) };
-    while (x.years > 1 && budget.total && x.wage * 52 * x.years + (x.signOn || 0) + (x.agentFee || 0) > budget.total) x.years--;
+    // limit zarządu na roczny koszt kontraktu (pensja i rozłożone premie, boardRequests.js contractAnnual)
+    if (budget.total && x.wage * 52 + ((x.signOn || 0) + (x.agentFee || 0)) / Math.max(1, x.years) > budget.total) x.wage = Math.max(0, Math.floor((budget.total - ((x.signOn || 0) + (x.agentFee || 0)) / Math.max(1, x.years)) / 52 / 100) * 100);
     return x;
   };
   const offer = fit({

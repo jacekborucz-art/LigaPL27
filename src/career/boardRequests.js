@@ -17,7 +17,7 @@ import { standings } from '../season/standings.js';
 import { GROUP } from './squad.js';
 import { ensureBoard, tablePos, seasonGoalFor } from './board.js';
 import { ownerOf } from './owners.js';
-import { wageBill, book } from './finance.js';
+import { wageBill, book, spendable } from './finance.js';
 import { marketWage, estimateValue, MAX_YEARS, yearsLabel } from './negotiation.js';
 import { fmtDate } from '../ui/dom.js';
 
@@ -44,7 +44,7 @@ export const REQ = {
 export const VETO = {
   SQUAD_X: 1.5, SQUAD_X_RICH: 1.8, MARKET_X: 1.3, RENEW_X: 1.15, // pensja: najwyższa w kadrze, rynkowa, obecna
   BUDGET_SHARE: 0.25, // pensja najwyżej 25 % tygodniowego budżetu płac
-  TOTAL_SHARE: 0.15, // koszt całego kontraktu najwyżej 15 % rocznych przychodów krajowych
+  TOTAL_SHARE: 0.15, // roczny koszt kontraktu (pensja i rozłożone premie) najwyżej 15 % rocznych przychodów z dopłatą właściciela
   FEE_VALUE_X: 2, FEE_WARN_X: 1.5, FEE_MIN: 1e6, // odstępne do wartości rynkowej (powyżej 1 mln zł)
   FEE_REVENUE: 0.4, // odstępne najwyżej 40 % przychodów krajowych (chyba że pokrywa skarbiec właściciela)
   SIGN_ON: 0.5, // premia za podpis najwyżej połowa pensji z pierwszego roku
@@ -165,7 +165,9 @@ export function requestScore(game, clubId, type, amount, date, opts = {}) {
   parts.table = type === 'goal' ? -table : table;
   const cost = opts.cost ?? requestCost(type, amount, date);
   const reserve = c?.plan ? (c.plan.wages + c.plan.ops) / 12 : 0;
-  parts.money = cost > 0 && c ? clamp(10 * ((c.balance - reserve) / cost - 1), -20, 15) : 0;
+  // Wolne pieniądze: saldo minus rezerwa na miesiąc kosztów i minus budżet transferowy już przyznany (wydany w planie)
+  const committed = c ? Math.max(0, spendable(game.finance, clubId)) : 0;
+  parts.money = cost > 0 && c ? clamp(10 * ((c.balance - reserve - committed) / cost - 1), -20, 15) : 0;
   let W = c ? wageRatio(game, clubId) : 0;
   if (c && (type === 'wage' || type === 'shift')) {
     const add = type === 'wage' ? amount : amount / REQ.WAGE_WEEKS_PER_ZL;
@@ -487,6 +489,7 @@ export function clubBoardData(game, clubId) {
     squadX: o && o.zasobnosc >= 14 && o.ambicja >= 14 ? VETO.SQUAD_X_RICH : VETO.SQUAD_X,
     wages, wageBudget: c?.wageBudget ?? Infinity,
     domestic: c?.plan?.domestic ?? c?.base ?? Infinity, skarbiec: c?.plan?.skarbiec ?? 0,
+    revenue: (c?.plan?.domestic ?? c?.base ?? Infinity) + (c?.plan?.owner ?? 0), // przychody krajowe i stała dopłata właściciela
   };
 }
 
@@ -508,7 +511,7 @@ export function boardCaps(game, clubId, player, kind = 'sign', data = null) {
     wage: floor100(Math.min(squadCap, budgetCap)), wageWhy: squadCap <= budgetCap ? (top * d.squadX * d.s >= squadCap ? 'squad' : 'market') : 'budget',
     top, market, wageBudget: d.wageBudget, cur,
     years: maxYearsFor(player), age: player.age ?? 25,
-    total: Math.round(VETO.TOTAL_SHARE * d.domestic * d.s), totalPct: VETO.TOTAL_SHARE * d.s,
+    total: Math.round(VETO.TOTAL_SHARE * (d.revenue ?? d.domestic) * d.s), totalPct: VETO.TOTAL_SHARE * d.s,
     signOnPct: VETO.SIGN_ON * d.s, agentPct: VETO.AGENT * d.s,
     value, fee: Math.max(VETO.FEE_MIN, VETO.FEE_VALUE_X * d.s * value), feeWarn: Math.max(VETO.FEE_MIN, VETO.FEE_WARN_X * d.s * value),
     feeRevenue: d.skarbiec > VETO.FEE_REVENUE * d.domestic * d.s ? d.skarbiec : VETO.FEE_REVENUE * d.domestic * d.s, feeRevenuePct: VETO.FEE_REVENUE * d.s,
@@ -517,6 +520,8 @@ export function boardCaps(game, clubId, player, kind = 'sign', data = null) {
 }
 
 const contractCost = (o) => o.wage * 52 * o.years + (o.signOn ?? 0) + (o.agentFee ?? 0);
+/** Roczny koszt kontraktu: pensja i premia za podpis z prowizją rozłożone na lata (limit weta). */
+export const contractAnnual = (o) => o.wage * 52 + ((o.signOn ?? 0) + (o.agentFee ?? 0)) / Math.max(1, o.years ?? 1);
 
 /** Naruszenia progów przez ofertę kontraktu. Zwraca listę { code, text, over } (pusta = zarząd zatwierdzi). */
 export function contractIssues(caps, offer) {
@@ -532,8 +537,8 @@ export function contractIssues(caps, offer) {
     add('wage', offer.wage / caps.wage - 1, `Proponowana pensja ${zl(offer.wage)} tygodniowo ${what}. Zaakceptujemy najwyżej ${zl(caps.wage)}.`);
   }
   if (offer.years > caps.years) add('years', offer.years / caps.years - 1, `Zawodnik ma ${caps.age} lat. W tym wieku zarząd podpisze kontrakt najwyżej na ${yearsLabel(caps.years)}.`);
-  const total = contractCost(offer);
-  if (total > caps.total) add('total', total / caps.total - 1, `Łączny koszt kontraktu (pensje, premia za podpis i prowizja) to ${zl(total)}. Zaakceptujemy najwyżej ${zl(caps.total)} (${pct(caps.totalPct)} rocznych przychodów krajowych).`);
+  const total = contractAnnual(offer);
+  if (total > caps.total) add('total', total / caps.total - 1, `Roczny koszt kontraktu (pensja, premia za podpis i prowizja rozłożone na lata) to ${zl(total)}. Zaakceptujemy najwyżej ${zl(caps.total)} (${pct(caps.totalPct)} rocznych przychodów klubu).`);
   const signCap = Math.round(caps.signOnPct * offer.wage * 52);
   if ((offer.signOn ?? 0) > signCap) add('signOn', offer.signOn / Math.max(1, signCap) - 1, `Premia za podpis ${zl(offer.signOn)} przekracza ${pct(caps.signOnPct)} pensji z pierwszego roku. Zaakceptujemy najwyżej ${zl(signCap)}.`);
   const agentCap = Math.round(caps.agentPct * offer.wage * 52 * offer.years);
@@ -557,9 +562,9 @@ export function fitOfferToCaps(caps, offer) {
   const o = { ...offer, bonus: { ...(offer.bonus ?? {}) } };
   o.wage = Math.min(o.wage, caps.wage);
   o.years = Math.max(1, Math.min(o.years ?? 1, caps.years));
-  while (o.years > 1 && contractCost(o) > caps.total) o.years--;
   o.signOn = Math.min(o.signOn ?? 0, Math.round(caps.signOnPct * o.wage * 52));
   o.agentFee = Math.min(o.agentFee ?? 0, Math.round(caps.agentPct * o.wage * 52 * o.years));
+  if (contractAnnual(o) > caps.total) o.wage = Math.max(0, Math.floor((caps.total - ((o.signOn ?? 0) + (o.agentFee ?? 0)) / o.years) / 52 / 100) * 100);
   return o;
 }
 
