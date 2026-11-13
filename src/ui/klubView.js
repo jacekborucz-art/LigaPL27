@@ -16,7 +16,7 @@ export function renderClubHub(game, ui = {}) {
   let body;
   if (tab === 'sponsorzy') body = sponsorsView(game, ui);
   else if (tab === 'infrastruktura') body = infraView(game, ui);
-  else if (tab === 'zarzad') body = boardView(game) + boardRequestsPanel(game, ui);
+  else if (tab === 'zarzad') body = `<div class="klub-cols"><div class="klub-main">${boardView(game)}</div>${boardRequestsPanel(game, ui)}</div>`;
   else body = financeView(game);
   const msg = ui.kMsg ? `<p class="tf-msg" role="status">${esc(ui.kMsg)}</p>` : '';
   return `<div class="tfx klub" data-tab="${esc(tab)}"><div class="tfx__head"><h2>Klub</h2></div>${tabs}${msg}${body}</div>`;

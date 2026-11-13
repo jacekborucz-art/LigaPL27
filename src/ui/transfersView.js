@@ -468,6 +468,33 @@ function monthsChart(c) {
     }).join('')}</ol>`;
 }
 
+/**
+ * Plan sezonu a wykonanie (prawa kolumna Finansów): roczny plan klubu (clubPlan) wobec wpływów i kosztów od lipca,
+ * z częścią sezonu, która minęła. Premia za miejsce w lidze i nagrody przychodzą po rozstrzygnięciach.
+ */
+function planPanel(game, c, s) {
+  const p = c.plan;
+  if (!p) return '';
+  const [y, m] = game.date.split('-').map(Number);
+  const done = Math.min(12, Math.max(1, (m >= 7 ? m - 6 : m + 6))) / 12; // miesiące od lipca (bieżący liczony)
+  const row = (label, plan, actual, dir) => {
+    const ratio = plan > 0 ? actual / plan : 0;
+    const ahead = dir === 'in' ? ratio >= done - 0.05 : ratio <= done + 0.05;
+    return `<div class="klub-plan__row"><span>${esc(label)}<small> plan ${fmtZl(plan)}</small></span><span>${fmtZl(actual)}</span><b data-k="${ahead ? 'pos' : 'neg'}">${Math.round(ratio * 100)}%</b></div>`;
+  };
+  const inn = s.in ?? {}; const out = s.out ?? {};
+  const rows = [
+    row('Dzień meczowy', p.tickets, inn.tickets ?? 0, 'in'),
+    row('Prawa TV i podział ligi', p.tv, inn.tv ?? 0, 'in'),
+    row('Sponsorzy', p.sponsor, inn.sponsor ?? 0, 'in'),
+    ...(p.owner ? [row('Właściciel', p.owner, inn.owner ?? 0, 'in')] : []),
+    row('Pensje', p.wages, out.wages ?? 0, 'out'),
+    row('Koszty klubu i obiektów', p.ops + (p.upkeep ?? 0) - (p.upkeepBase ?? 0), (out.ops ?? 0) + (out.upkeep ?? 0), 'out'),
+  ].join('');
+  void y;
+  return panel('Plan sezonu a wykonanie', 'misc', `<p class="tf-p__txt">Minęło ${Math.round(done * 100)}% sezonu. Zielony procent: zgodnie z planem albo lepiej. Premia za miejsce w lidze (plan ${fmtZl(p.merit ?? 0)}) i nagrody wpływają po rozstrzygnięciach.</p><div class="klub-plan">${rows}</div>`);
+}
+
 export function financeView(game) {
   const c = game.finance.clubs[game.clubId];
   const s = seasonSummary(c);
@@ -494,7 +521,8 @@ export function financeView(game) {
           <p class="tf-sum tf-sum--net"><span>Wynik miesiąca</span><b class="${m.net < 0 ? 'neg' : ''}">${m.net >= 0 ? '+' : ''}${fmtZl(m.net)}</b></p>`)}
       </div>
       <div class="tf-stack">
-        ${panel('Ostatnie operacje', 'info', `<ul class="tf-log">${c.log.slice(0, 15).map((l) => `<li><time>${esc(shortDate(l.date))}</time><span>${esc(l.note)}</span><b data-k="${l.dir}">${l.dir === 'out' ? '-' : '+'}${fmtZl(l.amount)}</b></li>`).join('') || '<li><span>Brak.</span></li>'}</ul>`)}
+        ${planPanel(game, c, s)}
+        ${panel('Ostatnie operacje', 'info', `<ul class="tf-log">${c.log.slice(0, 12).map((l) => `<li><time>${esc(shortDate(l.date))}</time><span>${esc(l.note)}</span><b data-k="${l.dir}">${l.dir === 'out' ? '-' : '+'}${fmtZl(l.amount)}</b></li>`).join('') || '<li><span>Brak.</span></li>'}</ul>`)}
       </div>
     </div>`;
 }

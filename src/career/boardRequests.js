@@ -351,7 +351,7 @@ export function askBoard(game, type, amount = 0, date = game.date) {
   let dTrust = 0;
   const t = sc.pos;
   if (B.trust < 35 || (t.played >= 4 && t.pos && t.pos >= (B.goal?.target ?? 99) + 4)) dTrust -= 2;
-  if (verdict === 'no') dTrust -= 1;
+  if (verdict === 'no' && type !== 'shift') dTrust -= 1; // przesunięcie to reguła wskaźnika płac, bez kosztu zaufania
   B.trust = Math.round(clamp(B.trust + dTrust, 0, 100));
 
   const label = REQ_TYPES[type].short;
@@ -400,7 +400,7 @@ export function askBoard(game, type, amount = 0, date = game.date) {
     subject = `Odmowa zarządu: ${label}`;
     const why = note ? [] : reasons(game, sc, type, amount);
     body = `zarząd nie zgadza się na ${label === 'przesunięcie pieniędzy do płac' ? 'przesunięcie pieniędzy do płac' : `większy ${label}`} (${zl(amount)}${type === 'wage' ? ' tygodniowo' : ''}).${note ? ` ${note}` : ''}${why.length ? ` Powody: ${why.join('; ')}.` : ''}`;
-    entry.text = 'Odmowa.';
+    entry.text = note || (why.length ? `Powód: ${why[0]}.` : 'Bez uzasadnienia w liście.');
   }
   const next = requestStatusAfter(entry);
   body += ` Do tej sprawy wrócimy najwcześniej ${fmtDate(next)}.`;
