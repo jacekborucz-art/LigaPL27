@@ -147,6 +147,38 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     return game.world?.players?.[id] ?? null;
   }
   const evLines = () => (S.M ? scoreboardLines(S.M.events, whoById) : [[], []]);
+  // Pasek informacji pod tablicą wyniku: rozgrywki, pogoda, sędzia, miejsce, widzowie (dane ze studia przedmeczowego)
+  const MI = {
+    comp: '<path d="M5 2h6v2.5a3 3 0 0 1-6 0zM5 3H2.5a2 2 0 0 0 2.6 2.6M11 3h2.5a2 2 0 0 1-2.6 2.6M8 7.5V11M5.5 13.5h5M6.5 11h3l.5 2.5h-4z"/>',
+    slonce: '<circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.8M8 12.7v1.8M1.5 8h1.8M12.7 8h1.8M3.4 3.4l1.3 1.3M11.3 11.3l1.3 1.3M3.4 12.6l1.3-1.3M11.3 4.7l1.3-1.3"/>',
+    pochmurno: '<path d="M4.5 12.5h7a2.8 2.8 0 0 0 .3-5.6A3.8 3.8 0 0 0 4.6 7a2.8 2.8 0 0 0-.1 5.5z"/>',
+    deszcz: '<path d="M4.5 9.5h7a2.6 2.6 0 0 0 .3-5.2A3.6 3.6 0 0 0 4.6 4.4a2.6 2.6 0 0 0-.1 5.1zM5.5 11.5l-.8 2M8.5 11.5l-.8 2M11.5 11.5l-.8 2"/>',
+    snieg: '<path d="M8 1.8v12.4M2.6 4.9l10.8 6.2M2.6 11.1l10.8-6.2M6.5 2.8 8 4.2l1.5-1.4M6.5 13.2 8 11.8l1.5 1.4"/>',
+    wiatr: '<path d="M1.5 6h8.2a2 2 0 1 0-2-2M1.5 9.5h11a2 2 0 1 1-2 2M1.5 12.5h5"/>',
+    ref: '<path d="M2.5 9.5a3.5 3.5 0 1 0 7 0 3.5 3.5 0 0 0-7 0zM6 6V3.5h7.5v3H9.3"/><circle cx="6" cy="9.5" r=".6"/>',
+    venue: '<path d="M8 14.5s4.5-4.2 4.5-8a4.5 4.5 0 0 0-9 0c0 3.8 4.5 8 4.5 8z"/><circle cx="8" cy="6.5" r="1.6"/>',
+    crowd: '<circle cx="5.5" cy="5" r="2"/><circle cx="11" cy="5.5" r="1.7"/><path d="M1.8 13.5a3.7 3.7 0 0 1 7.4 0M8.6 13.5a3 3 0 0 1 5.6-1.6"/>',
+  };
+  const miIcon = (k) => `<svg class="minfo__i" viewBox="0 0 16 16" aria-hidden="true">${MI[k] ?? MI.pochmurno}</svg>`;
+  const num = (n) => Math.round(n).toLocaleString('pl-PL');
+  function matchInfoHtml() {
+    const c = S.pre?.conditions;
+    if (!c) return '';
+    const home = anyClub(fixture.home)?.name ?? '';
+    const venue = fixture.neutral ? (fixture.venue ? `${fixture.venue}, teren neutralny` : 'Teren neutralny') : `Stadion gospodarzy, ${home}`;
+    const att = c.attendance ?? {};
+    const crowd = !att.expected ? 'Mecz bez publiczności'
+      : `Widzowie: ok. ${num(att.expected)}${att.capacity ? ` z ${num(att.capacity)}` : ''}`;
+    const items = [
+      ['comp', compLabel(fixture), 'Rozgrywki'],
+      [S.weather?.type ?? 'pochmurno', `${c.weather.label}${c.weather.tempC != null ? `, ${c.weather.tempC}°C` : ''}`, `Pogoda. Murawa: ${c.pitch.label.toLowerCase()}`],
+      ['ref', `Sędzia: ${c.referee.name}${c.referee.var ? ', VAR' : ''}`, `${c.referee.label}: średnio ${String(c.referee.expectedYellows).replace('.', ',')} żółtej kartki na mecz`],
+      ['venue', venue, 'Miejsce spotkania'],
+      ['crowd', crowd, att.capacity ? `Zapełnienie ok. ${Math.round((att.expected / att.capacity) * 100)}%` : 'Frekwencja'],
+    ];
+    return `<ul class="minfo" aria-label="Informacje o meczu">${items.map(([k, t, title]) => `<li class="minfo__it" data-k="${k === 'comp' || k === 'ref' || k === 'venue' || k === 'crowd' ? k : 'weather'}" title="${esc(title)}">${miIcon(k)}<span>${esc(t)}</span></li>`).join('')}</ul>`;
+  }
+
   function boardHtml(score, minLabel, { size = 30, live = false } = {}) {
     const [h, a] = evLines();
     return `<div class="board${h.length || a.length ? ' has-ev' : ''}" ${live ? 'id="mdBoard" aria-live="off"' : ''}>
@@ -421,6 +453,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       <div class="live" data-tab="${ui.tab}">
         <div class="live__head" id="mdHead">
           ${boardHtml(M.score, M.events[M.events.length - 1]?.min ?? "0'", { live: true })}
+          ${matchInfoHtml()}
         </div>
         <div class="live__centre">
           <div class="mom-area">
