@@ -10,6 +10,7 @@ import { applyMorale } from './morale.js';
 import { applyTrust, classifyReaction, REACTIONS } from '../match/briefings.js';
 import { noteAttention, attentionNeed, daysSinceAttention, ATTN } from './attention.js';
 import { logEngage } from './authority.js';
+import { approachMod } from './talkDialog.js';
 
 export const MEETING_TONES = {
   praise: { label: 'Pochwała', quote: '„Dobra robota w ostatnich tygodniach. Tak trzymać.”', hint: 'Działa po dobrej serii. Przy słabych wynikach brzmi fałszywie.' },
@@ -125,6 +126,12 @@ export function talkBlockedText(game, playerId) {
   return n > 0 ? `Rozmowa w tym tygodniu już była. Kolejna za ${n} ${dniWord(n)}` : null;
 }
 
+/** Rozmowa z zawodnikiem w tym tygodniu (wpis dziennika z reakcją) albo null. */
+export function talkThisWeek(game, playerId) {
+  if (!talkCooldown(game, playerId)) return null;
+  return state(game).log.find((x) => x.kind === 'talk' && x.playerId === playerId) ?? null;
+}
+
 /** Liczba rozmów indywidualnych w ostatnich 7 dniach (informacja, bez limitu). */
 export function talksThisWeek(game) {
   const T = state(game);
@@ -157,7 +164,11 @@ export function talkSuggestions(game) {
 }
 
 /** Rozmowa z zawodnikiem. kind z PLAYER_TALKS. Zwraca reakcję i tekst odpowiedzi. */
-export function talkToPlayer(game, playerId, kind) {
+/**
+ * Rozmowa z zawodnikiem. opts.approach: podejście trenera z okna rozmowy (career/talkDialog.js); bez podejścia
+ * (szybka rozmowa z menu) efekt jak dotąd.
+ */
+export function talkToPlayer(game, playerId, kind, { approach = null } = {}) {
   const T = state(game);
   const p = game.world.players[playerId];
   if (!p || p.clubId !== game.clubId) return { ok: false, text: 'To nie jest zawodnik twojej drużyny.' };
@@ -208,14 +219,15 @@ export function talkToPlayer(game, playerId, kind) {
       break;
     default: break;
   }
-  z += (trust - 50) / 60 - same * 0.9 + rng.gauss(0, 0.4);
+  z += (trust - 50) / 60 - same * 0.9 + rng.gauss(0, 0.4) + approachMod(persona, kind, approach);
   const trustD = z >= 1.4 ? 1 : z <= -0.8 ? -1.5 : 0;
   if (trustD) p.relations = { ...(p.relations ?? {}), [game.clubId]: applyTrust(p, trustD, `rozmowa:${kind}`, { clubId: game.clubId, date: game.date }) };
+  const moraleBefore = p.morale ?? 12;
   p.morale = applyMorale(p.morale ?? 12, clamp(z, -2.5, 2.5));
   noteAttention(p, game.date);
   logEngage(game, z >= 0.8 ? 'talkGood' : z <= -0.5 ? 'talkBad' : 'talkMeh'); // trafność rozmowy (career/authority.js)
   const reaction = classifyReaction(z * 1.8, trustD);
   T.perPlayer[playerId] = [...hist, { date: game.date, kind }];
-  T.log = [{ date: game.date, kind: 'talk', playerId, talk: kind, reaction, reply }, ...T.log].slice(0, 20);
-  return { ok: true, reaction, label: REACTIONS[reaction].label, reply: same ? `${reply} Słyszał to już niedawno.` : reply };
+  T.log = [{ date: game.date, kind: 'talk', playerId, talk: kind, reaction, reply, approach }, ...T.log].slice(0, 20);
+  return { ok: true, reaction, label: REACTIONS[reaction].label, reply: same ? `${reply} Słyszał to już niedawno.` : reply, moraleBefore, moraleAfter: p.morale, same: !!same };
 }

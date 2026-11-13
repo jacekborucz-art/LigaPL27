@@ -1117,3 +1117,50 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 @media (max-width: 759px) {
   .tbl--nt .tbl__row { grid-template-columns: 26px minmax(0, 1fr) 30px 52px 36px !important; }
 }
+
+/* ================= Okno rozmowy indywidualnej (src/ui/talksView.js, career/talkDialog.js) ================= */
+.tt-row.is-done { opacity: .92; background: color-mix(in srgb, var(--tt-good) 6%, var(--surface)); border-left-color: var(--tt-good); }
+.tt-done { --c: var(--tt-good); display: inline-block; padding: 2px 8px; border-radius: 999px; font: 700 11.5px/1.4 var(--font-body); color: color-mix(in srgb, var(--c) 75%, var(--text)); background: color-mix(in srgb, var(--c) 16%, transparent); }
+.tt-done[data-k="info"] { --c: var(--tt-calm); } .tt-done[data-k="warn"] { --c: var(--tt-push); } .tt-done[data-k="bad"] { --c: var(--tt-risk); }
+.tt-done-ico { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; color: #fff; background: var(--tt-good); font-weight: 700; margin-left: auto; }
+.ttd-back { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 16px; background: rgb(8 14 10 / .62); }
+.ttd { --tt-good: #2E8A4E; --tt-push: #C98A12; --tt-calm: #2D6A8F; --tt-risk: #C23B3B;
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto; width: min(720px, 100%); max-height: min(860px, calc(100dvh - 32px)); border-radius: var(--radius-m); background: var(--surface); color: var(--text); box-shadow: 0 24px 60px rgb(0 0 0 / .4); overflow: hidden; }
+.ttd-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--tt-calm) 8%, var(--surface)); }
+.ttd-head .pos { min-width: 42px; min-height: 30px; font-size: 13px; }
+.ttd-head h2 { margin: 0; font: 700 var(--step-1)/1.1 var(--font-display); }
+.ttd-head p { margin: 2px 0 0; font-size: var(--step--1); color: var(--text-muted); }
+.ttd-x { width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 22px; cursor: pointer; }
+.ttd-body { overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.ttd-msg { max-width: 82%; padding: 8px 12px 10px; border-radius: 14px; line-height: 1.5; }
+.ttd-msg p { margin: 2px 0 0; }
+.ttd-msg__who { font: 700 11px/1 var(--font-display); letter-spacing: .04em; color: var(--text-muted); }
+.ttd-msg--pl { align-self: flex-start; background: color-mix(in srgb, var(--text) 7%, var(--surface)); border-bottom-left-radius: 4px; }
+.ttd-msg--co { align-self: flex-end; background: color-mix(in srgb, var(--tt-good) 16%, var(--surface)); border-bottom-right-radius: 4px; }
+.ttd-note { margin: -4px 0 4px; font-size: var(--step--1); font-style: italic; color: var(--text-muted); }
+.ttd-h { margin: 8px 0 2px; font: 700 var(--step-0)/1.1 var(--font-display); }
+.ttd-topics { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
+.ttd-topic { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--surface); color: var(--text); text-align: left; font: inherit; cursor: pointer; }
+.ttd-topic b { font: 700 var(--step-0)/1.15 var(--font-display); }
+.ttd-topic small { color: var(--text-muted); font-size: 12px; }
+.ttd-topic:hover { border-color: var(--tt-calm); background: color-mix(in srgb, var(--tt-calm) 8%, var(--surface)); }
+.ttd-topic.is-sugg { border-color: var(--tt-push); background: color-mix(in srgb, var(--tt-push) 10%, var(--surface)); }
+.ttd-sugg { margin-top: 2px; padding: 1px 7px; border-radius: 999px; font: 700 10.5px/1.5 var(--font-body); color: #1C1404; background: var(--tt-push); }
+.ttd-topic-chosen { margin: 4px 0 0; font-size: var(--step--1); color: var(--text-muted); }
+.ttd-says { display: grid; gap: 8px; }
+.ttd-say { --c: var(--tt-calm); display: grid; gap: 3px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--c) 40%, var(--line)); border-left: 5px solid var(--c); border-radius: var(--radius-s); background: color-mix(in srgb, var(--c) 7%, var(--surface)); color: var(--text); text-align: left; font: inherit; cursor: pointer; }
+.ttd-say[data-ap="wsparcie"] { --c: var(--tt-good); } .ttd-say[data-ap="stanowczo"] { --c: var(--tt-risk); }
+.ttd-say:hover { background: color-mix(in srgb, var(--c) 15%, var(--surface)); }
+.ttd-say__k { font: 700 12px/1 var(--font-display); letter-spacing: .04em; color: color-mix(in srgb, var(--c) 75%, var(--text)); }
+.ttd-say__line { font-style: italic; line-height: 1.45; }
+.ttd-say small { color: var(--text-muted); font-size: 12px; }
+.ttd-out { --c: var(--tt-calm); display: grid; gap: 4px; margin-top: 6px; padding: 10px 12px; border-radius: var(--radius-s); background: color-mix(in srgb, var(--c) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--c) 40%, var(--line)); }
+.ttd-out[data-k="good"] { --c: var(--tt-good); } .ttd-out[data-k="warn"] { --c: var(--tt-push); } .ttd-out[data-k="bad"] { --c: var(--tt-risk); }
+.ttd-out b { font: 700 var(--step-0)/1.1 var(--font-display); color: color-mix(in srgb, var(--c) 75%, var(--text)); }
+.ttd-out i { font-style: normal; } .ttd-out i[data-dir="up"] { color: var(--tt-good); } .ttd-out i[data-dir="down"] { color: var(--tt-risk); }
+.ttd-out small { color: var(--text-muted); }
+.ttd-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); }
+.ttd-topic:focus-visible, .ttd-say:focus-visible, .ttd-x:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ttd { --tt-push: #E0A21C; --tt-calm: #4A8FC4; --tt-risk: #E05A5A; --tt-good: #3FA463; } }
+:root[data-theme="dark"] .ttd { --tt-push: #E0A21C; --tt-calm: #4A8FC4; --tt-risk: #E05A5A; --tt-good: #3FA463; }
+@media (max-width: 559px) { .ttd-back { padding: 0; align-items: end; } .ttd { max-height: 92dvh; border-radius: 16px 16px 0 0; } .ttd-msg { max-width: 92%; } }

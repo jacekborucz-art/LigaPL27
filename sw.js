@@ -98,6 +98,7 @@ const SHELL = [
   './src/career/squad.js',
   './src/career/squadLimit.js',
   './src/career/squadLimitSystem.js',
+  './src/career/talkDialog.js',
   './src/career/teamTalks.js',
   './src/career/threat.js',
   './src/career/transfers.js',
