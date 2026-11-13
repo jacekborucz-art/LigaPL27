@@ -23,6 +23,11 @@ import { TONES, TALKS, POST_TONES, MAX_TALKS } from '../match/briefings.js';
 import * as MD from '../match/matchday.js';
 import { CLIMATES, currentQuestion, progress, effectWords } from '../match/press.js';
 import { friendlyRuleTags, friendlyRulesOf } from '../training/friendlies.js';
+import { attrGroupsHtml } from './squadView.js';
+import { formChartHtml } from './formChart.js';
+import { NAT_NAMES } from '../data/names.js';
+import { POS_NAMES } from '../data/attributes.js';
+import { moraleLabel } from '../career/morale.js';
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size) => (anyClub(id) ? crestHtml(anyClub(id), { size, clubsById }) : '');
@@ -606,8 +611,8 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       <span class="ros__no" aria-hidden="true">${esc(String(no))}</span>
       <span class="pos" data-g="${GROUP[pos] ?? 'MID'}" aria-hidden="true">${esc(pos)}</span>
       <span class="ros__nm" aria-hidden="true"><span class="ros__last">${esc(lastName(x?.p ?? r))}</span>${markers(r, x)}</span>
-      ${r.on || r.bench ? `<span class="ros__c" data-c="${condCls(r.cond)}" aria-hidden="true"><i style="width:${r.cond}%"></i></span>` : '<span aria-hidden="true"></span>'}
-      ${rt != null ? `<b class="rt rt--${rBand(rt)}" aria-hidden="true">${rt.toFixed(1)}</b>` : '<b class="rt rt--none" aria-hidden="true">–</b>'}
+      ${r.on || r.bench ? `<span class="ros__cw" aria-hidden="true"><span class="ros__c" data-c="${condCls(r.cond)}"><i style="width:${r.cond}%"></i></span><small class="ros__cp" data-c="${condCls(r.cond)}">${r.cond}%</small></span>` : '<span aria-hidden="true"></span>'}
+      ${rt != null ? `<b class="rt rt--${rBand(rt)}" data-hov aria-hidden="true">${rt.toFixed(1)}</b>` : '<b class="rt rt--none" data-hov aria-hidden="true">–</b>'}
     </button></li>`;
   }
   function rosterHtml(side) {
@@ -644,6 +649,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       el.scrollTop = scroll;
     }
     if (focus) app.querySelector(`[data-mdp="${CSS.escape(focus)}"]`)?.focus({ preventScroll: true });
+    refreshHover();
   }
 
   // Numery na koszulkach (trwałe w klubie, career/shirts.js); liczone raz na mecz
@@ -1221,6 +1227,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     const items = [];
     if (mine && on) items.push({ label: 'Zmień zawodnika', hint: 'Okno zmian z nim wybranym', primary: true, disabled: subWhy, act: 'sub' });
     if (mine && onBench) items.push({ label: 'Wprowadź na boisko', hint: 'Okno zmian z nim wybranym', primary: true, disabled: subWhy, act: 'subIn' });
+    items.push({ label: 'Karta zawodnika', hint: 'Atrybuty, forma, stan', act: 'card' });
     items.push({ label: 'Statystyki meczu', hint: x.minOn === null ? 'Jeszcze nie grał' : null, act: 'stats' });
     if (mine && on && M.phase !== 'ended') {
       items.push({ sep: true });
@@ -1234,26 +1241,110 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     if (!x || !it?.act) return;
     if (it.act === 'sub' || it.act === 'subIn') { if (ui.running) stop(); ui.preSel = { kind: it.act === 'sub' ? 'on' : 'bench', id }; openDialog('manage', true); return; }
     if (it.act === 'stats') { if (ui.running) stop(); openPlayerStats(side, id); return; }
+    if (it.act === 'card') { if (ui.running) stop(); openPlayerCard(side, id); return; }
     if (it.act.startsWith('taker:')) {
       const k = it.act.slice(6);
       T.takers = { ...(T.takers ?? {}), [k]: id };
       menuToast(`${TAKERS.find(([q]) => q === k)?.[1]}: ${x.p.name}.`);
     }
   }
-  function openPlayerStats(side, id) {
-    const M = S.M; const x = findX(side, id); const dlg = app.querySelector('#mdDlg');
-    if (!x || !dlg) return;
+  /** Treść statystyk meczu zawodnika: nagłówek, stan, tabela (okno „Statystyki meczu” i podgląd po najechaniu na ocenę). */
+  function playerStatsParts(side, id) {
+    const M = S.M; const x = findX(side, id);
+    if (!x) return null;
     const r = playerStates(M, side).find((q) => q.id === id);
     const mins = r?.minutes ?? (x.minOn === null ? 0 : Math.max(0, (x.minOff ?? M.minute) - x.minOn));
     const gk = (r?.pos ?? x.p.pos) === 'BR';
     const rows = [['Minuty', mins], ['Gole', x.g ?? 0], ['Asysty', x.ast ?? 0], ['Strzały (celne)', `${x.sh ?? 0} (${x.sot ?? 0})`], ['Kluczowe podania', x.kp ?? 0], ['Odbiory', x.tk ?? 0], ...(gk ? [['Obrony', x.saves ?? 0]] : []), ['Faule', x.fouls ?? 0], ['Kondycja', `${Math.round(x.cond)}%`]];
     const status = [r?.card === 'yellow' ? 'żółta kartka' : r?.card === 'secondYellow' ? 'druga żółta, czerwona kartka' : r?.card === 'red' ? 'czerwona kartka' : '', r?.knock && r.on ? `gra z bólem (${r.knock.name}, od ${r.knock.since}. min)` : '', r?.injured ? `uraz: ${x.injury?.name ?? ''}` : '', x.subbedOff ? `zszedł w ${x.minOff}. min` : '', x.minOn > 0 ? `wszedł w ${x.minOn}. min` : ''].filter(Boolean);
+    const head = `<header class="pstat__head" data-side="${side}"><span class="pstat__no">${esc(String(kitNo(side, id) ?? ''))}</span><div><h2>${esc(x.p.name)}</h2><p>${esc(r?.pos ?? x.p.pos)}${r?.pos && r.pos !== x.p.pos ? ` (nominalnie ${esc(x.p.pos)})` : ''}, ${esc(sideName(side))}</p></div>
+        ${r?.rating != null ? `<b class="rt rt--${rBand(r.rating)}" title="Ocena na żywo">${r.rating.toFixed(1)}</b>` : ''}</header>`;
+    const body = `${status.length ? `<p class="pstat__st">${esc(status.join(', '))}</p>` : ''}
+      <dl class="pstat">${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(String(v))}</dd></div>`).join('')}</dl>`;
+    return { head, body };
+  }
+  function openPlayerStats(side, id) {
+    const dlg = app.querySelector('#mdDlg'); const parts = playerStatsParts(side, id);
+    if (!parts || !dlg) return;
+    hideHover();
     dlg.className = 'panel md-dlg pstat-dlg';
-    dlg.innerHTML = `<header class="pstat__head" data-side="${side}"><span class="pstat__no">${esc(String(kitNo(side, id) ?? ''))}</span><div><h2>${esc(x.p.name)}</h2><p>${esc(r?.pos ?? x.p.pos)}${r?.pos && r.pos !== x.p.pos ? ` (nominalnie ${esc(x.p.pos)})` : ''}, ${esc(sideName(side))}</p></div>
-        ${r?.rating != null ? `<b class="rt rt--${rBand(r.rating)}" title="Ocena na żywo">${r.rating.toFixed(1)}</b>` : ''}</header>
-      ${status.length ? `<p class="pstat__st">${esc(status.join(', '))}</p>` : ''}
-      <dl class="pstat">${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(String(v))}</dd></div>`).join('')}</dl>
+    dlg.innerHTML = `${parts.head}${parts.body}
       <p class="hint">Ocena na żywo: zdarzenia meczu, bez losowej korekty oceny końcowej.</p>
+      <p>${btn('closeDlg', 'Zamknij', false)}</p>`;
+    if (!dlg.open) dlg.showModal();
+  }
+
+  // Podgląd statystyk po najechaniu kursorem na ocenę zawodnika (listy składów, tylko urządzenia ze wskaźnikiem).
+  // Lista składów odświeża się co minutę meczu, więc podgląd żyje poza nią i odświeża treść przy każdej klatce.
+  let hov = null; // { side, id, el }
+  const canHover = () => window.matchMedia?.('(hover: hover) and (pointer: fine)').matches;
+  function hoverEl() {
+    let el = document.getElementById('mdHov');
+    if (!el) { el = document.createElement('div'); el.id = 'mdHov'; el.className = 'md-hov'; el.setAttribute('role', 'tooltip'); document.body.append(el); }
+    return el;
+  }
+  function placeHover(anchor) {
+    const el = hoverEl(); const r = anchor.getBoundingClientRect(); const w = el.offsetWidth || 320; const h = el.offsetHeight || 260;
+    let left = r.right + 10; if (left + w > innerWidth - 8) left = r.left - w - 10; if (left < 8) left = Math.max(8, Math.min(innerWidth - w - 8, r.left));
+    let top = r.top + r.height / 2 - h / 2; top = Math.max(8, Math.min(innerHeight - h - 8, top));
+    el.style.left = `${Math.round(left)}px`; el.style.top = `${Math.round(top)}px`;
+  }
+  function showHover(side, id, anchor) {
+    const parts = playerStatsParts(side, id);
+    if (!parts) return;
+    const el = hoverEl();
+    el.innerHTML = `${parts.head}${parts.body}`;
+    el.classList.add('is-open');
+    hov = { side, id };
+    placeHover(anchor);
+  }
+  function hideHover() { hov = null; document.getElementById('mdHov')?.classList.remove('is-open'); }
+  function refreshHover() {
+    if (!hov) return;
+    const anchor = app.querySelector(`[data-mdp="${hov.side}|${CSS.escape(hov.id)}"] [data-hov]`);
+    if (!anchor || !app.isConnected) { hideHover(); return; }
+    showHover(hov.side, hov.id, anchor);
+  }
+  if (!app.dataset.mdHov) {
+    app.dataset.mdHov = '1';
+    app.addEventListener('mouseover', (ev) => {
+      if (!canHover() || !S.M || !S.step?.startsWith('live')) return;
+      const rt = ev.target.closest?.('[data-mdp] [data-hov]');
+      if (!rt) { if (hov) hideHover(); return; }
+      const [sd, pid] = rt.closest('[data-mdp]').dataset.mdp.split('|');
+      if (hov && hov.side === Number(sd) && hov.id === pid) return;
+      showHover(Number(sd), pid, rt);
+    });
+    app.addEventListener('mouseleave', hideHover);
+  }
+
+  // Karta zawodnika w meczu (menu pod prawym przyciskiem): atrybuty, forma z ostatnich meczów, stan.
+  // Rywal: bez morale (zna je tylko jego klub).
+  function openPlayerCard(side, id) {
+    const dlg = app.querySelector('#mdDlg'); const x = findX(side, id);
+    if (!x || !dlg) return;
+    hideHover();
+    const p = game.world?.players?.[id] ?? x.p;
+    const mine = side === S.userSide;
+    const r = playerStates(S.M, side).find((q) => q.id === id);
+    const pos = r?.on ? r.pos : p.pos;
+    const prof = r?.on && x.slot ? proficiency(p, x.slot.pos, x.slot.side) : 100;
+    const facts = [
+      ['W meczu', r?.on ? `${pos}${prof < 100 ? `, ${prof}% na tej pozycji` : ''}` : r?.bench ? 'Ławka rezerwowych' : x.subbedOff ? `Zszedł w ${x.minOff}. min` : 'Poza grą'],
+      ['Kondycja', `${Math.round(x.cond)}%`],
+      ...(mine ? [['Morale', moraleLabel(p.morale ?? 12)]] : []),
+      ['Ocena meczu', r?.rating != null ? r.rating.toFixed(1) : 'brak'],
+    ];
+    dlg.className = 'panel md-dlg mcard-dlg';
+    dlg.innerHTML = `<header class="pstat__head mcard__head" data-side="${side}"><span class="pstat__no">${esc(String(kitNo(side, id) ?? ''))}</span>
+        <div><h2>${esc(p.name)}</h2><p>${esc(POS_NAMES[p.pos] ?? p.pos)}, ${esc(String(p.age ?? ''))} lat, ${esc(NAT_NAMES[p.nat] ?? p.nat ?? '')}, ${esc(sideName(side))}</p></div>
+        <span class="mcard__ovr" title="Ocena ogólna w skali 1-20">${Math.round(p.ovr ?? 0)}</span>
+        <button class="mcard__x" data-md="closeDlg" aria-label="Zamknij kartę zawodnika">×</button></header>
+      <dl class="mcard__facts">${facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(String(v))}</dd></div>`).join('')}</dl>
+      <div class="mcard__body">
+        <section class="mcard__attrs">${attrGroupsHtml(p, { heading: 'h4' })}</section>
+        <section class="mcard__side">${formChartHtml(p)}</section>
+      </div>
       <p>${btn('closeDlg', 'Zamknij', false)}</p>`;
     if (!dlg.open) dlg.showModal();
   }
