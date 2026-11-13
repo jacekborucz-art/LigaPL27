@@ -983,8 +983,8 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
   .hub__main:has(.eu) { max-width: 1840px; }
 }
 @media (min-width: 1680px) {
-  .eu .ufxlist { display: grid; grid-template-columns: 1fr 1fr; }
-  .eu .ufxlist > .ufx:nth-child(odd) { border-right: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+  .eu .ufxlist:not(.ufxlist--compact) { display: grid; grid-template-columns: 1fr 1fr; }
+  .eu .ufxlist:not(.ufxlist--compact) > .ufx:nth-child(odd) { border-right: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
   .eu .ufxlist > .ufx:nth-last-child(2):nth-child(odd) { border-bottom: 0; }
   .eu .ufxlist:has(> .ufx:only-child) { grid-template-columns: 1fr; }
 }
@@ -1022,3 +1022,54 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 /* Mapa pozycji i forma w karcie na ekranie Skład i taktyka: obok siebie, gdy jest miejsce */
 .tdet__vis { display: grid; gap: 0 var(--space-3); grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); align-items: start; }
 .tdet__vis .pmap { max-width: 380px; }
+
+/* ================= Rozgrywki (src/ui/competitionsView.js, europeView.js, nationalView.js) =================
+   Telefon: wszystko jedno pod drugim. PC: pełna szerokość; tabela z panelem bocznym (kolejka, strzelcy),
+   terminarz z tabelą obok, statystyki i karty w siatce, długie listy meczów w dwóch kolumnach. */
+.cgrid--side { display: grid; gap: var(--space-4); grid-template-columns: minmax(0, 1fr); }
+.cgrid__aside { display: grid; gap: var(--space-4); align-content: start; min-width: 0; }
+.cside { padding: 12px 14px 14px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--murawa) 6%, var(--surface)); border: 1px solid color-mix(in srgb, var(--murawa) 22%, var(--line)); }
+.cside__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.cside__head h3 { margin: 0; font: 700 var(--step-1)/1.1 var(--font-display); }
+.cside .stat-list { margin: 0; }
+.ufxlist--compact .ufx { padding: 6px 10px; }
+.ufx__nm.club-link { min-width: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: inherit; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ufx__nm.club-link:hover { text-decoration: underline; }
+.tbl--mini .tbl__row { grid-template-columns: 26px minmax(0, 1fr) 30px 54px 36px !important; min-height: 36px; font-size: var(--step--1); }
+.tbl--mini .tbl__club span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cards { display: grid; gap: var(--space-3); grid-template-columns: minmax(0, 1fr); }
+.ccard { padding: 12px 14px 14px; border-radius: var(--radius-m); background: var(--surface); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.ccard h3 { display: flex; align-items: baseline; gap: 8px; margin-top: 0; }
+.ccard .ufxlist { border: 0; border-radius: var(--radius-s); }
+.nt-grid { display: grid; gap: var(--space-3); grid-template-columns: minmax(0, 1fr); }
+.nt-grid > p, .nt-grid > .legend { grid-column: 1 / -1; margin: 0; }
+.nt-grid > .stat-sec { margin: 0; }
+.stat-list--cols { margin: 0; }
+@media (min-width: 900px) {
+  .cards { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); }
+  .nt-grid--ln, .nt-grid--euro { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); }
+  .stat-list--cols { columns: 2; column-gap: var(--space-4); }
+  .stat-list--cols li { break-inside: avoid; }
+}
+@media (min-width: 1280px) {
+  .hub__main:has(.comp) { max-width: 1840px; }
+  .cgrid--side { grid-template-columns: minmax(0, 1fr) minmax(360px, 440px); align-items: start; }
+  .cgrid__aside { position: sticky; top: var(--space-3); }
+  .comp .stats-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+  .nt-grid--pol { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .nt-grid--pol > .stat-sec:first-of-type { grid-row: span 3; }
+}
+@media (min-width: 1680px) {
+  .comp .cgrid__main > .ufxlist, .comp .ccard .ufxlist { display: grid; grid-template-columns: 1fr 1fr; }
+  .comp .cgrid__main > .ufxlist > .ufx:nth-child(odd), .comp .ccard .ufxlist > .ufx:nth-child(odd) { border-right: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+  .comp .ccard .ufxlist:has(> .ufx:only-child) { grid-template-columns: 1fr; }
+  .stat-list--cols { columns: 3; }
+}
+/* Wąska lista w panelu bocznym: zawsze układ telefonu (drużyny jedna pod drugą) */
+.ufxlist--compact .ufx { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "date date" "th sh" "ta sa" "sub sub"; row-gap: 3px; min-height: 0; }
+.ufxlist--compact .ufx__t--h { flex-direction: row; text-align: left; }
+.ufxlist--compact .ufx__s--h, .ufxlist--compact .ufx__s--a { text-align: right; }
+.ufxlist--compact .ufx__mid { display: none; }
+.ufxlist--compact .ufx.is-open .ufx__mid { display: block; grid-area: 2 / 2 / 4 / 3; }
+.ufxlist--compact .ufx__sub { justify-content: flex-start; }
+.ufxlist--compact .ufx__sub:empty { display: none; }

@@ -20,9 +20,10 @@ export const EUROPE_VIEWS = [['path', 'Przebieg'], ['league', 'Tabela'], ['fixtu
  * Wiersz meczu w pucharach (wyniki w tle, przebieg, Superpuchar Europy).
  * PC: data | gospodarz (do środka) | wynik | gość | dopisek. Telefon: drużyny jedna pod drugą, wynik po prawej.
  */
-function ufxRow({ cls = '', date = '', home, away, sh = null, sa = null, time = '', sub = '', winner = null }) {
+export function ufxRow({ cls = '', date = '', home, away, sh = null, sa = null, time = '', sub = '', winner = null, nameOf = name, crestOf = crest, flagOf = flag, link = false }) {
   const w = (id) => (winner ? (winner === id ? ' is-win' : ' is-out') : '');
-  const team = (id, side) => `<span class="ufx__t ufx__t--${side}${w(id)}">${crest(id)}<span class="ufx__nm">${esc(name(id))}</span>${flag(id)}</span>`;
+  const nm = (id) => (link && isPolish(id) ? `<button class="ufx__nm club-link" data-act="club" data-club="${esc(id)}">${esc(nameOf(id))}</button>` : `<span class="ufx__nm">${esc(nameOf(id))}</span>`);
+  const team = (id, side) => `<span class="ufx__t ufx__t--${side}${w(id)}">${crestOf(id)}${nm(id)}${flagOf(id)}</span>`;
   const played = sh != null;
   return `<li class="ufx ${cls}${played ? '' : ' is-open'}">
     <span class="ufx__date">${date}</span>
@@ -95,6 +96,7 @@ function superCupEUPanel(game) {
 }
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
+const FORM_PL = { W: 'W', D: 'R', L: 'P' };
 function leagueView(game, comp, md) {
   const U = game.season.uefa;
   const L = U.comps[comp].league;
@@ -104,21 +106,23 @@ function leagueView(game, comp, md) {
   const ms = L.matches.map((id) => U.matches[id]);
   const nMd = Math.max(...ms.map((m) => m.md));
   const cur = md ?? (ms.find((m) => !m.played)?.md ?? nMd);
-  return `
+  return `<div class="cgrid cgrid--side"><div class="cgrid__main">
     <div class="tbl" role="table" aria-label="Tabela fazy ligowej">
       <div class="tbl__row tbl__head" role="row"><span>#</span><span>Klub</span><span>M</span><span class="w">W</span><span class="w">R</span><span class="w">P</span><span>Bramki</span><span>Pkt</span><span class="w2">Forma</span></div>
       ${rows.map((r) => `<div class="tbl__row ${r.id === game.clubId ? 'is-me' : isPolish(r.id) ? 'is-pl' : ''}" role="row" data-zone="${zone(r.pos)}">
         <span class="tbl__pos">${r.pos}</span><span class="tbl__club">${crest(r.id)}<span>${esc(name(r.id))}</span>${flag(r.id)}</span>
         <span>${r.p}</span><span class="w">${r.w}</span><span class="w">${r.d}</span><span class="w">${r.l}</span><span>${r.gf}:${r.ga}</span><b>${r.pts}</b>
-        <span class="w2"><span class="form">${r.form.slice(-5).map((c) => `<b class="${c}">${c}</b>`).join('')}</span></span></div>`).join('')}
+        <span class="w2"><span class="form">${r.form.slice(-5).map((c) => FORM_PL[c] ?? c).map((c) => `<b class="${c}">${c}</b>`).join('')}</span></span></div>`).join('')}
     </div>
     <ul class="legend"><li data-zone="up">1/8 finału</li><li data-zone="playoff">Baraże fazy pucharowej</li><li data-zone="down">Koniec gry w pucharach</li></ul>
+    </div><aside class="cgrid__aside">
     <div class="roundnav">
       <button class="btn btn--quiet" data-act="cround" data-r="${Math.max(1, cur - 1)}" ${cur <= 1 ? 'disabled' : ''} aria-label="Poprzednia kolejka">‹</button>
       <span>${cur}. kolejka</span>
       <button class="btn btn--quiet" data-act="cround" data-r="${Math.min(nMd, cur + 1)}" ${cur >= nMd ? 'disabled' : ''} aria-label="Następna kolejka">›</button>
     </div>
-    <ul class="ufxlist">${ms.filter((m) => m.md === cur).sort((a, b) => (isPolish(b.home) || isPolish(b.away)) - (isPolish(a.home) || isPolish(a.away))).map((m) => matchRow(m, game)).join('')}</ul>`;
+    <ul class="ufxlist ufxlist--compact">${ms.filter((m) => m.md === cur).sort((a, b) => (isPolish(b.home) || isPolish(b.away)) - (isPolish(a.home) || isPolish(a.away))).map((m) => matchRow(m, game)).join('')}</ul>
+    </aside></div>`;
 }
 
 function fixturesView(game, comp, filter) {
@@ -135,7 +139,7 @@ function scorersView(game, comp) {
   const U = game.season.uefa;
   const rows = Object.values(U.scorers).filter((s) => s.comp === comp).sort((a, b) => b.g - a.g || a.name.localeCompare(b.name)).slice(0, 25);
   if (!rows.length) return '<p class="hint">Jeszcze nikt nie strzelił gola.</p>';
-  return `<ol class="stat-list">${rows.map((s) => `<li>${crest(s.club, 18)}<span>${esc(s.name)}<small>${esc(name(s.club))}</small></span><b>${s.g}</b></li>`).join('')}</ol>`;
+  return `<ol class="stat-list stat-list--cols">${rows.map((s) => `<li>${crest(s.club, 18)}<span>${esc(s.name)}<small>${esc(name(s.club))}</small></span><b>${s.g}</b></li>`).join('')}</ol>`;
 }
 
 function rankingView(game) {
@@ -144,7 +148,7 @@ function rankingView(game) {
   for (const c of Object.keys(U.comps)) for (const r of Object.values(U.comps[c].rounds)) for (const id of r.entrants) clubs.set(countryOf(id), (clubs.get(countryOf(id)) ?? 0) + 1);
   const rows = [...clubs].map(([cc, n]) => ({ cc, n, pts: Math.round(((U.countryPts[cc] ?? 0) / n) * 1000) / 1000 })).sort((a, b) => b.pts - a.pts);
   return `<p class="hint">Punkty krajów w sezonie 2026/27: zwycięstwo 2 pkt, remis 1 pkt (w eliminacjach połowa), podzielone przez liczbę klubów. Premie za awanse dojdą w kolejnych sezonach.</p>
-    <ol class="stat-list rank">${rows.map((r, i) => `<li class="${r.cc === 'POL' ? 'is-me' : ''}"><span></span><span>${esc(COUNTRY_NAMES[r.cc] ?? r.cc)}<small>${r.n} ${r.n === 1 ? 'klub' : r.n < 5 ? 'kluby' : 'klubów'}</small></span><b>${r.pts.toFixed(3).replace('.', ',')}</b></li>`).join('')}</ol>`;
+    <ol class="stat-list rank stat-list--cols">${rows.map((r, i) => `<li class="${r.cc === 'POL' ? 'is-me' : ''}"><span></span><span>${esc(COUNTRY_NAMES[r.cc] ?? r.cc)}<small>${r.n} ${r.n === 1 ? 'klub' : r.n < 5 ? 'kluby' : 'klubów'}</small></span><b>${r.pts.toFixed(3).replace('.', ',')}</b></li>`).join('')}</ol>`;
 }
 
 // ------------------------------------------------------------ Pokaz losowania

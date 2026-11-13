@@ -4,6 +4,7 @@ import { crestHtml } from './crest.js';
 import { esc, fmtDate, weekday } from './dom.js';
 import { anyClub } from '../season/season.js';
 import { ntName, lnGroupTable, euroGroupTable, teamMatches, NT_COMP_NAMES, ntTeam } from '../season/national.js';
+import { ufxRow } from './europeView.js';
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size = 18) => { const c = anyClub(id); return c ? crestHtml(c, { size, clubsById }) : ''; };
@@ -12,12 +13,12 @@ const shortDay = (iso) => `${weekday(iso).slice(0, 3)} ${fmtDate(iso).replace(/,
 export const NATIONAL_VIEWS = [['pol', 'Polska'], ['ln', 'Liga Narodów'], ['euro', 'Euro 2028'], ['callups', 'Powołania']];
 
 function ntRow(m) {
-  const res = m.played ? `<b class="fx__score">${m.result.score[0]}:${m.result.score[1]}</b>${m.result.shootout ? `<small>k. ${m.result.shootout[0]}:${m.result.shootout[1]}</small>` : m.result.extraTime ? '<small>po dogr.</small>' : ''}` : '<span class="fx__time">-</span>';
+  const r = m.played ? m.result : null;
   const pol = m.home === 'POL' || m.away === 'POL';
-  return `<li class="fx ${pol ? 'is-pl' : ''}">
-    <span class="fx__date">${esc(shortDay(m.date))}, ${esc(NT_COMP_NAMES[m.comp])}${m.group ? `, grupa ${esc(m.group)}` : ''}${m.leg ? `, ${m.leg === 1 ? '1. mecz' : 'rewanż'}` : ''}</span>
-    <span class="fx__team fx__team--h">${esc(ntName(m.home))}</span><span class="fx__mid">${res}</span><span class="fx__team">${esc(ntName(m.away))}</span>
-  </li>`;
+  const winner = r ? (r.score[0] !== r.score[1] ? (r.score[0] > r.score[1] ? m.home : m.away) : r.shootout ? (r.shootout[0] > r.shootout[1] ? m.home : m.away) : null) : null;
+  const info = [NT_COMP_NAMES[m.comp], m.group ? `grupa ${m.group}` : '', m.leg ? (m.leg === 1 ? '1. mecz' : 'rewanż') : '', r?.shootout ? `karne ${r.shootout[0]}:${r.shootout[1]}` : r?.extraTime ? 'po dogrywce' : ''].filter(Boolean).join(', ');
+  return ufxRow({ cls: pol ? 'is-pl' : '', date: esc(shortDay(m.date)), home: m.home, away: m.away, sh: r ? r.score[0] : null, sa: r ? r.score[1] : null,
+    time: '–', sub: esc(info), winner, nameOf: ntName, crestOf: () => '', flagOf: () => '' });
 }
 
 function table(rows, title, zones = () => '') {
@@ -36,8 +37,8 @@ function polView(game) {
   return `<p class="hint">Ranking FIFA: ${t.rankingFIFA}. Liga Narodów 2026/27: liga ${t.ligaLN}, grupa ${t.grupaLN}.</p>
     ${table(lnGroupTable(N, 'B4'), 'Liga Narodów, grupa B4', (p) => (p === 1 ? 'up' : p === 2 ? 'playoff' : p === 4 ? 'down' : ''))}
     <ul class="legend"><li data-zone="up">Awans do ligi A</li><li data-zone="playoff">Baraż A/B</li><li data-zone="down">Baraż B/C</li></ul>
-    ${next.length ? `<section class="stat-sec"><h3>Najbliższe mecze</h3><ul class="fxlist">${next.map(ntRow).join('')}</ul></section>` : ''}
-    ${done.length ? `<section class="stat-sec"><h3>Wyniki</h3><ul class="fxlist">${done.map(ntRow).join('')}</ul></section>` : ''}`;
+    ${next.length ? `<section class="stat-sec"><h3>Najbliższe mecze</h3><ul class="ufxlist">${next.map(ntRow).join('')}</ul></section>` : ''}
+    ${done.length ? `<section class="stat-sec"><h3>Wyniki</h3><ul class="ufxlist">${done.map(ntRow).join('')}</ul></section>` : ''}`;
 }
 
 function lnView(game) {
@@ -45,7 +46,7 @@ function lnView(game) {
   const zone = (g) => (p, n) => (g.startsWith('A') ? (p <= 2 ? 'up' : '') : (p === 1 ? 'up' : p === 2 ? 'playoff' : p === n && !g.startsWith('D') ? 'down' : ''));
   const ko = N.ln.ko ? Object.values(N.matches).filter((m) => ['LNQF', 'LNAB', 'LNBC', 'LNF'].includes(m.comp)).sort((a, b) => a.date.localeCompare(b.date)) : [];
   return `${N.ln.champion ? `<p class="panel__lead">Zwycięzca Ligi Narodów: ${esc(ntName(N.ln.champion))}</p>` : ''}
-    ${ko.length ? `<section class="stat-sec"><h3>Faza pucharowa i baraże</h3><ul class="fxlist">${ko.map(ntRow).join('')}</ul></section>` : '<p class="hint">Ćwierćfinały i baraże losowane po fazie ligowej (koniec listopada).</p>'}
+    ${ko.length ? `<section class="stat-sec"><h3>Faza pucharowa i baraże</h3><ul class="ufxlist">${ko.map(ntRow).join('')}</ul></section>` : '<p class="hint">Ćwierćfinały i baraże losowane po fazie ligowej (koniec listopada).</p>'}
     ${Object.keys(N.ln.groups).map((g) => table(lnGroupTable(N, g), `Grupa ${g}`, zone(g))).join('')}`;
 }
 
@@ -57,7 +58,7 @@ function euroView(game) {
   const polMatches = Object.values(N.matches).filter((m) => m.comp === 'EQ' && m.group === pg).sort((a, b) => a.date.localeCompare(b.date));
   return `<p class="hint">12 grup. Awans: zwycięzcy grup i 8 najlepszych drużyn z 2. miejsc, reszta przez baraże w marcu 2028.</p>
     ${order.map((g) => table(euroGroupTable(N, g), `Grupa ${g}`, (p) => (p === 1 ? 'up' : p === 2 ? 'playoff' : ''))).join('')}
-    ${pg ? `<section class="stat-sec"><h3>Mecze grupy ${esc(pg)}</h3><ul class="fxlist">${polMatches.map(ntRow).join('')}</ul></section>` : ''}`;
+    ${pg ? `<section class="stat-sec"><h3>Mecze grupy ${esc(pg)}</h3><ul class="ufxlist">${polMatches.map(ntRow).join('')}</ul></section>` : ''}`;
 }
 
 function callupsView(game) {
@@ -76,5 +77,5 @@ export function renderNational(game, view) {
   const v = NATIONAL_VIEWS.some(([k]) => k === view) ? view : 'pol';
   const tabs = `<div class="subtabs" role="tablist">${NATIONAL_VIEWS.map(([k, l]) => `<button role="tab" data-act="cview" data-v="${k}" aria-selected="${v === k}">${l}</button>`).join('')}</div>`;
   if (!game.national) return `${tabs}<p class="hint">Reprezentacje pojawią się następnego dnia gry.</p>`;
-  return tabs + (v === 'ln' ? lnView(game) : v === 'euro' ? euroView(game) : v === 'callups' ? callupsView(game) : polView(game));
+  return `${tabs}<div class="nt-grid nt-grid--${v}">${v === 'ln' ? lnView(game) : v === 'euro' ? euroView(game) : v === 'callups' ? callupsView(game) : polView(game)}</div>`;
 }

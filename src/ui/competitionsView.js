@@ -6,7 +6,7 @@ import { anyClub, LEAGUE_COMPS } from '../season/season.js';
 import { PP_ROUNDS, PP_NAMES, winnerOf } from '../season/cup.js';
 import { crestHtml } from './crest.js';
 import { esc, fmtDate, weekday } from './dom.js';
-import { renderEurope, EUROPE_TABS } from './europeView.js';
+import { renderEurope, EUROPE_TABS, ufxRow } from './europeView.js';
 import { renderNational } from './nationalView.js';
 
 export const COMP_TABS = [['ekstraklasa', 'Ekstraklasa'], ['liga1', '1 Liga'], ['liga2', '2 Liga'], ['pp', 'Puchar Polski'], ...EUROPE_TABS, ['NT', 'Reprezentacje'], ['HIST', 'Historia']];
@@ -19,13 +19,31 @@ function formDots(form) {
   return `<span class="form">${form.map((c) => `<b class="${c}">${c}</b>`).join('')}</span>`;
 }
 
+/** Kolejka do pokazania: najbliższa nierozegrana, a po sezonie ostatnia. */
+function currentRound(fx) {
+  const rounds = [...new Set(fx.map((f) => f.round))].sort((a, b) => a - b);
+  return { rounds, current: fx.find((f) => !f.played)?.round ?? rounds[rounds.length - 1] };
+}
+function roundList(game, comp, round, { compact = false } = {}) {
+  const fx = game.fixtures.filter((f) => f.comp === comp && f.round === round).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  return `<ul class="ufxlist${compact ? ' ufxlist--compact' : ''}">${fx.map((f) => matchRow(f, game)).join('')}</ul>`;
+}
+function topScorers(game, comp, n = 5) {
+  const tier = COMPETITIONS[comp].tier;
+  const clubIds = new Set(CLUBS_PL.filter((c) => c.tier === tier).map((c) => c.id));
+  const list = Object.values(game.world.players).filter((p) => clubIds.has(p.clubId) && (p.season?.g ?? 0) > 0).sort((a, b) => b.season.g - a.season.g || (b.season.a ?? 0) - (a.season.a ?? 0)).slice(0, n);
+  return list.length ? `<ol class="stat-list">${list.map((p) => `<li>${crest(p.clubId, 18)}<span>${esc(p.name)}<small>${esc(name(p.clubId))}</small></span><b>${p.season.g}</b></li>`).join('')}</ol>` : '<p class="hint">Jeszcze nikt nie strzelił gola.</p>';
+}
+
 function tableView(game, comp) {
   const tier = COMPETITIONS[comp].tier;
   const ids = CLUBS_PL.filter((c) => c.tier === tier).map((c) => c.id);
   const rows = standings(game.fixtures.filter((f) => f.comp === comp), ids);
   const zones = zonesFor(tier);
   const zoneOf = (pos) => zones.find((z) => pos >= z.from && pos <= z.to);
-  return `
+  const fx = game.fixtures.filter((f) => f.comp === comp);
+  const { current } = currentRound(fx);
+  return `<div class="cgrid cgrid--side"><div class="cgrid__main">
     <div class="tbl" role="table" aria-label="Tabela ${esc(COMPETITIONS[comp].name)}">
       <div class="tbl__row tbl__head" role="row"><span>#</span><span>Klub</span><span>M</span><span class="w">W</span><span class="w">R</span><span class="w">P</span><span>Bramki</span><span>Pkt</span><span class="w2">Forma</span></div>
       ${rows.map((r) => {
@@ -38,38 +56,49 @@ function tableView(game, comp) {
         </div>`;
       }).join('')}
     </div>
-    <ul class="legend">${zones.map((z) => `<li data-zone="${z.kind}">${esc(z.label)}</li>`).join('')}</ul>`;
+    <ul class="legend">${zones.map((z) => `<li data-zone="${z.kind}">${esc(z.label)}</li>`).join('')}</ul>
+    </div><aside class="cgrid__aside">
+      ${current ? `<section class="cside"><div class="cside__head"><h3>${current}. kolejka</h3><button class="btn btn--quiet btn--sm" data-act="cview" data-v="fixtures">Terminarz</button></div>${roundList(game, comp, current, { compact: true })}</section>` : ''}
+      <section class="cside"><div class="cside__head"><h3>Strzelcy</h3><button class="btn btn--quiet btn--sm" data-act="cview" data-v="stats">Statystyki</button></div>${topScorers(game, comp)}</section>
+    </aside></div>`;
+}
+
+/** Skrócona tabela (obok terminarza na PC). */
+function miniTable(game, comp) {
+  const tier = COMPETITIONS[comp].tier;
+  const ids = CLUBS_PL.filter((c) => c.tier === tier).map((c) => c.id);
+  const rows = standings(game.fixtures.filter((f) => f.comp === comp), ids);
+  const zones = zonesFor(tier);
+  const zoneOf = (pos) => zones.find((z) => pos >= z.from && pos <= z.to);
+  return `<div class="tbl tbl--mini" role="table" aria-label="Tabela">
+    <div class="tbl__row tbl__head" role="row"><span>#</span><span>Klub</span><span>M</span><span>Bramki</span><span>Pkt</span></div>
+    ${rows.map((r) => `<div class="tbl__row ${r.id === game.clubId ? 'is-me' : ''}" role="row" data-zone="${zoneOf(r.pos)?.kind ?? ''}"><span class="tbl__pos">${r.pos}</span><span class="tbl__club">${crest(r.id, 18)}<span>${esc(name(r.id))}</span></span><span>${r.played}</span><span>${r.gf}:${r.ga}</span><b>${r.points}</b></div>`).join('')}
+  </div>`;
 }
 
 function matchRow(f, game) {
   const res = f.result;
-  const mid = res ? `<b class="fx__score">${res.score[0]}:${res.score[1]}</b>` : `<span class="fx__time">${esc(f.time ?? '')}</span>`;
-  const extra = res?.shootout ? `<small>k. ${res.shootout[0]}:${res.shootout[1]}</small>` : res?.extraTime ? '<small>po dogr.</small>' : f.postponed && !res ? '<small>przełożony</small>' : '';
   const mine = f.home === game.clubId || f.away === game.clubId;
-  // Mecz pucharowy: zwycięzca wyróżniony i oznaczony „awans” (w finale „zdobywca”)
-  const w = res && f.knockout ? winnerOf(f) : null;
-  const tag = w ? ` <span class="tag-up">${f.round === 'F' ? 'zdobywca' : 'awans'}: ${esc(name(w))}</span>` : '';
-  const cls = (id) => (w ? (w === id ? ' fx__team--win' : ' fx__team--out') : '');
-  return `<li class="fx ${mine ? 'is-me' : ''}">
-    <span class="fx__date">${esc(shortDay(f.date))} ${esc(fmtDate(f.date).replace(/, \d{4}$/, ''))}${tag}</span>
-    <span class="fx__team fx__team--h${cls(f.home)}">${esc(name(f.home))}${crest(f.home)}</span>
-    <span class="fx__mid">${mid}${extra}</span>
-    <span class="fx__team${cls(f.away)}">${crest(f.away)}${esc(name(f.away))}</span>
-  </li>`;
+  // Mecz pucharowy: zwycięzca wyróżniony i oznaczony „awans” (w finale „zdobywca”); w lidze wyróżniony zwycięzca meczu
+  const w = res ? (f.knockout ? winnerOf(f) : res.score[0] > res.score[1] ? f.home : res.score[1] > res.score[0] ? f.away : null) : null;
+  const tag = res && f.knockout && w ? `<span class="ufx__tag">${f.round === 'F' ? 'zdobywca' : 'awans'}</span>` : '';
+  const sub = [res?.shootout ? `karne ${res.shootout[0]}:${res.shootout[1]}` : res?.extraTime ? 'po dogrywce' : '', f.postponed && !res ? 'przełożony' : ''].filter(Boolean).join(', ');
+  return ufxRow({ cls: mine ? 'is-me' : '', date: `${esc(shortDay(f.date))} ${esc(fmtDate(f.date).replace(/, \d{4}$/, ''))}`, home: f.home, away: f.away,
+    sh: res ? res.score[0] : null, sa: res ? res.score[1] : null, time: f.time ?? '', sub: `${esc(sub)}${tag}`, winner: w, nameOf: name, crestOf: (id) => crest(id), flagOf: () => '', link: true });
 }
 
 function fixturesView(game, comp, round) {
   const fx = game.fixtures.filter((f) => f.comp === comp);
-  const rounds = [...new Set(fx.map((f) => f.round))].sort((a, b) => a - b);
-  const current = round ?? (fx.find((f) => !f.played)?.round ?? rounds[rounds.length - 1]);
-  const list = fx.filter((f) => f.round === current).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-  return `
+  const { rounds, current: cur } = currentRound(fx);
+  const current = round ?? cur;
+  return `<div class="cgrid cgrid--side"><div class="cgrid__main">
     <div class="roundnav">
       <button class="btn btn--quiet" data-act="cround" data-r="${Math.max(1, current - 1)}" ${current <= 1 ? 'disabled' : ''} aria-label="Poprzednia kolejka">‹</button>
       <span>${current}. kolejka</span>
       <button class="btn btn--quiet" data-act="cround" data-r="${Math.min(rounds.length, current + 1)}" ${current >= rounds.length ? 'disabled' : ''} aria-label="Następna kolejka">›</button>
     </div>
-    <ul class="fxlist">${list.map((f) => matchRow(f, game)).join('')}</ul>`;
+    ${roundList(game, comp, current)}
+    </div><aside class="cgrid__aside">${miniTable(game, comp)}</aside></div>`;
 }
 
 function statsView(game, comp) {
@@ -96,35 +125,37 @@ function cupView(game) {
     ${cup.champion ? `<p class="panel__lead">Zdobywca Pucharu Polski: ${crest(cup.champion, 28)} ${esc(name(cup.champion))}</p>` : ''}
     ${rounds.slice().reverse().map((r) => {
       const fx = game.fixtures.filter((f) => f.comp === 'pp' && f.round === r).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-      return `<section class="stat-sec"><h3>${esc(PP_NAMES[r][0].toUpperCase() + PP_NAMES[r].slice(1))}</h3><ul class="fxlist">${fx.map((f) => matchRow(f, game)).join('')}</ul></section>`;
+      return `<section class="stat-sec ccard"><h3>${esc(PP_NAMES[r][0].toUpperCase() + PP_NAMES[r].slice(1))} <small class="muted">${fx.length} ${fx.length === 1 ? 'mecz' : fx.length < 5 ? 'mecze' : 'meczów'}</small></h3><ul class="ufxlist">${fx.map((f) => matchRow(f, game)).join('')}</ul></section>`;
     }).join('')}
     ${next ? `<p class="hint">Kolejna runda: ${esc(PP_NAMES[next])}. Losowanie po zakończeniu bieżącej rundy.</p>` : ''}`;
 }
 
 export function renderCompetitions(game, { comp = 'ekstraklasa', view = 'table', round = null, filter = 'pl', draw = null } = {}) {
   const tabs = COMP_TABS.map(([k, v]) => `<button class="chip" data-act="ccomp" data-c="${k}" aria-pressed="${comp === k}">${esc(v)}</button>`).join('');
-  if (comp === 'HIST') return `<h2>Rozgrywki</h2><div class="chips">${tabs}</div>${historyView(game)}`;
-  if (comp === 'NT') return `<h2>Rozgrywki</h2><div class="chips">${tabs}</div>${renderNational(game, view)}`;
-  if (EUROPE_TABS.some(([k]) => k === comp)) return `<h2>Rozgrywki</h2><div class="chips">${tabs}</div>${renderEurope(game, comp, { view, round, filter, draw })}`;
+  const wrap = (body) => `<div class="comp" data-comp="${esc(comp)}"><h2>Rozgrywki</h2><div class="chips">${tabs}</div>${body}</div>`;
+  if (comp === 'HIST') return wrap(historyView(game));
+  if (comp === 'NT') return wrap(renderNational(game, view));
+  if (EUROPE_TABS.some(([k]) => k === comp)) return wrap(renderEurope(game, comp, { view, round, filter, draw }));
   if (!['table', 'fixtures', 'stats'].includes(view)) view = 'table';
   const views = comp === 'pp' ? '' : `<div class="subtabs" role="tablist">${[['table', 'Tabela'], ['fixtures', 'Terminarz'], ['stats', 'Statystyki']].map(([k, v]) => `<button role="tab" data-act="cview" data-v="${k}" aria-selected="${view === k}">${v}</button>`).join('')}</div>`;
   const body = comp === 'pp' ? cupView(game) : view === 'fixtures' ? fixturesView(game, comp, round) : view === 'stats' ? statsView(game, comp) : tableView(game, comp);
-  return `<h2>Rozgrywki</h2><div class="chips">${tabs}</div>${views}${body}`;
+  return wrap(`${views}${body}`);
 }
 
 function historyView(game) {
   const A = [...(game.archive ?? [])].reverse();
   if (!A.length) return '<p class="hint">Tu pojawią się wyniki zakończonych sezonów: mistrzowie, zdobywcy pucharów, awanse i spadki oraz miejsca twoich drużyn.</p>';
   const uc = { LM: 'Liga Mistrzów', LE: 'Liga Europy', LK: 'Liga Konferencji' };
-  return A.map((a) => `<section class="stat-sec"><h3>Sezon ${esc(a.season)}</h3><ul class="plain-list">
+  return `<div class="cards">${A.map((a) => `<section class="stat-sec ccard"><h3>Sezon ${esc(a.season)}</h3><ul class="plain-list">
     <li><span class="k">Mistrz</span><span>${crest(a.champion)} ${esc(name(a.champion))}</span></li>
     <li><span class="k">Puchar Polski</span><span>${a.cup ? `${crest(a.cup)} ${esc(name(a.cup))}` : 'brak'}</span></li>
     ${Object.entries(a.uefa ?? {}).map(([k, v]) => `<li><span class="k">${uc[k]}</span><span>${esc(name(v))}</span></li>`).join('')}
     <li><span class="k">Awans</span><span>${esc([...(a.promoted?.[1] ?? [])].map(name).join(', '))} (do Ekstraklasy)</span></li>
     <li><span class="k">Spadek</span><span>${esc([...(a.relegated?.[2] ?? [])].map(name).join(', '))} (z Ekstraklasy)</span></li>
     <li><span class="k">Twoja drużyna</span><span>${crest(a.user.club)} ${esc(name(a.user.club))}: ${a.user.pos}. miejsce (${esc(['', 'Ekstraklasa', '1 Liga', '2 Liga'][a.user.tier] ?? '')})</span></li>
+    ${a.superCupEU ? `<li><span class="k">Superpuchar Europy</span><span>${esc(name(a.superCupEU))}</span></li>` : ''}
     <li><span class="k">Polska w UEFA</span><span>${a.polandRank}. miejsce w rankingu krajów</span></li>
-  </ul></section>`).join('');
+  </ul></section>`).join('')}</div>`;
 }
 
 export { LEAGUE_COMPS };
