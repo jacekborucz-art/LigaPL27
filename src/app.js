@@ -538,7 +538,7 @@ function dashMail(g) {
   const pend = pendingDecisions(g.inbox);
   const latest = g.inbox.slice(0, 8);
   const body = `${pend.length ? `<button class="dash-decide" data-act="mail" data-id="${esc(pend[0].id)}"><span class="dash-decide__card" aria-hidden="true"></span>${pend.length} ${plural(pend.length, 'wiadomość czeka', 'wiadomości czekają', 'wiadomości czeka')} na twoją decyzję</button>` : ''}
-    <ul class="mail-list stripes dash-mail">${latest.map((m, k) => (k >= 5 ? mailRow(m).replace('<li>', '<li class="dash-more">') : mailRow(m))).join('') || '<li class="mail-empty">Brak wiadomości.</li>'}</ul>`;
+    <ul class="mail-list stripes dash-mail">${latest.map((m, k) => (k >= 5 ? mailRow(m, g.date).replace('<li>', '<li class="dash-more">') : mailRow(m, g.date))).join('') || '<li class="mail-empty">Brak wiadomości.</li>'}</ul>`;
   return dashPanel('mail', 'poczta', `Poczta${unread ? ` <span class="dash-p__count">${unread} ${plural(unread, 'nowa', 'nowe', 'nowych')}</span>` : ''}`, body, dashLink('poczta', 'Cała poczta'));
 }
 
@@ -563,39 +563,73 @@ function renderDashboard(g, club) {
   </div>`;
 }
 
-function mailRow(m) {
-  return `<li><button class="mail-row ${m.read ? '' : 'mail-row--unread'}" data-act="mail" data-id="${esc(m.id)}">
-    <span class="mail-row__dot" data-p="${esc(m.priority)}" aria-hidden="true"></span>
-    <span class="mail-row__body"><span class="mail-row__subj">${esc(m.subject)}</span><span class="mail-row__from">${esc(m.from)}, ${esc(CATEGORIES[m.category])}</span></span>
-    <span class="mail-row__date">${esc(fmtDate(m.date).replace(/, \d{4}$/, ''))}</span>
+// ---------- Poczta: lista i czytanie (PC: dwie kolumny, telefon: lista albo wiadomość) ----------
+const MAIL_CAT = { board: ['ZA', 'Zarząd'], staff: ['SZ', 'Sztab'], players: ['ZW', 'Zawodnicy'], transfers: ['TR', 'Transfery'], competitions: ['RO', 'Rozgrywki'], national: ['RP', 'Reprezentacja'], media: ['ME', 'Media'], club: ['KL', 'Klub'] };
+const mailDayLabel = (iso, today) => {
+  const diff = Math.round((new Date(`${today}T12:00:00Z`) - new Date(`${iso}T12:00:00Z`)) / 86400000);
+  return diff === 0 ? 'dziś' : diff === 1 ? 'wczoraj' : `${weekday(iso).slice(0, 3)}, ${fmtDate(iso).replace(/, \d{4}$/, '')}`;
+};
+const mailSnippet = (body) => String(body ?? '').replace(/\s+/g, ' ').trim().slice(0, 140);
+const needsAnswer = (m) => m.actions?.length && !m.resolved;
+
+/** Treść wiadomości: akapity (pusta linia), łamania wierszy, listy z „- ” na początku linii. */
+function mailBodyHtml(body) {
+  return String(body ?? '').split(/\n{2,}/).map((para) => {
+    const lines = para.split('\n');
+    if (lines.length > 1 && lines.every((l) => /^\s*[-•]\s+/.test(l))) return `<ul>${lines.map((l) => `<li>${esc(l.replace(/^\s*[-•]\s+/, ''))}</li>`).join('')}</ul>`;
+    return `<p>${lines.map(esc).join('<br>')}</p>`;
+  }).join('');
+}
+
+function mailRow(m, today, openId) {
+  const [ab, label] = MAIL_CAT[m.category] ?? ['?', CATEGORIES[m.category] ?? ''];
+  return `<li><button class="mail-row ${m.read ? '' : 'mail-row--unread'} ${m.id === openId ? 'is-open' : ''}" data-act="mail" data-id="${esc(m.id)}" data-cat="${esc(m.category)}" data-p="${esc(m.priority)}">
+    <span class="mail-row__av" aria-hidden="true">${esc(ab)}</span>
+    <span class="mail-row__body">
+      <span class="mail-row__top"><span class="mail-row__from">${esc(m.from)}</span><time class="mail-row__date" datetime="${esc(m.date)}">${esc(mailDayLabel(m.date, today))}</time></span>
+      <span class="mail-row__subj">${needsAnswer(m) ? '<span class="mail-tag">Decyzja</span>' : ''}${esc(m.subject)}</span>
+      <span class="mail-row__snip">${esc(label)}: ${esc(mailSnippet(m.body))}</span>
+    </span>
   </button></li>`;
 }
 
+function mailReader(g, m) {
+  const [ab, label] = MAIL_CAT[m.category] ?? ['?', CATEGORIES[m.category] ?? ''];
+  return `<article class="mail-view" data-cat="${esc(m.category)}" aria-labelledby="mail-h">
+    <button class="btn btn--quiet btn--sm mail-back" data-act="mailback">Wróć do skrzynki</button>
+    <header class="mail-view__head">
+      <span class="mail-row__av" aria-hidden="true">${esc(ab)}</span>
+      <div class="mail-view__meta">
+        <p class="mail-view__cat"><span class="mail-cat">${esc(label)}</span>${m.priority === 'urgent' ? '<span class="mail-tag">Pilne</span>' : m.priority === 'important' ? '<span class="mail-tag mail-tag--imp">Ważne</span>' : ''}</p>
+        <h2 id="mail-h">${esc(m.subject)}</h2>
+        <p class="mail-view__from"><span>Od: <b>${esc(m.from)}</b></span><span>Nadano: <time datetime="${esc(m.date)}">${esc(weekday(m.date))}, ${esc(fmtDate(m.date))}</time></span></p>
+      </div>
+    </header>
+    <div class="mail-view__body">${mailBodyHtml(m.body)}</div>
+    ${needsAnswer(m) ? `<section class="mail-decide"><h3>Twoja decyzja</h3><div class="mail-actions">${m.actions.map((a, i) => `<button class="btn ${i === 0 ? 'btn--primary' : 'btn--quiet'}" data-act="mailaction" data-id="${esc(m.id)}" data-a="${esc(a.id)}">${esc(a.label)}</button>`).join('')}</div></section>` : ''}
+    ${m.chosen ? `<p class="mail-chosen">Twoja odpowiedź: <b>${esc(m.actions.find((a) => a.id === m.chosen)?.label ?? '')}</b></p>` : ''}
+    ${canDelete(m) ? `<p class="mail-view__foot"><button class="btn btn--quiet btn--sm" data-act="maildel" data-id="${esc(m.id)}">Usuń wiadomość</button></p>` : ''}
+  </article>`;
+}
+
 function renderMail(g) {
-  if (state.mailOpen) {
-    const m = g.inbox.find((x) => x.id === state.mailOpen);
-    if (m) {
-      return `<button class="btn btn--quiet" data-act="mailback">Wróć do skrzynki</button>
-      <article class="mail-view">
-        <p class="muted">${esc(m.from)}, ${esc(CATEGORIES[m.category])}, ${esc(fmtDate(m.date))}</p>
-        <h2>${esc(m.subject)}</h2>
-        <p>${esc(m.body)}</p>
-        ${m.actions.length && !m.resolved ? `<div class="mail-actions">${m.actions.map((a) => `<button class="btn btn--primary" data-act="mailaction" data-id="${esc(m.id)}" data-a="${esc(a.id)}">${esc(a.label)}</button>`).join('')}</div>` : ''}
-        ${m.chosen ? `<p class="muted">Twoja odpowiedź: ${esc(m.actions.find((a) => a.id === m.chosen)?.label ?? '')}</p>` : ''}
-        ${canDelete(m) ? `<p><button class="btn btn--quiet btn--sm" data-act="maildel" data-id="${esc(m.id)}">Usuń wiadomość</button></p>` : ''}
-      </article>`;
-    }
-  }
+  const open = state.mailOpen ? g.inbox.find((x) => x.id === state.mailOpen) : null;
   const cats = Object.entries(CATEGORIES).filter(([k]) => g.inbox.some((m) => m.category === k));
   const chips = [['', 'Wszystkie', unreadCount(g.inbox)], ...cats.map(([k, v]) => [k, v, unreadCount(g.inbox, k)])]
     .map(([k, v, n]) => `<button class="chip" data-act="mailcat" data-cat="${k}" aria-pressed="${(state.mailCat || '') === k}">${esc(v)}${n ? ` <b>${n}</b>` : ''}</button>`).join('');
   const list = filterInbox(g.inbox, state.mailCat);
   const pending = pendingDecisions(g.inbox).length;
-  return `<div class="mail-head"><h2>Poczta</h2><span class="mail-tools"><button class="btn btn--quiet btn--sm" data-act="readall">Oznacz jako przeczytane</button><button class="btn btn--quiet btn--sm" data-act="mailprune" data-m="read">Usuń przeczytane</button><button class="btn btn--quiet btn--sm" data-act="mailprune" data-m="old">Usuń starsze niż 30 dni</button></span></div>
-    <p class="hint">${g.inbox.length} wiadomości. Stare przeczytane wiadomości gra usuwa sama co tydzień. Wiadomości z decyzją do podjęcia zostają.</p>
+  const unread = unreadCount(g.inbox);
+  return `<div class="mailx ${open ? 'is-reading' : ''}">
+    <div class="mail-head"><h2>Poczta <small class="muted">${g.inbox.length} wiadomości${unread ? `, ${unread} nieprzeczytanych` : ''}</small></h2><span class="mail-tools"><button class="btn btn--quiet btn--sm" data-act="readall">Oznacz jako przeczytane</button><button class="btn btn--quiet btn--sm" data-act="mailprune" data-m="read">Usuń przeczytane</button><button class="btn btn--quiet btn--sm" data-act="mailprune" data-m="old">Usuń starsze niż 30 dni</button></span></div>
     ${pending ? `<p class="notice">Masz ${pending} ${pending === 1 ? 'wiadomość wymagającą' : 'wiadomości wymagające'} odpowiedzi.</p>` : ''}
     <div class="chips">${chips}</div>
-    <ul class="mail-list stripes">${list.map(mailRow).join('') || '<li class="mail-empty">Brak wiadomości w tej kategorii.</li>'}</ul>`;
+    <div class="mailx__panes">
+      <ul class="mail-list" aria-label="Wiadomości">${list.map((m) => mailRow(m, g.date, open?.id)).join('') || '<li class="mail-empty">Brak wiadomości w tej kategorii.</li>'}</ul>
+      <div class="mailx__read">${open ? mailReader(g, open) : '<p class="mail-pick">Wybierz wiadomość z listy, żeby ją przeczytać.</p>'}</div>
+    </div>
+    <p class="hint mailx__hint">Stare przeczytane wiadomości gra usuwa sama co tydzień. Wiadomości z decyzją do podjęcia zostają.</p>
+  </div>`;
 }
 
 /** Po zmianie kadry (transfer, rozwiązanie, nowy klub): skład i trening dla nowych zawodników. */

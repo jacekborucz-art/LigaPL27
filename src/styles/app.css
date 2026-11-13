@@ -250,27 +250,70 @@
 .chip b { margin-left: 4px; color: var(--kartka-czerwona); }
 .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 .chip[aria-pressed="true"] b { color: var(--led); }
-.mail-list { list-style: none; margin: 0; padding: 0; background: var(--surface); border-radius: var(--radius-m); overflow: hidden; }
-.mail-row {
-  display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: var(--space-3);
-  width: 100%; min-height: 60px; padding: var(--space-2) var(--space-4);
-  border: 0; background: none; text-align: left; cursor: pointer;
-}
-.mail-row:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
-.mail-row__dot { width: 8px; height: 8px; border-radius: 50%; background: transparent; }
-.mail-row--unread .mail-row__dot { background: var(--accent); }
-.mail-row--unread .mail-row__dot[data-p="important"] { background: var(--led); }
-.mail-row--unread .mail-row__dot[data-p="urgent"] { background: var(--kartka-czerwona); }
-.mail-row__body { display: flex; flex-direction: column; min-width: 0; }
-.mail-row__subj { font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* ================= Poczta (src/app.js, renderMail) =================
+   Lista: avatar kategorii w jej kolorze, nadawca i data, temat (do 2 linii), zajawka treści.
+   Czytanie: kategoria, temat w kroju nagłówkowym, „Od” i „Nadano” (dzień tygodnia i data), treść w akapitach.
+   PC: lista i wiadomość obok siebie; telefon: lista albo wiadomość. */
+.mailx { --mc: #4A5A52; }
+.mail-head h2 small { margin-left: 8px; font: 400 var(--step--1)/1 var(--font-body); }
+.mail-row, .mail-view { --mc: #4A5A52; }
+[data-cat="board"] { --mc: #6B4FB0; } [data-cat="staff"] { --mc: #2D6A8F; } [data-cat="players"] { --mc: #2E8A4E; } [data-cat="transfers"] { --mc: #C98A12; }
+[data-cat="competitions"] { --mc: #1E5AA8; } [data-cat="national"] { --mc: #D62839; } [data-cat="media"] { --mc: #8A5A00; } [data-cat="club"] { --mc: #4A5A52; }
+.mail-list { list-style: none; margin: 0; padding: 0; background: var(--surface); border-radius: var(--radius-m); overflow: hidden; border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.mail-list > li + li { border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+.mail-row { display: grid; grid-template-columns: 38px minmax(0, 1fr); align-items: start; gap: 12px; width: 100%; padding: 12px 14px 12px 12px;
+  border: 0; border-left: 3px solid transparent; background: none; color: var(--text); text-align: left; cursor: pointer; font: inherit; }
+.mail-row:hover { background: color-mix(in srgb, var(--mc) 7%, transparent); }
+.mail-row:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
+.mail-row--unread { border-left-color: var(--mc); background: color-mix(in srgb, var(--mc) 5%, transparent); }
+.mail-row.is-open { background: color-mix(in srgb, var(--mc) 14%, var(--surface)); border-left-color: var(--mc); }
+.mail-row__av { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: color-mix(in srgb, var(--mc) 20%, var(--surface)); color: color-mix(in srgb, var(--mc) 75%, var(--text)); font: 700 13px/1 var(--font-display); letter-spacing: .04em; }
+.mail-row__body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.mail-row__top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.mail-row__from { min-width: 0; font-size: var(--step--1); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mail-row--unread .mail-row__from { color: var(--text); font-weight: 600; }
+.mail-row__date { flex: none; font-size: 12px; color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.mail-row--unread .mail-row__date { color: color-mix(in srgb, var(--mc) 70%, var(--text)); font-weight: 600; }
+.mail-row__subj { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font: 600 var(--step-0)/1.25 var(--font-display); letter-spacing: .01em; overflow-wrap: anywhere; }
 .mail-row--unread .mail-row__subj { font-weight: 700; }
-.mail-row__from, .mail-row__date { font-size: var(--step--1); color: var(--text-muted); }
-.mail-row__date { white-space: nowrap; }
+.mail-row__snip { font-size: 12.5px; line-height: 1.35; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mail-tag { display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 999px; font: 700 10.5px/1.6 var(--font-body); letter-spacing: .02em; vertical-align: 2px; color: #fff; background: var(--kartka-czerwona); }
+.mail-tag--imp { color: #1C1404; background: var(--led); }
 .mail-empty { padding: var(--space-4); color: var(--text-muted); }
-.mail-view { margin-top: var(--space-4); padding: var(--space-4); background: var(--surface); border-radius: var(--radius-m); max-width: 68ch; }
-.mail-view h2 { margin: var(--space-2) 0 var(--space-3); }
-.mail-view h2 + p { white-space: pre-line; } /* treść wiadomości: akapity z \n\n (np. limit kadry, oceny zarządu) */
-.mail-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
+.mail-pick { margin: 0; padding: var(--space-6) var(--space-4); text-align: center; color: var(--text-muted); border: 1px dashed var(--line); border-radius: var(--radius-m); }
+.mail-view { padding: var(--space-4) var(--space-5) var(--space-5); background: var(--surface); border-radius: var(--radius-m); border-top: 4px solid var(--mc); }
+.mail-back { margin-bottom: var(--space-3); }
+.mail-view__head { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 14px; align-items: start; padding-bottom: var(--space-3); border-bottom: 1px solid var(--line); }
+.mail-view__head .mail-row__av { width: 46px; height: 46px; font-size: 15px; }
+.mail-view__cat { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; }
+.mail-cat { font: 700 12px/1 var(--font-display); letter-spacing: .06em; color: color-mix(in srgb, var(--mc) 75%, var(--text)); }
+.mail-view h2 { margin: 0 0 8px; font: 700 var(--step-2)/1.15 var(--font-display); overflow-wrap: anywhere; }
+.mail-view__from { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0; font-size: var(--step--1); color: var(--text-muted); }
+.mail-view__from b { color: var(--text); font-weight: 600; }
+.mail-view__body { max-width: 68ch; margin-top: var(--space-4); font-size: 1.02rem; line-height: 1.65; overflow-wrap: anywhere; hyphens: auto; }
+.mail-view__body p { margin: 0 0 .9em; }
+.mail-view__body ul { margin: 0 0 .9em; padding-left: 1.2em; }
+.mail-view__body li { margin: .2em 0; }
+.mail-decide { margin-top: var(--space-4); padding: 12px 14px 14px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--led) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--led) 45%, var(--line)); }
+.mail-decide h3 { margin: 0 0 8px; font: 700 var(--step-0)/1.1 var(--font-display); }
+.mail-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.mail-chosen { margin: var(--space-3) 0 0; padding: 8px 12px; border-radius: var(--radius-s); background: color-mix(in srgb, #2E8A4E 12%, transparent); font-size: var(--step--1); }
+.mail-view__foot { margin: var(--space-4) 0 0; }
+.mailx__panes { display: grid; gap: var(--space-3); grid-template-columns: minmax(0, 1fr); }
+.mailx:not(.is-reading) .mailx__read { display: none; }
+.mailx.is-reading .mail-list, .mailx.is-reading .chips, .mailx.is-reading .mailx__hint { display: none; }
+.mailx__hint { margin-top: var(--space-3); }
+@media (min-width: 1100px) {
+  .hub__main:has(.mailx) { max-width: 1840px; }
+  .mailx__panes { grid-template-columns: minmax(340px, 440px) minmax(0, 1fr); align-items: start; }
+  .mailx .mail-list { max-height: calc(100dvh - 250px); overflow: auto; position: sticky; top: var(--space-3); }
+  .mailx:not(.is-reading) .mailx__read { display: block; }
+  .mailx.is-reading .mail-list, .mailx.is-reading .chips, .mailx.is-reading .mailx__hint { display: revert; }
+  .mailx.is-reading .mail-list { display: block; }
+  .mailx .chips { display: flex; }
+  .mail-back { display: none; }
+  .mailx .mail-view { position: sticky; top: var(--space-3); }
+}
 
 @media (min-width: 1024px) {
   .go-wrap { position: static; padding: 0; background: none; border: 0; margin-left: var(--space-4); }
