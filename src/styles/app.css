@@ -848,3 +848,101 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 .fch { --fch-up: #1E7A43; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .fch { --fch-up: #7BD69A; } }
 :root[data-theme="dark"] .fch { --fch-up: #7BD69A; }
+
+/* ================= Kadra > Zawodnicy: widoki Przegląd / Atrybuty i forma / Statystyki (src/ui/squadView.js) ================= */
+.sqx__bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); margin-bottom: var(--space-2); }
+.sqx__bar .chips { margin: 0; padding: 0; }
+.sqv { margin: 0; flex: none; border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.sqv button { padding: 8px 14px; border: 0; background: var(--surface); color: var(--text); font: 600 var(--step--1)/1.2 var(--font-body); cursor: pointer; }
+.sqv button + button { border-left: 1px solid var(--line); }
+.sqv button[aria-selected="true"] { background: var(--accent); color: var(--accent-text); }
+.sqv button:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
+/* Przegląd: forma i kondycja w wierszu (szeroki ekran) */
+.sq__row .wx { display: none; }
+.sq__form, .xl__form { display: inline-flex; align-items: center; gap: 6px; }
+.sq__form b, .xl__form b, .xl__rt b { font: 700 var(--step-0)/1 var(--font-display); font-variant-numeric: tabular-nums; }
+[data-b="none"] { color: var(--text-muted); }
+.xl td.xl__form { display: table-cell; }
+.xl td.xl__form .spark { vertical-align: middle; margin-right: 6px; }
+.spark { width: 64px; height: 20px; flex: none; overflow: visible; }
+.spark path { fill: none; stroke: var(--text-muted); stroke-width: 1.5; stroke-linejoin: round; }
+.spark circle { fill: var(--text-muted); }
+.spark circle[data-b="top"] { fill: var(--led); } .spark circle[data-b="good"] { fill: #2E8A4E; } .spark circle[data-b="low"] { fill: var(--kartka-czerwona); }
+.spark--none { display: inline-block; width: 64px; }
+.sq__fresh { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.sq__fresh i { width: 44px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, currentColor var(--v), var(--line) var(--v)); }
+.sq__fresh[data-b="good"] { color: #2E8A4E; } .sq__fresh[data-b="mid"] { color: var(--warn-text); } .sq__fresh[data-b="low"] { color: var(--bad-text); }
+.xl__st { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-left: 4px; border-radius: 3px; font: 700 11px/1 var(--font-display); color: #fff; background: var(--kartka-czerwona); }
+.xl__st[data-k="sus"] { background: var(--warn-text); }
+/* Panel podsumowania po prawej (PC) */
+.sqa { display: none; }
+.sqa__p { --t: var(--murawa); padding: 12px 14px 14px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--t) 7%, var(--surface)); border: 1px solid color-mix(in srgb, var(--t) 24%, var(--line)); border-top: 4px solid var(--t); }
+.sqa__p[data-t="calm"] { --t: #2D6A8F; } .sqa__p[data-t="bad"] { --t: var(--kartka-czerwona); } .sqa__p[data-t="warn"] { --t: #C98A12; } .sqa__p[data-t="good"] { --t: #2E8A4E; }
+.sqa__p h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font: 700 var(--step-0)/1.1 var(--font-display); }
+.sqa__p h3 span { padding: 1px 7px; border-radius: 999px; font-size: var(--step--1); background: color-mix(in srgb, var(--t) 22%, transparent); }
+.sqa__lines { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.sqa__lines li { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.sqa__lines b { font: 700 var(--step-2)/1 var(--font-display); }
+.sqa__lines .pos { min-width: 40px; }
+.sqa__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.sqa__list button { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 0 8px; align-items: center; width: 100%; padding: 5px 4px; border: 0; border-radius: var(--radius-s); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.sqa__list button:hover { background: color-mix(in srgb, var(--text) 7%, transparent); }
+.sqa__list .pos { grid-row: span 2; }
+.sqa__nm { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sqa__list small { font-size: var(--step--1); color: var(--text-muted); }
+.sqa__list small[data-k="inj"] { color: var(--bad-text); } .sqa__list small[data-k="sus"], .sqa__list small[data-k="warn"] { color: var(--warn-text); }
+.sqa__ok { margin: 0; font-size: var(--step--1); color: var(--text-muted); }
+/* Tabele jak w arkuszu (Atrybuty i forma, Statystyki) */
+.xl-note { margin: 0 0 var(--space-2); font-size: var(--step--1); color: var(--text-muted); }
+.xl-wrap { overflow: auto; max-height: calc(100dvh - 230px); border-radius: var(--radius-m); background: var(--surface); border: 1px solid var(--line); }
+.xl-wrap:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.xl { border-collapse: separate; border-spacing: 0; width: 100%; font-size: var(--step--1); font-variant-numeric: tabular-nums; }
+.xl th, .xl td { padding: 6px 8px; text-align: center; white-space: nowrap; border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.xl thead th { position: sticky; top: 0; z-index: 2; background: color-mix(in srgb, var(--text) 6%, var(--surface)); font-weight: 600; color: var(--text-muted); }
+.xl thead tr.xl__grp th { top: 0; padding: 4px 8px; font: 700 var(--step--1)/1.1 var(--font-display); color: var(--text); text-align: left; border-bottom: 0; }
+.xl thead tr.xl__grp + tr th { top: 24px; }
+.xl__grp th[data-g="tech"] { box-shadow: inset 0 3px 0 #2D6A8F; } .xl__grp th[data-g="mental"] { box-shadow: inset 0 3px 0 #6B4FB0; }
+.xl__grp th[data-g="phys"] { box-shadow: inset 0 3px 0 #C98A12; } .xl__grp th[data-g="gk"] { box-shadow: inset 0 3px 0 var(--gk); } .xl__grp th[data-g="info"] { box-shadow: inset 0 3px 0 #2E8A4E; }
+.xl thead th button { display: inline-flex; align-items: center; gap: 3px; padding: 2px 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.xl thead th button:hover { color: var(--text); text-decoration: underline; }
+.xl thead th[aria-sort="ascending"] button, .xl thead th[aria-sort="descending"] button { color: var(--text); }
+.xl thead th button i { font-style: normal; font-size: 9px; }
+.xl tbody tr:nth-child(even) td, .xl tbody tr:nth-child(even) th { background: var(--surface-stripe); }
+.xl tbody tr:hover td, .xl tbody tr:hover th { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.xl tbody td, .xl tbody th { background: var(--surface); }
+/* Pozycja i nazwisko przyklejone przy przewijaniu w poziomie */
+.xl .xl__pos { position: sticky; left: 0; z-index: 1; width: 52px; text-align: left; }
+.xl .xl__nm { position: sticky; left: 52px; z-index: 1; text-align: left; box-shadow: 1px 0 0 var(--line); }
+.xl thead .xl__pos, .xl thead .xl__nm { z-index: 3; }
+.xl__nm button { display: inline-flex; align-items: center; gap: 6px; max-width: 200px; padding: 0; border: 0; background: none; color: var(--text); font: 600 var(--step--1)/1.2 var(--font-body); text-align: left; cursor: pointer; }
+.xl__nm button span { overflow: hidden; text-overflow: ellipsis; }
+.xl__nm button:hover span { text-decoration: underline; }
+.xl__ovr { font: 700 var(--step-0)/1 var(--font-display); }
+.xl__a { min-width: 30px; font-weight: 600; }
+.xl__g0 { border-left: 2px solid var(--line); }
+.xl__na, .xl__z { color: color-mix(in srgb, var(--text-muted) 60%, transparent); }
+.xl__a[data-b="top"] { background: color-mix(in srgb, #2E8A4E 22%, var(--surface)) !important; }
+.xl__a[data-b="good"] { background: color-mix(in srgb, #2E8A4E 10%, var(--surface)) !important; }
+.xl__a[data-b="low"] { background: color-mix(in srgb, var(--kartka-czerwona) 10%, var(--surface)) !important; }
+.xl__fresh[data-b="good"] { color: #2E8A4E; } .xl__fresh[data-b="mid"] { color: var(--warn-text); } .xl__fresh[data-b="low"] { color: var(--bad-text); }
+.xl__card { display: inline-grid; place-items: center; width: 16px; height: 21px; border-radius: 3px; font: 700 11px/1 var(--font-display); color: #14211A; background: var(--kartka-zolta); }
+.xl__card[data-c="r"] { background: var(--kartka-czerwona); color: #fff; }
+.xl tfoot td, .xl tfoot th { position: sticky; bottom: 0; background: color-mix(in srgb, var(--text) 8%, var(--surface)); font-weight: 700; border-top: 2px solid var(--line); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .xl__a[data-b="top"] { color: #7BD69A; } :root:not([data-theme="light"]) .xl__a[data-b="good"] { color: #6FC48C; } }
+:root[data-theme="dark"] .xl__a[data-b="top"] { color: #7BD69A; } :root[data-theme="dark"] .xl__a[data-b="good"] { color: #6FC48C; }
+/* PC: cała szerokość, w Przeglądzie lista + panel podsumowania po prawej */
+@media (min-width: 1280px) {
+  .hub__main:has(.sqx) { max-width: 1840px; }
+  .sq__row { grid-template-columns: 52px minmax(140px, 1fr) 40px 88px 104px 92px 100px 106px 58px; gap: 7px; }
+  .sq__row .wx { display: block; }
+  .sq__row .sq__form.wx, .sq__row .sq__fresh.wx { display: inline-flex; }
+  .xl-wrap { max-height: calc(100dvh - 210px); }
+}
+@media (min-width: 1440px) {
+  .sqx__main { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: var(--space-4); align-items: start; }
+  .sqa { display: grid; gap: var(--space-3); position: sticky; top: var(--space-3); }
+}
+@media (min-width: 1600px) {
+  .sqx__main { grid-template-columns: minmax(0, 1fr) 340px; }
+  .sq__row { grid-template-columns: 56px minmax(160px, 1fr) 44px 100px 108px 100px 108px 114px 62px; gap: 9px; }
+}

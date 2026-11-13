@@ -260,7 +260,7 @@ function renderTab(tab, g, club) {
     const ovrs = leagueOvrs(g, club.tier);
     const p = state.playerOpen && g.world.players[state.playerOpen];
     if (p) return renderPlayerProfile(p, { leagueOvrs: ovrs, clubName: club.name, date: g.date, game: g });
-    return sub + renderSquadList(squadOf(g.world, g.clubId), { filter: state.sqFilter, leagueOvrs: ovrs, academy: academyOf(g.world, g.clubId) });
+    return sub + renderSquadList(squadOf(g.world, g.clubId), { filter: state.sqFilter, leagueOvrs: ovrs, academy: academyOf(g.world, g.clubId), view: state.sqView ?? 'overview', sort: state.sqSort, game: g });
   }
   const soon = {
     transfery: ['Lista transferowa, wypożyczenia, wolni zawodnicy', 'Negocjacje kontraktów', 'Okna transferowe'],
@@ -1055,6 +1055,8 @@ async function dispatchAct(el, { root = app } = {}) {
     }
     if (act === 'mailback') { state.mailOpen = null; render(); }
     if (act === 'sqfilter') { state.sqFilter = el.dataset.f; render(); }
+    if (act === 'sqview') { state.sqView = el.dataset.v; state.sqSort = null; render(); }
+    if (act === 'sqsort') { const k = el.dataset.k; state.sqSort = state.sqSort?.k === k ? { k, dir: state.sqSort.dir === 'desc' ? 'asc' : 'desc' } : { k, dir: k === 'name' || k === 'pos' ? 'asc' : 'desc' }; render(); }
     if (act === 'player') { state.playerOpen = el.dataset.id; render(); window.scrollTo({ top: 0 }); }
     if (act === 'squadback') { state.playerOpen = null; render(); }
     if (act === 'extplayer') {
