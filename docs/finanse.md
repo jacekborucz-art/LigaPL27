@@ -250,3 +250,59 @@ Po 10 sezonach (lipiec 2036) salda w Ekstraklasie: Legia 183,9, Lech 113,7, Widz
 ## Limit kadry
 
 Odprawy i sprzedaże zarządu przy zbyt dużej kadrze (docs/limit-kadry.md) trafiają do księgi jako `release` (odprawa, zdejmowana też z budżetu transferowego) i `sales` (sprzedaż za 60 % wartości). Kluby AI płacą odprawy tylko wtedy, gdy stać je na nie (`spendable`), poza przekroczeniem maksimum kadry.
+
+## Prośby do zarządu i weto
+
+Kod: `src/career/boardRequests.js` (logika, system dnia `boardRequests`, order 51), `src/ui/boardRequestsView.js` (panel w zakładce Klub > Zarząd, prawa kolumna `.klub-side`, akcje `br-ask`, `br-appeal`), style `src/styles/klub.css` (klasy `.br-*`). Stan w zapisie: `game.board.requests` (tworzony leniwie: `log`, `conds`, `vetoes`, `overrides`, `appeals`, `goalSeason`, `ownerPaid`). Testy: `tests/boardRequests.test.mjs`. Wszystkie liczby w tym rozdziale to [SZAC].
+
+### Prośby gracza
+
+| Prośba | Kwota | Kiedy | Skutek zgody |
+|---|---|---|---|
+| Większy budżet transferowy | +10, +25, +50 % budżetu albo dowolna (przy zerowym budżecie odniesieniem jest 5 % przychodów krajowych) | w oknie transferowym albo do 30 dni przed jego otwarciem | `transferBudget` rośnie o przyznaną kwotę |
+| Większy budżet płac | +10, +25, +50 % tygodniowego budżetu płac albo dowolna | jak wyżej | `wageBudget` rośnie |
+| Przesunięcie do budżetu płac | 10, 25, 50 % budżetu transferowego (min. 100 tys. zł) | zawsze | 1 mln zł budżetu transferowego daje 1 mln / 104 zł tygodniowo w płacach; zgoda zawsze, gdy wskaźnik płac po przesunięciu mieści się w 80 % |
+| Niższy cel sezonu | o jeden poziom (np. puchary -> środek tabeli) | raz w sezonie, przed 1 listopada | nowy cel w `game.board.goal` |
+
+Częstotliwość: najwyżej jedna prośba w tygodniu i trzy w miesiącu kalendarzowym; ta sama sprawa najwcześniej po 30 dniach, po odmowie po 60, po zgodzie (pełnej albo częściowej) po 90. Budżety po zmianie sezonu liczy od nowa `initClub`, więc przyznane kwoty obowiązują do końca sezonu.
+
+Decyzja jest deterministyczna (ziarno `prosba:${seed}:${data}:${rodzaj}`):
+
+```
+S = 0,6 x (zaufanie - 50)
+  + clamp(3 x (cel - miejsce), -15, 15)           od 4. kolejki, wcześniej 0
+  + clamp(10 x ((saldo - rezerwa) / koszt - 1), -20, 15)   rezerwa = (płace + koszty klubu) / 12
+  + wskaźnik płac (tylko budżet płac): W > 0,80 -40; 0,70-0,80 -15; poniżej 0,60 +10
+  + (ambicja - 10) + 1,5 x (zasobność - 10)       cechy właściciela, src/career/owners.js
+  - 25 x kwota / obecny budżet
+  + 5 w oknie transferowym, -10 poza nim
+  + los od -5 do 5
+```
+
+Koszt dla salda: budżet transferowy w całości, płace tygodniowe razy liczba tygodni do końca sezonu (co najmniej 13). W = roczne płace I drużyny / (przychody krajowe + średnia sprzedaż zawodników z ostatnich 3 sezonów), bez dopłat właściciela; przy prośbie o płace liczony dla budżetu płac powiększonego o kwotę.
+
+Werdykt: S >= 20 zgoda; 5-20 częściowa zgoda (udział 0,3 + 0,5 x (S - 5) / 15 kwoty); od -10 do 5 zgoda warunkowa ("jeśli 1 dnia miesiąca za co najmniej 4 tygodnie drużyna będzie na N. miejscu lub wyżej, dostanie Pan 80 % kwoty"; N = cel sezonu albo obecne miejsce, jeśli lepsze; warunek sprawdza comiesięczna ocena zarządu, list z wynikiem); poniżej -10 odmowa. Przy W > 0,80 budżet płac jest możliwy tylko wtedy, gdy właściciel ma zasobność co najmniej 14 i pokrywa koszt ze skarbca (wpis `owner` w księdze, najwyżej skarbiec na sezon). Niższy cel: ten sam wzór, ale składnik tabeli z odwrotnym znakiem (zarząd łatwiej obniża cel drużynie wyraźnie pod celem), właściciel -1,5 x (ambicja - 10), stała -5 zamiast kwoty, bez składnika okna; zgoda od S >= 10, bez wariantów pośrednich.
+
+Zaufanie: odmowa -1; prośba przy zaufaniu poniżej 35 albo co najmniej 4 miejsca pod celem dodatkowo -2; niespełniony warunek -1. Zgoda na ponad 20 % budżetu podnosi cel sezonu o jedno miejsce ("pieniądze zobowiązują"). Każda odpowiedź to list w poczcie (kategoria Zarząd, nadawca i podpis "Zarząd klubu") z kwotami, powodami i datą, od której można wrócić do sprawy.
+
+Kluby AI nie piszą próśb. 2 lipca i 2 stycznia każdy klub AI ma liczone S dla +25 % budżetu transferowego (zaufanie 50, cel z siły kadry, bez limitów częstotliwości); przy S >= 20 budżet rośnie o tę kwotę.
+
+### Weto zarządu
+
+Progi (`boardCaps`), mnożone przez typ właściciela s (bogaty właściciel 1,2, oszczędny, czyli zasobność do 6, 0,9, miasto, spółka i pozostali 1,0, rezerwy 0,8):
+
+| Próg | Wartość |
+|---|---|
+| Pensja | najwyżej max(1,5 x najwyższa pensja w kadrze, 1,3 x pensja rynkowa `marketWage`) x s; bogaty i ambitny właściciel (zasobność i ambicja co najmniej 14) 1,8 zamiast 1,5; przy przedłużeniu co najmniej 1,15 x obecna pensja |
+| Pensja a budżet | najwyżej 25 % tygodniowego budżetu płac x s |
+| Koszt kontraktu | pensja x 52 x lata + premia za podpis + prowizja najwyżej 15 % rocznych przychodów krajowych x s |
+| Odstępne | weto, gdy ponad 2 x s x `estimateValue` i ponad 1 mln zł; ostrzeżenie od 1,5 x s; weto, gdy ponad 40 % przychodów krajowych x s, chyba że pokrywa to skarbiec właściciela |
+| Wiek i długość | 33+ najwyżej 1 rok, 31-32 dwa, 29-30 trzy, do 28 pięć; bramkarze o rok dłużej (maks. 5) |
+| Premia za podpis | najwyżej 50 % x s pensji z pierwszego roku |
+| Prowizja agenta | najwyżej 10 % x s wartości kontraktu (pensje) |
+
+Gdzie działa: `negotiationLimits` (src/ui/transfersView.js) zwraca progi w polu `board`; ekran rozmów pokazuje je pod limitem klubu, ostrzega przy wpisywaniu i przycina domyślną ofertę. Oferta ponad progi (także przyjęcie kontroferty) nie trafia do zawodnika: zarząd wysyła list z weta (np. "Proponowana pensja 180 tys. zł tygodniowo jest o 64 % wyższa od najwyższej w kadrze (110 tys. zł). Zaakceptujemy najwyżej 135 tys. zł.") i runda się nie liczy. `offerForPlayer` sprawdza odstępne przed odpowiedzią klubu sprzedającego (weto albo ostrzeżenie w tekście odpowiedzi).
+
+Odwołanie: raz na zawodnika w oknie (poza oknem: do otwarcia następnego), najwyżej dwa w sezonie; przycisk na ekranie rozmów, w karcie zawodnika na rynku i w panelu "Weta zarządu". Decyzja z tego samego S, w którym zamiast składnika kwoty jest -25 x przekroczenie progu (największe względne), a koszt to odstępne albo koszt kontraktu; zgoda od S >= 10. Zgoda kosztuje 3 punkty zaufania i zatwierdza dokładnie zawetowane warunki do końca okna (poza oknem na 30 dni), odmowa kosztuje 5.
+
+Kluby AI: te same progi wieku, długości, pensji i kosztu kontraktu w `aiNegotiate` (budżet `{ wage, maxYears, total }`: oferta i przyjmowana kontroferta skracane do progu), przy zakupach (`aiBuy`: odstępne ponad progi wypada z listy kandydatów), przedłużeniach (`aiRenewals`) i kupnie zawodnika gracza (`answerIncoming`). Domyślna oferta AI (4/3/2/1 rok wg wieku) już mieści się w progach, więc zmienia się głównie przyjmowanie kontrofert i pensje najlepiej opłacanych.

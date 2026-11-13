@@ -16,6 +16,7 @@ import { payLevel } from '../data/finanse_klubow.js';
 import { book, spendable, wageRoom, wageBill } from './finance.js';
 import { squadCount, canSign, boardTargets } from './squadLimit.js';
 import { spellsOf, syncSpell } from '../season/history.js';
+import { boardCaps, clubBoardData, feeIssues, checkUserFee } from './boardRequests.js'; // weto zarządu (docs/finanse.md)
 
 export { SEASON_END };
 const round = (x, step = 5000) => Math.round(x / step) * step;
@@ -112,13 +113,15 @@ export function offerForPlayer(game, playerId, fee) {
   const cap = canSign(game);
   if (!cap.ok) return { result: 'reject', text: cap.text };
   if (spendable(game.finance, game.clubId) < fee) return { result: 'reject', text: 'Kwota przekracza budżet transferowy albo saldo klubu.' };
+  const board = checkUserFee(game, p, fee); // weto zarządu: odstępne ponad progi (list w poczcie, odwołanie w zakładce Klub)
+  if (board.veto) return { result: 'reject', veto: true, text: board.text };
   const seller = clubById(p.clubId);
   if (notForSale(game, p) && !p.contract?.clause) return { result: 'reject', text: `${seller.name}: zawodnik nie jest na sprzedaż.` };
   let price = askingPrice(game, p);
   if (breaksMinimum(game, p)) price = round(price * 1.3);
   t.rounds++; t.date = date;
   game.market.talks[playerId] = t;
-  if (fee >= price) { t.accepted = fee; return { result: 'accept', price, text: `${seller.name} przyjmuje ofertę ${fmtZl(fee)}. Możesz rozmawiać z zawodnikiem o kontrakcie.` }; }
+  if (fee >= price) { t.accepted = fee; return { result: 'accept', price, text: `${seller.name} przyjmuje ofertę ${fmtZl(fee)}. Możesz rozmawiać z zawodnikiem o kontrakcie.${board.warn ? ` ${board.warn}` : ''}` }; }
   if (t.rounds >= 3) { t.until = addDaysIso(date, 14); t.rounds = 0; return { result: 'reject', text: `${seller.name} kończy rozmowy. Trzy oferty były za niskie. Spróbuj za 2 tygodnie.` }; }
   if (fee >= price * 0.82) { t.counter = price; return { result: 'counter', price, counter: price, text: `${seller.name} chce ${fmtZl(price)}.` }; }
   return { result: 'reject', price, text: `${seller.name} odrzuca ofertę jako zbyt niską.` };
@@ -272,11 +275,16 @@ function aiBuy(game, club, date, rng, log) {
       }
     }
   }
+  // Weto zarządu klubu AI: odstępne ponad progi (te same co dla gracza)
+  const cb = clubBoardData(game, club.id);
+  const allowed = pool.filter((x) => !x.fee || !feeIssues(boardCaps(game, club.id, x.p, 'sign', cb), x.fee).issues.length);
+  pool.length = 0; pool.push(...allowed);
   if (!pool.length) return null;
   const pick = pool.sort((a, b) => (b.p.ovr - b.fee / 5e6) - (a.p.ovr - a.fee / 5e6))[0];
   const p = pick.p;
   if (playerWillingness(game, p, club.id).verdict === 'odmowa') return null;
-  const neg = aiNegotiate({ kind: 'sign', player: { ...p, contract: p.contract ?? { wage: p.askWage, until: date } }, club: { ...club, name: club.name }, fromClub: p.clubId ? clubById(p.clubId) : null, date, rng, budget: { wage: Math.max(500, room) } });
+  const caps = boardCaps(game, club.id, p, 'sign', cb);
+  const neg = aiNegotiate({ kind: 'sign', player: { ...p, contract: p.contract ?? { wage: p.askWage, until: date } }, club: { ...club, name: club.name }, fromClub: p.clubId ? clubById(p.clubId) : null, date, rng, budget: { wage: Math.min(Math.max(500, room), caps.wage), maxYears: caps.years, total: caps.total } });
   if (neg.result !== 'signed') return null;
   const entry = completeTransfer(game, { playerId: p.id, to: club.id, fee: pick.fee, contract: neg.contract, kind: pick.fee || p.clubId ? 'transfer' : 'free', date });
   log.push(entry);
@@ -360,7 +368,8 @@ export function answerIncoming(game, offerId, action) {
     return { text: `${buyer.name} wycofuje ofertę za ${p.name}.` };
   }
   if (squadCount(game, o.from).full) { o.status = 'withdrawn'; return { text: `${buyer.name} wycofuje ofertę: nie ma miejsca w kadrze (limit kadry).` }; }
-  const neg = aiNegotiate({ kind: 'sign', player: p, club: buyer, fromClub: clubById(game.clubId), date: game.date, rng, budget: { wage: Math.max(p.contract.wage * 1.6, wageRoom(game.finance, game.world, o.from) + p.contract.wage) } });
+  const caps = boardCaps(game, o.from, p, 'sign');
+  const neg = aiNegotiate({ kind: 'sign', player: p, club: buyer, fromClub: clubById(game.clubId), date: game.date, rng, budget: { wage: Math.min(caps.wage, Math.max(p.contract.wage * 1.6, wageRoom(game.finance, game.world, o.from) + p.contract.wage)), maxYears: caps.years, total: caps.total } });
   if (neg.result !== 'signed') { o.status = 'failed'; return { text: `${p.name} nie dogadał się z ${buyer.name}. Zostaje w klubie.` }; }
   completeTransfer(game, { playerId: p.id, to: o.from, fee: o.fee, contract: neg.contract, kind: 'transfer' });
   o.status = 'accepted';
@@ -376,9 +385,11 @@ export function aiRenewals(game, date) {
     if (c.id === game.clubId || !game.world.clubs[c.id]) continue;
     const squad = squadOf(game.world, c.id);
     const cutoff = [...squad].sort((a, b) => b.ovr - a.ovr)[17]?.ovr ?? 0;
+    let cb = null; // progi zarządu klubu (weto), liczone raz na klub
     for (const p of squad) {
       if (p.contract?.until !== SEASON_END || p.renewRefused || p.ovr < cutoff - 0.3 || p.age >= 34 || p.loan) continue;
-      const r = aiNegotiate({ kind: 'renew', player: p, club: c, date, rng, budget: { wage: p.contract.wage * 1.35 } });
+      const caps = boardCaps(game, c.id, p, 'renew', cb ??= clubBoardData(game, c.id));
+      const r = aiNegotiate({ kind: 'renew', player: p, club: c, date, rng, budget: { wage: Math.min(p.contract.wage * 1.35, caps.wage), maxYears: caps.years, total: caps.total } });
       if (r.result === 'signed') { p.contract = { ...r.contract, signedOn: date }; p.wage = p.contract.wage; renewed++; } else p.renewRefused = true;
     }
   }

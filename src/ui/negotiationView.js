@@ -15,6 +15,7 @@ import { anyClub } from '../season/season.js';
 import { DOMESTIC } from '../config/calendar2026.js';
 import { POS_NAMES } from '../data/attributes.js';
 import { Rng, clamp } from '../core/rng.js';
+import { contractIssues, recordVeto, appealStatus, appealVeto, boardCaps } from '../career/boardRequests.js';
 import { esc, fmtDate } from './dom.js';
 
 export const isNegotiationAction = (act) => typeof act === 'string' && act.startsWith('ng-');
@@ -98,17 +99,18 @@ export function negotiationContext(game, { kind, player, club, fromClub, rival =
 // ------------------------------------------------------------ Oferta (szkic w formularzu)
 function emptyLimits(limits = {}) {
   const num = (v) => (Number.isFinite(v) && v >= 0 ? v : Infinity);
-  return { maxWage: num(limits.maxWage), maxSignOn: num(limits.maxSignOn) };
+  return { maxWage: num(limits.maxWage), maxSignOn: num(limits.maxSignOn), board: limits.board ?? null };
 }
 
 function defaultDraft(player, view, limits, hasAgent, club) {
   const age = player.age ?? 25;
   let wage = player.contract?.wage || player.wage || marketWage(player.ovr ?? 10, club.tier ?? 1);
   if (wage > limits.maxWage) wage = floorTo(limits.maxWage, 100);
+  if (limits.board && wage > limits.board.wage) wage = floorTo(limits.board.wage, 100); // próg zarządu (weto)
   wage = roundTo(wage, 100);
   return normalizeOffer({
     wage,
-    years: age <= 23 ? 4 : age <= 29 ? 3 : age <= 32 ? 2 : 1,
+    years: Math.min(age <= 23 ? 4 : age <= 29 ? 3 : age <= 32 ? 2 : 1, limits.board?.years ?? MAX_YEARS),
     role: view.expectedRole,
     agentFee: hasAgent ? roundTo(0.07 * wage * 52, 1000) : 0, // rynkowy standard prowizji
   });
@@ -150,6 +152,18 @@ export function offerIssues(ng, draft = ng.draft) {
   if (draft.wage > L.maxWage) out.push(`Pensja przekracza limit klubu (${formatZl(L.maxWage)} tygodniowo).`);
   if (draft.signOn > L.maxSignOn) out.push(`Premia za podpis przekracza limit klubu (${formatZl(L.maxSignOn)}).`);
   return out;
+}
+
+/** Naruszenia progów zarządu (weto): ofertę można wysłać, ale zarząd jej nie zatwierdzi. Lista { code, text }. */
+export function boardIssues(ng, draft = ng.draft) {
+  return ng.limits?.board ? contractIssues(ng.limits.board, draft) : [];
+}
+
+/** Opis progów zarządu w formularzu. */
+function boardLine(B) {
+  if (!B) return '';
+  const parts = [`pensja do ${formatZl(B.wage)} tygodniowo`, `kontrakt najwyżej na ${yearsLabel(B.years)}`, `łączny koszt do ${formatZl(B.total)}`];
+  return B.override ? `Zarząd po odwołaniu zgodził się na te warunki (do ${fmtDate(B.override.until)}).` : `Zarząd zatwierdzi: ${parts.join(', ')}.`;
 }
 
 /** Oferta słowami (kwestia gracza w rozmowie i podsumowanie kontroferty). */
@@ -206,7 +220,7 @@ export function startNegotiation(game, opts = {}) {
     draft: defaultDraft(player, view, L, hasAgent, club),
     log: [],
     counter: null, counterType: null, demand: null,
-    error: null, notice: null, done: null,
+    error: null, notice: null, done: null, veto: null,
   };
   pushLine(ng, r.opening);
   return { ok: true, ng };
@@ -251,6 +265,14 @@ export function handleNegotiationAction(game, ng, act, dataset = {}, form = null
       return propose(game, ng, 'Przyjmuję te warunki.');
     case 'ng-propose':
       return propose(game, ng, null);
+    case 'ng-appeal': {
+      // Odwołanie od weta zarządu (raz na zawodnika w oknie, najwyżej dwa w sezonie)
+      const r = appealVeto(game, ng.playerId, game.date);
+      if (r.approved) ng.limits.board = boardCaps(game, game.clubId, game.world.players[ng.playerId], ng.kind);
+      ng.veto = null;
+      if (r.approved) ng.notice = r.text; else ng.error = r.text;
+      return { ng, done: null, save: r.ok };
+    }
     case 'ng-bluff': {
       if (!s.view().canCallBluff) return stay();
       pushMe(ng, 'Proszę pokazać tę ofertę. Nie wierzę, że istnieje.');
@@ -289,6 +311,15 @@ function propose(game, ng, meText) {
     ng.error = `${issues.join(' ')} Oferty nie można wysłać.`;
     return { ng, done: null, save: false };
   }
+  // Weto zarządu: oferta ponad progi nie trafia do zawodnika, zarząd pisze list (można się odwołać)
+  const veto = boardIssues(ng);
+  if (veto.length) {
+    const v = recordVeto(game, { playerId: ng.playerId, kind: 'contract', issues: veto, offer: ng.draft, date: game.date });
+    ng.error = v.text;
+    ng.veto = { appeal: appealStatus(game, ng.playerId, game.date).ok };
+    return { ng, done: null, save: true };
+  }
+  ng.veto = null;
   const s = ng.session;
   pushMe(ng, meText ? `${meText} ${offerSummary(ng.draft)}.` : `Proponuję: ${offerSummary(ng.draft)}.`);
   const res = s.propose(ng.draft);
@@ -340,9 +371,10 @@ export function refreshNegotiationHints(root, ng) {
   if (!ng || ng.done) return;
   const form = readNegotiationForm(root);
   if (!form) return;
-  const issues = offerIssues(ng, mergeDraft(ng.draft, form));
+  const draft = mergeDraft(ng.draft, form);
+  const issues = offerIssues(ng, draft);
   const box = root.querySelector('[data-ng-warn]');
-  if (box) box.innerHTML = warnHtml(issues);
+  if (box) box.innerHTML = warnHtml(issues) + boardWarnHtml(boardIssues(ng, draft));
   const btn = root.querySelector('[data-act="ng-propose"]');
   if (btn) btn.disabled = issues.length > 0;
 }
@@ -350,6 +382,10 @@ export function refreshNegotiationHints(root, ng) {
 // ------------------------------------------------------------ Widok
 const warnHtml = (issues) => (issues.length
   ? `<p class="notice notice--err ng-warn">${esc(issues.join(' '))} Oferty nie można wysłać.</p>`
+  : '');
+
+const boardWarnHtml = (issues) => (issues.length
+  ? `<p class="notice ng-board" data-veto>Zarząd zawetuje tę ofertę: ${esc(issues.map((x) => x.text).join(' '))}</p>`
   : '');
 
 function fact(label, value, tone = '') {
@@ -401,12 +437,14 @@ function counterCard(ng) {
   if (!ng.counter || ng.done) return '';
   const c = ng.counter;
   const over = offerIssues(ng, c);
+  const veto = boardIssues(ng, c);
   const title = ng.counterType === 'ultimatum' ? 'Ultimatum' : ng.counterType === 'demand' ? 'Żądanie' : 'Kontroferta';
   const dem = ng.demand ? `<p class="muted">Chodzi o: ${esc(DEMAND_LABELS[ng.demand.element] ?? ng.demand.element)}.</p>` : '';
   return `<div class="ng-counter" data-type="${esc(ng.counterType ?? '')}">
     <h4>${esc(title)}</h4>${dem}
     <p>${esc(offerSummary(c))}</p>
     ${over.length ? `<p class="notice notice--err">${esc(over.join(' '))} Tych warunków nie można przyjąć.</p>` : ''}
+    ${!over.length && veto.length ? `<p class="notice ng-board">Zarząd nie zatwierdzi tych warunków: ${esc(veto.map((x) => x.text).join(' '))}</p>` : ''}
     <div class="ng-actions">
       <button class="btn btn--primary" data-act="ng-take" ${over.length ? 'disabled' : ''}>Przyjmij te warunki</button>
       <button class="btn btn--quiet" data-act="ng-fill">Wpisz do formularza</button>
@@ -438,6 +476,7 @@ function offerForm(ng, view) {
   return `<section class="panel ng-offer" aria-label="Twoja oferta">
     <h3>Twoja oferta</h3>
     <p class="ng-limits">Limit klubu: ${esc(lim)}.</p>
+    ${L.board ? `<p class="ng-limits ng-limits--board">${esc(boardLine(L.board))}</p>` : ''}
     <div class="ng-form" data-ng-form role="group" aria-label="Warunki oferty">
       <div class="ng-field ng-field--wage">
         <label for="ng-f-wage">Pensja tygodniowa (zł)</label>
@@ -462,9 +501,10 @@ function offerForm(ng, view) {
       </div>
       ${ng.hasAgent ? numField('agentFee', 'Prowizja agenta (zł)', d.agentFee, { step: 1000 }) : ''}
     </div>
-    <div data-ng-warn aria-live="polite">${warnHtml(issues)}</div>
+    <div data-ng-warn aria-live="polite">${warnHtml(issues)}${boardWarnHtml(boardIssues(ng))}</div>
     <div class="ng-actions">
       <button class="btn btn--primary" data-act="ng-propose" ${issues.length ? 'disabled' : ''}>Złóż ofertę</button>
+      ${ng.veto?.appeal ? '<button class="btn btn--quiet" data-act="ng-appeal">Odwołaj się od weta zarządu</button>' : ''}
       ${view.canCallBluff ? '<button class="btn btn--quiet" data-act="ng-bluff">Sprawdź blef</button>' : ''}
       <button class="btn btn--quiet" data-act="ng-walk">Zakończ rozmowy</button>
     </div>

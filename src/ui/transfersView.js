@@ -18,6 +18,7 @@ import { trustLabel, tablePos } from '../career/board.js';
 import { fansSummary } from '../career/fans.js';
 import { canSign, YOUTH_EXEMPT_AGE, KEEP_MAX, PRESSURE_DAYS } from '../career/squadLimit.js';
 import { limitStatus, toggleKeep, ageWord } from '../career/squadLimitSystem.js';
+import { boardCaps, appealStatus } from '../career/boardRequests.js';
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size = 20) => (clubById(id) ? crestHtml(clubById(id), { size, clubsById }) : '');
@@ -273,7 +274,9 @@ function playerCard(game, p, ui) {
       <button class="btn btn--quiet" data-act="tf-loan" data-id="${esc(p.id)}" ${open ? '' : 'disabled'}>Wypożycz do końca sezonu</button></div>`);
   }
   const blocked = will.verdict === 'odmowa' || !cap.ok;
+  const appeal = game.board?.requests?.vetoes?.some((v) => v.playerId === p.id && v.status === 'open') ? appealStatus(game, p.id) : null; // weto zarządu
   const deal = `${ui.tfMsg ? `<p class="notice">${esc(ui.tfMsg)}</p>` : ''}
+    ${appeal?.ok ? `<button class="btn btn--quiet" data-act="br-appeal" data-id="${esc(p.id)}">Odwołaj się od weta zarządu</button>` : ''}
     ${!cap.ok ? `<p class="notice notice--err">${esc(cap.text)}</p>` : cap.warn ? `<p class="notice">${esc(cap.text)}</p>` : ''}
     ${will.verdict === 'odmowa' ? '<p class="notice notice--err">Zawodnik nie chce rozmawiać o przejściu do twojego klubu.</p>' : cap.ok ? actions.join('') : ''}`;
   const notes = [
@@ -544,10 +547,16 @@ export function renderTransfers(game, ui = {}) {
   return `<div class="tfx" data-tab="${esc(tab)}"><div class="tfx__head"><h2>Transfery</h2>${windowBadge(game)}</div>${tabs}${body}</div>`;
 }
 
-/** Limity rozmów o kontrakcie: wolne miejsce w budżecie płac (+ obecna pensja przy przedłużeniu) i premia za podpis. */
+/**
+ * Limity rozmów o kontrakcie: wolne miejsce w budżecie płac (+ obecna pensja przy przedłużeniu) i premia za podpis.
+ * board: progi zarządu (weto, src/career/boardRequests.js): pensja, długość, koszt kontraktu, premia, prowizja.
+ */
 export function negotiationLimits(game, kind, p) {
   const room = wageRoom(game.finance, game.world, game.clubId) + (kind === 'renew' ? p.contract.wage : 0);
-  return { maxWage: Math.max(room, kind === 'renew' ? p.contract.wage : 0), maxSignOn: Math.round(spendable(game.finance, game.clubId) * 0.25 / 1000) * 1000 };
+  return {
+    maxWage: Math.max(room, kind === 'renew' ? p.contract.wage : 0), maxSignOn: Math.round(spendable(game.finance, game.clubId) * 0.25 / 1000) * 1000,
+    board: boardCaps(game, game.clubId, p, kind),
+  };
 }
 
 /**
