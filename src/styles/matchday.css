@@ -1212,3 +1212,27 @@
   .minfo::-webkit-scrollbar { display: none; }
   .minfo__it { flex: none; font-size: 11px; }
 }
+
+/* Przerwa: składy obu drużyn (pierwsza jedenastka z ocenami) po bokach statystyk */
+.brk-grid { display: grid; gap: var(--space-4); grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "stats stats" "home away"; align-items: start; }
+.brk-grid .brk-stats { grid-area: stats; margin: 0 auto; width: 100%; }
+.brk-xi[data-side="0"] { grid-area: home; } .brk-xi[data-side="1"] { grid-area: away; }
+.brk-xi { margin: 0; padding: 12px 12px 10px; border-radius: var(--radius-m); background: var(--surface); border-top: 4px solid var(--home); }
+.brk-xi[data-side="1"] { border-top-color: var(--away); }
+.brk-xi h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font: 700 var(--step-0)/1.1 var(--font-display); }
+.brk-xi h2 span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brk-xi ol { list-style: none; margin: 0; padding: 0; }
+.brk-xi li { display: grid; grid-template-columns: 22px 34px minmax(0, 1fr) auto; align-items: center; gap: 6px; min-height: 32px; border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent); font-size: var(--step--1); }
+.brk-xi li:last-child { border-bottom: 0; }
+.brk-xi__no { color: var(--text-muted); font: 700 12px/1 var(--font-display); text-align: right; }
+.brk-xi__nm { display: flex; align-items: center; gap: 4px; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brk-xi .rt { min-width: 38px; padding: 3px 5px; font-size: var(--step--1); }
+@media (max-width: 559px) {
+  .brk-xi { padding: 10px 8px 8px; }
+  .brk-xi li { grid-template-columns: 30px minmax(0, 1fr) auto; }
+  .brk-xi__no { display: none; }
+  .brk-xi .pos { min-width: 0; padding: 0 3px; font-size: 10px; }
+}
+@media (min-width: 1100px) {
+  .brk-grid { grid-template-columns: minmax(260px, 1fr) minmax(0, 760px) minmax(260px, 1fr); grid-template-areas: "home stats away"; }
+}

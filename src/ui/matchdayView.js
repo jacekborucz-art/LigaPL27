@@ -1408,12 +1408,29 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
   }
 
   // ------------------------------------------------------------ Przerwa, dogrywka, studio pomeczowe
+  /** Skład na boisku w przerwie: numer, pozycja, nazwisko, ocena na żywo (od bramkarza). */
+  function breakXi(side) {
+    const M = S.M; const T = M.teams[side];
+    const byId = new Map([...T.players, ...T.bench].map((x) => [x.id, x]));
+    const on = playerStates(M, side).filter((r) => r.on).sort((a, b) => (a.slotIdx < 0 ? 99 : a.slotIdx) - (b.slotIdx < 0 ? 99 : b.slotIdx));
+    const rows = on.map((r) => {
+      const x = byId.get(r.id);
+      const rt = r.rating;
+      return `<li><span class="brk-xi__no">${esc(String(kitNo(side, r.id) ?? ''))}</span><span class="pos" data-g="${GROUP[r.pos] ?? 'MID'}">${esc(r.pos)}</span>
+        <span class="brk-xi__nm">${esc(lastName(x?.p ?? r))}${markers(r, x)}</span>${rt != null ? `<b class="rt rt--${rBand(rt)}">${rt.toFixed(1)}</b>` : '<b class="rt rt--none">–</b>'}</li>`;
+    }).join('');
+    return `<section class="sec brk-xi" data-side="${side}" aria-label="Skład: ${esc(sideName(side))}"><h2>${crest(side === 0 ? fixture.home : fixture.away, 22)}<span>${esc(sideName(side))}</span></h2><ol>${rows}</ol></section>`;
+  }
   function renderBreak() {
     const h = MD.halfInfo(S);
     shell(`
       <h1>${S.step === 'etbreak' ? 'Przerwa przed dogrywką' : 'Przerwa'}</h1>
       <div class="brk-board">${boardHtml(S.M.score, S.step === 'etbreak' ? 'Dogrywka' : 'Przerwa')}</div>
-      <section class="sec brk-stats"><h2>Statystyki meczu</h2><table class="vs"><tbody>${STAT_ROWS.map(([k, l]) => { const x = Number(h.stats[0][k]); const y = Number(h.stats[1][k]); const t = x + y || 1; return `<tr><td>${h.stats[0][k]}</td><td class="lbl">${esc(l)}<div class="bar2"><i class="bh" style="width:${x / t * 100}%"></i><i class="ba" style="width:${y / t * 100}%"></i></div></td><td>${h.stats[1][k]}</td></tr>`; }).join('')}</tbody></table></section>`,
+      <div class="brk-grid">
+      ${breakXi(0)}
+      <section class="sec brk-stats"><h2>Statystyki meczu</h2><table class="vs"><tbody>${STAT_ROWS.map(([k, l]) => { const x = Number(h.stats[0][k]); const y = Number(h.stats[1][k]); const t = x + y || 1; return `<tr><td>${h.stats[0][k]}</td><td class="lbl">${esc(l)}<div class="bar2"><i class="bh" style="width:${x / t * 100}%"></i><i class="ba" style="width:${y / t * 100}%"></i></div></td><td>${h.stats[1][k]}</td></tr>`; }).join('')}</tbody></table></section>
+      ${breakXi(1)}
+      </div>`,
       (S.step === 'etbreak' ? btn('resumeET', 'Rozpocznij dogrywkę') : btn('toHalfTalk', 'Odprawa w przerwie')) + secondBtn() + btn('dlg:manage', 'Zmiany i taktyka', false));
     if (!app.querySelector('#mdDlg')) app.insertAdjacentHTML('beforeend', '<dialog id="mdDlg" class="panel md-dlg"></dialog>');
   }
