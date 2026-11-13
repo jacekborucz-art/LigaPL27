@@ -477,6 +477,8 @@ function finishing(x, type, header) {
 // kind w zdarzeniach strzałów: typ akcji (POZ, SKR, KON, DYS, SP, FK, PEN), widoczny dla trenera na ławce (coach.js)
 /** Udział pozycji w asystach przy akcjach z gry (cel: skrzydłowi i ofensywni pomocnicy najwięcej, środkowi obrońcy mało). */
 const ASSIST_POS_W = { ŚO: 0.3, BO: 0.9, WB: 1.1, DP: 0.6, ŚP: 1.1, OP: 1.9, SP: 1.5, SN: 1.7, NAP: 1.3 };
+/** Waga bramkarza przy asyście (cel: ok. 0,3-0,5% asyst, częściej po kontrze z długiego wybicia). */
+const GK_ASSIST = { KON: 0.07, other: 0.012 };
 function shot(M, ai, xg, type, header, forced = null) {
   const A = M.teams[ai]; const D = M.teams[1 - ai];
   const field = onPitch(A, M.minute).filter((y) => y.slot.pos !== 'BR');
@@ -485,10 +487,14 @@ function shot(M, ai, xg, type, header, forced = null) {
     * (header ? attr(y, 'GLO') : type === 'DYS' ? attr(y, 'DYS') : attr(y, 'RUC')) / 10);
   let assister = null;
   if (type !== 'DYS' && type !== 'FK' && field.length > 1) {
-    const others = field.filter((y) => y !== s);
-    assister = pickWeighted(M, others, (y) => (type === 'SKR' || type === 'SP'
-      ? attr(y, 'DOS') * (['BO', 'WB', 'SP', 'SN'].includes(y.slot.pos) ? 2 : y.slot.pos === 'ŚO' ? 0.2 : 0.5)
-      : (attr(y, 'POD') + attr(y, 'WIZ')) * (ASSIST_POS_W[y.slot.pos] ?? 1)));
+    // Bramkarz z bardzo małą wagą: rzadka asysta po długim wybiciu, najczęściej przy kontrze (gra nogami NOG)
+    const gkA = type === 'SKR' || type === 'SP' ? null : goalkeeper(A);
+    const others = [...field.filter((y) => y !== s), ...(gkA && gkA.p.pos === 'BR' ? [gkA] : [])];
+    assister = pickWeighted(M, others, (y) => (y === gkA
+      ? (attr(y, 'NOG') + attr(y, 'WIZ')) * (type === 'KON' ? GK_ASSIST.KON : GK_ASSIST.other)
+      : type === 'SKR' || type === 'SP'
+        ? attr(y, 'DOS') * (['BO', 'WB', 'SP', 'SN'].includes(y.slot.pos) ? 2 : y.slot.pos === 'ŚO' ? 0.2 : 0.5)
+        : (attr(y, 'POD') + attr(y, 'WIZ')) * (ASSIST_POS_W[y.slot.pos] ?? 1)));
   }
   s.sh++;
   A.threat += 6 * xg;
