@@ -66,6 +66,8 @@
 .tf-club { display: inline-flex; align-items: center; gap: 6px; max-width: 220px; }
 .tf-club > span { overflow: hidden; text-overflow: ellipsis; }
 .tf-club--none { color: var(--text-muted); }
+.xl td.tf-why { white-space: normal; min-width: 250px; line-height: 1.9; }
+.tf-why .tf-tag { margin: 1px 0; }
 .tf-tag[data-k="n"] { color: var(--text-muted); background: color-mix(in srgb, var(--text) 8%, transparent); font-weight: 500; }
 .tf-tag { --c: var(--tf-info); display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: var(--step--1); line-height: 1.35; font-weight: 600; white-space: nowrap;
   color: color-mix(in srgb, var(--c) 70%, var(--text)); background: color-mix(in srgb, var(--c) 15%, transparent); }
@@ -280,8 +282,6 @@
 @media (min-width: 1600px) {
   .tf-grid, .tf-grid.tf-grid--table { grid-template-columns: minmax(0, 1fr) 380px; }
   .tf-grid--table .tf-side { position: sticky; grid-template-columns: minmax(0, 1fr); }
-  .tf-grid.tf-grid--offers { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); }
-  .tf-grid--offers .tf-stack { grid-template-columns: minmax(0, 1fr); }
   .tf-card { grid-template-columns: minmax(0, 1fr) 440px; }
   .tf-facts { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .tf-attrs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -289,6 +289,12 @@
   .tf-board__rev { grid-row: auto; }
   .tf-month { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tf-chart__cols { height: 170px; }
+}
+
+/* Oferty: tabela transferów obok paneli dopiero, gdy zmieści wszystkie kolumny */
+@media (min-width: 1700px) {
+  .tf-grid.tf-grid--offers { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); }
+  .tf-grid--offers .tf-stack { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* Limit kadry (docs/limit-kadry.md): panel z odcieniem jak panele sekcji w Składzie */
