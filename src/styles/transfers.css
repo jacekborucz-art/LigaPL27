@@ -45,7 +45,7 @@
 /* Układ: treść + kolumna boczna (na telefonie kolumna boczna pod treścią) */
 .tf-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); align-items: start; }
 .tf-main { min-width: 0; }
-.tf-side { display: grid; gap: var(--space-3); min-width: 0; align-content: start; }
+.tf-side { display: grid; gap: var(--space-3); min-width: 0; align-content: start; align-items: start; }
 .tf-side .tf-limit { margin: 0; }
 
 /* Pasek filtrów rynku */
@@ -250,11 +250,8 @@
   .tf-card > .tf-main > .notice, .tf-card > .tf-main > .btn { order: 3; justify-self: start; }
   .tf-card > .tf-side { order: 4; }
 }
-@media (min-width: 760px) and (max-width: 1599px) {
-  .tf-grid--market .tf-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (min-width: 760px) and (max-width: 1279px) {
-  .tf-grid:not(.tf-card):not(.tf-grid--offers) .tf-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 760px) {
+  .tf-grid--table .tf-side, .tf-grid--offers .tf-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* PC: cała szerokość, kolumna boczna po prawej, zakładki do lewej */
@@ -264,14 +261,12 @@
   .tfx .subtabs button { flex: 0 0 auto; min-width: 128px; padding: 0 20px; font-size: var(--step-0); }
   .tf-grid { grid-template-columns: minmax(0, 1fr) 340px; gap: var(--space-4); }
   .tf-side { position: sticky; top: var(--space-3); }
-  /* Rynek: tabela potrzebuje szerokości, panele boczne pod nią aż do 1600 px */
-  .tf-grid.tf-grid--market { grid-template-columns: minmax(0, 1fr); }
-  .tf-grid--market .tf-side { position: static; }
-  .tf-grid--offers { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
+  /* Rynek i Kontrakty: tabela potrzebuje szerokości, panele boczne pod nią aż do 1600 px */
+  .tf-grid.tf-grid--table { grid-template-columns: minmax(0, 1fr); }
+  .tf-grid--table .tf-side { position: static; }
+  .tf-grid.tf-grid--offers { grid-template-columns: minmax(0, 1fr); }
   .tf-grid--offers .tf-side { position: static; }
-  .tf-card { grid-template-columns: minmax(0, 1fr) 400px; }
-  .tf-facts { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-  .tf-attrs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tf-card { grid-template-columns: minmax(0, 1fr) 380px; }
   .tf-xl .xl__nm button, .tf-nm { max-width: 240px; }
   .tf-xl { max-height: calc(100dvh - 330px); }
   .tf-xl--hist { max-height: none; }
@@ -283,10 +278,13 @@
   .tf-board__rev { grid-row: span 2; }
 }
 @media (min-width: 1600px) {
-  .tf-grid, .tf-grid.tf-grid--market { grid-template-columns: minmax(0, 1fr) 380px; }
-  .tf-grid--market .tf-side { position: sticky; }
-  .tf-grid--offers { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
+  .tf-grid, .tf-grid.tf-grid--table { grid-template-columns: minmax(0, 1fr) 380px; }
+  .tf-grid--table .tf-side { position: sticky; grid-template-columns: minmax(0, 1fr); }
+  .tf-grid.tf-grid--offers { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); }
+  .tf-grid--offers .tf-stack { grid-template-columns: minmax(0, 1fr); }
   .tf-card { grid-template-columns: minmax(0, 1fr) 440px; }
+  .tf-facts { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .tf-attrs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .tf-board { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); }
   .tf-board__rev { grid-row: auto; }
   .tf-month { grid-template-columns: repeat(2, minmax(0, 1fr)); }

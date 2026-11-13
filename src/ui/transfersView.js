@@ -166,14 +166,14 @@ function marketTable(game, rows, list, sort, total) {
   const priceTitle = free ? 'Oczekiwana pensja tygodniowo' : list === 'loan' ? 'Obecna pensja tygodniowo' : 'Cena wywoławcza klubu';
   const head = `<tr>${th('m', 'pos', 'Poz.', sort, { cls: 'xl__pos', first: 'asc' })}${th('m', 'name', 'Zawodnik', sort, { cls: 'xl__nm', first: 'asc' })}${th('m', 'ovr', 'OVR', sort, { title: 'Ocena ogólna 1-20' })}${th('m', 'price', priceLabel, sort, { title: priceTitle, cls: 'tf-num' })}
     ${th('m', 'age', 'Wiek', sort, { first: 'asc' })}${free ? '' : th('m', 'club', 'Klub', sort, { cls: 'tf-l', first: 'asc' })}${th('m', 'value', 'Wartość', sort, { cls: 'tf-num' })}${free ? '' : th('m', 'until', 'Kontrakt do', sort, { first: 'asc' })}
-    ${th('m', 'will', 'Nastawienie', sort, { title: 'Czy zawodnik chce przejść do twojego klubu', first: 'asc' })}${th('m', 'nat', 'Narodowość', sort, { cls: 'tf-l', first: 'asc' })}<th scope="col" class="tf-l">${free ? 'Uwagi' : 'Powód wystawienia'}</th></tr>`;
+    ${th('m', 'will', 'Nastawienie', sort, { title: 'Czy zawodnik chce przejść do twojego klubu', first: 'asc' })}<th scope="col" class="tf-l">${free ? 'Uwagi' : 'Powód wystawienia'}</th></tr>`;
   const body = rows.map((x) => {
     const { p } = x;
     return `<tr data-pid="${esc(p.id)}"><td class="xl__pos">${posBadge(p)}</td>
       <th scope="row" class="xl__nm"><button data-act="tf-open" data-id="${esc(p.id)}" data-pid="${esc(p.id)}"><span>${esc(p.name)}</span></button></th>
       <td class="xl__ovr">${ovrTxt(p)}</td><td class="tf-num tf-price">${x.price == null ? '<span class="tf-nfs">nie na sprzedaż</span>' : `${fmtZl(x.price)}${free || list === 'loan' ? '<small>/tydz.</small>' : ''}`}</td>
       <td>${p.age}</td>${free ? '' : `<td class="tf-l">${clubCell(p.clubId)}</td>`}<td class="tf-num">${fmtZl(p.value ?? 0)}</td>${free ? '' : `<td>${p.contract?.until ? esc(fmtDate(p.contract.until)) : '-'}</td>`}
-      <td>${tag(x.will, willTone(x.will))}</td><td class="tf-l">${esc(NAT_NAMES[p.nat] ?? p.nat ?? '')}</td>
+      <td>${tag(x.will, willTone(x.will))}</td>
       <td class="tf-l tf-why">${whyTags(x.reasons, free && recentlyMoved(p, game.date)) || '<span class="xl__z">·</span>'}</td></tr>`;
   }).join('');
   const note = total > rows.length ? `Pokazano ${rows.length} z ${total}. Zawęź listę pozycją albo sortowaniem.` : `${total} ${total === 1 ? 'zawodnik' : 'zawodników'}.`;
@@ -203,12 +203,12 @@ function marketView(game, ui) {
   const withWill = (x) => ({ ...x, will: playerWillingness(game, x.p).verdict });
   const val = (x, k) => (k === 'pos' ? POS_ORDER.indexOf(x.p.pos) : k === 'name' ? x.p.name : k === 'ovr' ? x.p.ovr : k === 'price' ? (x.price ?? Infinity)
     : k === 'age' ? x.p.age : k === 'club' ? (clubById(x.p.clubId)?.name ?? '') : k === 'value' ? x.p.value ?? 0 : k === 'until' ? (x.p.contract?.until ?? '9999')
-      : k === 'will' ? ['chętny', 'otwarty', 'niechętny', 'odmowa'].indexOf(x.will) : k === 'nat' ? (NAT_NAMES[x.p.nat] ?? x.p.nat ?? '') : 0);
+      : k === 'will' ? ['chętny', 'otwarty', 'niechętny', 'odmowa'].indexOf(x.will) : 0);
   const sorted = sortBy(needWill ? all.map(withWill) : all, sort, val).slice(0, 80);
   const rows = needWill ? sorted : sorted.map(withWill);
   const table = all.length ? marketTable(game, rows, list, sort, all.length) : `<p class="tf-empty">${list === 'search' ? 'Brak zawodników dla tych filtrów.' : 'Lista jest pusta.'}</p>`;
   return `${moneyStrip(game)}
-    <div class="tf-grid tf-grid--market">
+    <div class="tf-grid tf-grid--table">
       <div class="tf-main">${chips}${form}${table}</div>
       <aside class="tf-side" aria-label="Kadra i budżet">${limitPanel(game)}${marketHelp(list)}</aside>
     </div>`;
@@ -386,7 +386,7 @@ function contractsView(game, ui) {
     ? `<ul class="tf-mini">${ending.slice(0, 8).map(({ p, ml }) => `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${esc(p.name)}</span><small data-k="${ml <= 6 ? 'bad' : 'warn'}">${ml <= 0 ? 'kończy się' : `${ml} mies.`}</small></button></li>`).join('')}</ul>`
     : '<p class="tf-p__txt">Żaden kontrakt nie kończy się w ciągu roku.</p>', { count: ending.length });
   return `${moneyStrip(game)}
-    <div class="tf-grid">
+    <div class="tf-grid tf-grid--table">
       <div class="tf-main">
         <p class="xl-note">Płace ${fmtZl(bill)} tygodniowo z budżetu ${fmtZl(c.wageBudget)}. Kontrakty kończące się w ciągu 6 miesięcy na czerwono, w ciągu roku na bursztynowo. Kliknij nazwisko, żeby przedłużyć, wystawić albo rozwiązać kontrakt.</p>
         <div class="xl-wrap tf-xl" tabindex="0" aria-label="Kontrakty zawodników, tabela przewijana w poziomie"><table class="xl"><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table></div>
