@@ -6,6 +6,10 @@ import { clamp } from '../core/rng.js';
 
 export const POSITIONS = ['BR', 'ŚO', 'BO', 'WB', 'DP', 'ŚP', 'OP', 'SP', 'SN', 'NAP'];
 const SIDED = new Set(['BO', 'WB', 'SP', 'SN']);
+/** Kolejność pozycji na listach (od bramkarza do napastnika). */
+export const posRank = (pos) => { const i = POSITIONS.indexOf(pos); return i < 0 ? POSITIONS.length : i; };
+/** Porównanie do sortowania list zawodników: pozycja nominalna, potem ocena ogólna malejąco. */
+export const byPosition = (a, b) => posRank(a.pos) - posRank(b.pos) || (b.ovr ?? 0) - (a.ovr ?? 0);
 
 // Biegłość 0-100 na innej pozycji, wynikająca z naturalnej pozycji (wiersz -> kolumna).
 // Zawodnik z pola w bramce: 8. Bramkarz w polu: 15.

@@ -16,7 +16,7 @@ import { onPitch } from '../engine/match/teams.js';
 import { shirtNumbers } from '../career/shirts.js';
 import * as TEAMS from '../engine/match/teams.js';
 import { substitute, changeTactics, shout, canShout, assistantSuggest, applySuggestion, playerStates, previewShape } from '../engine/match/match.js';
-import { proficiency } from '../engine/positions.js';
+import { proficiency, byPosition } from '../engine/positions.js';
 import { openMenu, closeMenu, bindContextTrigger, showToast as menuToast } from './contextMenu.js';
 import { SHOUTS, SHOUT_COOLDOWN, SHOUT_DURATION } from '../engine/match/constants.js';
 import { TONES, TALKS, POST_TONES, MAX_TALKS } from '../match/briefings.js';
@@ -654,7 +654,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     const st = playerStates(M, side);
     const byId = new Map([...T.players, ...T.bench].map((x) => [x.id, x]));
     const on = st.filter((r) => r.on).sort((a, b) => (a.slotIdx < 0 ? 99 : a.slotIdx) - (b.slotIdx < 0 ? 99 : b.slotIdx));
-    const bench = st.filter((r) => r.bench);
+    const bench = st.filter((r) => r.bench).sort((a, b) => byPosition(byId.get(a.id)?.p ?? a, byId.get(b.id)?.p ?? b)); // według pozycji
     const out = st.filter((r) => !r.on && !r.bench);
     const used = new Set(on.map((r) => r.slotIdx));
     const empty = T.formation.slots.map((_, i) => i).filter((i) => !used.has(i));
@@ -1082,7 +1082,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       </nav>
       <div class="mm__lists">
         <section class="mm__xi"><h3>Pierwszy skład</h3><ul class="sub-list">${onList.map((x) => row(x, 'on')).join('')}</ul></section>
-        <section class="mm__bench"><h3>Ławka rezerwowych</h3><ul class="sub-list">${T.bench.map((x) => row(x, 'bench')).join('') || '<li class="hint">Brak rezerwowych.</li>'}</ul></section>
+        <section class="mm__bench"><h3>Ławka rezerwowych</h3><ul class="sub-list">${[...T.bench].sort((a, b) => byPosition(a.p, b.p)).map((x) => row(x, 'bench')).join('') || '<li class="hint">Brak rezerwowych.</li>'}</ul></section>
         <section class="mm__tac"><h3>Instrukcje</h3><div class="mm-segs">${INS_KEYS.map(seg).join('')}</div></section>
       </div>
       <footer class="mm__foot">

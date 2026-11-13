@@ -5,7 +5,7 @@ import { FORMATIONS, formationById } from '../data/formations.js';
 import { INSTRUCTIONS } from '../data/instructions.js';
 import { POS_NAMES } from '../data/attributes.js';
 import { NAT_NAMES } from '../data/names.js';
-import { proficiency } from '../engine/positions.js';
+import { proficiency, byPosition } from '../engine/positions.js';
 import { checkTactics } from '../engine/lineup.js';
 import { GROUP, isAvailable } from '../career/squad.js';
 import { moraleLabel } from '../career/morale.js';
@@ -112,7 +112,9 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
     </li>`;
   };
   const free = Math.max(0, benchSize - tactics.bench.length);
-  const bench = tactics.bench.map((id, i) => byId.get(id) && row(byId.get(id), { zone: 'bench', idx: i })).filter(Boolean).join('');
+  // Ławka według pozycji (od bramkarza), indeksy miejsc bez zmian (przenoszenie i zamiany działają jak dotąd)
+  const bench = tactics.bench.map((id, i) => [byId.get(id), i]).filter(([p]) => p).sort(([a], [b]) => byPosition(a, b))
+    .map(([p, i]) => row(p, { zone: 'bench', idx: i })).join('');
   const benchAdd = free ? `<li class="tp-row tp-add" data-drop="benchAdd">
       <button class="tp-row__main" data-act="tpick" data-loc="benchAdd">
         <span class="tp-add__plus" aria-hidden="true">+</span>
@@ -120,7 +122,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
       </button>
     </li>` : '';
   const out = squad.filter((p) => !inXI.has(p.id) && !onBench.has(p.id))
-    .sort((a, b) => Number(isAvailable(b)) - Number(isAvailable(a)) || b.ovr - a.ovr).map((p) => row(p, { zone: 'out', id: p.id })).join('');
+    .sort((a, b) => Number(isAvailable(b)) - Number(isAvailable(a)) || byPosition(a, b)).map((p) => row(p, { zone: 'out', id: p.id })).join('');
 
   const status = msg || (selPlayer
     ? `Wybrano: ${selPlayer.name}. Wskaż miejsce, na które ma przejść, albo zawodnika do zamiany.`
