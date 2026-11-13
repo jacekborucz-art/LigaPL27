@@ -151,6 +151,8 @@ function tableTermFor(game, clubId, comp, cache) {
 
 /** Model ocen meczów w tle (playQuick); fromEngineResult sprowadza oceny pełnego silnika do tej skali. */
 export const QUICK_RATING = { base: 6.4, goal: 0.9, assist: 0.5, assistShare: 0.72, yellow: -0.3, red: -1.2 };
+/** Waga pozycji przy asyście w meczu w tle (realne udziały: skrzydłowi i ofensywni pomocnicy najwięcej, bramkarz około 0,5%). */
+const ASSIST_W = { BR: 0.04, ŚO: 0.3, BO: 1.1, WB: 1.3, DP: 0.7, ŚP: 1.2, OP: 1.9, SP: 1.6, SN: 1.8, NAP: 1.2 };
 
 /**
  * Waga meczu w tle 0-3 jak ranga w studiu (match/studio.js matchRank), tanio: finał i Superpuchar 3, puchary UEFA,
@@ -202,7 +204,11 @@ export function playQuick(game, f, rng, cache = new Map()) {
     const find = (id) => out.find((x) => x.id === id);
     for (const id of r.scorers[s]) {
       const x = find(id); if (x) x.g++;
-      if (rng.chance(QUICK_RATING.assistShare) && out.length > 1) { const as = rng.pick(out.filter((y) => y.id !== id)); as.a++; }
+      if (rng.chance(QUICK_RATING.assistShare) && out.length > 1) {
+        // Asystujący według pozycji i umiejętności podań (jak w pełnym silniku: bramkarz praktycznie nigdy)
+        const as = rng.weighted(out.filter((y) => y.id !== id), (y) => { const q = byId.get(y.id); return (ASSIST_W[q?.pos] ?? 1) * ((q?.attr?.POD ?? 10) + (q?.attr?.DOS ?? 10) + (q?.attr?.WIZ ?? 10)) / 30; });
+        as.a++;
+      }
     }
     for (let i = 0; i < r.yellow[s]; i++) rng.weighted(out, (x) => (byId.get(x.id).attr?.AGR ?? 10) * (x.yc ? 0.4 : 1)).yc++;
     for (let i = 0; i < r.red[s]; i++) rng.weighted(out, (x) => byId.get(x.id).attr?.AGR ?? 10).rc = 1;

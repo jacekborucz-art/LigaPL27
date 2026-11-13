@@ -475,6 +475,8 @@ function finishing(x, type, header) {
 }
 
 // kind w zdarzeniach strzałów: typ akcji (POZ, SKR, KON, DYS, SP, FK, PEN), widoczny dla trenera na ławce (coach.js)
+/** Udział pozycji w asystach przy akcjach z gry (cel: skrzydłowi i ofensywni pomocnicy najwięcej, środkowi obrońcy mało). */
+const ASSIST_POS_W = { ŚO: 0.3, BO: 0.9, WB: 1.1, DP: 0.6, ŚP: 1.1, OP: 1.9, SP: 1.5, SN: 1.7, NAP: 1.3 };
 function shot(M, ai, xg, type, header, forced = null) {
   const A = M.teams[ai]; const D = M.teams[1 - ai];
   const field = onPitch(A, M.minute).filter((y) => y.slot.pos !== 'BR');
@@ -485,8 +487,8 @@ function shot(M, ai, xg, type, header, forced = null) {
   if (type !== 'DYS' && type !== 'FK' && field.length > 1) {
     const others = field.filter((y) => y !== s);
     assister = pickWeighted(M, others, (y) => (type === 'SKR' || type === 'SP'
-      ? attr(y, 'DOS') * (['BO', 'WB', 'SP', 'SN'].includes(y.slot.pos) ? 2 : 0.5)
-      : attr(y, 'POD') + attr(y, 'WIZ')));
+      ? attr(y, 'DOS') * (['BO', 'WB', 'SP', 'SN'].includes(y.slot.pos) ? 2 : y.slot.pos === 'ŚO' ? 0.2 : 0.5)
+      : (attr(y, 'POD') + attr(y, 'WIZ')) * (ASSIST_POS_W[y.slot.pos] ?? 1)));
   }
   s.sh++;
   A.threat += 6 * xg;
