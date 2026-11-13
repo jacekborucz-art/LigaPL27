@@ -306,3 +306,18 @@ Plik danych `src/data/reprezentacje_swiat.json` (generator `tools/federacje_gen.
 | OFC | Nowa Zelandia 13,1; Nowa Kaledonia 10,2; Wyspy Salomona 9,8; Fidżi 9,5; Tahiti 9,4; Vanuatu 9,0; Papua-Nowa Gwinea 8,6; Samoa 7,3; Tonga 7,0; Wyspy Cooka 6,9; Samoa Amerykańskie 6,5; Kiribati* 6,5; Tuvalu* 6,5 |
 
 Do weryfikacji przy dostępie do źródeł: aktualne Elo (eloratings.net) i ranking FIFA nowych reprezentacji (pole `rankingFIFA: null`), terminy kolejnych edycji Copa América i Pucharu Narodów Oceanii.
+
+### Afryka (CAF) i Azja (AFC), Nov 13, 2026
+
+Ten sam plik i moduł (`reprezentacje_swiat.json`, `worldNations.js`). Strefy są w polu `strefa`.
+
+- **CAF (56):** 54 członków FIFA w 6 strefach: Afryka Północna UNAF (5), Afryka Zachodnia WAFU A (9) i WAFU B (7), Afryka Środkowa UNIFFAC (8), Afryka Wschodnia CECAFA (11), Afryka Południowa COSAFA (14). Do tego Reunion i Zanzibar jako członkowie stowarzyszeni spoza FIFA.
+- **AFC (47):** 46 członków FIFA i Mariany Północne (spoza FIFA) w 5 strefach: Azja Zachodnia, czyli Bliski Wschód WAFF (12), Azja Środkowa CAFA (6), Azja Południowa SAFF (7), Azja Wschodnia EAFF (10), Azja Południowo-Wschodnia AFF z Australią (12).
+- **Azja Mniejsza:** Turcja gra w UEFA, podobnie jak Izrael, Kazachstan, Gruzja, Armenia i Azerbejdżan, więc są w `reprezentacje.json`, nie tutaj.
+- **Siła:** jak wyżej. Kraje obecne w `reprezentacje.json` (Maroko, Senegal, Egipt, Nigeria, Wybrzeże Kości Słoniowej, Algieria, Tunezja, Kamerun, Mali, RPA, Japonia, Iran, Korea Płd., Australia) mają te same Elo i L.
+- **Turnieje do rozgrywania w tle:** Puchar Narodów Afryki, Mistrzostwa Narodów Afryki (CHAN), Puchar Azji (terminy kolejnych edycji do weryfikacji).
+
+| Federacja | L od najsilniejszej (* spoza FIFA) |
+|---|---|
+| CAF | Maroko 15,6; Senegal 15,0; Egipt 14,2; Wybrzeże Kości Słoniowej 14,2; Algieria 14,0; Nigeria 14,0; Tunezja 13,6; Mali 13,6; Kamerun 13,6; RPA 13,4; Demokratyczna Republika Konga 13,3; Ghana 13,1; Republika Zielonego Przylądka 12,9; Burkina Faso 12,9; Gwinea 12,6; Gabon 12,3; Angola 12,3; Zambia 12,1; Benin 12,0; Uganda 12,0; Mauretania 11,8; Gwinea Równikowa 11,8; Libia 11,7; Madagaskar 11,7; Gambia 11,6; Gwinea Bissau 11,6; Kenia 11,6; Namibia 11,6; Togo 11,5; Tanzania 11,5; Mozambik 11,5; Zimbabwe 11,5; Sierra Leone 11,3; Kongo 11,3; Sudan 11,3; Niger 11,2; Komory 11,1; Republika Środkowoafrykańska 10,9; Malawi 10,9; Liberia 10,8; Burundi 10,8; Rwanda 10,8; Botswana 10,7; Etiopia 10,4; Lesotho 10,3; Eswatini 10,1; Czad 9,3; Sudan Południowy 9,3; Reunion* 9,3; Zanzibar* 8,9; Mauritius 8,9; Wyspy Świętego Tomasza i Książęca 8,5; Dżibuti 7,7; Erytrea 7,7; Seszele 7,7; Somalia 7,3 |
+| AFC | Japonia 15,3; Iran 14,5; Korea Płd. 14,4; Australia 14,4; Uzbekistan 13,6; Arabia Saudyjska 13,3; Jordania 13,2; Irak 13,1; Katar 12,9; Zjednoczone Emiraty Arabskie 12,8; Oman 12,5; Syria 12,3; Chiny 12,3; Bahrajn 12,1; Palestyna 12,0; Tajlandia 12,0; Wietnam 11,9; Korea Płn. 11,8; Liban 11,7; Tadżykistan 11,7; Kirgistan 11,6; Indonezja 11,6; Kuwejt 11,5; Malezja 11,2; Turkmenistan 10,8; Indie 10,8; Jemen 10,5; Hongkong 10,5; Filipiny 10,1; Mjanma 9,7; Afganistan 9,6; Tajwan 9,6; Singapur 9,6; Bangladesz 9,1; Nepal 8,5; Malediwy 8,5; Kambodża 8,1; Mongolia 7,7; Laos 7,7; Pakistan 7,1; Bhutan 6,9; Guam 6,9; Brunei 6,9; Sri Lanka 6,7; Makau 6,5; Mariany Północne* 6,5; Timor Wschodni 6,5 |

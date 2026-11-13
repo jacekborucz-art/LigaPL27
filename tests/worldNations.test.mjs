@@ -5,7 +5,7 @@ import { FEDERATIONS, WORLD_NT, worldTeam, federationTeams, topTeams } from '../
 import { ntName, ntTeam } from '../src/season/national.js';
 import BASE from '../src/data/reprezentacje.json' with { type: 'json' };
 
-test('Federacje: 10 CONMEBOL, 41 CONCACAF (3 strefy), 13 OFC, kody bez powtórzeń', () => {
+test('Federacje: 10 CONMEBOL, 41 CONCACAF, 13 OFC, 56 CAF, 47 AFC (ze strefami), kody bez powtórzeń', () => {
   assert.equal(federationTeams('CONMEBOL').length, 10);
   assert.equal(federationTeams('CONCACAF').length, 41);
   assert.deepEqual(['NAFU', 'UNCAF', 'CFU'].map((z) => federationTeams('CONCACAF', { zone: z }).length), [3, 7, 31]);
@@ -13,7 +13,14 @@ test('Federacje: 10 CONMEBOL, 41 CONCACAF (3 strefy), 13 OFC, kody bez powtórze
   assert.equal(federationTeams('OFC', { onlyFifa: true }).length, 11);
   assert.equal(new Set(WORLD_NT.map((t) => t.kod)).size, WORLD_NT.length);
   for (const [k, F] of Object.entries(FEDERATIONS)) assert.equal(F.czlonkowie.length, federationTeams(k).length, k);
-  assert.ok(!worldTeam('AUS'), 'Australia gra w AFC');
+  assert.equal(worldTeam('AUS').konfederacja, 'AFC', 'Australia gra w AFC');
+  assert.equal(federationTeams('CAF').length, 56);
+  assert.equal(federationTeams('CAF', { onlyFifa: true }).length, 54);
+  assert.deepEqual(['UNAF', 'WAFU-A', 'WAFU-B', 'UNIFFAC', 'CECAFA', 'COSAFA'].map((z) => federationTeams('CAF', { zone: z, onlyFifa: true }).length), [5, 9, 7, 8, 11, 14]);
+  assert.equal(federationTeams('AFC').length, 47);
+  assert.equal(federationTeams('AFC', { onlyFifa: true }).length, 46);
+  assert.deepEqual(['WAFF', 'CAFA', 'SAFF', 'EAFF', 'AFF'].map((z) => federationTeams('AFC', { zone: z }).length), [12, 6, 7, 10, 12]);
+  assert.ok(!worldTeam('TUR') && !worldTeam('ISR') && !worldTeam('KAZ'), 'Turcja, Izrael i Kazachstan grają w UEFA');
 });
 
 test('Siła L w skali gry i spójna z reprezentacje.json', () => {

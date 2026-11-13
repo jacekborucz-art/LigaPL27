@@ -1,4 +1,4 @@
-// Reprezentacje spoza Europy w pamięci gry: CONMEBOL, CONCACAF (strefy NAFU, UNCAF, CFU) i OFC
+// Reprezentacje spoza Europy w pamięci gry: CONMEBOL, CONCACAF (strefy NAFU, UNCAF, CFU), OFC, CAF i AFC (ze strefami)
 // (src/data/reprezentacje_swiat.json, generator tools/federacje_gen.cjs, docs/reprezentacje.md).
 // Podstawa pod mistrzostwa kontynentalne rozgrywane w tle (Copa América, Złoty Puchar, Puchar Narodów Oceanii).
 
