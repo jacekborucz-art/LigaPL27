@@ -47,12 +47,12 @@ export const TIER_WAGE = { 1: 1, 2: 0.66, 3: 0.38, 4: 0.2 };
 export const WAGE_MAX = 140000; // ok. 600 tys. zł miesięcznie, poziom najlepiej opłacanych w Ekstraklasie [SZAC]
 
 // ---------------------------------------------------------------- Formatowanie i daty
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTHS = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru']; // data po polsku jak fmtDate (src/ui/dom.js)
 
-/** 'YYYY-MM-DD' -> 'Jul 24, 2026'. */
+/** 'YYYY-MM-DD' -> '24 lip 2026'. */
 export function formatDate(iso) {
   const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
-  return `${MONTHS[m - 1]} ${d}, ${y}`;
+  return `${d} ${MONTHS[m - 1]} ${y}`;
 }
 
 /** 12500 -> '12 500 zł'. */

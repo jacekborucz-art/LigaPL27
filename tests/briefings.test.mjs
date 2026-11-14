@@ -284,8 +284,8 @@ test('Studio przedmeczowe: ranga, absencje, sędzia, frekwencja, data MMM D, YYY
   ctx.home.squad[5].injuryDays = 21;
   ctx.away.squad[2].suspended = 1;
   const pre = preMatchStudio(ctx);
-  assert.equal(pre.date, 'Nov 14, 2026');
-  assert.equal(formatDate('2027-03-05'), 'Mar 5, 2027');
+  assert.equal(pre.date, '14 lis 2026');
+  assert.equal(formatDate('2027-03-05'), '5 mar 2027');
   assert.equal(pre.preview.rank.level, 2);
   assert.ok(pre.preview.rank.tags.includes('derby'));
   assert.equal(pre.absences.home.injured[0].id, 'w5');

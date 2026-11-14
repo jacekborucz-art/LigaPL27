@@ -3,7 +3,7 @@
 // Dane: game.national (2026/27 i grupy eliminacji Euro 2028), game.intl (silnik wieczny), game.intlHistory.
 import { CLUBS_PL } from '../data/clubs_pl.js';
 import { crestHtml } from './crest.js';
-import { esc, fmtDate, weekday } from './dom.js';
+import { esc, fmtDate, weekday, fmtDay } from './dom.js';
 import { anyClub } from '../season/season.js';
 import { ntName, lnGroupTable, euroGroupTable, teamMatches, ntTeam } from '../season/national.js';
 import { bindRatings } from '../season/intl/ratings.js';
@@ -18,7 +18,7 @@ import { ufxRow } from './europeView.js';
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size = 18) => { const c = anyClub(id); return c ? crestHtml(c, { size, clubsById }) : ''; };
 const plural = (n, one, few, many) => `${n} ${n === 1 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? few : many}`;
-const shortDay = (iso) => `${weekday(iso).slice(0, 3)} ${fmtDate(iso).replace(/, \d{4}$/, '')}`;
+const shortDay = (iso) => `${weekday(iso).slice(0, 3)} ${fmtDay(iso)}`;
 const yearOf = (game) => Number(game.date.slice(0, 4));
 const names = (list) => list.map(intlName).join(', ');
 
@@ -164,7 +164,7 @@ function qView(game) {
   const q = currentUq(game);
   const N = game.national;
   if (!q) {
-    if (!N.euro?.groups) return '<p class="hint">Losowanie grup eliminacji Euro 2028 odbędzie się Dec 6, 2026. Mecze od marca 2027, turniej w Anglii, Irlandii, Szkocji i Walii w 2028.</p>';
+    if (!N.euro?.groups) return '<p class="hint">Losowanie grup eliminacji Euro 2028 odbędzie się 6 grudnia 2026. Mecze od marca 2027, turniej w Anglii, Irlandii, Szkocji i Walii w 2028.</p>';
     const pg = Object.entries(N.euro.groups).find(([, t]) => t.includes('POL'))?.[0];
     const order = [pg, ...Object.keys(N.euro.groups).filter((g) => g !== pg)].filter(Boolean);
     const polMs = Object.values(N.matches).filter((m) => m.comp === 'EQ' && m.group === pg).sort((a, b) => a.date.localeCompare(b.date));

@@ -8,7 +8,7 @@ import { GROUP } from '../career/squad.js';
 import { anyClub } from '../season/season.js';
 import { proficiency, POSITIONS } from '../engine/positions.js';
 import { addDays } from '../core/gameLoop.js';
-import { esc, fmtDate, weekday } from './dom.js';
+import { esc, fmtDate, weekday, fmtDay, fmtMon } from './dom.js';
 import {
   ensureTraining, attachTraining, weekPlan, setSession, removeSession, setRestDay, resetDay, resetWeek,
   teamCohesion, sessionPreview, loadSummary, acwrLabel, staffOf, staffLabel, PHASES, ROLE_LABELS, dayContext,
@@ -35,7 +35,7 @@ import { REPORT_FREQS, ensureAssistantReport, setReportFreq, nextReportDate } fr
 const WD = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
 const TABS = [['pulpit', 'Pulpit'], ['tydzien', 'Tydzień'], ['obozy', 'Obozy'], ['sparingi', 'Sparingi'], ['zawodnicy', 'Zawodnicy'], ['obciazenia', 'Obciążenia'], ['sztab', 'Sztab'], ['rozwoj', 'Rozwój']];
 const POS_ORDER = ['BR', 'ŚO', 'BO', 'WB', 'DP', 'ŚP', 'OP', 'SP', 'SN', 'NAP'];
-const shortDate = (iso) => fmtDate(iso).replace(/, \d{4}$/, '');
+const shortDate = (iso) => fmtDay(iso);
 const num = (v, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toFixed(d).replace('.', ',');
 const signed = (v, d = 1) => `${v > 0 ? '+' : ''}${num(v, d)}`;
 const sortSquad = (list) => [...list].sort((a, b) => POS_ORDER.indexOf(a.pos) - POS_ORDER.indexOf(b.pos) || b.ovr - a.ovr);
@@ -235,7 +235,7 @@ function dashFriendlies(game) {
   const last = all.filter((f) => f.played && f.result?.score).pop();
   const nameOf = (f) => anyClub(f.home === game.clubId ? f.away : f.home)?.name ?? 'rywal';
   let body = next.length
-    ? `<ul class="tr-dlist">${next.map((f) => `<li><span class="tr-dlist__date"><b>${dayNum(f.date)}</b><small>${esc(fmtDate(f.date).slice(0, 3))}</small></span>
+    ? `<ul class="tr-dlist">${next.map((f) => `<li><span class="tr-dlist__date"><b>${dayNum(f.date)}</b><small>${esc(fmtMon(f.date))}</small></span>
         <span class="tr-dlist__txt"><b>${esc(nameOf(f))}</b><small>${esc(weekday(f.date))}, ${f.neutral ? 'na obozie' : f.home === game.clubId ? 'u siebie' : 'na wyjeździe'}, ${esc(inDays(daysBetween(game.date, f.date)))}</small></span></li>`).join('')}</ul>`
     : '<p class="muted">Brak zaplanowanych sparingów.</p>';
   if (!next.length) {

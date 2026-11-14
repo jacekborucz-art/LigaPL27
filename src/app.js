@@ -4,7 +4,7 @@ import { CLUBS_PL, LEAGUE_NAMES, clubById, leagueLabel } from './data/clubs_pl.j
 import { compOfClub, compClubIds } from './season/leagueComps.js';
 import { GAME_START, SEASON, POLISH_EUROPE_2026, DOMESTIC } from './config/calendar2026.js';
 import { crestHtml } from './ui/crest.js';
-import { esc, fmtDate, weekday, icon } from './ui/dom.js';
+import { esc, fmtDate, fmtDay, weekday, icon } from './ui/dom.js';
 import * as store from './core/store.js';
 import { hashString } from './core/rng.js';
 import { CATEGORIES, unreadCount, markRead, markAllRead, resolveMessage, filterInbox, pendingDecisions, addMessages, pruneInbox, canDelete } from './core/inbox.js';
@@ -419,7 +419,7 @@ function renderTab(tab, g, club) {
 const LEAGUE_COMP_OF_TIER = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
 const dayNo = (iso) => Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) / 864e5;
 const daysBetween = (a, b) => Math.round(dayNo(b) - dayNo(a));
-const shortDate = (iso) => fmtDate(iso).replace(/, \d{4}$/, '');
+const shortDate = (iso) => fmtDay(iso);
 const fewPl = (n) => n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14);
 const plural = (n, one, few, many) => (n === 1 ? one : fewPl(n) ? few : many);
 const daysWord = (n) => (n === 1 ? 'dzień' : 'dni');
@@ -708,7 +708,7 @@ function renderDashboard(g, club) {
 const MAIL_CAT = { board: ['ZA', 'Zarząd'], staff: ['SZ', 'Sztab'], players: ['ZW', 'Zawodnicy'], transfers: ['TR', 'Transfery'], competitions: ['RO', 'Rozgrywki'], national: ['RP', 'Reprezentacja'], media: ['ME', 'Media'], club: ['KL', 'Klub'] };
 const mailDayLabel = (iso, today) => {
   const diff = Math.round((new Date(`${today}T12:00:00Z`) - new Date(`${iso}T12:00:00Z`)) / 86400000);
-  return diff === 0 ? 'dziś' : diff === 1 ? 'wczoraj' : `${weekday(iso).slice(0, 3)}, ${fmtDate(iso).replace(/, \d{4}$/, '')}`;
+  return diff === 0 ? 'dziś' : diff === 1 ? 'wczoraj' : `${weekday(iso).slice(0, 3)}, ${fmtDay(iso)}`;
 };
 const mailSnippet = (body) => String(body ?? '').replace(/\s+/g, ' ').trim().slice(0, 140);
 const needsAnswer = (m) => m.actions?.length && !m.resolved;

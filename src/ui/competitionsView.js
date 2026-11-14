@@ -7,7 +7,7 @@ import { compClubIds, isL3Comp, L3_COMPS } from '../season/leagueComps.js';
 import { L3_GROUP_NAMES, clubById } from '../data/clubs_pl.js';
 import { PP_ROUNDS, PP_NAMES, winnerOf } from '../season/cup.js';
 import { crestHtml } from './crest.js';
-import { esc, fmtDate, weekday } from './dom.js';
+import { esc, fmtDate, weekday, fmtDay } from './dom.js';
 import { renderEurope, EUROPE_TABS, ufxRow } from './europeView.js';
 import { renderNational } from './nationalView.js';
 
@@ -84,7 +84,7 @@ function matchRow(f, game) {
   const w = res ? (f.knockout ? winnerOf(f) : res.score[0] > res.score[1] ? f.home : res.score[1] > res.score[0] ? f.away : null) : null;
   const tag = res && f.knockout && w ? `<span class="ufx__tag">${f.round === 'F' ? 'zdobywca' : 'awans'}</span>` : '';
   const sub = [res?.shootout ? `karne ${res.shootout[0]}:${res.shootout[1]}` : res?.extraTime ? 'po dogrywce' : '', f.postponed && !res ? 'przełożony' : ''].filter(Boolean).join(', ');
-  return ufxRow({ cls: mine ? 'is-me' : '', date: `${esc(shortDay(f.date))} ${esc(fmtDate(f.date).replace(/, \d{4}$/, ''))}`, home: f.home, away: f.away,
+  return ufxRow({ cls: mine ? 'is-me' : '', date: `${esc(shortDay(f.date))} ${esc(fmtDay(f.date))}`, home: f.home, away: f.away,
     sh: res ? res.score[0] : null, sa: res ? res.score[1] : null, time: f.time ?? '', sub: `${esc(sub)}${tag}`, winner: w, nameOf: name, crestOf: (id) => crest(id), flagOf: () => '', link: true });
 }
 

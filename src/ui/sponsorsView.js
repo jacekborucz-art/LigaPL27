@@ -1,6 +1,6 @@
 // Sponsorzy klubu (zakładka Klub > Sponsorzy): umowy, oferty w trzech wariantach, premie i historia zdarzeń.
 // Model umów: src/career/sponsors.js, docs/finanse.md (rozdz. Sponsorzy). Akcje: sp-pick (wybór wariantu oferty).
-import { esc, fmtDate } from './dom.js';
+import { esc, fmtDate, fmtDay } from './dom.js';
 import { kpi, panel, meter } from './transfersView.js';
 import { fmtZl } from '../career/transfers.js';
 import { SEASON_YEAR } from '../config/calendar2026.js';
@@ -68,7 +68,7 @@ export function sponsorsView(game) {
   const list = s.contracts.length ? `<ul class="sp-list">${s.contracts.map((c) => contractRow(c, s.total)).join('')}</ul>` : '<p class="tf-p__txt">Brak umów.</p>';
   const offers = s.offers.length ? s.offers.map(offerBlock).join('')
     : '<p class="tf-p__txt">Brak ofert. Oferty przychodzą, gdy umowa wygasa (lipiec), po awansie, zerwaniu umowy, awansie do pucharów i po trofeum. Na wybór masz 14 dni, potem zarząd podpisuje wariant ze stałą kwotą.</p>';
-  const log = `<ul class="tf-log">${s.log.slice(0, 15).map((l) => `<li><time>${esc(fmtDate(l.date).replace(/, \d{4}$/, ''))}</time><span>${esc(l.text)}</span>${l.amount != null ? `<b data-k="in">+${fmtZl(l.amount)}</b>` : '<b></b>'}</li>`).join('') || '<li><span>Brak zdarzeń.</span><b></b></li>'}</ul>`;
+  const log = `<ul class="tf-log">${s.log.slice(0, 15).map((l) => `<li><time>${esc(fmtDay(l.date))}</time><span>${esc(l.text)}</span>${l.amount != null ? `<b data-k="in">+${fmtZl(l.amount)}</b>` : '<b></b>'}</li>`).join('') || '<li><span>Brak zdarzeń.</span><b></b></li>'}</ul>`;
   return `${kpis}
     <div class="sp-grid">
       <div class="tf-stack">${panel('Umowy sponsorskie', 'good', list, { count: s.contracts.length })}</div>

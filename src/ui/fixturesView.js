@@ -8,7 +8,7 @@ import { UCOMP_NAMES } from '../season/uefa.js';
 import { anyClub, compLabel } from '../season/season.js';
 import { teamFixtures, historySeasons, recordOf, ensureHistory } from '../season/history.js';
 import { crestHtml } from './crest.js';
-import { esc, fmtDate, weekday } from './dom.js';
+import { esc, fmtDate, weekday, fmtMon } from './dom.js';
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 
@@ -32,7 +32,7 @@ const RES_WORD = { W: 'Wygrana', R: 'Remis', P: 'Porażka' };
 
 const name = (id) => (id ? anyClub(id)?.name ?? 'Rywal' : 'Rywal z losowania');
 const crest = (id, size) => { const c = id ? anyClub(id) : null; return c ? crestHtml(c, { size, clubsById }) : `<span class="fx-tbd" style="--s:${size}px" aria-hidden="true"></span>`; };
-const mon = (iso) => fmtDate(iso).split(' ')[0];
+const mon = (iso) => fmtMon(iso);
 const dayNum = (iso) => Number(iso.slice(8, 10));
 const wd = (iso) => weekday(iso).slice(0, 3);
 

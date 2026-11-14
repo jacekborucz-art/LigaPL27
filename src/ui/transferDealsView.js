@@ -106,7 +106,7 @@ export function ownDealPanels(game, p, ui = {}) {
 // ------------------------------------------------------------ Karta cudzego zawodnika
 /**
  * Panel karty zawodnika innego klubu: transakcja w toku (wtedy bez ofert), umowa od 1 lipca z tobą
- * (wcześniejszy transfer zimą), przycisk „Umowa od Jul 1”. Zwraca { html, blocked }.
+ * (wcześniejszy transfer zimą), przycisk „Umowa od 1 lipca”. Zwraca { html, blocked }.
  */
 export function otherDealPanel(game, p) {
   const d = dealOf(game, p.id);
@@ -124,7 +124,7 @@ export function otherDealPanel(game, p) {
   if (!p.clubId) return { blocked: false, html: '' };
   if (canApproach(p, game.date)) {
     const chk = checkUserPre(game, p);
-    return { blocked: false, html: `<div class="td-pre"><p class="tf-p__txt">Kontrakt kończy się ${esc(fmtDate(p.contract.until))}. Możesz rozmawiać o umowie od 1 lipca bez kwoty odstępnego (FIFA RSTP art. 18.3).</p>${chk.ok ? `<button class="btn btn--quiet" data-act="tf-pre" data-id="${esc(p.id)}">Umowa od Jul 1</button>` : `<p class="hint">${esc(chk.text)}</p>`}</div>` };
+    return { blocked: false, html: `<div class="td-pre"><p class="tf-p__txt">Kontrakt kończy się ${esc(fmtDate(p.contract.until))}. Możesz rozmawiać o umowie od 1 lipca bez kwoty odstępnego (FIFA RSTP art. 18.3).</p>${chk.ok ? `<button class="btn btn--quiet" data-act="tf-pre" data-id="${esc(p.id)}">Umowa od 1 lipca</button>` : `<p class="hint">${esc(chk.text)}</p>`}</div>` };
   }
   const opens = preOpensOn(p);
   if (opens && p.contract.until <= `${Number(game.date.slice(0, 4)) + 1}-06-30` && opens > game.date) return { blocked: false, html: `<p class="hint">Umowę od 1 lipca zaproponujesz od ${esc(fmtDate(opens))}.</p>` };

@@ -20,13 +20,13 @@ const r3 = (v) => Math.round(v * 1000) / 1000;
 
 // ================================================================ Pomocnicze
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTHS = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru']; // data po polsku jak fmtDate (src/ui/dom.js)
 
-/** '2026-11-14' -> 'Nov 14, 2026' (format MMM D, YYYY). */
+/** '2026-11-14' -> '14 lis 2026'. */
 export function formatDate(iso) {
   if (!iso) return '';
   const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number);
-  return `${MONTHS[m - 1]} ${d}, ${y}`;
+  return `${d} ${MONTHS[m - 1]} ${y}`;
 }
 
 const injuryDaysOf = (p) => p.injury?.days ?? p.injuryDays ?? 0;

@@ -5,14 +5,14 @@ import { CLUBS_PL } from '../data/clubs_pl.js';
 import { anyClub } from '../season/season.js';
 import { UCOMP_NAMES, ROUND_NAMES, ROUND_SHORT, ORDER, leagueTable, countryOf, COUNTRY_NAMES, uefaClub } from '../season/uefa.js';
 import { crestHtml } from './crest.js';
-import { esc, fmtDate, weekday } from './dom.js';
+import { esc, fmtDate, weekday, fmtDay } from './dom.js';
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const isPolish = (id) => clubsById.has(id);
 const crest = (id, size = 22) => { const c = anyClub(id); return c ? crestHtml(c, { size, clubsById }) : ''; };
 const name = (id) => anyClub(id)?.name ?? id;
 const flag = (id) => (isPolish(id) ? '' : `<small class="ctry" title="${esc(COUNTRY_NAMES[countryOf(id)] ?? countryOf(id))}">${esc(countryOf(id))}</small>`);
-const shortDay = (iso) => `${weekday(iso).slice(0, 3)} ${fmtDate(iso).replace(/, \d{4}$/, '')}`;
+const shortDay = (iso) => `${weekday(iso).slice(0, 3)} ${fmtDay(iso)}`;
 export const EUROPE_TABS = [['LM', 'Liga Mistrzów'], ['LE', 'Liga Europy'], ['LK', 'Liga Konferencji']];
 export const EUROPE_VIEWS = [['path', 'Przebieg'], ['league', 'Tabela'], ['fixtures', 'Mecze'], ['scorers', 'Strzelcy'], ['ranking', 'Kraje']];
 

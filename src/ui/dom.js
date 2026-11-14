@@ -4,14 +4,23 @@ export const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
 ));
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export const MONTHS_PL = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
 const WEEKDAYS = ['niedziela', 'poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota'];
 
-/** Format daty "MMM D, YYYY" (standard organizacji), np. Jul 24, 2026. */
+/** Data po polsku w grze, np. 24 lip 2026. */
 export function fmtDate(iso) {
   const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
-  return `${MONTHS[m - 1]} ${d}, ${y}`;
+  return `${d} ${MONTHS_PL[m - 1]} ${y}`;
 }
+
+/** Dzień i miesiąc bez roku, np. 24 lip. */
+export function fmtDay(iso) {
+  const [, m, d] = iso.slice(0, 10).split('-').map(Number);
+  return `${d} ${MONTHS_PL[m - 1]}`;
+}
+
+/** Skrót miesiąca, np. lip. */
+export const fmtMon = (iso) => MONTHS_PL[Number(iso.slice(5, 7)) - 1];
 
 export function weekday(iso) {
   const [y, m, d] = iso.slice(0, 10).split('-').map(Number);

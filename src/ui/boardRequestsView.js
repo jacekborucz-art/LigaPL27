@@ -1,7 +1,7 @@
 // Prośby do zarządu (zakładka Klub > Zarząd, prawa kolumna): rodzaje próśb z kwotami, dostępność, warunki,
 // weta z odwołaniem i historia odpowiedzi. Logika: src/career/boardRequests.js. Akcje z prefiksem „br-”.
 
-import { esc, fmtDate } from './dom.js';
+import { esc, fmtDate, fmtDay } from './dom.js';
 import { kpi, panel, meter } from './transfersView.js';
 import {
   REQ, REQ_TYPES, VERDICT_LABELS, ensureRequests, requestStatus, amountPresets, askBoard, appealVeto, appealStatus,
@@ -10,7 +10,7 @@ import {
 import { clubById } from '../data/clubs_pl.js';
 
 const VERDICT_TONE = { yes: 'good', partial: 'info', cond: 'warn', no: 'bad' };
-const shortDate = (iso) => fmtDate(iso).replace(/, \d{4}$/, '');
+const shortDate = (iso) => fmtDay(iso);
 const pctTxt = (x) => `${Math.round(x * 100)} %`;
 
 function typeCard(game, type, c) {

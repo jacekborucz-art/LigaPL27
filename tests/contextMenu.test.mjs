@@ -81,7 +81,7 @@ test('Kadra: własny zawodnik ma profil, skład meczowy, rozmowę, trening i kon
   assert.deepEqual(top(m), ['Profil zawodnika', 'Raport asystenta', 'Statystyki i historia', 'Skład meczowy', 'Rozmowa indywidualna', 'Trening indywidualny', 'Przedłuż kontrakt', 'Wystaw na listę transferową', 'Rozwiąż kontrakt…']);
   assert.ok(m.items[0].primary, 'profil jak zwykłe kliknięcie wiersza');
   assert.deepEqual(m.items[0].run.steps.map((s) => s.act), ['tab', 'tsub', 'player']);
-  assert.match(find(m, 'Przedłuż kontrakt').disabled, /^Rozmowy możliwe od Dec 1, 2027$/);
+  assert.match(find(m, 'Przedłuż kontrakt').disabled, /^Rozmowy możliwe od 1 gru 2027$/);
   p.contract.until = '2027-06-30';
   assert.equal(find(menu(g, p.id, 'squad'), 'Przedłuż kontrakt').disabled, null);
   // Zawodnik na liście transferowej: zamiast wystawienia jest zdjęcie z listy
@@ -175,7 +175,7 @@ test('Rynek: cudzy zawodnik. Oferta i wypożyczenie wyłączone poza oknem, przy
   assert.ok(!find(menu(g, regular.id, 'transfers', { ui: { tfPlayer: regular.id } }), 'Karta zawodnika'));
   // Okno zamknięte
   g.date = '2026-10-10';
-  assert.match(find(menu(g, regular.id, 'transfers'), 'Złóż ofertę…').disabled, /^Okno transferowe zamknięte, otwarcie Feb 1, 2027$/);
+  assert.match(find(menu(g, regular.id, 'transfers'), 'Złóż ofertę…').disabled, /^Okno transferowe zamknięte, otwarcie 1 lut 2027$/);
   // Wolny zawodnik: rozmowa o kontrakcie także poza oknem
   const free = g.world.players[g.market.free[0]];
   assert.equal(find(menu(g, free.id, 'transfers'), 'Rozmawiaj o kontrakcie').disabled, null);

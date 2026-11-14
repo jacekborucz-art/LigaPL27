@@ -316,12 +316,12 @@ test('Sprzedaż za granicę: oferta w Ofertach, przyjęcie, zawodnik wyjeżdża 
 });
 
 // ------------------------------------------------------------ Widok
-test('Zakładka W toku, znaczniki i przycisk „Umowa od Jul 1” na karcie zawodnika z kończącym się kontraktem', () => {
+test('Zakładka W toku, znaczniki i przycisk „Umowa od 1 lipca” na karcie zawodnika z kończącym się kontraktem', () => {
   const g = newGame('widzew', 55, '2027-01-12');
   const t = squadOf(g.world, 'piast').find((x) => x.contract?.until === '2027-06-30' && !x.preContract);
   const html = renderTransfers(g, { tfTab: 'rynek', tfPlayer: t.id });
   assert.match(html, /data-act="tf-pre"/);
-  assert.match(html, /Umowa od Jul 1/);
+  assert.match(html, /Umowa od 1 lipca/);
   const r = handleTransferAction(g, 'tf-pre', { id: t.id });
   assert.equal(r.negotiate?.pre, true);
   assert.equal(r.negotiate.fee, 0);
@@ -335,7 +335,7 @@ test('Zakładka W toku, znaczniki i przycisk „Umowa od Jul 1” na karcie zawo
   const mine = squadOf(g.world, 'widzew').find((x) => x.contract?.until === '2027-06-30');
   if (mine) {
     mine.preContract = { club: 'lech', foreign: null, start: '2027-07-01', signedOn: g.date, contract: { wage: 9000, until: '2029-06-30', years: 2 } };
-    assert.match(renderTransfers(g, { tfTab: 'kontrakty' }), /porozumienie z Lech Poznań od Jul 1, 2027/);
+    assert.match(renderTransfers(g, { tfTab: 'kontrakty' }), /porozumienie z Lech Poznań od 1 lip 2027/);
   }
 });
 

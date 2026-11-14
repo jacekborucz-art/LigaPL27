@@ -5,7 +5,7 @@ import { POS_NAMES, ATTRS } from '../data/attributes.js';
 import { NAT_NAMES } from '../data/names.js';
 import { squadOf } from '../world/worldGen.js';
 import { crestHtml } from './crest.js';
-import { esc, fmtDate } from './dom.js';
+import { esc, fmtDate, fmtDay } from './dom.js';
 import { GROUP } from '../career/squad.js';
 import { reputationLabel } from '../career/reputation.js';
 import { RENEW_WINDOW_MONTHS } from '../career/negotiation.js';
@@ -92,7 +92,7 @@ export function limitPanel(game) {
 // bad czerwony (koszty, źle), info niebieski (informacja), misc fiolet (pozostałe).
 const POS_ORDER = ['BR', 'ŚO', 'BO', 'WB', 'DP', 'ŚP', 'OP', 'SP', 'SN', 'NAP'];
 const MONTHS_PL = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
-const shortDate = (iso) => fmtDate(iso).replace(/, \d{4}$/, '');
+const shortDate = (iso) => fmtDay(iso);
 const posBadge = (p) => `<span class="pos" data-g="${groupOf(p)}">${esc(p.pos)}</span>`;
 const clubCell = (id) => (id ? `<span class="tf-club">${crest(id, 16)}<span>${esc(clubById(id)?.name ?? '')}</span></span>` : '<span class="tf-club tf-club--none">bez klubu</span>');
 

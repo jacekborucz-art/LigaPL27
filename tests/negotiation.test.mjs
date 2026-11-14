@@ -148,7 +148,7 @@ test('Fiasko ustawia blokadę; próba przed jej końcem jest odrzucana, po końc
   const before = sign(p, { date: addDays(out.lock.until, -1) });
   assert.equal(before.ok, false);
   assert.equal(before.reason, 'locked');
-  assert.match(before.text, /[A-Z][a-z]{2} \d{1,2}, \d{4}/); // data w formacie MMM D, YYYY
+  assert.match(before.text, /\d{1,2} [a-zź]{3} \d{4}/); // data po polsku, np. 30 cze 2027
   assert.equal(canNegotiate(p, radomiak.id, out.lock.until).ok, true);
   const after = sign(p, { date: out.lock.until });
   assert.equal(after.ok, true);
@@ -330,7 +330,7 @@ test('Oferta: limity (maks. 5 lat), kontrakt, formaty kwot i dat', () => {
   assert.equal(buildContract({ ...o, years: 1 }, '2026-07-10').until, '2027-06-30');
   assert.equal(formatZl(1234567), '1 234 567 zł');
   assert.equal(formatZl(950), '950 zł');
-  assert.equal(formatDate('2026-07-24'), 'Jul 24, 2026');
+  assert.equal(formatDate('2026-07-24'), '24 lip 2026');
 });
 
 test('Biblioteka kwestii: co najmniej 80, po polsku, bez półpauz i myślników', () => {

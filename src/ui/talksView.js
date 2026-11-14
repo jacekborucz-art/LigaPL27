@@ -1,5 +1,5 @@
 // Kadra -> Rozmowy: zebranie drużyny i rozmowy indywidualne (akcje „tt-”).
-import { esc, fmtDate } from './dom.js';
+import { esc, fmtDate, fmtDay } from './dom.js';
 import { squadOf } from '../world/worldGen.js';
 import { moraleLabel } from '../career/morale.js';
 import {
@@ -132,7 +132,7 @@ export function renderTalks(game, ui = {}) {
         <div class="tt-tones">${Object.entries(MEETING_TONES).map(([k, t]) => `<button class="tt-tone" data-hue="${TONE_HUE[k] ?? 'calm'}" data-act="tt-meet" data-t="${k}" ${meetingOk ? '' : 'disabled'}><strong>${esc(t.label)}</strong><span class="tt-quote">${esc(t.quote)}</span><small>${esc(t.hint)}</small></button>`).join('')}</div>
         ${ui.ttMeeting ? `<ul class="tt-react">${ui.ttMeeting.map((r) => `<li><span>${esc(r.name)}</span><span class="react" data-r="${esc(r.reaction === 'obojetny' ? 'obojętny' : r.reaction === 'urazony' ? 'urażony' : r.reaction)}">${esc(r.label.toLowerCase())}</span></li>`).join('')}</ul>` : ''}
       </section>
-      ${T.log.length ? `<section class="tt-panel tt-log" aria-labelledby="tt-h-log"><h3 id="tt-h-log">Ostatnie rozmowy</h3><ol>${T.log.slice(0, 8).map((x) => `<li data-k="${x.kind === 'meeting' ? 'meet' : 'talk'}"><time>${esc(fmtDate(x.date).replace(/, \d{4}$/, ''))}</time><span>${x.kind === 'meeting' ? `<b>Zebranie, ${esc(MEETING_TONES[x.tone].label.toLowerCase())}.</b> ${esc(x.summary)}` : `<b>${esc(game.world.players[x.playerId]?.name ?? '')}, ${esc(PLAYER_TALKS[x.talk].label.toLowerCase())}.</b> ${esc(x.reply)}`}</span></li>`).join('')}</ol></section>` : ''}
+      ${T.log.length ? `<section class="tt-panel tt-log" aria-labelledby="tt-h-log"><h3 id="tt-h-log">Ostatnie rozmowy</h3><ol>${T.log.slice(0, 8).map((x) => `<li data-k="${x.kind === 'meeting' ? 'meet' : 'talk'}"><time>${esc(fmtDay(x.date))}</time><span>${x.kind === 'meeting' ? `<b>Zebranie, ${esc(MEETING_TONES[x.tone].label.toLowerCase())}.</b> ${esc(x.summary)}` : `<b>${esc(game.world.players[x.playerId]?.name ?? '')}, ${esc(PLAYER_TALKS[x.talk].label.toLowerCase())}.</b> ${esc(x.reply)}`}</span></li>`).join('')}</ol></section>` : ''}
     </aside>
     ${talkDialog(game, ui, reasonsOf)}
   </div>`;
