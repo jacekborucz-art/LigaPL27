@@ -1120,6 +1120,39 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
   .tbl--nt .tbl__row { grid-template-columns: 26px minmax(0, 1fr) 30px 52px 36px !important; }
 }
 
+/* Reprezentacje: zakładki przewijane, drabinka, karty turniejów, historia (src/ui/nationalView.js) */
+.subtabs--scroll { overflow-x: auto; scrollbar-width: none; }
+.subtabs--scroll::-webkit-scrollbar { display: none; }
+.subtabs--scroll button { flex: 1 0 auto; padding: 0 14px; white-space: nowrap; }
+.nt-grid > .ntko, .nt-grid > .ntcard, .nt-grid > .nthist-sec, .nt-grid > .panel__lead { grid-column: 1 / -1; margin: 0; }
+.ntko__cols { display: grid; gap: var(--space-3); grid-template-columns: minmax(0, 1fr); }
+.ntko__col h4 { margin: 0 0 var(--space-2); font: 700 var(--step--1)/1.2 var(--font-body); color: var(--text-muted); }
+.ntcard > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.ntcard > summary::-webkit-details-marker { display: none; }
+.ntcard > summary::before { content: "▸"; color: var(--text-muted); transition: transform .15s; }
+.ntcard[open] > summary::before { transform: rotate(90deg); }
+.ntcard > summary h3 { margin: 0; }
+.ntcard > .nt-grid { margin-top: var(--space-2); }
+.nthist { background: var(--surface); border-radius: var(--radius-m); overflow: hidden; }
+.nthist__row { display: grid; grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-items: center; min-height: 36px; padding: 4px var(--space-3); border-left: 4px solid transparent; font-size: var(--step--1); }
+.nthist__row:nth-child(even) { background: var(--surface-stripe); }
+.nthist__row > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nthist__row > :nth-child(4) { display: none; }
+.nthist--pol .nthist__row > :nth-child(2) { display: none; }
+.nthist__head { color: var(--text-muted); font-weight: 600; min-height: 30px; }
+.nthist__row.is-me { background: color-mix(in srgb, var(--led) 22%, transparent); }
+@media (prefers-reduced-motion: reduce) { .ntcard > summary::before { transition: none; } }
+@media (min-width: 900px) {
+  .nt-grid--q, .nt-grid--tour, .nt-grid--sub { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); }
+  .nt-grid--hist { grid-template-columns: repeat(auto-fill, minmax(600px, 1fr)); align-items: start; }
+  .nt-grid--hist > .nthist-sec { grid-column: auto; }
+  .ntko__cols { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .nthist__row { grid-template-columns: 64px minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); }
+  .nthist__row > :nth-child(4) { display: block; }
+  .nthist--pol .nthist__row { grid-template-columns: 64px minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr); }
+  .nthist--pol .nthist__row > :nth-child(2) { display: block; }
+}
+
 /* ================= Okno rozmowy indywidualnej (src/ui/talksView.js, career/talkDialog.js) ================= */
 .tt-row.is-done { opacity: .92; background: color-mix(in srgb, var(--tt-good) 6%, var(--surface)); border-left-color: var(--tt-good); }
 .tt-done { --c: var(--tt-good); display: inline-block; padding: 2px 8px; border-radius: 999px; font: 700 11.5px/1.4 var(--font-body); color: color-mix(in srgb, var(--c) 75%, var(--text)); background: color-mix(in srgb, var(--c) 16%, transparent); }

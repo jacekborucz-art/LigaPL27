@@ -7,13 +7,16 @@ import { QS, sampleScore } from '../engine/quickSim.js';
 import DATA from '../data/reprezentacje.json' with { type: 'json' };
 import { worldTeam } from './worldNations.js';
 import { addPlayerMatch, quickRating } from './history.js';
+import { liveTeam } from './intl/ratings.js';
+import { windowsNear } from './intl/windows.js';
 
 export const NT = DATA.reprezentacje.filter((t) => t.status === 'aktywna');
 const BY_CODE = new Map(NT.map((t) => [t.kod, t]));
 const BY_NAME = new Map(NT.map((t) => [t.nazwa, t.kod]));
 // Reprezentacje spoza Europy (CONMEBOL, CONCACAF, OFC) z worldNations.js, gdy nie ma ich w reprezentacje.json
 export const ntName = (code) => BY_CODE.get(code)?.nazwa ?? worldTeam(code)?.nazwa ?? code;
-export const ntTeam = (code) => BY_CODE.get(code) ?? worldTeam(code);
+// Siła bieżąca: Elo gry po meczach (src/season/intl/ratings.js), bez gry: wartości z danych
+export const ntTeam = (code) => liveTeam(BY_CODE.get(code) ?? worldTeam(code));
 export const FIFA_WINDOWS_ALL = DATA.oknaFIFA.map((o) => ({ from: o.od, to: o.do, matches: o.mecze }));
 const UEFA_CODES = NT.filter((t) => t.konfederacja === 'UEFA').map((t) => t.kod);
 export const NT_COMP_NAMES = { LN: 'Liga Narodów', LNQF: 'Liga Narodów, ćwierćfinał', LNAB: 'Liga Narodów, baraż A/B', LNBC: 'Liga Narodów, baraż B/C', LNF: 'Liga Narodów, Final Four', EQ: 'Eliminacje Euro 2028' };
@@ -22,6 +25,7 @@ const KO_DATES = ['2027-03-25', '2027-03-28'];
 const FINALS = { SF: ['2027-06-09', '2027-06-10'], third: '2027-06-13', F: '2027-06-13' };
 const LN_DRAW = '2026-11-20';
 const EURO_DRAW = '2026-12-06';
+const HARD_END = '2027-12-31';
 
 // ------------------------------------------------------------ Tworzenie
 export function createNational(seed) {
@@ -101,7 +105,7 @@ function lnKnockoutDraw(N, rng) {
   N.ln.ko = { qf, ab, bc };
 }
 
-function tieWinner(N, tie) {
+export function tieWinner(N, tie) {
   const m1 = N.matches[`${tie.id}-1`]; const m2 = N.matches[`${tie.id}-2`];
   if (!m1.played || !m2.played) return null;
   const a = m1.result.score[0] + m2.result.score[1]; const b = m1.result.score[1] + m2.result.score[0];
@@ -114,7 +118,7 @@ function lnFinals(N, rng) {
   const sf = [0, 1].map((i) => { const id = `LNF-SF${i + 1}`; N.matches[id] = { id, comp: 'LNF', round: 'SF', date: FINALS.SF[i], home: w[2 * i], away: w[2 * i + 1], neutral: true, knockout: true, played: false, result: null }; return id; });
   N.ln.finals = { sf };
 }
-function singleWinner(m) {
+export function singleWinner(m) {
   const [a, b] = m.result.score;
   if (a !== b) return [a > b ? m.home : m.away, a > b ? m.away : m.home];
   return m.result.shootout[0] > m.result.shootout[1] ? [m.home, m.away] : [m.away, m.home];
@@ -196,7 +200,7 @@ export function selectCallups(players, rng) {
 
 const SCORE_W = { NAP: 3, SN: 2, OP: 2, SP: 1.4, ŚP: 1, DP: 0.6, WB: 0.5, BO: 0.4, ŚO: 0.35, BR: 0 };
 /** Minuty i gole powołanych w meczu kadry (spójnie z wynikiem). */
-function assignPlay(N, m, called, players, rng) {
+export function assignPlay(N, m, called, players, rng) {
   for (const side of [0, 1]) {
     const code = side === 0 ? m.home : m.away;
     const team = ntTeam(code);
@@ -245,46 +249,12 @@ function recordNtStats(m, side, playedNow) {
  * Jeden dzień reprezentacji. players: game.world.players. Zwraca zdarzenia do wiadomości:
  * { announced: [{window, list}], started, released: [{window, list}], played: [mecze], draws: [...] }.
  */
-export function nationalDay(N, date, players) {
+export function nationalDay(N, date, players, opts = {}) {
   const out = { announced: [], released: [], played: [], draws: [] };
   const rng = new Rng(`kadry:${N.seed}:${date}`);
-  for (const w of FIFA_WINDOWS_ALL) {
-    const key = w.from;
-    const st = N.windows[key] ?? (N.windows[key] = { status: 'pending' });
-    if (st.status === 'pending' && date >= addDaysIso(w.from, -4) && date <= w.to) {
-      st.list = selectCallups(Object.values(players), rng);
-      st.status = 'announced';
-      out.announced.push({ window: w, list: st.list });
-    }
-    if (st.status === 'announced' && date >= w.from && date <= w.to) {
-      for (const c of st.list) { const p = players[c.id]; if (p) p.callUp = { team: c.team, u21: c.u21, from: w.from, to: w.to }; }
-      st.status = 'active';
-    }
-    if (st.status === 'active' && date > w.to) {
-      for (const c of st.list) {
-        const p = players[c.id];
-        if (!p) continue;
-        const far = ntTeam(c.team)?.konfederacja !== 'UEFA';
-        const mins = p.ntMinutes ?? (c.u21 || far ? rng.int(0, 150) : 0); // U21 i kadry spoza Europy: mecze poza naszą symulacją
-        p.fresh = clamp(Math.round((p.fresh ?? 90) - 15 - Math.min(15, mins / 12) - (far ? 10 : 0)), 35, 100);
-        p.morale = clamp((p.morale ?? 12) + 1 + Math.min(2, p.ntGoals ?? 0), 1, 20);
-        if (c.u21) { p.intlU21 = (p.intlU21 ?? 0) + (mins > 0 ? 1 : 0); }
-        if (far) {
-          p.intl = p.intl ?? { caps: 0, goals: 0, team: c.team }; p.intl.caps += mins > 0 ? 1 : 0;
-          if (mins > 0) addPlayerMatch(p, 'R', { minutes: mins, rating: null }); // mecze poza symulacją: występ bez oceny
-        }
-        c.minutes = mins; c.goals = p.ntGoals ?? 0;
-        if (rng.chance(0.03) && !(p.injuryDays > 0)) {
-          const days = rng.int(5, 24);
-          p.injuryDays = days; p.injury = { name: rng.pick(['uraz mięśnia uda', 'skręcenie stawu skokowego', 'stłuczenie kolana']), days, cat: days > 14 ? 'medium' : 'light', since: date, nt: true };
-          c.injury = p.injury;
-        }
-        delete p.callUp; delete p.ntMinutes; delete p.ntGoals;
-      }
-      st.status = 'done';
-      out.released.push({ window: w, list: st.list });
-    }
-  }
+  callupDay(N, date, players, rng, out, opts);
+  // Część zapisana na sztywno kończy się w listopadzie 2027; dalej rozgrywki prowadzi silnik (intl/engine.js)
+  if (date > HARD_END) return out;
   // Losowania
   if (!N.ln.ko && date >= LN_DRAW) { lnKnockoutDraw(N, new Rng(`ln-ko:${N.seed}`)); out.draws.push('LNKO'); }
   if (!N.euro.groups && date >= EURO_DRAW && N.ln.ko) { euroDraw(N, new Rng(`euro:${N.seed}`)); out.draws.push('EURO'); }
@@ -296,16 +266,100 @@ export function nationalDay(N, date, players) {
     N.ln.finals.final = 'LNF-F';
   }
   // Mecze dnia
-  const called = Object.values(N.windows).filter((s) => s.status === 'active').flatMap((s) => s.list);
+  const called = activeCallups(N);
   for (const m of Object.values(N.matches)) {
     if (m.date !== date || m.played) continue;
     m.result = simNt(N, m, rng);
     m.played = true;
+    opts.onResult?.(m);
     assignPlay(N, m, called, players, rng);
     out.played.push(m);
   }
   if (N.ln.finals?.final && N.matches['LNF-F'].played && !N.ln.champion) N.ln.champion = singleWinner(N.matches['LNF-F'])[0];
   return out;
+}
+
+
+/** Powołani przebywający dziś na zgrupowaniu (okna i turnieje). */
+export function activeCallups(N) {
+  return Object.values(N.windows).filter((s) => s.status === 'active').flatMap((s) => s.list.filter((c) => !c.off && c.on !== 0));
+}
+
+/**
+ * Powołania w oknach FIFA i na turnieje (src/season/intl/windows.js: okna na każdy rok). Okno w opts.windows:
+ * { key?, from, to, matches, kind, tour?, tourTeams?, teams?, title?, tourEnd? }. Zawodnicy reprezentacji grającej
+ * w turnieju (tour) zostają na zgrupowaniu do odpadnięcia drużyny: opts.teamDone(tour, kod) zwraca datę ostatniego
+ * meczu albo null. opts.clubBusy(klub, od, do): ostatni mecz klubu w oknie sparingowym (finały sezonu), po nim dojazd.
+ */
+function callupDay(N, date, players, rng, out, { windows = windowsNear(date), teamDone = () => null, clubBusy = null } = {}) {
+  // Zgrupowania trwające dłużej niż okno z listy (turniej): okno odtworzone z zapisu, żeby zwolnić zawodników
+  const seen = new Set(windows.map((w) => w.key ?? w.from));
+  const extra = Object.entries(N.windows).filter(([k, st]) => st.status === 'active' && !seen.has(k))
+    .map(([k, st]) => ({ key: k, from: /^\d{4}-/.test(k) ? k : date, to: st.to ?? k, tour: st.tour, title: st.title }));
+  for (const w of [...windows, ...extra]) {
+    const key = w.key ?? w.from;
+    const open = date >= addDaysIso(w.from, -4) && date <= w.to;
+    let st = N.windows[key];
+    if (!st) { if (!open) continue; st = N.windows[key] = { status: 'pending' }; }
+    if (st.status === 'pending' && open) {
+      const pool = Object.values(players).filter((p) => !w.teams || w.teams.includes(p.nat));
+      st.list = selectCallups(pool, rng);
+      st.to = w.to;
+      if (w.title) st.title = w.title;
+      if (w.tour) {
+        st.tour = w.tour;
+        const set = new Set(w.tourTeams ?? w.teams ?? []);
+        for (const c of st.list) if (!c.u21 && set.has(c.team)) c.tour = w.tour;
+      }
+      if (clubBusy && w.kind === 'prep') {
+        for (const c of st.list) { const cl = players[c.id]?.clubId; const d = cl && clubBusy(cl, w.from, w.to); if (d) { c.join = d; c.on = 0; } }
+      }
+      st.status = 'announced';
+      out.announced.push({ window: w, list: st.list });
+    }
+    if (st.status === 'announced' && date >= w.from && date <= w.to) st.status = 'active';
+    if (st.status !== 'active') continue;
+    for (const c of st.list) {
+      if (c.on || c.off || (c.join && date <= c.join)) continue;
+      const p = players[c.id];
+      if (p) p.callUp = { team: c.team, u21: c.u21, from: w.from, to: c.tour ? (w.tourEnd ?? w.to) : w.to };
+      c.on = 1;
+    }
+    const rel = [];
+    for (const c of st.list) {
+      if (c.off) continue;
+      const end = c.tour ? teamDone(c.tour, c.team) : w.to;
+      if (!end || date <= end) continue;
+      c.off = 1;
+      rel.push(c);
+      const p = players[c.id];
+      if (!p) continue;
+      const far = ntTeam(c.team)?.konfederacja !== 'UEFA';
+      // U21 i kadry spoza Europy w oknach: mecze poza naszą symulacją; turnieje: minuty z rozegranych meczów
+      const mins = p.ntMinutes ?? (!c.tour && (c.u21 || far) ? rng.int(0, 150) : 0);
+      p.fresh = clamp(Math.round((p.fresh ?? 90) - 15 - Math.min(15, mins / 12) - (far ? 10 : 0)), 35, 100);
+      p.morale = clamp((p.morale ?? 12) + 1 + Math.min(2, p.ntGoals ?? 0), 1, 20);
+      if (c.u21) { p.intlU21 = (p.intlU21 ?? 0) + (mins > 0 ? 1 : 0); }
+      if (far && !c.tour) {
+        p.intl = p.intl ?? { caps: 0, goals: 0, team: c.team }; p.intl.caps += mins > 0 ? 1 : 0;
+        if (mins > 0) addPlayerMatch(p, 'R', { minutes: mins, rating: null }); // mecze poza symulacją: występ bez oceny
+      }
+      c.minutes = mins; c.goals = p.ntGoals ?? 0;
+      if (rng.chance(0.03) && !(p.injuryDays > 0)) {
+        const days = rng.int(5, 24);
+        p.injuryDays = days; p.injury = { name: rng.pick(['uraz mięśnia uda', 'skręcenie stawu skokowego', 'stłuczenie kolana']), days, cat: days > 14 ? 'medium' : 'light', since: date, nt: true };
+        c.injury = p.injury;
+      }
+      delete p.callUp; delete p.ntMinutes; delete p.ntGoals;
+    }
+    if (rel.length) out.released.push({ window: w, list: rel });
+    if (st.list.every((c) => c.off)) st.status = 'done';
+  }
+  // Porządki: zakończone zgrupowania starsze niż pół roku (lista do widoku powołań zostaje dla ostatnich okien)
+  if (date.endsWith('-01')) {
+    const old = addDaysIso(date, -200);
+    for (const [k, st] of Object.entries(N.windows)) if ((st.status === 'done' || st.status === 'pending') && (st.to ?? k) < old) delete N.windows[k];
+  }
 }
 
 function addDaysIso(iso, n) { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
