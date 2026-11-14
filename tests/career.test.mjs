@@ -158,6 +158,7 @@ test('Finanse: przychód bazowy pokrywa płace, budżet płac i transferowy doda
   }
   const g = { seed: 1, clubId: 'widzew', date: '2026-07-01', world };
   createMarket(g);
-  assert.equal(g.market.free.length, 45);
+  // 45 wolnych z Polski i wolni z puli zawodników z zagranicy (src/career/foreignPool.js)
+  assert.equal(g.market.free.length, 45 + g.market.foreign.filter((id) => world.players[id].free).length);
   assert.ok(g.market.free.every((id) => world.players[id].clubId === null && world.players[id].askWage > 0));
 });

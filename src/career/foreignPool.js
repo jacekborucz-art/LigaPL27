@@ -25,7 +25,7 @@ const round = (x, step = 5000) => Math.round(x / step) * step;
 
 export const POOL = {
   size: 100, // tyle zawodników po każdym uzupełnieniu [SZAC]
-  free: 0.45, // udział wolnych [SZAC]
+  free: 0.45, // udział wolnych (wynik szans poziomów w BANDS) [SZAC]
   churn: 0.15, // część zawodników z kontraktem, która przy uzupełnieniu zostaje za granicą [SZAC]
   leadDays: 7, // uzupełnienie 7 dni przed otwarciem okna [SZAC]
   aiChance: 0.1, // szansa, że klub AI przy zakupie w ogóle patrzy na zawodników z kontraktem za granicą [SZAC]
@@ -35,9 +35,10 @@ export const POOL = {
 
 // Poziomy jakości: L dla genPlayer (siła „ligi” zawodnika) i wiek [SZAC]
 export const BANDS = [
-  { key: 'czolowka', w: 0.25, L: [12.0, 12.8], age: [23, 30] }, // poziom czołówki Ekstraklasy
-  { key: 'srodek', w: 0.45, L: [10.6, 11.8], age: [21, 31] }, // Ekstraklasa i 1 Liga
-  { key: 'mlodzi', w: 0.30, L: [9.5, 10.5], age: [18, 21], pot: [2, 4.5] }, // perspektywiczni, wyższy potencjał
+// free: szansa, że zawodnik jest wolny; najlepsi częściej mają kontrakt (razem ok. 45 % wolnych, stabilna siła lig)
+  { key: 'czolowka', w: 0.25, L: [12.0, 12.8], age: [23, 30], free: 0.1 }, // poziom czołówki Ekstraklasy
+  { key: 'srodek', w: 0.45, L: [10.6, 11.8], age: [21, 31], free: 0.55 }, // Ekstraklasa i 1 Liga
+  { key: 'mlodzi', w: 0.30, L: [9.5, 10.5], age: [18, 21], pot: [2, 4.5], free: 0.6 }, // perspektywiczni, wyższy potencjał
 ];
 
 // Regiony i narodowości z wagami wewnątrz regionu [SZAC]
@@ -98,8 +99,8 @@ export function poolSellerClub(p) {
   return { id: `zagranica:${a.country}`, name: a.club, rep: a.rep ?? repFromL(a.league ?? 10) + 25, tier: tierFromL(a.league ?? 10), prestige: 3, foreign: true, country: a.country };
 }
 
-/** Opis klubu zawodnika: „Hajduk Split (Chorwacja)”. */
-export const poolClubLabel = (p) => (p.abroad ? `${p.abroad.club} (${p.abroad.countryName ?? NAT_NAMES[p.abroad.country] ?? p.abroad.country})` : '');
+/** Opis klubu zawodnika: „Hajduk Split (Chorwacja)”; opis ligi bez kraju („klub z ligi brazylijskiej”). */
+export const poolClubLabel = (p) => (!p.abroad ? '' : p.abroad.clubId || !/^klub z ligi /.test(p.abroad.club) ? `${p.abroad.club} (${p.abroad.countryName ?? NAT_NAMES[p.abroad.country] ?? p.abroad.country})` : p.abroad.club);
 
 /** Cena wywoławcza klubu zagranicznego: wartość rynkowa (poziom ligi) x mnożnik ligi (słabe ligi 1,0-1,15, mocne 1,3-1,5). */
 export function foreignAskingPrice(game, p) {
@@ -151,22 +152,23 @@ function priceMulFor(nat, rng) {
   return 1.15 + 0.15 * u;
 }
 
-/** Jeden zawodnik puli. status: 'free' | 'contract'. */
-function genPoolPlayer(rng, id, date, status) {
+/** Jeden zawodnik puli: poziom, potem status (wolny albo kontrakt za granicą) z szansy poziomu. */
+function genPoolPlayer(rng, id, date, { free = null } = {}) {
   const band = rng.weighted(BANDS, (b) => b.w);
+  const status = free === true || (free == null && rng.chance(band.free)) ? 'free' : 'contract'; // free: wymuszony wolny (zastępstwo za wolnego, mindset.js)
   const L = band.L[0] + rng.next() * (band.L[1] - band.L[0]);
   const age = rng.int(band.age[0], band.age[1]);
   const [pos, side] = rng.pick(SQUAD_LAYOUT);
   const nat = pickNat(rng);
   const club = { id: 'zagranica', tier: 1, prestige: 2, L };
-  const p = genPlayer(rng, { id, L, pos, age, slotOffset: -0.3, nat, tier: 1, side: side ?? null, club, date });
+  const p = genPlayer(rng, { id, L, pos, age, slotOffset: -0.4, nat, tier: 1, side: side ?? null, club, date });
   if (band.pot && p.hidden) p.hidden.POT = clamp(Math.round(Math.max(p.hidden.POT ?? 0, p.ovr + band.pot[0] + rng.next() * (band.pot[1] - band.pot[0])) * 10) / 10, 1, 18);
   p.clubId = null; p.squad = null; p.foreignPool = true; p.poolSince = date; p.poolBand = band.key;
   const [y, m] = date.split('-').map(Number);
   const startYear = m >= 7 ? y : y - 1;
   if (status === 'free') {
-    // Wolny: oczekuje pensji na poziomie polskiego rynku (zainteresowany grą w Polsce) [SZAC]
-    p.askWage = Math.round(marketWage(p.ovr, 1, false, 1) * (0.85 + 0.25 * rng.next()) / 100) * 100;
+    // Wolny: oczekuje pensji obcokrajowca w Ekstraklasie (rynek x1,5, jak importy w addFreeAgents) [SZAC]
+    p.askWage = Math.round(marketWage(p.ovr, 1, true, 1) * (0.85 + 0.25 * rng.next()) / 100) * 100;
     p.contract = null; p.wage = 0; p.free = true; p.freeSince = date;
     p.value = marketValue(p, { tier: 1, date });
     return p;
@@ -184,18 +186,16 @@ function genPoolPlayer(rng, id, date, status) {
 }
 
 /** Dodaje n zawodników do puli (deterministycznie z ziarna gry i znacznika). Zwraca dodanych. */
-export function addPoolPlayers(game, n, date, tag) {
+export function addPoolPlayers(game, n, date, tag, { free = null } = {}) {
   const M = game.market; const W = game.world;
   if (!Array.isArray(M.foreign)) M.foreign = [];
   const rng = new Rng(`zagranica:${game.seed}:${tag}`);
-  const nFree = Math.round(n * POOL.free);
-  const statuses = rng.shuffle(Array.from({ length: n }, (_, i) => (i < nFree ? 'free' : 'contract')));
   const out = [];
   let k = 0;
-  for (const status of statuses) {
+  for (let i = 0; i < n; i++) {
     let id;
     do id = `zag-${tag}-${++k}`; while (W.players[id] && k < 10000);
-    const p = genPoolPlayer(rng, id, date, status);
+    const p = genPoolPlayer(rng, id, date, { free });
     W.players[id] = p;
     M.foreign.push(id);
     if (p.free) M.free.push(id);
@@ -227,6 +227,10 @@ export function topUpPool(game, date, tag) {
   M.foreign = M.foreign.filter((id) => {
     const p = W.players[id];
     if (p.free) return true;
+    if (p.contract.until < date && !busy(game, id) && p.poolBand === 'czolowka') { // najlepsi przedłużają kontrakt za granicą
+      const y = Number(date.slice(0, 4)) + (Number(date.slice(5, 7)) >= 7 ? 0 : -1);
+      p.contract = { ...p.contract, until: `${y + rng.int(1, 2)}-06-30`, signedOn: date };
+    }
     if (p.contract.until < date && !busy(game, id)) { // koniec kontraktu za granicą: zostaje na rynku jako wolny
       p.askWage = p.contract.wage; p.contract = null; p.wage = 0; p.free = true; p.freeSince = date; delete p.abroad;
       M.free.push(id);

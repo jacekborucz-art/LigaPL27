@@ -296,12 +296,23 @@ function aiBuy(game, club, date, rng, log) {
   const allowed = pool.filter((x) => !x.fee || !feeIssues(boardCaps(game, club.id, x.p, 'sign', cb), x.fee).issues.length);
   pool.length = 0; pool.push(...allowed);
   if (!pool.length) return null;
-  const pick = pool.sort((a, b) => (b.p.ovr - b.fee / 5e6) - (a.p.ovr - a.fee / 5e6))[0];
+  // Najlepszy z chętnych: odmowa najlepszego nie blokuje zakupu (pięciu pierwszych; braki w kadrze, np. bramkarz po powrocie z wypożyczenia)
+  // Przy braku w kadrze także pensja w zasięgu budżetu płac (inaczej rozmowy z najlepszym upadają co tydzień)
+  const asks = (x) => (x.p.contract?.wage ?? effectiveAsk(x.p, club.tier, payLevel(club))) <= Math.max(500, room) * 1.1;
+  const rank = (a, b) => (b.p.ovr - b.fee / 5e6) - (a.p.ovr - a.fee / 5e6);
+  // Brak w kadrze: najpierw najlepsi z tych, na których klub stać (wcześniej drodzy wolni wypierali tanich z ośmiu kandydatów)
+  const ordered = needs.length ? [...pool.filter(asks).sort(rank).slice(0, 8), ...pool.filter((x) => !asks(x)).sort(rank).slice(0, 3)]
+    : pool.sort(rank).slice(0, 5);
+  // Brak w kadrze: po nieudanych rozmowach z pierwszym kandydatem klub próbuje z kolejnymi (do trzech w tygodniu)
+  const willing = ordered.filter((x) => playerWillingness(game, x.p, club.id).verdict !== 'odmowa').slice(0, needs.length ? 3 : 1);
+  let pick = null; let neg = null;
+  for (const x of willing) {
+    const caps = boardCaps(game, club.id, x.p, 'sign', cb);
+    neg = aiNegotiate({ kind: 'sign', player: { ...x.p, contract: x.p.contract ?? { wage: effectiveAsk(x.p, club.tier, payLevel(club)), until: date } }, club: { ...club, name: club.name }, fromClub: x.p.clubId ? clubById(x.p.clubId) : isPoolContracted(x.p) ? poolSellerClub(x.p) : null, date, rng, budget: { wage: Math.min(Math.max(500, room), caps.wage), maxYears: caps.years, total: caps.total } });
+    if (neg.result === 'signed') { pick = x; break; }
+  }
+  if (!pick) return null;
   const p = pick.p;
-  if (playerWillingness(game, p, club.id).verdict === 'odmowa') return null;
-  const caps = boardCaps(game, club.id, p, 'sign', cb);
-  const neg = aiNegotiate({ kind: 'sign', player: { ...p, contract: p.contract ?? { wage: effectiveAsk(p, club.tier, payLevel(club)), until: date } }, club: { ...club, name: club.name }, fromClub: p.clubId ? clubById(p.clubId) : isPoolContracted(p) ? poolSellerClub(p) : null, date, rng, budget: { wage: Math.min(Math.max(500, room), caps.wage), maxYears: caps.years, total: caps.total } });
-  if (neg.result !== 'signed') return null;
   if (p.clubId && firstRefusal(game, p, club.id, pick.fee, date, neg.contract).blocked) return null; // prawo pierwokupu (loans.js)
   // Transfer jako proces: porozumienie, testy medyczne, zgłoszenie (src/career/transferDeals.js)
   const deal = startDeal(game, { playerId: p.id, to: club.id, fee: pick.fee, contract: neg.contract, kind: pick.fee || p.clubId ? 'transfer' : 'free', date });
@@ -359,7 +370,9 @@ export function marketWeek(game, date) {
   refreshListings(game, date);
   const moves = [];
   for (const c of rng.shuffle(CLUBS_PL.filter((x) => x.id !== game.clubId && game.world.clubs[x.id]))) {
-    if (rng.chance(0.4)) aiBuy(game, c, date, rng, moves);
+    // Brak w kadrze (np. bramkarz po powrocie z wypożyczenia): klub szuka co tydzień, inaczej co ok. 2,5 tygodnia
+    const gap = squadDeficits(squadOf(game.world, c.id)).some((n) => n.scope === 'squad');
+    if (rng.chance(0.4) || gap) aiBuy(game, c, date, rng, moves);
     aiBalance(game, c, date);
   }
   const offers = aiOffersForUser(game, date, rng);

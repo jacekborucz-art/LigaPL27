@@ -183,3 +183,86 @@ Do obserwacji: transfery AI-AI w trzecim sezonie rosną do 56-59 (cel 35-45), pr
 
 `ensureTransferState` (wywoływane w `ensureCareer`) tworzy `game.market.deals` i `game.market.pre`.
 Brak `p.freeSince`, `p.stepDown`, `p.moveWish` oznacza wartości domyślne. Statystyki kalibracji: `game.market.tstats`.
+
+## 9. Zawodnicy z zagranicy na rynku
+
+Moduł `src/career/foreignPool.js`, lista `game.market.foreign`, w interfejsie Transfery > Rynek > „Z zagranicy”.
+Na rynku jest ok. 100 obcokrajowców zainteresowanych grą w Polsce. Wszystkie liczby [SZAC].
+
+Narodowości (region, potem kraj z wagą w regionie):
+
+| Region | Udział | Kraje (waga) |
+|---|---|---|
+| Ameryka Południowa | 24 % | BRA 3, ARG 2, COL 1,5, URU 1, ECU 1, PAR 0,8, VEN 0,6, CHI 0,6, PER 0,5 |
+| Afryka | 24 % | NGA 1,5, GHA 1,2, SEN 1,2, CIV 1,2, CMR 1, MAR 0,8, ALG, TUN, MLI, GUI, COD po 0,6 |
+| Bałkany | 24 % | SRB 1,5, CRO 1,2, SVN 1, BIH 1, MKD, MNE, ALB, BUL po 0,8, KOS 0,6 |
+| Bliski Wschód | 7 % | ISR 1,2, LBN 1, JOR 1, IRQ 1, SYR 0,8 |
+| Europa Wschodnia | 7 % | UKR 2, GEO 1 |
+| Skandynawia | 6 % | SWE, NOR, DEN po 1,2, FIN 0,8, ISL 0,6 |
+| Hiszpania, Portugalia | po 4 % | ESP, POR |
+
+Poziomy (L dla `genPlayer`, przesunięcie -0,4, premia obcokrajowca ligi 1):
+
+| Poziom | Udział | L | Wiek | Szansa, że wolny |
+|---|---|---|---|---|
+| Czołówka Ekstraklasy | 25 % | 12,0-12,8 | 23-30 | 10 % |
+| Ekstraklasa i 1 Liga | 45 % | 10,6-11,8 | 21-31 | 55 % |
+| Perspektywiczni | 30 % | 9,5-10,5 | 18-21, POT co najmniej OVR + 2-4,5 | 60 % |
+
+Razem ok. 45 % wolnych. Najlepsi rzadko są wolni, bo przy wolnych z poziomu czołówki siła lig rosła (niżej).
+
+Wolny zawodnik z puli to zwykły wolny zawodnik (`p.free`, `p.askWage`, `p.freeSince`, `game.market.free`):
+oczekuje pensji obcokrajowca w Ekstraklasie (rynek x1,5 x U(0,85; 1,1)), podpisują go gracz i kluby AI jak
+każdego wolnego. Zawodnik z kontraktem ma `p.clubId = null`, `p.free = false`, `p.foreignPool = true`, kontrakt na
+1-3 lata i `p.abroad = { country, countryName, club, clubId, league, rep, vt, priceMul, since }` (ten sam kształt co
+po sprzedaży za granicę w `completeAbroad`, plus poziom ligi i cena). Klub to prawdziwy klub z `kluby_uefa.json`
+z kraju zawodnika o sile L między OVR - 1,2 a OVR + 1,8, inaczej opis „klub z ligi brazylijskiej” (przymiotnik
+z mapy w module). Siła lig spoza danych UEFA jest szacowana (Brazylia 12,8, Argentyna 12,4, Maroko 10,6,
+Nigeria 8,6, Liban 8,0 i inne). Pensja w klubie zagranicznym: rynek Ekstraklasy x 0,5-0,95 według siły ligi.
+
+Cena wywoławcza: `wartość rynkowa (poziom ligi klubu) x mnożnik ligi`, najmniej 25 tys. zł. Mnożnik: ligi słabsze
+niż 10,5 od 1,0 do 1,15, ligi od 12 oraz Hiszpania i Portugalia od 1,3 do 1,5, pozostałe od 1,15 do 1,3.
+Nastawienie zawodnika liczy klub sprzedający z reputacją ligi w skali polskich klubów: prawdziwy klub
+prestiż x 7 + 25, opis ligi `30 + 9 (L - 11) + 25` (ten sam wzór co kupcy z zagranicy), poziom ligi 1-3 z L.
+
+Kupno przez gracza (`offerForForeign`, `offerForPlayer` przekazuje do niej zawodników z puli): okno transferowe,
+budżet z odstępnym w otwartych transakcjach, weto zarządu (`checkUserFee`), limit kadry, kontroferta od 0,82 ceny,
+po trzech za niskich ofertach przerwa 14 dni. Po zgodzie klubu ekran rozmów z `fromClub` jako klub zagraniczny,
+potem transakcja typu „zagraniczny” z etapem certyfikatu ITC i podróży (`d.origin`, `startDeal` rozpoznaje
+zawodnika z puli sam). Przy zgłoszeniu odstępne idzie z kasy kupującego, po stronie sprzedającego nie ma
+polskiego klubu (historia: `fromName`, `country`). Zawodnik traci `p.abroad` i wypada z puli.
+
+Kluby AI: wolnych z puli podpisują zwykłą drogą. Zawodnika z kontraktem rozważają rzadko: przy 10 % zakupów
+(`Rng('zagranica-ai:${seed}:${klub}:${data}')`), tylko lepszego od progu grupy, za najwyżej połowę wolnych środków.
+Przy okazji zakup AI wybiera najlepszego chętnego z pięciu pierwszych kandydatów, a przy brakach w kadrze najpierw
+takich, których pensja mieści się w budżecie płac (wcześniej odmowa albo zbyt wysoka pensja najlepszego
+blokowała zakup co tydzień, np. bramkarz po powrocie z wypożyczenia).
+
+Uzupełnienie: nowa gra tworzy 100 zawodników (`createMarket`), stary zapis raz, leniwie w `ensureTransferState`
+(flaga `game.market.foreignPoolV1`). Raz na okno (7 dni przed otwarciem albo pierwszego dnia okna, `foreignTop`):
+odpadają zawodnicy, którzy trafili do polskiego klubu albo zniknęli z wolnych; najlepsi z wygasłym kontraktem
+przedłużają go za granicą, pozostali z wygasłym kontraktem zostają na rynku jako wolni; 15 % zawodników
+z kontraktem (bez rozmów i transakcji w toku) zostaje za granicą i znika ze świata gry; braki do 100 to nowi
+zawodnicy (`Rng('zagranica:${seed}:${okno}')`, identyfikatory `zag-${okno}-${n}`).
+
+Wolni z zagranicy przychodzą teraz także z puli, więc letnia dostawa importów w `addFreeAgents` spadła z 22 do 8
+zawodników (src/season/rollover.js).
+
+Kalibracja (Nov 14, 2026), `node tools/transfery-kalibracja.mjs widzew <ziarno> 3`, OVR top14 Ekstraklasa / 1 Liga
+po sezonach 2026/27, 2027/28, 2028/29:
+
+| Ziarno | Przed | Po |
+|---|---|---|
+| 5 | 11,55 / 11,55 / 11,66; 10,08 / 10,14 / 10,16 | 11,62 / 11,59 / 11,75; 10,07 / 10,30 / 10,14 |
+| 7 | 11,53 / 11,61 / 11,81; 10,04 / 10,21 / 10,12 | 11,60 / 11,62 / 11,70; 10,08 / 10,24 / 10,22 |
+| 9 | 11,58 / 11,64 / 11,79; 10,09 / 10,26 / 10,17 | 11,58 / 11,69 / 11,63; 10,14 / 10,20 / 10,22 |
+
+Średnio Ekstraklasa 11,64 przed i 11,64 po, 1 Liga 10,14 i 10,18, 2 Liga 8,60 i 8,55. Pierwsza wersja (wolni
+z czołówki co czwarty, importy 22, przesunięcie -0,3) podnosiła Ekstraklasę do 11,85-11,90 w trzecim sezonie.
+Z puli w sezonie: 17-23 wolnych podpisanych przez transakcje i 3-6 kupionych przez kluby AI (ziarno 5,
+`tstats.poolFree`, `poolBought`), uzupełnienia 21-69 zawodników na okno.
+
+
+## Rotacja wolnych zawodników (Nov 14, 2026)
+
+1. dnia każdego miesiąca wolny zawodnik, który długo nie znajduje klubu, może zniknąć z rynku (koniec kariery, gra za granicą albo w niższej lidze) [SZAC]: pierwsze 2 miesiące bez zmian, potem 8 % i +5 % za każdy kolejny miesiąc (najwyżej 45 %), zawodnicy 30+ x1,5, weterani 32+ po pół roku co najmniej 15 %. Na jego miejsce od razu pojawia się nowy, losowy wolny zawodnik (za zawodnika z puli zagranicznej: nowy z puli, za pozostałych: zwykły wolny), dopóki na rynku jest mniej niż 150 wolnych. Na każdej grupie pozycji zawsze zostaje kilku wolnych (bramkarze 8, obrońcy i pomocnicy 14, napastnicy 10), bo kluby AI uzupełniają nimi braki w kadrze. Kluby AI z brakiem w kadrze wybierają najpierw najlepszego z wolnych, na których je stać (`aiBuy`).

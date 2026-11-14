@@ -15,6 +15,7 @@ import { STAFF_ROLES } from '../training/config.js';
 import { standings } from '../season/standings.js';
 import { clubFixtures, recordOf, statObj, sumStats, CLUB_GROUPS } from '../season/history.js';
 import { clubFacts } from './menuView.js';
+import { capacityOf } from '../career/infrastructure.js';
 import { fixtureRowHtml } from './fixturesView.js';
 import { crestHtml } from './crest.js';
 import { esc, fmtDate } from './dom.js';
@@ -149,6 +150,7 @@ export function renderClubView(game, clubId) {
   const club = clubById(clubId);
   if (!club) return '<p>Brak danych o klubie.</p>';
   const facts = clubFacts(club);
+  const cap = game.infra && game.finance?.clubs?.[clubId] ? capacityOf(game, clubId).full : facts.cap; // z rozbudową trybun i edytorem
   const kit = kitColors(club);
   const comp = LEAGUE_COMP[club.tier];
   const ids = CLUBS_PL.filter((c) => c.tier === club.tier && !c.parent).map((c) => c.id);
@@ -174,7 +176,7 @@ export function renderClubView(game, clubId) {
     <dl class="clv-dl">
       <div><dt>Siła kadry</dt><dd>${esc(facts.strength)}</dd></div>
       ${facts.europe ? `<div><dt>Puchary</dt><dd>${esc(facts.europe.comp)}</dd></div>` : ''}
-      <div><dt>Stadion</dt><dd>${facts.cap ? `${facts.cap.toLocaleString('pl-PL')} miejsc${facts.capEst ? ' (szacunek)' : ''}` : 'brak danych'}</dd></div>
+      <div><dt>Stadion</dt><dd>${club.stadium ? `${esc(club.stadium)}, ` : ''}${cap ? `${cap.toLocaleString('pl-PL')} miejsc${cap === facts.cap && facts.capEst ? ' (szacunek)' : ''}` : 'brak danych'}</dd></div>
       <div><dt>Frekwencja</dt><dd>${facts.att ? `średnio ${Math.round(facts.att).toLocaleString('pl-PL')}${facts.attEst ? ' (szacunek)' : ''}` : 'brak danych'}</dd></div>
       ${ownerHtml(game, clubId, facts)}
       ${facts.rivals?.length ? `<div><dt>Rywale</dt><dd>${facts.rivals.map((r) => esc(r.c.name)).join(', ')}</dd></div>` : ''}

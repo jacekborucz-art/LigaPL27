@@ -30,6 +30,10 @@ export const ICONS = {
   mecz: '<circle cx="12" cy="12" r="8"/><path d="M12 7l3.5 2.5-1.3 4.1H9.8L8.5 9.5zM12 4v3M20 10l-4.5-.5M17 19l-2.8-5.4M7 19l2.8-5.4M4 10l4.5-.5"/>',
   transfery: '<path d="M4 8h13l-3-3M20 16H7l3 3"/>',
   trening: '<path d="M4 18l4-4 3 3 7-8M14 9h4v4"/>',
+  opcje: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+  zapis: '<path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h8V3M8 21v-7h8v7"/>',
+  wyjscie: '<path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
   klub: '<path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M9 12h6M12 9v6"/>',
 };
 

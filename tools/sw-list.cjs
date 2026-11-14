@@ -19,5 +19,11 @@ const i = sw.indexOf(start);
 const j = sw.indexOf(end);
 if (i < 0 || j < 0) throw new Error('Brak znaczników AUTO-FILES w sw.js');
 const block = `${start}\n${files.map((f) => `  '${f}',`).join('\n')}\n  ${end}`;
-fs.writeFileSync(swPath, sw.slice(0, i) + block + sw.slice(j + end.length));
-console.log(`sw.js: ${files.length} plików w trybie offline`);
+// Wersja pamięci podręcznej z zawartości plików gry: każda zmiana kodu daje nową wersję, stara pamięć jest usuwana
+const crypto = require('crypto');
+const h = crypto.createHash('sha1');
+for (const f of [...files, './index.html', './manifest.webmanifest']) { const fp = path.join(root, f); if (fs.existsSync(fp)) h.update(f).update(fs.readFileSync(fp)); }
+const version = `v0.3-${h.digest('hex').slice(0, 10)}`;
+const out = (sw.slice(0, i) + block + sw.slice(j + end.length)).replace(/const VERSION = '[^']*';/, `const VERSION = '${version}';`);
+fs.writeFileSync(swPath, out);
+console.log(`sw.js: ${files.length} plików w trybie offline, wersja ${version}`);

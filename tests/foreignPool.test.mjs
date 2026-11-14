@@ -33,10 +33,10 @@ function newGame(clubId = 'widzew', seed = 61, date = '2026-07-01') {
 const step = (g, n = 1) => { for (let i = 0; i < n; i++) { g.date = addDays(g.date, 1); processDay(g); } };
 /** Lekki stan gry do generowania puli bez świata ligi. */
 const bare = (seed) => ({ seed, world: { players: {} }, market: { free: [], foreign: [], talks: {} } });
-const rich = (g) => { const c = g.finance.clubs[g.clubId]; c.transferBudget = 5e7; c.balance = Math.max(c.balance, 5e7); };
+const rich = (g, x = 5e7) => { const c = g.finance.clubs[g.clubId]; c.transferBudget = x; c.balance = Math.max(c.balance, x); };
 const cheapest = (g) => poolList(g).filter((p) => !p.free).sort((a, b) => foreignAskingPrice(g, a) - foreignAskingPrice(g, b))[0];
 
-test('Nowa gra: 100 zawodników z zagranicy, 45 wolnych w market.free, 55 z kontraktem w klubie zagranicznym', () => {
+test('Nowa gra: 100 zawodników z zagranicy, ok. 45 wolnych w market.free, reszta z kontraktem w klubie zagranicznym', () => {
   const g = newGame();
   const ids = g.market.foreign;
   assert.equal(ids.length, POOL.size);
@@ -46,7 +46,7 @@ test('Nowa gra: 100 zawodników z zagranicy, 45 wolnych w market.free, 55 z kont
   const ps = ids.map((id) => g.world.players[id]);
   const free = ps.filter((p) => p.free);
   const con = ps.filter((p) => !p.free);
-  assert.equal(free.length, 45);
+  assert.ok(free.length >= 33 && free.length <= 57, `wolnych ${free.length}`);
   assert.ok(free.every((p) => g.market.free.includes(p.id) && p.clubId === null && !p.contract && p.askWage > 0 && p.freeSince));
   for (const p of con) {
     assert.ok(isPoolContracted(p), p.id);
@@ -70,7 +70,8 @@ test('Skład puli: regiony, poziomy, wolni i kontrakty zgodne z ustawieniami (10
   for (const [r, cfg] of Object.entries(POOL_REGIONS)) regionShare[r] = share((p) => cfg.nats[p.nat] != null);
   for (const [r, cfg] of Object.entries(POOL_REGIONS)) assert.ok(Math.abs(regionShare[r] - cfg.w) < 0.04, `${r}: ${regionShare[r]} zamiast ${cfg.w}`);
   assert.ok(share((p) => p.nat === 'ESP') < 0.07 && share((p) => p.nat === 'POR') < 0.07);
-  assert.equal(share((p) => p.free), POOL.free);
+  assert.ok(Math.abs(share((p) => p.free) - POOL.free) < 0.04, `wolnych ${share((p) => p.free)}`);
+  assert.ok(share((p) => p.free && p.poolBand === 'czolowka') < 0.1, 'najlepsi zwykle z kontraktem');
   for (const b of BANDS) assert.ok(Math.abs(share((p) => p.poolBand === b.key) - b.w) < 0.05, b.key);
   const avg = (k) => { const xs = ps.filter((p) => p.poolBand === k); return xs.reduce((s, p) => s + p.ovr, 0) / xs.length; };
   assert.ok(avg('czolowka') > avg('srodek') && avg('srodek') > avg('mlodzi'));
@@ -110,7 +111,8 @@ test('Cena: słabsze ligi sprzedają taniej (x1,0-1,15 wartości), mocniejsze or
 
 test('Uzupełnienie przed oknem: wraca do 100, odchodzą podpisani, ok. 15 % z kontraktem zostaje za granicą', () => {
   const g = newGame('widzew', 62, '2027-01-24');
-  assert.equal(upcomingWindow('2027-01-24')?.from, '2027-02-01');
+  assert.equal(upcomingWindow('2027-01-25')?.from, '2027-02-01');
+  assert.equal(upcomingWindow('2027-01-24'), null);
   assert.equal(upcomingWindow('2026-12-01'), null);
   const ids = [...g.market.foreign];
   // Trzech wolnych podpisuje klub (poza pulą), jeden z kontraktem trafia do polskiego klubu
@@ -179,9 +181,9 @@ test('Budżet i weto zarządu blokują ofertę za granicę', () => {
   const c = g.finance.clubs[g.clubId];
   c.transferBudget = 0;
   assert.match(offerForForeign(g, p.id, foreignAskingPrice(g, p)).text, /budżet/);
-  rich(g);
+  rich(g, 1e9);
   const top = poolList(g).filter((x) => !x.free).sort((a, b) => b.value - a.value)[0];
-  const r = offerForForeign(g, top.id, top.value * 20);
+  const r = offerForForeign(g, top.id, top.value * 8);
   assert.equal(r.result, 'reject');
   assert.ok(r.veto, 'kwota wielokrotnie ponad wartość: weto zarządu');
 });
@@ -272,7 +274,7 @@ test('Widok Rynek > Z zagranicy: kolumny, filtr regionu, karta zawodnika z klube
   const html = renderTransfers(g, { tfTab: 'rynek', tfList: 'abroad' });
   assert.ok(html.includes('data-l="abroad"') && html.includes('Z zagranicy'));
   for (const t of ['Narodowość', 'Klub (kraj)', 'Pensja', 'Ameryka Południowa', 'Afryka', 'Bałkany', 'Bliski Wschód', 'Inne', 'wolny']) assert.ok(html.includes(t), t);
-  assert.ok(html.includes('100 zawodników'));
+  assert.ok(html.includes('Pokazano 80 z 100'));
   const r = handleTransferAction(g, 'tf-region', { r: 'afryka' });
   assert.equal(r.ui.tfRegion, 'afryka');
   const af = renderTransfers(g, { tfTab: 'rynek', tfList: 'abroad', tfRegion: 'afryka' });
@@ -314,4 +316,24 @@ test('Nastawienie zawodnika z kontraktem za granicą liczone z ligi (poolSellerC
     assert.ok(s.rep > 0 && s.tier >= 1 && s.tier <= 3 && s.name === p.abroad.club);
     assert.ok(['chętny', 'otwarty', 'niechętny', 'odmowa'].includes(playerWillingness(g, p).verdict));
   }
+});
+
+test('Wolni bez klubu przez dłuższy czas znikają z listy, w ich miejsce od razu pojawiają się nowi (liczba bez zmian)', async () => {
+  const { retireFreeAgents, freeLeaveChance } = await import('../src/career/mindset.js');
+  assert.equal(freeLeaveChance({ age: 25 }, 1), 0, 'pierwsze miesiące bez zmian');
+  assert.ok(freeLeaveChance({ age: 25 }, 6) > freeLeaveChance({ age: 25 }, 3), 'im dłużej bez klubu, tym większa szansa');
+  assert.ok(freeLeaveChance({ age: 31 }, 4) > freeLeaveChance({ age: 24 }, 4), 'starsi szybciej');
+  const g = newGame();
+  const before = g.market.free.length;
+  // wszyscy wolni od 8 miesięcy bez klubu
+  for (const id of g.market.free) g.world.players[id].freeSince = '2026-03-01';
+  const old = new Set(g.market.free);
+  const r = retireFreeAgents(g, '2026-11-01');
+  assert.ok(r.left >= 5, `zniknęło ${r.left}`);
+  assert.equal(g.market.free.length, Math.min(before, 150), 'liczba wolnych bez zmian (do limitu rynku)');
+  const fresh = g.market.free.filter((id) => !old.has(id));
+  assert.equal(fresh.length, r.added);
+  for (const id of fresh) assert.equal(g.world.players[id].freeSince, '2026-11-01');
+  for (const id of old) if (!g.market.free.includes(id)) assert.ok(!g.world.players[id], 'zniknięty usunięty ze świata');
+  assert.ok(g.market.foreign.every((id) => g.world.players[id]), 'pula bez usuniętych');
 });

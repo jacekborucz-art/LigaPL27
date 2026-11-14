@@ -1,6 +1,7 @@
-// Service worker: tryb offline. Pliki aplikacji są w pamięci podręcznej przy instalacji,
-// potem odpowiedź idzie z pamięci, a w tle pobieramy nowszą wersję (stale-while-revalidate).
-const VERSION = 'v0.2.1';
+// Service worker: tryb offline. Pliki aplikacji są w pamięci podręcznej przy instalacji. Przy dostępie do sieci
+// gra zawsze bierze najnowsze pliki z serwera (sieć najpierw) i odświeża nimi pamięć; bez sieci działa z pamięci.
+// Wcześniej pamięć miała pierwszeństwo, więc po aktualizacji telefon pokazywał starą wersję (albo mieszankę).
+const VERSION = 'v0.3-0d660b7b8c';
 const CACHE = `manager-${VERSION}`;
 
 const SHELL = [
@@ -87,10 +88,12 @@ const SHELL = [
   './src/career/careerSystem.js',
   './src/career/coachMarket.js',
   './src/career/coaches.js',
+  './src/career/editor.js',
   './src/career/fans.js',
   './src/career/fansSystem.js',
   './src/career/finance.js',
   './src/career/foreignMarket.js',
+  './src/career/foreignPool.js',
   './src/career/infrastructure.js',
   './src/career/loans.js',
   './src/career/mindset.js',
@@ -157,6 +160,11 @@ const SHELL = [
   './src/season/europe.js',
   './src/season/europeAccess.js',
   './src/season/history.js',
+  './src/season/intl/engine.js',
+  './src/season/intl/hosts.js',
+  './src/season/intl/ratings.js',
+  './src/season/intl/sim.js',
+  './src/season/intl/windows.js',
   './src/season/leagues.js',
   './src/season/national.js',
   './src/season/nationalSystem.js',
@@ -173,6 +181,7 @@ const SHELL = [
   './src/styles/club.css',
   './src/styles/contextmenu.css',
   './src/styles/dashboard.css',
+  './src/styles/editor.css',
   './src/styles/fonts.css',
   './src/styles/history.css',
   './src/styles/klub.css',
@@ -203,6 +212,7 @@ const SHELL = [
   './src/ui/contextMenu.js',
   './src/ui/crest.js',
   './src/ui/dom.js',
+  './src/ui/editorView.js',
   './src/ui/europeView.js',
   './src/ui/fixturesView.js',
   './src/ui/formChart.js',
@@ -218,6 +228,7 @@ const SHELL = [
   './src/ui/positionMap.js',
   './src/ui/sponsorsView.js',
   './src/ui/squadView.js',
+  './src/ui/sysMenu.js',
   './src/ui/tacticsDrag.js',
   './src/ui/tacticsMoves.js',
   './src/ui/tacticsView.js',
@@ -248,14 +259,14 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
   event.respondWith(
     caches.open(CACHE).then(async (cache) => {
-      const cached = await cache.match(request, { ignoreSearch: true });
-      const fresh = fetch(request)
-        .then((res) => {
-          if (res.ok) cache.put(request, res.clone());
-          return res;
-        })
-        .catch(() => cached);
-      return cached || fresh;
+      try {
+        const res = await fetch(request, { cache: 'no-cache' }); // bez pamięci HTTP przeglądarki: zawsze aktualna wersja
+        if (res.ok) cache.put(request, res.clone());
+        return res;
+      } catch {
+        const cached = await cache.match(request, { ignoreSearch: true });
+        return cached ?? Response.error();
+      }
     }),
   );
 });
