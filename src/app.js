@@ -42,6 +42,7 @@ import { renderTransfers, handleTransferAction, isTransferAction } from './ui/tr
 import { renderClubHub, handleClubAction, isClubAction } from './ui/klubView.js';
 import { sysNavHtml, sysHeaderBtn, sysDialogHtml } from './ui/sysMenu.js';
 import { renderEditor, handleEditorAction, isEditorAction, newEditorState, clubListHtml, playerListHtml } from './ui/editorView.js'; // edytor i datapack (docs/edytor.md)
+import { canPromote, promoteYouth } from './career/academy.js'; // wychowankowie do pierwszego składu
 import { applyPack, restoreOriginals, exportPack, packFileName, parsePack, importPack, importSummary } from './career/editor.js';
 import { renderTalks, handleTalkAction, isTalkAction } from './ui/talksView.js';
 import { ensureCareer } from './career/careerSystem.js';
@@ -398,7 +399,10 @@ function renderTab(tab, g, club) {
     }
     const ovrs = leagueOvrs(g, club.tier);
     const p = state.playerOpen && g.world.players[state.playerOpen];
-    if (p) return renderPlayerProfile(p, { leagueOvrs: ovrs, clubName: club.name, date: g.date, game: g });
+    if (p) {
+      const inAcademy = !!g.world.clubs[g.clubId]?.academy?.includes(p.id);
+      return renderPlayerProfile(p, { leagueOvrs: ovrs, clubName: club.name, date: g.date, game: g, promote: inAcademy ? canPromote(g, p.id) : null, promoteMsg: state.acMsg?.id === p.id ? state.acMsg.text : null });
+    }
     return sub + renderSquadList(squadOf(g.world, g.clubId), { filter: state.sqFilter, leagueOvrs: ovrs, academy: academyOf(g.world, g.clubId), view: state.sqView ?? 'overview', sort: state.sqSort, game: g });
   }
   const soon = {
@@ -1260,6 +1264,12 @@ async function dispatchAct(el, { root = app } = {}) {
       if (pl && pl.clubId === state.game.clubId) { state.extPlayer = null; state.tab = 'kadra'; state.sqSub = 'players'; state.playerOpen = id; }
       else if (pl) state.extPlayer = { id };
       render(); window.scrollTo({ top: 0 });
+    }
+    if (act === 'ac-promote') {
+      const r = promoteYouth(state.game, el.dataset.id);
+      state.acMsg = { id: el.dataset.id, text: r.text }; state.tMsg = r.text;
+      if (r.ok) { afterSquadChange(state.game); await save(); }
+      render();
     }
     if (act === 'extback') { state.extPlayer = null; render(); }
     if (act === 'club') {

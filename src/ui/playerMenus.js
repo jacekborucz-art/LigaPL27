@@ -6,6 +6,7 @@
 // Model menu: { title, pos, meta, note, items }. Pozycja: { label, hint?, disabled?: powód, danger?, primary?,
 // checked? (opcja wyboru), run?: { steps, focus?: selektor po akcji, toast?: true (komunikat akcji) | tekst },
 // items?: podmenu } albo { sep: true } albo { heading: tekst }.
+import { canPromote } from '../career/academy.js';
 import { ATTRS, ATTR_GROUPS } from '../data/attributes.js';
 import { formationById } from '../data/formations.js';
 import { clubById } from '../data/clubs_pl.js';
@@ -326,7 +327,9 @@ export function playerMenu(game, pid, { view, ui = {}, why = null, lineup = null
   const stats = item('Statystyki i historia', NAV.stats(p.id), { hint: 'Mecze, gole, asysty i oceny w rozgrywkach, kluby' });
   const report = ui.repOpen === p.id ? null : item('Raport asystenta', NAV.assistant(p.id), { hint: 'Ukryte cechy, stan, zalecenia' });
   if (academy) {
-    return { ...head, note: 'Akademia', items: tidy([view === 'profile' ? null : profile, report, SEP, ...trainingItems(p, { inEditor: view === 'training' && ui.trPlayer === p.id })]) };
+    const chk = canPromote(game, p.id);
+    const promote = item('Przenieś do pierwszego składu', { steps: [{ act: 'ac-promote', id: p.id }], toast: true }, { primary: true, disabled: chk.ok ? null : chk.text, hint: chk.ok ? 'Pierwszy kontrakt na 3 lata, do 21 lat poza limitem kadry' : null });
+    return { ...head, note: 'Akademia', items: tidy([promote, view === 'profile' ? null : profile, report, SEP, ...trainingItems(p, { inEditor: view === 'training' && ui.trPlayer === p.id })]) };
   }
   const inLineup = !!L?.byId?.has(p.id);
   const lineupNav = inLineup ? item('Pokaż w składzie', NAV.lineup(locKey(locOf(L.tactics, p.id))), { hint: 'Skład i taktyka, zawodnik wybrany' }) : null;

@@ -217,7 +217,8 @@ export function renderPlayerProfile(p, opts = {}) {
   const { leagueOvrs = [], clubName = '', foreign = false, back = { act: 'squadback', label: 'Wróć do kadry' } } = opts;
   const alt = Object.entries(p.alt || {}).filter(([, v]) => v >= 70).map(([k]) => k);
   return `
-    <button class="btn btn--quiet" data-act="${esc(back.act)}">${esc(back.label)}</button>
+    <div class="pp-top"><button class="btn btn--quiet" data-act="${esc(back.act)}">${esc(back.label)}</button>${opts.promote ? (opts.promote.ok ? `<button class="btn btn--primary" data-act="ac-promote" data-id="${esc(p.id)}">Przenieś do pierwszego składu</button>` : `<span class="hint">${esc(opts.promote.text)}</span>`) : ''}</div>
+    ${opts.promoteMsg ? `<p class="hint" role="status">${esc(opts.promoteMsg)}</p>` : ''}
     ${foreign ? '<p class="hint">Zawodnik innego klubu: morale, świeżość, pensja i agent są znane tylko jego klubowi.</p>' : ''}
     <header class="pp" data-pid="${esc(p.id)}">
       <div class="pp__ovr"><span class="pp__ovrn" title="Ocena ogólna w skali 1-20">${Math.round(p.ovr)}</span>${stars(starsFor(p.ovr, leagueOvrs))}</div>

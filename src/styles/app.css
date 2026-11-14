@@ -1235,3 +1235,4 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 .sysdlg__opt input { width: 20px; height: 20px; accent-color: var(--murawa, #2E8A4E); }
 .sysdlg__opt span { display: grid; }
 .sysdlg__opt small { color: var(--text-muted); }
+.pp-top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }

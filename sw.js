@@ -1,7 +1,7 @@
 // Service worker: tryb offline. Pliki aplikacji są w pamięci podręcznej przy instalacji. Przy dostępie do sieci
 // gra zawsze bierze najnowsze pliki z serwera (sieć najpierw) i odświeża nimi pamięć; bez sieci działa z pamięci.
 // Wcześniej pamięć miała pierwszeństwo, więc po aktualizacji telefon pokazywał starą wersję (albo mieszankę).
-const VERSION = 'v0.3-f9c1f23a5a';
+const VERSION = 'v0.3-842e98c4dc';
 const CACHE = `manager-${VERSION}`;
 
 const SHELL = [
@@ -79,6 +79,7 @@ const SHELL = [
   './assets/icons/icon-maskable-512.png',
   './assets/icons/icon.svg',
   './src/app.js',
+  './src/career/academy.js',
   './src/career/acclimatization.js',
   './src/career/assistantReport.js',
   './src/career/attention.js',
