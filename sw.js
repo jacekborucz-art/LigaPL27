@@ -1,6 +1,7 @@
-// Service worker: tryb offline. Pliki aplikacji są w pamięci podręcznej przy instalacji,
-// potem odpowiedź idzie z pamięci, a w tle pobieramy nowszą wersję (stale-while-revalidate).
-const VERSION = 'v0.2.1';
+// Service worker: tryb offline. Pliki aplikacji są w pamięci podręcznej przy instalacji. Przy dostępie do sieci
+// gra zawsze bierze najnowsze pliki z serwera (sieć najpierw) i odświeża nimi pamięć; bez sieci działa z pamięci.
+// Wcześniej pamięć miała pierwszeństwo, więc po aktualizacji telefon pokazywał starą wersję (albo mieszankę).
+const VERSION = 'v0.3-363f64e582';
 const CACHE = `manager-${VERSION}`;
 
 const SHELL = [
@@ -255,14 +256,14 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
   event.respondWith(
     caches.open(CACHE).then(async (cache) => {
-      const cached = await cache.match(request, { ignoreSearch: true });
-      const fresh = fetch(request)
-        .then((res) => {
-          if (res.ok) cache.put(request, res.clone());
-          return res;
-        })
-        .catch(() => cached);
-      return cached || fresh;
+      try {
+        const res = await fetch(request, { cache: 'no-cache' }); // bez pamięci HTTP przeglądarki: zawsze aktualna wersja
+        if (res.ok) cache.put(request, res.clone());
+        return res;
+      } catch {
+        const cached = await cache.match(request, { ignoreSearch: true });
+        return cached ?? Response.error();
+      }
     }),
   );
 });
