@@ -173,7 +173,7 @@ registerDailySystem({
       const { moves, offers } = marketWeek(game, date);
       for (const o of offers) messages.push(offerMessage(game, o, date));
       const mineMoves = moves.filter((x) => x.from === game.clubId);
-      if (moves.length) messages.push(createMessage({ date, key: `rynek:${date}`, category: 'transfers', from: 'Rynek transferowy', priority: 'info', subject: `Transfery tygodnia (${moves.length})`, body: moves.slice(0, 12).map((x) => `${x.name} (${x.pos}): ${anyClub(x.from)?.name ?? 'wolny zawodnik'} -> ${anyClub(x.to).name}${x.fee ? `, ${fmtZl(x.fee)}` : ''}`).join('\n') + (mineMoves.length ? '' : '') }));
+      if (moves.length) messages.push(createMessage({ date, key: `rynek:${date}`, category: 'transfers', from: 'Rynek transferowy', priority: 'info', subject: `Transfery tygodnia (${moves.length})`, body: moves.slice(0, 12).map((x) => `${x.name} (${x.pos}): ${anyClub(x.from)?.name ?? x.origin?.name ?? 'wolny zawodnik'} -> ${anyClub(x.to).name}${x.fee ? `, ${fmtZl(x.fee)}` : ''}`).join('\n') + (mineMoves.length ? '' : '') }));
     }
     // Wygasłe oferty
     for (const o of game.market.offers) if (o.status === 'open' && o.expires < date) o.status = 'expired';

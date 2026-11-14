@@ -16,6 +16,7 @@ import { RENEW_WINDOW_MONTHS } from '../career/negotiation.js';
 import { canSign, KEEP_MAX } from '../career/squadLimit.js';
 import { limitStatus } from '../career/squadLimitSystem.js';
 import { askingPrice, notForSale, playerWillingness, inWindow, releaseCost, fmtZl } from '../career/transfers.js';
+import { isPoolContracted, poolClubLabel } from '../career/foreignPool.js';
 import { PLAYER_TALKS, talkBlockedText, talkSuggestions } from '../career/teamTalks.js';
 import { PROGRAMS, MODES } from '../training/config.js';
 import { locKey, playerAt, resolveMove, resolveTap, sameLoc } from './tacticsMoves.js';
@@ -257,7 +258,8 @@ function otherItems(game, p, { view, ui = {} } = {}) {
   const capTxt = cap.ok ? null : `Limit kadry ${cap.count.counted}/${cap.count.hard}`;
   const refuse = playerWillingness(game, p).verdict === 'odmowa' ? 'Nie chce przejść do twojego klubu' : null;
   const winTxt = inWindow(game.date) ? null : closedWindowText(game.date);
-  if (!p.clubId) {
+  const abroad = isPoolContracted(p); // kontrakt w klubie zagranicznym (src/career/foreignPool.js)
+  if (!p.clubId && !abroad) {
     items.push(item('Rozmawiaj o kontrakcie', withSteps(card, [{ act: 'tf-negotiate', id: p.id }], { focus: null }), {
       hint: `Wolny zawodnik, oczekuje ok. ${fmtZl(p.askWage ?? 0)} tygodniowo`, disabled: capTxt ?? refuse,
     }));
@@ -275,6 +277,7 @@ function otherItems(game, p, { view, ui = {} } = {}) {
       disabled: nfs ? 'Klub go nie sprzedaje (czołowy zawodnik)' : winTxt ?? capTxt ?? refuse,
     }));
   }
+  if (abroad) return items; // klub zagraniczny nie wypożycza
   const loanable = game.market?.listed?.[p.id]?.kind === 'loan' || (p.age <= 21 && !nfs);
   items.push(item('Wypożycz…', { ...card, focus: '#tfShare' }, {
     hint: loanable ? 'Do końca sezonu, część pensji' : null,
@@ -285,7 +288,7 @@ function otherItems(game, p, { view, ui = {} } = {}) {
 
 // ------------------------------------------------------------ Nagłówek
 function header(game, p, own, L) {
-  const club = p.clubId ? clubById(p.clubId)?.name : null;
+  const club = p.clubId ? clubById(p.clubId)?.name : isPoolContracted(p) ? poolClubLabel(p) : null;
   const meta = [`${p.age} lat`, `OVR ${Math.round(p.ovr)}`, own ? null : (club ?? 'wolny zawodnik')].filter(Boolean).join(', ');
   let note = null;
   if (own) {

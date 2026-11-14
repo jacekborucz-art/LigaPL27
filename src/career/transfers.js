@@ -19,7 +19,8 @@ import { squadCount, canSign, boardTargets } from './squadLimit.js';
 import { spellsOf, syncSpell } from '../season/history.js';
 import { boardCaps, clubBoardData, feeIssues, checkUserFee } from './boardRequests.js'; // weto zarządu (docs/finanse.md)
 import { makeLoan, dropLoanIndex, requestLoanIn, firstRefusal } from './loans.js'; // wypożyczenia (docs/wypozyczenia.md)
-import { startDeal, hasOpenDeal, pendingFees } from './transferDeals.js'; // transfer jako proces (docs/transfery.md)
+import { startDeal, hasOpenDeal, pendingFees, stat } from './transferDeals.js'; // transfer jako proces (docs/transfery.md)
+import { ensureForeignPool, isPoolContracted, foreignAskingPrice, poolSellerClub, poolCandidates, offerForForeign, poolList } from './foreignPool.js'; // zawodnicy z zagranicy (docs/transfery.md, rozdz. 9)
 import { onOfferRejected, onUserRejected } from './moveWish.js';
 import { effectiveAsk } from './mindset.js';
 
@@ -33,9 +34,10 @@ export const inWindow = (date) => !!windowOf(date);
 
 // ------------------------------------------------------------ Stan rynku
 export function createMarket(game) {
-  const M = { listed: {}, free: [], offers: [], talks: {}, history: [], userListed: {}, lastRefresh: null };
+  const M = { listed: {}, free: [], offers: [], talks: {}, history: [], userListed: {}, lastRefresh: null, foreign: [] };
   game.market = M;
   addFreeAgents(game, 45, game.date ?? '2026-07-01', SEASON_YEAR === 2026 ? 'start' : `lato-${SEASON_YEAR}`);
+  ensureForeignPool(game); // 100 zawodników z zagranicy (src/career/foreignPool.js)
   return M;
 }
 
@@ -70,6 +72,7 @@ export function notForSale(game, p) {
 }
 
 export function askingPrice(game, p) {
+  if (isPoolContracted(p)) return foreignAskingPrice(game, p); // klub zagraniczny (foreignPool.js)
   if (!p.clubId) return 0;
   if (p.clubId === game.clubId) return game.market.userListed[p.id] ?? round(p.value * 1.3);
   const listed = game.market.listed[p.id];
@@ -90,13 +93,14 @@ export function breaksMinimum(game, p) {
 /** Zgoda zawodnika na przejście (strona zawodnika, przed rozmową o kontrakcie). */
 export function playerWillingness(game, p, toClubId = game.clubId, offerWage = null) {
   const to = clubById(toClubId) ?? { prestige: 3, tier: 1 };
-  const from = p.clubId ? clubById(p.clubId) ?? { prestige: 2, tier: 3 } : { prestige: 2, tier: clubTier(toClubId) + 1 };
+  const abroad = isPoolContracted(p); // kontrakt za granicą: reputacja i poziom z ligi (foreignPool.js)
+  const from = p.clubId ? clubById(p.clubId) ?? { prestige: 2, tier: 3 } : abroad ? poolSellerClub(p) : { prestige: 2, tier: clubTier(toClubId) + 1 };
   const inEurope = (id) => (game.fixtures ?? []).some((f) => f.comp === 'uefa' && (f.home === id || f.away === id));
   const monthsLeft = p.contract?.until ? Math.max(0, (Number(p.contract.until.slice(0, 4)) - Number(game.date.slice(0, 4))) * 12 + Number(p.contract.until.slice(5, 7)) - Number(game.date.slice(5, 7))) : 0;
   const squad = squadOf(game.world, toClubId);
   const better = squad.filter((x) => groupOf(x) === groupOf(p) && x.ovr > p.ovr).length;
   return willingnessToJoin({
-    player: { rep: p.rep ?? 30, age: p.age, persona: p.persona, wage: p.contract?.wage ?? p.askWage ?? marketWage(p.ovr, clubTier(toClubId), false, payLevel(toClubId)), monthsLeft, unhappy: !!p.unhappy, stepDown: p.stepDown ?? 0, free: !p.clubId },
+    player: { rep: p.rep ?? 30, age: p.age, persona: p.persona, wage: p.contract?.wage ?? p.askWage ?? marketWage(p.ovr, clubTier(toClubId), false, payLevel(toClubId)), monthsLeft, unhappy: !!p.unhappy, stepDown: p.stepDown ?? 0, free: !p.clubId && !abroad },
     from, to, offerWage, toTier: to.tier, fromTier: from.tier ?? 3, toEurope: inEurope(toClubId), fromEurope: p.clubId ? inEurope(p.clubId) : false,
     starter: better < ({ GK: 1, DEF: 4, MID: 4, ATT: 2 })[groupOf(p)],
   });
@@ -110,6 +114,7 @@ export function playerWillingness(game, p, toClubId = game.clubId, offerWage = n
 export function offerForPlayer(game, playerId, fee) {
   const p = game.world.players[playerId];
   const date = game.date;
+  if (isPoolContracted(p)) return offerForForeign(game, playerId, fee); // klub zagraniczny (foreignPool.js)
   if (!p || !isAi(game, p.clubId)) return { result: 'reject', text: 'Tego zawodnika nie można kupić.' };
   if (!inWindow(date)) return { result: 'reject', text: 'Okno transferowe jest zamknięte. Transfer możliwy w następnym oknie.' };
   const t = game.market.talks[playerId] ?? { rounds: 0, until: null };
@@ -143,9 +148,13 @@ export function offerForPlayer(game, playerId, fee) {
  * loan: warunki wypożyczenia (src/career/loans.js loanTerms); bez nich wypożyczenie do końca sezonu.
  * Księguje odstępne, premię za podpis i prowizję. Zwraca wpis historii.
  */
-export function completeTransfer(game, { playerId, to, fee = 0, contract, kind = 'transfer', date = game.date, loanShare = 0, loan = null }) {
+export function completeTransfer(game, { playerId, to, fee = 0, contract, kind = 'transfer', date = game.date, loanShare = 0, loan = null, fromName = null }) {
   const W = game.world; const p = W.players[playerId];
   const from = p.clubId;
+  // Zawodnik z zagranicy (foreignPool.js): klub sprzedający poza Polską, odstępne tylko po stronie kupującego
+  const origin = !from && p.abroad ? { name: fromName ?? p.abroad.club, country: p.abroad.country } : null;
+  if (p.foreignPool) { game.market.foreign = (game.market.foreign ?? []).filter((id) => id !== playerId); stat(game, origin ? 'poolBought' : 'poolFree'); if (to === game.clubId) stat(game, 'poolUser'); }
+  delete p.abroad;
   spellsOf(p); // historia klubowa: okres w dotychczasowym klubie (leniwie), zamknięcie niżej
   if (from && W.clubs[from]) W.clubs[from].squad = W.clubs[from].squad.filter((id) => id !== playerId);
   if (kind === 'free') game.market.free = game.market.free.filter((id) => id !== playerId);
@@ -164,12 +173,12 @@ export function completeTransfer(game, { playerId, to, fee = 0, contract, kind =
   delete p.transfer; delete p.moveWish; delete p.preContract; delete p.freeSince; delete p.stepDown; delete p.stepDownFree;
   delete game.market.listed[playerId]; delete game.market.userListed[playerId]; delete game.market.talks[playerId];
   const F = game.finance;
-  if (fee) { book(F, to, date, 'out', 'transfers', fee, `${p.name} (${clubById(from)?.name ?? 'wolny'})`); book(F, from, date, 'in', 'sales', fee, `${p.name} do ${clubById(to)?.name}`); if (F.clubs[to]) F.clubs[to].transferBudget = Math.max(0, F.clubs[to].transferBudget - fee); if (F.clubs[from]) F.clubs[from].transferBudget += Math.round(fee * 0.5); }
+  if (fee) { book(F, to, date, 'out', 'transfers', fee, `${p.name} (${clubById(from)?.name ?? origin?.name ?? 'wolny'})`); book(F, from, date, 'in', 'sales', fee, `${p.name} do ${clubById(to)?.name}`); if (F.clubs[to]) F.clubs[to].transferBudget = Math.max(0, F.clubs[to].transferBudget - fee); if (F.clubs[from]) F.clubs[from].transferBudget += Math.round(fee * 0.5); }
   if (contract?.signOn) book(F, to, date, 'out', 'signOn', contract.signOn);
   if (contract?.agentFee) book(F, to, date, 'out', 'agents', contract.agentFee);
-  const entry = { date, playerId, name: p.name, pos: p.pos, from, to, fee, kind };
+  const entry = { date, playerId, name: p.name, pos: p.pos, from, to, fee, kind, ...(origin ? { fromName: origin.name, country: origin.country } : {}) };
   game.market.history.unshift(entry);
-  p.career = [...(p.career ?? []), { date, from, to, fee, kind }];
+  p.career = [...(p.career ?? []), { date, from, to, fee, kind, ...(origin ? { fromName: origin.name } : {}) }];
   return entry;
 }
 
@@ -206,6 +215,7 @@ export function marketLists(game) {
     transfer: listed.filter((x) => x.kind !== 'loan'),
     loan: listed.filter((x) => x.kind === 'loan'),
     free: game.market.free.map((id) => W.players[id]).filter(Boolean).map((p) => ({ p, kind: 'free', reasons: ['Wolny zawodnik'] })),
+    abroad: poolList(game).map((p) => ({ p, kind: p.free ? 'free' : 'abroad', reasons: [] })), // z zagranicy (foreignPool.js)
   };
 }
 
@@ -279,16 +289,23 @@ function aiBuy(game, club, date, rng, log) {
       }
     }
   }
+  // Rzadko: zawodnik z kontraktem za granicą (pula foreignPool.js), za co najwyżej połowę wolnych środków
+  pool.push(...poolCandidates(game, club, date, { group: g, bar, money, groupOf }));
   // Weto zarządu klubu AI: odstępne ponad progi (te same co dla gracza)
   const cb = clubBoardData(game, club.id);
   const allowed = pool.filter((x) => !x.fee || !feeIssues(boardCaps(game, club.id, x.p, 'sign', cb), x.fee).issues.length);
   pool.length = 0; pool.push(...allowed);
   if (!pool.length) return null;
-  const pick = pool.sort((a, b) => (b.p.ovr - b.fee / 5e6) - (a.p.ovr - a.fee / 5e6))[0];
+  // Najlepszy z chętnych: odmowa najlepszego nie blokuje zakupu (pięciu pierwszych; braki w kadrze, np. bramkarz po powrocie z wypożyczenia)
+  // Przy braku w kadrze także pensja w zasięgu budżetu płac (inaczej rozmowy z najlepszym upadają co tydzień)
+  const asks = (x) => (x.p.contract?.wage ?? effectiveAsk(x.p, club.tier, payLevel(club))) <= Math.max(500, room) * 1.1;
+  const pick = pool.sort((a, b) => (b.p.ovr - b.fee / 5e6) - (a.p.ovr - a.fee / 5e6)).slice(0, 8)
+    .filter((x, i) => i < 5 || (needs.length && asks(x))).sort((a, b) => (needs.length ? asks(b) - asks(a) : 0))
+    .find((x) => playerWillingness(game, x.p, club.id).verdict !== 'odmowa');
+  if (!pick) return null;
   const p = pick.p;
-  if (playerWillingness(game, p, club.id).verdict === 'odmowa') return null;
   const caps = boardCaps(game, club.id, p, 'sign', cb);
-  const neg = aiNegotiate({ kind: 'sign', player: { ...p, contract: p.contract ?? { wage: effectiveAsk(p, club.tier, payLevel(club)), until: date } }, club: { ...club, name: club.name }, fromClub: p.clubId ? clubById(p.clubId) : null, date, rng, budget: { wage: Math.min(Math.max(500, room), caps.wage), maxYears: caps.years, total: caps.total } });
+  const neg = aiNegotiate({ kind: 'sign', player: { ...p, contract: p.contract ?? { wage: effectiveAsk(p, club.tier, payLevel(club)), until: date } }, club: { ...club, name: club.name }, fromClub: p.clubId ? clubById(p.clubId) : isPoolContracted(p) ? poolSellerClub(p) : null, date, rng, budget: { wage: Math.min(Math.max(500, room), caps.wage), maxYears: caps.years, total: caps.total } });
   if (neg.result !== 'signed') return null;
   if (p.clubId && firstRefusal(game, p, club.id, pick.fee, date, neg.contract).blocked) return null; // prawo pierwokupu (loans.js)
   // Transfer jako proces: porozumienie, testy medyczne, zgłoszenie (src/career/transferDeals.js)

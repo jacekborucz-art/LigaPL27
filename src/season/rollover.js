@@ -263,7 +263,7 @@ export function rolloverSeason(game) {
   processAcademy(game, newStart, rng.fork('akademia'), report);
   for (const p of Object.values(game.world.players)) if (p.clubId) p.value = marketValue(p, { tier: Math.min(3, clubById(p.clubId)?.tier ?? 3), date: newStart });
   addFreeAgents(game, 30, newStart, `lato-${year}`);
-  addFreeAgents(game, 22, newStart, `import-${year}`, { imports: true });
+  addFreeAgents(game, 8, newStart, `import-${year}`, { imports: true }); // było 22: wolni z zagranicy przychodzą też z puli (career/foreignPool.js)
   for (const cid of Object.keys(game.world.clubs)) {
     if (!clubById(cid)) continue;
     if (cid === game.clubId) fillSquad(game, cid, 18, newStart, rng.fork(`uzup:${cid}`), report);

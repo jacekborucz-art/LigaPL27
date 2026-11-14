@@ -43,7 +43,7 @@ export function stageBar(d) {
 
 function dealRow(game, d, { mine = false } = {}) {
   const p = game.world.players[d.pid];
-  const route = `${d.from ? clubName(d.from) : 'wolny zawodnik'} do ${d.foreign ? `${d.foreign.name} (${d.foreign.countryName ?? d.foreign.country})` : clubName(d.to)}`;
+  const route = `${d.from ? clubName(d.from) : d.origin ? `${d.origin.name} (${d.origin.countryName ?? d.origin.country})` : 'wolny zawodnik'} do ${d.foreign ? `${d.foreign.name} (${d.foreign.countryName ?? d.foreign.country})` : clubName(d.to)}`;
   const terms = d.fee ? fmtZl(d.fee) : 'bez odstępnego';
   const meta = d.end
     ? (d.end.result === 'registered' ? `Zgłoszony ${fmtDate(d.end.date)}${d.lastMinute ? ', w ostatniej chwili' : ''}.` : `Upadł ${fmtDate(d.end.date)}: ${FAIL_LABELS[d.end.reason] ?? d.end.reason}.`)

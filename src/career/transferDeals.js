@@ -68,6 +68,8 @@ export function stat(game, key, n = 1) {
 
 const clubName = (id) => clubById(id)?.name ?? 'klub';
 export const buyerName = (d) => (d.foreign ? d.foreign.name : d.to ? clubName(d.to) : 'klub');
+/** Klub sprzedający: polski albo zagraniczny (d.origin, pula foreignPool.js). */
+export const sellerName = (d) => (d.origin ? d.origin.name : d.from ? clubName(d.from) : 'wolny zawodnik');
 const repOf = (id) => (clubById(id) ? clubReputation(clubById(id)) : 35);
 const isUserDeal = (game, d) => d.to === game.clubId || d.from === game.clubId;
 
@@ -92,7 +94,7 @@ export function expectedRegistration(d) {
 }
 
 /** Etapy, przez które przechodzi transakcja (bez podróży dla transferów krajowych). */
-export function dealStages(d) { return DEAL_STAGES.filter((s) => s !== 'travel' || d.foreign); }
+export function dealStages(d) { return DEAL_STAGES.filter((s) => s !== 'travel' || d.foreign || d.origin); }
 
 // ------------------------------------------------------------ Założenie transakcji
 /**
@@ -110,10 +112,13 @@ export function startDeal(game, opts) {
   const M = game.market;
   const id = `d${++M.dealSeq}-${playerId}`;
   const user = to === game.clubId || p.clubId === game.clubId;
-  const type = foreign ? 'foreign' : kind === 'free' ? 'free' : user ? 'domestic' : 'ai';
+  // Kupno z klubu zagranicznego (pula src/career/foreignPool.js): etap certyfikatu ITC i podróży jak przy sprzedaży za granicę
+  const origin = opts.origin ?? (!p.clubId && kind !== 'free' && p.foreignPool && p.abroad && p.contract
+    ? { country: p.abroad.country, countryName: p.abroad.countryName ?? p.abroad.country, name: p.abroad.club, clubId: p.abroad.clubId ?? null } : null);
+  const type = foreign || origin ? 'foreign' : kind === 'free' ? 'free' : user ? 'domestic' : 'ai';
   const plan = planDays(type, new Rng(`deal:${game.seed}:${id}`));
   const d = {
-    id, pid: playerId, name: p.name, pos: p.pos, from: p.clubId ?? null, to, fee, contract, kind, foreign, type, needsTerms, early,
+    id, pid: playerId, name: p.name, pos: p.pos, from: p.clubId ?? null, to, fee, contract, kind, foreign, origin, type, needsTerms, early,
     start: date, stage: opts.stage ?? 'terms', due: null, plan, renegotiated: false, end: null, windowTo: kind === 'free' ? null : windowOn(date)?.to ?? null,
   };
   // Kupiec AI z małą liczbą dni do końca okna: etapy skrócone, żeby zdążyć (zgłoszenie najpóźniej w ostatnim dniu)
@@ -137,7 +142,7 @@ const dealMsg = (date, d, key, subject, body, priority = 'info') => createMessag
 
 function agreedMessage(game, d, date) {
   const selling = d.from === game.clubId;
-  const other = selling ? buyerName(d) : clubName(d.from);
+  const other = selling ? buyerName(d) : sellerName(d);
   return dealMsg(date, d, 'agreed', `Porozumienie z ${other} w sprawie ${d.name}`,
     `${selling ? `${other} kupuje ${d.name}` : `Kupujemy ${d.name} z ${other}`}${d.fee ? ` za ${fmtZl(d.fee)}` : ''}. Teraz warunki osobiste i testy medyczne. Spodziewane zgłoszenie: ${fmtDate(expectedRegistration(d))}.${selling ? ' Do zgłoszenia zawodnik zostaje u nas, od testów medycznych nie gra.' : ''}`);
 }
@@ -162,13 +167,13 @@ function closeDeal(game, d, result, reason, date, out) {
 }
 
 function failText(game, d, reason) {
-  const other = d.from === game.clubId ? buyerName(d) : clubName(d.from);
+  const other = d.from === game.clubId ? buyerName(d) : sellerName(d);
   const t = {
     terms: `${d.name} nie dogadał się z ${buyerName(d)} co do kontraktu.`,
     medical: `${d.name} nie przeszedł testów medycznych w ${buyerName(d)}.`,
     deadline: `Okno transferowe się zamknęło, zanim transakcja z ${other} dotarła do testów medycznych.`,
     withdrawn: `${other} wycofał się z transakcji.`,
-    seller: `${clubName(d.from)} wstrzymał transfer.`,
+    seller: `${sellerName(d)} wstrzymał transfer.`,
   }[reason] ?? 'Transakcja nie doszła do skutku.';
   return `${t} ${d.from === game.clubId ? 'Zawodnik zostaje w klubie.' : 'Zawodnik zostaje w swoim klubie.'}`;
 }
@@ -209,7 +214,7 @@ function register(game, d, date, out, lastMinute = false) {
   const p = game.world.players[d.pid];
   if (d.foreign) completeAbroad(game, d, date);
   else {
-    const e = completeTransfer(game, { playerId: d.pid, to: d.to, fee: d.fee, contract: d.contract, kind: d.kind === 'free' ? 'free' : 'transfer', date });
+    const e = completeTransfer(game, { playerId: d.pid, to: d.to, fee: d.fee, contract: d.contract, kind: d.kind === 'free' ? 'free' : 'transfer', date, fromName: d.origin?.name ?? null });
     if (d.early) e.early = true;
   }
   if (lastMinute) d.lastMinute = true;
@@ -264,8 +269,8 @@ function advance(game, d, date, out) {
       if (r === 'renegotiate') { d.fee = round(d.fee * (1 - MEDICAL.feeCut)); d.renegotiated = true; }
       if (user) out.push(dealMsg(date, d, 'medical', `${p.name} przeszedł testy medyczne`, r === 'renegotiate'
         ? `Testy wykazały drobny problem zdrowotny. ${buyerName(d)} obniżył kwotę o ${Math.round(MEDICAL.feeCut * 100)} %: teraz ${fmtZl(d.fee)}. Transakcja idzie dalej.`
-        : `${p.name} przeszedł testy medyczne w ${buyerName(d)}. Spodziewane zgłoszenie: ${fmtDate(expectedRegistration({ ...d, stage: d.foreign ? 'travel' : 'announce', due: addDays(d.due, d.plan[d.foreign ? 'travel' : 'announce']) }))}.`));
-      setStage(game, d, d.foreign ? 'travel' : 'announce', d.due);
+        : `${p.name} przeszedł testy medyczne w ${buyerName(d)}. Spodziewane zgłoszenie: ${fmtDate(expectedRegistration({ ...d, stage: d.foreign || d.origin ? 'travel' : 'announce', due: addDays(d.due, d.plan[d.foreign || d.origin ? 'travel' : 'announce']) }))}.`));
+      setStage(game, d, d.foreign || d.origin ? 'travel' : 'announce', d.due);
       return;
     }
     case 'travel':
@@ -301,7 +306,7 @@ export function dealsDay(game, date) {
     if (d.end || !d.windowTo || date < d.windowTo) continue;
     // Ostatni dzień okna (albo transakcja zaczęta po przetworzeniu ostatniego dnia)
     if (STAGE_I[d.stage] < STAGE_I.medical) { closeDeal(game, d, 'failed', 'deadline', date, out); continue; }
-    const pFail = d.foreign ? DEADLINE_FAIL.foreign : DEADLINE_FAIL.domestic;
+    const pFail = d.foreign || d.origin ? DEADLINE_FAIL.foreign : DEADLINE_FAIL.domestic;
     if (new Rng(`deal:${game.seed}:${d.id}:deadline`).chance(pFail)) closeDeal(game, d, 'failed', 'deadline', date, out);
     else register(game, d, date, out, true);
   }

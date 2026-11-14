@@ -96,9 +96,10 @@
 .tf-ch { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; margin-bottom: var(--space-3); padding: 14px 16px;
   border-radius: var(--radius-m); background: var(--surface); border: 1px solid var(--line); }
 .tf-ch__crest:empty { display: none; }
+.tf-ch:has(> .tf-ch__crest:empty) { grid-template-columns: minmax(0, 1fr) auto; } /* bez herbu (wolny, klub zagraniczny) */
 .tf-ch__who { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .tf-ch__who h2 { margin: 0; font-size: var(--step-2); line-height: 1.1; }
-.tf-ch__who p { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: var(--step--1); color: var(--text-muted); }
+.tf-ch__who p { margin: 0; max-width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: var(--step--1); color: var(--text-muted); }
 .tf-ch__who .pos { min-width: 40px; }
 .tf-ch__ovr { display: grid; place-items: center; min-width: 72px; padding: 8px 10px; border-radius: var(--radius-m); font: 700 var(--step-3)/1 var(--font-display);
   background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--text); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); }
@@ -402,3 +403,12 @@
 .td-pre:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
 .td-flag { display: inline-block; flex: none; width: 32px; height: 32px; border-radius: 50%; background: color-mix(in srgb, var(--tf-misc) 22%, var(--surface)); border: 2px solid color-mix(in srgb, var(--tf-misc) 55%, var(--line)); }
 @media (prefers-reduced-motion: no-preference) { .td-bar i { transition: background-color .2s ease; } }
+
+/* Z zagranicy (src/career/foreignPool.js): filtr regionu, klub i kraj, wolny zamiast ceny */
+.fp-regions { flex-basis: 100%; }
+.fp-club { display: inline-flex; flex-direction: column; max-width: 220px; line-height: 1.2; }
+.fp-club > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-club small { color: var(--text-muted); font-size: var(--step--1); }
+.xl td.fp-nat { white-space: nowrap; }
+.fp-free { color: var(--tf-good); font-weight: 600; }
+.tf-facts b .fp-fact { font-size: var(--step-0); }

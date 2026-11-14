@@ -91,6 +91,7 @@ const SHELL = [
   './src/career/fansSystem.js',
   './src/career/finance.js',
   './src/career/foreignMarket.js',
+  './src/career/foreignPool.js',
   './src/career/infrastructure.js',
   './src/career/loans.js',
   './src/career/mindset.js',
