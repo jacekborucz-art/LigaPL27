@@ -18,12 +18,15 @@ const end = '// AUTO-FILES-END';
 const i = sw.indexOf(start);
 const j = sw.indexOf(end);
 if (i < 0 || j < 0) throw new Error('Brak znaczników AUTO-FILES w sw.js');
-const block = `${start}\n${files.map((f) => `  '${f}',`).join('\n')}\n  ${end}`;
-// Wersja pamięci podręcznej z zawartości plików gry: każda zmiana kodu daje nową wersję, stara pamięć jest usuwana
+// Każdy plik z krótkim skrótem zawartości: urządzenie pobiera po aktualizacji tylko pliki ze zmienionym skrótem
 const crypto = require('crypto');
+const fileHash = (f) => crypto.createHash('sha1').update(fs.readFileSync(path.join(root, f))).digest('hex').slice(0, 10);
+const all = ['./index.html', './manifest.webmanifest', ...files].filter((f) => fs.existsSync(path.join(root, f)));
+const block = `${start}\n${all.map((f) => `  ['${f}', '${fileHash(f)}'],`).join('\n')}\n  ${end}`;
+// Wersja pamięci podręcznej z zawartości plików gry: każda zmiana kodu daje nową wersję, stara pamięć jest usuwana
 const h = crypto.createHash('sha1');
-for (const f of [...files, './index.html', './manifest.webmanifest']) { const fp = path.join(root, f); if (fs.existsSync(fp)) h.update(f).update(fs.readFileSync(fp)); }
+for (const f of all) h.update(f).update(fs.readFileSync(path.join(root, f)));
 const version = `v0.3-${h.digest('hex').slice(0, 10)}`;
 const out = (sw.slice(0, i) + block + sw.slice(j + end.length)).replace(/const VERSION = '[^']*';/, `const VERSION = '${version}';`);
 fs.writeFileSync(swPath, out);
-console.log(`sw.js: ${files.length} plików w trybie offline, wersja ${version}`);
+console.log(`sw.js: ${all.length} plików w trybie offline, wersja ${version}`);

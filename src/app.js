@@ -96,6 +96,7 @@ const TABS = [
 ];
 
 function render() {
+  if (state.screen === 'start' && state.updateReady) { location.reload(); return; } // nowa wersja gry (sw.js)
   if (state.screen === 'start') return renderStart();
   if (state.screen === 'career' || state.screen === 'pick') return renderCareerScreen();
   if (state.screen === 'matchday') return renderLiveMatchday();
@@ -1486,7 +1487,20 @@ document.addEventListener('keydown', (ev) => {
 if (navigator.storage?.persist) navigator.storage.persisted?.().then((p) => (p ? null : navigator.storage.persist())).catch(() => {});
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-  navigator.serviceWorker.register('./sw.js').catch(() => { /* gra działa także bez trybu offline */ });
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('./sw.js').then((reg) => {
+    // Gra otwarta długo w tle: przy powrocie sprawdź nową wersję (jedno zapytanie o sw.js, najwyżej co godzinę)
+    let last = Date.now();
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && Date.now() - last > 3600e3) { last = Date.now(); reg.update().catch(() => {}); }
+    });
+  }).catch(() => { /* gra działa także bez trybu offline */ });
+  // Nowa wersja przejęła stronę: przeładowanie od razu na ekranie startowym, w trakcie gry dopiero po wyjściu do menu
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || state.updateReady) return;
+    state.updateReady = true;
+    if (state.screen === 'start') location.reload();
+  });
 }
 
 applyTheme(state.theme);

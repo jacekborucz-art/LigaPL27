@@ -107,3 +107,13 @@ test('Tryb offline: każdy plik gry jest na liście sw.js (uruchom npm run sw po
   const missing = walk('src').filter((f) => /\.(js|css|json)$/.test(f)).map((f) => `./${f.split(path.sep).join('/')}`).filter((f) => !sw.includes(`'${f}'`));
   assert.deepEqual(missing, []);
 });
+
+test('Tryb offline: skróty plików w sw.js zgadzają się z zawartością (inaczej urządzenia nie dostaną zmiany)', async () => {
+  const fs = await import('node:fs');
+  const crypto = await import('node:crypto');
+  const sw = fs.readFileSync('sw.js', 'utf8');
+  const rows = [...sw.matchAll(/\['(\.\/[^']+)', '([0-9a-f]{10})'\]/g)];
+  assert.ok(rows.length > 200);
+  const stale = rows.filter(([, f, h]) => crypto.createHash('sha1').update(fs.readFileSync(f.slice(2))).digest('hex').slice(0, 10) !== h).map(([, f]) => f);
+  assert.deepEqual(stale, [], 'uruchom npm run sw');
+});
