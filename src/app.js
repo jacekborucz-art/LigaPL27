@@ -1,5 +1,6 @@
 // Powłoka aplikacji: ekran startowy, sloty zapisu, wybór klubu, główny ekran z pocztą
 // i upływem dni („Dalej” albo „Zagraj mecz”).
+import { inject } from '@vercel/analytics';
 import { CLUBS_PL, LEAGUE_NAMES, clubById } from './data/clubs_pl.js';
 import { GAME_START, SEASON, POLISH_EUROPE_2026, DOMESTIC } from './config/calendar2026.js';
 import { crestHtml } from './ui/crest.js';
@@ -1332,6 +1333,9 @@ if (navigator.storage?.persist) navigator.storage.persisted?.().then((p) => (p ?
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('./sw.js').catch(() => { /* gra działa także bez trybu offline */ });
 }
+
+// Initialize Vercel Web Analytics
+inject({ mode: 'production' });
 
 applyTheme(state.theme);
 Promise.resolve(render()).then(() => {
