@@ -247,9 +247,9 @@ export function renderPlayerProfile(p, opts = {}) {
         ${positionMapHtml(p)}
         <h3>Kontrakt</h3>
         <ul class="plain-list">
-          ${foreign ? '' : `<li><span class="k">Pensja</span><span>${esc(formatZl(p.contract.wage))} tygodniowo</span></li>`}
+          ${!p.contract ? '<li><span class="k">Status</span><span>Wolny zawodnik, bez kontraktu</span></li>' : `${foreign ? '' : `<li><span class="k">Pensja</span><span>${esc(formatZl(p.contract.wage))} tygodniowo</span></li>`}
           <li><span class="k">Do</span><span>${esc(fmtDate(p.contract.until))}</span></li>
-          <li><span class="k">Klauzula</span><span>${p.contract.clause ? esc(formatZl(p.contract.clause)) : 'Brak'}</span></li>
+          <li><span class="k">Klauzula</span><span>${p.contract.clause ? esc(formatZl(p.contract.clause)) : 'Brak'}</span></li>`}
           <li><span class="k">Wartość</span><span>${esc(formatZl(p.value))}</span></li>
           ${foreign ? '' : `<li><span class="k">Agent</span><span>${esc(AGENT_TYPES[p.agent]?.label ?? 'Brak danych')}</span></li>`}
         </ul>

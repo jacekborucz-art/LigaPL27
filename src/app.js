@@ -1326,6 +1326,12 @@ async function dispatchAct(el, { root = app } = {}) {
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }
   } catch (err) {
+    // Błąd widoku w trakcie kariery: zostajemy w grze (widok podglądu zamknięty), zamiast wyrzucać na ekran startowy
+    if (state.game && state.screen === 'hub') {
+      console.error(err);
+      state.extPlayer = null; state.extClub = null; state.repOpen = null; state.fx = null;
+      try { render(); window.alert(`Nie udało się otworzyć tego widoku: ${err.message}`); return; } catch (e2) { console.error(e2); }
+    }
     state.notice = err.message; state.screen = 'start'; render();
   }
 }

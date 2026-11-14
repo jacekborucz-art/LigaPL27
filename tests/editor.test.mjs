@@ -219,3 +219,12 @@ test('Pełny datapack: wszystkie kluby i zawodnicy, wczytuje się bez błędów,
   assert.equal(g3.world.players[p.id].attr[Object.keys(before)[0]], 20);
   restoreOriginals();
 });
+
+test('Profil wolnego zawodnika (bez kontraktu) otwiera się bez błędu', async () => {
+  const { renderPlayerProfile } = await import('../src/ui/squadView.js');
+  const g = structuredClone(G);
+  const p = Object.values(g.world.players).find((x) => !x.clubId) ?? Object.values(g.world.players)[0];
+  const free = { ...p, clubId: null, contract: null };
+  const html = renderPlayerProfile(free, { leagueOvrs: [10, 11, 12], clubName: 'Wolny zawodnik', date: g.date, game: g, foreign: true, back: { act: 'extback', label: 'Wróć' } });
+  assert.match(html, /Wolny zawodnik, bez kontraktu/);
+});
