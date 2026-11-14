@@ -197,8 +197,9 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
   function matchInfoHtml() {
     const c = S.pre?.conditions;
     if (!c) return '';
-    const home = anyClub(fixture.home)?.name ?? '';
-    const venue = fixture.neutral ? (fixture.venue ? `${fixture.venue}, teren neutralny` : 'Teren neutralny') : `Stadion gospodarzy, ${home}`;
+    const hc = anyClub(fixture.home); const home = hc?.name ?? '';
+    // Nazwa stadionu z edytora (club.stadium, docs/edytor.md), inaczej opis ogólny
+    const venue = fixture.neutral ? (fixture.venue ? `${fixture.venue}, teren neutralny` : 'Teren neutralny') : hc?.stadium ? `${hc.stadium}, ${home}` : `Stadion gospodarzy, ${home}`;
     const att = c.attendance ?? {};
     const crowd = !att.expected ? 'Mecz bez publiczności'
       : `Widzowie: ok. ${num(att.expected)}${att.capacity ? ` z ${num(att.capacity)}` : ''}`;

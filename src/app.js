@@ -39,6 +39,8 @@ import { renderClubView, hasClubView } from './ui/clubView.js';
 import { renderTransfers, handleTransferAction, isTransferAction } from './ui/transfersView.js';
 import { renderClubHub, handleClubAction, isClubAction } from './ui/klubView.js';
 import { sysNavHtml, sysHeaderBtn, sysDialogHtml } from './ui/sysMenu.js';
+import { renderEditor, handleEditorAction, isEditorAction, newEditorState, clubListHtml, playerListHtml } from './ui/editorView.js'; // edytor i datapack (docs/edytor.md)
+import { applyPack, restoreOriginals, exportPack, packFileName, parsePack, importPack, importSummary } from './career/editor.js';
 import { renderTalks, handleTalkAction, isTalkAction } from './ui/talksView.js';
 import { ensureCareer } from './career/careerSystem.js';
 import { fmtZl } from './career/transfers.js';
@@ -95,6 +97,7 @@ function render() {
   if (state.screen === 'matchday') return renderLiveMatchday();
   if (state.screen === 'match') return renderMatchDay();
   if (state.screen === 'matchResult') return renderMatchResult();
+  if (state.screen === 'editor') return renderEditorScreen();
   return renderHub();
 }
 
@@ -122,6 +125,11 @@ async function sysAction(act, el) {
   if (act === 'sys-save') { sys.msg = null; return openSys('save'); }
   if (act === 'sys-close') return closeSys();
   if (act === 'sys-theme') { state.theme = el.dataset.t; applyTheme(state.theme); return openSys('options'); }
+  if (act === 'sys-editor') {
+    closeSys(); state.running = false;
+    state.ed ??= newEditorState(); state.ed.msg = null; state.ed.errors = null; state.ed.draft = null;
+    state.screen = 'editor'; render(); window.scrollTo({ top: 0 }); app.querySelector('.ed-head h1')?.focus?.(); return;
+  }
   if (act === 'sys-exit') {
     closeSys(); state.running = false;
     await save();
@@ -139,6 +147,76 @@ async function sysAction(act, el) {
   }
 }
 
+// ---------- Edytor i datapack (src/ui/editorView.js, src/career/editor.js, docs/edytor.md) ----------
+function renderEditorScreen() {
+  app.innerHTML = renderEditor(state.game, state.ed ??= newEditorState());
+}
+
+async function editorAction(act, el) {
+  const g = state.game;
+  const ed = (state.ed ??= newEditorState());
+  const r = handleEditorAction(g, ed, act, el.dataset, app);
+  if (r.exit) { state.screen = 'hub'; leagueOvrCache.clear(); render(); window.scrollTo({ top: 0 }); return; }
+  if (r.export) { exportDatapack(); return; }
+  if (r.squadChanged) afterSquadChange(g);
+  else if (r.save) leagueOvrCache.clear();
+  if (r.save) await save();
+  render();
+  if (r.top) window.scrollTo({ top: 0 });
+  if (r.focus) app.querySelector(r.focus)?.focus({ preventScroll: true });
+}
+
+function exportDatapack() {
+  const g = state.game;
+  const name = packFileName(g.date);
+  const blob = new Blob([JSON.stringify(exportPack(g), null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name; a.hidden = true;
+  (app.querySelector('.ed') ?? document.body).appendChild(a); a.click(); a.remove(); // nazwa tylko ASCII (Chromium)
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  state.ed.msg = `Zapisano plik ${name}.`; state.ed.errors = null;
+  render();
+}
+
+// Wczytanie datapacku, wyszukiwarki i filtry edytora (pola INPUT i SELECT nie przechodzą przez dispatchAct)
+app.addEventListener('change', async (ev) => {
+  const input = ev.target.closest?.('input[data-act="ed-import"]');
+  if (!input || !input.files?.[0] || !state.game || !state.ed) return;
+  const ed = state.ed;
+  try {
+    const file = input.files[0];
+    if (file.size > 5e6) throw new Error('Plik jest za duży jak na datapack.');
+    const r = importPack(state.game, parsePack(await file.text()));
+    afterSquadChange(state.game);
+    await save();
+    ed.msg = `Wczytano datapack. ${importSummary(r)}`; ed.errors = null;
+  } catch (err) {
+    ed.msg = `Nie wczytano pliku: ${err.message}`; ed.errors = {};
+  }
+  input.value = '';
+  render();
+});
+app.addEventListener('input', (ev) => {
+  if (state.screen !== 'editor' || !state.ed) return;
+  const id = ev.target.id;
+  if (id !== 'ed-q' && id !== 'ed-pq') return;
+  if (id === 'ed-q') state.ed.q = ev.target.value; else state.ed.pq = ev.target.value;
+  const box = app.querySelector('#ed-results');
+  if (box) box.innerHTML = id === 'ed-q' ? clubListHtml(state.game, state.ed) : playerListHtml(state.game, state.ed);
+});
+app.addEventListener('change', (ev) => {
+  if (state.screen !== 'editor' || !state.ed || (ev.target.id !== 'ed-pclub' && ev.target.id !== 'ed-ppos')) return;
+  state.ed[ev.target.id === 'ed-pclub' ? 'pclub' : 'ppos'] = ev.target.value;
+  const box = app.querySelector('#ed-results');
+  if (box) box.innerHTML = playerListHtml(state.game, state.ed);
+});
+app.addEventListener('keydown', (ev) => {
+  // Enter w polu formularza edytora = Zapisz zmiany
+  if (ev.key !== 'Enter' || state.screen !== 'editor' || !ev.target.matches?.('[data-ed-form] input')) return;
+  ev.preventDefault();
+  app.querySelector('[data-act="ed-save-club"], [data-act="ed-save-player"]')?.click();
+});
+
 // ---------- Zapis ----------
 async function save() {
   const g = state.game;
@@ -150,6 +228,7 @@ async function save() {
 /** Uzupełnia zapisy sprzed poczty i pętli dni (migracja w miejscu). */
 function ensureGameShape(g) {
   applySeasonState(g); // kalendarz i ligi sezonu zapisanego w grze
+  applyPack(g); // edytor: nazwy klubów i stadiony z datapacku gry (docs/edytor.md)
   if (!g.world) g.world = generateWorld(g.seed);
   if (!g.tactics) g.tactics = createTactics(mySquad(g), { benchSize: benchSizeFor(g) });
   else g.tactics = refreshTactics(g.tactics, mySquad(g), { benchSize: benchSizeFor(g) }).tactics;
@@ -185,6 +264,7 @@ function ensureGameShape(g) {
 
 // ---------- Menu główne ----------
 async function renderStart() {
+  restoreOriginals(); // edytor: inne zapisy i nowa kariera widzą oryginalne nazwy klubów
   const slots = await store.listSlots();
   state.slotsCache = slots;
   app.innerHTML = renderMenu({ slots, notice: state.notice, memoryOnly: store.isMemoryOnly(), theme: state.theme, confirmDel: state.confirmDel });
@@ -972,6 +1052,7 @@ app.addEventListener('change', async (ev) => {
 // ---------- Akcje ----------
 async function newGame(slot, clubId, profile = null) {
   applySeasonState({});
+  restoreOriginals();
   const seed = hashString(`${clubId}:${Date.now()}:${Math.random()}`);
   const game = {
     seed, clubId, date: GAME_START, season: SEASON, createdAt: new Date().toISOString(),
@@ -1009,6 +1090,7 @@ app.addEventListener('click', (ev) => {
 async function dispatchAct(el, { root = app } = {}) {
   const act = el.dataset.act;
   if (act?.startsWith('sys-') && state.game) { await sysAction(act, el); return; } // Opcje, Zapis, Wyjście
+  if (isEditorAction(act) && state.game && state.screen === 'editor') { await editorAction(act, el); return; }
   if (isTalkAction(act) && state.game) {
     const r = handleTalkAction(state.game, act, el.dataset, root);
     Object.assign(state, r.ui ?? {});
@@ -1368,6 +1450,7 @@ document.addEventListener('keydown', (ev) => {
   if (state.screen === 'matchday') return;
   if (ev.key === 'Escape' && state.screen === 'career') { ev.preventDefault(); app.querySelector('[data-act="ncBack"]')?.click(); return; }
   if (ev.key === 'Escape' && state.screen === 'start' && state.confirmDel) { app.querySelector('[data-act="deleteNo"]')?.click(); return; }
+  if (ev.key === 'Escape' && state.screen === 'editor') { app.querySelector('[data-act="ed-back"]')?.click(); return; } // edytor: powrót do gry
   if (ev.key === 'Escape' && state.screen !== 'start') { state.running = false; state.screen = 'start'; render(); }
   if (ev.key === 'Enter' && state.screen === 'hub' && !state.running && !ev.target.closest('button')) document.querySelector('[data-act="go"]')?.click();
 });

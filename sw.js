@@ -1,7 +1,7 @@
 // Service worker: tryb offline. Pliki aplikacji są w pamięci podręcznej przy instalacji. Przy dostępie do sieci
 // gra zawsze bierze najnowsze pliki z serwera (sieć najpierw) i odświeża nimi pamięć; bez sieci działa z pamięci.
 // Wcześniej pamięć miała pierwszeństwo, więc po aktualizacji telefon pokazywał starą wersję (albo mieszankę).
-const VERSION = 'v0.3-80a88f6cba';
+const VERSION = 'v0.3-12f0521720';
 const CACHE = `manager-${VERSION}`;
 
 const SHELL = [
@@ -88,6 +88,7 @@ const SHELL = [
   './src/career/careerSystem.js',
   './src/career/coachMarket.js',
   './src/career/coaches.js',
+  './src/career/editor.js',
   './src/career/fans.js',
   './src/career/fansSystem.js',
   './src/career/finance.js',
@@ -180,6 +181,7 @@ const SHELL = [
   './src/styles/club.css',
   './src/styles/contextmenu.css',
   './src/styles/dashboard.css',
+  './src/styles/editor.css',
   './src/styles/fonts.css',
   './src/styles/history.css',
   './src/styles/klub.css',
@@ -210,6 +212,7 @@ const SHELL = [
   './src/ui/contextMenu.js',
   './src/ui/crest.js',
   './src/ui/dom.js',
+  './src/ui/editorView.js',
   './src/ui/europeView.js',
   './src/ui/fixturesView.js',
   './src/ui/formChart.js',

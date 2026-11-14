@@ -1,4 +1,4 @@
-// Menu systemowe gry (u dołu bocznego menu na PC, na telefonie przycisk w nagłówku): Opcje (motyw), Zapis (plik
+// Menu systemowe gry (u dołu bocznego menu na PC, na telefonie przycisk w nagłówku): Opcje (motyw, Edytor), Zapis (plik
 // JSON na urządzeniu), Wyjście (zapis i powrót do strony startowej).
 
 import { esc, icon } from './dom.js';
@@ -31,7 +31,10 @@ export function sysDialogHtml(kind, ctx = {}) {
     return `<h2 id="sysTitle">Opcje</h2>
       <fieldset class="sysdlg__themes"><legend>Jasność motywu</legend>
         ${Object.entries(THEMES).map(([k, l]) => `<label class="sysdlg__opt"><input type="radio" name="sysTheme" value="${k}" data-act="sys-theme" data-t="${k}" ${ctx.theme === k ? 'checked' : ''}><span>${esc(l)}${k === 'auto' ? '<small>jak w systemie</small>' : ''}</span></label>`).join('')}
-      </fieldset>${close}`;
+      </fieldset>
+      <section class="sysdlg__sec"><h3>Edytor</h3>
+        <p class="sysdlg__note">Zmień nazwy klubów, stadiony, finanse oraz dane i atrybuty zawodników. Zmiany zapiszesz jako datapack.</p>
+        <button class="btn btn--primary" data-act="sys-editor">Edytor</button></section>${close}`;
   }
   // Zapis
   return `<h2 id="sysTitle">Zapis gry</h2>
