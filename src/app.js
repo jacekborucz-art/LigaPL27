@@ -38,6 +38,8 @@ import { playerStatsHtml } from './ui/playerStatsView.js';
 import { renderClubView, hasClubView } from './ui/clubView.js';
 import { renderTransfers, handleTransferAction, isTransferAction } from './ui/transfersView.js';
 import { renderClubHub, handleClubAction, isClubAction } from './ui/klubView.js';
+import { sysNavHtml, sysHeaderBtn, sysDialogHtml } from './ui/sysMenu.js';
+import { driveSignIn, driveSignOut, driveSave } from './core/gdrive.js';
 import { renderTalks, handleTalkAction, isTalkAction } from './ui/talksView.js';
 import { ensureCareer } from './career/careerSystem.js';
 import { fmtZl } from './career/transfers.js';
@@ -95,6 +97,61 @@ function render() {
   if (state.screen === 'match') return renderMatchDay();
   if (state.screen === 'matchResult') return renderMatchResult();
   return renderHub();
+}
+
+// ---------- Menu systemowe: Opcje, Zapis, Wyjście (src/ui/sysMenu.js) ----------
+const sys = { kind: null, msg: null, busy: false };
+function openSys(kind) {
+  sys.kind = kind;
+  let dlg = app.querySelector('#sysDlg');
+  if (!dlg) {
+    app.insertAdjacentHTML('beforeend', '<dialog id="sysDlg" class="sysdlg" aria-labelledby="sysTitle"></dialog>');
+    dlg = app.querySelector('#sysDlg');
+    dlg.addEventListener('close', () => { sys.kind = null; sys.msg = null; });
+  }
+  dlg.innerHTML = sysDialogHtml(kind, { theme: state.theme, slot: state.slot, msg: sys.msg, busy: sys.busy });
+  if (!dlg.open) dlg.showModal();
+  dlg.querySelector('h2')?.setAttribute('tabindex', '-1');
+}
+const closeSys = () => app.querySelector('#sysDlg')?.close();
+// Nazwa pliku bez polskich znaków i spacji (z nimi przeglądarka odrzuca nazwę i zapisuje „download”)
+const slug = (t) => String(t).replace(/[łŁ]/g, (c) => (c === 'ł' ? 'l' : 'L')).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const saveName = () => { const g = state.game; return `LigaPL27-slot${state.slot}-${slug(clubById(g.clubId)?.name ?? g.clubId)}-${g.date}.json`; };
+async function sysAction(act, el) {
+  if (act === 'sys-menu') return openSys('menu');
+  if (act === 'sys-options') return openSys('options');
+  if (act === 'sys-save') { sys.msg = null; return openSys('save'); }
+  if (act === 'sys-close') return closeSys();
+  if (act === 'sys-theme') { state.theme = el.dataset.t; applyTheme(state.theme); return openSys('options'); }
+  if (act === 'sys-exit') {
+    closeSys(); state.running = false;
+    await save();
+    state.notice = `Gra zapisana w slocie ${state.slot}.`; state.screen = 'start'; render(); return;
+  }
+  if (act === 'sys-file') {
+    await save();
+    const rec = await store.loadSlot(state.slot);
+    const blob = new Blob([store.exportJson(rec)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = saveName(); a.hidden = true;
+    (app.querySelector('#sysDlg[open]') ?? document.body).appendChild(a); a.click(); a.remove(); // w aktywnym oknie: przeglądarka używa nazwy z download
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    sys.msg = `Zapisano plik ${saveName()}.`; return openSys('save');
+  }
+  if (act === 'sys-drive-logout') { driveSignOut(); sys.msg = 'Wylogowano z Google Drive.'; return openSys('save'); }
+  if (act === 'sys-drive-login' || act === 'sys-drive-save') {
+    sys.busy = true; sys.msg = act === 'sys-drive-login' ? 'Logowanie do Google…' : 'Zapisywanie na Google Drive…'; openSys('save');
+    try {
+      if (act === 'sys-drive-login') { await driveSignIn(); sys.msg = 'Zalogowano. Możesz zapisać grę na Google Drive.'; }
+      else {
+        await save();
+        const rec = await store.loadSlot(state.slot);
+        const f = await driveSave(state.slot, saveName(), store.exportJson(rec));
+        sys.msg = `Zapisano na Google Drive: ${f.name}.`;
+      }
+    } catch (err) { sys.msg = err.message; }
+    sys.busy = false; return openSys('save');
+  }
 }
 
 // ---------- Zapis ----------
@@ -238,8 +295,9 @@ function renderHub() {
       </div>
       <div class="led hub__date" id="leddate" aria-label="Data w grze: ${esc(fmtDate(g.date))}">${esc(fmtDate(g.date))}</div>
       <div class="go-wrap" id="gowrap">${goButton(g)}</div>
+      ${sysHeaderBtn()}
     </header>
-    <nav class="nav" aria-label="Menu gry">${nav}</nav>
+    <nav class="nav" aria-label="Menu gry">${nav}${sysNavHtml()}</nav>
     <main class="hub__main" id="main">${renderTab(state.tab, g, club)}</main>
     <div class="ticker" id="ticker" aria-live="polite"></div>
   </div>`;
@@ -920,6 +978,7 @@ app.addEventListener('input', (ev) => {
 });
 
 app.addEventListener('change', async (ev) => {
+  if (ev.target.matches?.('input[data-act="sys-theme"]')) { await sysAction('sys-theme', ev.target); return; } // Opcje: motyw
   const sel = ev.target.closest('select[data-act="trole"]');
   if (!sel) return;
   await setRole(sel.dataset.role, sel.value);
@@ -964,6 +1023,7 @@ app.addEventListener('click', (ev) => {
  */
 async function dispatchAct(el, { root = app } = {}) {
   const act = el.dataset.act;
+  if (act?.startsWith('sys-') && state.game) { await sysAction(act, el); return; } // Opcje, Zapis, Wyjście
   if (isTalkAction(act) && state.game) {
     const r = handleTalkAction(state.game, act, el.dataset, root);
     Object.assign(state, r.ui ?? {});
