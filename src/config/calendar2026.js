@@ -83,6 +83,7 @@ export const inFifaWindow = (iso) => FIFA_WINDOWS.some((w) => iso >= w.from && i
 // Daty sezonu 2026/27 są wzorcem. Kolejny sezon to przesunięcie o pełne tygodnie (te same dni tygodnia),
 // okna FIFA z danych reprezentacji (docs/reprezentacje.md), polskie kluby w pucharach z europeAccess.
 const BASE = JSON.parse(JSON.stringify({ DOMESTIC, UEFA, POLISH_EUROPE_2026, FIFA_WINDOWS }));
+const addDaysTo = (iso, days) => shiftIso(iso, days);
 const shiftIso = (iso, days) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); };
 function shiftDeep(v, days) {
   if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) return shiftIso(v, days);
@@ -105,6 +106,13 @@ export function setSeasonYear(y, { windows = null, polishEurope = null } = {}) {
   SEASON_END = `${y + 1}-06-30`;
   replaceContents(DOMESTIC, shiftDeep(BASE.DOMESTIC, days));
   replaceContents(UEFA, shiftDeep(BASE.UEFA, days));
+  // Rok Euro albo mistrzostw świata: finały pucharów UEFA przed oknem sparingów przed turniejem (jak w 2016, 2021, 2024)
+  const prep = windows?.find((w) => w.kind === 'prep');
+  if (prep) {
+    if (UEFA.LM.F >= addDaysTo(prep.from, -1)) UEFA.LM.F = addDaysTo(prep.from, -2);
+    if (UEFA.LK.F >= addDaysTo(prep.from, -4)) UEFA.LK.F = addDaysTo(prep.from, -5);
+    if (UEFA.LE.F >= addDaysTo(prep.from, -5)) UEFA.LE.F = addDaysTo(prep.from, -12);
+  }
   const fifa = k === 0 ? BASE.FIFA_WINDOWS : (windows ?? shiftDeep(BASE.FIFA_WINDOWS, days)).filter((w) => w.from >= SEASON_START && w.to <= SEASON_END && w.matches);
   FIFA_WINDOWS.length = 0; FIFA_WINDOWS.push(...fifa.map((w) => ({ sure: false, note: '', ...w })));
   POLISH_EUROPE_2026.length = 0; POLISH_EUROPE_2026.push(...(k === 0 && !polishEurope ? BASE.POLISH_EUROPE_2026 : polishEurope ?? []));

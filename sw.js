@@ -158,6 +158,7 @@ const SHELL = [
   './src/season/europe.js',
   './src/season/europeAccess.js',
   './src/season/history.js',
+  './src/season/intl/windows.js',
   './src/season/leagues.js',
   './src/season/national.js',
   './src/season/nationalSystem.js',

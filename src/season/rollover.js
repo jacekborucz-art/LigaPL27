@@ -21,7 +21,7 @@ import { createSeason, anyClub, lowerTierClubs } from './season.js';
 import { applyLeagueState, computeMoves, validateTiers } from './leagues.js';
 import { allocateEuropeanSpots } from './europeAccess.js';
 import { COUNTRY_COEF_2026, UCOMP_NAMES } from './uefa.js';
-import { FIFA_WINDOWS_ALL } from './national.js';
+import { seasonWindows } from './intl/windows.js';
 import { initClub, seasonSummary, FIN } from '../career/finance.js';
 import { academyMods } from '../career/infrastructure.js';
 import { addFreeAgents } from '../career/transfers.js';
@@ -41,7 +41,7 @@ const LEAGUE_L = { 1: 11.5, 2: 10, 3: 8.5, 4: 7.5 };
 /** Ustawia kalendarz i ligi zgodnie z zapisem gry (wczytanie albo nowa gra). */
 export function applySeasonState(game) {
   const y = game.seasonYear ?? 2026;
-  setSeasonYear(y, { windows: FIFA_WINDOWS_ALL, polishEurope: y === 2026 ? null : game.season?.polishEurope ?? [] });
+  setSeasonYear(y, { windows: seasonWindows(y), polishEurope: y === 2026 ? null : game.season?.polishEurope ?? [] });
   applyLeagueState(game);
 }
 
@@ -228,7 +228,7 @@ export function rolloverSeason(game) {
   coachesNewSeason(game, year); // trenerzy AI: rok starsi, doświadczenie albo spadek formy (career/coaches.js)
   coachMarketNewSeason(game, year); // pula wolnych trenerów: starsi, część odchodzi z zawodu, nowi (career/coachMarket.js)
   const polishEurope = europe.spots.map(({ club, comp, entry, path, via }) => ({ club, comp, entry, ...(path ? { path } : {}), via }));
-  setSeasonYear(year, { windows: FIFA_WINDOWS_ALL, polishEurope });
+  setSeasonYear(year, { windows: seasonWindows(year), polishEurope });
   applyLeagueState(game);
   // Powroty z wypożyczeń kończących się 30 czerwca i z udziałem klubów spadających do III ligi; obowiązek albo opcja
   // wykupu zamienia wypożyczenie w transfer (src/career/loans.js). Wypożyczenia na rok trwają dalej.
