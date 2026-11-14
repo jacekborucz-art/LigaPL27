@@ -124,7 +124,11 @@ export function singleWinner(m) {
   return m.result.shootout[0] > m.result.shootout[1] ? [m.home, m.away] : [m.away, m.home];
 }
 
-/** Losowanie eliminacji Euro 2028: drużyny grające w marcu w LN -> 6 grup po 4, pozostałe -> 6 grup po 5. */
+/**
+ * Losowanie eliminacji Euro 2028: drużyny grające w marcu w LN -> 6 grup po 4, pozostałe -> 6 grup po 5.
+ * Grupy po 4 grają od września do listopada (kolejki 5-10): w czerwcu czwórka z nich gra turniej finałowy LN
+ * (wcześniej kolejki 3-4 wypadały w tych samych dniach co półfinały i finał LN).
+ */
 function euroDraw(N, rng) {
   const busy = new Set(Object.values(N.matches).filter((m) => ['LNQF', 'LNAB', 'LNBC'].includes(m.comp)).flatMap((m) => [m.home, m.away]));
   const all = UEFA_CODES.filter((c) => BY_CODE.get(c));
@@ -141,7 +145,7 @@ function euroDraw(N, rng) {
   const terms = DATA.eliminacjeEuro2028.terminy.filter((t) => t.kolejka).map((t) => t.do);
   for (const [g, teams] of Object.entries(groups)) {
     const rounds = roundRobin(teams, rng);
-    const dates = teams.length === 5 ? terms : terms.slice(2, 8);
+    const dates = teams.length === 5 ? terms : FOUR_TERMS(terms);
     rounds.forEach((pairs, r) => pairs.forEach(([h, a]) => {
       const id = `EQ-${g}-${r + 1}-${h}-${a}`;
       N.matches[id] = { id, comp: 'EQ', group: g, md: r + 1, date: dates[r], home: h, away: a, played: false, result: null };
@@ -159,6 +163,20 @@ function roundRobin(teams, rng) {
     list.splice(1, 0, list.pop());
   }
   return [...half, ...half.map((p) => p.map(([a, b]) => [b, a]))];
+}
+const FOUR_TERMS = (terms) => terms.slice(4, 10);
+/** Stare zapisy: grupy po 4 z meczami w czerwcu 2027 przenoszone na wrzesień-listopad (jeśli grupa jeszcze nie grała). */
+function fixFourGroups(N) {
+  if (!N.euro?.groups || N.euro.fourFix) return;
+  N.euro.fourFix = true;
+  const terms = DATA.eliminacjeEuro2028.terminy.filter((t) => t.kolejka).map((t) => t.do);
+  const dates = FOUR_TERMS(terms);
+  for (const [g, teams] of Object.entries(N.euro.groups)) {
+    if (teams.length !== 4) continue;
+    const ms = Object.values(N.matches).filter((m) => m.comp === 'EQ' && m.group === g);
+    if (ms.some((m) => m.played)) continue;
+    for (const m of ms) m.date = dates[m.md - 1];
+  }
 }
 export function euroGroupTable(N, g) {
   return groupTable(N, Object.values(N.matches).filter((m) => m.comp === 'EQ' && m.group === g), N.euro.groups[g]);
@@ -250,6 +268,7 @@ function recordNtStats(m, side, playedNow) {
  * { announced: [{window, list}], started, released: [{window, list}], played: [mecze], draws: [...] }.
  */
 export function nationalDay(N, date, players, opts = {}) {
+  fixFourGroups(N); // stare zapisy: grupy po 4 bez meczów w czerwcu 2027 (turniej finałowy LN)
   const out = { announced: [], released: [], played: [], draws: [] };
   const rng = new Rng(`kadry:${N.seed}:${date}`);
   callupDay(N, date, players, rng, out, opts);

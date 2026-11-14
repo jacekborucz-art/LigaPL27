@@ -58,3 +58,22 @@ test('Powołania: zawodnik niedostępny dla klubu tylko w czasie okna, wraca zm�
   });
   assert.equal(checked, 2);
 });
+
+test('Czerwiec 2027: drużyny z turnieju finałowego LN nie grają w tych samych dniach eliminacji Euro (grupy po 4 jesienią)', () => {
+  const { N } = run(31, '2027-12-31');
+  const ms = Object.values(N.matches).filter((m) => m.date >= '2027-01-01' && m.date <= '2027-12-31');
+  for (const [g, teams] of Object.entries(N.euro.groups)) {
+    if (teams.length !== 4) continue;
+    const gm = ms.filter((m) => m.comp === 'EQ' && m.group === g);
+    assert.equal(gm.length, 12, `grupa ${g}`);
+    assert.ok(gm.every((m) => m.date >= '2027-09-01'), `grupa ${g}: mecze od września`);
+  }
+  // żadna drużyna nie gra dwóch meczów w odstępie krótszym niż 2 dni
+  const byTeam = {};
+  for (const m of ms) for (const t of [m.home, m.away]) (byTeam[t] ??= []).push(m.date);
+  const day = (d) => Date.parse(`${d}T12:00:00Z`) / 86400000;
+  for (const [t, ds] of Object.entries(byTeam)) {
+    ds.sort();
+    for (let i = 1; i < ds.length; i++) assert.ok(day(ds[i]) - day(ds[i - 1]) >= 2, `${t}: ${ds[i - 1]} i ${ds[i]}`);
+  }
+});
