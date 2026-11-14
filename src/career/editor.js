@@ -250,6 +250,7 @@ export function editPlayer(game, pid, values) {
     for (const [k, v] of Object.entries(values.attrs)) if (v !== p.attr[k]) { n++; a[k] = v; p.attr[k] = v; }
     if (Object.keys(a).length) rec.attrs = a;
   }
+  if (!n) return 0; // nic się nie zmieniło (np. pełny datapack wczytany do tej samej gry)
   if (values.first !== undefined || values.last !== undefined) {
     p.first = values.first ?? cur.first; p.last = values.last ?? cur.last;
     p.name = `${p.first} ${p.last}`.trim();
@@ -287,14 +288,36 @@ export function clearPack(game) {
 }
 
 // ------------------------------------------------------------ Plik datapacku
-/** Datapack do pliku JSON. */
-export function exportPack(game, now = new Date()) {
+/**
+ * Datapack do pliku JSON. Domyślnie tylko zmiany z edytora. full: wszystkie kluby z kadrą i wszyscy zawodnicy
+ * świata gry z bieżącymi wartościami (w tym edytowane). Pola, które nie przeszłyby walidacji importu, są pomijane,
+ * więc pełny plik zawsze da się wczytać. Pola club i ovr przy zawodniku są tylko do czytania (import je pomija).
+ */
+export function exportPack(game, now = new Date(), { full = false } = {}) {
   const E = ensureEditor(game);
-  return { type: PACK_TYPE, v: PACK_V, seed: game.seed, created: now.toISOString(), clubs: structuredClone(E.clubs), players: structuredClone(E.players) };
+  const head = { type: PACK_TYPE, v: PACK_V, seed: game.seed, created: now.toISOString(), full };
+  if (!full) return { ...head, clubs: structuredClone(E.clubs), players: structuredClone(E.players) };
+  const clubs = {}; const players = {};
+  for (const id of Object.keys(game.world?.clubs ?? {})) {
+    if (!clubObj(id)) continue;
+    const cur = Object.fromEntries(Object.entries(clubValues(game, id)).filter(([, v]) => v != null && v !== ''));
+    const { value } = checkClub(cur);
+    if (Object.keys(value).length) clubs[id] = value;
+  }
+  for (const [id, p] of Object.entries(game.world?.players ?? {})) {
+    if (!ID_RE.test(id)) continue;
+    const cur = playerValues(p);
+    if (!cur.birthDate) delete cur.birthDate;
+    if (typeof cur.pot === 'number') cur.pot = Math.round(cur.pot * 10) / 10;
+    const { value } = checkPlayer(cur);
+    if (!Object.keys(value).length) continue;
+    players[id] = { ...value, club: p.clubId ? (clubObj(p.clubId)?.name ?? p.clubId) : null, ovr: p.ovr };
+  }
+  return { ...head, clubs, players };
 }
 
 /** Nazwa pliku tylko ze znaków ASCII (polskie litery psują nazwę pobieranego pliku w Chromium). */
-export const packFileName = (date) => `LigaPL27-datapack-${String(date).replace(/[^0-9-]/g, '')}.json`;
+export const packFileName = (date, { full = false } = {}) => `LigaPL27-datapack${full ? '-pelny' : ''}-${String(date).replace(/[^0-9-]/g, '')}.json`;
 
 const isObj = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
 const ID_RE = /^[A-Za-z0-9_.:-]{1,80}$/;

@@ -158,11 +158,12 @@ function packPanel(game, ed) {
   const n = packCounts(game);
   return `<div class="ed-form ed-pack">
     <h2 id="ed-title" tabindex="-1">Datapack</h2>
-    <p class="ed-note">Datapack to zapis Twoich zmian: kluby (nazwy, stadion, pojemność, finanse) i zawodnicy. Plik wczytasz w innej grze. Zmiany klubów działają zawsze, zmiany zawodników tylko w tym samym świecie gry (ta sama kariera albo jej kopia).</p>
-    <dl class="ed-sum"><div><dt>Kluby</dt><dd>${n.clubs}</dd></div><div><dt>Zawodnicy</dt><dd>${n.players}</dd></div></dl>
+    <p class="ed-note">Datapack to plik z danymi klubów (nazwy, stadion, pojemność, finanse) i zawodników. Możesz zapisać same swoje zmiany albo wszystkie kluby i wszystkich zawodników, razem ze zmienionymi. Plik wczytasz w innej grze. Dane klubów działają zawsze, dane zawodników tylko w tym samym świecie gry (ta sama kariera albo jej kopia).</p>
+    <dl class="ed-sum"><div><dt>Zmienione kluby</dt><dd>${n.clubs}</dd></div><div><dt>Zmienieni zawodnicy</dt><dd>${n.players}</dd></div></dl>
     ${msgHtml(ed)}
     <div class="ed-actions">
-      <button class="btn btn--primary" data-act="ed-export">Eksportuj datapack</button>
+      <button class="btn btn--primary" data-act="ed-export">Eksportuj zmiany</button>
+      <button class="btn btn--primary" data-act="ed-export" data-full="1">Eksportuj wszystkie kluby i zawodników</button>
       <label class="btn btn--quiet ed-import">Wczytaj datapack<input type="file" accept=".json,application/json" data-act="ed-import" hidden></label>
     </div>
     <section class="ed-danger"><h3>Wyczyść datapack</h3>
@@ -233,7 +234,7 @@ const changed = (n) => (n ? `Zapisano zmiany (${n} ${n === 1 ? 'pole' : n % 10 >
 export function handleEditorAction(game, ed, act, data, root) {
   const clearMsg = () => { ed.msg = null; ed.errors = null; ed.draft = null; };
   if (act === 'ed-back') return { exit: true };
-  if (act === 'ed-export') return { export: true };
+  if (act === 'ed-export') return { export: true, full: data?.full === '1' };
   if (act === 'ed-tab') { ed.tab = data.tab; ed.confirmClear = false; clearMsg(); return { focus: '#ed-title' }; }
   if (act === 'ed-tier') { ed.tier = data.t === 'all' ? 'all' : Number(data.t); return {}; }
   if (act === 'ed-club') { ed.club = data.id; ed.cplayer = null; clearMsg(); return { focus: '#ed-title', top: true }; }

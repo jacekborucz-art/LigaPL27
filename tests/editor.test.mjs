@@ -192,3 +192,30 @@ test('Widok edytora: zakładki, formularz klubu i zawodnika, zapis przez akcje, 
   assert.match(renderEditor(g, ed), /data-act="ed-export"/);
   restoreOriginals();
 });
+
+test('Pełny datapack: wszystkie kluby i zawodnicy, wczytuje się bez błędów, przywraca wartości', () => {
+  const g = structuredClone(G);
+  const pid = squadOf(g.world, 'legia')[0].id ?? squadOf(g.world, 'legia')[0];
+  const p = g.world.players[typeof pid === 'string' ? pid : pid.id];
+  const before = { ...p.attr };
+  editPlayer(g, p.id, { attrs: { [Object.keys(before)[0]]: 20 } });
+  const full = exportPack(g, new Date('2026-07-01T00:00:00Z'), { full: true });
+  assert.equal(full.full, true);
+  assert.equal(Object.keys(full.players).length, Object.keys(g.world.players).length);
+  assert.ok(Object.keys(full.clubs).length >= 54);
+  assert.equal(full.players[p.id].attrs[Object.keys(before)[0]], 20, 'edytowana wartość w pełnym pliku');
+  assert.ok(full.clubs.legia.name && full.clubs.legia.capacity);
+  assert.match(packFileName('2026-07-01', { full: true }), /^LigaPL27-datapack-pelny-2026-07-01\.json$/);
+  const parsed = parsePack(JSON.stringify(full));
+  assert.equal(Object.keys(parsed.players).length, Object.keys(full.players).length, 'żaden zawodnik nie odpada w walidacji');
+  // Ten sam świat bez zmian: import nic nie zmienia i nie zaśmieca datapacku
+  const g2 = structuredClone(g);
+  const packBefore = JSON.stringify(g2.editor);
+  importPack(g2, parsed);
+  assert.equal(JSON.stringify(g2.editor), packBefore);
+  // Kopia gry sprzed edycji dostaje wartość z pełnego pliku
+  const g3 = structuredClone(G);
+  importPack(g3, parsed);
+  assert.equal(g3.world.players[p.id].attr[Object.keys(before)[0]], 20);
+  restoreOriginals();
+});

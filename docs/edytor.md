@@ -69,6 +69,17 @@ Plik (`Eksportuj datapack`, nazwa tylko ASCII, np. `LigaPL27-datapack-2026-10-20
 
 Zapisywane są tylko zmienione pola. Klucze atrybutów jak w `src/data/attributes.js` (`POD`, `DRY`, `WYK`, ...).
 
+### Pełny datapack
+
+Przycisk „Eksportuj wszystkie kluby i zawodników” zapisuje plik `LigaPL27-datapack-pelny-<data>.json` z bieżącymi
+danymi wszystkich klubów z kadrą (wszystkie pola klubu) i wszystkich zawodników świata gry (kluby polskie, zagranica,
+wolni zawodnicy), razem z edytowanymi. Format jak wyżej, z `"full": true`; zawodnik ma dodatkowo `club` (nazwa klubu)
+i `ovr`, tylko do czytania (import je pomija). Pole, które nie przeszłoby walidacji importu, jest pomijane, więc plik
+zawsze da się wczytać. Plik jest bez wcięć: ok. 1,6 MB dla 126 klubów i ok. 4200 zawodników.
+
+Wczytanie pełnego pliku działa jak zwykłego: do datapacku gry trafiają tylko pola, które różnią się od stanu gry
+(wczytanie do tej samej gry niczego nie zmienia). Limit rozmiaru pliku przy imporcie: 40 MB.
+
 ## Wczytanie datapacku
 
 - Plik musi mieć `type: "ligapl27-datapack"` i `v: 1`, inaczej jest odrzucony z komunikatem (np. zapis gry: „To nie jest datapack LigaPL 27”).

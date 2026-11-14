@@ -159,7 +159,7 @@ async function editorAction(act, el) {
   const ed = (state.ed ??= newEditorState());
   const r = handleEditorAction(g, ed, act, el.dataset, app);
   if (r.exit) { state.screen = 'hub'; leagueOvrCache.clear(); render(); window.scrollTo({ top: 0 }); return; }
-  if (r.export) { exportDatapack(); return; }
+  if (r.export) { exportDatapack(r.full); return; }
   if (r.squadChanged) afterSquadChange(g);
   else if (r.save) leagueOvrCache.clear();
   if (r.save) await save();
@@ -168,15 +168,16 @@ async function editorAction(act, el) {
   if (r.focus) app.querySelector(r.focus)?.focus({ preventScroll: true });
 }
 
-function exportDatapack() {
+function exportDatapack(full = false) {
   const g = state.game;
-  const name = packFileName(g.date);
-  const blob = new Blob([JSON.stringify(exportPack(g), null, 2)], { type: 'application/json' });
+  const name = packFileName(g.date, { full });
+  const pack = exportPack(g, new Date(), { full });
+  const blob = new Blob([full ? JSON.stringify(pack) : JSON.stringify(pack, null, 2)], { type: 'application/json' }); // pełny bez wcięć (rozmiar)
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = name; a.hidden = true;
   (app.querySelector('.ed') ?? document.body).appendChild(a); a.click(); a.remove(); // nazwa tylko ASCII (Chromium)
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  state.ed.msg = `Zapisano plik ${name}.`; state.ed.errors = null;
+  state.ed.msg = full ? `Zapisano plik ${name}: ${Object.keys(pack.clubs).length} klubów, ${Object.keys(pack.players).length} zawodników.` : `Zapisano plik ${name}.`; state.ed.errors = null;
   render();
 }
 
@@ -187,7 +188,7 @@ app.addEventListener('change', async (ev) => {
   const ed = state.ed;
   try {
     const file = input.files[0];
-    if (file.size > 5e6) throw new Error('Plik jest za duży jak na datapack.');
+    if (file.size > 40e6) throw new Error('Plik jest za duży jak na datapack.');
     const r = importPack(state.game, parsePack(await file.text()));
     afterSquadChange(state.game);
     await save();
