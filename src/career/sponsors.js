@@ -17,7 +17,7 @@ import { seasonGoalFor } from './board.js';
 import { fmtZl } from './transfers.js';
 import { fmtDate } from '../ui/dom.js';
 
-const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
+import { LEAGUE_COMPS, compOfClub, compClubIds } from '../season/leagueComps.js';
 
 // [SZAC] wszystkie
 export const SP = {
@@ -162,19 +162,20 @@ function initClubSponsors(game, id, date) {
 // ------------------------------------------------------------ Atrakcyjność klubu i oferty
 let tableCache = { key: null, map: new Map() };
 function positionOf(game, id, club) {
-  const comp = TIER_COMP[club.tier];
+  const comp = compOfClub(club);
   if (comp && game.fixtures) {
     const key = `${game.date}:${game.fixtures.length}`;
     if (tableCache.key !== key) tableCache = { key, map: new Map() };
     if (!tableCache.map.has(comp)) {
       const lf = game.fixtures.filter((f) => f.comp === comp);
-      tableCache.map.set(comp, standings(lf, CLUBS_PL.filter((c) => c.tier === club.tier).map((c) => c.id)));
+      tableCache.map.set(comp, standings(lf, compClubIds(comp)));
     }
     const row = tableCache.map.get(comp).find((r) => r.id === id);
     if (row && row.played >= 5) return row.pos ?? tableCache.map.get(comp).indexOf(row) + 1;
   }
   // Początek sezonu: miejsce z poprzedniego sezonu, jeśli klub gra w tej samej lidze
-  const t = game.archive?.at(-1)?.tables?.[club.tier];
+  const last = game.archive?.at(-1);
+  const t = club.tier === 4 ? last?.l3?.[club.group] : last?.tables?.[club.tier];
   const i = t ? t.findIndex((r) => r.id === id) : -1;
   return i >= 0 ? i + 1 : null;
 }
@@ -396,9 +397,9 @@ export function sponsorsDay(game, date) {
   const F = game.finance;
   // Rozstrzygnięcia sezonu do premii
   const leagueEnd = {};
-  for (const [t, comp] of Object.entries(TIER_COMP)) {
+  for (const comp of LEAGUE_COMPS) {
     if (F.merit?.[comp] !== date) continue;
-    standings(game.fixtures.filter((f) => f.comp === comp), CLUBS_PL.filter((c) => c.tier === Number(t)).map((c) => c.id)).forEach((r, i) => { leagueEnd[r.id] = i + 1; });
+    standings(game.fixtures.filter((f) => f.comp === comp), compClubIds(comp)).forEach((r, i) => { leagueEnd[r.id] = i + 1; });
   }
   let cupWinner = null;
   if (st.cup !== SEASON_YEAR) {

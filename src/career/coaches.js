@@ -49,7 +49,7 @@ export const COACH = {
   // Plan przedmeczowy: trafny plan pod rywala (s > 0), chybiony (s < 0), losowy błąd w ocenie zawodników
   plan: { good: 0.4, bad: 0.4, xiNoise: 1.2 },
   // Asystent gracza w meczu: atrybut trenera z jakości asystenta w sztabie
-  assistant: { base: 2, perQ: 0.62, tier: { 1: 0, 2: 0.7, 3: 1.6 } },
+  assistant: { base: 2, perQ: 0.62, tier: { 1: 0, 2: 0.7, 3: 1.6, 4: 2.0 } },
   // Sezon trenera w klubie (docs/trener-ai-atrybuty.md, „Stały punkt + los w skali sezonu”): dopasowanie stylu
   // do kadry, chemia z szatnią (losowana raz na sezon) i efekt nowej miotły; punkty atrybutu dodawane do TAK, SKL, MOT
   season: { styleFit: 0.75, chemSd: 1.5, chemMax: 3, bounce: 1.5, bounceDays: 42, max: 3.5 },

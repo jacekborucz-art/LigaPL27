@@ -148,7 +148,7 @@ export function requestsMonth(game, date) {
   const ym = date.slice(0, 7);
   const inWin = !!windowOf(date);
   for (const c of CLUBS_PL) {
-    if (!game.world.clubs[c.id] || c.tier > 3) continue;
+    if (!game.world.clubs[c.id] || c.tier > 4) continue;
     const clubRep = clubReputation(c);
     const n = games[c.id] ?? 0;
     for (const p of squadOf(game.world, c.id)) {

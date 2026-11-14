@@ -33,7 +33,8 @@ const protestMsgs = (msgs) => msgs.filter((m) => m.refs?.kind === 'fans');
 
 test('Dane kibiców: profil dla każdego klubu z clubs_pl.js, rywalizacje i derby', () => {
   for (const c of CLUBS_PL) {
-    assert.ok(KIBICE[c.id], `brak danych kibiców: ${c.id}`);
+    // III liga: profil szacowany z renomy (bez danych w kibice.js, docs/iii-liga.md)
+    if (c.tier <= 3) assert.ok(KIBICE[c.id], `brak danych kibiców: ${c.id}`);
     const p = fanProfile(c.id);
     assert.ok(p.size >= 1 && p.size <= 5 && p.ultras >= 1 && p.ultras <= 5, c.id);
     assert.ok(p.maxLevel >= 1 && p.maxLevel <= 8, c.id);

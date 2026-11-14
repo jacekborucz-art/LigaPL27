@@ -3,7 +3,8 @@
 // Trener klubu AI: profil z atrybutami (career/coaches.js, docs/trener-ai-atrybuty.md); dokładność ocen jak
 // w raportach sztabu zależy od analityka klubu gracza.
 
-import { CLUBS_PL, LEAGUE_NAMES, clubById } from '../data/clubs_pl.js';
+import { CLUBS_PL, LEAGUE_NAMES, clubById, leagueLabel } from '../data/clubs_pl.js';
+import { compOfClub, compClubIds } from '../season/leagueComps.js';
 import { squadOf } from '../world/worldGen.js';
 import { coachOf, headCoachName, coachBlurb, coachSeen, coachBand, COACH_ATTRS, COACH_KEYS, COACH_STYLES } from '../career/coaches.js';
 import { ownerOf, ownerBlurb, OWNER_TYPES } from '../career/owners.js';
@@ -20,9 +21,8 @@ import { fixtureRowHtml } from './fixturesView.js';
 import { crestHtml } from './crest.js';
 import { esc, fmtDate } from './dom.js';
 
-const clubsById = Object.fromEntries(CLUBS_PL.map((c) => [c.id, c]));
+const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (club, size) => crestHtml(club, { size, clubsById });
-const LEAGUE_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
 const POS_ORDER = ['BR', 'BO', 'ŚO', 'WB', 'DP', 'ŚP', 'OP', 'SP', 'SN', 'NAP'];
 
 /** Czy klub ma widok (polski klub z kadrą w świecie gry). */
@@ -152,8 +152,8 @@ export function renderClubView(game, clubId) {
   const facts = clubFacts(club);
   const cap = game.infra && game.finance?.clubs?.[clubId] ? capacityOf(game, clubId).full : facts.cap; // z rozbudową trybun i edytorem
   const kit = kitColors(club);
-  const comp = LEAGUE_COMP[club.tier];
-  const ids = CLUBS_PL.filter((c) => c.tier === club.tier && !c.parent).map((c) => c.id);
+  const comp = compOfClub(club);
+  const ids = comp ? compClubIds(comp) : [];
   const table = comp ? standings((game.fixtures ?? []).filter((f) => f.comp === comp), ids) : [];
   const row = table.find((r) => r.id === clubId);
   const rows = clubFixtures(game, clubId);
@@ -167,7 +167,7 @@ export function renderClubView(game, clubId) {
     ${crest(club, 72)}
     <div class="clv__title">
       <h2>${esc(club.name)}</h2>
-      <p>${esc(LEAGUE_NAMES[club.tier] ?? '')}${row ? `, ${row.pos}. miejsce, ${row.points} pkt` : ''}${rec.n ? `. Bilans: ${rec.w}W ${rec.d}R ${rec.l}P, bramki ${rec.gf}:${rec.ga}` : ''}</p>
+      <p>${esc(leagueLabel(club))}${row ? `, ${row.pos}. miejsce, ${row.points} pkt` : ''}${rec.n ? `. Bilans: ${rec.w}W ${rec.d}R ${rec.l}P, bramki ${rec.gf}:${rec.ga}` : ''}</p>
       ${form.length ? `<p class="clv__form" aria-label="Forma: ostatnie mecze">${form.map((r) => `<b class="fchip fchip--${r.res}" title="${esc(`${fmtDate(r.d)}, ${r.gf}:${r.ga}`)}">${r.res}</b>`).join('')}</p>` : ''}
     </div>
   </header>`;

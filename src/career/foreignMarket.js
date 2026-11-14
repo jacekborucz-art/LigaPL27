@@ -97,7 +97,7 @@ export function foreignWeek(game, date) {
   const openUser = game.market.offers.filter((o) => o.status === 'open' && o.kind === 'incoming' && o.foreign).length;
   let userOffers = 0;
   for (const c of CLUBS_PL) {
-    if (!W.clubs[c.id] || c.tier > 3) continue;
+    if (!W.clubs[c.id] || c.tier > 4) continue;
     for (const p of squadOf(W, c.id)) {
       if (!foreignTarget(p) || p.loan || p.preContract || hasOpenDeal(game, p.id) || p.injuryDays > 28) continue;
       const rng = new Rng(`zagranica:${game.seed}:${p.id}:${date}`);

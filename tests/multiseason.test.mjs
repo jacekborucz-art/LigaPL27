@@ -43,12 +43,14 @@ test('Trzy sezony: ligi po 18 klubów, reguły rezerw, kadry i finanse w normie,
   const g = newGame('widzew', 31);
   const checks = [];
   playTo(g, '2029-07-03', (game) => {
-    const tiers = Object.fromEntries(CLUBS_PL.filter((c) => c.tier <= 3).map((c) => [c.id, c.tier]));
-    assert.deepEqual(validateTiers(tiers), [], SEASON);
+    const tiers = Object.fromEntries(CLUBS_PL.filter((c) => c.tier <= 4).map((c) => [c.id, c.tier]));
+    const groups = Object.fromEntries(CLUBS_PL.filter((c) => c.tier === 4).map((c) => [c.id, c.group]));
+    assert.deepEqual(validateTiers(tiers, groups), [], SEASON);
     for (const t of [1, 2, 3]) assert.equal(CLUBS_PL.filter((c) => c.tier === t).length, 18, `${SEASON} liga ${t}`);
-    // Każdy klub ligowy ma stałą kadrę, nikt nie jest w dwóch kadrach
+    for (const gr of [1, 2, 3, 4]) assert.equal(CLUBS_PL.filter((c) => c.tier === 4 && c.group === gr).length, 18, `${SEASON} III liga grupa ${gr}`);
+    // Każdy klub ligowy (z III ligą) ma stałą kadrę, nikt nie jest w dwóch kadrach
     const seen = new Set();
-    for (const c of CLUBS_PL.filter((x) => x.tier <= 3)) {
+    for (const c of CLUBS_PL.filter((x) => x.tier <= 4)) {
       const sq = squadOf(game.world, c.id);
       assert.ok(sq.length >= (c.id === game.clubId ? 16 : 22), `${SEASON} ${c.id}: kadra ${sq.length}`);
       for (const p of sq) { assert.ok(!seen.has(p.id), p.id); seen.add(p.id); assert.equal(p.clubId, c.id); }
@@ -82,19 +84,20 @@ test('Reguła rezerw: spadek pierwszej drużyny do ligi rezerw spycha rezerwy ni
   const tables = { 1: t1.filter((x) => x !== parent).concat([parent]).slice(0, 18), 2: t2, 3: t3 };
   if (!t1.includes(parent)) return;
   // parent spada z Ekstraklasy do 1 Ligi: rezerwy w 2 Lidze wolno (2 Liga niżej niż 1 Liga)
-  const m1 = computeMoves(tables, {}, CLUBS_L3, new Rng('r1'));
+  const groupTables = Object.fromEntries([1, 2, 3, 4].map((gr) => [gr, CLUBS_L3.filter((c) => c.group === gr).map((c) => c.id)]));
+  const m1 = computeMoves(tables, {}, groupTables, new Rng('r1'));
   assert.equal(m1.tiers[parent], 2);
   assert.equal(m1.tiers['slask-ii'] >= 3, true);
   assert.ok(reserveMayPlayIn(3, 2) && !reserveMayPlayIn(3, 3) && !reserveMayPlayIn(2, 1));
   // Gdy pierwsza drużyna jest w 2 Lidze, rezerwy muszą zejść do III ligi i ratują klub z miejsca spadkowego
   const t3b = [parent, ...t3.filter((x) => x !== 'slask-ii').slice(0, 16), 'slask-ii'];
   const t2b = t2.filter((x) => x !== parent);
-  const m2 = computeMoves({ 1: t1.filter((x) => x !== parent).concat(t2b[0]), 2: [...t2b.slice(1), t3[0], t3[1]].slice(0, 18), 3: t3b }, {}, CLUBS_L3, new Rng('r2'));
+  const m2 = computeMoves({ 1: t1.filter((x) => x !== parent).concat(t2b[0]), 2: [...t2b.slice(1), t3[0], t3[1]].slice(0, 18), 3: t3b }, {}, groupTables, new Rng('r2'));
   if (m2.tiers[parent] === 3) assert.equal(m2.tiers['slask-ii'], 4);
   applySeasonState({});
 });
 
-test('Klub gracza spada do III ligi: automatyczne zwolnienie i oferty pracy z lig 1-3', async () => {
+test('Klub gracza spada do III ligi: zostaje (III liga jest grywalna), kadra i finanse przechodzą', async () => {
   const { rolloverSeason } = await import('../src/season/rollover.js');
   const g = newGame('chojniczanka', 32);
   const club = CLUBS_PL.find((c) => c.id === 'chojniczanka');
@@ -106,10 +109,10 @@ test('Klub gracza spada do III ligi: automatyczne zwolnienie i oferty pracy z li
   g.date = '2027-07-01';
   const r = rolloverSeason(g);
   assert.equal(anyClub('chojniczanka').tier, 4);
-  const fire = r.messages.find((m) => m.refs?.kind === 'jobOffer');
-  assert.ok(fire && !fire.optional && fire.actions.length >= 1);
-  for (const a of fire.actions) assert.ok(anyClub(a.id).tier <= 3, a.id);
-  runDecision(g, fire, fire.actions[0].id);
-  assert.equal(g.clubId, fire.actions[0].id);
+  assert.ok(anyClub('chojniczanka').group >= 1 && anyClub('chojniczanka').group <= 4);
+  assert.ok(!r.messages.find((m) => m.refs?.kind === 'jobOffer'), 'bez zwolnienia za sam spadek do III ligi');
+  assert.equal(g.clubId, 'chojniczanka');
+  assert.ok(squadOf(g.world, 'chojniczanka').length >= 16 && g.finance.clubs.chojniczanka);
+  assert.ok(g.fixtures.some((f) => f.comp === `liga3-${anyClub('chojniczanka').group}` && (f.home === 'chojniczanka' || f.away === 'chojniczanka')));
   applySeasonState({});
 });

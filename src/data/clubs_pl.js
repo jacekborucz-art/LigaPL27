@@ -3,14 +3,24 @@
 // prestige: 1-10, coach: O ofensywny, S ostrożny, P pragmatyczny.
 // colors: barwy do ikon zawodników [przybliżone, do edycji]. region: do wykrywania derbów.
 // parent: id pierwszej drużyny (tylko rezerwy).
+// Lista CLUBS_PL to kluby ze stałą kadrą (ligi 1-4). Na start: 54 kluby z tego pliku i 72 kluby III ligi
+// (src/data/clubs_l3.js, 4 grupy po 18). Skład lig w kolejnych sezonach ustawia src/season/leagues.js
+// (applyLeagueState): kluby spadające do IV ligi wypadają z listy, beniaminkowie z IV ligi do niej trafiają.
 
-export const TIERS = { EK: 1, L1: 2, L2: 3 };
+import { CLUBS_L3 } from './clubs_l3.js';
+
+export const TIERS = { EK: 1, L1: 2, L2: 3, L3: 4 };
 
 export const LEAGUE_NAMES = {
   1: 'Ekstraklasa',
   2: '1 Liga',
   3: '2 Liga',
+  4: 'III liga',
 };
+/** Numery grup III ligi (PZPN): I-IV. */
+export const L3_GROUP_NAMES = { 1: 'I', 2: 'II', 3: 'III', 4: 'IV' };
+/** Nazwa ligi klubu, w III lidze z grupą („III liga, grupa II”). */
+export const leagueLabel = (club) => (club?.tier === 4 && club.group ? `III liga, grupa ${L3_GROUP_NAMES[club.group] ?? club.group}` : LEAGUE_NAMES[club?.tier] ?? 'IV liga');
 
 const c = (id, name, short, tier, L, prestige, coach, colors, region, extra = {}) => ({
   id, name, short, tier, L, prestige, coach, colors, region, ...extra,
@@ -78,10 +88,18 @@ export const CLUBS_PL = [
   c('sokol-kleczew', 'Sokół Kleczew', 'SOK', 3, 8.0, 2, 'S', ['#0057B8', '#FFFFFF'], 'wielkopolska'),
 ];
 
+for (const c of CLUBS_L3) CLUBS_PL.push(c);
+
 export function clubsInTier(tier, clubs = CLUBS_PL) {
   return clubs.filter((cl) => cl.tier === tier);
 }
 
+// Indeks klubów po id (126 klubów i więcej: liniowe szukanie było zbyt wolne w pętlach po zawodnikach).
+// Przebudowa, gdy zmieni się skład listy (touchClubs() z src/season/leagues.js albo inna długość).
+let INDEX = null; let INDEX_LEN = -1;
+export function touchClubs() { INDEX = null; }
 export function clubById(id, clubs = CLUBS_PL) {
-  return clubs.find((cl) => cl.id === id) || null;
+  if (clubs !== CLUBS_PL) return clubs.find((cl) => cl.id === id) || null;
+  if (!INDEX || INDEX_LEN !== CLUBS_PL.length) { INDEX = new Map(CLUBS_PL.map((c) => [c.id, c])); INDEX_LEN = CLUBS_PL.length; }
+  return INDEX.get(id) ?? null;
 }

@@ -118,6 +118,7 @@ export const FOREIGN_MIX = {
   1: { POL: 0.52, balkany: 0.096, ESP: 0.048, POR: 0.043, SVK: 0.038, zachod: 0.043, afryka: 0.043, amerykaPd: 0.034, UKR: 0.029, skandynawia: 0.029, CZE: 0.019, GEO: 0.019, baltyk: 0.019, inne: 0.02 },
   2: { POL: 0.78, UKR: 0.044, SVK: 0.033, ESP: 0.033, balkany: 0.033, afryka: 0.026, CZE: 0.018, baltyk: 0.018, inne: 0.015 },
   3: { POL: 0.92, UKR: 0.032, baltyk: 0.016, SVK: 0.008, CZE: 0.008, inne: 0.016 },
+  4: { POL: 0.96, UKR: 0.025, baltyk: 0.008, inne: 0.007 }, // III liga [SZAC]
 };
 
 /** Losuje narodowość zawodnika polskiego klubu wg ligi. */

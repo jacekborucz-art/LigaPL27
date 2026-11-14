@@ -16,6 +16,7 @@ export const SQUAD_LIMITS = {
   1: { soft: 28, hard: 30 },
   2: { soft: 27, hard: 29 },
   3: { soft: 26, hard: 28 },
+  4: { soft: 26, hard: 28 }, // III liga jak 2 Liga [SZAC]
 };
 export const YOUTH_EXEMPT_AGE = 21; // wychowanek do 21 lat nie liczy się do limitu (jak lista B UEFA)
 export const EUROPE_BONUS = 2; // gra w pucharach: więcej meczów, szersza kadra
@@ -38,13 +39,21 @@ export function isExempt(p) {
   return !!p && (p.age ?? 99) <= YOUTH_EXEMPT_AGE && !p.lastMove && !p.loan;
 }
 
+// Kluby z meczami UEFA w terminarzu: zbiór liczony raz na dzień i długość terminarza (126 klubów, 2500 meczów)
+const euroCache = new WeakMap();
 function inEurope(game, clubId) {
-  return (game.fixtures ?? []).some((f) => f.comp === 'uefa' && (f.home === clubId || f.away === clubId));
+  const fx = game.fixtures ?? [];
+  const hit = euroCache.get(game);
+  if (hit && hit.date === game.date && hit.n === fx.length && hit.fx === fx) return hit.set.has(clubId);
+  const set = new Set();
+  for (const f of fx) if (f.comp === 'uefa') { set.add(f.home); set.add(f.away); }
+  euroCache.set(game, { date: game.date, n: fx.length, fx, set });
+  return set.has(clubId);
 }
 
 /** Progi klubu: { tier, soft, hard, europe, emergency }. */
 export function squadLimitOf(game, clubId) {
-  const tier = Math.min(3, Math.max(1, clubById(clubId)?.tier ?? 3));
+  const tier = Math.min(4, Math.max(1, clubById(clubId)?.tier ?? 3));
   const base = SQUAD_LIMITS[tier];
   const europe = inEurope(game, clubId);
   const emergency = squadDeficits(squadOf(game.world, clubId).filter(Boolean)).some((n) => n.scope === 'match');

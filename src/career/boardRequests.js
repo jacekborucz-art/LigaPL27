@@ -20,6 +20,7 @@ import { ownerOf } from './owners.js';
 import { wageBill, book, spendable } from './finance.js';
 import { marketWage, estimateValue, MAX_YEARS, yearsLabel } from './negotiation.js';
 import { fmtDate } from '../ui/dom.js';
+import { LEAGUE_COMPS, compClubIds } from '../season/leagueComps.js';
 
 // ------------------------------------------------------------ Stałe [SZAC]
 export const REQ = {
@@ -138,10 +139,10 @@ function requestCost(type, amount, date) {
 /** Miejsca w tabeli wszystkich klubów (raz na ligę). */
 function positionsAll(game) {
   const out = {};
-  for (const [tier, comp] of [[1, 'ekstraklasa'], [2, 'liga1'], [3, 'liga2']]) {
+  for (const comp of LEAGUE_COMPS) {
     const lf = (game.fixtures ?? []).filter((f) => f.comp === comp);
     if (!lf.some((f) => f.played)) continue;
-    for (const r of standings(lf, CLUBS_PL.filter((c) => c.tier === tier).map((c) => c.id))) out[r.id] = { pos: r.pos, played: r.played };
+    for (const r of standings(lf, compClubIds(comp))) out[r.id] = { pos: r.pos, played: r.played };
   }
   return out;
 }

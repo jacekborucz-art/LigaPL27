@@ -1,3 +1,4 @@
+import { CLUBS_PL } from '../src/data/clubs_pl.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Rng } from '../src/core/rng.js';
@@ -120,7 +121,8 @@ test('Kluby AI jadą na obóz same według możliwości: bogaci zimą do Turcji 
   assert.ok(['austria', 'slowenia'].includes(summer.dest));
   assert.deepEqual(TR.aiCampChoice(g, 'lech', 'winter'), TR.aiCampChoice(g, 'lech', 'winter'), 'deterministycznie');
   playUntil(g, '2026-07-21');
-  const cbs = Object.keys(g.world.clubs).filter((id) => id !== 'widzew').map((id) => g.training.clubs[id].cb);
+  // Ligi 1-3 (III liga zaczyna później: obóz przed jej startem, docs/iii-liga.md)
+  const cbs = Object.keys(g.world.clubs).filter((id) => id !== 'widzew' && CLUBS_PL.find((c) => c.id === id)?.tier <= 3).map((id) => g.training.clubs[id].cb);
   assert.ok(cbs.every((x) => x && x.key === '2026-L' && x.base >= CAMP.baseMin && x.base <= CAMP.baseMax));
   assert.ok(g.training.clubs.legia.cb.base > g.training.clubs['sokol-kleczew'].cb.base - 0.01);
 });

@@ -41,6 +41,7 @@ import './pressSystem.js'; // decyzje komisji dyscyplinarnych po słowach o sęd
 import { addMessages, createMessage } from '../core/inbox.js';
 import { applyMorale } from '../career/morale.js';
 import { isAvailable } from '../career/squad.js';
+import { compClubIds } from '../season/leagueComps.js';
 
 const REFEREES = ['Marek Wierzbicki', 'Tomasz Kwiecień', 'Paweł Sokołowski', 'Krzysztof Malec', 'Bartosz Frankowski-Nowak', 'Damian Kos', 'Jarosław Przybył', 'Łukasz Szczepan', 'Piotr Lasyk-Kral', 'Szymon Marcinek', 'Wojciech Myć-Ostrowski', 'Karol Arys-Wolny', 'Daniel Stefański-Mróz', 'Sebastian Jarzębak', 'Mariusz Złotek-Bąk'];
 
@@ -95,7 +96,7 @@ export function talkContext(game, S) {
   let table = null;
   if (LEAGUE_COMPS.includes(f.comp)) {
     const cfg = COMPETITIONS[f.comp];
-    const rows = standings(game.fixtures.filter((x) => x.comp === f.comp), CLUBS_PL.filter((c) => c.tier === cfg.tier).map((c) => c.id));
+    const rows = standings(game.fixtures.filter((x) => x.comp === f.comp), compClubIds(f.comp));
     const me = rows.find((r) => r.id === game.clubId);
     const opp = rows.find((r) => r.id === S.oppId);
     const size = rows.length;
@@ -282,7 +283,7 @@ export function startMatchday(game, f) {
   const comp = f.comp;
   const tier = clubById(game.clubId)?.tier;
   const table = LEAGUE_COMPS.includes(comp)
-    ? standings(game.fixtures.filter((x) => x.comp === comp), CLUBS_PL.filter((c) => c.tier === COMPETITIONS[comp].tier).map((c) => c.id)) : null;
+    ? standings(game.fixtures.filter((x) => x.comp === comp), compClubIds(comp)) : null;
   const benchSize = (LEAGUE_COMPS.includes(comp) ? COMPETITIONS[comp].benchSize : 12);
   const mySquad = squadFor(game, game.clubId, comp);
   game.tactics = matchTactics(game, mySquad, benchSize);
@@ -652,7 +653,7 @@ export function finishMatchday(game, S) {
     const rng = new Rng(`karne:${S.f.id}`);
     r.shootout = { goals: rng.chance(0.5) ? [4, 3] : [3, 4], kicks: [] };
   }
-  const tableBefore = S.preCtx.table ? standings(game.fixtures.filter((x) => x.comp === S.comp), CLUBS_PL.filter((c) => c.tier === COMPETITIONS[S.comp].tier).map((c) => c.id)) : null;
+  const tableBefore = S.preCtx.table ? standings(game.fixtures.filter((x) => x.comp === S.comp), compClubIds(S.comp)) : null;
   const rng = new Rng(`wynik:${game.seed}:${S.f.id}`);
   const msgs = applyResult(game, S.f, fromEngineResult(r), rng);
   const names = new Map([...M.teams[0].players, ...M.teams[0].bench, ...M.teams[1].players, ...M.teams[1].bench].map((x) => [x.id, x.p.name]));

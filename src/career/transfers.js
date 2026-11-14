@@ -6,6 +6,7 @@
 import { Rng, clamp } from '../core/rng.js';
 import { addMessages } from '../core/inbox.js';
 import { CLUBS_PL, clubById } from '../data/clubs_pl.js';
+import { l3GroupFor } from '../season/leagues.js';
 import { DOMESTIC, SEASON_END, SEASON_YEAR } from '../config/calendar2026.js';
 import { genPlayer, marketValue } from '../world/playerGen.js';
 import { SQUAD_LAYOUT, squadOf, academyOf } from '../world/worldGen.js';
@@ -36,7 +37,7 @@ export const inWindow = (date) => !!windowOf(date);
 export function createMarket(game) {
   const M = { listed: {}, free: [], offers: [], talks: {}, history: [], userListed: {}, lastRefresh: null, foreign: [] };
   game.market = M;
-  addFreeAgents(game, 45, game.date ?? '2026-07-01', SEASON_YEAR === 2026 ? 'start' : `lato-${SEASON_YEAR}`);
+  addFreeAgents(game, 65, game.date ?? '2026-07-01', SEASON_YEAR === 2026 ? 'start' : `lato-${SEASON_YEAR}`); // 126 klubów z kadrami (było 45 przy 54)
   ensureForeignPool(game); // 100 zawodników z zagranicy (src/career/foreignPool.js)
   return M;
 }
@@ -46,8 +47,9 @@ export function addFreeAgents(game, n, date, tag, { imports = false } = {}) {
   const rng = new Rng(`wolni:${game.seed}:${tag}`);
   for (let i = 0; i < n; i++) {
     // imports: zawodnicy z zagranicy (koniec kontraktu w innej lidze), poziom czołówki Ekstraklasy [SZAC]
-    const tier = imports ? 1 : rng.weighted([1, 2, 3], (t) => [0.25, 0.4, 0.35][t - 1]);
-    const L = imports ? 12.3 + rng.gauss(0, 0.8) : { 1: 10.6, 2: 9.4, 3: 8.2 }[tier] + rng.gauss(0, 0.7);
+    // Poziomy jak ligi z kadrami; od grywalnej III ligi także jej poziom (ok. 1/5 wolnych) [SZAC]
+    const tier = imports ? 1 : rng.weighted([1, 2, 3, 4], (t) => [0.2, 0.33, 0.29, 0.18][t - 1]);
+    const L = imports ? 12.3 + rng.gauss(0, 0.8) : { 1: 10.6, 2: 9.4, 3: 8.2, 4: 7.4 }[tier] + rng.gauss(0, 0.7);
     const [pos, side] = rng.pick(SQUAD_LAYOUT);
     const age = imports ? rng.int(22, 30) : rng.weighted([19, 21, 23, 25, 27, 29, 31, 33, 35], (a) => (a >= 29 ? 1.4 : 1));
     const club = { id: 'wolny', tier, prestige: 2, L };
@@ -273,14 +275,17 @@ function aiBuy(game, club, date, rng, log) {
   for (const id of game.market.free) { const p = W.players[id]; if (p && groupOf(p) === g && p.ovr > bar && !busy(p)) pool.push({ p, fee: 0 }); }
   for (const [id, l] of Object.entries(game.market.listed)) {
     const p = W.players[id];
-    if (!p || l.kind === 'loan' || p.clubId === club.id || p.clubId === game.clubId || groupOf(p) !== g || p.ovr <= bar || busy(p) || (p.clubId && breaksMinimum(game, p))) continue;
+    if (!p || l.kind === 'loan' || p.clubId === club.id || p.clubId === game.clubId || groupOf(p) !== g || p.ovr <= bar || busy(p) || (p.value ?? 0) * 0.5 > money || (p.clubId && breaksMinimum(game, p))) continue;
     const fee = askingPrice(game, p);
     if (fee <= money) pool.push({ p, fee });
   }
-  // Zakup z niższej ligi: najlepsi zawodnicy słabszych klubów (spoza ich trójki najlepszych), cena wywoławcza x1,45
+  // Zakup z niższej ligi: najlepsi zawodnicy słabszych klubów (spoza ich trójki najlepszych), cena wywoławcza x1,45.
+  // III liga (72 kluby) tylko z grupy regionu kupującego: tańsze przeszukiwanie i realny zasięg skautingu
   if (club.tier < 3 || pool.length < 2) {
+    const region = l3GroupFor(club);
     for (const c of CLUBS_PL) {
       if (c.tier !== club.tier + 1 && !(c.tier === club.tier && rng.chance(0.3))) continue;
+      if (c.tier === 4 && c.group !== (club.tier === 4 ? club.group : region)) continue;
       if (c.id === club.id || c.id === game.clubId || !W.clubs[c.id] || c.parent === club.id) continue;
       for (const p of squadOf(W, c.id)) {
         if (groupOf(p) !== g || p.ovr <= bar + 0.3 || p.loan || recentlyMoved(p, date) || notForSale(game, p) || busy(p) || breaksMinimum(game, p) || game.market.listed[p.id]) continue;
@@ -372,7 +377,8 @@ export function marketWeek(game, date) {
   for (const c of rng.shuffle(CLUBS_PL.filter((x) => x.id !== game.clubId && game.world.clubs[x.id]))) {
     // Brak w kadrze (np. bramkarz po powrocie z wypożyczenia): klub szuka co tydzień, inaczej co ok. 2,5 tygodnia
     const gap = squadDeficits(squadOf(game.world, c.id)).some((n) => n.scope === 'squad');
-    if (rng.chance(0.4) || gap) aiBuy(game, c, date, rng, moves);
+    // III liga kupuje rzadziej (ok. co 5 tygodni) i tanio (mały budżet), docs/iii-liga.md
+    if (rng.chance(c.tier === 4 ? 0.2 : 0.4) || gap) aiBuy(game, c, date, rng, moves);
     aiBalance(game, c, date);
   }
   const offers = aiOffersForUser(game, date, rng);

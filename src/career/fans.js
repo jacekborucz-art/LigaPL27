@@ -19,12 +19,13 @@ import { KIBICE, RIVALRIES } from '../data/kibice.js';
 import { anyClub } from '../season/season.js';
 import { isDecider, tieWinner } from '../season/cup.js';
 import { standings } from '../season/standings.js';
+import { LEAGUE_COMPS, compClubIds } from '../season/leagueComps.js';
+import { COMPETITIONS } from '../config/competitions.js';
 import { book, FIN } from './finance.js';
 import { applyMorale } from './morale.js';
 import { fansSackCoach, fansSackP } from './coachMarket.js';
 
-const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
-const COMP_TIER = { ekstraklasa: 1, liga1: 2, liga2: 3 };
+const COMP_TIER = { ekstraklasa: 1, liga1: 2, liga2: 3, 'liga3-1': 3, 'liga3-2': 3, 'liga3-3': 3, 'liga3-4': 3 }; // kary III ligi jak w 2 Lidze [SZAC]
 
 export const FANS = {
   T: [0, 22, 34, 44, 54, 64, 72, 80, 88], // progi heat dla szczebli 1-8 [SZAC]
@@ -207,7 +208,8 @@ export function expectedPoints(meId, oppId, home, neutral = false) {
 
 /** Oczekiwane przez kibiców miejsce w lidze: średnia z rankingu siły kadry i rankingu renomy w lidze. */
 export function expectedPosition(clubId, tier = tierOfClub(clubId)) {
-  const clubs = CLUBS_PL.filter((c) => c.tier === tier);
+  const me = anyClub(clubId);
+  const clubs = CLUBS_PL.filter((c) => c.tier === tier && (tier !== 4 || c.group === me?.group)); // III liga: w grupie
   const byL = [...clubs].sort((a, b) => b.L - a.L || b.prestige - a.prestige);
   const byP = [...clubs].sort((a, b) => b.prestige - a.prestige || b.L - a.L);
   const r1 = byL.findIndex((c) => c.id === clubId) + 1;
@@ -517,9 +519,9 @@ export function fansMonth(game, date) {
   const S = ensureFans(game);
   const msgs = [];
   const rng = new Rng(`kibice-miesiac:${game.seed}:${date}`);
-  for (const tier of [1, 2, 3]) {
-    const comp = TIER_COMP[tier];
-    const ids = CLUBS_PL.filter((c) => c.tier === tier).map((c) => c.id);
+  for (const comp of LEAGUE_COMPS) {
+    const tier = COMPETITIONS[comp].tier;
+    const ids = compClubIds(comp);
     const lf = (game.fixtures ?? []).filter((f) => f.comp === comp);
     if (!lf.some((f) => f.played)) continue;
     const table = standings(lf, ids);
@@ -645,10 +647,10 @@ export function fansSummary(game, clubId = game.clubId) {
     mood, moodLabel: fanMoodLabel(mood),
     heat: Math.round(C.heat), heatLabel: heatLabel(C.heat),
     level: C.level, levelLabel: LEVELS[C.level].label,
-    expectedPosition: tier >= 1 && tier <= 3 ? expectedPosition(clubId, tier) : null,
+    expectedPosition: tier >= 1 && tier <= 4 ? expectedPosition(clubId, tier) : null,
     rivals, sanctions,
     season: { ...C.season },
     recent: S.log.filter((e) => e.club === clubId).slice(0, 8),
-    league: S.log.filter((e) => e.kind === 'fine' && anyClub(e.club)?.tier === tier).slice(0, 8),
+    league: S.log.filter((e) => e.kind === 'fine' && anyClub(e.club)?.tier === tier && (tier !== 4 || anyClub(e.club)?.group === club?.group)).slice(0, 8),
   };
 }

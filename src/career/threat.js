@@ -11,8 +11,8 @@ import { clamp } from '../core/rng.js';
 import { CLUBS_PL, clubById } from '../data/clubs_pl.js';
 import { standings } from '../season/standings.js';
 
-const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
-const LEAGUE_L = { 1: 11.5, 2: 10, 3: 8.5 };
+import { compOfClub, compClubIds } from '../season/leagueComps.js';
+const LEAGUE_L = { 1: 11.5, 2: 10, 3: 8.5, 4: 7.7 };
 
 export const THREAT = {
   minGames: 6, // od tylu meczów ligowych liczy się bieżący sezon
@@ -36,9 +36,9 @@ export function managerThreat(game) {
   if (hit && hit.date === game.date && hit.clubId === game.clubId) return hit.v;
   let v = 0;
   const club = clubById(game.clubId);
-  if (club && TIER_COMP[club.tier]) {
-    const comp = TIER_COMP[club.tier];
-    const table = standings(game.fixtures.filter((f) => f.comp === comp), CLUBS_PL.filter((c) => c.tier === club.tier).map((c) => c.id));
+  const comp = compOfClub(club);
+  if (club && comp) {
+    const table = standings(game.fixtures.filter((f) => f.comp === comp), compClubIds(comp));
     const row = table.find((r) => r.id === game.clubId);
     if (row && row.played >= THREAT.minGames) {
       const over = row.points / row.played - expectedPpg(club.L, LEAGUE_L[club.tier]);

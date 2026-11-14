@@ -403,7 +403,7 @@ test('Zapis: stan treningu jest mały i przechodzi przez JSON', () => {
   const g = newGame('widzew');
   playUntil(g, '2026-09-15');
   const json = JSON.stringify(g.training);
-  assert.ok(json.length < 120 * 1024, `${json.length} B`);
+  assert.ok(json.length < 260 * 1024, `${json.length} B`); // 126 klubów z kadrami (z III ligą), było 120 KB przy 54
   const back = JSON.parse(JSON.stringify(g));
   TR.ensureTraining(back);
   assert.equal(TR.teamCohesion(back).z, TR.teamCohesion(g).z);

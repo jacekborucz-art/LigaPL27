@@ -50,5 +50,6 @@ export function standings(fixtures, clubIds, { tieBreak = ['points', 'h2hPoints'
 export function zonesFor(tier) {
   if (tier === 1) return [{ from: 1, to: 2, kind: 'europe-cl', label: 'Liga Mistrzów (eliminacje)' }, { from: 3, to: 4, kind: 'europe', label: 'Liga Konferencji (eliminacje)' }, { from: 16, to: 18, kind: 'down', label: 'Spadek' }];
   if (tier === 2) return [{ from: 1, to: 2, kind: 'up', label: 'Awans' }, { from: 3, to: 6, kind: 'playoff', label: 'Baraże o awans' }, { from: 16, to: 18, kind: 'down', label: 'Spadek' }];
+  if (tier === 4) return [{ from: 1, to: 1, kind: 'up', label: 'Awans do 2 Ligi' }, { from: 2, to: 2, kind: 'playoff', label: 'Baraże o 2 Ligę' }, { from: 15, to: 18, kind: 'down', label: 'Spadek do IV ligi (co najmniej 4 drużyny)' }];
   return [{ from: 1, to: 2, kind: 'up', label: 'Awans' }, { from: 3, to: 6, kind: 'playoff', label: 'Baraże o awans' }, { from: 13, to: 14, kind: 'playoff-down', label: 'Baraż o utrzymanie' }, { from: 15, to: 18, kind: 'down', label: 'Spadek' }];
 }

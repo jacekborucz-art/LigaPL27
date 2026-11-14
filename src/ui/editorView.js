@@ -2,7 +2,7 @@
 // Na PC lista po lewej i formularz po prawej, na telefonie jedna kolumna: lista, potem formularz z przyciskiem Wróć.
 // Akcje data-act zaczynają się od "ed-"; app.js przekazuje je do handleEditorAction (bez DOM poza odczytem pól).
 
-import { CLUBS_PL, LEAGUE_NAMES } from '../data/clubs_pl.js';
+import { CLUBS_PL, LEAGUE_NAMES, leagueLabel } from '../data/clubs_pl.js';
 import { CLUBS_L3 } from '../data/clubs_l3.js';
 import { ATTRS, ATTR_GROUPS, POS_NAMES } from '../data/attributes.js';
 import { NAT_NAMES } from '../data/names.js';
@@ -23,7 +23,7 @@ const POS_ORDER = Object.keys(POS_NAMES);
 const clubObj = (id) => CLUBS_PL.find((c) => c.id === id) ?? CLUBS_L3.find((c) => c.id === id) ?? null;
 const crest = (c, size = 24) => (c ? crestHtml(c, { size }) : '');
 const fold = (s) => String(s ?? '').toLowerCase().replace(/ł/g, 'l').normalize('NFD').replace(/[̀-ͯ]/g, '');
-const leagueOf = (c) => LEAGUE_NAMES[c?.tier] ?? 'III liga';
+const leagueOf = (c) => (c?.tier <= 4 ? leagueLabel(c) : 'IV liga');
 
 export const newEditorState = () => ({ tab: 'clubs', tier: 1, q: '', club: null, cplayer: null, player: null, pq: '', pclub: 'all', ppos: 'all', msg: null, errors: null, draft: null, confirmClear: false });
 export const isEditorAction = (act) => typeof act === 'string' && act.startsWith('ed-');
@@ -180,7 +180,7 @@ export function renderEditor(game, ed) {
   const tabs = `<div class="ed-tabs" role="tablist" aria-label="Edytor">${TABS.map(([k, l]) => `<button class="ed-tab" role="tab" data-act="ed-tab" data-tab="${k}" aria-selected="${ed.tab === k}">${esc(l)}</button>`).join('')}</div>`;
   let list = ''; let form = ''; let sel = false;
   if (ed.tab === 'clubs') {
-    const tiers = [[1, LEAGUE_NAMES[1]], [2, LEAGUE_NAMES[2]], [3, LEAGUE_NAMES[3]], ['all', 'Wszystkie']];
+    const tiers = [[1, LEAGUE_NAMES[1]], [2, LEAGUE_NAMES[2]], [3, LEAGUE_NAMES[3]], [4, LEAGUE_NAMES[4]], ['all', 'Wszystkie']];
     list = `<div class="ed-filters">
       <div class="chips chips--sm chips--wrap" role="group" aria-label="Liga">${tiers.map(([t, l]) => `<button class="chip" data-act="ed-tier" data-t="${t}" aria-pressed="${ed.tier === t}">${esc(l)}</button>`).join('')}</div>
       <input class="ed-search" id="ed-q" type="search" placeholder="Szukaj klubu" aria-label="Szukaj klubu" value="${esc(ed.q)}" autocomplete="off"></div>

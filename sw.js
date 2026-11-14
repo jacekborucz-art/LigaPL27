@@ -1,7 +1,7 @@
 // Service worker: tryb offline. Pliki aplikacji są w pamięci podręcznej przy instalacji. Przy dostępie do sieci
 // gra zawsze bierze najnowsze pliki z serwera (sieć najpierw) i odświeża nimi pamięć; bez sieci działa z pamięci.
 // Wcześniej pamięć miała pierwszeństwo, więc po aktualizacji telefon pokazywał starą wersję (albo mieszankę).
-const VERSION = 'v0.3-0d660b7b8c';
+const VERSION = 'v0.3-e58ed7920f';
 const CACHE = `manager-${VERSION}`;
 
 const SHELL = [
@@ -165,6 +165,7 @@ const SHELL = [
   './src/season/intl/ratings.js',
   './src/season/intl/sim.js',
   './src/season/intl/windows.js',
+  './src/season/leagueComps.js',
   './src/season/leagues.js',
   './src/season/national.js',
   './src/season/nationalSystem.js',
@@ -173,6 +174,7 @@ const SHELL = [
   './src/season/season.js',
   './src/season/standings.js',
   './src/season/superCupEU.js',
+  './src/season/thirdLeague.js',
   './src/season/uefa.js',
   './src/season/worldNations.js',
   './src/styles/app.css',

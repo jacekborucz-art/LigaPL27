@@ -10,7 +10,7 @@ import { Rng, clamp } from '../core/rng.js';
 import { registerDailySystem, addDays } from '../core/gameLoop.js';
 import { createMessage } from '../core/inbox.js';
 import { registerDecision } from '../core/decisions.js';
-import { CLUBS_PL, clubById } from '../data/clubs_pl.js';
+import { CLUBS_PL, clubById, leagueLabel } from '../data/clubs_pl.js';
 import { DOMESTIC, SEASON_END } from '../config/calendar2026.js';
 import { payLevel } from '../data/finanse_klubow.js';
 import { squadOf } from '../world/worldGen.js';
@@ -287,7 +287,7 @@ function loanProposals(game, p, terms, date, rng, max = 3) {
   const g = groupOf(p);
   const cands = [];
   for (const c of CLUBS_PL) {
-    if (!isAiClub(game, c.id) || c.parent || c.tier < tier || c.tier > 3) continue;
+    if (!isAiClub(game, c.id) || c.parent || c.tier < tier || c.tier > 4) continue;
     const st = squadCount(game, c.id);
     if (st.full || st.total >= SQUAD_SIZE.max - 1 || loanBlockers(game, p, c.id, terms, date)) continue;
     const grp = squadOf(W, c.id).filter((x) => groupOf(x) === g);
@@ -343,7 +343,7 @@ function offerLetter(game, p, offers, date, { ask = true } = {}) {
   const lines = offers.map((o) => {
     const t = o.terms;
     const extra = [t.fee ? `opłata ${fmtZl(t.fee)}` : 'bez opłaty', t.option ? `opcja wykupu ${fmtZl(t.option.fee)}` : null, t.obligation ? `obowiązek wykupu ${fmtZl(t.obligation.fee)}` : null, t.recall ? 'klauzula odwołania' : null, t.noParent ? 'zakaz gry przeciwko nam' : null].filter(Boolean).join(', ');
-    return `${name(o.from)} (${clubById(o.from)?.tier === 1 ? 'Ekstraklasa' : clubById(o.from)?.tier === 2 ? '1 Liga' : '2 Liga'}): ${LOAN_TYPE_NAMES[t.type]}, płaci ${t.share} % pensji, ${extra}.${o.dropped?.length ? ` Nie zgadza się na warunek ${o.dropped.join(' ani ')}.` : ''}`;
+    return `${name(o.from)} (${leagueLabel(clubById(o.from))}): ${LOAN_TYPE_NAMES[t.type]}, płaci ${t.share} % pensji, ${extra}.${o.dropped?.length ? ` Nie zgadza się na warunek ${o.dropped.join(' ani ')}.` : ''}`;
   });
   return createMessage({
     date, key: `wyp-propozycje:${offers[0].id}`, category: 'transfers', from: ask ? 'Dyrektor sportowy' : name(offers[0].from), priority: 'important',
@@ -486,7 +486,7 @@ function passFirstRefusal(game, o, date) {
 function conversion(game, p, L) {
   const b = p.clubId;
   if (!isAiClub(game, b) && b !== game.clubId) return null;
-  if (!clubById(b) || clubById(b).tier > 3) return null;
+  if (!clubById(b) || clubById(b).tier > 4) return null;
   if (L.exercised && L.option) return { fee: L.option.fee, contract: L.exercised.contract, kind: 'opcja' };
   const o = L.obligation;
   if (!o) return null;
@@ -538,13 +538,13 @@ export function endLoan(game, p, date, { why = 'koniec', quiet = false } = {}) {
   return out;
 }
 
-/** Koniec sezonu (rollover.js): powroty wypożyczeń do 30 czerwca i wypożyczeń z udziałem klubów spadających do III ligi. */
+/** Koniec sezonu (rollover.js): powroty wypożyczeń do 30 czerwca i wypożyczeń z udziałem klubów spadających do IV ligi. */
 export function returnLoansAtRollover(game, oldEnd, newStart) {
   ensureLoans(game);
   const names = [];
   for (const p of allLoaned(game)) {
     const L = normalizeLoan(p, newStart);
-    const gone = !clubById(p.clubId) || clubById(p.clubId).tier > 3 || !clubById(L.from) || clubById(L.from).tier > 3;
+    const gone = !clubById(p.clubId) || clubById(p.clubId).tier > 4 || !clubById(L.from) || clubById(L.from).tier > 4;
     if (L.until > oldEnd && !gone) continue;
     if (p.clubId === game.clubId || L.from === game.clubId) names.push(p.name);
     endLoan(game, p, newStart, { quiet: true, why: L.until > oldEnd ? 'spadek' : 'koniec' });
@@ -661,7 +661,7 @@ export function aiLoansWeek(game, date, rng) {
   };
   // Miejsce w kadrze: poniżej limitu zarządu (z zapasem) i najwyżej 28 zawodników razem z młodzieżowcami [SZAC]
   const roomIn = (c) => { const st = squadCount(game, c.id); return st.counted < st.soft - 1 && st.total < SQUAD_SIZE.max - 1; };
-  const borrowers = CLUBS_PL.filter((x) => isAiClub(game, x.id) && !x.parent && x.tier <= 3);
+  const borrowers = CLUBS_PL.filter((x) => isAiClub(game, x.id) && !x.parent && x.tier <= 4);
   // 1. Klub z potrzebą na pozycji (szansa 0,3 na tydzień): grupa poniżej celu albo zawodnik co najmniej na poziomie
   // mediany grupy (Ekstraklasa: do 0,8 poniżej, bo bierze młodych z silniejszych klubów) [SZAC]
   for (const c of rng.shuffle(borrowers)) {

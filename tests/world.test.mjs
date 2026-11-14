@@ -10,8 +10,8 @@ const world = generateWorld(2026);
 const all = Object.values(world.players);
 const avg = (arr, f) => arr.reduce((s, x) => s + f(x), 0) / arr.length;
 
-test('Świat: 54 kluby po 25 zawodników + 7 juniorów, deterministycznie z ziarna', () => {
-  assert.equal(Object.keys(world.clubs).length, 54);
+test('Świat: 126 klubów (ligi 1-3 i III liga) po 25 zawodników + 7 juniorów, deterministycznie z ziarna', () => {
+  assert.equal(Object.keys(world.clubs).length, 126);
   for (const c of CLUBS_PL) {
     assert.equal(squadOf(world, c.id).length, 25);
     assert.equal(academyOf(world, c.id).length, 7);

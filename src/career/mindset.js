@@ -19,8 +19,9 @@ import { addPoolPlayers } from './foreignPool.js';
 export const MIND = {
   retireAge: 32, retireMonths: 6, retireP: 0.15, // wolny weteran: 15 % w miesiącu po pół roku bez klubu
   leaveAfter: 2, leaveBase: 0.08, leaveStep: 0.05, leaveMax: 0.45, // wolny długo bez klubu znika z rynku [SZAC]
-  keepFree: { GK: 8, DEF: 14, MID: 14, ATT: 10 }, // tylu wolnych na grupę pozycji zostaje zawsze na rynku [SZAC]
-  freeTarget: 150, // na miejsce zniknięcia przychodzą nowi, dopóki wolnych jest mniej niż tyle (rynek nie rośnie bez końca) [SZAC]
+  // Od grywalnej III ligi 126 klubów z kadrami (było 54): progi rynku wolnych x1,5 [SZAC]
+  keepFree: { GK: 12, DEF: 20, MID: 20, ATT: 15 }, // tylu wolnych na grupę pozycji zostaje zawsze na rynku [SZAC]
+  freeTarget: 220, // na miejsce zniknięcia przychodzą nowi, dopóki wolnych jest mniej niż tyle (rynek nie rośnie bez końca) [SZAC]
   askFloor: 0.6, askCut: 0.45, // efektywne żądanie: max(0,6 rynku, żądanie x (1 - 0,45 D_free))
   reason: 0.25, // od tego D zawodnik mówi, że obniżył wymagania
 };

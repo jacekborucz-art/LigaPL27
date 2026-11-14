@@ -16,6 +16,10 @@ export const DOMESTIC = {
   // 1L i 2L: start, koniec i baraże 1L ze źródeł; start wiosny i baraże 2L to założenia.
   liga1: { start: '2026-07-24', springStart: '2027-02-26', end: '2027-05-29', playoffSemis: '2027-06-03', playoffFinal: '2027-06-06', sure: false },
   liga2: { start: '2026-07-24', springStart: '2027-03-05', end: '2027-05-29', playoffSemis: '2027-06-02', playoffFinal: '2027-06-05', sure: false },
+  // III liga [SZAC]: start w ostatni weekend lipca, przerwa zimowa od grudnia do końca lutego, koniec na początku czerwca.
+  // Mecze w soboty i niedziele (jedna kolejka w środę, gdy brakuje weekendów). Baraże: półfinały wicemistrzów grup
+  // (jeden mecz), potem dwumecz z 13. i 14. drużyną 2 Ligi (pierwszy mecz u drużyny z III ligi).
+  liga3: { start: '2026-07-31', autumnEnd: '2026-11-29', springStart: '2027-02-26', end: '2027-06-06', playoffSemis: '2027-06-09', playoffLeg1: '2027-06-13', playoffLeg2: '2027-06-16', sure: false },
   pucharPolski: {
     rounds: [
       { id: 'PRE', date: '2026-08-05', window: ['2026-08-04', '2026-08-06'], sure: false },

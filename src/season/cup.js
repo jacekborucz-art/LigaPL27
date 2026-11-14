@@ -1,7 +1,7 @@
 // Puchar Polski 2026/27 i Superpuchar. Mecze jednomeczowe, gospodarz z niższej ligi,
 // dogrywka i karne (PP), w Superpucharze od razu karne. Losowanie kolejnej rundy dzień po
 // ostatnim meczu poprzedniej. Rezerwy nie grają w PP.
-// Format (docs/ekspert_sedzia.md B4): runda wstępna (14 drużyn z III ligi), 1/32 (54 drużyny:
+// Format (docs/ekspert_sedzia.md B4): runda wstępna (7 najsilniejszych z III ligi, 7 zdobywców pucharów wojewódzkich z IV ligi), 1/32 (54 drużyny:
 // 13 z Ekstraklasy bez pucharowiczów UEFA, 18 z 1 Ligi, 16 z 2 Ligi, 7 z rundy wstępnej),
 // 1/16 (27 + 5 pucharowiczów UEFA), 1/8, 1/4, 1/2, finał na PGE Narodowym.
 
@@ -14,7 +14,7 @@ export const PP_NAMES = { PRE: 'runda wstępna', R64: '1/32 finału', R32: '1/16
 const roundCfg = (id) => DOMESTIC.pucharPolski.rounds.find((r) => r.id === id);
 
 /** Stan pucharu na start sezonu (uczestnicy rund). */
-export function createCup(clubsPl, clubsL3, clubsL4 = [], rng = null) {
+export function createCup(clubsPl, clubsL3, clubsL4 = [], rng = null, { playerClub = null } = {}) {
   const europe = new Set(POLISH_EUROPE_2026.map((e) => e.club));
   const ek = clubsPl.filter((c) => c.tier === 1 && !europe.has(c.id)).map((c) => c.id);
   const l1 = clubsPl.filter((c) => c.tier === 2).map((c) => c.id);
@@ -22,13 +22,19 @@ export function createCup(clubsPl, clubsL3, clubsL4 = [], rng = null) {
   // Runda wstępna: 7 najsilniejszych klubów III ligi + 7 zdobywców pucharów wojewódzkich
   // (liderzy losowych grup IV ligi). Rezerwy nie grają w Pucharze Polski.
   const l3 = clubsL3.filter((c) => !c.parent).sort((a, b) => b.weight - a.weight || a.id.localeCompare(b.id));
-  const groups4 = [...new Set(clubsL4.map((c) => c.group))];
+  // Grupy IV ligi to województwa (pole voiv; pole group klubu awansującego do III ligi zmienia się na grupę III ligi)
+  const gOf = (c) => c.voiv ?? c.group;
+  const groups4 = [...new Set(clubsL4.map(gOf))];
   const pickedGroups = (rng ? rng.shuffle(groups4) : groups4).slice(0, 7);
-  const l4 = pickedGroups.map((g) => clubsL4.find((c) => c.group === g && !c.parent)).filter(Boolean);
+  const l4 = pickedGroups.map((g) => clubsL4.find((c) => gOf(c) === g && !c.parent)).filter(Boolean);
   // Rozmiar rundy wstępnej tak, żeby w 1/16 finału grały 32 drużyny (zwycięzcy 1/32 + kluby z pucharów UEFA)
   const preWinners = Math.max(0, (32 - europe.size) * 2 - (ek.length + l1.length + l2.length));
   const nL4 = Math.min(l4.length, preWinners);
   const pre = [...l3.slice(0, preWinners * 2 - nL4), ...l4.slice(0, nL4)].map((c) => c.id);
+  // Klub gracza z III ligi spoza 7 najsilniejszych: gra w rundzie wstępnej jako zdobywca pucharu wojewódzkiego
+  // (zastępuje ostatniego zdobywcę z IV ligi; docs/iii-liga.md). Rezerwy nie grają w Pucharze Polski.
+  const mine = clubsL3.find((c) => c.id === playerClub && !c.parent);
+  if (mine && !pre.includes(mine.id) && nL4 > 0) pre[pre.length - 1] = mine.id;
   return {
     entrants: { PRE: pre, R64: [...ek, ...l1, ...l2], R32: [...europe] },
     drawn: [],
@@ -69,7 +75,8 @@ export function drawRound(cup, roundId, tierOf, rng, gapOk = () => true) {
  */
 export function isDecider(f) {
   if (!f) return false;
-  if (f.comp === 'pp' || f.comp === 'super' || String(f.comp).startsWith('playoff')) return true;
+  if (f.comp === 'pp' || f.comp === 'super') return true;
+  if (String(f.comp).startsWith('playoff')) return f.leg !== 1; // baraż III ligi: 1. mecz dwumeczu nie rozstrzyga
   return f.comp === 'uefa' && (!!f.knockout || f.leg === 2);
 }
 

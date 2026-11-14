@@ -14,7 +14,7 @@ export function generateStaffFor(game, clubId) {
   const club = clubById(clubId);
   const parent = club?.parent ? clubById(club.parent) : null;
   const prestige = parent ? Math.max(1, parent.prestige - 3) : club?.prestige ?? 4;
-  const tierBonus = { 1: 1, 2: 0, 3: -1 }[club?.tier] ?? 0;
+  const tierBonus = { 1: 1, 2: 0, 3: -1, 4: -2 }[club?.tier] ?? 0;
   const rng = new Rng(`sztab:${game.seed}:${clubId}`);
   const out = {};
   for (const role of ROLE_IDS) {

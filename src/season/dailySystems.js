@@ -4,25 +4,16 @@
 import { registerDailySystem, addDays } from '../core/gameLoop.js';
 import { createMessage } from '../core/inbox.js';
 import { DOMESTIC, UEFA, FIFA_WINDOWS, POLISH_EUROPE_2026, SEASON_START, SEASON } from '../config/calendar2026.js';
-import { CLUBS_PL, LEAGUE_NAMES, clubById } from '../data/clubs_pl.js';
+import { LEAGUE_NAMES, clubById, leagueLabel } from '../data/clubs_pl.js';
+import { seasonGoalFor } from '../career/board.js';
 import { fmtDate } from '../ui/dom.js';
 
 const COMP_NAMES = { LM: 'Liga Mistrzów', LE: 'Liga Europy', LK: 'Liga Konferencji' };
 
-/** Cel sezonu od zarządu z siły kadry na tle ligi. */
+/** Cel sezonu od zarządu z siły kadry na tle ligi (ten sam model co zarząd, src/career/board.js). */
 export function seasonGoal(club) {
-  const rivals = CLUBS_PL.filter((c) => c.tier === club.tier && !c.parent).sort((a, b) => b.L - a.L);
-  const rank = rivals.findIndex((c) => c.id === club.id) + 1;
-  if (club.tier === 1) {
-    if (rank <= 3) return { rank, text: 'walka o mistrzostwo Polski' };
-    if (rank <= 6) return { rank, text: 'miejsce dające grę w europejskich pucharach' };
-    if (rank <= 12) return { rank, text: 'spokojne miejsce w środku tabeli' };
-    return { rank, text: 'utrzymanie w Ekstraklasie' };
-  }
-  if (rank <= 3) return { rank, text: club.tier === 2 ? 'awans do Ekstraklasy' : 'awans do 1 Ligi' };
-  if (rank <= 8) return { rank, text: 'miejsce w strefie baraży o awans' };
-  if (rank <= 14) return { rank, text: 'spokojny środek tabeli' };
-  return { rank, text: 'utrzymanie w lidze' };
+  const { rank, text } = seasonGoalFor(club);
+  return { rank, text };
 }
 
 /** Tymczasowe mecze klubu gracza, zanim powstanie pełny terminarz (etap 7). */
@@ -38,8 +29,8 @@ export function provisionalFixtures(clubId) {
     out.push({ id: `${europe.comp}-${europe.entry}-1`, date: first, comp: `${COMP_NAMES[europe.comp]}, ${europe.entry}`, home: clubId, away: null });
   }
   // Kluby grające w czwartek/środę w pucharach zaczynają ligę w niedzielę (harmonogram, PLAN 5.1).
-  const leagueDay = europe ? addDays(DOMESTIC.ekstraklasa.start, 2) : DOMESTIC.ekstraklasa.start;
-  out.push({ id: `L-${club.tier}-1`, date: leagueDay, comp: `${LEAGUE_NAMES[club.tier]}, 1. kolejka`, home: clubId, away: null });
+  const leagueDay = club.tier === 4 ? DOMESTIC.liga3.start : europe ? addDays(DOMESTIC.ekstraklasa.start, 2) : DOMESTIC.ekstraklasa.start;
+  out.push({ id: `L-${club.tier}-1`, date: leagueDay, comp: `${leagueLabel(club)}, 1. kolejka`, home: clubId, away: null });
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
@@ -63,7 +54,7 @@ registerDailySystem({
         msg(date, {
           key: `staff-intro:${SEASON}`, category: 'staff', from: 'Asystent trenera', priority: 'info',
           subject: 'Plan na pierwsze tygodnie',
-          body: `Okno transferowe jest otwarte do ${fmtDate(DOMESTIC.transferWindows[0].to)}. ${europe ? `Zaczynamy od eliminacji: ${COMP_NAMES[europe.comp]}, runda ${europe.entry}.` : `Liga startuje ${fmtDate(DOMESTIC.ekstraklasa.start)}.`} Warto przejrzeć kadrę i ustalić plan treningów.`,
+          body: `Okno transferowe jest otwarte do ${fmtDate(DOMESTIC.transferWindows[0].to)}. ${europe ? `Zaczynamy od eliminacji: ${COMP_NAMES[europe.comp]}, runda ${europe.entry}.` : `Liga startuje ${fmtDate(clubById(state.clubId)?.tier === 4 ? DOMESTIC.liga3.start : DOMESTIC.ekstraklasa.start)}.`} Warto przejrzeć kadrę i ustalić plan treningów.`,
         }),
       ],
     };
@@ -96,10 +87,10 @@ registerDailySystem({
   run(state, date) {
     const out = [];
     const club = clubById(state.clubId);
-    const leagueStart = DOMESTIC[['ekstraklasa', 'liga1', 'liga2'][club.tier - 1]]?.start;
+    const leagueStart = DOMESTIC[['ekstraklasa', 'liga1', 'liga2', 'liga3'][club.tier - 1]]?.start;
     if (!leagueStart) return {};
     if (date === addDays(leagueStart, -1)) {
-      out.push(msg(date, { key: `league-start:${SEASON}`, category: 'competitions', from: LEAGUE_NAMES[club.tier], priority: 'info', subject: `Jutro startuje ${LEAGUE_NAMES[club.tier]}`, body: `Sezon ${SEASON} rusza ${fmtDate(leagueStart)}. 34 kolejki, mecz i rewanż.` }));
+      out.push(msg(date, { key: `league-start:${SEASON}`, category: 'competitions', from: LEAGUE_NAMES[club.tier], priority: 'info', subject: `Jutro startuje ${LEAGUE_NAMES[club.tier]}`, body: `Sezon ${SEASON} rusza ${fmtDate(leagueStart)}. 34 kolejki, mecz i rewanż${club.tier === 4 ? `, ${leagueLabel(club)}` : ''}.` }));
     }
     for (const r of DOMESTIC.pucharPolski.rounds) {
       if (date === addDays(r.date, -7)) {

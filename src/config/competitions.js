@@ -48,6 +48,7 @@ export const COMPETITIONS = {
     tieBreak: ['points', 'h2hPoints', 'h2hGoalDiff', 'goalDiff', 'goalsFor', 'wins', 'fairPlay', 'lots'],
     lastRoundsSimultaneous: 2,
   },
+  // III liga: 4 grupy po 18 (wpisy liga3-1 ... liga3-4 dopisane niżej), awans zwycięzców grup, wicemistrzowie w barażach
   pucharPolski: {
     name: 'Puchar Polski', type: 'cup', singleLeg: true, host: 'lowerDivision',
     ...matchRules, benchSize: 12, var: 'fromSemiFinal', varVerify: true,
@@ -67,6 +68,24 @@ export const COMPETITIONS = {
     },
   },
 };
+
+// III liga 2026/27 (docs/iii-liga.md): 4 grupy po 18 drużyn, 34 kolejki. Zwycięzca grupy awansuje do 2 Ligi,
+// wicemistrzowie grają baraże (półfinały jednomeczowe, potem dwumecz z 13. i 14. drużyną 2 Ligi). Spadek: co najmniej
+// miejsca 15-18, więcej, gdy z 2 Ligi spada więcej klubów z województw grupy (grupa liczy zawsze 18 drużyn).
+export const L3_GROUPS = [1, 2, 3, 4];
+const ROMAN = { 1: 'I', 2: 'II', 3: 'III', 4: 'IV' };
+for (const g of L3_GROUPS) {
+  COMPETITIONS[`liga3-${g}`] = {
+    tier: 4, group: g, name: `III liga, grupa ${ROMAN[g]}`, short: `III liga ${ROMAN[g]}`, type: 'league', teams: 18, rounds: 34,
+    ...matchRules, benchSize: 9, benchSizeVerify: true, var: false,
+    promotionDirect: 1,
+    promotionPlayoff: { places: [2, 2], vs: 'liga2-13-14', semisSingleLeg: true, finalTwoLegs: true },
+    relegationDirect: 4, relegationVariable: true,
+    yellowSuspension: yellowPl,
+    tieBreak: ['points', 'h2hPoints', 'h2hGoalDiff', 'goalDiff', 'goalsFor', 'wins', 'fairPlay', 'lots'],
+    lastRoundsSimultaneous: 2,
+  };
+}
 
 // Rezerwy: reguła użytkownika (zawsze) + limit PZPN (włączony decyzją użytkownika).
 export const RESERVES = {

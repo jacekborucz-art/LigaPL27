@@ -168,14 +168,14 @@ export function aiPreProposals(game, date) {
   // Kandydaci: zawodnicy z kontraktem do końca sezonu, z którymi wolno rozmawiać
   const pool = [];
   for (const c of CLUBS_PL) {
-    if (!W.clubs[c.id] || c.tier > 3) continue;
+    if (!W.clubs[c.id] || c.tier > 4) continue;
     for (const p of squadOf(W, c.id)) if (canApproach(p, date) && !hasOpenDeal(game, p.id) && !p.transfer) pool.push(p);
   }
   const offered = new Set(P.offers.filter((o) => o.status === 'open').map((o) => `${o.pid}:${o.to}`));
   const openCount = new Map();
   for (const o of P.offers) if (o.status === 'open') openCount.set(o.pid, (openCount.get(o.pid) ?? 0) + 1);
   const rng = new Rng(`prekontrakt-ai:${game.seed}:${date}`);
-  for (const c of rng.shuffle(CLUBS_PL.filter((x) => isAi(game, x.id) && x.tier <= 3))) {
+  for (const c of rng.shuffle(CLUBS_PL.filter((x) => isAi(game, x.id) && x.tier <= 4))) {
     const need = nextSeasonNeeds(game, c.id)[0];
     if (!need) continue;
     const rep = clubReputation(c);
@@ -235,7 +235,7 @@ export function preDecisions(game, date) {
     const own = ownOffer ? offerUtility(p, ownView(game, p), { trust, noise: rng.gauss(0, 0.08) }) : -Infinity;
     let best = null; let bestU = -Infinity;
     for (const o of offers) {
-      if (o.to && (!game.world.clubs[o.to] || clubById(o.to).tier > 3)) { o.status = 'expired'; continue; }
+      if (o.to && (!game.world.clubs[o.to] || !(clubById(o.to)?.tier <= 4))) { o.status = 'expired'; continue; }
       const u = offerUtility(p, offerView(game, o), { noise: rng.gauss(0, 0.08) });
       o.u = Math.round(u * 100) / 100;
       if (u > bestU) { best = o; bestU = u; }
@@ -359,7 +359,7 @@ export function applyPreContracts(game, date) {
       continue;
     }
     const to = pc.club;
-    if (!W.clubs[to] || (clubById(to)?.tier ?? 9) > 3) continue; // klub spadł do III ligi: umowa nieważna
+    if (!W.clubs[to] || (clubById(to)?.tier ?? 9) > 4) continue; // klub spadł do IV ligi: umowa nieważna
     spellsOf(p);
     if (from && W.clubs[from]) W.clubs[from].squad = W.clubs[from].squad.filter((id) => id !== p.id);
     if (!from) game.market.free = game.market.free.filter((id) => id !== p.id);

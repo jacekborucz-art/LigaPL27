@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Rng } from '../src/core/rng.js';
 import { generateWorld } from '../src/world/worldGen.js';
 import { createSeason, playQuick, applyResult, LEAGUE_COMPS, anyClub } from '../src/season/season.js';
+import { compClubIds } from '../src/season/leagueComps.js';
 import { processDay, continueUntilStop, primaryAction, addDays } from '../src/core/gameLoop.js';
 import { standings } from '../src/season/standings.js';
 import { roundRobin } from '../src/season/schedule.js';
@@ -105,8 +106,7 @@ test('Pełny sezon: wszystkie mecze rozegrane, puchar ma zwycięzcę, baraże ro
   for (const comp of LEAGUE_COMPS) {
     const fx = g.fixtures.filter((f) => f.comp === comp);
     assert.ok(fx.every((f) => f.played), comp);
-    const tier = { ekstraklasa: 1, liga1: 2, liga2: 3 }[comp];
-    const table = standings(fx, CLUBS_PL.filter((c) => c.tier === tier).map((c) => c.id));
+    const table = standings(fx, compClubIds(comp));
     const draws = fx.filter((f) => f.result.score[0] === f.result.score[1]).length;
     assert.equal(table.reduce((s, r) => s + r.points, 0), 3 * (306 - draws) + 2 * draws);
     assert.ok(table.every((r) => r.played === 34));
@@ -173,7 +173,7 @@ test('Niższe ligi: 72 kluby III ligi i 276 IV ligi, rezerwy przypięte do pierw
   const { CLUBS_L4 } = await import('../src/data/clubs_l4.js');
   assert.equal(CLUBS_L3.length, 72);
   assert.equal(CLUBS_L4.length, 276);
-  const ids = [...CLUBS_PL, ...CLUBS_L3, ...CLUBS_L4].map((c) => c.id);
+  const ids = [...new Set([...CLUBS_PL, ...CLUBS_L3]), ...CLUBS_L4].map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length);
   const known = new Set(ids);
   for (const c of [...CLUBS_L3, ...CLUBS_L4].filter((x) => x.parent)) assert.ok(known.has(c.parent), `${c.name} -> ${c.parent}`);

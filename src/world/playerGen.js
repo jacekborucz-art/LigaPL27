@@ -11,7 +11,7 @@ import { marketWage, VALUE_BASE_EUR, VALUE_SLOPE } from '../career/negotiation.j
 import { payLevel, EUR_PLN } from '../data/finanse_klubow.js';
 
 const AGE_ADJ = { 17: -2.5, 18: -2.0, 19: -1.5, 20: -1.0, 21: -0.6, 22: -0.3, 30: -0.1, 31: -0.3, 32: -0.6, 33: -1.0, 34: -1.4, 35: -1.8 };
-const FOREIGN_BONUS = { 1: 0.3, 2: 0.5, 3: 0.3 };
+const FOREIGN_BONUS = { 1: 0.3, 2: 0.5, 3: 0.3, 4: 0.2 };
 const LEAGUE_VALUE = { 1: 1.0, 2: 0.6, 3: 0.35, 4: 0.2 }; // [SZAC]
 
 function persona(h, age, rng) {

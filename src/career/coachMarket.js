@@ -13,6 +13,8 @@ import { CLUBS_PL, clubById, LEAGUE_NAMES } from '../data/clubs_pl.js';
 import { NATIONALITIES, randomName } from '../data/names.js';
 import { SEASON_YEAR } from '../config/calendar2026.js';
 import { standings } from '../season/standings.js';
+import { LEAGUE_COMPS as ALL_LEAGUE_COMPS, compOfClub, compClubIds } from '../season/leagueComps.js';
+import { COMPETITIONS } from '../config/competitions.js';
 import { winnerOf } from '../season/cup.js';
 import { squadOf } from '../world/worldGen.js';
 import { staffOf, staffQ } from '../training/staff.js';
@@ -23,8 +25,7 @@ import { fmtDate } from '../ui/dom.js';
 import { ownerOf } from './owners.js';
 import { COACH, COACH_KEYS, COACH_STYLES, coachOf, coachAvg, coachLevelFor, replaceCoach } from './coaches.js';
 
-const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
-const LEAGUE_COMPS = new Set(Object.values(TIER_COMP));
+const LEAGUE_COMPS = new Set(ALL_LEAGUE_COMPS);
 
 /** Liczby rynku trenerów [SZAC]. Kalibracja: docs/trenerzy-i-wlasciciele.md, rozdz. 5. */
 export const MARKET = {
@@ -43,7 +44,7 @@ export const MARKET = {
   honeyMatches: 8, // pierwsze mecze nowego trenera: presja x (0,35 + 0,65 x mecze/8)
   minMatches: 4, // nowy trener nie jest zwalniany przed 4. meczem o punkty
   thr: 23, thrPat: 1.1, thrTemper: 0.3, thrNoise: 0.22, // próg = 23 + 1,1 (cierpliwość - 10) - 0,3 (temperament - 10), los x temperament
-  thrTier: { 1: 1.5, 2: -2.5, 3: -1.3 }, // 1 Liga: walka o awans i tani trenerzy, więcej zmian; Ekstraklasa ostrożniej (odprawy)
+  thrTier: { 1: 1.5, 2: -2.5, 3: -1.3, 4: -0.5 }, // III liga [SZAC]: // 1 Liga: walka o awans i tani trenerzy, więcej zmian; Ekstraklasa ostrożniej (odprawy)
   winter: { date: '12-18', thr: -3 }, // przerwa zimowa: przegląd z niższym progiem (czas na nowego trenera przed obozem)
   credit: 2, longTenure: 0, // kapitał: cel wykonany w poprzednim sezonie; premia za staż ponad 2 lata wyłączona (kalibracja wieloletnia)
   span: 12, hMax: 0.4, hPow: 1.5, // szansa zwolnienia po meczu: 0,4 x ((C - próg) / 12)^1,5
@@ -57,7 +58,7 @@ export const MARKET = {
   // Pula wolnych trenerów
   pool: { start: 44, perSeason: 12, mean: 8.4, sd: 1.6, attrSd: 1.6, foreign: 0.3, maxAge: 68, gone: 0.5 },
   // Odprawa: 3 miesięczne pensje; pensja trenera 2,5 % rocznych płac I drużyny, najmniej wg ligi (zł / mies.)
-  pay: { share: 0.025, min: { 1: 30000, 2: 15000, 3: 8000 }, months: 3 },
+  pay: { share: 0.025, min: { 1: 30000, 2: 15000, 3: 8000, 4: 4000 }, months: 3 },
   bounceMorale: 0.4, // nowa miotła: jednorazowo morale kadry
 };
 
@@ -135,12 +136,12 @@ function updateBoost(game, clubId, p, date) {
 
 // ------------------------------------------------------------ Ocena sytuacji klubu
 
+/** Tabele lig według rozgrywek (III liga: 4 grupy). */
 function tablesFor(game) {
   const t = {};
-  for (const tier of [1, 2, 3]) {
-    const comp = TIER_COMP[tier];
-    t[tier] = standings(game.fixtures.filter((f) => f.comp === comp), CLUBS_PL.filter((c) => c.tier === tier).map((c) => c.id));
-  }
+  const by = new Map(ALL_LEAGUE_COMPS.map((c) => [c, []]));
+  for (const f of game.fixtures) by.get(f.comp)?.push(f);
+  for (const comp of ALL_LEAGUE_COMPS) t[comp] = standings(by.get(comp), compClubIds(comp));
   return t;
 }
 
@@ -154,13 +155,13 @@ export function coachPressure(game, clubId, tables, date, p = coachOf(game, club
   const K = MARKET;
   const club = clubById(clubId);
   const o = ownerOf(game, clubId);
-  const table = tables[club.tier] ?? [];
+  const comp = compOfClub(club);
+  const table = tables[comp] ?? [];
   const row = table.find((r) => r.id === clubId);
   const size = table.length || 18;
-  const dropFrom = size - (club.tier === 3 ? 4 : 3) + 1;
+  const dropFrom = size - (club.tier >= 3 ? 4 : 3) + 1;
   const goal = seasonGoalFor(club);
   const target = Math.max(1, goal.target - (o.ambicja - 10) * K.ambitionShift);
-  const comp = TIER_COMP[club.tier];
   const lf = game.fixtures.filter((f) => f.comp === comp && f.played && (f.home === clubId || f.away === clubId)).sort((a, b) => a.date.localeCompare(b.date));
   const played = lf.length;
   const total = (size - 1) * 2;
@@ -191,7 +192,27 @@ export function coachPressure(game, clubId, tables, date, p = coachOf(game, club
 /** Mecze o punkty klubu od początku pracy trenera (tylko bieżący terminarz). */
 export function coachMatches(game, clubId, p = coachOf(game, clubId)) {
   const from = p?.from ?? '0000';
-  return game.fixtures.filter((f) => f.played && f.date >= from && f.comp !== 'friendly' && (f.home === clubId || f.away === clubId)).length;
+  const dates = playedDates(game).get(clubId);
+  if (!dates) return 0;
+  let n = 0;
+  for (const d of dates) if (d >= from) n++;
+  return n;
+}
+// Daty rozegranych meczów o punkty i pucharowych każdego klubu (indeks na dzień gry: wcześniej filtr całego terminarza
+// dla każdego klubu, a terminarz z III ligą ma ok. 2500 meczów)
+const playedCache = new WeakMap();
+function playedDates(game) {
+  const fx = game.fixtures;
+  const n = fx.reduce((s, f) => s + (f.played ? 1 : 0), 0);
+  const hit = playedCache.get(game);
+  if (hit && hit.fx === fx && hit.n === n && hit.len === fx.length) return hit.map;
+  const map = new Map();
+  for (const f of fx) {
+    if (!f.played || f.comp === 'friendly') continue;
+    for (const id of [f.home, f.away]) { if (!id) continue; if (!map.has(id)) map.set(id, []); map.get(id).push(f.date); }
+  }
+  playedCache.set(game, { fx, n, len: fx.length, map });
+  return map;
 }
 
 /** Próg właściciela: cierpliwość podnosi, porywczość obniża, kapitał trenera (cel wykonany, długi staż) podnosi. */
@@ -241,7 +262,7 @@ function coachPay(game, clubId) {
 
 const notable = (game, clubId) => {
   const c = clubById(clubId); const me = clubById(game.clubId);
-  return !!c && !c.parent && (c.tier === me?.tier || (c.tier === 1 && c.prestige >= 7));
+  return !!c && !c.parent && ((c.tier === me?.tier && (c.tier !== 4 || c.group === me.group)) || (c.tier === 1 && c.prestige >= 7));
 };
 const media = (date, key, subject, body) => createMessage({ date, key, category: 'media', from: 'Media', priority: 'info', subject, body });
 
@@ -442,7 +463,7 @@ export function coachMarketDay(game, date) {
   if (!played.size) return messages;
   tables ??= tablesFor(game);
   for (const id of played) {
-    if (id === game.clubId || !game.world.clubs[id] || clubById(id)?.tier > 3 || clubById(id)?.parent) continue;
+    if (id === game.clubId || !game.world.clubs[id] || !(clubById(id)?.tier <= 4) || clubById(id)?.parent) continue;
     const p = coachOf(game, id);
     if (!p || p.caretaker) continue;
     const pr = coachPressure(game, id, tables, date, p);
@@ -465,8 +486,9 @@ export function summerReview(game, date) {
   const S = MARKET.summer;
   const messages = [];
   const changes = [];
-  for (const tier of [1, 2, 3]) {
-    const t = tables[tier] ?? [];
+  for (const comp of ALL_LEAGUE_COMPS) {
+    const tier = COMPETITIONS[comp].tier;
+    const t = tables[comp] ?? [];
     for (const row of t) {
       const id = row.id;
       if (id === game.clubId || !game.world.clubs[id] || clubById(id)?.parent) continue;
@@ -508,7 +530,7 @@ export function summerReview(game, date) {
   const mine = changes.filter((c) => notable(game, c.id));
   if (mine.length) {
     messages.push(media(date, `karuzela:${date}`, `Karuzela trenerska po sezonie (${mine.length})`,
-      `${mine.map((c) => `${nameOf(c.id)}: ${c.out ?? 'trener tymczasowy'} -> ${c.in}${c.why === 'odejście' ? ' (trener odszedł)' : ''}`).join('\n')}\n\nZmiany w ${LEAGUE_NAMES[me] ?? 'lidze'} i w czołowych klubach Ekstraklasy.`));
+      `${mine.map((c) => `${nameOf(c.id)}: ${c.out ?? 'trener tymczasowy'} -> ${c.in}${c.why === 'odejście' ? ' (trener odszedł)' : ''}`).join('\n')}\n\nZmiany w ${me === 4 ? 'III lidze' : LEAGUE_NAMES[me] ?? 'lidze'} i w czołowych klubach Ekstraklasy.`));
   }
   return messages;
 }

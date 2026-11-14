@@ -238,7 +238,7 @@ function marketView(game, ui) {
       <label>Maks. cena (zł)<input name="maxPrice" type="number" step="50000" min="0" value="${f.maxPrice ?? ''}"></label>
       <label>Maks. wiek<input name="maxAge" type="number" min="16" max="40" value="${f.maxAge ?? ''}"></label>
       <label>Min. OVR<input name="minOvr" type="number" min="1" max="20" value="${f.minOvr ?? ''}"></label>
-      <label>Liga<select name="tier"><option value="all">Wszystkie</option>${[1, 2, 3].map((t) => `<option value="${t}" ${String(f.tier) === String(t) ? 'selected' : ''}>${esc(LEAGUE_NAMES[t])}</option>`).join('')}</select></label>
+      <label>Liga<select name="tier"><option value="all">Wszystkie</option>${[1, 2, 3, 4].map((t) => `<option value="${t}" ${String(f.tier) === String(t) ? 'selected' : ''}>${esc(LEAGUE_NAMES[t])}</option>`).join('')}</select></label>
       <button class="btn btn--primary" type="button" data-act="tf-search">Szukaj</button></form>`;
   }
   const all = marketRows(game, list, pos, ui);

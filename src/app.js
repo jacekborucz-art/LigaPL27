@@ -1,6 +1,7 @@
 // Powłoka aplikacji: ekran startowy, sloty zapisu, wybór klubu, główny ekran z pocztą
 // i upływem dni („Dalej” albo „Zagraj mecz”).
-import { CLUBS_PL, LEAGUE_NAMES, clubById } from './data/clubs_pl.js';
+import { CLUBS_PL, LEAGUE_NAMES, clubById, leagueLabel } from './data/clubs_pl.js';
+import { compOfClub, compClubIds } from './season/leagueComps.js';
 import { GAME_START, SEASON, POLISH_EUROPE_2026, DOMESTIC } from './config/calendar2026.js';
 import { crestHtml } from './ui/crest.js';
 import { esc, fmtDate, weekday, icon } from './ui/dom.js';
@@ -31,6 +32,7 @@ import { mountDrawAnimation } from './ui/europeView.js';
 import { ensureUefa, syncSuperCupEU } from './season/europe.js';
 import { ensureNational, ensureIntl } from './season/nationalSystem.js';
 import { applySeasonState } from './season/rollover.js';
+import { ensureThirdLeague } from './season/thirdLeague.js';
 import { ensureTraining, trainingMatchInput, teamCohesion } from './training/index.js';
 import { renderTraining, handleTrainingAction, isTrainingAction } from './ui/trainingView.js';
 import { shirtNumbers, kitColors } from './career/shirts.js';
@@ -244,6 +246,7 @@ function ensureGameShape(g) {
     for (const f of g.fixtures) if (f.date < today && !f.played && (f.home === g.clubId || f.away === g.clubId)) { f.played = true; f.result = f.away ? { score: [0, 0], forfeit: true } : { score: [0, 0] }; }
   }
   if (g.season?.fixtures && g.fixtures && g.season.fixtures !== g.fixtures) g.season.fixtures = g.fixtures; // po imporcie z pliku JSON
+  ensureThirdLeague(g); // zapis sprzed grywalnej III ligi: kadry, finanse i terminarz 4 grup (docs/iii-liga.md)
   ensureUefa(g); // zapis sprzed etapu 8: puchary UEFA nadrobione w tle
   syncSuperCupEU(g); // zapis sprzed Superpucharu Europy: mecz sezonu (rozegrany w tle, jeśli termin minął)
   ensureNational(g);
@@ -356,7 +359,7 @@ function renderHub() {
       ${crestHtml(club, { size: 36, clubsById })}
       <div class="hub__club">
         <span class="hub__name">${esc(club.name)}</span>
-        <span class="muted hub__sub"><span>${esc(LEAGUE_NAMES[club.tier])}</span><span class="hub__mgr">${esc(managerName(g))}</span></span>
+        <span class="muted hub__sub"><span>${esc(leagueLabel(club))}</span><span class="hub__mgr">${esc(managerName(g))}</span></span>
       </div>
       <div class="led hub__date" id="leddate" aria-label="Data w grze: ${esc(fmtDate(g.date))}">${esc(fmtDate(g.date))}</div>
       <div class="go-wrap" id="gowrap">${goButton(g)}</div>
@@ -384,7 +387,7 @@ function renderTab(tab, g, club) {
   if (tab === 'trening') return renderTraining(g, state);
   if (tab === 'transfery') return state.ng ? renderNegotiation(g, state.ng) : renderTransfers(g, state);
   if (tab === 'klub') return renderClubHub(g, state);
-  if (tab === 'rozgrywki') return renderCompetitions(g, { comp: state.cComp ?? ['ekstraklasa', 'liga1', 'liga2'][club.tier - 1], view: state.cView, round: state.cRound, filter: state.uFilter, draw: state.uDraw });
+  if (tab === 'rozgrywki') return renderCompetitions(g, { comp: state.cComp ?? compOfClub(club) ?? 'ekstraklasa', view: state.cView, round: state.cRound, filter: state.uFilter, draw: state.uDraw });
   if (tab === 'kadra') {
     const sub = `<div class="subtabs" role="tablist"><button role="tab" data-act="tsub" data-s="players" aria-selected="${state.sqSub === 'players'}">Zawodnicy</button><button role="tab" data-act="tsub" data-s="tactics" aria-selected="${state.sqSub === 'tactics'}">Skład i taktyka</button><button role="tab" data-act="tsub" data-s="talks" aria-selected="${state.sqSub === 'talks'}">Rozmowy</button></div>`;
     if (state.sqSub === 'talks') return sub + renderTalks(g, state);
@@ -460,9 +463,12 @@ function formHtml(list) {
 /** Tabela ligowa poziomu (1-3), liczona raz na render pulpitu. */
 function dashTables(g) {
   const cache = new Map();
-  return (tier) => {
-    if (!cache.has(tier)) cache.set(tier, standings(g.fixtures.filter((f) => f.comp === LEAGUE_COMP_OF_TIER[tier]), CLUBS_PL.filter((c) => c.tier === tier).map((c) => c.id)));
-    return cache.get(tier);
+  // Tabela ligi klubu (III liga: grupa klubu)
+  return (club) => {
+    const comp = compOfClub(club);
+    if (!comp) return [];
+    if (!cache.has(comp)) cache.set(comp, standings(g.fixtures.filter((f) => f.comp === comp), compClubIds(comp)));
+    return cache.get(comp);
   };
 }
 
@@ -477,8 +483,8 @@ function dashHero(g, club, next, tableOf) {
   const team = (id) => {
     const c = id ? anyClub(id) : null;
     const pl = id ? clubById(id) : null; // polski klub ligowy: miejsce w tabeli
-    const row = pl && pl.tier >= 1 && pl.tier <= 3 ? tableOf(pl.tier).find((r) => r.id === id) : null;
-    const meta = row ? (row.played ? `${row.pos}. miejsce${pl.tier !== club.tier ? `, ${LEAGUE_NAMES[pl.tier]}` : ''}, ${row.points} pkt` : LEAGUE_NAMES[pl.tier]) : '';
+    const row = pl && pl.tier >= 1 && pl.tier <= 4 ? tableOf(pl).find((r) => r.id === id) : null;
+    const meta = row ? (row.played ? `${row.pos}. miejsce${compOfClub(pl) !== compOfClub(club) ? `, ${leagueLabel(pl)}` : ''}, ${row.points} pkt` : leagueLabel(pl)) : '';
     return `<div class="dash-team${id === g.clubId ? ' is-me' : ''}">
       ${c ? crestHtml(c, { size: 72, clubsById }) : '<span class="dash-team__tbd" aria-hidden="true">?</span>'}
       <b class="dash-team__name">${c ? esc(c.name) : 'Rywal z losowania'}</b>
@@ -531,13 +537,13 @@ function dashTable(g, club, table) {
   const me = table[i];
   const legend = zones.map((z) => `<li data-z="${z.kind}">${esc(z.label)}</li>`).join('');
   const body = `<table class="dash-t">
-      <caption class="sr">${esc(LEAGUE_NAMES[club.tier])}: tabela wokół twojego klubu</caption>
+      <caption class="sr">${esc(leagueLabel(club))}: tabela wokół twojego klubu</caption>
       <thead><tr><th scope="col"><span class="sr">Miejsce</span></th><th scope="col">Klub</th><th scope="col"><abbr title="Mecze">M</abbr></th><th scope="col"><abbr title="Bilans bramek">+/-</abbr></th><th scope="col">Pkt</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
     <p class="dash-note">${me.played ? `${me.played} ${plural(me.played, 'mecz', 'mecze', 'meczów')}: ${me.wins} ${plural(me.wins, 'wygrana', 'wygrane', 'wygranych')}, ${me.draws} ${plural(me.draws, 'remis', 'remisy', 'remisów')}, ${me.losses} ${plural(me.losses, 'porażka', 'porażki', 'porażek')}, bramki ${me.gf}:${me.ga}.` : 'Liga jeszcze nie wystartowała. Kolejność w tabeli jest umowna.'}</p>
     <ul class="dash-zones">${legend}</ul>`;
-  return dashPanel('table', 'table', esc(LEAGUE_NAMES[club.tier]), body, dashLink('rozgrywki', 'Pełna tabela'));
+  return dashPanel('table', 'table', esc(leagueLabel(club)), body, dashLink('rozgrywki', 'Pełna tabela'));
 }
 
 function dashBoard(g, table) {
@@ -678,7 +684,7 @@ function dashMail(g) {
 
 function renderDashboard(g, club) {
   const tableOf = dashTables(g);
-  const table = tableOf(club.tier);
+  const table = tableOf(club);
   const waiting = pendingDecisions(g.inbox);
   const decideBar = waiting.length ? `<div class="dash-decide" role="status"><span><b>${waiting.length === 1 ? 'Czeka decyzja' : `Czekają decyzje (${waiting.length})`}:</b> ${esc(waiting[0].subject ?? '')}. Gra ruszy dalej po decyzji.</span><button class="btn btn--primary btn--sm" data-act="mail" data-id="${esc(waiting[0].id)}">Otwórz decyzję</button></div>` : '';
   return `<div class="dash">
@@ -1173,10 +1179,11 @@ async function dispatchAct(el, { root = app } = {}) {
     if (act === 'ageDec') setAge(-1);
     if (act === 'ageInc') setAge(1);
     if (act === 'profileNext' && state.nc && readCoachForm()) {
-      if (state.nc.clubId) state.nc.tier = clubById(state.nc.clubId).tier;
+      if (state.nc.clubId) { state.nc.tier = clubById(state.nc.clubId).tier; if (state.nc.tier === 4) state.nc.l3group = clubById(state.nc.clubId).group; }
       careerGo(2, state.nc.clubId ? `[data-club="${state.nc.clubId}"]` : '[role="tab"][aria-selected="true"]');
     }
     if (act === 'tier' && state.nc) { state.nc.tier = Number(el.dataset.tier); state.nc.msg = ''; render(); app.querySelector(`[data-act="tier"][data-tier="${state.nc.tier}"]`)?.focus(); }
+    if (act === 'ncgroup' && state.nc) { state.nc.l3group = Number(el.dataset.g); state.nc.msg = ''; render(); app.querySelector(`[data-act="ncgroup"][data-g="${state.nc.l3group}"]`)?.focus(); }
     if (act === 'pick' && state.nc) {
       state.nc.clubId = el.dataset.club; state.nc.tier = clubById(el.dataset.club).tier; state.nc.msg = '';
       render();

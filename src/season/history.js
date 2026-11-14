@@ -26,7 +26,7 @@ export const CLUB_GROUPS = ['L', 'P', 'E'];
 /** Grupa statystyk dla comp terminarza: liga z barażami, Puchar Polski z Superpucharem, UEFA, sparingi. */
 export function statGroup(comp) {
   if (!comp) return null;
-  if (comp === 'ekstraklasa' || comp === 'liga1' || comp === 'liga2' || comp.startsWith('playoff')) return 'L';
+  if (comp === 'ekstraklasa' || comp === 'liga1' || comp === 'liga2' || comp.startsWith('liga3-') || comp.startsWith('playoff')) return 'L';
   if (comp === 'pp' || comp === 'super') return 'P';
   if (comp === 'uefa') return 'E';
   if (comp === 'friendly') return 'T';

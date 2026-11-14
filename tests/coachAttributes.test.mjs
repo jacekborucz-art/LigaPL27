@@ -58,9 +58,9 @@ test('Stary zapis: profile tworzone przy pierwszym użyciu, zapis JSON, widok kl
   assert.ok(html.includes(coachBlurb(p)));
   const vague = renderClubView({ ...g, training: { staff: { widzew: { analityk: { q: 5 } } } } }, 'legia');
   assert.ok(vague.includes('clv-attrs--vague') && !/<em>\d+<\/em>/.test(vague), 'słaby analityk: tylko słowa');
-  // Klub spoza świata gry (III liga, zagraniczny): profil z ziarna, bez zapisu
-  const eph = coachOf(g, 'wigry');
-  assert.ok(eph?.a && !g.coaches.wigry);
+  // Klub spoza świata gry (IV liga, zagraniczny): profil z ziarna, bez zapisu
+  const eph = coachOf(g, 'chrobry-ii-glogow');
+  assert.ok(eph?.a && !g.coaches['chrobry-ii-glogow']);
 });
 
 test('Dyspozycja dnia i waga meczu: stały punkt + kilka procent losu, wielki mecz wzmacnia odpornych i osłabia nerwowych', () => {

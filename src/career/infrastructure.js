@@ -84,6 +84,7 @@ export const LICENCE = {
   1: { stadium: 4, cap: 4500, training: 3, academy: 3 },
   2: { stadium: 3, academy: 2 },
   3: { stadium: 2 },
+  4: { stadium: 1 }, // III liga: licencja PZPN bez wymogów poziomu w grze [SZAC]
 };
 
 const r1000 = (x) => Math.round(x / 1000) * 1000;
@@ -108,12 +109,13 @@ export function startLevels(club) {
     if (tier === 1) stadium = (d.pojemnosc ?? 0) < 9000 ? 4 : 5;
     else if (tier === 2) stadium = clamp(guess, 3, 5);
     else if (tier === 3) stadium = clamp(guess, 2, 3);
+    else if (tier === 4) stadium = clamp(guess - 1, 1, 3); // III liga: zwykle stadion miejski bez zadaszenia [SZAC]
     else stadium = guess;
   }
   let training = START.training[id];
-  if (training == null) training = tier === 1 ? clamp(Math.round(1 + 0.6 * pr), 4, 6) : tier === 2 ? (pr >= 6 ? 4 : 3) : (pr >= 5 ? 3 : 2);
+  if (training == null) training = tier === 1 ? clamp(Math.round(1 + 0.6 * pr), 4, 6) : tier === 2 ? (pr >= 6 ? 4 : 3) : tier >= 4 ? (pr >= 4 ? 2 : 1) : (pr >= 5 ? 3 : 2);
   let academy = START.academy[id];
-  if (academy == null) academy = tier === 1 ? (pr >= 7 ? 5 : 4) : tier === 2 ? (pr >= 6 ? 4 : 3) : (pr >= 5 ? 3 : 2);
+  if (academy == null) academy = tier === 1 ? (pr >= 7 ? 5 : 4) : tier === 2 ? (pr >= 6 ? 4 : 3) : tier >= 4 ? (pr >= 4 ? 2 : 1) : (pr >= 5 ? 3 : 2);
   if (club?.parent) { training = Math.min(training, 3); academy = 2; }
   return { stadium, training, academy };
 }
@@ -426,12 +428,13 @@ export function infraSeason(game, date) {
     // Licencja: sezon na rozpoczęcie inwestycji, potem kara
     const needs = licenceNeeds(game, id);
     if (!needs.length) I.licence = null;
-    else if (!I.licence) {
-      I.licence = { since: date };
+    else if (!I.licence || (I.licence.tier != null && I.licence.tier !== club.tier)) {
+      // Nowa liga (awans, także dwa awanse z rzędu z III ligi): znowu sezon na rozpoczęcie inwestycji
+      I.licence = { since: date, tier: club.tier };
       if (mine) out.push(msgOf(date, `licencja:${id}:${date}`, 'Licencja: obiekty poniżej wymogów ligi', `${needs.map((n) => n.text).join('. ')}.\n\nMamy sezon na rozpoczęcie inwestycji (zakładka Klub, Infrastruktura). Bez niej PZPN nałoży karę ${fmtZl(INFRA.LICENCE_FINE)}.`, 'important'));
     } else if (needs.some((n) => !I.proj?.[n.track])) {
       book(F, id, date, 'out', 'fines', INFRA.LICENCE_FINE, 'Kara licencyjna PZPN: obiekty poniżej wymogów');
-      I.licence = { since: date, fined: (I.licence.fined ?? 0) + 1 };
+      I.licence = { since: date, fined: (I.licence.fined ?? 0) + 1, tier: club.tier };
       if (mine) out.push(msgOf(date, `licencja-kara:${id}:${date}`, `Kara licencyjna: ${fmtZl(INFRA.LICENCE_FINE)}`, `Nie rozpoczęliśmy inwestycji wymaganych przez licencję. ${needs.map((n) => n.text).join('. ')}.\n\nKolejna kara za rok, jeśli inwestycja nie ruszy.`, 'urgent'));
     }
     if (!mine && !club.parent) aiInvest(game, id, needs);

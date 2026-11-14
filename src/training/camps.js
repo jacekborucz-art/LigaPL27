@@ -14,7 +14,7 @@ import { book, wageBill, FIN } from '../career/finance.js';
 import { CAMP } from './config.js';
 import { daysBetween } from './state.js';
 
-const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
+const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2', 4: 'liga3' }; // klucze DOMESTIC (III liga: DOMESTIC.liga3)
 const r1000 = (v) => Math.round(v / 1000) * 1000;
 
 /** Daty meczów o punkty klubu (bez sparingów), posortowane. */
@@ -66,7 +66,7 @@ export function campCost(game, clubId, dest, days) {
   if (!d) return 0;
   const tier = game.world?.clubs?.[clubId] ? (clubTierOf(clubId) ?? 1) : 1;
   const standard = Math.min(1.3, Math.max(0.8, clubBudgetBase(game, clubId) / 60e6)); // budżet ok. 60 mln zł = standard 1,0
-  const mul = ({ 1: 1, 2: 0.65, 3: 0.45 }[tier] ?? 0.45) * (tier === 1 ? standard : 1);
+  const mul = ({ 1: 1, 2: 0.65, 3: 0.45, 4: 0.3 }[tier] ?? 0.3) * (tier === 1 ? standard : 1);
   return Math.max(5000, r1000(d.perDay * days * mul));
 }
 

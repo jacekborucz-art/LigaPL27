@@ -2,19 +2,24 @@
 // zaufanie 0-100, zwolnienie, oferty pracy z innych klubów, reputacja trenera.
 
 import { Rng, clamp } from '../core/rng.js';
-import { CLUBS_PL, clubById, LEAGUE_NAMES } from '../data/clubs_pl.js';
+import { CLUBS_PL, clubById, leagueLabel } from '../data/clubs_pl.js';
+import { compOfClub, compClubIds } from '../season/leagueComps.js';
 import { COMPETITIONS } from '../config/competitions.js';
 import { standings } from '../season/standings.js';
 import { SEASON_YEAR } from '../config/calendar2026.js';
 import { clubReputation } from './reputation.js';
 import { pressBoardTerm } from '../match/press.js';
 
-const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
-
-/** Cel sezonu z siły kadry na tle ligi (ranking siły L). */
+/** Cel sezonu z siły kadry na tle ligi (ranking siły L; w III lidze na tle grupy). */
 export function seasonGoalFor(club) {
-  const rivals = CLUBS_PL.filter((c) => c.tier === club.tier && !c.parent).sort((a, b) => b.L - a.L);
+  const rivals = CLUBS_PL.filter((c) => c.tier === club.tier && (club.tier !== 4 || c.group === club.group) && !c.parent).sort((a, b) => b.L - a.L);
   const rank = rivals.findIndex((c) => c.id === club.id) + 1;
+  if (club.tier === 4) {
+    if (rank <= 2) return { rank, target: 2, text: 'awans do 2 Ligi albo baraże o awans' };
+    if (rank <= 5) return { rank, target: 4, text: 'miejsce w czołówce grupy' };
+    if (rank <= 12) return { rank, target: 10, text: 'spokojny środek tabeli' };
+    return { rank, target: 14, text: 'utrzymanie w III lidze' };
+  }
   if (club.tier === 1) {
     if (rank <= 3) return { rank, target: 3, text: 'walka o mistrzostwo Polski' };
     if (rank <= 6) return { rank, target: 6, text: 'miejsce dające grę w europejskich pucharach' };
@@ -31,6 +36,7 @@ const GOAL_TEXT = {
   1: [[1, 'obrona mistrzostwa Polski'], [3, 'walka o mistrzostwo Polski'], [6, 'miejsce dające grę w europejskich pucharach'], [12, 'spokojne miejsce w środku tabeli'], [99, 'utrzymanie w Ekstraklasie']],
 };
 function goalText(tier, target, base) {
+  if (tier === 4) return target <= 1 ? 'awans do 2 Ligi' : target <= 2 ? 'awans do 2 Ligi albo baraże o awans' : target <= 4 ? 'miejsce w czołówce grupy' : base.text;
   if (tier !== 1) return target <= 2 ? (tier === 2 ? 'awans do Ekstraklasy' : 'awans do 1 Ligi') : target <= 6 ? 'miejsce w strefie baraży o awans' : base.text;
   return GOAL_TEXT[1].find(([t]) => target <= t)[1];
 }
@@ -46,7 +52,7 @@ export function boardGoal(game, club) {
   if (!last?.pos || last.pos >= base.target - 1) return base;
   const target = Math.max(1, Math.round((base.target + last.pos) / 2));
   const lastTitle = club.tier === 1 && last.pos === 1;
-  return { ...base, target, raised: true, text: lastTitle && target <= 2 ? 'obrona mistrzostwa Polski' : goalText(club.tier, Math.max(2, target), base) };
+  return { ...base, target, raised: true, text: lastTitle && target <= 2 ? 'obrona mistrzostwa Polski' : goalText(club.tier, club.tier === 4 ? target : Math.max(2, target), base) };
 }
 
 export function ensureBoard(game) {
@@ -63,9 +69,9 @@ export function ensureBoard(game) {
 }
 
 function tablePos(game, clubId) {
-  const club = clubById(clubId);
-  const comp = TIER_COMP[club.tier];
-  const t = standings(game.fixtures.filter((f) => f.comp === comp), CLUBS_PL.filter((c) => c.tier === club.tier).map((c) => c.id));
+  const comp = compOfClub(clubById(clubId));
+  if (!comp) return { pos: null, played: 0, size: 0 };
+  const t = standings(game.fixtures.filter((f) => f.comp === comp), compClubIds(comp));
   const row = t.find((r) => r.id === clubId);
   return { pos: row?.pos ?? null, played: row?.played ?? 0, size: t.length };
 }
@@ -113,7 +119,7 @@ export function jobOffers(game, date, afterFiring) {
   const rng = new Rng(`oferty-pracy:${game.seed}:${date}`);
   const rep = game.manager.rep;
   const cur = clubReputation(clubById(game.clubId));
-  const cands = CLUBS_PL.filter((c) => !c.parent && c.tier <= 3 && c.id !== game.clubId && game.world.clubs[c.id]).map((c) => {
+  const cands = CLUBS_PL.filter((c) => !c.parent && c.tier <= 4 && c.id !== game.clubId && game.world.clubs[c.id]).map((c) => {
     const g = seasonGoalFor(c); const t = tablePos(game, c.id);
     return { c, rep: clubReputation(c), under: t.pos ? t.pos - g.target : 0 };
   });
@@ -121,8 +127,8 @@ export function jobOffers(game, date, afterFiring) {
     ? cands.filter((x) => x.rep <= rep + 5 && x.under > 0)
     : cands.filter((x) => x.rep > cur + 4 && x.rep <= rep + 10 && x.under >= 3);
   let list = rng.shuffle(pool).sort((a, b) => b.under - a.under).slice(0, 3);
-  if (afterFiring && !list.length) list = rng.shuffle(cands.filter((x) => x.c.tier === 3)).slice(0, 2);
-  return list.map((x) => ({ clubId: x.c.id, name: x.c.name, league: LEAGUE_NAMES[x.c.tier] }));
+  if (afterFiring && !list.length) list = rng.shuffle(cands.filter((x) => x.c.tier === 3 || (x.c.tier === 4 && x.rep <= rep + 5))).slice(0, 2);
+  return list.map((x) => ({ clubId: x.c.id, name: x.c.name, league: leagueLabel(x.c) }));
 }
 
 export { tablePos, COMPETITIONS };

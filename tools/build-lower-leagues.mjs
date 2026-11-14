@@ -123,7 +123,7 @@ function build(file, tier, baseL, step) {
 }
 
 // III liga: siła skalibrowana tak, żeby najlepsze drużyny były słabsze od średniej 2 Ligi (L ok. 8,5) [SZAC]
-const l3 = build('3_liga_2026_2027.txt', 4, 6.9, 0.26);
+const l3 = build('3_liga_2026_2027.txt', 4, 6.75, 0.23);
 const l4 = build('4_liga_2026_2027.txt', 5, 5.9, 0.25);
 
 // Dane właściciela: nazwa oficjalna (wyświetlana), barwy, stadion, pojemność

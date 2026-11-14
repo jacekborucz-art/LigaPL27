@@ -13,7 +13,9 @@ import { DOMESTIC, FIFA_WINDOWS, UEFA, POLISH_EUROPE_2026, SEASON, SEASON_YEAR, 
 import { createSuperCupEU, superCupEUFixture, HOLDERS_2026 } from './superCupEU.js';
 import { roundDates, buildLeague } from './schedule.js';
 import { standings } from './standings.js';
-import { createCup, drawRound, winnerOf, superCupFixture, PP_ROUNDS, PP_NAMES, moodResult, compRank, tieMood } from './cup.js';
+import { createCup, drawRound, winnerOf, tieWinner, superCupFixture, PP_ROUNDS, PP_NAMES, moodResult, compRank, tieMood } from './cup.js';
+import { LEAGUE_COMPS, TIER_COMP, L3_COMPS, isL3Comp, compOfClub, compClubIds } from './leagueComps.js';
+import { reserveMayPlayIn } from './leagues.js';
 import { squadOf } from '../world/worldGen.js';
 import { ephemeralSquad } from '../world/ephemeral.js';
 import { quickMatch, quickKnockout } from '../engine/quickSim.js';
@@ -27,8 +29,7 @@ import { coachOf, coachStyle, matchCoach, quickCoachTerm, formRng, assistantProf
 import { staffQ } from '../training/staff.js';
 import { statGroup, addPlayerMatch, syncSpell, recordTeamMatch, CLUB_GROUPS } from './history.js';
 
-export const LEAGUE_COMPS = ['ekstraklasa', 'liga1', 'liga2'];
-const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
+export { LEAGUE_COMPS, L3_COMPS, isL3Comp, compOfClub, compClubIds };
 const ALL_CLUBS = [...CLUBS_PL, ...CLUBS_L3, ...CLUBS_L4, ...UEFA_CLUBS];
 const CLUB_INDEX = new Map(ALL_CLUBS.map((c) => [c.id, c]));
 export const anyClub = (id) => CLUB_INDEX.get(id) ?? null;
@@ -65,16 +66,35 @@ export function createSeason(seed, { playerClub = null, superCup = ['lech', 'gor
     const clubs = CLUBS_PL.filter((c) => c.tier === tier).map((c) => c.id);
     fixtures.push(...buildLeague({ comp, tier, clubs, dates, rng: rng.fork(comp), busy, skip: tier === 1 ? FIFA_WINDOWS : [] }));
   }
+  fixtures.push(...thirdLeagueFixtures(rng, busy));
   fixtures.push(superCupFixture(...superCup));
-  const cup = createCup(CLUBS_PL.filter((c) => c.tier <= 3), lowerTierClubs(), CLUBS_L4, rng.fork('pp:uczestnicy'));
+  const cup = createCup(CLUBS_PL.filter((c) => c.tier <= 3), lowerTierClubs(), CLUBS_L4.filter((c) => c.tier === 5), rng.fork('pp:uczestnicy'), { playerClub });
   fixtures.push(...drawRound(cup, 'PRE', tierOf, rng.fork('pp:PRE')));
   // Superpuchar Europy (src/season/superCupEU.js): polski klub z kadrą w grze dostaje mecz w terminarzu
   const superCupEU = createSuperCupEU(SEASON_YEAR, uefaHolders);
   if (superCupEU && (clubById(superCupEU.home) || clubById(superCupEU.away))) fixtures.push(superCupEUFixture(superCupEU));
-  void playerClub;
   fixtures.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
   // Puchary UEFA: losowania i mecze dzień po dniu (src/season/europe.js)
   return { fixtures, cup, playoffs: {}, seasonId: SEASON, superCup, superCupEU, uefa: createUefa(seed, holder ? { holder } : {}) };
+}
+
+/** Terminy kolejek III ligi: weekendy, środa tylko poza oknami rund Pucharu Polski (docs/iii-liga.md). */
+export function thirdLeagueDates() {
+  const cfg = DOMESTIC.liga3;
+  const cupWeeks = DOMESTIC.pucharPolski.rounds.map((r) => ({ from: r.window?.[0] ?? r.date, to: r.window?.[1] ?? r.date }));
+  return roundDates({ start: cfg.start, autumnEnd: cfg.autumnEnd, springStart: cfg.springStart, end: cfg.end, rounds: 34, skip: cupWeeks });
+}
+
+/** Terminarz 4 grup III ligi (każda 34 kolejki w tych samych terminach). from: tylko kolejki od tej daty (stary zapis). */
+export function thirdLeagueFixtures(rng, busy = () => false) {
+  const dates = thirdLeagueDates();
+  const out = [];
+  for (const comp of L3_COMPS) {
+    const clubs = compClubIds(comp);
+    if (clubs.length !== 18) continue;
+    out.push(...buildLeague({ comp, tier: 4, clubs, dates, rng: rng.fork(comp), busy }));
+  }
+  return out;
 }
 
 /** Czy klub ma co najmniej 2 dni przerwy od innych meczów w danym dniu. */
@@ -113,11 +133,9 @@ export function rescheduleAround(fixtures, fixed) {
 
 export function tierOf(id) { return anyClub(id)?.tier ?? 5; }
 
-/** Kluby III ligi w bieżącym sezonie: lista z danych bez beniaminków 2 Ligi, plus spadkowicze z 2 Ligi. */
+/** Kluby III ligi w bieżącym sezonie (4 grupy, kadry stałe). */
 export function lowerTierClubs() {
-  const out = new Map();
-  for (const c of [...CLUBS_L3, ...CLUBS_PL]) if (c.tier === 4) out.set(c.id, c);
-  return [...out.values()];
+  return CLUBS_PL.filter((c) => c.tier === 4);
 }
 
 export function compLabel(f) {
@@ -125,6 +143,7 @@ export function compLabel(f) {
   if (LEAGUE_COMPS.includes(f.comp)) return `${COMPETITIONS[f.comp].name}, ${f.round}. kolejka`;
   if (f.comp === 'pp') return `Puchar Polski, ${PP_NAMES[f.round]}`;
   if (f.comp === 'super') return 'Superpuchar Polski';
+  if (f.comp === 'playoff-liga3') return `Baraże o 2 Ligę, ${f.round === 'F' ? `finał, ${f.leg === 1 ? '1. mecz' : 'rewanż'}` : 'półfinał'}`;
   if (f.comp.startsWith('playoff')) return `Baraże o awans, ${f.round === 'F' ? 'finał' : 'półfinał'}`;
   return f.comp;
 }
@@ -139,13 +158,10 @@ export function squadFor(game, clubId, comp) {
 
 function tableTermFor(game, clubId, comp, cache) {
   if (!LEAGUE_COMPS.includes(comp)) return 0;
-  if (!cache.has(comp)) {
-    const tier = COMPETITIONS[comp].tier;
-    cache.set(comp, standings(game.fixtures.filter((f) => f.comp === comp), CLUBS_PL.filter((c) => c.tier === tier).map((c) => c.id)));
-  }
+  if (!cache.has(comp)) cache.set(comp, standings(game.fixtures.filter((f) => f.comp === comp), compClubIds(comp)));
   const row = cache.get(comp).find((r) => r.id === clubId);
   const club = clubById(clubId);
-  const leagueL = { 1: 11.5, 2: 10, 3: 8.5 }[club?.tier] ?? 10;
+  const leagueL = { 1: 11.5, 2: 10, 3: 8.5, 4: 7.7 }[club?.tier] ?? 10;
   return row ? tableConfidence({ played: row.played, points: row.points }, club?.L ?? leagueL, leagueL) : 0;
 }
 
@@ -309,7 +325,8 @@ function aiPostMatchTalk(game, f, clubId, s, res, squad, played) {
   // Motywacja trenera (docs/trener-ai-atrybuty.md): dobry trener częściej trafia z tonem (ocenia wszystkie, jak
   // podpowiedź asystenta gracza), słaby czasem źle czyta szatnię i mówi coś gorszego niż zwykle; siła odprawy
   // x(1 + 0,25 s)
-  const mot = motivationSkill(game, clubId);
+  // III liga: bez szukania najlepszego tonu (lżejszy dzień meczowy dla 72 klubów, docs/iii-liga.md)
+  const mot = clubById(clubId)?.tier === 4 ? 0 : motivationSkill(game, clubId);
   if (mot) {
     const pick = new Rng(`${game.seed}:${f.id}:po-meczu-ai-ton:${clubId}`);
     const mean = (r) => players.reduce((a, p) => a + (r.morale[p.id]?.delta ?? 0), 0);
@@ -437,7 +454,13 @@ export function applyResult(game, f, res, rng) {
       game.season.cup.winners[f.round] = [...(game.season.cup.winners[f.round] ?? []), w];
       if (f.round === 'F') game.season.cup.champion = w;
     }
-    if (f.comp.startsWith('playoff')) (game.season.playoffs.winners ??= {})[f.id] = w;
+    if (f.comp.startsWith('playoff')) {
+      if (f.leg === 1) {
+        // Baraż III ligi: wynik 1. meczu do rewanżu (gospodarz rewanżu był gościem)
+        const back = game.fixtures.find((x) => x.tieId === f.tieId && x.leg === 2);
+        if (back) back.knockout = { firstLeg: [f.result.score[1], f.result.score[0]] };
+      } else (game.season.playoffs.winners ??= {})[f.id] = f.leg === 2 ? tieWinner(f) : w;
+    }
   }
   recordTeamMatch(game, f); // historia meczów drużyny gracza (tylko jej mecze)
   return msgs;
@@ -460,15 +483,15 @@ registerDailySystem({
       applyResult(game, f, res, rng);
     }
     // Wyniki kolejki ligi gracza: jedna wiadomość, gdy cała kolejka jest rozegrana
-    const myComp = TIER_COMP[clubById(game.clubId)?.tier];
+    const myComp = compOfClub(clubById(game.clubId));
     const roundsToday = new Set(game.fixtures.filter((f) => f.comp === myComp && f.date === date).map((f) => f.round));
     for (const round of roundsToday) {
       const rf = game.fixtures.filter((f) => f.comp === myComp && f.round === round);
       if (rf.every((f) => f.played)) {
         const lines = rf.map((f) => `${anyClub(f.home).name} ${f.result.score[0]}:${f.result.score[1]} ${anyClub(f.away).name}`).join('\n');
-        const table = standings(game.fixtures.filter((f) => f.comp === myComp), CLUBS_PL.filter((c) => c.tier === COMPETITIONS[myComp].tier).map((c) => c.id));
+        const table = standings(game.fixtures.filter((f) => f.comp === myComp), compClubIds(myComp));
         const pos = table.find((r) => r.id === game.clubId)?.pos;
-        messages.push(createMessage({ date, key: `round:${myComp}:${round}`, category: 'competitions', from: LEAGUE_NAMES[COMPETITIONS[myComp].tier], priority: 'info', subject: `Wyniki ${round}. kolejki`, body: `${lines}\n\nTwoja drużyna jest na ${pos}. miejscu.` }));
+        messages.push(createMessage({ date, key: `round:${myComp}:${round}`, category: 'competitions', from: COMPETITIONS[myComp].name, priority: 'info', subject: `Wyniki ${round}. kolejki`, body: `${lines}\n\nTwoja drużyna jest na ${pos}. miejscu.` }));
       }
     }
     return { messages };
@@ -495,7 +518,7 @@ registerDailySystem({
       for (const pf of fx) {
         for (const mv of rescheduleAround(game.fixtures, pf)) {
           if (mv.home === game.clubId || mv.away === game.clubId) {
-            messages.push(createMessage({ date, key: `moved:${mv.id}`, category: 'competitions', from: LEAGUE_NAMES[COMPETITIONS[mv.comp].tier], priority: 'important', subject: 'Mecz ligowy przełożony', body: `Z powodu meczu w Pucharze Polski mecz ${anyClub(mv.home).name} - ${anyClub(mv.away).name} (${mv.round}. kolejka) został przełożony na ${fmtDate(mv.date)}.` }));
+            messages.push(createMessage({ date, key: `moved:${mv.id}`, category: 'competitions', from: COMPETITIONS[mv.comp].name, priority: 'important', subject: 'Mecz ligowy przełożony', body: `Z powodu meczu w Pucharze Polski mecz ${anyClub(mv.home).name} - ${anyClub(mv.away).name} (${mv.round}. kolejka) został przełożony na ${fmtDate(mv.date)}.` }));
           }
         }
       }
@@ -524,6 +547,7 @@ registerDailySystem({
       );
       messages.push(createMessage({ date, key: `po:${comp}`, category: 'competitions', from: LEAGUE_NAMES[tier], priority: 'info', subject: `${LEAGUE_NAMES[tier]}: koniec sezonu zasadniczego`, body: `Awans bezpośredni: ${eligible.slice(0, 2).map((r) => anyClub(r.id).name).join(', ')}. Baraże: ${anyClub(s3).name} - ${anyClub(s6).name}, ${anyClub(s4).name} - ${anyClub(s5).name}.` }));
     }
+    messages.push(...thirdLeaguePlayoffs(game, date));
     for (const comp of ['liga1', 'liga2']) {
       const po = game.season.playoffs[comp];
       if (!po || po.final) continue;
@@ -538,6 +562,70 @@ registerDailySystem({
     return { messages };
   },
 });
+
+/**
+ * Baraże III ligi (docs/iii-liga.md): po ostatniej kolejce wszystkich grup i 2 Ligi wicemistrzowie grup (pierwsze
+ * uprawnione drużyny za zwycięzcą; rezerwy tylko, gdy mogą grać w 2 Lidze) losują pary półfinałów (jeden mecz u
+ * pierwszej wylosowanej). Zwycięzcy grają dwumecz z 13. i 14. drużyną 2 Ligi, 1. mecz u drużyny z III ligi.
+ */
+function thirdLeaguePlayoffs(game, date) {
+  const P = game.season.playoffs;
+  const out = [];
+  const cfg = DOMESTIC.liga3;
+  if (!P.liga3) {
+    const lf = game.fixtures.filter((f) => isL3Comp(f.comp));
+    const l2 = game.fixtures.filter((f) => f.comp === 'liga2');
+    if (!lf.length || !lf.every((f) => f.played) || !l2.every((f) => f.played)) return out;
+    const last = [...lf, ...l2].map((f) => f.date).sort().pop();
+    if (date <= last) return out;
+    const ok = (id) => { const c = clubById(id); return !c?.parent || reserveMayPlayIn(3, clubById(c.parent)?.tier ?? anyClub(c.parent)?.tier ?? 1); };
+    const winners = []; const runners = [];
+    for (const comp of L3_COMPS) {
+      const t = standings(game.fixtures.filter((f) => f.comp === comp), compClubIds(comp)).map((r) => r.id).filter(ok);
+      if (t[0]) winners.push(t[0]);
+      if (t[1]) runners.push(t[1]);
+    }
+    const t2 = standings(l2, compClubIds('liga2')).map((r) => r.id);
+    const keepers = [t2[12], t2[13]].filter(Boolean);
+    const draw = new Rng(`baraz-iii:${game.seed}:${SEASON}`).shuffle([...runners]);
+    const semis = [[draw[0], draw[1]], [draw[2], draw[3]]].filter((p) => p[0] && p[1]);
+    P.liga3 = { winners, runners, keepers, semis, ties: [] };
+    const d = cfg.playoffSemis > addDays(last, 2) ? cfg.playoffSemis : addDays(last, 3);
+    semis.forEach(([h, a], i) => game.fixtures.push({ id: `PO-liga3-SF${i + 1}`, comp: 'playoff-liga3', round: 'SF', date: d, time: '18:00', home: h, away: a, played: false, knockout: 'single' }));
+    game.fixtures.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+    const nm = (id) => anyClub(id)?.name ?? id;
+    out.push(createMessage({ date, key: `po:liga3:${SEASON}`, category: 'competitions', from: 'III liga', priority: [...winners, ...runners, ...keepers].includes(game.clubId) ? 'important' : 'info', subject: 'III liga: koniec sezonu, baraże o 2 Ligę', body: `Awans do 2 Ligi: ${winners.map(nm).join(', ')}.\n\nPółfinały baraży (${fmtDate(d)}): ${semis.map(([h, a]) => `${nm(h)} - ${nm(a)}`).join(', ')}. Zwycięzcy zagrają dwumecz z ${keepers.map(nm).join(' i ')} (13. i 14. miejsce w 2 Lidze).` }));
+    return out;
+  }
+  const po = P.liga3;
+  if (po.final) return out;
+  const sf = game.fixtures.filter((f) => f.comp === 'playoff-liga3' && f.round === 'SF');
+  if (!sf.length || !sf.every((f) => f.played) || date <= sf[0].date) return out;
+  po.final = true;
+  const ws = sf.map(winnerOf);
+  const d1 = cfg.playoffLeg1 > addDays(sf[0].date, 2) ? cfg.playoffLeg1 : addDays(sf[0].date, 3);
+  const d2 = cfg.playoffLeg2 > addDays(d1, 2) ? cfg.playoffLeg2 : addDays(d1, 3);
+  po.keepers.forEach((keeper, i) => {
+    const ch = ws[i];
+    if (!ch) return;
+    const tieId = `PO-liga3-F${i + 1}`;
+    po.ties.push({ id: tieId, keeper, challenger: ch });
+    game.fixtures.push(
+      { id: `${tieId}-1`, tieId, comp: 'playoff-liga3', round: 'F', leg: 1, date: d1, time: '17:00', home: ch, away: keeper, played: false },
+      { id: `${tieId}-2`, tieId, comp: 'playoff-liga3', round: 'F', leg: 2, date: d2, time: '18:00', home: keeper, away: ch, played: false, knockout: { firstLeg: [0, 0] } },
+    );
+  });
+  game.fixtures.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+  return out;
+}
+
+/** Wyniki baraży III ligi do ruchów między ligami: [{ keeper, challenger, winner }] albo null (brak dwumeczów). */
+export function thirdLeaguePlayoffResult(game) {
+  const po = game.season?.playoffs?.liga3;
+  if (!po?.ties?.length) return null;
+  const res = po.ties.map((t) => ({ keeper: t.keeper, challenger: t.challenger, winner: game.season.playoffs.winners?.[`${t.id}-2`] ?? null }));
+  return res.every((x) => x.winner) ? res : null;
+}
 
 /** Codzienna regeneracja: kontuzje, świeżość, ostrość; w poniedziałki dryf morale. */
 registerDailySystem({

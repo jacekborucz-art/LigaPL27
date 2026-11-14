@@ -5,8 +5,7 @@
 import { Rng, clamp } from '../core/rng.js';
 import { registerDailySystem, addDays } from '../core/gameLoop.js';
 import { createMessage } from '../core/inbox.js';
-import { CLUBS_PL, clubById, LEAGUE_NAMES } from '../data/clubs_pl.js';
-import { CLUBS_L3 } from '../data/clubs_l3.js';
+import { CLUBS_PL, clubById, LEAGUE_NAMES, leagueLabel } from '../data/clubs_pl.js';
 import { SQUAD_LAYOUT, squadOf, academyOf, generateClubSquad } from '../world/worldGen.js';
 import { genPlayer, marketValue } from '../world/playerGen.js';
 import { pickNationality } from '../data/names.js';
@@ -17,8 +16,10 @@ import { payLevel } from '../data/finanse_klubow.js';
 import { createTactics } from '../engine/lineup.js';
 import { standings } from './standings.js';
 import { winnerOf } from './cup.js';
-import { createSeason, anyClub, lowerTierClubs } from './season.js';
-import { applyLeagueState, computeMoves, validateTiers } from './leagues.js';
+import { createSeason, anyClub, thirdLeaguePlayoffResult } from './season.js';
+import { applyLeagueState, computeMoves, validateTiers, knownClub, dissolveDropped } from './leagues.js';
+import { L3_COMPS, compClubIds } from './leagueComps.js';
+import { L3_GROUPS } from '../config/competitions.js';
 import { allocateEuropeanSpots } from './europeAccess.js';
 import { COUNTRY_COEF_2026, UCOMP_NAMES } from './uefa.js';
 import { seasonWindows } from './intl/windows.js';
@@ -53,13 +54,23 @@ export function seasonResults(game) {
     rows[t] = standings(game.fixtures.filter((f) => f.comp === comp), CLUBS_PL.filter((c) => c.tier === t).map((c) => c.id));
     tables[t] = rows[t].map((r) => r.id);
   }
+  // III liga: tabele 4 grup (pusta grupa w zapisie sprzed grywalnej III ligi: kolejność z siły)
+  const groupTables = {}; const groupRows = {};
+  L3_GROUPS.forEach((g, i) => {
+    const comp = L3_COMPS[i];
+    const ids = compClubIds(comp);
+    const fx = game.fixtures.filter((f) => f.comp === comp);
+    groupRows[g] = fx.length ? standings(fx, ids) : ids.map((id) => ({ id, points: 0, gf: 0, ga: 0 })).sort((a, b) => (anyClub(b.id)?.L ?? 0) - (anyClub(a.id)?.L ?? 0));
+    groupTables[g] = groupRows[g].map((r) => r.id);
+  });
   const pw = game.season.playoffs?.winners ?? {};
   const playoffWinners = { 2: pw['PO-liga1-F'] ?? null, 3: pw['PO-liga2-F'] ?? null };
+  const l3Playoff = thirdLeaguePlayoffResult(game);
   const ppF = game.fixtures.find((f) => f.comp === 'pp' && f.round === 'F' && f.played);
   const cup = { winner: game.season.cup?.champion ?? (ppF ? winnerOf(ppF) : null), runnerUp: ppF ? [ppF.home, ppF.away].find((x) => x !== winnerOf(ppF)) : null };
   const U = game.season.uefa;
   const uefa = U ? Object.fromEntries(Object.entries(U.comps).map(([k, c]) => [k, c.champion])) : {};
-  return { tables, rows, playoffWinners, cup, uefa };
+  return { tables, rows, groupTables, groupRows, playoffWinners, l3Playoff, cup, uefa };
 }
 
 // ------------------------------------------------------------ Puchary na kolejny sezon
@@ -83,6 +94,7 @@ function polandNextSeason(game, res) {
 
 // ------------------------------------------------------------ Zawodnicy
 function newContract(p, tier, years, date, club = null) {
+  tier = Math.min(4, tier);
   return { wage: marketWage(p.ovr, tier, p.nat !== 'POL' && tier === 1, payLevel(club)), until: `${Number(date.slice(0, 4)) + years}-06-30`, clause: 0, signedOn: date };
 }
 
@@ -155,7 +167,7 @@ function processAcademy(game, newStart, rng, report) {
     const n = Math.max(1, rng.int(3, 5) + am.extra);
     for (let i = 0; i < n; i++) {
       const [pos, side] = rng.pick(SQUAD_LAYOUT);
-      const p = genPlayer(rng, { id: `${cid}-a${SEASON_YEAR}-${i + 1}`, L: c.L, pos, age: rng.int(16, 17), slotOffset: -1.0 + am.offset, nat: 'POL', tier: Math.min(3, c.tier), side: side ?? null, club: c, date: newStart });
+      const p = genPlayer(rng, { id: `${cid}-a${SEASON_YEAR}-${i + 1}`, L: c.L, pos, age: rng.int(16, 17), slotOffset: -1.0 + am.offset, nat: 'POL', tier: Math.min(4, c.tier), side: side ?? null, club: c, date: newStart });
       if (am.talent > 0 && p.hidden && new Rng(`talent:${game.seed}:${p.id}`).next() < am.talent) p.hidden.POT = Math.min(20, Math.round((p.hidden.POT + 1.5) * 10) / 10);
       p.squad = 'Y';
       W.players[p.id] = p; club.academy.push(p.id);
@@ -168,7 +180,7 @@ function processAcademy(game, newStart, rng, report) {
 /** Uzupełnienie kadry: wolni zawodnicy pasujący poziomem, a gdy ich brak, zawodnik wygenerowany na miejscu. */
 export function fillSquad(game, cid, target, date, rng, report = null) {
   const W = game.world; const c = clubById(cid);
-  const tier = Math.min(3, c.tier);
+  const tier = Math.min(4, c.tier);
   let squad = squadOf(W, cid);
   let guard = 0;
   while (guard++ < 30) {
@@ -198,59 +210,58 @@ export function rolloverSeason(game) {
   const oldSeason = SEASON; const oldYear = SEASON_YEAR; const oldEnd = SEASON_END;
   const rng = new Rng(`koniec-sezonu:${game.seed}:${oldYear}`);
   const res = seasonResults(game);
-  const userTier = clubById(game.clubId).tier;
-  const userPos = res.tables[userTier].indexOf(game.clubId) + 1;
-  // Ruchy między ligami
-  const l3 = lowerTierClubs();
-  const moves = computeMoves(res.tables, res.playoffWinners, l3, rng.fork('ligi'));
-  const tiers = Object.fromEntries(Object.entries(moves.tiers).filter(([, t]) => t <= 4));
-  const errors = validateTiers(tiers);
+  const userClub = clubById(game.clubId);
+  const userTier = userClub.tier; const userGroup = userClub.group;
+  const userTable = userTier === 4 ? res.groupTables[userGroup] ?? [] : res.tables[userTier] ?? [];
+  const userPos = userTable.indexOf(game.clubId) + 1;
+  // Ruchy między ligami (III liga z tabel grup i baraży, IV liga: uzupełnienie grup, docs/iii-liga.md)
+  const moves = computeMoves(res.tables, res.playoffWinners, res.groupTables, rng.fork('ligi'), { l3Playoff: res.l3Playoff });
+  const tiers4 = Object.fromEntries(Object.entries(moves.tiers).filter(([, t]) => t <= 4));
+  const errors = validateTiers(tiers4, moves.groups);
   const europe = polandNextSeason(game, res);
   archiveSeasonMatches(game, oldSeason); // historia meczów drużyny gracza: sezon zamknięty przed nowym terminarzem
-  // Statystyki zawodników do p.history przed ruchami końca sezonu (spadki do III ligi, powroty z wypożyczeń),
+  // Statystyki zawodników do p.history przed ruchami końca sezonu (spadki do IV ligi, powroty z wypożyczeń),
   // więc wiersz należy do klubu, w którym zawodnik kończył sezon
   for (const p of Object.values(game.world.players)) archivePlayerSeason(p, oldSeason);
   // Archiwum sezonu
   game.archive = [...(game.archive ?? []), {
     season: oldSeason, champion: res.tables[1][0], cup: res.cup.winner, uefa: res.uefa, superCupEU: game.season.superCupEU?.winner ?? null,
     tables: Object.fromEntries([1, 2, 3].map((t) => [t, res.rows[t].map((r) => ({ id: r.id, pts: r.points, gd: r.gf - r.ga }))])),
-    user: { club: game.clubId, tier: userTier, pos: userPos }, promoted: moves.promoted, relegated: moves.relegated, polandRank: europe.rank,
+    l3: Object.fromEntries(L3_GROUPS.map((g) => [g, res.groupRows[g].map((r) => ({ id: r.id, pts: r.points, gd: r.gf - r.ga }))])),
+    l3Playoff: (moves.l3Playoff ?? []).map((x) => ({ keeper: x.keeper, challenger: x.challenger, winner: x.winner })),
+    user: { club: game.clubId, tier: userTier, pos: userPos, ...(userTier === 4 ? { group: userGroup } : {}) }, promoted: moves.promoted, relegated: moves.relegated, polandRank: europe.rank,
   }].slice(-15);
 
-  // Nowy sezon: kalendarz, ligi
+  // Nowy sezon: kalendarz, ligi. Zapis tylko odstępstw od danych (kluby w innej lidze lub grupie niż na start gry)
   const year = oldYear + 1;
   const newStart = `${year}-07-01`;
-  const dyn = [...new Set([...(game.leagueState?.dyn ?? []), ...Object.keys(tiers).filter((id) => CLUBS_L3.some((c) => c.id === id) && tiers[id] <= 3)])];
-  const groups = { ...(game.leagueState?.groups ?? {}) };
-  for (const id of moves.relegated[4]) if (CLUBS_PL.some((c) => c.id === id) && !CLUBS_L3.some((c) => c.id === id)) groups[id] = 1 + rng.int(0, 3);
-  game.leagueState = { year, tiers: Object.fromEntries([...CLUBS_PL, ...CLUBS_L3].filter((c) => tiers[c.id] != null).map((c) => [c.id, tiers[c.id]])), dyn, groups };
+  const prev = game.leagueState ?? { tiers: {}, groups: {} };
+  const merged = { ...prev.tiers, ...moves.tiers };
+  const userDown = merged[game.clubId] > 4; // klub gracza spada do IV ligi: kadra zostaje do zmiany pracy
+  game.leagueState = {
+    year,
+    tiers: Object.fromEntries(Object.entries(merged).filter(([id, t]) => knownClub(id) && knownClub(id).tier0 !== t)),
+    groups: Object.fromEntries(Object.entries(moves.groups).filter(([id]) => merged[id] === 4 && (knownClub(id)?.tier0 !== 4 || knownClub(id)?.group0 !== moves.groups[id]))),
+    ...(userDown ? { keep: [game.clubId] } : {}),
+  };
   game.seasonYear = year;
   coachesNewSeason(game, year); // trenerzy AI: rok starsi, doświadczenie albo spadek formy (career/coaches.js)
   coachMarketNewSeason(game, year); // pula wolnych trenerów: starsi, część odchodzi z zawodu, nowi (career/coachMarket.js)
   const polishEurope = europe.spots.map(({ club, comp, entry, path, via }) => ({ club, comp, entry, ...(path ? { path } : {}), via }));
   setSeasonYear(year, { windows: seasonWindows(year), polishEurope });
   applyLeagueState(game);
-  // Powroty z wypożyczeń kończących się 30 czerwca i z udziałem klubów spadających do III ligi; obowiązek albo opcja
+  // Powroty z wypożyczeń kończących się 30 czerwca i z udziałem klubów spadających do IV ligi; obowiązek albo opcja
   // wykupu zamienia wypożyczenie w transfer (src/career/loans.js). Wypożyczenia na rok trwają dalej.
   const loansBack = returnLoansAtRollover(game, oldEnd, newStart);
   // Prekontrakty: zawodnicy przechodzą do nowych klubów, zanim wygasną ich kontrakty (src/career/preContracts.js)
   const pre = applyPreContracts(game, newStart);
-  // Spadkowicze do III ligi (nie symulowanej) tracą stałą kadrę: lepsi zawodnicy trafiają do wolnych
-  for (const c of CLUBS_PL) {
-    if (c.tier <= 3 || !game.world.clubs[c.id] || c.id === game.clubId) continue;
-    const wc = game.world.clubs[c.id];
-    for (const pid of wc.squad) {
-      const p = game.world.players[pid];
-      if (p && p.age < 33 && p.ovr >= 7) { p.askWage = p.contract?.wage ?? 1000; p.contract = null; p.wage = 0; p.clubId = null; p.free = true; p.freeSince = newStart; game.market.free.push(pid); } else delete game.world.players[pid];
-    }
-    for (const pid of wc.academy) delete game.world.players[pid];
-    delete game.world.clubs[c.id];
-    delete game.finance.clubs[c.id];
-  }
-  // Beniaminkowie (z III ligi albo wracający) dostają kadry, spadkowicze do III ligi mają wagę siły
+  // Spadkowicze do IV ligi (bez stałych kadr) tracą kadrę: lepsi zawodnicy trafiają do wolnych.
+  // Spadkowicze z 2 Ligi do III ligi zachowują kadry (III liga jest grywalna).
+  dissolveDropped(game, newStart);
+  // Beniaminkowie z IV ligi (albo wracający) dostają kadry, spadkowicze do III ligi mają wagę siły
   for (const c of CLUBS_PL) {
     const id = c.id;
-    if (c.tier > 3 || game.world.clubs[id]) continue;
+    if (c.tier > 4 || game.world.clubs[id]) continue;
     const { players, academy } = generateClubSquad(c, new Rng(`awans:${game.seed}:${id}:${year}`), newStart);
     for (const p of [...players, ...academy]) { if (game.world.players[p.id]) p.id = `${p.id}-s${year}`; p.clubId = id; game.world.players[p.id] = p; }
     game.world.clubs[id] = { squad: players.map((p) => p.id), academy: academy.map((p) => p.id) };
@@ -261,8 +272,8 @@ export function rolloverSeason(game) {
   const report = { expired: [], retired: [], loansBack, promotedYouth: [], newYouth: [], signed: [] };
   processPlayers(game, oldEnd, newStart, rng.fork('zawodnicy'), report);
   processAcademy(game, newStart, rng.fork('akademia'), report);
-  for (const p of Object.values(game.world.players)) if (p.clubId) p.value = marketValue(p, { tier: Math.min(3, clubById(p.clubId)?.tier ?? 3), date: newStart });
-  addFreeAgents(game, 30, newStart, `lato-${year}`);
+  for (const p of Object.values(game.world.players)) if (p.clubId) p.value = marketValue(p, { tier: Math.min(4, clubById(p.clubId)?.tier ?? 4), date: newStart });
+  addFreeAgents(game, 45, newStart, `lato-${year}`); // 126 klubów z kadrami (było 30 przy 54)
   addFreeAgents(game, 8, newStart, `import-${year}`, { imports: true }); // było 22: wolni z zagranicy przychodzą też z puli (career/foreignPool.js)
   for (const cid of Object.keys(game.world.clubs)) {
     if (!clubById(cid)) continue;
@@ -306,7 +317,7 @@ export function rolloverSeason(game) {
   B.reviews = [{ date: newStart, trust: B.trust, delta: Math.round(delta * 10) / 10, pos: userPos, notes: [`Sezon ${oldSeason} zakończony na ${userPos}. miejscu.`] }, ...(B.reviews ?? [])].slice(0, 12);
   game.manager.seasons = [...(game.manager.seasons ?? []), { season: oldSeason, club: game.clubId, tier: userTier, pos: userPos, target }];
   B.goal = boardGoal(game, clubById(game.clubId)); B.goalClub = game.clubId;
-  const droppedOut = clubById(game.clubId).tier > 3; // III liga nie jest symulowana: trener szuka nowego klubu
+  const droppedOut = clubById(game.clubId).tier > 4; // IV liga nie jest prowadzona: trener szuka nowego klubu
   const fired = B.trust < 18 || droppedOut;
 
   // Rynek i nowy terminarz
@@ -326,12 +337,13 @@ export function rolloverSeason(game) {
     date: newStart, key: `koniec:${oldSeason}`, category: 'competitions', from: 'Rozgrywki', priority: 'important',
     subject: `Koniec sezonu ${oldSeason}: ${name(champion)} mistrzem Polski`,
     body: [
-      `Twoja drużyna: ${userPos}. miejsce (${LEAGUE_NAMES[userTier]}).`,
+      `Twoja drużyna: ${userPos}. miejsce (${userTier === 4 ? `III liga, grupa ${['', 'I', 'II', 'III', 'IV'][userGroup] ?? userGroup}` : LEAGUE_NAMES[userTier]}).`,
       `Puchar Polski: ${res.cup.winner ? name(res.cup.winner) : 'brak rozstrzygnięcia'}.`,
       `Awans do Ekstraklasy: ${list(moves.promoted[1])}. Spadek: ${list(moves.relegated[2])}.`,
       `Awans do 1 Ligi: ${list(moves.promoted[2])}. Spadek z 1 Ligi: ${list(moves.relegated[3])}.`,
       `Awans do 2 Ligi z III ligi: ${list(moves.promoted[3])}. Spadek do III ligi: ${list(moves.relegated[4])}.`,
-      ...moves.l3Playoff.map((x) => `Baraż o 2 Ligę: ${name(x.keeper)} - ${name(x.challenger)}, wygrywa ${name(x.winner)}.`),
+      ...(moves.l3Playoff ?? []).map((x) => `Baraż o 2 Ligę: ${name(x.keeper)} - ${name(x.challenger)}, wygrywa ${name(x.winner)}.`),
+      `Awans do III ligi z IV ligi: ${list(moves.promoted[4])}. Spadek do IV ligi: ${list(moves.relegated[5])}.`,
       ...moves.notes.filter((n) => n.kind === 'reserve').map((n) => `${name(n.id)}: przeniesienie administracyjne (rezerwy muszą grać niżej niż pierwsza drużyna).`),
       `Puchary europejskie: ${Object.entries(res.uefa).map(([k, v]) => `${UCOMP_NAMES[k]}: ${name(v)}`).join(', ')}.`,
       ...(errors.length ? [`Uwaga techniczna: ${errors.join('; ')}`] : []),
@@ -354,7 +366,7 @@ export function rolloverSeason(game) {
   if (fired) {
     game.manager.fired = (game.manager.fired ?? 0) + 1;
     const offers = jobOffers(game, newStart, true);
-    msgs.push(createMessage({ date: newStart, key: `zwolnienie-lato:${year}`, category: 'board', from: 'Zarząd', priority: 'urgent', subject: `${name(game.clubId)}: zarząd rozwiązuje umowę`, body: droppedOut ? `${name(game.clubId)} spada do III ligi, której gra nie prowadzi. Wybierz nowy klub, żeby kontynuować karierę.` : `Po sezonie ${oldSeason} zarząd nie widzi cię na stanowisku trenera. Wybierz nowy klub.`, actions: offers.map((o) => ({ id: o.clubId, label: `${o.name} (${o.league})` })), refs: { kind: 'jobOffer' } }));
+    msgs.push(createMessage({ date: newStart, key: `zwolnienie-lato:${year}`, category: 'board', from: 'Zarząd', priority: 'urgent', subject: `${name(game.clubId)}: zarząd rozwiązuje umowę`, body: droppedOut ? `${name(game.clubId)} spada do IV ligi, której gra nie prowadzi. Wybierz nowy klub, żeby kontynuować karierę.` : `Po sezonie ${oldSeason} zarząd nie widzi cię na stanowisku trenera. Wybierz nowy klub.`, actions: offers.map((o) => ({ id: o.clubId, label: `${o.name} (${o.league})` })), refs: { kind: 'jobOffer' } }));
   } else {
     msgs.push(createMessage({ date: newStart, key: `zarzad-lato:${year}`, category: 'board', from: 'Zarząd', priority: 'important', subject: `Cel na sezon ${SEASON}: ${B.goal.text}`, body: `Ocena sezonu ${oldSeason}: ${userPos}. miejsce. Zaufanie zarządu: ${B.trust} na 100.\n\nBudżet transferowy: ${Math.round(fin.transferBudget / 1000)} tys. zł. Budżet płac: ${Math.round(fin.wageBudget / 100) * 100} zł tygodniowo. Saldo: ${Math.round(fin.balance / 1000)} tys. zł.` }));
   }

@@ -126,14 +126,35 @@ export const DOMYSLNE = {
   4: k(4, 0.8, 0.8, 1500, 300, 10, 1, own('miasto', 'samorząd', 0.3, 0), [...ALL, 'pojemnosc', 'doplata']),
 };
 
-/** Dane klubu (z domyślnymi dla nieznanych). */
+/**
+ * III liga (docs/iii-liga.md): wszystko [SZAC] poza pojemnością stadionu (plik właściciela, pole cap klubu).
+ * Budżety realnych klubów III ligi to ok. 0,8-3 mln zł na sezon: płace rosną z siłą klubu (waga 1-5), komercja
+ * i dopłaty miasta podobnie, frekwencja kilkaset osób (u silnych do ok. 1500). Rezerwy: bez komercji i biletów,
+ * pensje i koszty pokrywa pierwsza drużyna (dopłata klubu).
+ */
+const L3_CACHE = new Map();
+function thirdLeagueData(club) {
+  if (L3_CACHE.has(club.id)) return L3_CACHE.get(club.id);
+  const w = club.weight ?? 3;
+  const cap = club.cap ?? 1500;
+  const d = club.parent
+    ? k(4, 0.05, 0.5 + 0.08 * w, cap, Math.min(cap, 150 + 20 * w), 6, 1, own('klub', 'pierwsza drużyna', 0.45 + 0.07 * w, 0), [...ALL, 'doplata'], 0.9)
+    : k(4, 0.3 + 0.14 * w, 0.45 + 0.17 * w, cap, Math.min(Math.round(cap * 0.8), 250 + 220 * w), 9 + w, 1, own('miasto', 'samorząd', 0.2 + 0.07 * w, 0), [...ALL, 'doplata'], 0.8 + 0.06 * w);
+  L3_CACHE.set(club.id, d);
+  return d;
+}
+
+/** Dane klubu (z domyślnymi dla nieznanych; III liga z siły klubu i pojemności z danych). */
 export function clubFinanceData(club) {
   const id = typeof club === 'string' ? club : club?.id;
-  return FINANSE_KLUBOW[id] ?? DOMYSLNE[Math.min(4, Math.max(1, club?.tier ?? 3))];
+  if (FINANSE_KLUBOW[id]) return FINANSE_KLUBOW[id];
+  if (club && typeof club === 'object' && (club.cap || (club.tier0 ?? club.tier) === 4)) return thirdLeagueData(club);
+  return DOMYSLNE[Math.min(4, Math.max(1, club?.tier ?? 3))];
 }
 
 /** Płacowość klubu: mnożnik rynkowej pensji (bogaci właściciele płacą więcej). Wolni zawodnicy i nieznane kluby: 1. */
 export function payLevel(club) {
   const id = typeof club === 'string' ? club : club?.id;
+  if (!FINANSE_KLUBOW[id] && club && typeof club === 'object' && (club.cap || (club.tier0 ?? club.tier) === 4)) return thirdLeagueData(club).pay;
   return FINANSE_KLUBOW[id]?.pay ?? 1;
 }

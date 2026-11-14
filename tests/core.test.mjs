@@ -28,9 +28,11 @@ test('RNG: rozkłady mają poprawne średnie', () => {
   assert.ok(Math.abs(sumP / n - 1.35) < 0.03);
 });
 
-test('3 ligi po 18 drużyn, unikalne id', () => {
+test('3 ligi po 18 drużyn i III liga w 4 grupach po 18, unikalne id', () => {
   for (const t of [1, 2, 3]) assert.equal(clubsInTier(t).length, 18, `liga ${t}`);
-  assert.equal(new Set(CLUBS_PL.map((c) => c.id)).size, 54);
+  assert.equal(clubsInTier(4).length, 72);
+  for (const g of [1, 2, 3, 4]) assert.equal(clubsInTier(4).filter((c) => c.group === g).length, 18, `grupa ${g}`);
+  assert.equal(new Set(CLUBS_PL.map((c) => c.id)).size, 126);
 });
 
 test('Średnie siły lig zgodne z założeniami eksperta', () => {
@@ -42,12 +44,13 @@ test('Średnie siły lig zgodne z założeniami eksperta', () => {
 
 test('Rezerwy: rodzic istnieje, gra wyżej, a rezerwy nie wyżej niż 2 Liga', () => {
   const reserves = CLUBS_PL.filter((c) => c.parent);
-  assert.deepEqual(reserves.map((c) => c.id).sort(), ['legia-ii', 'slask-ii']);
+  assert.deepEqual(reserves.filter((c) => c.tier <= 3).map((c) => c.id).sort(), ['legia-ii', 'slask-ii']);
+  assert.equal(reserves.filter((c) => c.tier === 4).length, 11); // rezerwy w III lidze
   for (const r of reserves) {
     const parent = clubById(r.parent);
     assert.ok(parent, r.id);
     assert.ok(r.tier > parent.tier);
-    assert.ok(r.tier <= RESERVES.reserveMaxTier);
+    assert.ok(r.tier >= RESERVES.reserveMaxTier && r.tier <= 4); // rezerwy najwyżej w 2 Lidze, kadry do III ligi
   }
 });
 

@@ -2,7 +2,7 @@
 // (trener, klub, kontrakt). Widok składa HTML; stan i akcje trzyma src/app.js.
 // Każdy tekst wpisany przez gracza przechodzi przez esc(). Profil trenera nie opuszcza urządzenia.
 
-import { CLUBS_PL, LEAGUE_NAMES } from '../data/clubs_pl.js';
+import { CLUBS_PL, LEAGUE_NAMES, L3_GROUP_NAMES, leagueLabel } from '../data/clubs_pl.js';
 import { POLISH_EUROPE_2026, SEASON, SEASON_YEAR, GAME_START } from '../config/calendar2026.js';
 import { clubFinanceData } from '../data/finanse_klubow.js';
 import { NAT_NAMES, NATIONALITIES, randomName } from '../data/names.js';
@@ -423,7 +423,7 @@ export function clubFacts(club) {
     .map((c) => ({ c, v: rivalry(club.id, c.id) })).filter((x) => x.v > 0)
     .sort((a, b) => b.v - a.v || b.c.prestige - a.c.prestige).slice(0, 3);
   const f = {
-    goal, strength: strengthOf(club), size: pickable(club.tier).length, europe: europeOf(club),
+    goal, strength: strengthOf(club), size: pickable(club.tier).filter((c) => club.tier !== 4 || c.group === club.group).length, europe: europeOf(club),
     transfer: start.transferBudget, wages: plan.wages, cap: stadiumCapacity(club), att: plan.att,
     capEst: est.has('pojemnosc'), attEst: est.has('frekwencja'),
     owner: plan.ownerName, ownerType: OWNER[plan.ownerType] ?? '', rivals,
@@ -459,15 +459,15 @@ function clubDetail(club, { inline }) {
   return `<section class="cd${inline ? ' cd--inline' : ''}" id="club-detail" aria-labelledby="cd-title" style="${colorsOf(club)}">
     <header class="cd__head">
       ${crest(club, 64)}
-      <div><h2 id="cd-title" class="cd__name">${esc(club.name)}</h2><span class="cd__league">${esc(LEAGUE_NAMES[club.tier])}, renoma ${club.prestige}/10</span></div>
+      <div><h2 id="cd-title" class="cd__name">${esc(club.name)}</h2><span class="cd__league">${esc(leagueLabel(club))}, renoma ${club.prestige}/10</span></div>
     </header>
-    <div class="cd__goal"><span>Zarząd oczekuje</span><b>${esc(f.goal.text)}</b><small>Cel: ${f.goal.target <= 1 ? 'mistrzostwo' : `miejsce ${f.goal.target} lub wyżej`}</small></div>
+    <div class="cd__goal"><span>Zarząd oczekuje</span><b>${esc(f.goal.text)}</b><small>Cel: ${f.goal.target <= 1 ? (club.tier === 1 ? 'mistrzostwo' : 'pierwsze miejsce') : `miejsce ${f.goal.target} lub wyżej`}</small></div>
     <dl class="cd__facts">
       ${row('Siła kadry', `${f.strength}, ${f.goal.rank}. w lidze na ${f.size}`)}
       ${row(`Europa ${esc(SEASON)}`, eu ? `${esc(EURO[eu.comp])}, ${esc(ENTRY[eu.entry] ?? eu.entry)}` : 'Bez europejskich pucharów')}
       ${row('Budżet transferowy', esc(fmtZl(f.transfer)))}
       ${row('Płace kadry', `${esc(fmtZl(f.wages))} na sezon`)}
-      ${row('Stadion', `${num(f.cap)} miejsc${f.capEst ? ' (szacunek)' : ''}`)}
+      ${row('Stadion', `${club.stadium ? `${esc(club.stadium)}, ` : ''}${num(f.cap)} miejsc${f.capEst && !club.cap ? ' (szacunek)' : ''}`)}
       ${row('Frekwencja', `średnio ${num(f.att)}${f.attEst ? ' (szacunek)' : ''}`)}
       ${f.owner ? row('Właściciel', `${esc(f.owner)}${f.ownerType ? `, ${esc(f.ownerType)}` : ''}`) : ''}
     </dl>
@@ -477,10 +477,13 @@ function clubDetail(club, { inline }) {
 }
 
 function stepClub(nc, { wide }) {
-  const list = pickable(nc.tier);
+  const l3g = nc.l3group ?? 1;
+  const list = pickable(nc.tier).filter((c) => nc.tier !== 4 || c.group === l3g);
   const sel = nc.clubId ? clubsById.get(nc.clubId) : null;
-  const selInTier = sel && sel.tier === nc.tier;
-  const tabs = [1, 2, 3].map((t) => `<button role="tab" id="tier-${t}" aria-controls="club-grid" aria-selected="${t === nc.tier}" tabindex="${t === nc.tier ? 0 : -1}" class="ltab" data-act="tier" data-tier="${t}">${esc(LEAGUE_NAMES[t])}<span class="ltab__n">${pickable(t).length}</span></button>`).join('');
+  const selInTier = sel && sel.tier === nc.tier && (nc.tier !== 4 || sel.group === l3g);
+  // III liga: 4 grupy po 18 (przełącznik grup; bez rezerw, jak w 2 Lidze)
+  const groups = nc.tier === 4 ? `<div class="chips chips--sub nc__groups" role="group" aria-label="Grupa III ligi">${[1, 2, 3, 4].map((g) => `<button class="chip chip--sm" data-act="ncgroup" data-g="${g}" aria-pressed="${g === l3g}">Grupa ${L3_GROUP_NAMES[g]}</button>`).join('')}</div>` : '';
+  const tabs = [1, 2, 3, 4].map((t) => `<button role="tab" id="tier-${t}" aria-controls="club-grid" aria-selected="${t === nc.tier}" tabindex="${t === nc.tier ? 0 : -1}" class="ltab" data-act="tier" data-tier="${t}">${esc(LEAGUE_NAMES[t])}<span class="ltab__n">${pickable(t).length}</span></button>`).join('');
   const cards = list.map((c) => {
     const on = c.id === nc.clubId;
     return clubCard(c, on) + (on && !wide ? `<li class="cc-detail">${clubDetail(c, { inline: true })}</li>` : '');
@@ -495,9 +498,10 @@ function stepClub(nc, { wide }) {
         <h2 class="nc__h">Gdzie zaczynasz?</h2>
         <div class="ltabs" role="tablist" aria-label="Liga">${tabs}</div>
       </div>
+      ${groups}
       <p class="nc__lead">Siła to kadra na tle ligi. Od niej zależy cel zarządu. Kadry wylosujemy po podpisaniu kontraktu.</p>
       <ul class="cc-grid" id="club-grid" role="tabpanel" aria-labelledby="tier-${nc.tier}">${cards}</ul>
-      ${sel && !selInTier ? `<p class="pick2__other">Wybrany klub: ${esc(sel.name)} (${esc(LEAGUE_NAMES[sel.tier])}).</p>` : ''}
+      ${sel && !selInTier ? `<p class="pick2__other">Wybrany klub: ${esc(sel.name)} (${esc(leagueLabel(sel))}).</p>` : ''}
     </div>
     ${side}
   </div>`;
@@ -526,7 +530,7 @@ function stepContract(nc) {
       <div><dt>Trener</dt><dd>${esc(full)}</dd></div>
       <div><dt>Narodowość</dt><dd>${esc(natName(p.nationality))}</dd></div>
       <div><dt>Wiek</dt><dd>${esc(ageText(p.age))}, rocznik ${p.birthYear}</dd></div>
-      <div><dt>Rozgrywki</dt><dd>${esc(LEAGUE_NAMES[club.tier])}${f.europe ? `, ${esc(EURO[f.europe.comp])}` : ''}, Puchar Polski</dd></div>
+      <div><dt>Rozgrywki</dt><dd>${esc(leagueLabel(club))}${f.europe ? `, ${esc(EURO[f.europe.comp])}` : ''}, Puchar Polski</dd></div>
       <div class="contract__goal"><dt>Cel sezonu</dt><dd>${esc(f.goal.text)}</dd></div>
       <div><dt>Budżet transferowy</dt><dd>${esc(fmtZl(f.transfer))}</dd></div>
     </dl>

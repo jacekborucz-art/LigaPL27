@@ -12,6 +12,9 @@ import { anyClub } from '../season/season.js';
 import { SEASON_START, SEASON_YEAR } from '../config/calendar2026.js';
 import { winnerOf } from '../season/cup.js';
 import { standings } from '../season/standings.js';
+import { dissolveDropped } from '../season/leagues.js';
+import { compOfClub, compClubIds, LEAGUE_COMPS } from '../season/leagueComps.js';
+import { COMPETITIONS } from '../config/competitions.js';
 import { createFinance, financeDay, book, matchIncome, attendanceFill, uefaPrize, stadiumCapacity, meritTv, clubPlan, FIN } from './finance.js';
 import { bookCupPrize, bookUefaWinner, uefaSolidarity } from './prizes.js'; // nagrody PP, UEFA (docs/finanse.md)
 import './sponsors.js'; // umowy sponsorskie (docs/finanse.md, Sponsorzy)
@@ -25,7 +28,6 @@ import { ensureLoans } from './loans.js'; // wypożyczenia: systemy dnia i stare
 import { ensureTransferState } from './transferSystem.js'; // transakcje w toku, prekontrakty, prośby o transfer, zagranica (docs/transfery.md)
 import { foreignOfferMessage } from './foreignMarket.js';
 
-const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
 
 export function ensureCareer(game) {
   if (!game.world) return;
@@ -46,9 +48,8 @@ function matchMoney(game, date) {
   const F = game.finance;
   const tables = new Map();
   const rowOf = (clubId) => {
-    const club = clubById(clubId); if (!club) return null;
-    const comp = TIER_COMP[club.tier];
-    if (!tables.has(comp)) tables.set(comp, standings(game.fixtures.filter((f) => f.comp === comp), CLUBS_PL.filter((c) => c.tier === club.tier).map((c) => c.id)));
+    const comp = compOfClub(clubById(clubId)); if (!comp) return null;
+    if (!tables.has(comp)) tables.set(comp, standings(game.fixtures.filter((f) => f.comp === comp), compClubIds(comp)));
     return tables.get(comp).find((r) => r.id === clubId);
   };
   for (const f of game.fixtures) {
@@ -79,14 +80,15 @@ function matchMoney(game, date) {
   }
   // Premia za miejsce z centralnego podziału ligi po ostatniej kolejce (Ekstraklasa SA 2025/26: mistrz 22,6 mln zł,
   // część liniowa i premia za podium; spadkowicze z Ekstraklasy dostają rekompensatę). 1 i 2 Liga [SZAC]. Model: docs/finanse.md.
-  for (const comp of Object.values(TIER_COMP)) {
+  // III liga: bez centralnego podziału (docs/iii-liga.md).
+  for (const comp of LEAGUE_COMPS) {
     F.merit = F.merit ?? {};
     if (F.merit[comp]) continue;
     const lf = game.fixtures.filter((f) => f.comp === comp);
     if (!lf.length || !lf.every((f) => f.played)) continue;
     F.merit[comp] = date;
-    const tier = Number(Object.keys(TIER_COMP).find((k) => TIER_COMP[k] === comp));
-    for (const r of standings(lf, CLUBS_PL.filter((c) => c.tier === tier).map((c) => c.id))) {
+    const tier = COMPETITIONS[comp].tier;
+    for (const r of standings(lf, compClubIds(comp))) {
       const c = F.clubs[r.id]; if (!c) continue;
       book(F, r.id, date, 'in', 'tv', meritTv(tier, r.pos), `Podział środków ligi: premia za ${r.pos}. miejsce`);
       if (tier === 1 && r.pos >= 16) book(F, r.id, date, 'in', 'tv', FIN.RELEGATION_COMP, 'Rekompensata za spadek z Ekstraklasy');
@@ -124,6 +126,8 @@ export function switchClub(game, clubId, date) {
   if (game.coaches?.[clubId] && game.world?.clubs?.[clubId]) { fireCoach(game, clubId, date, { why: 'wyniki', quiet: true, direct: true }); delete game.coaches[clubId]; }
   game.manager.history = [...(game.manager.history ?? []).map((h) => (h.club === old && !h.to ? { ...h, to: date } : h)), { club: clubId, from: date }];
   game.clubId = clubId;
+  // Poprzedni klub spadł do IV ligi: jego kadra rozwiązana dopiero teraz (src/season/leagues.js)
+  if (game.leagueState?.keep?.includes(old)) dissolveDropped(game, date);
   // Poprzedni klub gracza zatrudnia trenera z rynku
   if (old && old !== clubId && game.world?.clubs?.[old]) hireCoach(game, old, date, { quiet: true });
   game.tactics = createTactics(squadOf(game.world, clubId), { benchSize: 12 });
