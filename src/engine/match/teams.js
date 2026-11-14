@@ -61,7 +61,7 @@ function mkPlayer(p, slot, side, rng, ctx, Z = 0) {
 }
 
 // Pamięć dopasowania zawodnika do slotu: indeks pozycji * 3 + strona (brak, L, P)
-const POS_IDX = { BR: 0, ŚO: 1, BO: 2, WB: 3, DP: 4, ŚP: 5, OP: 6, SP: 7, SN: 8, NAP: 9 };
+const POS_IDX = { BR: 0, ŚO: 1, BO: 2, WB: 3, DP: 4, ŚP: 5, OP: 6, BP: 7, SN: 8, NAP: 9 };
 const FIT_N = 30;
 
 // ------------------------------------------------------------ Parametry taktyki
@@ -171,7 +171,7 @@ function eff(x, zone) {
   return posEff(prof) * x.R[zone] + x.base + 0.035 * x.Z + condPen;
 }
 
-const ATT_LINE = new Set(['NAP', 'SN', 'SP', 'OP']);
+const ATT_LINE = new Set(['NAP', 'SN', 'BP', 'OP']);
 const DEF_LINE = new Set(['ŚO', 'BO', 'WB']);
 /** Mnożnik szybkości od bieżącej kondycji (FATIGUE.speedLoss za punkt poniżej 85). */
 export const condSpeed = (cond) => (cond >= FATIGUE.speedFrom ? 1 : Math.max(0.5, 1 - FATIGUE.speedLoss * (FATIGUE.speedFrom - cond)));
@@ -245,7 +245,7 @@ export function updateCondition(T, M) {
   const P = T.P;
   for (const x of onPitch(T, M.minute)) {
     const role = FATIGUE_ROLE[x.slot.pos] ?? 1;
-    const mid = ['DP', 'ŚP', 'OP', 'SP'].includes(x.slot.pos) ? P.fatMidMul : 1;
+    const mid = ['DP', 'ŚP', 'OP', 'BP'].includes(x.slot.pos) ? P.fatMidMul : 1;
     const dK = 0.22 * P.fatMul * mid * role * (1.4 - 0.04 * a(x.p, 'WYT')) * (M.ctx.weather?.fat ?? 1) * ((x.p.age ?? 25) >= 31 ? 1.1 : 1)
       * (x.knock && !x.knock.aggravated ? KNOCK.fatigue : 1);
     x.cond = Math.max(20, x.cond - dK);

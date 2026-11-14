@@ -9,8 +9,8 @@ import { statsFromEvents, checkStatsInvariants } from '../src/engine/matchStats.
 
 // Kadra 22 zawodników na poziomie L: podstawowa jedenastka +0.3, ławka -0.5 (jak w generatorze eksperta).
 function squad(L, tag, extra = {}) {
-  const layout = [['BR', 3], ['ŚO', 4], ['BO', 4], ['ŚP', 5], ['SP', 3], ['NAP', 3]];
-  const starters = { BR: 1, ŚO: 2, BO: 2, ŚP: 3, SP: 1, NAP: 2 };
+  const layout = [['BR', 3], ['ŚO', 4], ['BO', 4], ['ŚP', 5], ['BP', 3], ['NAP', 3]];
+  const starters = { BR: 1, ŚO: 2, BO: 2, ŚP: 3, BP: 1, NAP: 2 };
   const out = [];
   for (const [pos, n] of layout) {
     for (let i = 0; i < n; i++) {

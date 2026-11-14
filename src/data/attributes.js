@@ -41,7 +41,7 @@ export const GK_ATTRS = Object.keys(ATTRS).filter((k) => ATTRS[k].group === 'gk'
 
 export const POS_NAMES = {
   BR: 'Bramkarz', ŚO: 'Środkowy obrońca', BO: 'Boczny obrońca', WB: 'Wahadłowy', DP: 'Defensywny pomocnik',
-  ŚP: 'Środkowy pomocnik', OP: 'Ofensywny pomocnik', SP: 'Boczny pomocnik', SN: 'Skrzydłowy', NAP: 'Napastnik',
+  ŚP: 'Środkowy pomocnik', OP: 'Ofensywny pomocnik', BP: 'Boczny pomocnik', SN: 'Skrzydłowy', NAP: 'Napastnik',
 };
 
 const P = 3; const p = 1.5; const m = -1.5; const M = -3;
@@ -64,7 +64,7 @@ export const OFF = {
   DP: prof(s('ODB UST POD'), s('DEC PRA WYT SIL AGR'), s('DRY SZY RUC'), s('WYK')),
   ŚP: prof(s('POD DEC TEC'), s('WIZ PRA WYT OPA'), s('GLO SKO SIL'), []),
   OP: prof(s('WIZ TEC POD'), s('DRY DYS RUC DEC OPA SFR'), s('ODB SIL SKO UST'), []),
-  SP: prof(s('DOS SZY DRY'), s('WYT TEC POD PRA'), s('GLO SIL UST'), []),
+  BP: prof(s('DOS SZY DRY'), s('WYT TEC POD PRA'), s('GLO SIL UST'), []),
   SN: prof(s('DRY SZY RUC'), s('WYK TEC ZWI OPA'), s('ODB GLO UST'), []),
   NAP: prof(s('WYK RUC OPA'), s('GLO SIL TEC SZY SKO'), s('ODB WIZ DOS UST'), []),
 };
@@ -95,6 +95,6 @@ export function ovrAt(attr, pos, offsets = OFF[pos]) {
 
 // Pozycje pokrewne do losowania alternatyw (ekspert 2.5).
 export const RELATED = {
-  BR: [], ŚO: ['DP', 'BO'], BO: ['WB', 'SP', 'ŚO'], WB: ['BO', 'SP'], DP: ['ŚP', 'ŚO'],
-  ŚP: ['DP', 'OP'], OP: ['ŚP', 'SN', 'NAP'], SP: ['SN', 'WB', 'OP'], SN: ['SP', 'NAP', 'OP'], NAP: ['SN', 'OP'],
+  BR: [], ŚO: ['DP', 'BO'], BO: ['WB', 'BP', 'ŚO'], WB: ['BO', 'BP'], DP: ['ŚP', 'ŚO'],
+  ŚP: ['DP', 'OP'], OP: ['ŚP', 'SN', 'NAP'], BP: ['SN', 'WB', 'OP'], SN: ['BP', 'NAP', 'OP'], NAP: ['SN', 'OP'],
 };

@@ -5,6 +5,7 @@ import { compOfClub, compClubIds } from './season/leagueComps.js';
 import { GAME_START, SEASON, POLISH_EUROPE_2026, DOMESTIC } from './config/calendar2026.js';
 import { crestHtml } from './ui/crest.js';
 import { esc, fmtDate, fmtDay, weekday, icon } from './ui/dom.js';
+import { migratePosCodes } from './engine/positions.js'; // zapisy sprzed zmiany kodu SP -> BP
 import * as store from './core/store.js';
 import { hashString } from './core/rng.js';
 import { CATEGORIES, unreadCount, markRead, markAllRead, resolveMessage, filterInbox, pendingDecisions, addMessages, pruneInbox, canDelete } from './core/inbox.js';
@@ -231,6 +232,7 @@ async function save() {
 
 /** Uzupełnia zapisy sprzed poczty i pętli dni (migracja w miejscu). */
 function ensureGameShape(g) {
+  migratePosCodes(g); // kody pozycji: SP (boczny pomocnik) -> BP, przed wszystkim, co czyta pozycje
   applySeasonState(g); // kalendarz i ligi sezonu zapisanego w grze
   applyPack(g); // edytor: nazwy klubów i stadiony z datapacku gry (docs/edytor.md)
   if (!g.world) g.world = generateWorld(g.seed);
@@ -1406,6 +1408,7 @@ app.addEventListener('change', async (ev) => {
   if (!input || !input.files[0]) return;
   try {
     const data = store.parseImport(await input.files[0].text());
+    migratePosCodes(data.game); // stary plik: kody pozycji SP -> BP już przy imporcie
     const slots = await store.listSlots();
     const free = slots.find((s) => s.empty);
     if (!free) throw new Error('Wszystkie sloty są zajęte. Usuń jeden zapis i wczytaj plik ponownie.');

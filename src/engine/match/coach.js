@@ -17,7 +17,7 @@ import { clamp } from '../../core/rng.js';
 const CHECKPOINTS = new Set([46, 55, 60, 65, 70, 75, 80, 85, 88, 95, 100, 105, 110, 115, 119]);
 // Przegląd planu w 1. połowie: trener reaguje, gdy plan wyraźnie nie działa (nie tylko w przerwie) [SZAC]
 const REVIEW_H1 = new Set([25, 35]);
-const ATT = new Set(['NAP', 'SN', 'OP', 'SP']);
+const ATT = new Set(['NAP', 'SN', 'OP', 'BP']);
 const DEF_ROLE = new Set(['ŚO', 'BO', 'WB', 'DP']);
 const BACK = new Set(['ŚO', 'BO', 'WB']);
 const BACK3 = new Set(['352', '343', '532', '541']);
@@ -156,16 +156,16 @@ export function shortShape(T, st, k = 11 - fieldPlayers(T).length) {
   if (k <= 0) return null;
   const back3 = BACK3.has(T.tactics.formation);
   if (st.diff < 0 && st.minute >= 55) return back3 ? { formation: '352', drop: ['DP', 'ŚP', 'ŚP'].slice(0, k) } : { formation: '442d', drop: ['OP', 'ŚP', 'DP'].slice(0, k) };
-  const deep = { formation: '442def', drop: ['NAP', 'SP', 'SP'].slice(0, k) };
+  const deep = { formation: '442def', drop: ['NAP', 'BP', 'BP'].slice(0, k) };
   if (st.diff > 0 && st.minute >= 70) {
     // Obrona prowadzenia w osłabieniu: piątka obrońców (5-3-1 w dziesiątkę, 5-2-1 w dziewiątkę), gdy zawodnicy
     // pasują do takiego ustawienia; w innym razie niski blok 4-4-1 (4-3-1)
-    const five = { formation: '541', drop: ['SP', 'SP', 'NAP'].slice(0, k) };
+    const five = { formation: '541', drop: ['BP', 'BP', 'NAP'].slice(0, k) };
     return back3 || shapeFit(T, five.formation, five.drop) >= 0.97 * shapeFit(T, deep.formation, deep.drop) ? five : deep;
   }
   if (back3) return { formation: '532', drop: ['NAP', 'ŚP', 'NAP'].slice(0, k) };
   // Niski blok 4-4-1 przy prowadzeniu lub przeciw silniejszemu, zwykłe 4-4-1 przy remisie z równym lub słabszym
-  return st.diff > 0 || st.str < 0 ? deep : { formation: '442', drop: ['NAP', 'SP', 'ŚP'].slice(0, k) };
+  return st.diff > 0 || st.str < 0 ? deep : { formation: '442', drop: ['NAP', 'BP', 'ŚP'].slice(0, k) };
 }
 
 /**

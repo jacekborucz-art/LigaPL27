@@ -49,7 +49,7 @@ test('Czerwona dla bramkarza AI, rezerwowy na ławce: schodzi zawodnik z pola, r
     assert.equal(fieldPlayers(T).length, menBefore - 1);
     // Przy prowadzeniu schodzi zawodnik ofensywny
     const out = T.players.find((x) => x.id === sub.outId);
-    if (score[0] > score[1]) assert.ok(['NAP', 'SN', 'OP', 'SP'].includes(out.p.pos), `schodzi ${out.p.pos}`);
+    if (score[0] > score[1]) assert.ok(['NAP', 'SN', 'OP', 'BP'].includes(out.p.pos), `schodzi ${out.p.pos}`);
     const red = M.events.slice(from).find((e) => e.type === 'red');
     assert.equal(red.gk, true);
     assert.equal(red.reason, 'dogso');

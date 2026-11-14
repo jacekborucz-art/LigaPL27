@@ -124,19 +124,19 @@ export function h2hSummary(h2h = [], homeId, awayId, names = {}) {
 
 // 10 formacji z ekspert_futbol.md 3 (kolejność slotów: BR, obrona, pomoc, atak; strona L/P). W = szerokość.
 export const FORMATIONS = {
-  '4-4-2': { nick: 'Dwie Linie', W: 1.0, slots: 'BR BO:L ŚO ŚO BO:P SP:L ŚP ŚP SP:P NAP NAP' },
+  '4-4-2': { nick: 'Dwie Linie', W: 1.0, slots: 'BR BO:L ŚO ŚO BO:P BP:L ŚP ŚP BP:P NAP NAP' },
   '4-3-3': { nick: 'Trójząb', W: 1.0, slots: 'BR BO:L ŚO ŚO BO:P DP ŚP ŚP SN:L NAP SN:P' },
-  '4-2-3-1': { nick: 'Parasol', W: 0.9, slots: 'BR BO:L ŚO ŚO BO:P DP DP SP:L OP SP:P NAP' },
-  '4-1-4-1': { nick: 'Kurtyna', W: 0.9, slots: 'BR BO:L ŚO ŚO BO:P DP SP:L ŚP ŚP SP:P NAP' },
+  '4-2-3-1': { nick: 'Parasol', W: 0.9, slots: 'BR BO:L ŚO ŚO BO:P DP DP BP:L OP BP:P NAP' },
+  '4-1-4-1': { nick: 'Kurtyna', W: 0.9, slots: 'BR BO:L ŚO ŚO BO:P DP BP:L ŚP ŚP BP:P NAP' },
   '4-4-2D': { nick: 'Diament', W: 0.6, slots: 'BR BO:L ŚO ŚO BO:P DP ŚP ŚP OP NAP NAP' },
   // Nazwy z src/data/formations.js (formationById(...).name): warianty 4-4-2 i romb pod pełną nazwą
   '4-4-2 romb': { nick: 'Diament', W: 0.6, slots: 'BR BO:L ŚO ŚO BO:P DP ŚP ŚP OP NAP NAP', alias: '4-4-2D' },
-  '4-4-2 defensywne': { nick: 'Niski Blok', W: 0.85, slots: 'BR BO:L ŚO ŚO BO:P SP:L ŚP ŚP SP:P NAP NAP', family: '442', block: 'low' },
-  '4-4-2 ofensywne': { nick: 'Wysokie Skrzydła', W: 1.15, slots: 'BR BO:L ŚO ŚO BO:P SP:L ŚP ŚP SP:P NAP NAP', family: '442', block: 'high' },
+  '4-4-2 defensywne': { nick: 'Niski Blok', W: 0.85, slots: 'BR BO:L ŚO ŚO BO:P BP:L ŚP ŚP BP:P NAP NAP', family: '442', block: 'low' },
+  '4-4-2 ofensywne': { nick: 'Wysokie Skrzydła', W: 1.15, slots: 'BR BO:L ŚO ŚO BO:P BP:L ŚP ŚP BP:P NAP NAP', family: '442', block: 'high' },
   '3-5-2': { nick: 'Wahadło', W: 0.9, slots: 'BR ŚO ŚO ŚO WB:L DP ŚP ŚP WB:P NAP NAP' },
   '3-4-3': { nick: 'Wysoki Trójkąt', W: 1.2, slots: 'BR ŚO ŚO ŚO WB:L ŚP ŚP WB:P SN:L NAP SN:P' },
   '5-3-2': { nick: 'Bunkier', W: 0.8, slots: 'BR WB:L ŚO ŚO ŚO WB:P ŚP DP ŚP NAP NAP' },
-  '5-4-1': { nick: 'Mur', W: 0.9, slots: 'BR WB:L ŚO ŚO ŚO WB:P SP:L ŚP ŚP SP:P NAP' },
+  '5-4-1': { nick: 'Mur', W: 0.9, slots: 'BR WB:L ŚO ŚO ŚO WB:P BP:L ŚP ŚP BP:P NAP' },
   '4-3-2-1': { nick: 'Choinka', W: 0.5, slots: 'BR BO:L ŚO ŚO BO:P DP ŚP ŚP OP OP NAP' },
 };
 export function formationSlots(name) {

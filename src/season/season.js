@@ -168,7 +168,7 @@ function tableTermFor(game, clubId, comp, cache) {
 /** Model ocen meczów w tle (playQuick); fromEngineResult sprowadza oceny pełnego silnika do tej skali. */
 export const QUICK_RATING = { base: 6.4, goal: 0.9, assist: 0.5, assistShare: 0.72, yellow: -0.3, red: -1.2 };
 /** Waga pozycji przy asyście w meczu w tle (realne udziały: skrzydłowi i ofensywni pomocnicy najwięcej, bramkarz około 0,5%). */
-const ASSIST_W = { BR: 0.04, ŚO: 0.3, BO: 1.1, WB: 1.3, DP: 0.7, ŚP: 1.2, OP: 1.9, SP: 1.6, SN: 1.8, NAP: 1.2 };
+const ASSIST_W = { BR: 0.04, ŚO: 0.3, BO: 1.1, WB: 1.3, DP: 0.7, ŚP: 1.2, OP: 1.9, BP: 1.6, SN: 1.8, NAP: 1.2 };
 
 /**
  * Waga meczu w tle 0-3 jak ranga w studiu (match/studio.js matchRank), tanio: finał i Superpuchar 3, puchary UEFA,

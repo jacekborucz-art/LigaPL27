@@ -115,7 +115,7 @@ function phaseOffside(M) {
 }
 
 function offside(M, at) {
-  const xs = onPitch(at, M.minute).filter((x) => ['NAP', 'SN', 'OP', 'SP'].includes(x.slot.pos));
+  const xs = onPitch(at, M.minute).filter((x) => ['NAP', 'SN', 'OP', 'BP'].includes(x.slot.pos));
   const x = xs.length ? pickWeighted(M, xs, (y) => attr(y, 'RUC')) : null;
   if (x) { x.offs++; rateEv(x, -0.05); }
   emit(M, 'offside', at.side, x, { text: x ? `Spalony: ${last(x)}.` : 'Spalony.' });
@@ -487,7 +487,7 @@ function finishing(x, type, header) {
 
 // kind w zdarzeniach strzałów: typ akcji (POZ, SKR, KON, DYS, SP, FK, PEN), widoczny dla trenera na ławce (coach.js)
 /** Udział pozycji w asystach przy akcjach z gry (cel: skrzydłowi i ofensywni pomocnicy najwięcej, środkowi obrońcy mało). */
-const ASSIST_POS_W = { ŚO: 0.3, BO: 0.9, WB: 1.1, DP: 0.6, ŚP: 1.1, OP: 1.9, SP: 1.5, SN: 1.7, NAP: 1.3 };
+const ASSIST_POS_W = { ŚO: 0.3, BO: 0.9, WB: 1.1, DP: 0.6, ŚP: 1.1, OP: 1.9, BP: 1.5, SN: 1.7, NAP: 1.3 };
 /** Waga bramkarza przy asyście (cel: ok. 0,3-0,5% asyst, częściej po kontrze z długiego wybicia). */
 const GK_ASSIST = { KON: 0.07, other: 0.012 };
 function shot(M, ai, xg, type, header, forced = null) {
@@ -504,7 +504,7 @@ function shot(M, ai, xg, type, header, forced = null) {
     assister = pickWeighted(M, others, (y) => (y === gkA
       ? (attr(y, 'NOG') + attr(y, 'WIZ')) * (type === 'KON' ? GK_ASSIST.KON : GK_ASSIST.other)
       : type === 'SKR' || type === 'SP'
-        ? attr(y, 'DOS') * (['BO', 'WB', 'SP', 'SN'].includes(y.slot.pos) ? 2 : y.slot.pos === 'ŚO' ? 0.2 : 0.5)
+        ? attr(y, 'DOS') * (['BO', 'WB', 'BP', 'SN'].includes(y.slot.pos) ? 2 : y.slot.pos === 'ŚO' ? 0.2 : 0.5)
         : (attr(y, 'POD') + attr(y, 'WIZ')) * (ASSIST_POS_W[y.slot.pos] ?? 1)));
   }
   s.sh++;

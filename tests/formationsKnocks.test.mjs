@@ -280,7 +280,7 @@ test('Dowolne ustawienie w osłabieniu (gracz): 5-4-1 w dziewięciu, pięciu obr
   const xs = fieldPlayers(T);
   const gk = xs.find((y) => y.slot.pos === 'BR');
   const rest = xs.filter((y) => y !== gk);
-  // 5-4-1: 0 BR, 1 WB, 2-4 ŚO, 5 WB, 6 SP, 7 ŚP, 8 ŚP, 9 SP, 10 NAP. Puste: oba środkowe pomocnicze (5-2-1)
+  // 5-4-1: 0 BR, 1 WB, 2-4 ŚO, 5 WB, 6 BP, 7 ŚP, 8 ŚP, 9 BP, 10 NAP. Puste: oba środkowe pomocnicze (5-2-1)
   const order = [1, 2, 3, 4, 5, 6, 9, 10];
   const assign = { [gk.id]: 0 };
   rest.forEach((y, i) => { assign[y.id] = order[i]; });
@@ -354,7 +354,7 @@ test('Ta sama funkcja działa dla AI: shortShape wybiera 5-3-1 przy obronie prow
   until(M, 75);
   const T = M.teams[0];
   const st = { ...matchState(M, 0), diff: 1, minute: 80 };
-  assert.deepEqual(shortShape(T, st, 2), { formation: '541', drop: ['SP', 'SP'] });
+  assert.deepEqual(shortShape(T, st, 2), { formation: '541', drop: ['BP', 'BP'] });
   // AI może też użyć jawnego przypisania (ta sama walidacja co u gracza)
   const O = M.teams[1];
   sendOff(M, O, fieldPlayers(O).find((y) => y.slot.pos !== 'BR'), 'violent');

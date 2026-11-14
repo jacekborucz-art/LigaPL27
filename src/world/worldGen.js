@@ -14,14 +14,14 @@ export const SQUAD_LAYOUT = [
   ['ŚO'], ['ŚO'], ['ŚO'], ['ŚO'],
   ['BO', 'L'], ['BO', 'P'], ['BO', 'L'], ['BO', 'P'],
   ['DP'], ['DP'], ['ŚP'], ['ŚP'], ['ŚP'], ['OP'], ['OP'],
-  ['SP', 'L'], ['SP', 'P'],
+  ['BP', 'L'], ['BP', 'P'],
   ['SN', 'L'], ['SN', 'P'],
   ['NAP'], ['NAP'], ['NAP'],
 ];
 
 // Podstawowa jedenastka domyślnej formacji 4-2-3-1 i ławka (offsety jakości z ekspert 1.3).
 const XI = { BR: 1, ŚO: 2, BO: 2, DP: 2, OP: 1, SN: 2, NAP: 1 };
-const BENCH = { BR: 1, ŚO: 1, BO: 1, ŚP: 2, SP: 1, NAP: 1 };
+const BENCH = { BR: 1, ŚO: 1, BO: 1, ŚP: 2, BP: 1, NAP: 1 };
 const ACADEMY_SIZE = 7;
 
 function ageFor(role, rng) {

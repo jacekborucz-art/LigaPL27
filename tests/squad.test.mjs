@@ -12,7 +12,7 @@ function squad() {
   const s = [];
   ['BR', 'BR', 'BR'].forEach((p, i) => s.push(pl(`gk${i}`, p, 11 - i)));
   for (let i = 0; i < 8; i++) s.push(pl(`d${i}`, i % 2 ? 'ŚO' : 'BO', 12 - i * 0.3));
-  for (let i = 0; i < 8; i++) s.push(pl(`m${i}`, i % 2 ? 'ŚP' : 'SP', 12 - i * 0.3));
+  for (let i = 0; i < 8; i++) s.push(pl(`m${i}`, i % 2 ? 'ŚP' : 'BP', 12 - i * 0.3));
   for (let i = 0; i < 5; i++) s.push(pl(`a${i}`, 'NAP', 12 - i * 0.4));
   return s;
 }

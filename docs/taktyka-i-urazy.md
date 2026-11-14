@@ -33,13 +33,13 @@ w meczu jest tańsze niż przejście na inną formację.
 
 ### Ekspert silnika: odwzorowanie w danych formacji
 
-Warianty mają **te same role na slotach** co 4-4-2 (BO, ŚO, ŚO, BO, SP, ŚP, ŚP, SP, NAP, NAP). Siły stref (udziały ról,
+Warianty mają **te same role na slotach** co 4-4-2 (BO, ŚO, ŚO, BO, BP, ŚP, ŚP, BP, NAP, NAP). Siły stref (udziały ról,
 `ROLE_SHARE`) są więc takie same i ten sam skład pasuje bez kary za pozycję. Różnice idą przez dane, które silnik
 już czyta, i jedno nowe pole:
 
 | Parametr | 4-4-2 | 4-4-2 defensywne | 4-4-2 ofensywne | Działanie w silniku |
 |---|---|---|---|---|
-| Współrzędne | y obrony 21-25, pomocy 47-50, ataku 75 | obrona 16-19, pomoc 35-37, napastnicy 58 i 66, SP x 21/79 | obrona 26-33, pomoc 52-62, napastnicy 83, SP x 12/88 | rysowanie (UI) |
+| Współrzędne | y obrony 21-25, pomocy 47-50, ataku 75 | obrona 16-19, pomoc 35-37, napastnicy 58 i 66, BP x 21/79 | obrona 26-33, pomoc 52-62, napastnicy 83, BP x 12/88 | rysowanie (UI) |
 | W (szerokość) | 1,0 | 0,85 | 1,15 | przełamanie SKR: `0,25*(W_atak - W_obrona)` |
 | act POZ/SKR/KON/DYS | 1,0/1,15/1,1/1,0 | 0,85/1,0/1,3/0,95 | 1,0/1,25/0,95/1,0 | proporcje typów własnych akcji |
 | counterVuln | 1,0 | 0,8 | 1,2 | waga kontr rywala |

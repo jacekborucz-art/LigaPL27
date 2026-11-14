@@ -16,7 +16,7 @@ import { anyClub, rescheduleAround, restOk, playQuick, applyResult } from './sea
 import { createSuperCupEU, superCupEUFixture, simulateSuperCupEU, settleSuperCupEU, superCupEULine, venueLabel, HOLDERS_2026 } from './superCupEU.js';
 
 const isPolish = (id) => !!clubById(id);
-const SCORE_W = { NAP: 3, SN: 2, OP: 2, SP: 1.4, ŚP: 1, DP: 0.6, WB: 0.5, BO: 0.4, ŚO: 0.35, BR: 0 };
+const SCORE_W = { NAP: 3, SN: 2, OP: 2, BP: 1.4, ŚP: 1, DP: 0.6, WB: 0.5, BO: 0.4, ŚO: 0.35, BR: 0 };
 
 /** Strzelcy klubu bez stałej kadry (kadra na sezon z ziarna klubu, te same nazwiska co w meczu na żywo). */
 function scorersFor(clubId, n, rng) {

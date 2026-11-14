@@ -13,8 +13,8 @@ const crest = (c, size) => crestHtml(c, { size, base: '../assets/crests', clubsB
 const homeXI = [
   [1, 'Szymon Kowal', 'BR', 'Spokojny'], [2, 'Igor Bednarek', 'BO', 'Ambitny'], [4, 'Paweł Żurek', 'ŚO', 'Lider'],
   [5, 'Damian Rogala', 'ŚO', 'Spokojny'], [3, 'Oskar Lis', 'BO', 'Wrażliwy'], [6, 'Michał Kurek', 'DP', 'Narwaniec'],
-  [8, 'Filip Mazur', 'DP', 'Ambitny'], [11, 'Adrian Sowa', 'SP', 'Wrażliwy'], [10, 'Tomasz Wrona', 'OP', 'Ambitny'],
-  [7, 'Kamil Dudek', 'SP', 'Spokojny'], [9, 'Jakub Orzeł', 'NAP', 'Narwaniec'],
+  [8, 'Filip Mazur', 'DP', 'Ambitny'], [11, 'Adrian Sowa', 'BP', 'Wrażliwy'], [10, 'Tomasz Wrona', 'OP', 'Ambitny'],
+  [7, 'Kamil Dudek', 'BP', 'Spokojny'], [9, 'Jakub Orzeł', 'NAP', 'Narwaniec'],
 ].map(([n, name, pos, persona]) => ({ n, name, pos, persona }));
 const awayXI = [
   [1, 'Gajda', 'BR'], [2, 'Wolny', 'BO'], [4, 'Ptak', 'ŚO'], [5, 'Kos', 'ŚO'], [3, 'Siwiec', 'BO'], [6, 'Bąk', 'DP'],

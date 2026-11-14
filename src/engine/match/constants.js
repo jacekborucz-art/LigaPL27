@@ -72,15 +72,15 @@ export const ROLE_SHARE = {
   DP: { DEF: 0.45, MID: 0.75, ATT: 0 },
   ŚP: { DEF: 0.2, MID: 0.85, ATT: 0.15 },
   OP: { DEF: 0, MID: 0.55, ATT: 0.6 },
-  SP: { DEF: 0.15, MID: 0.6, ATT: 0.45 },
+  BP: { DEF: 0.15, MID: 0.6, ATT: 0.45 },
   SN: { DEF: 0, MID: 0.3, ATT: 0.9 },
   NAP: { DEF: 0, MID: 0.1, ATT: 1.1 },
 };
 export const ZONE_N = { DEF: 4.3, MID: 3.9, ATT: 3.4 };
 
-export const SHOOT_W = { BR: 0, ŚO: 0.5, BO: 0.5, WB: 0.5, DP: 0.6, ŚP: 1.2, SP: 1.6, SN: 2.2, OP: 1.8, NAP: 3.2 };
-export const FOUL_W = { BR: 0.1, ŚO: 1.4, BO: 1.2, WB: 1.1, DP: 1.5, ŚP: 1.0, SP: 0.8, SN: 0.8, OP: 0.7, NAP: 0.9 };
-export const FATIGUE_ROLE = { WB: 1.15, SP: 1.1, SN: 1.1, ŚP: 1.05, DP: 1.05, BO: 1.05, OP: 1.0, NAP: 0.95, ŚO: 0.85, BR: 0.2 };
+export const SHOOT_W = { BR: 0, ŚO: 0.5, BO: 0.5, WB: 0.5, DP: 0.6, ŚP: 1.2, BP: 1.6, SN: 2.2, OP: 1.8, NAP: 3.2 };
+export const FOUL_W = { BR: 0.1, ŚO: 1.4, BO: 1.2, WB: 1.1, DP: 1.5, ŚP: 1.0, BP: 0.8, SN: 0.8, OP: 0.7, NAP: 0.9 };
+export const FATIGUE_ROLE = { WB: 1.15, BP: 1.1, SN: 1.1, ŚP: 1.05, DP: 1.05, BO: 1.05, OP: 1.0, NAP: 0.95, ŚO: 0.85, BR: 0.2 };
 
 // Kontuzje (8.2): [nazwa, min dni, max dni, grywalna z bólem]
 export const INJURY_TYPES = {

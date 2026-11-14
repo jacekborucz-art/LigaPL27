@@ -292,7 +292,7 @@ const ROLES = {
   DP: [['defensywny pomocnik do odbioru', ['ODB', 'AGR', 'PRA']], ['cofnięty rozgrywający', ['POD', 'WIZ', 'OPA']]],
   ŚP: [['rozgrywający', ['POD', 'WIZ', 'TEC']], ['pomocnik od pola karnego do pola karnego', ['WYT', 'PRA', 'RUC']], ['pomocnik do odbioru', ['ODB', 'AGR', 'SIL']]],
   OP: [['kreator gry', ['WIZ', 'POD', 'TEC']], ['cień napastnika', ['RUC', 'WYK', 'OPA']], ['strzelec z dystansu', ['DYS', 'TEC', 'OPA']]],
-  SP: [['klasyczny skrzydłowy z dośrodkowaniem', ['DOS', 'SZY', 'DRY']], ['pracowity boczny pomocnik', ['WYT', 'PRA', 'ODB']]],
+  BP: [['klasyczny skrzydłowy z dośrodkowaniem', ['DOS', 'SZY', 'DRY']], ['pracowity boczny pomocnik', ['WYT', 'PRA', 'ODB']]],
   SN: [['klasyczny skrzydłowy z dośrodkowaniem', ['DOS', 'SZY', 'DRY']], ['skrzydłowy schodzący do strzału', ['DRY', 'WYK', 'DYS']], ['pracowity skrzydłowy', ['WYT', 'PRA', 'ODB']]],
   NAP: [['lis pola karnego', ['WYK', 'RUC', 'OPA']], ['wysoki napastnik do gry tyłem', ['GLO', 'SIL', 'SKO']], ['szybki napastnik do kontr', ['SZY', 'RUC', 'DRY']], ['cofnięty napastnik do rozegrania', ['POD', 'WIZ', 'TEC']]],
 };

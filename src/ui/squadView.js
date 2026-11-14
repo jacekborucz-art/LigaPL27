@@ -16,7 +16,7 @@ export const SQUAD_FILTERS = [
   ['all', 'Wszyscy'], ['GK', 'Bramkarze'], ['DEF', 'Obrońcy'], ['MID', 'Pomocnicy'], ['ATT', 'Napastnicy'], ['academy', 'Akademia'],
 ];
 const GROUP_ORDER = { GK: 0, DEF: 1, MID: 2, ATT: 3 };
-const POS_ORDER = ['BR', 'ŚO', 'BO', 'WB', 'DP', 'ŚP', 'OP', 'SP', 'SN', 'NAP'];
+const POS_ORDER = ['BR', 'ŚO', 'BO', 'WB', 'DP', 'ŚP', 'OP', 'BP', 'SN', 'NAP'];
 
 /** Gwiazdki 1-5: kwantyl OVR zawodnika wśród zawodników jego ligi. */
 export function starsFor(ovr, leagueOvrsSorted) {

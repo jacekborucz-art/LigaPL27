@@ -20,6 +20,7 @@ import { ageAt } from '../training/state.js';
 import { marketValue } from '../world/playerGen.js';
 import { infraOf, applyPlan, capacityOf } from './infrastructure.js';
 import { stadiumCapacity } from './finance.js';
+import { normPos } from '../engine/positions.js';
 
 export const PACK_TYPE = 'ligapl27-datapack';
 export const PACK_V = 1;
@@ -346,6 +347,7 @@ export function parsePack(text) {
   for (const [id, o] of Object.entries(d.players ?? {})) {
     if (!ID_RE.test(id) || !isObj(o)) throw new Error('Datapack: zły wpis zawodnika.');
     const src = Object.fromEntries(PLAYER_FIELDS.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
+    if (src.pos !== undefined) src.pos = normPos(src.pos); // starsze datapacki: SP (boczny pomocnik) -> BP
     const r = checkPlayer(src);
     const bad = Object.values(r.errors)[0];
     if (bad) throw new Error(`Zawodnik ${id}: ${bad}`);

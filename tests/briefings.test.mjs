@@ -235,7 +235,7 @@ test('AI wybiera przemowę zgodnie z sytuacją i osobowością trenera', () => {
 
 // ---------------------------------------------------------------- studio
 
-const POS = ['BR', 'BR', 'ŚO', 'ŚO', 'ŚO', 'BO', 'BO', 'DP', 'ŚP', 'ŚP', 'SP', 'SP', 'OP', 'NAP', 'NAP', 'SN', 'BO', 'ŚP'];
+const POS = ['BR', 'BR', 'ŚO', 'ŚO', 'ŚO', 'BO', 'BO', 'DP', 'ŚP', 'ŚP', 'BP', 'BP', 'OP', 'NAP', 'NAP', 'SN', 'BO', 'ŚP'];
 const squad = (pref, L) => POS.map((pos, i) => ({
   id: `${pref}${i}`, name: `${pref.toUpperCase()} Gracz${i}`, pos, ovr: L - i * 0.04, persona: 'Spokojny',
   yc: { league: i === 3 ? 3 : i === 4 ? 2 : i === 6 ? 7 : 0 }, fresh: 95, form: [6.8, 7], morale: 12,

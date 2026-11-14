@@ -90,7 +90,7 @@ export function limitPanel(game) {
 // ------------------------------------------------------------ Wspólne elementy wyglądu
 // Barwy znaczeniowe (transfers.css): good zielony (pieniądze na plus, dobrze), warn bursztyn (uwaga),
 // bad czerwony (koszty, źle), info niebieski (informacja), misc fiolet (pozostałe).
-const POS_ORDER = ['BR', 'ŚO', 'BO', 'WB', 'DP', 'ŚP', 'OP', 'SP', 'SN', 'NAP'];
+const POS_ORDER = ['BR', 'ŚO', 'BO', 'WB', 'DP', 'ŚP', 'OP', 'BP', 'SN', 'NAP'];
 const MONTHS_PL = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
 const shortDate = (iso) => fmtDay(iso);
 const posBadge = (p) => `<span class="pos" data-g="${groupOf(p)}">${esc(p.pos)}</span>`;

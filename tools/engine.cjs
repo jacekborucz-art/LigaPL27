@@ -26,10 +26,10 @@ const uni = (a, b) => a + (b - a) * r();
 function pickW(obj) { let s = 0; for (const k in obj) s += obj[k]; let x = r() * s; for (const k in obj) { x -= obj[k]; if (x <= 0) return k; } return Object.keys(obj)[0]; }
 function drawXg(table) { let x = r(); for (const [p, a, b] of table) { if ((x -= p) <= 0) return uni(a, b); } const l = table[table.length - 1]; return uni(l[1], l[2]); }
 
-const ROLES = ['BR','ŚO','ŚO','BO','BO','DP','ŚP','ŚP','SP','SP','NAP'];
-const SHOOTW = { BR: 0, 'ŚO': 0.5, BO: 0.5, DP: 0.6, 'ŚP': 1.2, SP: 1.6, OP: 1.8, NAP: 3.2 };
-const FINOFF = { BR: -6, 'ŚO': -3, BO: -2.5, DP: -1.5, 'ŚP': -0.5, SP: 0.5, OP: 1, NAP: 2.5 };
-const FOULW = { BR: 0.1, 'ŚO': 1.4, BO: 1.2, DP: 1.5, 'ŚP': 1.0, SP: 0.8, OP: 0.7, NAP: 0.9 };
+const ROLES = ['BR','ŚO','ŚO','BO','BO','DP','ŚP','ŚP','BP','BP','NAP'];
+const SHOOTW = { BR: 0, 'ŚO': 0.5, BO: 0.5, DP: 0.6, 'ŚP': 1.2, BP: 1.6, OP: 1.8, NAP: 3.2 };
+const FINOFF = { BR: -6, 'ŚO': -3, BO: -2.5, DP: -1.5, 'ŚP': -0.5, BP: 0.5, OP: 1, NAP: 2.5 };
+const FOULW = { BR: 0.1, 'ŚO': 1.4, BO: 1.2, DP: 1.5, 'ŚP': 1.0, BP: 0.8, OP: 0.7, NAP: 0.9 };
 
 function team(L, sd = 0) {
   const q = L + (sd ? (r() + r() + r() - 1.5) * sd * 2 : 0);

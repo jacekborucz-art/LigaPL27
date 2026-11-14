@@ -140,11 +140,11 @@ function genPlayer(L, pos, age, slotOffset) {
 }
 ```
 
-Gwarancje struktury kadry: min. 3 BR, 7 obrońców (w tym 2 BO lewych/prawych), 8 pomocników, 4 napastników. Noga: 74 % prawa, 20 % lewa, 6 % obie. Na lewych pozycjach (BO-L, WB-L, SP-L) losuj lewą nogę z p = 0.65.
+Gwarancje struktury kadry: min. 3 BR, 7 obrońców (w tym 2 BO lewych/prawych), 8 pomocników, 4 napastników. Noga: 74 % prawa, 20 % lewa, 6 % obie. Na lewych pozycjach (BO-L, WB-L, BP-L) losuj lewą nogę z p = 0.65.
 
 ### 1.5 Profile pozycji (offset atrybutu)
 
-Symbole: `++` = +3.0, `+` = +1.5, `-` = -1.5, `--` = -3.0, brak = 0. Pozycje: BR, ŚO, BO (L/P), WB (wahadłowy L/P), DP, ŚP, OP, SP (boczny pomocnik L/P), SN (skrzydłowy napastnik L/P), NAP.
+Symbole: `++` = +3.0, `+` = +1.5, `-` = -1.5, `--` = -3.0, brak = 0. Pozycje: BR, ŚO, BO (L/P), WB (wahadłowy L/P), DP, ŚP, OP, BP (boczny pomocnik L/P; do listopada 2026 kod SP, stare zapisy i datapacki są migrowane), SN (skrzydłowy napastnik L/P), NAP.
 
 | Poz. | ++ | + | - | -- |
 |---|---|---|---|---|
@@ -155,7 +155,7 @@ Symbole: `++` = +3.0, `+` = +1.5, `-` = -1.5, `--` = -3.0, brak = 0. Pozycje: BR
 | DP | ODB, UST, POD | DEC, PRA, WYT, SIL, AGR | DRY, SZY, RUC | WYK |
 | ŚP | POD, DEC, TEC | WIZ, PRA, WYT, OPA | GLO, SKO, SIL | - |
 | OP | WIZ, TEC, POD | DRY, DYS, RUC, DEC, OPA, SFR | ODB, SIL, SKO, UST | - |
-| SP | DOS, SZY, DRY | WYT, TEC, POD, PRA | GLO, SIL, UST | - |
+| BP | DOS, SZY, DRY | WYT, TEC, POD, PRA | GLO, SIL, UST | - |
 | SN | DRY, SZY, RUC | WYK, TEC, ZWI, OPA | ODB, GLO, UST | - |
 | NAP | WYK, RUC, OPA | GLO, SIL, TEC, SZY, SKO | ODB, WIZ, DOS, UST | - |
 
@@ -250,13 +250,13 @@ Biegłość 0-100 na każdej pozycji. Naturalna = 100. Losowane alternatywy wg p
 | Pozycja | Pokrewne (biegłość start 60-90) |
 |---|---|
 | ŚO | DP, BO |
-| BO | WB, SP, ŚO |
-| WB | BO, SP |
+| BO | WB, BP, ŚO |
+| WB | BO, BP |
 | DP | ŚP, ŚO |
 | ŚP | DP, OP |
 | OP | ŚP, SN, NAP |
-| SP | SN, WB, OP |
-| SN | SP, NAP, OP |
+| BP | SN, WB, OP |
+| SN | BP, NAP, OP |
 | NAP | SN, OP |
 
 Mnożnik efektywności pozycji: `posEff = 0.70 + 0.30 * (biegłość/100)`; pozycja spoza listy: biegłość 0 -> 0.70; zawodnik z pola w bramce: oceny BR liczone z jego atrybutów bramkarskich (1-8), bez dodatkowej kary. Strona boiska: gra na przeciwnej flance -5 biegłości (prawonożny na lewym skrzydle SN: 0, bo schodzi do strzału). Biegłość rośnie +2 za mecz na pozycji, +1 za tydzień treningu taktycznego.
@@ -269,23 +269,23 @@ Współrzędne: `x` 0-100 szerokość (0 = lewa linia boczna), `y` 0-100 długo�
 
 | # | Nazwa | Ustawienie (rola: x,y) |
 |---|---|---|
-| 1 | 4-4-2 "Dwie Linie" | BR 50,5; BO 15,25; ŚO 38,21; ŚO 62,21; BO 85,25; SP 15,50; ŚP 40,47; ŚP 60,47; SP 85,50; NAP 40,75; NAP 60,75 |
+| 1 | 4-4-2 "Dwie Linie" | BR 50,5; BO 15,25; ŚO 38,21; ŚO 62,21; BO 85,25; BP 15,50; ŚP 40,47; ŚP 60,47; BP 85,50; NAP 40,75; NAP 60,75 |
 | 2 | 4-3-3 "Trójząb" | BR 50,5; BO 15,26; ŚO 38,21; ŚO 62,21; BO 85,26; DP 50,38; ŚP 32,52; ŚP 68,52; SN 15,74; NAP 50,80; SN 85,74 |
-| 3 | 4-2-3-1 "Parasol" | BR 50,5; BO 15,26; ŚO 38,21; ŚO 62,21; BO 85,26; DP 40,39; DP 60,39; SP 15,62; OP 50,62; SP 85,62; NAP 50,82 |
-| 4 | 4-1-4-1 "Kurtyna" | BR 50,5; BO 15,25; ŚO 38,21; ŚO 62,21; BO 85,25; DP 50,36; SP 15,55; ŚP 38,54; ŚP 62,54; SP 85,55; NAP 50,78 |
+| 3 | 4-2-3-1 "Parasol" | BR 50,5; BO 15,26; ŚO 38,21; ŚO 62,21; BO 85,26; DP 40,39; DP 60,39; BP 15,62; OP 50,62; BP 85,62; NAP 50,82 |
+| 4 | 4-1-4-1 "Kurtyna" | BR 50,5; BO 15,25; ŚO 38,21; ŚO 62,21; BO 85,25; DP 50,36; BP 15,55; ŚP 38,54; ŚP 62,54; BP 85,55; NAP 50,78 |
 | 5 | 4-4-2 "Diament" | BR 50,5; BO 15,26; ŚO 38,21; ŚO 62,21; BO 85,26; DP 50,36; ŚP 30,50; ŚP 70,50; OP 50,63; NAP 40,80; NAP 60,80 |
 | 6 | 3-5-2 "Wahadło" | BR 50,5; ŚO 28,22; ŚO 50,19; ŚO 72,22; WB 10,48; DP 50,39; ŚP 33,53; ŚP 67,53; WB 90,48; NAP 40,78; NAP 60,78 |
 | 7 | 3-4-3 "Wysoki Trójkąt" | BR 50,5; ŚO 28,24; ŚO 50,21; ŚO 72,24; WB 12,50; ŚP 38,47; ŚP 62,47; WB 88,50; SN 18,75; NAP 50,82; SN 82,75 |
 | 8 | 5-3-2 "Bunkier" | BR 50,5; WB 12,30; ŚO 30,20; ŚO 50,17; ŚO 70,20; WB 88,30; ŚP 30,45; DP 50,40; ŚP 70,45; NAP 42,70; NAP 58,70 |
-| 9 | 5-4-1 "Mur" | BR 50,5; WB 12,26; ŚO 30,19; ŚO 50,17; ŚO 70,19; WB 88,26; SP 15,45; ŚP 40,42; ŚP 60,42; SP 85,45; NAP 50,68 |
+| 9 | 5-4-1 "Mur" | BR 50,5; WB 12,26; ŚO 30,19; ŚO 50,17; ŚO 70,19; WB 88,26; BP 15,45; ŚP 40,42; ŚP 60,42; BP 85,45; NAP 50,68 |
 | 10 | 4-3-2-1 "Choinka" | BR 50,5; BO 15,26; ŚO 38,21; ŚO 62,21; BO 85,26; DP 50,38; ŚP 30,46; ŚP 70,46; OP 37,64; OP 63,64; NAP 50,82 |
 
 Warianty 4-4-2 (te same role co nr 1, inne linie i efekty, szczegóły i kalibracja: `docs/taktyka-i-urazy.md`):
 
 | # | Nazwa | Ustawienie (rola: x,y) |
 |---|---|---|
-| 11 | 4-4-2 defensywne "Niski Blok" | BR 50,5; BO 18,19; ŚO 39,16; ŚO 61,16; BO 82,19; SP 21,37; ŚP 41,35; ŚP 59,35; SP 79,37; NAP 45,58; NAP 57,66 |
-| 12 | 4-4-2 ofensywne "Wysokie Skrzydła" | BR 50,5; BO 13,33; ŚO 38,26; ŚO 62,26; BO 87,33; SP 12,62; ŚP 40,52; ŚP 60,52; SP 88,62; NAP 40,83; NAP 60,83 |
+| 11 | 4-4-2 defensywne "Niski Blok" | BR 50,5; BO 18,19; ŚO 39,16; ŚO 61,16; BO 82,19; BP 21,37; ŚP 41,35; ŚP 59,35; BP 79,37; NAP 45,58; NAP 57,66 |
+| 12 | 4-4-2 ofensywne "Wysokie Skrzydła" | BR 50,5; BO 13,33; ŚO 38,26; ŚO 62,26; BO 87,33; BP 12,62; ŚP 40,52; ŚP 60,52; BP 88,62; NAP 40,83; NAP 60,83 |
 
 Animacja na boisku: pozycja ikony = slot + przesunięcie fazy. Drużyna przy piłce: `y += 8 * (1 + 0.5*nastawienie)` (ograniczone do 92), drużyna broniąca: `y -= 6`, szerokość broniącej x 0.85 wokół x=50. Ikony interpolowane liniowo (lerp 0.1 na klatkę), piłka skacze do wykonawcy zdarzenia. Koszt: 23 elementy DOM/canvas, bez fizyki.
 
@@ -453,7 +453,7 @@ Udział roli w strefach `c[rola][strefa]`:
 | DP | 0.45 | 0.75 | 0 |
 | ŚP | 0.20 | 0.85 | 0.15 |
 | OP | 0 | 0.55 | 0.60 |
-| SP | 0.15 | 0.60 | 0.45 |
+| BP | 0.15 | 0.60 | 0.45 |
 | SN | 0 | 0.30 | 0.90 |
 | NAP | 0 | 0.10 | 1.10 |
 
@@ -547,7 +547,7 @@ function tick(M) {                       // M: stan meczu
   // 3. Faul
   if (rnd() < K.foulTick * M.weather.foul * M.rankFoul * M.ref.called) {
     const fi = rnd() < K.foulDefShare ? 1 - ai : ai, ft = M.teams[fi];
-    const p = pickFouler(ft);              // waga: rola (ŚO 1.4, DP 1.5, BO 1.2, ŚP 1.0, NAP 0.9, SP 0.8, OP 0.7, BR 0.1)
+    const p = pickFouler(ft);              // waga: rola (ŚO 1.4, DP 1.5, BO 1.2, ŚP 1.0, NAP 0.9, BP 0.8, OP 0.7, BR 0.1)
                                            // * (AGR/10) * agresjaInstr * (p.yc ? K.bookedFoulMul : 1)
     emit(M, 'FOUL', fi, p);
     const cm = (fi === 0 ? K.homeCardMul : K.awayCardMul) * M.ref.s * ft.cardMul * (0.7 + 0.03 * p.hidden.TMP)
@@ -589,7 +589,7 @@ function tick(M) {                       // M: stan meczu
 
 function shot(M, ai, xg, type, header) {
   const at = M.teams[ai], df = M.teams[1 - ai];
-  const s = pickShooter(at, type, header);   // waga: rola (NAP 3.2, OP 1.8, SN 2.2, SP 1.6, ŚP 1.2, DP 0.6, BO/WB 0.5, ŚO 0.5; przy główce ŚO x3)
+  const s = pickShooter(at, type, header);   // waga: rola (NAP 3.2, OP 1.8, SN 2.2, BP 1.6, ŚP 1.2, DP 0.6, BO/WB 0.5, ŚO 0.5; przy główce ŚO x3)
                                              // * RUC/10 (lub GLO/10 przy główce, DYS/10 przy DYS)
   const assister = type === 'DYS' ? null : pickAssister(at, type, s); // POD/WIZ (POZ, KON), DOS (SKR)
   const F = finishing(s, type, header) + weakFootPenalty(s);
@@ -627,7 +627,7 @@ Kondycja w meczu (co minutę, na zawodnika):
 
 ```text
 dK = 0.22 * fatMul_team * rolaMul * (1.4 - 0.04*WYT) * pogodaFat * (wiek >= 31 ? 1.1 : 1)
-rolaMul: WB 1.15, SP/SN 1.10, ŚP/DP 1.05, BO 1.05, OP 1.0, NAP 0.95, ŚO 0.85, BR 0.2
+rolaMul: WB 1.15, BP/SN 1.10, ŚP/DP 1.05, BO 1.05, OP 1.0, NAP 0.95, ŚO 0.85, BR 0.2
 kond_start = świeżość; kara efektywności: kond < 85 -> -0.04*(85 - kond) pkt
 ```
 Przykład: WYT 10, normalna taktyka: 95 -> ~75 po 90'. Wysoki pressing + szybkie tempo, WYT 8: 95 -> ~62 (kara -0.9 pkt pod koniec).
@@ -809,7 +809,7 @@ Patrz 2.3. Dodatkowo forma dnia: na początku meczu `dayForm = gauss() * (0.9 - 
 ### 9.2 Chemia i zgranie
 
 - Zgranie formacji (familiarity) 0-100 na każdą formację: +4 za mecz, +1 za trening taktyczny, -1/tydzień bez użycia (min 30). Kara: `-(100 - fam)*0.006` pkt do wszystkich stref (max -0.4).
-- Zgranie linii: dla par sąsiednich zawodników w formacji (np. ŚO-ŚO, BO-SP) licznik wspólnych meczów; chemia linii = min(1, wspólne/10). Strefa DEF i MID: `+0.3*(śr. chemia - 0.5)` pkt.
+- Zgranie linii: dla par sąsiednich zawodników w formacji (np. ŚO-ŚO, BO-BP) licznik wspólnych meczów; chemia linii = min(1, wspólne/10). Strefa DEF i MID: `+0.3*(śr. chemia - 0.5)` pkt.
 - Nowy zawodnik: chemia startuje od 0, obcokrajowiec bez znajomości języka: przez pierwsze 8 tygodni x0.7 przyrostu.
 
 ### 9.3 Zmęczenie w sezonie (mecze co 3 dni)

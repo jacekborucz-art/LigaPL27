@@ -4,8 +4,8 @@
 
 import { clamp } from '../core/rng.js';
 
-export const POSITIONS = ['BR', 'ŚO', 'BO', 'WB', 'DP', 'ŚP', 'OP', 'SP', 'SN', 'NAP'];
-const SIDED = new Set(['BO', 'WB', 'SP', 'SN']);
+export const POSITIONS = ['BR', 'ŚO', 'BO', 'WB', 'DP', 'ŚP', 'OP', 'BP', 'SN', 'NAP'];
+const SIDED = new Set(['BO', 'WB', 'BP', 'SN']);
 /** Kolejność pozycji na listach (od bramkarza do napastnika). */
 export const posRank = (pos) => { const i = POSITIONS.indexOf(pos); return i < 0 ? POSITIONS.length : i; };
 /** Porównanie do sortowania list zawodników: pozycja nominalna, potem ocena ogólna malejąco. */
@@ -14,15 +14,15 @@ export const byPosition = (a, b) => posRank(a.pos) - posRank(b.pos) || (b.ovr ??
 // Biegłość 0-100 na innej pozycji, wynikająca z naturalnej pozycji (wiersz -> kolumna).
 // Zawodnik z pola w bramce: 8. Bramkarz w polu: 15.
 const F = {
-  ŚO: { BO: 60, WB: 45, DP: 70, ŚP: 45, OP: 25, SP: 30, SN: 20, NAP: 30 },
-  BO: { ŚO: 55, WB: 85, DP: 50, ŚP: 45, OP: 30, SP: 70, SN: 45, NAP: 25 },
-  WB: { ŚO: 40, BO: 85, DP: 45, ŚP: 45, OP: 35, SP: 85, SN: 60, NAP: 30 },
-  DP: { ŚO: 70, BO: 45, WB: 45, ŚP: 85, OP: 55, SP: 45, SN: 30, NAP: 30 },
-  ŚP: { ŚO: 40, BO: 40, WB: 50, DP: 85, OP: 80, SP: 65, SN: 50, NAP: 45 },
-  OP: { ŚO: 20, BO: 25, WB: 35, DP: 50, ŚP: 80, SP: 65, SN: 70, NAP: 70 },
-  SP: { ŚO: 25, BO: 65, WB: 80, DP: 40, ŚP: 65, OP: 65, SN: 85, NAP: 50 },
-  SN: { ŚO: 20, BO: 35, WB: 55, DP: 25, ŚP: 45, OP: 70, SP: 85, NAP: 75 },
-  NAP: { ŚO: 30, BO: 25, WB: 30, DP: 30, ŚP: 40, OP: 65, SP: 50, SN: 75 },
+  ŚO: { BO: 60, WB: 45, DP: 70, ŚP: 45, OP: 25, BP: 30, SN: 20, NAP: 30 },
+  BO: { ŚO: 55, WB: 85, DP: 50, ŚP: 45, OP: 30, BP: 70, SN: 45, NAP: 25 },
+  WB: { ŚO: 40, BO: 85, DP: 45, ŚP: 45, OP: 35, BP: 85, SN: 60, NAP: 30 },
+  DP: { ŚO: 70, BO: 45, WB: 45, ŚP: 85, OP: 55, BP: 45, SN: 30, NAP: 30 },
+  ŚP: { ŚO: 40, BO: 40, WB: 50, DP: 85, OP: 80, BP: 65, SN: 50, NAP: 45 },
+  OP: { ŚO: 20, BO: 25, WB: 35, DP: 50, ŚP: 80, BP: 65, SN: 70, NAP: 70 },
+  BP: { ŚO: 25, BO: 65, WB: 80, DP: 40, ŚP: 65, OP: 65, SN: 85, NAP: 50 },
+  SN: { ŚO: 20, BO: 35, WB: 55, DP: 25, ŚP: 45, OP: 70, BP: 85, NAP: 75 },
+  NAP: { ŚO: 30, BO: 25, WB: 30, DP: 30, ŚP: 40, OP: 65, BP: 50, SN: 75 },
 };
 const OUTFIELD_IN_GOAL = 8;
 const GK_IN_FIELD = 15;
@@ -122,4 +122,60 @@ export function validateLineup(lineup, { bench = [], formationSlots = 11 } = {})
   if (gks.length !== 1) errors.push('W składzie musi być dokładnie jeden bramkarz');
   for (const p of bench) if (ids.has(p.id)) errors.push(`${p.name ?? p.id} jest jednocześnie w składzie i na ławce`);
   return errors;
+}
+
+// ------------------------------------------------------------ Migracja kodów pozycji w zapisach
+// Boczny pomocnik miał kod SP (mylony ze ŚP), teraz BP. "SP" w zapisie znaczy też stały fragment
+// (pole kind w zdarzeniach meczu) i Superpuchar lub sparing (id meczów), więc zmieniamy tylko pola pozycji.
+export const POS_CODES_V = 2;
+const OLD_POS = { SP: 'BP' };
+const POS_FIELDS = new Set(['pos', 'natPos', 'fromPos', 'outPos', 'inPos']); // wartość: kod pozycji
+const POS_LISTS = new Set(['drop', 'dropPos']); // tablica kodów pozycji (plan gry w osłabieniu)
+const POS_MAPS = new Set(['alt']); // obiekt z kluczami pozycji (biegłość na innych pozycjach)
+const POS_KEYS = new Set([...POSITIONS, ...Object.keys(OLD_POS)]);
+/** Obiekt kluczowany pozycjami (np. tabela wag): wszystkie klucze to kody pozycji, w tym co najmniej jedna inna niż stary kod. */
+const isPosMap = (o, keys) => keys.length > 1 && keys.every((k) => POS_KEYS.has(k)) && keys.some((k) => POSITIONS.includes(k));
+
+/** Stary kod pozycji na nowy (inne wartości bez zmian). Dla danych z zewnątrz, np. datapacku. */
+export const normPos = (pos) => OLD_POS[pos] ?? pos;
+
+/**
+ * Jednorazowa migracja zapisu: kody pozycji SP -> BP u zawodników (pos, alt, trening), w historii transferów,
+ * raportach, datapacku edytora i innych polach pozycji. Znacznik game.posCodes chroni przed powtórką.
+ * Zwraca liczbę zmienionych wartości.
+ */
+export function migratePosCodes(game) {
+  if (!game || typeof game !== 'object' || game.posCodes >= POS_CODES_V) return 0;
+  let n = 0;
+  const seen = new Set();
+  const walk = (o) => {
+    if (!o || typeof o !== 'object' || seen.has(o)) return;
+    seen.add(o);
+    if (Array.isArray(o)) { for (const v of o) walk(v); return; }
+    const keys = Object.keys(o);
+    for (const k of keys) {
+      const v = o[k];
+      if (typeof v === 'string') { if (POS_FIELDS.has(k) && OLD_POS[v]) { o[k] = OLD_POS[v]; n++; } continue; }
+      if (!v || typeof v !== 'object') continue;
+      if (Array.isArray(v) && POS_LISTS.has(k)) v.forEach((x, i) => { if (OLD_POS[x]) { v[i] = OLD_POS[x]; n++; } });
+      else if (!Array.isArray(v)) {
+        const vk = Object.keys(v);
+        if (vk.some((x) => OLD_POS[x]) && (POS_MAPS.has(k) || isPosMap(v, vk))) {
+          // nowy obiekt z tą samą kolejnością kluczy
+          o[k] = Object.fromEntries(vk.map((x) => [OLD_POS[x] && !(OLD_POS[x] in v) ? OLD_POS[x] : x, v[x]]));
+          n++;
+          walk(o[k]);
+          continue;
+        }
+      }
+      walk(v);
+    }
+  };
+  walk(game);
+  // Gotowe teksty w poczcie: "Jan Kowalski (SP): ..." albo "(SP, 21 lat)"
+  for (const m of Array.isArray(game.inbox) ? game.inbox : []) {
+    for (const f of ['title', 'body']) if (typeof m?.[f] === 'string' && /\(SP[,)]/.test(m[f])) { m[f] = m[f].replace(/\(SP(?=[,)])/g, '(BP'); n++; }
+  }
+  game.posCodes = POS_CODES_V;
+  return n;
 }

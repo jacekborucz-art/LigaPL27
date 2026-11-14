@@ -23,7 +23,7 @@ import { esc, fmtDate } from './dom.js';
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (club, size) => crestHtml(club, { size, clubsById });
-const POS_ORDER = ['BR', 'BO', 'ŚO', 'WB', 'DP', 'ŚP', 'OP', 'SP', 'SN', 'NAP'];
+const POS_ORDER = ['BR', 'BO', 'ŚO', 'WB', 'DP', 'ŚP', 'OP', 'BP', 'SN', 'NAP'];
 
 /** Czy klub ma widok (polski klub z kadrą w świecie gry). */
 export const hasClubView = (game, id) => !!(clubById(id) && game?.world?.clubs?.[id]);

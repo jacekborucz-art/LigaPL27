@@ -5,7 +5,7 @@
 import { clamp } from '../core/rng.js';
 
 export const GROUP = {
-  BR: 'GK', ŚO: 'DEF', BO: 'DEF', WB: 'DEF', DP: 'MID', ŚP: 'MID', OP: 'MID', SP: 'MID', SN: 'ATT', NAP: 'ATT',
+  BR: 'GK', ŚO: 'DEF', BO: 'DEF', WB: 'DEF', DP: 'MID', ŚP: 'MID', OP: 'MID', BP: 'MID', SN: 'ATT', NAP: 'ATT',
 };
 
 // Pierwsza drużyna: minimum, cel i maksimum na grupę pozycji. Bramkarzy zawsze co najmniej 3.
