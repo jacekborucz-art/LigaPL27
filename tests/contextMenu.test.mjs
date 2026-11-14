@@ -39,7 +39,7 @@ const top = (m) => m.items.filter((x) => !x.sep).map((x) => x.label);
 const outIds = (g) => squadOf(g.world, g.clubId).map((p) => p.id).filter((id) => !g.tactics.xi.includes(id) && !g.tactics.bench.includes(id));
 
 // Akcje, które obsługuje app.js (kliknięcia data-act); prefiksy tf-, tt-, tr- mają własne handlery widoków.
-const APP_ACTS = new Set(['tab', 'tsub', 'player', 'tpick', 'tmove', 'tbench', 'tunbench', 'tcancel', 'tinfo', 'trole', 'extplayer', 'arep']);
+const APP_ACTS = new Set(['tab', 'tsub', 'player', 'tpick', 'tmove', 'tbench', 'tunbench', 'tcancel', 'tinfo', 'trole', 'extplayer', 'arep', 'ac-promote']);
 const TF_ACTS = new Set(['tf-open', 'tf-offer', 'tf-loan', 'tf-negotiate', 'tf-renew', 'tf-list-own', 'tf-unlist', 'tf-keep', 'tf-release']);
 const TR_ACTS = new Set(['tr-tab', 'tr-player', 'tr-focus', 'tr-mode', 'tr-pos', 'tr-prog']);
 
@@ -96,11 +96,11 @@ test('Kadra: własny zawodnik ma profil, skład meczowy, rozmowę, trening i kon
   assert.match(find(m3, 'Przedłuż kontrakt').disabled, /Wypożyczony z/);
 });
 
-test('Akademia: tylko profil, raport asystenta i trening indywidualny', () => {
+test('Akademia: przeniesienie do pierwszego składu, profil, raport asystenta i trening indywidualny', () => {
   const g = newGame();
   const a = academyOf(g.world, g.clubId)[0];
   const m = menu(g, a.id, 'squad');
-  assert.deepEqual(top(m), ['Profil zawodnika', 'Raport asystenta', 'Akcent indywidualny', 'Obciążenie', 'Nauka pozycji', 'Program', 'Ustawienia treningu']);
+  assert.deepEqual(top(m), ['Przenieś do pierwszego składu', 'Profil zawodnika', 'Raport asystenta', 'Akcent indywidualny', 'Obciążenie', 'Nauka pozycji', 'Program', 'Ustawienia treningu']);
   assert.equal(m.note, 'Akademia');
 });
 
