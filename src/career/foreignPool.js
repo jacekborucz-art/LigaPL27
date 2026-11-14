@@ -153,9 +153,9 @@ function priceMulFor(nat, rng) {
 }
 
 /** Jeden zawodnik puli: poziom, potem status (wolny albo kontrakt za granicą) z szansy poziomu. */
-function genPoolPlayer(rng, id, date) {
+function genPoolPlayer(rng, id, date, { free = null } = {}) {
   const band = rng.weighted(BANDS, (b) => b.w);
-  const status = rng.chance(band.free) ? 'free' : 'contract';
+  const status = free === true || (free == null && rng.chance(band.free)) ? 'free' : 'contract'; // free: wymuszony wolny (zastępstwo za wolnego, mindset.js)
   const L = band.L[0] + rng.next() * (band.L[1] - band.L[0]);
   const age = rng.int(band.age[0], band.age[1]);
   const [pos, side] = rng.pick(SQUAD_LAYOUT);
@@ -186,7 +186,7 @@ function genPoolPlayer(rng, id, date) {
 }
 
 /** Dodaje n zawodników do puli (deterministycznie z ziarna gry i znacznika). Zwraca dodanych. */
-export function addPoolPlayers(game, n, date, tag) {
+export function addPoolPlayers(game, n, date, tag, { free = null } = {}) {
   const M = game.market; const W = game.world;
   if (!Array.isArray(M.foreign)) M.foreign = [];
   const rng = new Rng(`zagranica:${game.seed}:${tag}`);
@@ -195,7 +195,7 @@ export function addPoolPlayers(game, n, date, tag) {
   for (let i = 0; i < n; i++) {
     let id;
     do id = `zag-${tag}-${++k}`; while (W.players[id] && k < 10000);
-    const p = genPoolPlayer(rng, id, date);
+    const p = genPoolPlayer(rng, id, date, { free });
     W.players[id] = p;
     M.foreign.push(id);
     if (p.free) M.free.push(id);

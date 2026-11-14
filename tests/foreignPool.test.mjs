@@ -317,3 +317,23 @@ test('Nastawienie zawodnika z kontraktem za granicą liczone z ligi (poolSellerC
     assert.ok(['chętny', 'otwarty', 'niechętny', 'odmowa'].includes(playerWillingness(g, p).verdict));
   }
 });
+
+test('Wolni bez klubu przez dłuższy czas znikają z listy, w ich miejsce od razu pojawiają się nowi (liczba bez zmian)', async () => {
+  const { retireFreeAgents, freeLeaveChance } = await import('../src/career/mindset.js');
+  assert.equal(freeLeaveChance({ age: 25 }, 1), 0, 'pierwsze miesiące bez zmian');
+  assert.ok(freeLeaveChance({ age: 25 }, 6) > freeLeaveChance({ age: 25 }, 3), 'im dłużej bez klubu, tym większa szansa');
+  assert.ok(freeLeaveChance({ age: 31 }, 4) > freeLeaveChance({ age: 24 }, 4), 'starsi szybciej');
+  const g = newGame();
+  const before = g.market.free.length;
+  // wszyscy wolni od 8 miesięcy bez klubu
+  for (const id of g.market.free) g.world.players[id].freeSince = '2026-03-01';
+  const old = new Set(g.market.free);
+  const r = retireFreeAgents(g, '2026-11-01');
+  assert.ok(r.left >= 5, `zniknęło ${r.left}`);
+  assert.equal(g.market.free.length, Math.min(before, 150), 'liczba wolnych bez zmian (do limitu rynku)');
+  const fresh = g.market.free.filter((id) => !old.has(id));
+  assert.equal(fresh.length, r.added);
+  for (const id of fresh) assert.equal(g.world.players[id].freeSince, '2026-11-01');
+  for (const id of old) if (!g.market.free.includes(id)) assert.ok(!g.world.players[id], 'zniknięty usunięty ze świata');
+  assert.ok(g.market.foreign.every((id) => g.world.players[id]), 'pula bez usuniętych');
+});

@@ -261,3 +261,8 @@ po sezonach 2026/27, 2027/28, 2028/29:
 z czołówki co czwarty, importy 22, przesunięcie -0,3) podnosiła Ekstraklasę do 11,85-11,90 w trzecim sezonie.
 Z puli w sezonie: 17-23 wolnych podpisanych przez transakcje i 3-6 kupionych przez kluby AI (ziarno 5,
 `tstats.poolFree`, `poolBought`), uzupełnienia 21-69 zawodników na okno.
+
+
+## Rotacja wolnych zawodników (Nov 14, 2026)
+
+1. dnia każdego miesiąca wolny zawodnik, który długo nie znajduje klubu, może zniknąć z rynku (koniec kariery, gra za granicą albo w niższej lidze) [SZAC]: pierwsze 2 miesiące bez zmian, potem 8 % i +5 % za każdy kolejny miesiąc (najwyżej 45 %), zawodnicy 30+ x1,5, weterani 32+ po pół roku co najmniej 15 %. Na jego miejsce od razu pojawia się nowy, losowy wolny zawodnik (za zawodnika z puli zagranicznej: nowy z puli, za pozostałych: zwykły wolny), dopóki na rynku jest mniej niż 150 wolnych. Na każdej grupie pozycji zawsze zostaje kilku wolnych (bramkarze 8, obrońcy i pomocnicy 14, napastnicy 10), bo kluby AI uzupełniają nimi braki w kadrze. Kluby AI z brakiem w kadrze wybierają najpierw najlepszego z wolnych, na których je stać (`aiBuy`).

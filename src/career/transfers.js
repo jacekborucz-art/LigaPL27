@@ -299,9 +299,11 @@ function aiBuy(game, club, date, rng, log) {
   // Najlepszy z chętnych: odmowa najlepszego nie blokuje zakupu (pięciu pierwszych; braki w kadrze, np. bramkarz po powrocie z wypożyczenia)
   // Przy braku w kadrze także pensja w zasięgu budżetu płac (inaczej rozmowy z najlepszym upadają co tydzień)
   const asks = (x) => (x.p.contract?.wage ?? effectiveAsk(x.p, club.tier, payLevel(club))) <= Math.max(500, room) * 1.1;
-  const pick = pool.sort((a, b) => (b.p.ovr - b.fee / 5e6) - (a.p.ovr - a.fee / 5e6)).slice(0, 8)
-    .filter((x, i) => i < 5 || (needs.length && asks(x))).sort((a, b) => (needs.length ? asks(b) - asks(a) : 0))
-    .find((x) => playerWillingness(game, x.p, club.id).verdict !== 'odmowa');
+  const rank = (a, b) => (b.p.ovr - b.fee / 5e6) - (a.p.ovr - a.fee / 5e6);
+  // Brak w kadrze: najpierw najlepsi z tych, na których klub stać (wcześniej drodzy wolni wypierali tanich z ośmiu kandydatów)
+  const ordered = needs.length ? [...pool.filter(asks).sort(rank).slice(0, 8), ...pool.filter((x) => !asks(x)).sort(rank).slice(0, 3)]
+    : pool.sort(rank).slice(0, 5);
+  const pick = ordered.find((x) => playerWillingness(game, x.p, club.id).verdict !== 'odmowa');
   if (!pick) return null;
   const p = pick.p;
   const caps = boardCaps(game, club.id, p, 'sign', cb);
