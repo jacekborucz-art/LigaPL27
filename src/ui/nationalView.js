@@ -7,10 +7,10 @@ import { esc, fmtDate, weekday } from './dom.js';
 import { anyClub } from '../season/season.js';
 import { ntName, lnGroupTable, euroGroupTable, teamMatches, ntTeam } from '../season/national.js';
 import { bindRatings } from '../season/intl/ratings.js';
-import { tourPeriod } from '../season/intl/windows.js';
+import { tourPeriod, addDaysIso } from '../season/intl/windows.js';
 import { tableOf } from '../season/intl/sim.js';
 import {
-  asNt, intlName, compLabel, lnTable, uqTable, cqTable, intlTeamMatches, FMT, COMP_NAME, CONF_NAME, ROUND_NAME, STAGE_LABEL, stageRank, tourName, tourKey,
+  asNt, intlName, compLabel, groupLabel, lnTable, tourSchedule, uqTable, cqTable, intlTeamMatches, FMT, COMP_NAME, CONF_NAME, ROUND_NAME, STAGE_LABEL, stageRank, tourName, tourKey,
 } from '../season/intl/engine.js';
 import { hostsFor } from '../season/intl/hosts.js';
 import { ufxRow } from './europeView.js';
@@ -56,11 +56,19 @@ const winnerOfNt = (m) => {
 function ntRow(m, { label = true } = {}) {
   const r = m.played ? m.result : null;
   const pol = m.home === 'POL' || m.away === 'POL';
-  const info = [label ? compLabel(m) : '', m.group ? `grupa ${m.group}` : '', m.leg ? (m.leg === 1 ? '1. mecz' : 'rewanż') : '', m.path ? `ścieżka ${m.path}` : '', r?.shootout ? `karne ${r.shootout[0]}:${r.shootout[1]}` : r?.extraTime ? 'po dogrywce' : ''].filter(Boolean).join(', ');
+  const info = [label ? compLabel(m) : '', groupLabel(m), m.leg ? (m.leg === 1 ? '1. mecz' : 'rewanż') : '', m.path ? `ścieżka ${m.path}` : '', r?.shootout ? `karne ${r.shootout[0]}:${r.shootout[1]}` : r?.extraTime ? 'po dogrywce' : ''].filter(Boolean).join(', ');
   return ufxRow({ cls: pol ? 'is-pl' : '', date: esc(shortDay(m.date)), home: m.home, away: m.away, sh: r ? r.score[0] : null, sa: r ? r.score[1] : null,
     time: '–', sub: esc(info), winner: winnerOfNt(m), nameOf: intlName, crestOf: () => '', flagOf: () => '' });
 }
-const list = (title, ms, opts) => (ms.length ? `<section class="stat-sec"><h3>${esc(title)}</h3><ul class="ufxlist">${ms.map((m) => ntRow(m, opts)).join('')}</ul></section>` : '');
+// Lista meczów: w kolumnach siatki (PC) zawsze układ zwarty, drużyny jedna pod drugą; wide: pełna szerokość
+const list = (title, ms, opts = {}) => (ms.length ? `<section class="stat-sec${opts.wide ? '' : ' ntlist'}"><h3>${esc(title)}</h3><ul class="ufxlist${opts.wide ? '' : ' ufxlist--compact'}">${ms.map((m) => ntRow(m, opts)).join('')}</ul></section>` : '');
+/** Faza pucharowa Ligi Narodów: kolumny etapów (ćwierćfinały, baraże, finały). */
+function lnKo(ms) {
+  const cols = [['Ćwierćfinały', (m) => m.round === 'QF' || m.comp === 'LNQF'], ['Baraże A/B', (m) => m.round === 'AB' || m.comp === 'LNAB'], ['Baraże B/C', (m) => m.round === 'BC' || m.comp === 'LNBC'],
+    ['Finały', (m) => ['SF', '3', 'F'].includes(m.round) || m.comp === 'LNF']].map(([t, f]) => [t, ms.filter(f)]).filter(([, x]) => x.length);
+  if (!cols.length) return '';
+  return `<section class="stat-sec ntko"><h3>Faza pucharowa i baraże</h3><div class="ntko__cols">${cols.map(([t, x]) => `<div class="ntko__col"><h4>${esc(t)}</h4><ul class="ufxlist ufxlist--compact">${x.map((m) => ntRow(m, { label: false })).join('')}</ul></div>`).join('')}</div></section>`;
+}
 
 function table(rows, title, zones = () => '', note = '') {
   return `<section class="stat-sec"><h3>${esc(title)}${note ? ` <small class="muted">${esc(note)}</small>` : ''}</h3><div class="tbl tbl--nt" role="table">
@@ -74,10 +82,13 @@ const LN_ZONE = (lg) => (p) => (lg === 'A' ? (p <= 8 ? 'up' : p >= 17 ? 'down' :
 const LN_LEGEND = legend([['up', 'Liga A: ćwierćfinał; B i C: awans'], ['playoff', 'Baraż o awans'], ['playoff-down', 'Baraż o utrzymanie'], ['down', 'Spadek']]);
 
 /** Drabinka: rundy pucharowe obok siebie (PC) albo jedna pod drugą (telefon). */
-function bracket(c, rounds) {
-  const cols = rounds.map((k) => [k, c.m.filter((m) => m.k === k).map((m) => asNt(c, m))]).filter(([, ms]) => ms.length);
-  if (!cols.length) return '';
-  return `<section class="stat-sec ntko"><h3>Faza pucharowa</h3><div class="ntko__cols">${cols.map(([k, ms]) => `<div class="ntko__col"><h4>${esc(cap(ROUND_NAME[k] ?? k))}</h4><ul class="ufxlist ufxlist--compact">${ms.map((m) => ntRow(m, { label: false })).join('')}</ul></div>`).join('')}</div></section>`;
+function bracket(c, rounds, started) {
+  const fmt = FMT[c.type];
+  const days = tourSchedule(fmt, c.len);
+  const dayOf = (k) => addDaysIso(c.from, k === '3' ? days.third : days.ko[fmt.ko.indexOf(k)]);
+  const cols = rounds.filter((k) => k !== '3' || fmt.third).map((k) => [k, c.m.filter((m) => m.k === k).map((m) => asNt(c, m))]);
+  if (!cols.some(([, ms]) => ms.length) && !started) return '';
+  return `<section class="stat-sec ntko"><h3>Faza pucharowa</h3><div class="ntko__cols">${cols.map(([k, ms]) => `<div class="ntko__col"><h4>${esc(cap(ROUND_NAME[k] ?? k))}</h4>${ms.length ? `<ul class="ufxlist ufxlist--compact">${ms.map((m) => ntRow(m, { label: false })).join('')}</ul>` : `<p class="hint">Od ${esc(fmtDate(dayOf(k)))}, pary po poprzedniej rundzie.</p>`}</div>`).join('')}</div></section>`;
 }
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const flagLine = (c) => `${c.host?.length ? `Gospodarze: ${names(c.host)}. ` : ''}${c.from ? `${fmtDate(c.from)} - ${fmtDate(c.to)}.` : ''}`;
@@ -123,9 +134,9 @@ function polView(game) {
   const best = bestResults(game);
   return `<p class="hint">${er ? `Siła reprezentacji: Elo ${er.elo} (${er.rank}. miejsce na świecie), L ${er.L.toFixed(1)}. Elo zmienia się po każdym meczu.` : ''}</p>
     ${polGroup(game)}
-    ${list('Najbliższe mecze', next)}
-    ${list('Ostatnie wyniki', done)}
-    ${best.length ? `<section class="stat-sec"><h3>Najlepsze wyniki w grze</h3><ol class="stat-list">${best.map(([t, h]) => `<li><span>${esc(t)}<small>${esc(h.year)}</small></span><b>${esc(h.polandResult ?? '')}</b></li>`).join('')}</ol></section>` : ''}`;
+    ${list('Najbliższe mecze', next, { wide: true })}
+    ${list('Ostatnie wyniki', done, { wide: true })}
+    ${best.length ? `<section class="stat-sec"><h3>Najlepsze wyniki w grze</h3><ol class="ntfacts">${best.map(([t, h]) => `<li><span>${esc(t)}<small>${esc(h.year)}</small></span><b>${esc(h.polandResult ?? '')}</b></li>`).join('')}</ol></section>` : ''}`;
 }
 
 // ------------------------------------------------------------ Liga Narodów
@@ -135,7 +146,7 @@ function lnView(game) {
   const ko = c.m.filter((m) => m.k).map((m) => asNt(c, m));
   const head = `<p class="hint">Liga Narodów ${c.y}/${String(c.y + 1).slice(2)}: trzy ligi po 18 drużyn, każda drużyna 6 meczów (po 2 rywali z każdego koszyka). Ćwierćfinały i baraże w marcu, finały w czerwcu ${c.y + 1}.</p>`;
   return `${c.champion ? `<p class="panel__lead">Zwycięzca Ligi Narodów: ${esc(ntName(c.champion))}</p>` : ''}${head}
-    ${ko.length ? list('Faza pucharowa i baraże', ko.sort((a, b) => a.date.localeCompare(b.date))) : ''}
+    ${lnKo(ko.sort((a, b) => a.date.localeCompare(b.date)))}
     ${['A', 'B', 'C'].map((lg) => table(lnTable(c, lg), `Liga ${lg}`, LN_ZONE(lg))).join('')}${LN_LEGEND}`;
 }
 function ln26View(game) {
@@ -144,7 +155,7 @@ function ln26View(game) {
   const zone = (g) => (p, n) => (g.startsWith('A') ? (p <= 2 ? 'up' : '') : (p === 1 ? 'up' : p === 2 ? 'playoff' : p === n && !g.startsWith('D') ? 'down' : ''));
   const ko = N.ln.ko ? Object.values(N.matches).filter((m) => ['LNQF', 'LNAB', 'LNBC', 'LNF'].includes(m.comp)).sort((a, b) => a.date.localeCompare(b.date)) : [];
   return `${N.ln.champion ? `<p class="panel__lead">Zwycięzca Ligi Narodów: ${esc(ntName(N.ln.champion))}</p>` : ''}
-    ${ko.length ? list('Faza pucharowa i baraże', ko) : '<p class="hint">Ćwierćfinały i baraże losowane po fazie ligowej (koniec listopada).</p>'}
+    ${ko.length ? lnKo(ko) : '<p class="hint">Ćwierćfinały i baraże losowane po fazie ligowej (koniec listopada).</p>'}
     ${Object.keys(N.ln.groups).map((g) => table(lnGroupTable(N, g), `Grupa ${g}`, zone(g))).join('')}`;
 }
 
@@ -169,14 +180,14 @@ function qView(game) {
   const po = q.m.filter((m) => m.k).map((m) => asNt(q, m));
   const groupMs = pg ? q.m.filter((m) => m.g === pg).map((m) => asNt(q, m)) : [];
   return `<p class="hint">Eliminacje: ${esc(name)}. Gospodarze: ${esc(names(q.hosts))}. ${esc(rule)}</p>
-    ${q.paths?.length ? `<section class="stat-sec"><h3>Baraże</h3><ol class="stat-list">${q.paths.map((p) => `<li><span>Ścieżka ${esc(p.id)}<small>${esc(names(p.teams))}</small></span><b>${esc(p.winner ? ntName(p.winner) : '')}</b></li>`).join('')}</ol></section>` : ''}
+    ${q.paths?.length ? `<section class="stat-sec"><h3>Baraże</h3><ol class="ntfacts">${q.paths.map((p) => `<li><span>Ścieżka ${esc(p.id)}<small>${esc(names(p.teams))}</small></span><b>${esc(p.winner ? ntName(p.winner) : '')}</b></li>`).join('')}</ol></section>` : ''}
     ${list('Mecze barażowe', po)}
     ${order.map((g) => table(uqTable(q, g), `Grupa ${g}`, (p) => (p === 1 ? 'up' : p === 2 ? 'playoff' : ''))).join('')}
     ${list(`Mecze grupy ${pg ?? ''}`, groupMs, { label: false })}`;
 }
 
 // ------------------------------------------------------------ Turniej finałowy
-function tournamentBlock(c, { polFirst = true } = {}) {
+function tournamentBlock(c, { polFirst = true, started = true } = {}) {
   const fmt = FMT[c.type];
   const order = Object.keys(c.groups);
   const pg = polFirst ? order.find((g) => c.groups[g].includes('POL')) : null;
@@ -184,7 +195,7 @@ function tournamentBlock(c, { polFirst = true } = {}) {
   const zone = (p) => (p <= 2 ? 'up' : p === 3 && fmt.thirds ? 'playoff' : '');
   return `${c.champion ? `<p class="panel__lead">${esc(tourName(c.key))}: ${esc(ntName(c.champion))}</p>` : ''}
     <p class="hint">${esc(flagLine(c))} ${fmt.n} drużyn, ${fmt.groups} grup po 4; do fazy pucharowej 2 najlepsze${fmt.thirds ? ` i ${fmt.thirds} najlepszych z 3. miejsc` : ''}.</p>
-    ${bracket(c, [...fmt.ko.slice(0, -1), '3', 'F'])}
+    ${bracket(c, [...fmt.ko.slice(0, -1), '3', 'F'], started)}
     ${sorted.map((g) => table(tableOf(c.groups[g], c.m.filter((m) => m.g === g)), `Grupa ${g}`, zone)).join('')}
     ${fmt.thirds ? legend([['up', 'Awans'], ['playoff', 'Awans z 3. miejsca (najlepsze)']]) : ''}`;
 }
@@ -194,7 +205,7 @@ function tourView(game) {
   if (c && c.key === key) {
     const pg = Object.entries(c.groups).find(([, t]) => t.includes('POL'))?.[0];
     const polMs = pg ? c.m.filter((m) => m.h === 'POL' || m.a === 'POL').map((m) => asNt(c, m)) : [];
-    return `${tournamentBlock(c)}${list('Mecze Polski', polMs, { label: false })}`;
+    return `${tournamentBlock(c, { started: game.date >= c.from })}${list('Mecze Polski', polMs, { label: false })}`;
   }
   const [type, ys] = key.split('-'); const y = Number(ys);
   const H = game.intl ? hostsFor(game.intl.hosts, game.intl.seed, key, (x) => ntTeam(x)?.konfederacja) : [];
@@ -211,7 +222,7 @@ function worldView(game) {
     const st = c.st === 'done' ? `Zwycięzca: ${ntName(c.champion)}` : game.date >= c.from ? 'w trakcie' : `start ${fmtDate(c.from)}`;
     return `<details class="stat-sec ntcard"${c.st !== 'done' && game.date >= c.from ? ' open' : ''}><summary><h3>${esc(tourName(c.key))} <small class="muted">${esc(st)}</small></h3></summary>
       ${f?.s ? `<p class="hint">Finał: ${esc(ntName(f.h))} - ${esc(ntName(f.a))} ${f.s[0]}:${f.s[1]}${f.p ? ` (karne ${f.p[0]}:${f.p[1]})` : f.x ? ' (po dogrywce)' : ''}</p>` : ''}
-      <div class="nt-grid nt-grid--sub">${tournamentBlock(c, { polFirst: false })}</div></details>`;
+      <div class="nt-grid nt-grid--sub">${tournamentBlock(c, { polFirst: false, started: game.date >= c.from })}</div></details>`;
   }).join('');
   const cq = comps(game).filter((c) => c.type === 'CQ').sort((a, b) => a.conf.localeCompare(b.conf));
   const cqHtml = cq.map((c) => `<details class="stat-sec ntcard"><summary><h3>Eliminacje MŚ ${c.T}: ${esc(CONF_NAME[c.conf])} <small class="muted">${c.st === 'done' ? `awans: ${esc(names(c.direct))}` : 'w trakcie'}</small></h3></summary>
@@ -254,12 +265,12 @@ function histView(game) {
       ${rows.map((h) => `<div class="nthist__row${h.champion === 'POL' ? ' is-me' : ''}" role="row"><span>${esc(h.edition ?? h.year)}</span><span>${esc(h.host ? names(h.host) : '')}</span><b>${esc(ntName(h.champion))}</b><span>${esc(ntName(h.runnerUp))}</span>${pol ? `<span class="nthist__pol">${esc(h.polandResult ?? 'nie grała')}</span>` : ''}</div>`).join('')}
       </div></section>`;
   }).join('');
-  return `<section class="stat-sec"><h3>Polska w grze</h3><ol class="stat-list">
+  return `<section class="stat-sec"><h3>Polska w grze</h3><ol class="ntfacts">
       <li><span>Mistrzostwa świata<small>występy w turnieju</small></span><b>${polApps('WC')}</b></li>
       <li><span>Euro<small>występy w turnieju</small></span><b>${polApps('EURO')}</b></li>
       ${best.map(([t, h]) => `<li><span>${esc(t)}: najlepszy wynik<small>${esc(h.year)}</small></span><b>${esc(h.polandResult ?? '')}</b></li>`).join('')}
     </ol></section>
-    ${honours.length ? `<section class="stat-sec"><h3>Mistrzowie świata i Europy</h3><ol class="stat-list">${honours.map(([code, t]) => `<li><span>${esc(ntName(code))}</span><b>${[t.WC ? `MŚ ${t.WC}` : '', t.EURO ? `Euro ${t.EURO}` : ''].filter(Boolean).join(', ')}</b></li>`).join('')}</ol></section>` : ''}
+    ${honours.length ? `<section class="stat-sec"><h3>Mistrzowie świata i Europy</h3><ol class="ntfacts">${honours.map(([code, t]) => `<li><span>${esc(ntName(code))}</span><b>${[t.WC ? `MŚ ${t.WC}` : '', t.EURO ? `Euro ${t.EURO}` : ''].filter(Boolean).join(', ')}</b></li>`).join('')}</ol></section>` : ''}
     ${sections}`;
 }
 

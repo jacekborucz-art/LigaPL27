@@ -78,9 +78,12 @@ export function intlName(code) {
 }
 const isPh = (c) => c?.startsWith('@');
 
+/** Grupa meczu do opisu: w Lidze Narodów od 2028/29 grupą jest liga. */
+export const groupLabel = (m) => (m.group ? (m.comp === 'LN' && m.key ? `liga ${m.group}` : `grupa ${m.group}`) : '');
+
 /** Opis rozgrywek meczu (format national.js, także mecze silnika z asNt). */
 export function compLabel(m) {
-  if (NT_COMP_NAMES[m.comp]) return NT_COMP_NAMES[m.comp];
+  if (!m.key && NT_COMP_NAMES[m.comp]) return NT_COMP_NAMES[m.comp];
   const y = Number(m.key?.split('-').at(-1));
   const rd = m.round === 'AB' ? 'baraż A/B' : m.round === 'BC' ? 'baraż B/C' : ROUND_NAME[m.round] ?? '';
   if (m.comp === 'LN') return `Liga Narodów ${y}/${String(y + 1).slice(2)}${rd ? `, ${rd}` : ''}`;

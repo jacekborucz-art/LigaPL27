@@ -322,7 +322,7 @@ function callupDay(N, date, players, rng, out, { windows = windowsNear(date), te
     for (const c of st.list) {
       if (c.on || c.off || (c.join && date <= c.join)) continue;
       const p = players[c.id];
-      if (p) p.callUp = { team: c.team, u21: c.u21, from: w.from, to: c.tour ? (w.tourEnd ?? w.to) : w.to };
+      if (p) p.callUp = { team: c.team, u21: c.u21, from: w.from, to: c.tour ? (w.tourEnd ?? w.to) : w.to, key };
       c.on = 1;
     }
     const rel = [];
@@ -350,7 +350,8 @@ function callupDay(N, date, players, rng, out, { windows = windowsNear(date), te
         p.injuryDays = days; p.injury = { name: rng.pick(['uraz mięśnia uda', 'skręcenie stawu skokowego', 'stłuczenie kolana']), days, cat: days > 14 ? 'medium' : 'light', since: date, nt: true };
         c.injury = p.injury;
       }
-      delete p.callUp; delete p.ntMinutes; delete p.ntGoals;
+      // Zawodnik już na innym zgrupowaniu (okno FIFA tuż przed turniejem kontynentalnym): zostaje na nim
+      if (!p.callUp?.key || p.callUp.key === key) { delete p.callUp; delete p.ntMinutes; delete p.ntGoals; }
     }
     if (rel.length) out.released.push({ window: w, list: rel });
     if (st.list.every((c) => c.off)) st.status = 'done';

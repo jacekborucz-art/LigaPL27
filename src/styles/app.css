@@ -1129,10 +1129,15 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 .ntko__col h4 { margin: 0 0 var(--space-2); font: 700 var(--step--1)/1.2 var(--font-body); color: var(--text-muted); }
 .ntcard > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; min-height: 44px; }
 .ntcard > summary::-webkit-details-marker { display: none; }
-.ntcard > summary::before { content: "▸"; color: var(--text-muted); transition: transform .15s; }
+.ntcard > summary::before { content: "▸"; display: inline-block; color: var(--text-muted); transition: transform .15s; }
 .ntcard[open] > summary::before { transform: rotate(90deg); }
 .ntcard > summary h3 { margin: 0; }
 .ntcard > .nt-grid { margin-top: var(--space-2); }
+.ntfacts { margin: 0; padding: 0; list-style: none; background: var(--surface); border-radius: var(--radius-m); overflow: hidden; }
+.ntfacts li { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px var(--space-3); font-size: var(--step--1); }
+.ntfacts li:nth-child(even) { background: var(--surface-stripe); }
+.ntfacts small { display: block; color: var(--text-muted); font-size: 11px; }
+.ntfacts b { font-family: var(--font-display); text-align: right; }
 .nthist { background: var(--surface); border-radius: var(--radius-m); overflow: hidden; }
 .nthist__row { display: grid; grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-items: center; min-height: 36px; padding: 4px var(--space-3); border-left: 4px solid transparent; font-size: var(--step--1); }
 .nthist__row:nth-child(even) { background: var(--surface-stripe); }
@@ -1146,7 +1151,7 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
   .nt-grid--q, .nt-grid--tour, .nt-grid--sub { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); }
   .nt-grid--hist { grid-template-columns: repeat(auto-fill, minmax(600px, 1fr)); align-items: start; }
   .nt-grid--hist > .nthist-sec { grid-column: auto; }
-  .ntko__cols { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .ntko__cols { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); align-items: start; }
   .nthist__row { grid-template-columns: 64px minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); }
   .nthist__row > :nth-child(4) { display: block; }
   .nthist--pol .nthist__row { grid-template-columns: 64px minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr); }

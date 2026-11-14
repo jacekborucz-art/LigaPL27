@@ -10,7 +10,7 @@ import { Rng } from '../core/rng.js';
 import { createNational, nationalDay, ntName, NT_COMP_NAMES, teamMatches, assignPlay, activeCallups } from './national.js';
 import { windowsNear } from './intl/windows.js';
 import { bindRatings } from './intl/ratings.js';
-import { createIntl, intlDay, intlCamps, withTournament, teamDone, rateNt, catchUpIntl, asNt, intlName, compLabel as ntCompLabel } from './intl/engine.js';
+import { createIntl, intlDay, intlCamps, withTournament, teamDone, rateNt, catchUpIntl, asNt, intlName, compLabel as ntCompLabel, groupLabel } from './intl/engine.js';
 
 const who = (game, c) => {
   const p = game.world.players[c.id];
@@ -42,7 +42,7 @@ export function nationalMessages(game, date, ev) {
   const pol = ev.played.filter((m) => m.home === 'POL' || m.away === 'POL');
   for (const m of pol) {
     const sc = (m.result.ourScorers ?? []).filter((s) => s.team === 'POL').map((s) => s.name);
-    out.push(createMessage({ date, key: `nt:${m.id}`, category: 'national', from: 'Reprezentacja Polski', priority: 'info', subject: resText(m), body: `${ntCompLabel(m)}${m.group ? `, grupa ${m.group}` : ''}.${sc.length ? ` Gole zawodników z polskich klubów: ${sc.join(', ')}.` : ''}` }));
+    out.push(createMessage({ date, key: `nt:${m.id}`, category: 'national', from: 'Reprezentacja Polski', priority: 'info', subject: resText(m), body: `${ntCompLabel(m)}${m.group ? `, ${groupLabel(m)}` : ''}.${sc.length ? ` Gole zawodników z polskich klubów: ${sc.join(', ')}.` : ''}` }));
   }
   if (ev.draws.includes('LNKO')) {
     const next = teamMatches(game.national, 'POL').find((m) => !m.played && m.comp !== 'LN');
