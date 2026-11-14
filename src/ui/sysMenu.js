@@ -1,5 +1,5 @@
 // Menu systemowe gry (u dołu bocznego menu na PC, na telefonie przycisk w nagłówku): Opcje (motyw), Zapis (plik
-// na urządzeniu albo udostępnienie pliku przez system, np. do Dysku Google), Wyjście (zapis i powrót do startu).
+// JSON na urządzeniu), Wyjście (zapis i powrót do strony startowej).
 
 import { esc, icon } from './dom.js';
 import { THEMES } from './menuView.js';
@@ -33,15 +33,11 @@ export function sysDialogHtml(kind, ctx = {}) {
         ${Object.entries(THEMES).map(([k, l]) => `<label class="sysdlg__opt"><input type="radio" name="sysTheme" value="${k}" data-act="sys-theme" data-t="${k}" ${ctx.theme === k ? 'checked' : ''}><span>${esc(l)}${k === 'auto' ? '<small>jak w systemie</small>' : ''}</span></label>`).join('')}
       </fieldset>${close}`;
   }
-  // Zapis. Udostępnianie pliku (Web Share API) tylko tam, gdzie przeglądarka to obsługuje (głównie telefony)
-  const share = ctx.canShare ? `<section class="sysdlg__sec"><h3>Udostępnij plik</h3>
-      <p class="sysdlg__note">Wyślij plik zapisu tam, gdzie chcesz go trzymać: na Dysk Google, mailem albo do komunikatora. Wybierasz w oknie telefonu, gra nie loguje się nigdzie.</p>
-      <button class="btn" data-act="sys-share" ${ctx.busy ? 'disabled' : ''}>Udostępnij plik</button></section>` : '';
+  // Zapis
   return `<h2 id="sysTitle">Zapis gry</h2>
     <p class="sysdlg__note">Gra zapisuje się sama w slocie ${esc(String(ctx.slot ?? ''))} w tej przeglądarce. Tutaj zrobisz kopię zapasową.</p>
     <section class="sysdlg__sec"><h3>Plik na tym urządzeniu</h3>
       <p class="sysdlg__note">Plik JSON, który wczytasz z ekranu startowego (Importuj).</p>
       <button class="btn btn--primary" data-act="sys-file" ${ctx.busy ? 'disabled' : ''}>Zapisz plik</button></section>
-    ${share}
     ${msg}${close}`;
 }

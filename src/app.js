@@ -108,7 +108,7 @@ function openSys(kind) {
     dlg = app.querySelector('#sysDlg');
     dlg.addEventListener('close', () => { sys.kind = null; sys.msg = null; });
   }
-  dlg.innerHTML = sysDialogHtml(kind, { theme: state.theme, slot: state.slot, msg: sys.msg, busy: sys.busy, canShare: canShareFile() });
+  dlg.innerHTML = sysDialogHtml(kind, { theme: state.theme, slot: state.slot, msg: sys.msg, busy: sys.busy });
   if (!dlg.open) dlg.showModal();
   dlg.querySelector('h2')?.setAttribute('tabindex', '-1');
 }
@@ -137,24 +137,6 @@ async function sysAction(act, el) {
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     sys.msg = `Zapisano plik ${saveName()}.`; return openSys('save');
   }
-  if (act === 'sys-share') {
-    try {
-      await save();
-      const file = await saveFile();
-      await navigator.share({ files: [file], title: 'Zapis gry LigaPL27' });
-      sys.msg = 'Plik zapisu udostępniony.';
-    } catch (err) { sys.msg = err?.name === 'AbortError' ? 'Anulowano udostępnianie.' : 'Nie udało się udostępnić pliku. Użyj przycisku Zapisz plik.'; }
-    return openSys('save');
-  }
-}
-/** Plik zapisu bieżącego slotu (do udostępnienia przez system). */
-async function saveFile() {
-  const rec = await store.loadSlot(state.slot);
-  return new File([store.exportJson(rec)], saveName(), { type: 'application/json' });
-}
-/** Czy przeglądarka udostępnia pliki (Web Share API z plikami; zwykle telefony). */
-function canShareFile() {
-  try { return !!navigator.canShare?.({ files: [new File(['{}'], 'x.json', { type: 'application/json' })] }); } catch { return false; }
 }
 
 // ---------- Zapis ----------

@@ -1,7 +1,7 @@
 // Service worker: tryb offline. Pliki aplikacji są w pamięci podręcznej przy instalacji. Przy dostępie do sieci
 // gra zawsze bierze najnowsze pliki z serwera (sieć najpierw) i odświeża nimi pamięć; bez sieci działa z pamięci.
 // Wcześniej pamięć miała pierwszeństwo, więc po aktualizacji telefon pokazywał starą wersję (albo mieszankę).
-const VERSION = 'v0.3-363f64e582';
+const VERSION = 'v0.3-80a88f6cba';
 const CACHE = `manager-${VERSION}`;
 
 const SHELL = [

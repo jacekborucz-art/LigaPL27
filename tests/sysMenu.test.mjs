@@ -15,8 +15,8 @@ test('Menu systemowe: trzy przyciski i okna Opcje oraz Zapis', () => {
   assert.ok(!/—/.test(save + opt + nav), 'bez pauz');
 });
 
-test('Zapis: przycisk udostępniania tylko tam, gdzie przeglądarka udostępnia pliki', () => {
-  assert.ok(!/sys-share/.test(sysDialogHtml('save', { slot: 1, canShare: false })));
-  assert.match(sysDialogHtml('save', { slot: 1, canShare: true }), /data-act="sys-share"/);
-  assert.ok(!/Google Drive nie jest/.test(sysDialogHtml('save', { slot: 1 })));
+test('Zapis: tylko zapis pliku, bez udostępniania i bez Google Drive', () => {
+  const html = sysDialogHtml('save', { slot: 1 });
+  assert.match(html, /data-act="sys-file"/);
+  assert.ok(!/sys-share|Google Drive/.test(html));
 });
