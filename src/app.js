@@ -39,7 +39,6 @@ import { renderClubView, hasClubView } from './ui/clubView.js';
 import { renderTransfers, handleTransferAction, isTransferAction } from './ui/transfersView.js';
 import { renderClubHub, handleClubAction, isClubAction } from './ui/klubView.js';
 import { sysNavHtml, sysHeaderBtn, sysDialogHtml } from './ui/sysMenu.js';
-import { driveSignIn, driveSignOut, driveSave } from './core/gdrive.js';
 import { renderTalks, handleTalkAction, isTalkAction } from './ui/talksView.js';
 import { ensureCareer } from './career/careerSystem.js';
 import { fmtZl } from './career/transfers.js';
@@ -109,7 +108,7 @@ function openSys(kind) {
     dlg = app.querySelector('#sysDlg');
     dlg.addEventListener('close', () => { sys.kind = null; sys.msg = null; });
   }
-  dlg.innerHTML = sysDialogHtml(kind, { theme: state.theme, slot: state.slot, msg: sys.msg, busy: sys.busy });
+  dlg.innerHTML = sysDialogHtml(kind, { theme: state.theme, slot: state.slot, msg: sys.msg, busy: sys.busy, canShare: canShareFile() });
   if (!dlg.open) dlg.showModal();
   dlg.querySelector('h2')?.setAttribute('tabindex', '-1');
 }
@@ -138,20 +137,24 @@ async function sysAction(act, el) {
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     sys.msg = `Zapisano plik ${saveName()}.`; return openSys('save');
   }
-  if (act === 'sys-drive-logout') { driveSignOut(); sys.msg = 'Wylogowano z Google Drive.'; return openSys('save'); }
-  if (act === 'sys-drive-login' || act === 'sys-drive-save') {
-    sys.busy = true; sys.msg = act === 'sys-drive-login' ? 'Logowanie do Google…' : 'Zapisywanie na Google Drive…'; openSys('save');
+  if (act === 'sys-share') {
     try {
-      if (act === 'sys-drive-login') { await driveSignIn(); sys.msg = 'Zalogowano. Możesz zapisać grę na Google Drive.'; }
-      else {
-        await save();
-        const rec = await store.loadSlot(state.slot);
-        const f = await driveSave(state.slot, saveName(), store.exportJson(rec));
-        sys.msg = `Zapisano na Google Drive: ${f.name}.`;
-      }
-    } catch (err) { sys.msg = err.message; }
-    sys.busy = false; return openSys('save');
+      await save();
+      const file = await saveFile();
+      await navigator.share({ files: [file], title: 'Zapis gry LigaPL27' });
+      sys.msg = 'Plik zapisu udostępniony.';
+    } catch (err) { sys.msg = err?.name === 'AbortError' ? 'Anulowano udostępnianie.' : 'Nie udało się udostępnić pliku. Użyj przycisku Zapisz plik.'; }
+    return openSys('save');
   }
+}
+/** Plik zapisu bieżącego slotu (do udostępnienia przez system). */
+async function saveFile() {
+  const rec = await store.loadSlot(state.slot);
+  return new File([store.exportJson(rec)], saveName(), { type: 'application/json' });
+}
+/** Czy przeglądarka udostępnia pliki (Web Share API z plikami; zwykle telefony). */
+function canShareFile() {
+  try { return !!navigator.canShare?.({ files: [new File(['{}'], 'x.json', { type: 'application/json' })] }); } catch { return false; }
 }
 
 // ---------- Zapis ----------

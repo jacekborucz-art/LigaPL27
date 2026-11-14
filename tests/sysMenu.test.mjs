@@ -1,8 +1,7 @@
-// Menu systemowe (Opcje, Zapis, Wyjście) i zapis na Google Drive (src/ui/sysMenu.js, src/core/gdrive.js).
+// Menu systemowe (Opcje, Zapis, Wyjście): src/ui/sysMenu.js.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sysDialogHtml, sysNavHtml } from '../src/ui/sysMenu.js';
-import { driveConfigured, driveSignedIn, driveSave, multipartBody } from '../src/core/gdrive.js';
 
 test('Menu systemowe: trzy przyciski i okna Opcje oraz Zapis', () => {
   const nav = sysNavHtml();
@@ -16,12 +15,8 @@ test('Menu systemowe: trzy przyciski i okna Opcje oraz Zapis', () => {
   assert.ok(!/—/.test(save + opt + nav), 'bez pauz');
 });
 
-test('Google Drive: bez identyfikatora aplikacji wyjaśnienie, bez logowania brak zapisu, poprawne żądanie multipart', async () => {
-  assert.equal(driveConfigured(), false);
-  assert.match(sysDialogHtml('save', { slot: 1 }), /nie jest jeszcze włączony/);
-  assert.equal(driveSignedIn(), false);
-  await assert.rejects(() => driveSave(1, 'a.json', '{}'), /zaloguj/i);
-  const body = multipartBody({ name: 'a.json', mimeType: 'application/json' }, '{"x":1}', 'B');
-  assert.ok(body.startsWith('--B\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{"name":"a.json"'));
-  assert.ok(body.includes('\r\n--B\r\nContent-Type: application/json\r\n\r\n{"x":1}\r\n--B--'));
+test('Zapis: przycisk udostępniania tylko tam, gdzie przeglądarka udostępnia pliki', () => {
+  assert.ok(!/sys-share/.test(sysDialogHtml('save', { slot: 1, canShare: false })));
+  assert.match(sysDialogHtml('save', { slot: 1, canShare: true }), /data-act="sys-share"/);
+  assert.ok(!/Google Drive nie jest/.test(sysDialogHtml('save', { slot: 1 })));
 });
