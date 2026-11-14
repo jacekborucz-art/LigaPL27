@@ -24,6 +24,7 @@ import { rollTrainingInjury } from './sessions.js';
 import { offsetsFor } from './development.js';
 import { aiAccentAt, staleEffects } from './variety.js';
 import { trainingSkill, COACH, coachStyle } from '../career/coaches.js';
+import { trainingMods } from '../career/infrastructure.js';
 
 const r2 = (v) => Math.round(v * 100) / 100;
 /** Liczba z cyfr napisu (bez tworzenia podnapisów). */
@@ -216,7 +217,8 @@ export function processAiDay(game, date) {
     const f = c.cb && c.cb.key === key ? baseFactor(c.cb.start, date) : 0;
     const lack = f ? Math.max(0, 1 - c.cb.base) * f : 0;
     const sharpMul = (1 - 0.5 * lack) * (1 + COACH.train.sharp * tre);
-    const injuryMul = (1 + CAMP.injuryPenalty * lack) * (1 - COACH.train.injury * tre);
+    const im = trainingMods(game, clubId); // baza treningowa: urazy i regeneracja (career/infrastructure.js)
+    const injuryMul = (1 + CAMP.injuryPenalty * lack) * (1 - COACH.train.injury * tre) * im.inj;
 
     const team = day.sessions.map((x) => sessionStim(x, campQ, !!camp));
     const st = stimState(c);
@@ -229,7 +231,7 @@ export function processAiDay(game, date) {
     }
     // Skutki dnia dla pełnego uczestnika (z pola, bramkarz) i dla rezerwowych po meczu, którzy zamiast
     // regeneracji mają trening uzupełniający (jak w planie gracza). Na zawodnika zostają tylko mnożniki osobiste.
-    const rec = staffMul.recover(fitQ);
+    const rec = staffMul.recover(fitQ) + im.rec;
     const prof = (list, gk) => profileOf(list, gk, campQ, rec, sharpMul);
     const subsList = ctx.role === 'MD+1' && team.length ? [sessionStim({ type: 'gierki', int: 'mid' }, campQ, !!camp), ...team.slice(1)] : null;
     const P = { out: prof(team, false), gk: prof(team, true), subsOut: subsList && prof(subsList, false), subsGk: subsList && prof(subsList, true) };
@@ -250,7 +252,7 @@ export function processAiDay(game, date) {
       if (tr.m == null || min < tr.m) tr.m = min;
       else if (min > tr.m) { load += LOAD.matchLoad * (min - tr.m) / 90; tr.m = min; }
       const gk = p.pos === 'BR';
-      const pr = !team.length || p.callUp || p.onLoanOut ? null
+      const pr = !team.length || p.callUp ? null
         : subsList && p.lastMatch !== yesterday ? (gk ? P.subsGk : P.subsOut) : (gk ? P.gk : P.out);
       let morale = restMorale;
       if (pr) {

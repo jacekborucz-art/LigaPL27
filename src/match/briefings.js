@@ -113,6 +113,15 @@ const PRE_CTX = {
   crisis: { shout: 2, praise: -2, calm: 1, demand: 1 },
   goodRun: { praise: 1, shout: -1 },
   highStakes: { demand: 1, calm: -1, noPressure: -1 },
+  // Mecze pucharowe (panel psycholog + trener) [SZAC]: mecz o wszystko, stan dwumeczu przed rewanżem, finał, pułapka
+  singleKO: { calm: 0.5, demand: 1, noPressure: -1, defend: -1 },
+  aggLead1: { calm: 1, demand: 0.5, shout: -1, noPressure: -1, defend: 0.5 },
+  aggLead2plus: { calm: 1, praise: -1, demand: 1, shout: -1, noPressure: -1, defend: -0.5 },
+  aggLevel: { calm: 1, demand: 0.5, shout: -0.5 },
+  aggBehind1: { calm: 1, demand: 1, shout: -1, noPressure: 0.5, defend: -2 },
+  aggBehind2plus: { demand: 1, noPressure: 2, defend: -3 },
+  final: { calm: 1, praise: 0.5, shout: -1.5, noPressure: -1 },
+  trap: { calm: -0.5, praise: -1, demand: 1.5, noPressure: -1 },
 };
 
 // Sytuacja w przerwie (wynik kontra xG) [SZAC]
@@ -147,6 +156,15 @@ export function preSituation(ctx = {}) {
   if ((lastTwo.length === 2 && lastTwo.every((x) => x === 'P')) || (last5.length >= 4 && pts <= 3)) flags.push('crisis');
   else if (last5.length >= 3 && pts >= 10) flags.push('goodRun');
   if (ctx.boardExpectation === 'win' || (ctx.boardTrust ?? 60) < 30) flags.push('highStakes');
+  // ko: { decider, agg (bilans 1. meczu z naszej strony, rewanż), single, final, playoff, trap } z koBrief (matchday.js)
+  const ko = ctx.ko;
+  if (ko) {
+    if (ko.final) flags.push('final');
+    else if (ko.agg != null) flags.push(ko.agg >= 2 ? 'aggLead2plus' : ko.agg === 1 ? 'aggLead1' : ko.agg === 0 ? 'aggLevel' : ko.agg === -1 ? 'aggBehind1' : 'aggBehind2plus');
+    else if (ko.single) flags.push('singleKO');
+    if (ko.playoff && !flags.includes('highStakes')) flags.push('highStakes');
+    if (ko.trap) flags.push('trap');
+  }
   return { phase: 'pre', stateIdx: 1, behindBy: 0, rank: ctx.rank ?? 0, flags, pWin, clubId: ctx.clubId };
 }
 
@@ -155,6 +173,9 @@ export function halfSituation(ctx = {}) {
   const gf = ctx.score?.for ?? 0;
   const ga = ctx.score?.against ?? 0;
   const diff = gf - ga;
+  // Rewanż: stan (prowadzimy, remis, przegrywamy) liczy się z dwumeczu, opis gry (klucz) z tego meczu [SZAC]
+  const agg = ctx.ko?.agg ?? null;
+  const aggDiff = agg != null ? diff + agg : diff;
   const xgd = (ctx.xgFor ?? 0) - (ctx.xgAgainst ?? 0);
   let key = 'wyrownany';
   if ((diff < 0 && xgd >= 0.5) || (diff === 0 && xgd >= 0.8)) key = 'pechowo';
@@ -163,15 +184,18 @@ export function halfSituation(ctx = {}) {
   else if (diff > 0 && xgd >= 0.5) key = 'pewnePrzod';
   return {
     phase: 'half',
-    stateIdx: diff > 0 ? 0 : diff === 0 ? 1 : 2,
-    behindBy: Math.max(0, -diff),
+    stateIdx: aggDiff > 0 ? 0 : aggDiff === 0 ? 1 : 2,
+    behindBy: Math.max(0, -aggDiff),
     diff,
+    aggDiff,
+    etLooming: !!ctx.ko?.decider && aggDiff === 0, // remis w meczu rozstrzygającym: w perspektywie dogrywka
+    calmGame: !!ctx.ko?.decider && Math.abs(aggDiff) >= 3, // dwumecz rozstrzygnięty: emocje słabsze
     xgd: r2(xgd),
     key,
     label: HALF_SITUATIONS[key],
     momentum: ctx.momentum ?? 0,
     possession: ctx.possession ?? 50,
-    rank: ctx.rank ?? 0,
+    rank: ctx.ko?.decider && Math.abs(aggDiff) >= 3 ? 0 : ctx.rank ?? 0,
     flags: [],
     pWin: ctx.pWin ?? 0.4,
     clubId: ctx.clubId,
@@ -215,11 +239,17 @@ function speechParts(p, tone, sit, memory, rating) {
   parts.push(PERSONA_MOD[tone][tr.persona] || 0);
   if (tone === 'noPressure' && (sit.pWin ?? 0.4) <= 0.25) parts.push(sit.phase === 'pre' ? 0 : 2); // wobec faworyta rywala
   // 2. kontekst fazy
-  if (sit.phase === 'pre') for (const f of sit.flags) parts.push(PRE_CTX[f]?.[tone] || 0);
+  if (sit.phase === 'pre') {
+    for (const f of sit.flags) parts.push(PRE_CTX[f]?.[tone] || 0);
+    const ko = sit.flags.includes('singleKO') || sit.flags.includes('final');
+    if (ko && tone === 'noPressure' && sit.flags.includes('underdog')) parts.push(2); // słabszy w meczu o wszystko: „nie macie nic do stracenia”
+    if (sit.flags.includes('final') && tone === 'calm' && tr.persona === 'Wrażliwy') parts.push(1);
+  }
   if (sit.phase === 'half') {
     parts.push(HALF_CTX[sit.key]?.[tone] || 0);
     if (sit.momentum <= -30) parts.push({ calm: 1, defend: 1 }[tone] || 0);
     if (sit.momentum >= 30) parts.push({ praise: 1, demand: 0.5 }[tone] || 0);
+    if (sit.etLooming) parts.push({ calm: 1, shout: -1, demand: 0.5, defend: (sit.pWin ?? 0.4) < 0.5 ? 0.5 : 0 }[tone] || 0); // „nie wszystko naraz”
   }
   // 3. cechy indywidualne [SZAC]
   const form = avgForm(p);
@@ -248,6 +278,7 @@ function speechParts(p, tone, sit, memory, rating) {
     if (tr.persona === 'Wrażliwy' && rank >= 2 && tr.waz < 14) neg -= 2;
     else if (pos > 0) pos += RANK_BONUS[rank] + (rank >= 2 ? 0.1 * (tr.waz - 10) : 0);
   }
+  if (sit.calmGame) { pos *= 0.5; neg *= 0.5; }
   // 5. zaufanie mnoży część pozytywną; niskie zaufanie buntuje przy krzyku i wymaganiach
   const trust = getTrust(p, sit.clubId);
   pos *= 1 + 0.04 * trust;
@@ -293,6 +324,14 @@ const REACTION_TEXT = {
   zdenerwowany: ['Nerwowo poprawia getry.', 'Unika wzroku, wyraźnie się spiął.', 'Chodzi po szatni w tę i z powrotem.', 'Kręci się na ławce i przygryza wargę.'],
   urazony: ['Odwraca się z grymasem.', 'Mruczy coś pod nosem.', 'Trzaska drzwiczkami szafki.', 'Patrzy na trenera z wyrzutem.'],
 };
+// Po meczu bez „gotowy do gry” i poprawiania ochraniaczy (mecz już się skończył)
+const REACTION_TEXT_POST = {
+  zmotywowany: ['Zaciska pięści i kiwa głową.', 'Wstaje i klaszcze, dodając otuchy kolegom.', 'W jego oczach widać ogień.', 'Klepie kolegów po plecach.'],
+  spokojny: ['Słucha uważnie i kiwa głową.', 'Spokojnie zdejmuje ochraniacze.', 'Kiwa głową bez słowa.', 'Oddycha głęboko i analizuje mecz w myślach.'],
+  obojetny: REACTION_TEXT.obojetny,
+  zdenerwowany: ['Nerwowo zdejmuje getry.', 'Unika wzroku, wyraźnie się spiął.', 'Chodzi po szatni w tę i z powrotem.', 'Siedzi z głową w dłoniach.'],
+  urazony: REACTION_TEXT.urazony,
+};
 
 export function classifyReaction(z, trustDelta = 0, nerves = 0) {
   if (trustDelta <= -1 || z <= -3) return 'urazony';
@@ -303,8 +342,8 @@ export function classifyReaction(z, trustDelta = 0, nerves = 0) {
   return 'obojetny';
 }
 
-function reactionView(kind, rng, extra) {
-  const list = REACTION_TEXT[kind];
+function reactionView(kind, rng, extra, texts = REACTION_TEXT) {
+  const list = texts[kind];
   return { reaction: kind, label: REACTIONS[kind].label, icon: REACTIONS[kind].icon, text: extra || list[Math.floor(rng.next() * list.length)] };
 }
 
@@ -329,6 +368,39 @@ const TALK_REPLY = {
   obojetny: ['„Mhm.”', '„Okej.”', '„Jak pan uważa.”'],
   zdenerwowany: ['„Wiem, wiem…”', '„Postaram się, ale to nie jest łatwe.”', '„Dobrze, tylko proszę nie dokładać presji.”'],
   urazony: ['„Serio? To nie moja wina.”', '„Nie zgadzam się z panem.”', '„Zapamiętam to.”'],
+};
+
+// Dodatkowe odpowiedzi przed meczem i w przerwie, gdy pasują do meczu (sparing, finał, derby, puchar)
+const TALK_REPLY_CTX = {
+  friendly: { zmotywowany: ['„Pokażę, że zasługuję na miejsce w składzie.”'], spokojny: ['„Jasne, potraktuję to jak dobry trening.”'], zdenerwowany: ['„Postaram się, choć jeszcze nie czuję się pewnie.”'] },
+  final: { zmotywowany: ['„To trofeum będzie nasze, trenerze.”'], zdenerwowany: ['„Wiem, ile to znaczy. Trochę mnie to przytłacza.”'] },
+  derby: { zmotywowany: ['„Wiem, ile te derby znaczą dla kibiców.”'], spokojny: ['„Spokojnie, nie dam się sprowokować.”'] },
+  knockout: { zmotywowany: ['„Nie odpadniemy, trenerze.”'] },
+};
+function replyPool(kind, context) {
+  const base = TALK_REPLY[kind];
+  if (!context) return base;
+  const g = context.kind === 'friendly' ? 'friendly' : context.final && context.kind !== 'playoffFinal' ? 'final'
+    : context.rival === 'derby' ? 'derby' : context.knockout && context.leg?.n !== 1 ? 'knockout' : null;
+  return g && TALK_REPLY_CTX[g][kind] ? [...base, ...TALK_REPLY_CTX[g][kind]] : base;
+}
+
+// Odpowiedzi po meczu: osobno na pochwałę i krytykę (wcześniej „Nie zawiodę, trenerze.” padało po końcowym gwizdku)
+const TALK_REPLY_POST = {
+  praise: {
+    zmotywowany: ['„Dziękuję, trenerze. To dla mnie ważne.”', '„Dziękuję. Następnym razem będzie jeszcze lepiej.”', '„Cieszę się, że pan to docenia.”'],
+    spokojny: ['„Dziękuję, trenerze.”', '„Miło to słyszeć.”', '„Dziękuję, robię swoje.”'],
+    obojetny: TALK_REPLY.obojetny,
+    zdenerwowany: ['„Dziękuję, ale wiem, że mogłem więcej.”', '„Nie wiem, czy zasłużyłem.”', '„Dobrze, dziękuję…”'],
+    urazony: ['„Pochwała? Po takim meczu?”', '„Nie potrzebuję litości.”', '„Proszę sobie darować.”'],
+  },
+  criticize: {
+    zmotywowany: ['„Ma pan rację. Poprawię to.”', '„Będę pracował jeszcze ciężej.”', '„Zrozumiałem, to się nie powtórzy.”'],
+    spokojny: ['„Rozumiem, trenerze.”', '„Przemyślę to.”', '„Dobrze, popracuję nad tym.”'],
+    obojetny: TALK_REPLY.obojetny,
+    zdenerwowany: ['„Wiem, wiem…”', '„Wiem, że to nie był mój dzień.”', '„Dobrze, rozumiem…”'],
+    urazony: TALK_REPLY.urazony,
+  },
 };
 
 /** Efekt rozmowy indywidualnej (bez szumu). ctx: { phase, rank, rating, atRisk, onYellow } */
@@ -417,7 +489,7 @@ function validateTalks(talks, phase, players) {
 const rngFor = (seed, phase, id) => new Rng(`${seed}|${phase}|${id}`);
 
 /** Wspólna ścieżka odprawy przed meczem i w przerwie. */
-function runBriefing(phase, { players, tone, talks = [], memory, seed = 'odprawa', ratings = {}, sit, cardInfo = {}, rel = {} }) {
+function runBriefing(phase, { players, tone, talks = [], memory, seed = 'odprawa', ratings = {}, sit, cardInfo = {}, rel = {}, context = null, score = null }) {
   if (!TONES[tone]) throw new RangeError(`Nieznana przemowa: ${tone}`);
   validateTalks(talks, phase, players);
   const talkById = Object.fromEntries(talks.map((t) => [t.id, t.kind]));
@@ -453,7 +525,7 @@ function runBriefing(phase, { players, tone, talks = [], memory, seed = 'odprawa
       if (tk === 'zmotywowany' || tk === 'spokojny') td += 0.5;
       if (tk === 'urazony') td -= traitsOf(p).persona === 'Wrażliwy' ? 1 : 0.5;
       trustDelta += td;
-      const replies = TALK_REPLY[tk];
+      const replies = replyPool(tk, context);
       row.talk = { kind, talkLabel: TALKS[kind].label, ...reactionView(tk, rng), quote: replies[Math.floor(rng.next() * replies.length)] };
     }
     z = r1(clamp(z, -10, 10));
@@ -473,7 +545,7 @@ function runBriefing(phase, { players, tone, talks = [], memory, seed = 'odprawa
     phase,
     tone,
     toneLabel: TONES[tone].label,
-    quote: TONES[tone].quote,
+    quote: toneQuote(tone, context, { phase, seed, score }),
     players: out,
     team: { counts, summary: teamSummary(counts, out.length), backfire, backfireText: backfire ? BACKFIRE_TEXT : null },
     relations,
@@ -499,13 +571,13 @@ function teamSummary(counts, n) {
 /**
  * Odprawa przedmeczowa.
  * args: { players:[zawodnicy z kadry meczowej], tone, talks:[{id, kind}] (maks. 3), memory,
- *         ctx:{ rank, pWin, last5, boardExpectation, boardTrust, atRisk:[id], }, seed }
+ *         ctx:{ rank, pWin, last5, boardExpectation, boardTrust, atRisk:[id], context (briefingContext, tylko teksty) }, seed }
  * Zwraca widok dla gracza (reakcje bez liczb) i `engine` (Z na start, ryzyko kartek, nerwowość, premia obrony).
  */
 export function preMatchBriefing({ players, tone, talks = [], memory, ctx = {}, seed }) {
   const sit = preSituation(ctx);
   return runBriefing('pre', {
-    players, tone, talks, memory, seed, sit, cardInfo: { atRisk: ctx.atRisk || [] }, rel: { clubId: ctx.clubId, date: ctx.date },
+    players, tone, talks, memory, seed, sit, cardInfo: { atRisk: ctx.atRisk || [] }, rel: { clubId: ctx.clubId, date: ctx.date }, context: ctx.context ?? null,
   });
 }
 
@@ -519,7 +591,7 @@ export function halftimeBriefing({ players, tone, talks = [], memory, ctx = {}, 
   const sit = halfSituation(ctx);
   const res = runBriefing('half', {
     players, tone, talks, memory, seed, sit, ratings: ctx.ratings || {}, cardInfo: { onYellow: ctx.onYellow || [], atRisk: ctx.atRisk || [] },
-    rel: { clubId: ctx.clubId, date: ctx.date },
+    rel: { clubId: ctx.clubId, date: ctx.date }, context: ctx.context ?? null, score: ctx.score ?? null,
   });
   res.situation = { key: sit.key, label: sit.label };
   return res;
@@ -547,6 +619,54 @@ const ADVICE_REASON = {
   defend: 'Najważniejsze teraz to nie stracić gola.',
 };
 
+/** Uzasadnienie zalecanej przemowy zgodne z meczem (sparing, faworyt, dwumecz). Bez kontekstu: tekst ogólny. */
+function adviceReason(tone, phase, c, sit) {
+  if (!c) return ADVICE_REASON[tone];
+  const pre = phase === 'pre';
+  const under = c.gap === 'muchStronger' || c.gap === 'stronger';
+  const fav = c.gap === 'muchWeaker' || c.gap === 'weaker';
+  const friendly = c.kind === 'friendly';
+  switch (tone) {
+    case 'calm':
+      if (friendly) return 'To sparing; spokój pomoże zrealizować założenia bez ryzyka urazów.';
+      if (pre && (c.final || c.stake === 'title' || c.stake === 'relegation' || c.rival)) return 'Przy takiej stawce spokój zdejmie nerwy, zwłaszcza z wrażliwych.';
+      return ADVICE_REASON.calm;
+    case 'praise':
+      return pre ? 'Drużyna dobrze pracuje; pochwała doda zawodnikom pewności.' : ADVICE_REASON.praise;
+    case 'demand':
+      if (friendly) return 'Nawet w sparingu jasne wymagania pomogą utrzymać tempo.';
+      if (pre && c.gap === 'muchWeaker') return 'Z wyraźnie słabszym rywalem największym zagrożeniem jest lekceważenie; jasne wymagania utrzymają koncentrację.';
+      return ADVICE_REASON.demand;
+    case 'shout':
+      if (c.rival === 'derby' && !friendly) return 'Potrzebny jest wstrząs, ale uważaj na wrażliwych i na kartki: w derbach emocje i tak są wysokie.';
+      return ADVICE_REASON.shout;
+    case 'noPressure':
+      if (friendly) return 'To sparing; luz pomoże sprawdzić nowe rozwiązania.';
+      if (!pre) return sit?.stateIdx === 2 ? ADVICE_REASON.noPressure : 'Zdejmij z nich ciężar; w drugiej połowie zagrają swobodniej.';
+      if (c.leg?.state === 'behind') return 'Musimy odrabiać stratę z pierwszego meczu; bez presji łatwiej zaryzykować.';
+      if (under) return 'Rywal jest faworytem; bez presji zagrają odważniej.';
+      if (fav) return 'Presja faworyta może ich usztywnić; zdejmij z nich ciężar.';
+      return 'Zdejmij z nich ciężar; zagrają swobodniej.';
+    case 'defend':
+      if (pre && c.leg?.state === 'ahead') return 'Mamy zaliczkę z pierwszego meczu; czyste konto da awans.';
+      return pre ? 'Najważniejsze to nie stracić gola.' : ADVICE_REASON.defend;
+    default:
+      return ADVICE_REASON[tone];
+  }
+}
+
+/** Jedna uwaga asystenta o meczu (derby, finał, różnica sił, sparing). */
+function adviceNote(c, best) {
+  if (!c) return null;
+  if (best === 'demand' && c.gap === 'muchWeaker' && c.kind !== 'friendly' && c.rival !== 'derby' && !c.final) return null; // uzasadnienie już o tym mówi
+  if (c.kind === 'friendly') return 'To sparing: ważniejsze od wyniku są minuty, sprawdzenie założeń i zdrowie zawodników.';
+  if (c.rival === 'derby') return 'W derbach uważaj na porywczych: jedna kartka może zmienić mecz.';
+  if (c.final) return 'Finał: część zawodników może czuć presję wielkiego meczu.';
+  if (c.gap === 'muchWeaker') return 'Rywal jest wyraźnie słabszy, ale lekceważenie to największe zagrożenie.';
+  if (c.gap === 'muchStronger') return 'Rywal jest wyraźnie silniejszy; dyscyplina będzie ważniejsza niż fantazja.';
+  return null;
+}
+
 /**
  * Podpowiedź asystenta. phase 'pre' albo 'half'. Liczy oczekiwany efekt wszystkich 6 przemów na tych samych
  * zawodnikach i wskazuje najlepszą; dorzuca maks. 3 propozycje rozmów indywidualnych.
@@ -559,8 +679,11 @@ export function assistantAdvice(phase, players, ctx = {}, memory) {
   const best = scored[0].tone;
   const avoid = scored[scored.length - 1].tone;
   const lines = [];
+  const c = ctx.context ?? null;
   if (phase === 'half') lines.push(sit.label + '.');
-  lines.push(ADVICE_REASON[best]);
+  lines.push(adviceReason(best, phase, c, sit));
+  const note = phase === 'pre' ? adviceNote(c, best) : null;
+  if (note) lines.push(note);
   if (repeatCount(memory, best) >= 1) lines.push('Używałeś jej niedawno, więc zadziała słabiej.');
   const sensitive = players.filter((p) => traitsOf(p).persona === 'Wrażliwy').length;
   if (best === 'shout' && sensitive) lines.push('Kilku zawodników źle znosi krzyk.');
@@ -620,7 +743,7 @@ const POST_PERSONA = {
 };
 
 /**
- * Odprawa pomeczowa. ctx: { score:{for, against}, xgFor, xgAgainst, ratings:{id}, rank, clubId, date }
+ * Odprawa pomeczowa. ctx: { score:{for, against}, xgFor, xgAgainst, ratings:{id}, rank, clubId, date, context (z outcome, tylko teksty) }
  * talks: [{id, kind:'praise'|'criticize'}] maks. 3.
  * Zwraca reakcje, `morale` ({delta, value} przez morale.js applyMorale; działa na najbliższy tydzień, potem
  * wraca dryfem weeklyDrift), nowe relacje (zaufanie wspólne z negocjacjami) i konflikty.
@@ -630,12 +753,14 @@ export function postMatchBriefing({ players, tone, talks = [], memory, ctx = {},
   validateTalks(talks, 'post', players);
   const gf = ctx.score?.for ?? 0;
   const ga = ctx.score?.against ?? 0;
-  const res = gf > ga ? 0 : gf === ga ? 1 : 2;
+  // ctx.decided ('W'|'D'|'L'): mecz rozstrzygający (awans, trofeum, odpadnięcie, także po karnych i w dwumeczu) liczy się wg rozstrzygnięcia
+  const res = ctx.decided ? { W: 0, D: 1, L: 2 }[ctx.decided] : gf > ga ? 0 : gf === ga ? 1 : 2;
   const xgd = (ctx.xgFor ?? 0) - (ctx.xgAgainst ?? 0);
   const playedWell = xgd >= 0.5;
   const playedBadly = xgd <= -0.5;
   const rank = ctx.rank ?? 0;
-  const rankMul = rank >= 2 ? 1.5 : 1; // derby i wielkie mecze: emocje mocniejsze [SZAC]
+  // derby, puchary i finały: emocje mocniejsze; pierwszy mecz dwumeczu niczego nie rozstrzyga [SZAC, panel psycholog + trener]
+  const rankMul = [1, 1.15, 1.4, 1.6][Math.min(3, Math.max(0, rank))] * (ctx.firstLeg ? 0.8 : 1);
   const ratings = ctx.ratings || {};
   const memKey = `post:${tone}`;
   const reps = repeatCount(memory, memKey);
@@ -663,7 +788,7 @@ export function postMatchBriefing({ players, tone, talks = [], memory, ctx = {},
     m *= rankMul;
     m += rng.gauss(0, 0.2);
     let kind = classifyReaction(m * 2, td);
-    const row = { id: p.id, name: p.name, ...reactionView(kind, rng) };
+    const row = { id: p.id, name: p.name, ...reactionView(kind, rng, null, REACTION_TEXT_POST) };
     // rozmowa indywidualna
     const talk = talkById[p.id];
     if (talk) {
@@ -671,8 +796,8 @@ export function postMatchBriefing({ players, tone, talks = [], memory, ctx = {},
       m += ind.morale;
       td += ind.trust;
       const tk = classifyReaction(ind.morale * 2, ind.trust);
-      const replies = TALK_REPLY[tk];
-      row.talk = { kind: talk, talkLabel: TALKS[talk].label, ...reactionView(tk, rng), quote: replies[Math.floor(rng.next() * replies.length)] };
+      const replies = TALK_REPLY_POST[talk]?.[tk] ?? TALK_REPLY[tk];
+      row.talk = { kind: talk, talkLabel: TALKS[talk].label, ...reactionView(tk, rng, null, REACTION_TEXT_POST), quote: replies[Math.floor(rng.next() * replies.length)] };
       if (ind.conflictP > 0 && rng.chance(ind.conflictP)) {
         conflicts.push({ id: p.id, text: `${p.name ?? p.id} nie zgadza się z oceną trenera i chce o tym porozmawiać.` });
         row.talk.conflict = true;
@@ -690,7 +815,7 @@ export function postMatchBriefing({ players, tone, talks = [], memory, ctx = {},
     phase: 'post',
     tone,
     toneLabel: POST_TONES[tone].label,
-    quote: POST_TONES[tone].quote,
+    quote: toneQuote(tone, ctx.context ?? null, { phase: 'post', seed, result: ['W', 'D', 'L'][res] }),
     players: out,
     team: { counts, summary: teamSummary(counts, out.length), moraleTrend: avg > 0.3 ? 'up' : avg < -0.3 ? 'down' : 'flat' },
     morale,
@@ -806,6 +931,618 @@ export function trustLabel(trust) {
   return 'Konflikt z trenerem';
 }
 
+// ================================================================ Kontekst odprawy: rodzaj meczu, stawka, rywal
+//
+// Teksty przemów zależą od kontekstu meczu (docs/odprawy-kontekst.md). Wcześniej każda przemowa miała jeden
+// cytat, więc w Pucharze Polski trener mówił o lidze, a w sparingu o punktach. Kontekst zmienia TYLKO teksty
+// (cytat przemowy, podpowiedź asystenta, odpowiedzi zawodników); efekty i balans przemów są te same.
+
+// Progi różnicy sił z szans 1X2 (z perspektywy klubu gracza) [SZAC]
+export const GAP = { muchStronger: 0.58, stronger: 0.45, muchWeaker: 0.62, weaker: 0.5, minWin: 0.15 };
+
+const GAP_LABEL = { muchStronger: 'Rywal wyraźnie silniejszy', stronger: 'Rywal faworytem', even: 'Wyrównane siły', weaker: 'Jesteśmy faworytem', muchWeaker: 'Rywal wyraźnie słabszy' };
+const STAKE_LABEL = {
+  title: 'Mecz, który może rozstrzygnąć o mistrzostwie', relegation: 'Walka o utrzymanie', six: 'Bezpośredni rywal w walce o utrzymanie',
+  promotion: 'Walka o awans', deadRubber: 'W tabeli niewiele już się zmieni',
+};
+
+/**
+ * Klasyfikator kontekstu odprawy (czysta funkcja). Wejście to zwykłe dane z dnia meczowego (matchday.js talkContext):
+ * { type:'league'|'cup'|'supercup'|'uefa'|'friendly', title (nazwa rozgrywek i rundy), round, ucomp, leg, playoff,
+ *   stage:'final'|'main', firstLeg:[nasze gole, gole rywala] z 1. meczu albo null, venue:'home'|'away'|'neutral',
+ *   pWin, pLose, derby, rivalry (0-3), last5, tags (z matchRank),
+ *   table:{ tier, pos, points, oppPos, oppPoints, played, total, leaderPts, secondPts, relFrom, dropPts, targetTo, targetPts } }
+ * Zwraca: { kind, key, stake, six, last, gap, rival, venue, leg, points, et, final, knockout, form, label, title }.
+ */
+export function briefingContext(input = {}) {
+  const type = input.type || 'league';
+  const round = input.round ?? null;
+  const pWin = input.pWin ?? 0.4;
+  const pLose = input.pLose ?? Math.max(0, 1 - pWin - 0.27);
+  // rodzaj meczu
+  let kind = 'league';
+  if (type === 'friendly') kind = 'friendly';
+  else if (input.playoff) kind = round === 'F' ? 'playoffFinal' : 'playoffSemi';
+  else if (type === 'supercup') kind = 'supercup';
+  else if (type === 'cup') kind = round === 'F' || input.stage === 'final' ? 'cupFinal' : round === 'SF' ? 'cupSemi' : round === 'QF' ? 'cupQF' : 'cupEarly';
+  else if (type === 'uefa') {
+    if (input.ucomp === 'SEU') kind = 'uefaSuper';
+    else if (round === 'F') kind = 'uefaFinal';
+    else if (round === 'league') kind = 'uefaLeague';
+    else if (['Q1', 'Q2', 'Q3', 'PO'].includes(round)) kind = 'uefaQual';
+    else if (round === 'SF') kind = 'uefaSemi';
+    else kind = 'uefaKO';
+  }
+  const final = ['cupFinal', 'supercup', 'uefaSuper', 'uefaFinal', 'playoffFinal'].includes(kind);
+  const points = kind === 'league' || kind === 'uefaLeague';
+  const knockout = !points && kind !== 'friendly';
+  // dwumecz: 1. mecz albo rewanż z wynikiem 1. meczu
+  let leg = null;
+  if (type === 'uefa' && (input.leg === 1 || input.leg === 2)) {
+    leg = { n: input.leg };
+    if (input.leg === 2 && Array.isArray(input.firstLeg)) {
+      const [f, a] = input.firstLeg;
+      leg.first = [f, a];
+      leg.state = f > a ? 'ahead' : f === a ? 'level' : 'behind';
+    }
+  }
+  // dogrywka czy od razu karne (Superpuchar Polski i Superpuchar Europy: od razu karne)
+  const et = !knockout ? null : (kind === 'supercup' || kind === 'uefaSuper') ? 'pens' : (leg?.n === 1 ? null : 'et');
+  // różnica sił
+  let gap = 'even';
+  if (pLose >= GAP.muchStronger || pWin <= GAP.minWin) gap = 'muchStronger';
+  else if (pWin >= GAP.muchWeaker) gap = 'muchWeaker';
+  else if (pLose >= GAP.stronger) gap = 'stronger';
+  else if (pWin >= GAP.weaker) gap = 'weaker';
+  // rywal: derby (to samo miasto albo region z listy derbów) albo wielki rywal (lista rywalizacji, klasyk)
+  const tags = input.tags || [];
+  const derby = !!(input.derby || tags.includes('derby'));
+  const rival = derby ? 'derby' : ((input.rivalry ?? 0) >= 2 || tags.includes('klasyk')) ? 'rival' : null;
+  // stawka w lidze
+  let stake = null; let six = false; let last = false;
+  const t = input.table;
+  if (kind === 'league' && t && t.pos) {
+    const total = t.total ?? 34;
+    const left = Math.max(0, total - (t.played ?? 0));
+    const late = (t.played ?? 0) >= total / 2;
+    last = left === 1;
+    const pts = t.points ?? 0;
+    const relFrom = t.relFrom ?? 16;
+    const tier = t.tier ?? 1;
+    const reach = 3 * left;
+    if (late && left > 0) {
+      const topGap = t.pos === 1 ? (pts - (t.secondPts ?? pts)) : ((t.leaderPts ?? pts) - pts);
+      const titleRace = tier === 1 && (tags.includes('title') || (left <= 8 && t.pos <= 3 && topGap <= Math.min(6, reach)));
+      const promoRace = tier >= 2 && left <= 10 && (t.pos <= (t.targetTo ?? 6) || (t.targetPts ?? 0) - pts <= 3) && (t.targetPts ?? 0) - pts <= reach;
+      const dropRace = left <= 12 && (t.pos >= relFrom || (t.pos >= relFrom - 3 && pts - (t.dropPts ?? 0) <= 4)) || tags.includes('relegation');
+      if (titleRace) stake = 'title';
+      else if (promoRace) stake = 'promotion';
+      else if (dropRace) stake = 'relegation';
+      else if (left <= 5 && pts - (t.dropPts ?? 0) > reach && (t.targetPts ?? t.leaderPts ?? pts) - pts > reach) stake = 'deadRubber';
+      if (stake === 'relegation' && t.oppPos && t.oppPos >= relFrom - 3 && Math.abs((t.oppPoints ?? 0) - pts) <= 4) six = true;
+    }
+  }
+  // forma (z 5 ostatnich meczów)
+  const r5 = (input.last5 || []).map((x) => ({ W: 'W', D: 'R', R: 'R', L: 'P', P: 'P' }[x] || x));
+  const f5 = r5.reduce((s, x) => s + (x === 'W' ? 3 : x === 'R' ? 1 : 0), 0);
+  const form = (r5.length >= 4 && f5 <= 3) || (r5.length >= 2 && r5.slice(-2).every((x) => x === 'P')) ? 'crisis' : (r5.length >= 3 && f5 >= 10) ? 'run' : null;
+  const venue = input.venue || 'home';
+  const c = { kind, stake, six, last, gap, rival, venue, leg, points, et, final, knockout, form, playoff: !!input.playoff, title: input.title || null };
+  c.key = primaryKey(c);
+  c.label = contextLabel(c);
+  return c;
+}
+
+/** Główny klucz tekstów (najbardziej szczegółowa sytuacja wygrywa). */
+function primaryKey(c) {
+  if (c.kind === 'friendly') return 'friendly';
+  if (c.final) return c.kind;
+  if (c.leg?.n === 2 && c.leg.state) return `leg2${c.leg.state[0].toUpperCase()}${c.leg.state.slice(1)}`;
+  if (c.kind !== 'league') return c.kind;
+  if (c.stake) return c.stake;
+  if (c.rival) return c.rival;
+  return 'league';
+}
+
+function contextLabel(c) {
+  const parts = [];
+  if (c.title) parts.push(c.title);
+  if (c.leg?.n === 2 && c.leg.first) {
+    const [f, a] = c.leg.first;
+    parts.push(f === a ? `Po pierwszym meczu remis ${f}:${a}` : f > a ? `Po pierwszym meczu prowadzimy ${f}:${a}` : `Po pierwszym meczu przegrywamy ${f}:${a}`);
+  }
+  if (c.stake) parts.push(c.six ? STAKE_LABEL.six : STAKE_LABEL[c.stake]);
+  if (c.last && c.kind === 'league') parts.push('Ostatnia kolejka');
+  if (c.rival === 'derby' && c.kind !== 'friendly') parts.push('Derby');
+  if (c.rival === 'rival' && c.kind !== 'friendly') parts.push('Mecz z wielkim rywalem');
+  if (c.gap === 'muchStronger' || c.gap === 'muchWeaker') parts.push(GAP_LABEL[c.gap]);
+  return parts.join('. ');
+}
+
+// ---------------------------------------------------------------- teksty przemów
+// Linie mogą mieć znaczniki warunków na początku, np. „[home]” albo „[under,leg1]”: linia pasuje tylko wtedy,
+// gdy spełnione są wszystkie. Znaczniki nie trafiają do tekstu.
+const TAG_TEST = {
+  home: (c) => c.venue === 'home',
+  away: (c) => c.venue === 'away',
+  neutral: (c) => c.venue === 'neutral',
+  under: (c) => c.gap === 'muchStronger' || c.gap === 'stronger',
+  fav: (c) => c.gap === 'muchWeaker' || c.gap === 'weaker',
+  run: (c) => c.form === 'run',
+  crisis: (c) => c.form === 'crisis',
+  six: (c) => c.six,
+  last: (c) => c.last,
+  notlast: (c) => !c.last,
+  leg1: (c) => c.leg?.n === 1,
+  et: (c) => c.et === 'et',
+  pens: (c) => c.et === 'pens',
+  b1: (c, x) => x.behindBy === 1,
+  b2: (c, x) => x.behindBy >= 2,
+  l1: (c, x) => x.leadBy === 1,
+};
+const TAG_RE = /^\[([a-z0-9,]+)\]\s*/;
+function lineFits(line, c, x) {
+  const m = TAG_RE.exec(line);
+  if (!m) return true;
+  return m[1].split(',').every((t) => TAG_TEST[t]?.(c, x) ?? false);
+}
+const lineText = (line) => line.replace(TAG_RE, '');
+const lineTagged = (line, tags) => { const m = TAG_RE.exec(line); return !!m && m[1].split(',').some((t) => tags.includes(t)); };
+
+// Kolejność szukania tekstów dla klucza (pierwszy klucz z pasującą linią wygrywa). Klucz 'any' jest neutralny:
+// bez punktów, ligi, pucharu, trofeum i rywala, więc pasuje do każdego meczu o stawkę. Sparing ma własne teksty.
+const PRE_CHAIN = {
+  friendly: ['friendly'],
+  league: ['league', 'any'], title: ['title', 'league', 'any'], relegation: ['relegation', 'league', 'any'],
+  promotion: ['promotion', 'league', 'any'], deadRubber: ['deadRubber', 'league', 'any'],
+  derby: ['derby', 'league', 'any'], rival: ['rival', 'league', 'any'],
+  cupEarly: ['cupEarly', 'cup', 'any'], cupQF: ['cupQF', 'cup', 'any'], cupSemi: ['cupSemi', 'cup', 'any'],
+  cupFinal: ['cupFinal', 'final', 'any'], supercup: ['supercup', 'final', 'any'],
+  uefaSuper: ['uefaSuper', 'final', 'europe', 'any'], uefaFinal: ['uefaFinal', 'final', 'europe', 'any'],
+  uefaQual: ['uefaQual', 'europe', 'any'], uefaLeague: ['uefaLeague', 'europe', 'any'], uefaKO: ['uefaKO', 'europe', 'any'],
+  uefaSemi: ['uefaSemi', 'uefaKO', 'europe', 'any'],
+  leg2Ahead: ['leg2Ahead', 'europe', 'any'], leg2Level: ['leg2Level', 'europe', 'any'], leg2Behind: ['leg2Behind', 'europe', 'any'],
+  playoffSemi: ['playoffSemi', 'playoff', 'any'], playoffFinal: ['playoffFinal', 'playoff', 'any'],
+};
+
+const PRE_LINES = {
+  calm: {
+    any: ['Trzymamy plan. Róbcie swoje, a wynik przyjdzie.', 'Spokojnie. Każdy zna swoje zadanie, reszta przyjdzie sama.', 'Bez nerwów. Wiemy, jak chcemy grać, i tego się trzymamy do końca.'],
+    friendly: ['To sparing. Spokojnie wprowadzamy to, co ćwiczyliśmy w tygodniu, i nikt nie ryzykuje zdrowia.', 'Traktujcie ten mecz jak trening z rywalem. Spokojnie, z głową, bez niepotrzebnych starć.', 'Wynik dziś nie jest najważniejszy. Chcę zobaczyć, jak realizujecie założenia.', 'Najważniejsze, żeby każdy złapał minuty w nogach i zszedł z boiska zdrowy.'],
+    league: ['Spokojnie. Do tego meczu przygotowaliśmy się jak zawsze, wiemy, co robić.', 'W lidze liczy się regularność. Grajmy swoje, a punkty przyjdą.'],
+    title: ['Wiem, o co gramy. Nie myślcie o tabeli, myślcie o następnej akcji.', 'Mistrzostwo nie rozstrzyga się w pierwszej minucie. Spokojnie, cierpliwie, swoją piłką.', '[last] Ostatnia kolejka. Spokojnie, gramy to, co trenowaliśmy cały sezon.'],
+    relegation: ['Wiem, że ciąży na was tabela. Zostawcie ją w szatni i grajcie prosto, bez paniki.', 'Strach to zły doradca. Robimy to, co umiemy, krok po kroku.', '[six] Rywal jest w tej samej sytuacji co my. Wygra ten, kto zachowa zimną głowę.'],
+    promotion: ['Awans jest blisko, ale nie wolno go wyprzedzać myślami. Ten mecz, ta akcja, nic więcej.', 'Nie liczcie punktów w tabeli. Liczy się tylko ten mecz.'],
+    deadRubber: ['W tabeli niewiele się już zmieni, ale gramy dla siebie i dla kibiców. Spokojnie, porządnie, do końca.', 'Niech nikt nie gra na pół gwizdka. Spokojnie, ale profesjonalnie, jak w każdym meczu.'],
+    derby: ['Wiem, ile znaczą derby. Emocje zostawcie kibicom, wy grajcie głową.', 'Chłodna głowa wygrywa derby. Nie dajcie się sprowokować.'],
+    rival: ['Kibice czekają na ten mecz od dawna. Spokojnie, nasza piłka, nasz plan.', 'Z tym rywalem zawsze jest gorąco. Tym bardziej grajmy spokojnie i mądrze.'],
+    cup: ['Puchar wybacza brzydką grę, ale nie wybacza nerwów. Spokojnie i do przodu.', 'W pucharze liczy się awans. Spokojnie, cierpliwie, nawet jeśli trzeba będzie grać dogrywkę.'],
+    cupQF: ['Ćwierćfinał. Nie myślimy o półfinale, myślimy o tym meczu.'],
+    cupSemi: ['Półfinał. Nie myślcie o finale, myślcie o pierwszym podaniu.', 'Jeden mecz od finału. Spokojnie, nasz plan wystarczy, jeśli go zrealizujemy.'],
+    final: ['Finał gra się głową. Świętować będziemy po ostatnim gwizdku.', 'Wiem, że serce bije szybciej. Oddychajcie i grajcie swoje. Trofeum zdobywa ten, kto pierwszy się uspokoi.'],
+    supercup: ['Superpuchar to pierwsze trofeum sezonu. Spokojnie, gramy swoje od pierwszej minuty.', 'Pamiętajcie: przy remisie od razu rzuty karne, bez dogrywki. Spokojnie, liczy się każda minuta.'],
+    uefaSuper: ['Superpuchar Europy. Gramy z najlepszymi, ale spokojnie: to wciąż ta sama piłka.'],
+    europe: ['Europejski wieczór. Spokojnie, piłka jest tak samo okrągła jak w lidze.', 'Wiem, że to wielka scena. Spokojnie, grajmy to, co umiemy.'],
+    uefaQual: ['[leg1] Pierwszy mecz dwumeczu. Spokojnie, nie wszystko rozstrzygnie się dziś.'],
+    uefaLeague: ['Faza ligowa to długi dystans. Spokojnie, każdy punkt przybliża nas do awansu.'],
+    uefaKO: ['[leg1] Faza pucharowa, pierwszy mecz. Nie wszystko rozstrzygnie się dziś, spokojnie i z głową.'],
+    uefaSemi: ['[leg1] Półfinał w Europie. Spokojnie, to dopiero pierwsza połowa dwumeczu.'],
+    leg2Ahead: ['Mamy zaliczkę z pierwszego meczu. Spokojnie, nie bronimy jej nerwowo, gramy swoje.'],
+    leg2Level: ['Po pierwszym meczu jest remis. Wszystko zaczyna się od nowa, spokojnie i z głową.'],
+    leg2Behind: ['Musimy odrobić stratę, ale mamy na to cały mecz. Bez paniki, krok po kroku.'],
+    playoff: ['Baraże to jeden mecz. Spokojnie, nasz plan, nasza cierpliwość.'],
+    playoffFinal: ['Jeden mecz od awansu. Spokojnie, nie myślcie o fecie, myślcie o boisku.'],
+  },
+  praise: {
+    any: ['Widzę, jak pracujecie na treningach. Jestem z was dumny, pokażcie to dziś.', 'Ufam wam. Pokażcie na boisku to, co widzę w tygodniu.', '[run] Jestem z was dumny. Tak trzymać.'],
+    friendly: ['Dobrze pracowaliście w tym tygodniu. Ten sparing to okazja, żeby to pokazać.', 'Każdy, kto dziś dostanie minuty, ma szansę mnie przekonać. Jestem zadowolony z waszej pracy.'],
+    league: ['[run] Ostatnie mecze to dobra robota. Dopiszmy dziś kolejne punkty.', 'Jestem zadowolony z tego, jak pracujecie. W lidze to procentuje.'],
+    title: ['Zapracowaliście na to, żeby grać o mistrzostwo. Teraz po nie sięgnijcie.', 'Cały sezon pokazujecie charakter. Dziś pokażcie go jeszcze raz.'],
+    relegation: ['Wierzę w tę szatnię. Charakter, który pokazujecie na treningach, utrzyma nas w lidze.'],
+    promotion: ['Zapracowaliście na to, żeby walczyć o awans. Dokończmy to.'],
+    deadRubber: ['To był długi sezon i dużo z siebie daliście. Zagrajmy dziś tak, żeby kibice wyszli zadowoleni.'],
+    derby: ['Jestem dumny, że to wy zagracie w tych derbach. Kibice wiedzą, że mogą na was liczyć.'],
+    rival: ['Ufam wam. Ten mecz pokaże, kto jest lepszą drużyną, i wierzę, że to będziemy my.'],
+    cup: ['Wierzę w was. W pucharze każdy mecz to szansa, żeby pokazać się szerzej.', 'Pracujecie świetnie. Pokażmy w tym pucharze, ile jesteśmy warci.'],
+    cupQF: ['Dotarliście do ćwierćfinału ciężką pracą. Teraz krok dalej.'],
+    cupSemi: ['Zasłużyliście na ten półfinał. Teraz idźmy dalej.'],
+    final: ['Zasłużyliście, żeby tu być. Jestem z was dumny, a teraz idźmy po trofeum.'],
+    cupFinal: ['Przeszliście całą drogę do finału. Jestem z was dumny, dokończmy to.'],
+    europe: ['Ciężka praca dała nam grę w Europie. Pokażmy, że tu pasujemy.'],
+    uefaLeague: ['Zasłużyliście na fazę ligową. Pokażmy, że to nie przypadek.'],
+    leg2Ahead: ['Pierwszy mecz był dobry. Pokażcie, że to nie był przypadek.'],
+    leg2Level: ['W pierwszym meczu byliśmy równorzędnym rywalem. Dziś pokażcie, że jesteśmy lepsi.'],
+    leg2Behind: ['Wierzę w was. Stratę z pierwszego meczu da się odrobić, jeśli zagramy, jak potrafimy.'],
+    playoff: ['Zapracowaliście na baraże. Teraz pokażmy, że zasługujemy na awans.'],
+  },
+  demand: {
+    any: ['Stać was na dużo więcej. Chcę to zobaczyć na boisku.', 'Od pierwszej minuty chcę intensywności. Każdy pojedynek jest nasz.'],
+    friendly: ['Sparing to też sprawdzian. Kto chce grać w meczach o stawkę, niech pokaże to dziś.', 'Chcę zobaczyć intensywność z treningów. Miejsce w składzie wywalcza się także w sparingach.'],
+    league: ['Dziś chcę trzech punktów i pełnego zaangażowania. Mniej nie przyjmuję.', 'Każdy punkt w lidze trzeba wyszarpać. Chcę walki od pierwszej do ostatniej minuty.'],
+    title: ['Mistrzostwo nie spadnie z nieba. Każdy pojedynek, każdy metr, wszystko na sto procent.', 'Takie mecze decydują o tytule. Chcę widzieć, że rozumiecie, o co gramy.'],
+    relegation: ['W tym meczu nie ma miejsca na półśrodki. Każda piłka to walka o utrzymanie.', '[six] To mecz o sześć punktów. Wygrana pozwala odskoczyć, porażka wciąga nas głębiej.'],
+    promotion: ['Awans trzeba wyszarpać. Chcę widzieć głód w każdej akcji.'],
+    deadRubber: ['Nie ma meczów o nic. Kto dziś odpuści, ten sam sobie wystawi ocenę przed następnym sezonem.'],
+    derby: ['Derbów się nie przegrywa. Chcę widzieć walkę o każdy metr, ale z głową.', 'W derbach liczy się charakter. Pokażcie, kto tu rządzi, ale bez głupich fauli.'],
+    rival: ['Z tym rywalem gra się o prestiż. Chcę pełnego zaangażowania od pierwszej minuty.'],
+    cup: ['W pucharze nie ma drugiej szansy. Kto przegrywa, odpada, więc chcę maksimum od pierwszej minuty.'],
+    cupQF: ['Ćwierćfinał. Chcę widzieć drużynę, która chce iść dalej, a nie taką, która cieszy się, że tu jest.'],
+    cupSemi: ['Półfinał to nie miejsce na oszczędzanie sił. Chcę zobaczyć głód finału.', 'Jeden mecz dzieli nas od finału. Chcę zobaczyć, że naprawdę tego chcecie.'],
+    final: ['Finału się nie gra, finał się wygrywa. Wszystko, co macie, zostawcie dziś na boisku.', 'Do trofeum jeden mecz. Chcę pełnej koncentracji od pierwszego gwizdka.'],
+    supercup: ['Superpuchar to trofeum, a nie mecz pokazowy. Chcę go zdobyć.'],
+    uefaSuper: ['Superpuchar Europy to trofeum, a nie mecz pokazowy. Chcę go zdobyć.'],
+    europe: ['W Europie każdy błąd kosztuje podwójnie. Chcę koncentracji przez cały mecz.'],
+    uefaQual: ['[leg1] Chcę dobrego wyniku przed rewanżem. Gol strzelony dziś może zdecydować o awansie.'],
+    uefaLeague: ['[home] U siebie w fazie ligowej trzeba punktować. Chcę wygranej.', '[away] Nie przyjechaliśmy tu na wycieczkę. W fazie ligowej każdy punkt ma wagę.'],
+    uefaKO: ['[leg1] Faza pucharowa. Chcę wyniku, który da nam przewagę przed rewanżem.'],
+    leg2Ahead: ['Mamy zaliczkę, ale nie po to, żeby się cofać. Chcę gola, który zamknie dwumecz.'],
+    leg2Level: ['Wszystko do rozstrzygnięcia. Kto bardziej chce, ten awansuje.'],
+    leg2Behind: ['Musimy strzelać. Chcę odwagi i agresji od pierwszej minuty.'],
+    playoff: ['Baraże wygrywa ten, kto bardziej chce. Chcę to zobaczyć od pierwszej minuty.'],
+    playoffFinal: ['Jeden mecz dzieli nas od awansu. Nie zostawiajcie niczego w szatni.'],
+  },
+  shout: {
+    any: ['Obudźcie się! Od pierwszej minuty chcę ognia, a nie spaceru!', '[crisis] Dość tego! Ostatnie wyniki to wstyd i dziś to zmieniamy!'],
+    friendly: ['Sparing to nie wakacje! Kto będzie dziś człapał, nie zagra w następnym meczu!', 'Nie obchodzi mnie, że to mecz kontrolny! Chcę tempa i koncentracji!'],
+    league: ['[crisis] Dość gubienia punktów! Dziś wychodzicie i walczycie, jasne?!', 'Każdy mecz w lidze traktujemy jak najważniejszy! Do roboty!'],
+    title: ['To jest mecz o mistrzostwo, a nie towarzyski! Chcę widzieć furię!'],
+    relegation: ['Chcecie spaść?! Bo ja nie! Dziś walczycie o każdą piłkę!', 'Kibice nie zasłużyli na spadek! Dziś każdy zostawia serce na boisku!'],
+    promotion: ['Nie po to harowaliśmy cały sezon, żeby teraz odpuścić awans!'],
+    deadRubber: ['Nie obchodzi mnie, że w tabeli nic się nie zmieni! Gracie w koszulce tego klubu, więc ją szanujcie!'],
+    derby: ['To są derby! Chcę ognia w sercu i lodu w głowie, żadnych głupich kartek!'],
+    rival: ['Ten rywal tylko czeka, żeby się z nas pośmiać! Nie dajcie mu tej satysfakcji!'],
+    cup: ['W pucharze odpada się raz! Kto nie chce grać dalej, niech zostanie w szatni!'],
+    cupSemi: ['Jesteście o krok od finału i chcecie to zmarnować?! Do boju!'],
+    final: ['Trofeum leży na stole! Kto chce je zabrać, niech pokaże to od pierwszej minuty!'],
+    cupFinal: ['Do tego finału szliśmy przez wszystkie rundy! Nie oddamy go bez walki!'],
+    europe: ['Cała Polska patrzy! Pokażcie, że zasługujemy na Europę!'],
+    leg2Ahead: ['Zaliczka nic nie znaczy, jeśli zaśniecie! Gramy tak, jakby dwumecz zaczynał się od zera!'],
+    leg2Level: ['Wszystko rozstrzyga się dziś! Kto nie jest gotowy, niech powie to teraz!'],
+    leg2Behind: ['Przegrywamy dwumecz, ale to jeszcze nie koniec! Atak od pierwszej minuty!'],
+    playoff: ['Cały sezon na jeden mecz! Nie zmarnujcie tego!'],
+  },
+  noPressure: {
+    any: ['[under] Nie macie nic do stracenia. Wyjdźcie i cieszcie się grą.', 'Bez spinania się. Grajcie odważnie, błędy biorę na siebie.', '[fav] Wiemy, że jesteśmy mocniejsi. Bez nerwów, wystarczy grać swoje.'],
+    friendly: ['To tylko sparing. Bawcie się piłką i próbujcie odważnych zagrań.', 'Nikt was nie rozliczy z wyniku. Liczy się to, co dziś sprawdzimy.'],
+    league: ['[notlast] To jeden z wielu meczów w sezonie. Grajcie swobodnie, bez patrzenia na tabelę.', 'Grajcie swobodnie i nie patrzcie na tabelę. Liczy się nasza gra.'],
+    title: ['Presja jest po obu stronach. Wy grajcie z uśmiechem, niech ciężar poczują inni.'],
+    relegation: ['Wiem, że tabela ciąży. Odłóżcie ją i grajcie tak, jakbyśmy byli w środku stawki.'],
+    promotion: ['Awans to nagroda, a nie obowiązek. Grajcie z radością, a reszta przyjdzie.'],
+    deadRubber: ['Nic nie musimy, wszystko możemy. Pokażcie kibicom ładną piłkę.'],
+    derby: ['Wiem, ile mówi się o tych derbach. Zostawcie gadanie innym i bawcie się tym meczem.'],
+    rival: ['Niech oni się denerwują. My gramy swoje, z luzem.'],
+    cup: ['[under] Puchar to święto. Nikt na nas nie stawia, więc grajcie odważnie.', '[fav] Wszyscy oczekują naszego awansu. Zapomnijcie o tym i grajcie swobodnie.', 'Puchar rządzi się swoimi prawami. Grajcie odważnie, bez strachu przed błędem.'],
+    final: ['Finał to święto. Cieszcie się nim, takie mecze pamięta się całe życie.', '[under] W finale faworytem jest rywal. My nie mamy nic do stracenia.'],
+    supercup: ['Superpuchar to święto. Cieszcie się nim, takie mecze pamięta się długo.', '[under] Faworytem jest rywal. My nie mamy nic do stracenia, grajcie odważnie.'],
+    uefaSuper: ['Superpuchar Europy to święto. Cieszcie się nim, takie mecze pamięta się całe życie.'],
+    europe: ['Gramy w Europie, o tym marzy każdy piłkarz. Cieszcie się tym meczem.', '[under] Nikt w Europie na nas nie stawia. Grajcie odważnie, bez kompleksów.'],
+    leg2Ahead: ['Mamy zaliczkę, ale nie myślcie o niej. Grajcie swobodnie.'],
+    leg2Level: ['Wszystko zaczyna się od zera. Bez kalkulacji, grajcie swoje.'],
+    leg2Behind: ['Musimy gonić, więc nie mamy nic do stracenia. Grajcie odważnie.'],
+    playoff: ['Baraże to nagroda za dobry sezon. Grajcie bez strachu.'],
+  },
+  defend: {
+    any: ['Najpierw zero z tyłu. Każdy pilnuje swojego.', 'Zaczynamy od solidnej obrony. Gole z przodu przyjdą, jeśli z tyłu będzie spokój.'],
+    friendly: ['Dziś sprawdzamy ustawienie w obronie. Każdy pilnuje swojej strefy, bez ryzykownych wślizgów.', 'Ćwiczymy organizację w obronie. Zwarte linie, komunikacja i żadnych niepotrzebnych fauli.'],
+    league: ['Zero z tyłu da nam co najmniej punkt. Od tego zaczynamy.'],
+    title: ['Mistrzów buduje obrona. Zero z tyłu i cierpliwie czekamy na swoją szansę.'],
+    relegation: ['Każdy punkt jest na wagę złota. Najpierw zero z tyłu, nie dajmy się zaskoczyć.'],
+    cup: ['W pucharze jeden błąd kończy przygodę. Najpierw zero z tyłu.'],
+    final: ['Finały wygrywa obrona. Nikt nie odpuszcza krycia przez cały mecz.'],
+    supercup: ['Przy remisie od razu karne, więc nie dajmy się zaskoczyć. Najpierw zero z tyłu.'],
+    uefaSuper: ['Przy remisie od razu karne. Zwarte linie i cierpliwość przez cały mecz.'],
+    europe: ['W Europie rywal ukarze każdy błąd. Zwarte linie, zero z tyłu.'],
+    uefaQual: ['[home,leg1] Czyste konto u siebie to dobra podstawa przed rewanżem. Najpierw zero z tyłu.', '[away,leg1] Na wyjeździe najpierw obrona. Wynik bez straty gola da nam spokój przed rewanżem.'],
+    uefaKO: ['[home,leg1] Czyste konto u siebie to dobra podstawa przed rewanżem. Najpierw zero z tyłu.', '[away,leg1] Na wyjeździe najpierw obrona. Wynik bez straty gola da nam spokój przed rewanżem.'],
+    uefaLeague: ['W fazie ligowej punkt też się liczy. Najpierw solidna obrona.'],
+    leg2Ahead: ['Mamy przewagę z pierwszego meczu. Zero z tyłu i awans jest nasz.'],
+    leg2Level: ['Nie możemy stracić gola, który ustawi rywalowi dwumecz. Obrona przede wszystkim.'],
+    leg2Behind: ['Musimy odrobić stratę, ale bez straty kolejnego gola. Najpierw zero z tyłu, potem atak.'],
+    playoff: ['W barażu jeden błąd może kosztować cały sezon. Najpierw zero z tyłu.'],
+  },
+};
+
+// Drugie zdanie przemowy: rywal (derby, wielki rywal) albo duża różnica sił. Teksty bez nazwy rozgrywek.
+const PRE_MOD = {
+  calm: {
+    derby: ['To derby, więc trzymajcie emocje na wodzy. Głupia kartka to prezent dla rywala.'],
+    rival: ['Wiem, jak kibice czekają na mecz z tym rywalem. Nie dajmy się ponieść.'],
+    muchStronger: ['Rywal jest faworytem, ale faworyci też się mylą.'],
+    muchWeaker: ['Jesteśmy faworytem. Rywal w końcu się otworzy, wystarczy zmęczyć go posiadaniem piłki.'],
+    fStrong: ['Rywal jest mocniejszy, to dobry test dla naszej obrony.'],
+    fWeak: ['Rywal jest słabszy, więc ćwiczymy atak pozycyjny. Cierpliwie.'],
+  },
+  praise: {
+    derby: ['Kibice czekali na te derby. Wiem, że ich nie zawiedziecie.'],
+    rival: ['Kibice długo czekali na mecz z tym rywalem. Wiem, że ich nie zawiedziecie.'],
+    muchStronger: ['Nikt na nas nie stawia, a ja wiem, ile jesteście warci.'],
+    muchWeaker: ['Jesteście lepszą drużyną, ale to trzeba pokazać na boisku, a nie na papierze.'],
+    fStrong: ['Sprawdzian z mocnym rywalem pokaże, jak daleko zaszliście.'],
+    fWeak: ['Pokażcie jakość, a nie tylko wynik.'],
+  },
+  demand: {
+    derby: ['To derby. Chcę walki o każdy metr, ale z głową.'],
+    rival: ['Z tym rywalem gra się o prestiż. Nie oddamy mu ani metra.'],
+    muchStronger: ['Rywal jest silniejszy na papierze, więc musimy przebiec więcej niż on.'],
+    muchWeaker: ['Nie ma słabych rywali. Kto zlekceważy przeciwnika, usiądzie na ławce.'],
+    fStrong: ['Mocny sparingpartner to szansa. Chcę zobaczyć, jak radzicie sobie pod presją.'],
+    fWeak: ['Słabszy rywal to nie wymówka do grania na pół gwizdka.'],
+  },
+  shout: {
+    derby: ['To są derby! Ogień w sercu, lód w głowie!'],
+    rival: ['Nie dajcie temu rywalowi powodu do świętowania!'],
+    muchStronger: ['Mają lepszy skład, ale nie mają naszego serca!'],
+    muchWeaker: ['Jeśli ktoś myśli, że ten mecz wygra się sam, to grubo się myli!'],
+    fStrong: ['Mocny rywal to nie powód, żeby się chować!'],
+    fWeak: ['Nie chcę widzieć lekceważenia rywala, nawet w sparingu!'],
+  },
+  noPressure: {
+    derby: ['Wokół derbów zawsze jest dużo hałasu. Zostawcie go kibicom.'],
+    rival: ['Niech rywal się denerwuje. My zachowajmy luz.'],
+    muchStronger: ['Faworytem są oni, presja jest po ich stronie.'],
+    muchWeaker: ['Jesteśmy faworytem, ale niech to was nie usztywnia.'],
+    fStrong: ['Silny rywal, zero presji. Uczcie się z każdej akcji.'],
+    fWeak: ['Bawcie się grą, ale z szacunkiem dla rywala.'],
+  },
+  defend: {
+    derby: ['W derbach rywal będzie szukał prowokacji. Nie dajcie się wyciągnąć z ustawienia.'],
+    rival: ['Ten rywal zna nasze słabe strony. Zwarte linie i pełna koncentracja.'],
+    muchStronger: ['Na mocniejszego rywala potrzebujemy zwartych linii i cierpliwości.'],
+    muchWeaker: ['Nie dajmy rywalowi nadziei. Cierpliwie rozbijamy jego obronę, bez otwierania się.'],
+    fStrong: ['Na mocnym rywalu sprawdzimy organizację w obronie.'],
+    fWeak: ['Nawet ze słabszym rywalem pilnujemy ustawienia. Tego się uczymy.'],
+  },
+};
+
+function modKey(c) {
+  if (c.kind === 'friendly') return c.gap === 'muchStronger' ? 'fStrong' : c.gap === 'muchWeaker' ? 'fWeak' : null;
+  if (c.rival && c.key !== c.rival) return c.rival;
+  if (c.gap === 'muchStronger' || c.gap === 'muchWeaker') return c.gap;
+  return null;
+}
+
+// Przerwa: grupa meczu i stan wyniku (dwumecz: stan dwumeczu). Klucz 'grupa.stan' albo 'grupa.all'.
+const HALF_LINES = {
+  calm: {
+    'any.lead': ['Prowadzimy, ale to dopiero połowa. Spokojnie, trzymamy plan.', 'Dobra połowa. Bez euforii, gramy dalej to samo.'],
+    'any.level': ['Remis, nic się nie stało. Trzymamy plan, szansa przyjdzie.', 'Spokojnie. Jeszcze czterdzieści pięć minut, wystarczy jedna dobra akcja.'],
+    'any.behind': ['Mamy czterdzieści pięć minut, żeby to odwrócić. Bez paniki.', '[b1] Jeden gol i wszystko zaczyna się od nowa. Spokojnie, krok po kroku.'],
+    'friendly.all': ['Druga połowa to czas dla zmienników. Spokojnie realizujemy założenia, wynik jest drugorzędny.', 'Spokojnie. Sprawdzamy to, co ćwiczyliśmy, i dbamy o zdrowie.'],
+    'points.lead': ['Prowadzimy. Spokojnie dowieźmy te punkty do końca.'],
+    'points.level': ['Remis to też punkt, ale stać nas na więcej. Spokojnie, cierpliwie.'],
+    'points.behind': ['Mamy czas, żeby uratować punkty. Bez paniki.'],
+    'ko.lead': ['Jesteśmy czterdzieści pięć minut od awansu. Spokojnie, nie myślcie o wyniku.'],
+    'ko.level': ['Na razie remis, a w razie potrzeby jest dogrywka. Spokojnie, mamy czas.'],
+    'ko.behind': ['Na odrobienie straty mamy całą drugą połowę. Bez paniki, gramy swoje.'],
+    'final.lead': ['Czterdzieści pięć minut od trofeum. Nie myślcie o pucharze, myślcie o następnej akcji.'],
+    'final.level': ['[et] Remis w finale to na razie dogrywka. Spokojnie, cierpliwie.', '[pens] Przy remisie od razu karne. Spokojnie, ale spróbujmy rozstrzygnąć to wcześniej.'],
+    'pfinal.lead': ['Czterdzieści pięć minut od awansu. Spokojnie, nie myślcie jeszcze o fecie.'],
+    'leg1.lead': ['Prowadzimy, ale to dopiero pierwsza połowa dwumeczu. Spokojnie.'],
+    'leg1.level': ['Remis, a przed nami jeszcze rewanż. Bez nerwów.'],
+    'leg1.behind': ['Do rewanżu wszystko jest otwarte, ale spróbujmy zmniejszyć stratę.'],
+    'leg2.ahead': ['W dwumeczu jesteśmy z przodu. Spokojnie, kontrolujemy to.'],
+    'leg2.level': ['W dwumeczu remis. Mamy czterdzieści pięć minut, a w razie potrzeby dogrywkę.'],
+    'leg2.behind': ['W dwumeczu przegrywamy, ale mamy czterdzieści pięć minut. Bez paniki.'],
+  },
+  praise: {
+    'any.lead': ['Świetna połowa. Tak trzymać.', 'Dokładnie tak to sobie wyobrażałem. Jeszcze jedna taka połowa.'],
+    'any.level': ['Dobrze gracie, wynik jeszcze przyjdzie.'],
+    'any.behind': ['Mimo wyniku jestem z was zadowolony. Grajcie dalej tak samo, a gole przyjdą.'],
+    'friendly.lead': ['Dobrze to wygląda. Ci, którzy wejdą, niech grają dalej w tym stylu.'],
+    'friendly.level': ['Dobrze to wygląda. Ci, którzy wejdą, niech grają dalej w tym stylu.'],
+    'friendly.behind': ['Wynik nie jest ważny. Podobało mi się kilka akcji, pokażcie ich więcej.'],
+    'final.lead': ['Gracie wielki finał. Jeszcze jedna taka połowa.'],
+    'leg2.ahead': ['Dobra robota. Jesteśmy blisko awansu, tak trzymać.'],
+    'leg2.level': ['Dobrze gracie. Dwumecz jest w naszych rękach.'],
+    'leg2.behind': ['Gracie dobrze. Jeszcze trochę, a gole przyjdą.'],
+  },
+  demand: {
+    'any.lead': ['Prowadzimy, ale stać was na więcej. Chcę kolejnego gola, a nie cofania się.'],
+    'any.level': ['Remis mnie nie interesuje. Chcę więcej odwagi z przodu.'],
+    'any.behind': ['Tak się nie gra. Chcę więcej biegania i więcej odwagi.'],
+    'friendly.all': ['To nadal sparing, ale chcę więcej tempa. Kto wchodzi, niech pokaże się z dobrej strony.'],
+    'points.level': ['Jeden punkt to za mało. Chcę zwycięstwa.'],
+    'points.behind': ['Tracimy punkty na własne życzenie. Chcę reakcji.'],
+    'ko.level': ['Nie chcę dogrywki. Rozstrzygnijmy to w drugiej połowie.'],
+    'ko.lead': ['[l1] Jedna bramka przewagi to za mało, żeby być spokojnym. Chcę gola, który zamknie mecz.'],
+    'final.lead': ['Trofeum jest blisko, ale jeszcze nie nasze. Chcę kolejnego gola.'],
+    'final.level': ['Chcę zobaczyć, kto bardziej chce tego trofeum. Więcej odwagi z przodu.'],
+    'leg1.lead': ['Każdy gol więcej przyda się w rewanżu. Chcę jeszcze jednego.'],
+    'leg1.level': ['Chcę gola przed rewanżem. Więcej odwagi z przodu.'],
+    'leg2.ahead': ['Jesteśmy z przodu w dwumeczu, ale chcę gola, który zamknie sprawę.'],
+    'leg2.level': ['Jeden gol może dać nam awans. Chcę go zobaczyć.'],
+    'leg2.behind': ['Potrzebujemy goli. Więcej odwagi, więcej ludzi w polu karnym.'],
+  },
+  shout: {
+    'any.lead': ['Prowadzimy, a gracie, jakby było po meczu! Obudźcie się!'],
+    'any.level': ['Co to ma być?! Tak się nie gra w tym klubie!'],
+    'any.behind': ['Co to ma być?! W tym klubie tak się nie gra!', '[b2] To jest kompromitacja! Wyjdźcie i pokażcie, że macie charakter!'],
+    'friendly.all': ['Za wolno i za łatwo tracicie piłkę! W drugiej połowie chcę tempa!'],
+    'ko.behind': ['Przegrywamy i odpadamy! Tego chcecie?!'],
+    'pfinal.behind': ['Awans ucieka nam sprzed nosa! Tego chcecie?!'],
+    'final.behind': ['W finale nie ma jutra! Wyjdźcie i walczcie!'],
+    'leg1.behind': ['Nie oddamy dwumeczu w pierwszej połowie pierwszego meczu! Do roboty!'],
+    'leg2.ahead': ['Jesteśmy z przodu, a gracie, jakbyśmy już awansowali! Obudźcie się!'],
+    'leg2.level': ['Wszystko się waży, a wy gracie bez energii!'],
+    'leg2.behind': ['Odpadamy! Tego chcecie?! Atak od pierwszej minuty drugiej połowy!'],
+  },
+  noPressure: {
+    'any.lead': ['Prowadzimy. Grajcie swobodnie, bez strachu przed błędem.'],
+    'any.level': ['Wszystko jest otwarte. Grajcie odważnie, bez strachu przed błędem.'],
+    'any.behind': ['Nie mamy nic do stracenia. Wyjdźcie i grajcie odważnie.', '[b2] Wynik już jest zły, więc grajcie bez strachu. Każdy gol coś da.'],
+    'friendly.all': ['Wynik sparingu nie ma znaczenia. Próbujcie, ryzykujcie, uczcie się.'],
+    'ko.behind': ['Albo zaryzykujemy, albo odpadamy. Grajcie odważnie.'],
+    'final.behind': ['Nikt nie zapamięta tej połowy, jeśli ją odwrócimy. Grajcie odważnie.'],
+    'leg1.behind': ['Nawet przy tym wyniku dwumecz jest otwarty. Grajcie odważnie.'],
+    'leg2.ahead': ['Mamy przewagę. Grajcie swobodnie, bez strachu.'],
+    'leg2.level': ['Wszystko jest otwarte. Grajcie odważnie.'],
+    'leg2.behind': ['Nie mamy nic do stracenia. Ryzykujemy i atakujemy.'],
+  },
+  defend: {
+    'any.lead': ['Prowadzimy. Zwarte linie, rywal nie może dostać ani metra.', 'Teraz najważniejsza jest obrona. Utrzymajmy to prowadzenie.'],
+    'any.level': ['Najpierw nie stracić gola. Okazja z przodu przyjdzie.'],
+    'any.behind': ['Nie możemy stracić kolejnego gola. Najpierw obrona, potem gonimy.'],
+    'friendly.all': ['W drugiej połowie ćwiczymy ustawienie w obronie. Każdy pilnuje swojej strefy.'],
+    'points.lead': ['Punkty są na wyciągnięcie ręki. Zwarte linie do końca.'],
+    'ko.lead': ['Czterdzieści pięć minut do awansu. Zwarte linie, żadnych prezentów.'],
+    'final.lead': ['Czterdzieści pięć minut obrony i trofeum jest nasze.'],
+    'pfinal.lead': ['Czterdzieści pięć minut do awansu. Zwarte linie, żadnych prezentów.'],
+    'leg1.lead': ['[home] Nie traćmy gola u siebie. Zwarte linie.', 'Utrzymajmy tę zaliczkę przed rewanżem. Zwarte linie.'],
+    'leg2.ahead': ['Czterdzieści pięć minut do awansu. Nie dajmy rywalowi gola, który da mu nadzieję.'],
+    'leg2.level': ['Nie możemy dać rywalowi gola. Zwarte linie, cierpliwie.'],
+    'leg2.behind': ['Nie możemy stracić gola, ale musimy też strzelać. Najpierw spokój z tyłu, potem atak.'],
+  },
+};
+
+const HALF_PARENT = { pfinal: 'ko' };
+
+function halfGroup(c) {
+  if (c.kind === 'friendly') return 'friendly';
+  if (c.leg?.n === 1) return 'leg1';
+  if (c.leg?.n === 2 && c.leg.first) return 'leg2';
+  if (c.kind === 'playoffFinal') return 'pfinal';
+  if (c.final) return 'final';
+  if (c.points) return 'points';
+  if (c.knockout) return 'ko';
+  return 'any';
+}
+
+// Po meczu: grupa (rodzaj meczu i rozstrzygnięcie) i wynik W, D, L albo 'all'.
+const POST_LINES = {
+  praise: {
+    'any.W': ['Dziękuję za ten mecz. Tak się gra.', 'Świetna robota, wszyscy zasłużyliście na pochwałę.'],
+    'any.D': ['Za zaangażowanie należą wam się słowa uznania.'],
+    'any.L': ['Przegraliśmy, ale za walkę należy się wam szacunek.'],
+    'friendly.W': ['Dobry sprawdzian. Zrealizowaliście sporo z tego, co ćwiczyliśmy.', 'Dobra praca. Widać, że trening przynosi efekty.'],
+    'friendly.D': ['Wynik sparingu nie jest ważny. Podobało mi się wasze zaangażowanie.'],
+    'friendly.L': ['Wynik sparingu nie jest ważny. Podobało mi się wasze zaangażowanie.'],
+    'points.W': ['Zasłużone zwycięstwo. Dziękuję za ten mecz.', 'Komplet punktów zasłużony. Tak się gra.'],
+    'points.D': ['Punkt to nie jest zły wynik, a za walkę należy się wam uznanie.'],
+    'adv.all': ['Awans wywalczony. Zasłużyliście na to.', 'Jesteśmy dalej i to wasza zasługa. Dziękuję za ten mecz.'],
+    'padv.all': ['Jesteśmy w finale baraży. Zasłużyliście na to, został jeszcze jeden krok.'],
+    'out.all': ['Odpadamy, ale za walkę jestem wam wdzięczny.', 'To boli, ale nie mam do was pretensji o zaangażowanie.'],
+    'pout.all': ['Zabrakło niewiele. Za ten sezon i za walkę jestem wam wdzięczny.'],
+    'trophy.all': ['Zdobyliście trofeum. Zapamiętajcie ten dzień, zasłużyliście na niego.', 'To trofeum jest wasze. Jestem z was ogromnie dumny.'],
+    'lostFinal.all': ['Przegraliśmy finał, ale za walkę jestem z was dumny.', 'Dziś boli, ale samo dojście do tego meczu to wasza zasługa.'],
+    'promoted.all': ['Awans! Zasłużyliście na to każdym treningiem tego sezonu.'],
+    'leg1.W': ['Dobry wynik przed rewanżem. Dziękuję.'],
+    'leg1.D': ['Wszystko otwarte przed rewanżem, a wasza postawa daje nadzieję.'],
+    'leg1.L': ['Przegraliśmy pierwszy mecz, ale dwumecz trwa. Za walkę dziękuję.'],
+  },
+  criticize: {
+    'any.W': ['Wygraliśmy, ale nie podobała mi się nasza gra. Wiem, że stać was na więcej.'],
+    'any.D': ['Nie tak się umawialiśmy. To było za mało.'],
+    'any.L': ['Nie tak się umawialiśmy. To było za mało.', 'Za mało biegania, za mało jakości. Tak się nie wygrywa.'],
+    'friendly.W': ['Wygraliśmy, ale w sparingu chodzi o realizację założeń, a z tym było słabo.'],
+    'friendly.D': ['Sparing czy nie, tak się nie gra. Za dużo prostych strat.'],
+    'friendly.L': ['Sparing czy nie, tak się nie gra. Za dużo prostych strat.'],
+    'points.D': ['Oddaliśmy punkty, które powinny być nasze. To było za mało.'],
+    'points.L': ['Oddaliśmy te punkty za łatwo. To było za mało.'],
+    'adv.all': ['Awansowaliśmy, ale gra była daleka od tego, czego chcę.'],
+    'padv.all': ['Jesteśmy w finale baraży, ale z taką grą nie wywalczymy awansu.'],
+    'out.all': ['Odpadliśmy na własne życzenie. To boli i powinno boleć.', 'Odpadliśmy, bo zabrakło konsekwencji. Każdy musi spojrzeć w lustro.'],
+    'pout.all': ['Mieliśmy awans w zasięgu i go oddaliśmy. Tak się nie gra w barażach.'],
+    'trophy.all': ['Trofeum jest nasze, ale o grze porozmawiamy po świętowaniu.'],
+    'lostFinal.all': ['Finału się nie gra, finał się wygrywa. Dziś zabrakło nam odwagi.'],
+    'promoted.all': ['Awans jest, ale z taką grą w wyższej lidze będzie bardzo ciężko.'],
+    'leg1.W': ['Wygraliśmy, ale mogliśmy zbudować większą zaliczkę.'],
+    'leg1.D': ['Ten wynik nic nam nie daje przed rewanżem. Stać nas na więcej.'],
+    'leg1.L': ['Ten wynik utrudnia nam rewanż. Stać nas na więcej.'],
+  },
+  neutral: {
+    'any.all': ['Przeanalizujemy to na spokojnie.', 'Na gorąco nie będę oceniał. Jutro siądziemy do wideo.'],
+    'friendly.all': ['Mamy sporo materiału do analizy. Wnioski omówimy na treningu.'],
+    'adv.all': ['Awans jest, resztę przeanalizujemy na spokojnie.'],
+    'padv.all': ['Finał baraży jest nasz. Resztę przeanalizujemy na spokojnie.'],
+    'out.all': ['Odpadliśmy. Przeanalizujemy, co poszło nie tak.'],
+    'pout.all': ['To boli. Na spokojnie przeanalizujemy, czego zabrakło.'],
+    'trophy.all': ['Gratuluję. Analizy zostawmy na później, dziś świętujcie.'],
+    'lostFinal.all': ['To boli. Na spokojnie przeanalizujemy, czego zabrakło.'],
+    'promoted.all': ['Gratuluję awansu. Analizy zostawmy na później.'],
+    'leg1.all': ['Przeanalizujemy ten mecz przed rewanżem.'],
+  },
+  focusNext: {
+    'any.W': ['Cieszymy się dziś, a od jutra myślimy o następnym meczu.'],
+    'any.D': ['Zamykamy temat. Od jutra myślimy o następnym rywalu.'],
+    'any.L': ['Zamykamy temat. Od jutra myślimy o następnym rywalu.'],
+    'friendly.all': ['Sparing za nami. Wnioski przenosimy na trening i na mecze o stawkę.'],
+    'points.W': ['Zwycięstwo dopisane. Od jutra myślimy o kolejnym meczu.'],
+    'adv.all': ['Awans to tylko krok. Od jutra myślimy o kolejnym meczu.'],
+    'padv.all': ['Cieszymy się krótko. Od jutra myślimy tylko o finale baraży.'],
+    'out.all': ['Przygoda w tych rozgrywkach się skończyła. Teraz cała energia na kolejne mecze.'],
+    'pout.all': ['Sezon się skończył. Odpocznijcie, a potem wracamy silniejsi.'],
+    'trophy.all': ['Świętujcie dziś, bo od jutra znów pracujemy.', 'Trofeum mamy. Jutro wracamy do pracy, bo sezon trwa.'],
+    'lostFinal.all': ['Ten finał zostanie z nami, ale od jutra myślimy o kolejnych meczach.'],
+    'promoted.all': ['Świętujcie, a potem przygotowujemy się do gry ligę wyżej.'],
+    'leg1.all': ['Pierwsza połowa dwumeczu za nami. Od jutra myślimy o rewanżu.'],
+  },
+};
+
+function postGroup(c) {
+  if (c.kind === 'friendly') return 'friendly';
+  if (c.outcome) return c.outcome;
+  if (c.leg?.n === 1) return 'leg1';
+  if (c.points) return 'points';
+  return 'any';
+}
+
+const wrapQuote = (s) => `„${s}”`;
+
+/**
+ * Cytat przemowy dopasowany do kontekstu (czysta funkcja, deterministyczny z ziarna).
+ * phase: 'pre' | 'half' (opts.score: {for, against}) | 'post' (opts.result: 'W'|'D'|'L', kontekst z outcome).
+ * Bez kontekstu zwraca stały cytat z TONES albo POST_TONES.
+ */
+export function toneQuote(tone, context, { phase = 'pre', seed = 'odprawa', score, result } = {}) {
+  const base = phase === 'post' ? POST_TONES[tone] : TONES[tone];
+  if (!base) throw new RangeError(`Nieznana przemowa: ${tone}`);
+  if (!context) return base.quote;
+  const c = context;
+  const rng = new Rng(`${seed}|cytat|${phase}|${tone}|${c.key ?? c.kind}`);
+  const pick = (pool, x = {}) => {
+    const ok = (pool || []).filter((l) => lineFits(l, c, x));
+    return ok.length ? ok[Math.floor(rng.next() * ok.length)] : null;
+  };
+  if (phase === 'pre') {
+    let line = null;
+    for (const k of PRE_CHAIN[c.key] || ['any']) { line = pick(PRE_LINES[tone][k]); if (line) break; }
+    if (!line) return base.quote;
+    let text = lineText(line);
+    const mk = modKey(c);
+    const gapMod = mk === 'muchStronger' || mk === 'muchWeaker' || mk === 'fStrong' || mk === 'fWeak';
+    if (mk && !(gapMod && lineTagged(line, ['under', 'fav']))) {
+      const mod = pick(PRE_MOD[tone][mk]);
+      if (mod) text = `${text} ${lineText(mod)}`;
+    }
+    return wrapQuote(text);
+  }
+  if (phase === 'half') {
+    const gf = score?.for ?? 0; const ga = score?.against ?? 0;
+    const x = { behindBy: Math.max(0, ga - gf), leadBy: Math.max(0, gf - ga) };
+    const g = halfGroup(c);
+    let state = gf > ga ? 'lead' : gf === ga ? 'level' : 'behind';
+    if (g === 'leg2') {
+      const d = gf + c.leg.first[0] - (ga + c.leg.first[1]);
+      state = d > 0 ? 'ahead' : d === 0 ? 'level' : 'behind';
+    }
+    const anyState = g === 'leg2' ? { ahead: 'lead', level: 'level', behind: 'behind' }[state] : state;
+    const parent = HALF_PARENT[g];
+    const keys = [`${g}.${state}`, `${g}.all`, ...(parent ? [`${parent}.${state}`] : []), `any.${anyState}`];
+    for (const k of keys) { const line = pick(HALF_LINES[tone][k], x); if (line) return wrapQuote(lineText(line)); }
+    return base.quote;
+  }
+  const g = postGroup(c);
+  const r = result || 'D';
+  for (const k of [`${g}.${r}`, `${g}.all`, `any.${r}`, 'any.all']) { const line = pick(POST_LINES[tone][k]); if (line) return wrapQuote(lineText(line)); }
+  return base.quote;
+}
+
+/** Wszystkie przemowy fazy z cytatami dla kontekstu: { ton: { label, quote } } (ekran odprawy). */
+export function toneQuotes(phase, context, opts = {}) {
+  const tones = phase === 'post' ? POST_TONES : TONES;
+  return Object.fromEntries(Object.entries(tones).map(([k, t]) => [k, { label: t.label, quote: toneQuote(k, context, { ...opts, phase }) }]));
+}
+
 // ================================================================ AI: wybór przemowy (osobowość O/S/P)
 
 /**
@@ -848,7 +1585,8 @@ export function aiChooseSpeech(coach, ctx = {}) {
  */
 export function aiBriefing(team, ctx = {}, seed = 'ai') {
   const phase = ctx.phase || 'pre';
-  let tone = aiChooseSpeech(team.coach || 'P', ctx);
+  // rewanż: trener AI wybiera ton wg stanu dwumeczu, jak szatnia gracza
+  let tone = aiChooseSpeech(team.coach || 'P', phase === 'half' && ctx.ko?.agg != null ? { ...ctx, diff: (ctx.diff ?? 0) + ctx.ko.agg } : ctx);
   if (phase === 'post') return { tone, memory: remember(ctx.memory, `post:${tone}`) };
   const sit = phase === 'pre'
     ? preSituation(ctx)

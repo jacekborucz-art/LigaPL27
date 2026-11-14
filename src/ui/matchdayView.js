@@ -16,7 +16,7 @@ import { onPitch } from '../engine/match/teams.js';
 import { shirtNumbers } from '../career/shirts.js';
 import * as TEAMS from '../engine/match/teams.js';
 import { substitute, changeTactics, shout, canShout, assistantSuggest, applySuggestion, playerStates, previewShape } from '../engine/match/match.js';
-import { proficiency, byPosition } from '../engine/positions.js';
+import { proficiency, byPosition, posEff } from '../engine/positions.js';
 import { openMenu, closeMenu, bindContextTrigger, showToast as menuToast } from './contextMenu.js';
 import { SHOUTS, SHOUT_COOLDOWN, SHOUT_DURATION } from '../engine/match/constants.js';
 import { TONES, TALKS, POST_TONES, MAX_TALKS } from '../match/briefings.js';
@@ -32,8 +32,8 @@ import { moraleLabel } from '../career/morale.js';
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size) => (anyClub(id) ? crestHtml(anyClub(id), { size, clubsById }) : '');
-const STEPS = [['studio', 'Studio'], ['odprawa', 'Odprawa'], ['live1', '1. połowa'], ['break', 'Przerwa'], ['odprawa2', 'Odprawa w przerwie'], ['live2', '2. połowa'], ['studio2', 'Studio pomeczowe'], ['odprawa3', 'Odprawa pomeczowa']];
-const STEP_INDEX = { studio: 0, odprawa: 1, live1: 2, break: 3, odprawa2: 4, live2: 5, etbreak: 5, shootoutPrep: 5, shootout: 5, fulltime: 5, studio2: 6, odprawa3: 7, press: 7 };
+const STEPS = [['studio', 'Studio'], ['odprawa', 'Odprawa'], ['live1', '1. połowa'], ['break', 'Przerwa'], ['odprawa2', 'Odprawa w przerwie'], ['live2', '2. połowa'], ['studio2', 'Studio pomeczowe'], ['odprawa3', 'Odprawa pomeczowa'], ['press', 'Konferencja prasowa']];
+const STEP_INDEX = { studio: 0, odprawa: 1, live1: 2, break: 3, odprawa2: 4, live2: 5, etbreak: 5, shootoutPrep: 5, shootout: 5, fulltime: 5, studio2: 6, odprawa3: 7, press: 8 };
 const STAT_ROWS = [['possession', 'Posiadanie %'], ['shots', 'Strzały'], ['onTarget', 'Celne'], ['xg', 'xG'], ['passes', 'Podania'], ['passAccuracy', 'Celność podań %'], ['corners', 'Rożne'], ['throwIns', 'Auty'], ['fouls', 'Faule'], ['offsides', 'Spalone'], ['yellow', 'Żółte kartki'], ['red', 'Czerwone kartki'], ['saves', 'Obrony']];
 
 function luminance(hex) {
@@ -92,6 +92,39 @@ export function scoreboardLines(events, who) {
   }
   return out.map((m) => [...m.values()]);
 }
+/**
+ * Dramaturgia minuty z rzutem karnym albo analizą VAR: gra staje, a zdarzenia odsłaniamy po kolei
+ * (gol, protest, analiza VAR, werdykt, rzut karny, wynik karnego). events: zdarzenia jednej minuty,
+ * before: wynik przed tą minutą. Zwraca etapy { end (indeks w events, wyłącznie), kind, title, who, side, ms, score }
+ * albo pustą listę, gdy w minucie nie ma karnego ani VAR (wtedy zwykłe odświeżenie).
+ */
+const VERDICT = {
+  goalConfirmed: 'GOL UZNANY', goalDisallowed: 'GOL NIEUZNANY', redConfirmed: 'DECYZJA UTRZYMANA',
+  redCancelled: 'KARTKA ZMIENIONA', redCard: 'CZERWONA KARTKA', secondYellowCancelled: 'KARTKA COFNIĘTA',
+  noPenalty: 'NIE MA KARNEGO', penaltyAwarded: 'RZUT KARNY',
+};
+export function dramaStages(events, before, teamName = () => '') {
+  if (!events.some((e) => e.type === 'penalty' || e.type === 'varCheck')) return [];
+  const out = []; const score = [...before];
+  const add = (k, st) => out.push({ end: k + 1, score: [...score], ...st });
+  events.forEach((e, k) => {
+    if (e.type === 'goal' && e.provisional) score[e.side]++;
+    else if (e.type === 'goal' && e.score) score.splice(0, 2, ...e.score);
+    else if (e.type === 'varOverturn' && e.cancelGoal) score[e.side]--;
+    if (e.type === 'goal') add(k, { kind: 'goal', title: 'GOL', who: `${(e.text ?? '').replace(/^GOL! /, '')} ${teamName(e.side)}`.trim(), side: String(e.side), ms: 2200 });
+    else if (e.type === 'penaltyClaim') add(k, { kind: 'claim', title: 'PROTEST', who: e.text, side: String(e.side), ms: 1600 });
+    else if (e.type === 'varCheck' && !e.confirmed) add(k, { kind: 'check', title: 'VAR', who: e.text, side: 'var', ms: 3200 });
+    else if (e.type === 'varOverturn' || (e.type === 'varCheck' && e.confirmed)) {
+      const keep = e.decision === 'goalConfirmed';
+      add(k, { kind: 'verdict', title: VERDICT[e.decision] ?? 'VAR', who: e.text, side: keep ? String(e.side) : 'var', ms: e.decision === 'penaltyAwarded' ? 3000 : 2600 });
+    } else if (e.type === 'penalty' && !e.byVar) { // karny po VAR ma już baner werdyktu
+      add(k, { kind: 'penalty', title: 'RZUT KARNY', who: e.text, side: String(e.side), ms: 2800 });
+    } else if ((e.type === 'shotOn' || e.type === 'shotOff') && e.penalty) {
+      add(k, { kind: 'penmiss', title: e.type === 'shotOn' ? 'OBRONIONY' : 'PUDŁO', who: e.text, side: String(1 - e.side), ms: 2000 });
+    }
+  });
+  return out;
+}
 const MARK = {
   goal: [ICON.ball, 'gol'], pen: [ICON.ball, 'gol z rzutu karnego', 'k.'], og: [ICON.ball, 'gol samobójczy'],
   penmiss: [ICON.ballX, 'niestrzelony rzut karny'], red: [ICON.red, 'czerwona kartka'], second: [ICON.second, 'druga żółta i czerwona kartka'],
@@ -146,7 +179,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     for (const T of S.M.teams) { const x = T.players.find((y) => y.id === id) ?? T.bench.find((y) => y.id === id); if (x) return x.p; }
     return game.world?.players?.[id] ?? null;
   }
-  const evLines = () => (S.M ? scoreboardLines(S.M.events, whoById) : [[], []]);
+  const evLines = (upto) => (S.M ? scoreboardLines(upto == null ? S.M.events : S.M.events.slice(0, upto), whoById) : [[], []]);
   // Pasek informacji pod tablicą wyniku: rozgrywki, pogoda, sędzia, miejsce, widzowie (dane ze studia przedmeczowego)
   const MI = {
     comp: '<path d="M5 2h6v2.5a3 3 0 0 1-6 0zM5 3H2.5a2 2 0 0 0 2.6 2.6M11 3h2.5a2 2 0 0 1-2.6 2.6M8 7.5V11M5.5 13.5h5M6.5 11h3l.5 2.5h-4z"/>',
@@ -257,15 +290,20 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     if (!ui.adv) { try { ui.adv = phase === 'pre' ? MD.preAdvice(game, S) : phase === 'half' ? MD.halfAdvice(game, S) : MD.postAdvice(game, S); } catch { ui.adv = null; } }
     const chosen = done?.tone ?? ui.sel.tone ?? ui.adv?.tone ?? Object.keys(tones)[0];
     const talks = Object.entries(TALKS).filter(([, t]) => t.phases.includes(phase));
-    const ctxText = phase === 'pre' ? `${S.pre.preview.rank.label}. ${S.pre.expectations.board}`
-      : phase === 'half' ? `Przerwa przy ${S.M.score[0]}:${S.M.score[1]}. Zmiany w przerwie nie zużywają okna.`
-        : `${S.post.result.label} ${S.post.result.score}. ${S.post.reactions.board.text}`;
+    // Cytaty i zdanie kontekstu dopasowane do meczu (puchar, finał, sparing, derby, dwumecz): docs/odprawy-kontekst.md
+    let quotes = null;
+    try { quotes = MD.talkQuotes(game, S, phase); } catch { quotes = null; }
+    let ctxText;
+    try { ctxText = MD.talkContextText(game, S, phase); } catch {
+      ctxText = phase === 'pre' ? `${S.pre.preview.rank.label}. ${S.pre.expectations.board}`
+        : phase === 'half' ? `Przerwa przy ${S.M.score[0]}:${S.M.score[1]}. Zmiany w przerwie nie zużywają okna.`
+          : `${S.post.result.label} ${S.post.result.score}. ${S.post.reactions.board.text}`;
+    }
     const reactionOf = (id) => done?.players.find((r) => r.id === id);
     const title = { pre: 'Odprawa przedmeczowa', half: 'Odprawa w przerwie', post: 'Odprawa pomeczowa' }[phase];
     const rating = (id) => (phase === 'post' ? S.result.ratings.find((x) => x.id === id)?.rating : null);
     shell(`
       <h1>${title}</h1>
-      ${phase === 'post' ? renderPressDoor('post', !!done) : ''}
       <div class="talk-grid talk-grid--${phase}">
       <section class="tpanel tpanel--speech">
         <p class="talk-ctx">${esc(ctxText)}</p>
@@ -275,7 +313,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
         <h2>Przemowa do drużyny</h2>
         <fieldset class="tones" ${done ? 'disabled' : ''}>
           <legend class="hint">Wybierz ton. Ta sama przemowa powtarzana mecz po meczu działa słabiej.</legend>
-          ${Object.entries(tones).map(([id, t]) => `<label class="tone"><input type="radio" name="tone" value="${id}" ${id === chosen ? 'checked' : ''} data-md-tone="${id}"><div><strong>${esc(t.label)}${ui.adv?.tone === id && !done ? ' (zalecana)' : ''}</strong><span>${esc(t.quote)}</span></div></label>`).join('')}
+          ${Object.entries(tones).map(([id, t]) => `<label class="tone"><input type="radio" name="tone" value="${id}" ${id === chosen ? 'checked' : ''} data-md-tone="${id}"><div><strong>${esc(t.label)}${ui.adv?.tone === id && !done ? ' (zalecana)' : ''}</strong><span>${esc(done?.tone === id && done.quote ? done.quote : quotes?.[id]?.quote ?? t.quote)}</span></div></label>`).join('')}
         </fieldset>
       </section>
       <section class="tpanel tpanel--talks">
@@ -344,7 +382,8 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
   // Zmiana składu przed meczem: powrót do ekranu Skład i taktyka (tylko przed odprawą w szatni)
   const lineupBtn = () => (onLineup && !S.briefings?.pre ? btnC('toLineup', 'Zmień skład', 'btn--lineup') : '');
   const preActions = () => lineupBtn() + pressButtons('pre') + btn('toBriefing', 'Przejdź do odprawy');
-  const postActions = () => pressButtons('post') + btn('exit', 'Dalej');
+  // Po odprawie pomeczowej tylko „Dalej”: konferencja prasowa ma własny ekran (krok 9), sparing kończy dzień od razu
+  const postActions = () => btn(MD.pressSetup(game, S, 'post') ? 'toPress' : 'exit', 'Dalej');
 
   /** Ścianka za stołem: herb klubu i znak ligi na przemian (dekoracja, ukryta przed czytnikiem ekranu). */
   function wallTiles() {
@@ -374,9 +413,8 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     return dlg;
   }
 
-  function renderPressDialog() {
-    const dlg = pressDialog();
-    const ph = ui.prsPhase ?? 'post';
+  /** Konferencja w trakcie albo po zakończeniu: ścianka, sala, scena (pytanie, wyjście, podsumowanie), zapis. page: ekran zamiast okna. */
+  function pressInner(ph, page) {
     const pre = ph === 'pre';
     const slot = slotOf(ph);
     const conf = slot.conf;
@@ -399,7 +437,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
           ${conf.room.map((j) => `<li class="prs__p ${q?.by?.id === j.id ? 'is-now' : askedBy.has(j.id) ? 'is-done' : ''}"><b>${esc(j.name)}</b><span>${esc(j.outlet)}</span></li>`).join('')}
         </ol>
       </aside>`;
-    const transcript = conf.answers.length ? `<details class="prs__log" ${slot.settled ? '' : 'open'}><summary>Zapis konferencji</summary><ol>${conf.answers.map((a) => {
+    const transcript = conf.answers.length ? `<details class="prs__log" ${slot.settled && !page ? '' : 'open'}><summary>Zapis konferencji</summary><ol>${conf.answers.map((a) => {
       const by = conf.room.find((j) => j.id === a.by);
       return `<li><p class="prs__lq"><b>${esc(by ? `${by.name}, ${by.outlet}` : conf.officer.name)}:</b> ${esc(a.question)}</p><p class="prs__la">${esc(a.text)}</p></li>`;
     }).join('')}</ol></details>` : '';
@@ -433,16 +471,67 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
         </div>
       </section>`;
     }
+    if (page) {
+      const side = transcript || `<section class="prs__log prs__log--empty"><h3>Nagłówki dnia</h3><ul class="headlines">${(S.post?.headlines ?? []).map((h) => `<li>${esc(h.text)}</li>`).join('')}</ul></section>`;
+      const actions = slot.settled ? btn('exit', 'Dalej') : ui.prsConfirm ? '' : conf.answers.length ? btn('pressOut', 'Wyjdź z sali', false) : btn('exit', 'Wyślij asystenta', false);
+      return { cl, html: `${header}<div class="prs__body prs__body--page">${room}<div class="prs__main">${stage}</div><aside class="prs__side" aria-label="Zapis konferencji">${side}</aside></div>`, actions };
+    }
     const back = pre ? 'Wróć do studia' : 'Wróć do odprawy';
     const foot = slot.settled ? `${btn('pressClose', back, false)}${pre ? btn('toBriefing', 'Przejdź do odprawy') : btn('exit', 'Dalej')}`
       : ui.prsConfirm ? '' : `${conf.answers.length ? btn('pressOut', 'Wyjdź z sali', false) : btn('pressClose', back, false)}`;
+    return { cl, html: `${header}<div class="prs__body">${room}<div class="prs__main">${stage}${transcript}</div></div>${foot ? `<footer class="prs__foot">${foot}</footer>` : ''}` };
+  }
+
+  function renderPressDialog() {
+    const dlg = pressDialog();
+    const ph = ui.prsPhase ?? 'post';
+    const { cl, html } = pressInner(ph, false);
     dlg.dataset.c = cl;
-    dlg.innerHTML = `${header}<div class="prs__body">${room}<div class="prs__main">${stage}${transcript}</div></div>${foot ? `<footer class="prs__foot">${foot}</footer>` : ''}`;
+    dlg.innerHTML = html;
     if (!dlg.open) dlg.showModal();
     dlg.querySelector('#prsQ, #prsAfter, #prsConf')?.focus({ preventScroll: false });
     dlg.querySelector('.prs__p.is-now')?.scrollIntoView({ inline: 'center', block: 'nearest' });
     dlg.querySelector('.prs__main')?.scrollTo?.({ top: 0 });
   }
+
+  /** Konferencja po meczu na własnym ekranie (krok 9). Przed salą: Udziel wywiadu albo Wyślij asystenta (= Dalej). */
+  function renderPressPage() {
+    const room = MD.pressSetup(game, S, 'post');
+    if (!room) return renderTalk('post');
+    ui.prsPhase = 'post';
+    const slot = slotOf('post');
+    if (slot.conf || slot.settled) {
+      const { cl, html, actions } = pressInner('post', true);
+      shell(`<div class="prs prs--page" data-c="${cl}">${html}</div>`, actions);
+      app.querySelector('#prsQ, #prsAfter, #prsConf')?.focus({ preventScroll: true });
+      return;
+    }
+    const cl = room.climate.climate;
+    const people = MD.pressRoomPreview(game, S, 'post');
+    const header = `<header class="prs__wall" data-c="${cl}">${wallTiles()}
+        <div class="prs__bar">
+          <div><h2 id="prsTitle">Konferencja prasowa</h2><p class="prs__match">${esc(sideName(0))} ${esc(S.post.result.score)} ${esc(sideName(1))}</p></div>
+          ${climateChip(cl)}
+        </div>
+        <p class="prs__mood">${esc(CLIMATES[cl].mood)} <span>${esc(room.climate.reasons.join('. '))}.</span></p>
+      </header>`;
+    const roomList = `<aside class="prs__room" aria-label="Na sali"><h3>Na sali</h3><ol class="prs__people">${people.map((j) => `<li class="prs__p"><b>${esc(j.name ?? j.outlet)}</b><span>${esc(j.outlet)}</span></li>`).join('')}</ol></aside>`;
+    const stage = `<section class="prs__stage prs__lobby" aria-labelledby="prsLobby">
+        <h3 id="prsLobby" tabindex="-1">Dziennikarze czekają na sali</h3>
+        <p>Możesz udzielić wywiadu i sam odpowiadać na pytania albo wysłać na salę asystenta.</p>
+        <dl class="prs__opts">
+          <div><dt>Udziel wywiadu</dt><dd>Odpowiadasz na ${conf3(cl)} pytania. Ton odpowiedzi wpływa na zarząd, kibiców, media i morale drużyny.</dd></div>
+          <div><dt>Wyślij asystenta</dt><dd>${esc(CLIMATES[cl].skip.replace(/^Jeśli pominiesz konferencję, /, '').replace(/^./, (x) => x.toUpperCase()))}</dd></div>
+        </dl>
+      </section>`;
+    const side = `<section class="prs__log prs__log--empty"><h3>Nagłówki dnia</h3><ul class="headlines">${(S.post?.headlines ?? []).map((h) => `<li>${esc(h.text)}</li>`).join('')}</ul></section>`;
+    shell(`<div class="prs prs--page" data-c="${cl}">${header}<div class="prs__body prs__body--page">${roomList}<div class="prs__main">${stage}</div><aside class="prs__side" aria-label="Nagłówki">${side}</aside></div></div>`,
+      btn('exit', 'Wyślij asystenta', false) + btn('pressStart', 'Udziel wywiadu'));
+    app.querySelector('#prsLobby')?.focus({ preventScroll: true });
+  }
+  const conf3 = (cl) => (cl === 'agresywna' ? 'cztery' : 'trzy');
+  /** Odświeżenie konferencji: ekran po meczu albo okno przed meczem. */
+  function renderPress() { if (S.step === 'press' && ui.prsPhase !== 'pre') renderPressPage(); else renderPressDialog(); }
 
   // ------------------------------------------------------------ Mecz na żywo
   const SPEEDS = [[1, 'x1'], [2.5, 'x2,5'], [5, 'x5']];
@@ -463,7 +552,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
           </div>
           <div class="pitch-area">
             <div class="pitch-wrap"><canvas class="pitch" id="mdPitch" aria-label="Boisko. Prawy przycisk albo przytrzymanie na zawodniku otwiera menu."></canvas>
-              <div class="goal" id="mdGoal" role="status"><div class="goal__in"><b id="mdGoalTitle">GOL</b><small id="mdGoalWho"></small></div></div>
+              <div class="goal" id="mdGoal" role="status"><div class="goal__in"><b id="mdGoalTitle">GOL</b><small id="mdGoalWho"></small><i class="goal__bar" aria-hidden="true"></i></div></div>
               <div class="md-toasts" id="mdToasts" aria-live="polite"></div>
               <div class="md-halt" id="mdHalt" hidden role="alertdialog" aria-labelledby="mdHaltTitle">
                 <b id="mdHaltTitle">Gra wstrzymana</b><p id="mdHaltText"></p>
@@ -529,20 +618,22 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     headRo.observe(head);
   }
 
-  function updateLive(newEvents = []) {
+  /** opt.upto: relacja i tablica tylko do tego zdarzenia; opt.score: wynik na tym etapie; opt.noOverlay: baner robi dramaturgia. */
+  function updateLive(newEvents = [], opt = {}) {
     const M = S.M;
     const q = (id) => app.querySelector(id);
     if (!q('#mdScore')) return;
-    q('#mdScore').textContent = `${M.score[0]}:${M.score[1]}`;
-    q('#mdMin').textContent = M.events[M.events.length - 1]?.min ?? "0'";
+    const upto = opt.upto ?? M.events.length; const sc = opt.score ?? M.score;
+    q('#mdScore').textContent = `${sc[0]}:${sc[1]}`;
+    q('#mdMin').textContent = M.events[upto - 1]?.min ?? "0'";
     updateShoutBtn();
     const stats = statsFromEvents(M.events);
     drawMomentum(M, q);
     // Relacja
-    const feed = M.events.filter((e) => e.text && !['possessionMinute'].includes(e.type)).slice(-60).reverse();
+    const feed = M.events.slice(0, upto).filter((e) => e.text && !['possessionMinute'].includes(e.type)).slice(-60).reverse();
     q('#mdFeed').innerHTML = feed.map((e) => `<li class="${e.type === 'goal' && !e.provisional ? 'goalrow' : ''}"${e.side != null ? ` data-side="${e.side}"` : ''}><span class="m">${esc(e.min)}</span><span>${e.side != null ? `<b class="tm">${esc(shortName(e.side))}</b> ` : ''}${e.type === 'yellow' ? '<i class="card-ico y" aria-hidden="true"></i>' : e.type === 'red' ? '<i class="card-ico r" aria-hidden="true"></i>' : ''}${esc(e.text)}</span></li>`).join('') || `<li><span class="m"></span><span class="hint">Naciśnij Start. 1 minuta meczu trwa 1 sekundę.</span></li>`;
     // Tablica: strzelcy i czerwone kartki
-    const [lh, la] = evLines();
+    const [lh, la] = evLines(upto);
     q('#mdEvH').innerHTML = linesHtml(lh); q('#mdEvA').innerHTML = linesHtml(la);
     q('#mdBoard')?.classList.toggle('has-ev', !!(lh.length || la.length));
     // Statystyki (zawsze w DOM; widoczność zależy od zakładki i szerokości)
@@ -550,20 +641,26 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     renderRosters();
     layoutDots();
     // GOL i VAR
-    for (const e of newEvents) if (TOAST[e.type]) showToast(e);
-    const goalEv = newEvents.find((e) => e.type === 'goal');
-    const varEv = newEvents.find((e) => e.type === 'varOverturn' || e.type === 'varCheck');
-    if (goalEv || varEv) {
-      const ov = q('#mdGoal');
-      const isGoal = goalEv && !newEvents.some((e) => e.type === 'varOverturn');
-      ov.dataset.side = isGoal ? String(goalEv.side) : 'var';
-      ov.classList.remove('on'); void ov.offsetWidth;
-      q('#mdGoalTitle').textContent = isGoal ? 'GOL' : 'VAR';
-      q('#mdGoalWho').textContent = (goalEv && !newEvents.some((e) => e.type === 'varOverturn')) ? `${goalEv.text.replace(/^GOL! /, '')} ${sideName(goalEv.side)}` : (newEvents.find((e) => e.type === 'varOverturn')?.text ?? varEv.text);
-      ov.classList.add('on');
-      setTimeout(() => ov.classList.remove('on'), goalEv ? 3000 : 2000);
-    }
+    // w dramaturgii karny, protest i werdykt VAR mają baner na boisku, więc bez dublującego okienka
+    for (const e of newEvents) if (TOAST[e.type] && !(opt.noOverlay && STAGED.has(e.type))) showToast(e);
+    const goalEv = !opt.noOverlay && newEvents.find((e) => e.type === 'goal');
+    if (goalEv) showBanner({ kind: 'goal', title: 'GOL', who: `${goalEv.text.replace(/^GOL! /, '')} ${sideName(goalEv.side)}`, side: String(goalEv.side), ms: 3000 });
   }
+  /** Baner na boisku: GOL, analiza VAR (z paskiem postępu), werdykt, rzut karny. */
+  function showBanner({ kind, title, who, side, ms }) {
+    const ov = app.querySelector('#mdGoal');
+    if (!ov) return;
+    clearTimeout(ui.bannerT);
+    ov.dataset.side = side; ov.dataset.kind = kind;
+    ov.classList.toggle('goal--long', title.length > 5);
+    ov.style.setProperty('--stage-ms', `${ms}ms`);
+    ov.classList.remove('on'); void ov.offsetWidth;
+    app.querySelector('#mdGoalTitle').textContent = title;
+    app.querySelector('#mdGoalWho').textContent = who ?? '';
+    ov.classList.add('on');
+    ui.bannerT = setTimeout(() => ov.classList.remove('on'), ms);
+  }
+  function hideBanner() { clearTimeout(ui.bannerT); app.querySelector('#mdGoal')?.classList.remove('on'); }
 
   /**
    * Momentum: słupek na każdą minutę (gospodarze w górę, goście w dół), skala dopasowana
@@ -778,23 +875,54 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
 
   function loop() {
     if (!ui.running) return;
+    const before = [...S.M.score];
     const r = MD.tick(S);
-    updateLive(r.events);
+    const stages = dramaStages(r.events, before, sideName);
+    if (stages.length) { playStages(r, stages); return; }
+    afterTick(r, r.events);
+  }
+  /**
+   * Gra staje na kilka sekund: etapy odsłaniają relację i wynik po kolei, potem reszta minuty.
+   * Pauza, zmiana tempa albo „Pokaż wynik” kończą dramaturgię od razu (finishStages).
+   */
+  function playStages(r, stages) {
+    const base = S.M.events.length - r.events.length;
+    const slow = ui.speed >= 5 ? 0.6 : 1;
+    let i = 0; let shown = 0;
+    const rest = () => { ui.stage = null; updateLive(r.events.slice(shown), { noOverlay: true }); };
+    ui.stage = { finish: () => { hideBanner(); rest(); } };
+    const next = () => {
+      if (!ui.stage) return;
+      if (i >= stages.length) { rest(); afterTick(r, [], true); return; }
+      const st = stages[i++];
+      updateLive(r.events.slice(shown, st.end), { upto: base + st.end, score: st.score, noOverlay: true });
+      shown = st.end;
+      const ms = Math.round(st.ms * slow);
+      showBanner({ ...st, ms });
+      ui.timer = setTimeout(next, ms);
+    };
+    next();
+  }
+  function finishStages() { if (ui.stage) ui.stage.finish(); }
+  function afterTick(r, fresh, staged = false) {
+    if (!staged) updateLive(fresh);
     if (S.step !== 'live1' && S.step !== 'live2') { stop(); return route(); }
     const halt = haltReason(r.events) ?? MD.keeperReminder(S);
     if (halt) { stop(); showHalt(halt); return; }
     const pause = (r.pause ?? 0) * 1000;
-    ui.timer = setTimeout(loop, Math.max(pause, 1000 / ui.speed));
+    ui.timer = setTimeout(loop, Math.max(staged ? 0 : pause, 1000 / ui.speed));
   }
   function start() { hideHalt(); ui.running = true; const b = app.querySelector('#mdPause'); if (b) { b.textContent = 'Pauza'; b.classList.add('is-running'); } ui.timer = setTimeout(loop, 1000 / ui.speed); }
-  function stop() { ui.running = false; clearTimeout(ui.timer); const b = app.querySelector('#mdPause'); if (b) { b.textContent = 'Wznów mecz'; b.classList.remove('is-running'); } }
+  function stop() { ui.running = false; clearTimeout(ui.timer); finishStages(); const b = app.querySelector('#mdPause'); if (b) { b.textContent = 'Wznów mecz'; b.classList.remove('is-running'); } }
 
   // ------------------------------------------------------------ Zdarzenia: okienka i zatrzymanie gry
+  const STAGED = new Set(['penalty', 'penaltyClaim', 'varOverturn']);
   const TOAST = {
     yellow: { cls: 'y', ms: 3200, label: 'Żółta kartka' },
     red: { cls: 'r', ms: 4500, label: 'Czerwona kartka' },
     varOverturn: { cls: 'var', ms: 4500, label: 'VAR' },
     penalty: { cls: 'pen', ms: 3500, label: 'Rzut karny' },
+    penaltyClaim: { cls: 'var', ms: 3500, label: 'Protest w polu karnym' },
     injury: { cls: 'inj', ms: 4500, label: 'Kontuzja' },
   };
   function showToast(e) {
@@ -1001,6 +1129,34 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     // Pozycja po zatwierdzeniu: slot z podglądu (zaplanowany zmiennik zajmuje miejsce schodzącego)
     const slotOfId = new Map((pv.ok ? pv.slots : []).filter((sl) => sl.playerId).map((sl) => [sl.playerId, sl]));
     const fitOf = (p, sl) => (p && sl ? proficiency(p, sl.pos, sl.side) : 100);
+    // Podpowiedzi po kliknięciu zawodnika: najlepsi kandydaci do zmiany (biegłość na miejscu, jakość, świeżość, kartka, uraz)
+    const sugg = new Map();
+    {
+      const condPen = (c) => (c < 85 ? 0.04 * (85 - c) : 0);
+      const offPen = (prof) => (prof < 85 ? 0.04 * (85 - prof) : 0); // gra poza pozycją: także ryzyko błędów w obronie
+      const effAt = (x, sl) => (x.p.ovr ?? 10) * posEff(fitOf(x.p, sl)) - condPen(x.cond ?? 100) - offPen(fitOf(x.p, sl));
+      const outPen = (x) => (x.injury && !x.injury.playable ? 6 : x.knock && !x.knock.aggravated ? 1.2 : 0) + (x.yc ? 0.6 : 0);
+      if (sel?.kind === 'on') {
+        const out = T.players.find((y) => y.id === sel.id);
+        const sl = out ? slotOfId.get(out.id) ?? out.slot : null;
+        if (sl) {
+          const base = effAt(out, sl) - outPen(out);
+          T.bench.filter((b) => !inIds.has(b.id) && !(b.injury && !b.injury.playable) && !(b.p.pos === 'BR') === !(sl.pos === 'BR'))
+            .map((b) => ({ b, gain: effAt(b, sl) - base, prof: fitOf(b.p, sl) })).filter((c) => c.prof >= 60).sort((a, z) => z.gain - a.gain).slice(0, 3)
+            .forEach((c, i) => sugg.set(`bench:${c.b.id}`, { rank: i + 1, text: `${i === 0 ? 'Najlepsza zmiana' : 'Dobra opcja'}: ${sl.pos} ${c.prof}%${c.gain > 0.3 ? `, +${c.gain.toFixed(1)}` : ''}` }));
+        }
+      } else if (sel?.kind === 'bench') {
+        const inc = T.bench.find((y) => y.id === sel.id);
+        if (inc) {
+          T.players.filter((x) => x.on && !x.sentOff && !outIds.has(x.id)).map((x) => {
+            const sl = slotOfId.get(x.id) ?? x.slot;
+            if (!sl || (sl.pos === 'BR') !== (inc.p.pos === 'BR')) return null;
+            return { x, gain: effAt(inc, sl) - (effAt(x, sl) - outPen(x)), prof: fitOf(inc.p, sl), pos: sl.pos };
+          }).filter((c) => c && c.prof >= 60).sort((a, z) => z.gain - a.gain).slice(0, 3)
+            .forEach((c, i) => sugg.set(`on:${c.x.id}`, { rank: i + 1, text: `${i === 0 ? 'Najlepiej zmienić' : 'Można zmienić'}: ${inc.p.name.split(' ').slice(-1)[0]} na ${c.pos} ${c.prof}%` }));
+        }
+      }
+    }
     const row = (x, kind) => {
       const planned = kind === 'on' ? outIds.has(x.id) : inIds.has(x.id);
       const isSel = sel && sel.kind === kind && sel.id === x.id;
@@ -1012,11 +1168,12 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       const k = x.knock && !x.knock.aggravated;
       const back = kind === 'bench' && x.rolledOff > 0 ? `może wrócić, grał ${x.prevMins ?? 0} min` : '';
       const note = [kind === 'on' && pos !== x.p.pos ? `nominalnie ${x.p.pos}${band !== 'ok' ? `, ${prof}% na tej pozycji` : ''}` : '', x.injury && !x.injury.playable ? 'uraz' : k ? `gra z bólem (${x.knock.name})` : '', x.yc ? 'żółta kartka' : '', back, kind === 'bench' ? `OVR ${Math.round(x.p.ovr)}` : ''].filter(Boolean).join(', ');
-      return `<li class="sub-row ${planned ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${back ? 'is-back' : ''} ${x.injury && !x.injury.playable ? 'is-hurt' : ''} ${band !== 'ok' ? `is-off is-off--${band}` : ''}" data-sdrop="${kind}:${esc(x.id)}">
+      const sg = sugg.get(`${kind}:${x.id}`);
+      return `<li class="sub-row ${planned ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${sg ? `is-sugg is-sugg--${sg.rank}` : ''} ${back ? 'is-back' : ''} ${x.injury && !x.injury.playable ? 'is-hurt' : ''} ${band !== 'ok' ? `is-off is-off--${band}` : ''}" data-sdrop="${kind}:${esc(x.id)}">
         <button class="sub-row__main" data-md="subPick:${kind}|${esc(x.id)}" data-sdrag="${kind}:${esc(x.id)}" data-name="${esc(x.p.name)}" aria-pressed="${isSel}" ${planned ? 'disabled' : ''}>
           <span class="sub-handle" data-shandle aria-hidden="true"></span>
           <span class="pos" data-g="${GROUP[pos] ?? 'MID'}">${esc(pos)}</span>
-          <span class="sub-name"><span class="sub-name__l"><span class="sub-name__t">${esc(x.p.name)}</span>${x.yc ? ICON.yellow : ''}${k ? ICON.knock : ''}</span>${note ? `<small>${esc(note)}</small>` : ''}</span>
+          <span class="sub-name"><span class="sub-name__l"><span class="sub-name__t">${esc(x.p.name)}</span>${x.yc ? ICON.yellow : ''}${k ? ICON.knock : ''}</span>${sg ? `<span class="sub-sugg">${esc(sg.text)}</span>` : ''}${note ? `<small>${esc(note)}</small>` : ''}</span>
           <span class="sub-cond" title="Kondycja"><i style="width:${cond}%" class="${condCls(cond)}"></i></span><b>${cond}%</b>
         </button></li>`;
     };
@@ -1035,7 +1192,8 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       const isSel = sel && sel.kind === 'on' && sel.id === x.id;
       const prof = fitOf(who.p, sl); const band = fitBand(prof);
       const k = who.knock && !who.knock.aggravated;
-      return `<button class="mm-tok ${sl.pos === 'BR' ? 'is-gk' : ''} ${pl ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${x.injury && !x.injury.playable ? 'is-hurt' : ''}" style="--x:${sl.x};--y:${sl.y};--cond:${cond}" data-c="${condCls(cond)}" data-fit="${band}"
+      const sgT = sugg.get(`on:${x.id}`);
+      return `<button class="mm-tok ${sl.pos === 'BR' ? 'is-gk' : ''} ${pl ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${sgT ? `is-sugg is-sugg--${sgT.rank}` : ''} ${x.injury && !x.injury.playable ? 'is-hurt' : ''}" style="--x:${sl.x};--y:${sl.y};--cond:${cond}" data-c="${condCls(cond)}" data-fit="${band}"
         data-sdrop="on:${esc(x.id)}" data-sdrag="on:${esc(x.id)}" data-shandle data-name="${esc(x.p.name)}" data-md="tokPick:${esc(x.id)}" ${pl ? 'disabled' : ''} title="${esc(`${who.p.name}, ${sl.pos}${band !== 'ok' ? ` (nominalnie ${who.p.pos}, ${prof}%)` : ''}, kondycja ${cond}%`)}">
         <span class="mm-tok__dot"><span>${esc(sl.pos)}</span></span>${who.yc ? '<i class="mm-tok__yc" aria-label="żółta kartka"></i>' : ''}${x.injury && !x.injury.playable ? '<i class="mm-tok__inj" aria-label="uraz">+</i>' : k ? `<i class="mm-tok__knock" aria-label="gra z bólem">${ICON.knock}</i>` : ''}
         <span class="mm-tok__name">${inc ? `↑ ${esc(last(inc.p.name))}` : esc(last(x.p.name))}</span></button>`;
@@ -1695,6 +1853,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     if (S.step === 'fulltime') { MD.finishMatchday(game, S); save(); return renderPost(); }
     if (S.step === 'studio2') return renderPost();
     if (S.step === 'odprawa3') return renderTalk('post');
+    if (S.step === 'press') return renderPressPage();
     return null;
   }
 
@@ -1782,10 +1941,12 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     if (act === 'soEnd') { clearTimeout(ui.soTimer); MD.endShootout(S); route(); }
     if (act === 'toPostTalk') { S.step = 'odprawa3'; ui.sel = {}; ui.adv = null; route(); }
     if (act === 'pressOpen' || act === 'pressView') { ui.prsPhase = arg === 'pre' ? 'pre' : 'post'; MD.pressOpen(game, S, ui.prsPhase); ui.prsConfirm = false; renderPressDialog(); }
-    if (act === 'pressAns') { MD.pressAnswer(game, S, Number(arg), ui.prsPhase); if (slotOf(ui.prsPhase).settled) await save(); renderPressDialog(); }
-    if (act === 'pressOut') { ui.prsConfirm = true; renderPressDialog(); }
-    if (act === 'pressOutNo') { ui.prsConfirm = false; renderPressDialog(); }
-    if (act === 'pressOutYes') { ui.prsConfirm = false; MD.pressWalkOut(game, S, ui.prsPhase); await save(); renderPressDialog(); }
+    if (act === 'toPress') { S.step = 'press'; ui.prsPhase = 'post'; ui.prsConfirm = false; await save(); route(); }
+    if (act === 'pressStart') { ui.prsPhase = 'post'; MD.pressOpen(game, S, 'post'); renderPressPage(); }
+    if (act === 'pressAns') { MD.pressAnswer(game, S, Number(arg), ui.prsPhase); if (slotOf(ui.prsPhase).settled) await save(); renderPress(); }
+    if (act === 'pressOut') { ui.prsConfirm = true; renderPress(); }
+    if (act === 'pressOutNo') { ui.prsConfirm = false; renderPress(); }
+    if (act === 'pressOutYes') { ui.prsConfirm = false; MD.pressWalkOut(game, S, ui.prsPhase); await save(); renderPress(); }
     if (act === 'pressClose') app.querySelector('#mdPress')?.close();
     if (act === 'exit') { stop(); MD.closeMatchday(game, S); app.querySelector('#mdPress')?.remove(); cleanup(); await save(); onExit(); }
   }

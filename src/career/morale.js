@@ -13,14 +13,38 @@ export const MORALE = { MIN: 1, MAX: 20, START: 12, DRIFT_TARGET: 12, DRIFT_WEEK
  */
 export function afterMatchDelta(m) {
   let d = 0;
-  if (m.result === 'W') d += m.strengthDiff < -1 ? 2.5 : 1.5;
-  if (m.result === 'L') d -= m.strengthDiff > 1 ? 2.5 : 1.5;
-  if (m.result === 'D') d += m.strengthDiff < -1 ? 0.6 : m.strengthDiff > 1 ? -0.6 : 0;
+  if (m.tie) d += tieDelta(m.tie, m.strengthDiff ?? 0);
+  else {
+    if (m.result === 'W') d += m.strengthDiff < -1 ? 2.5 : 1.5;
+    if (m.result === 'L') d -= m.strengthDiff > 1 ? 2.5 : 1.5;
+    if (m.result === 'D') d += m.strengthDiff < -1 ? 0.6 : m.strengthDiff > 1 ? -0.6 : 0;
+  }
   if (m.derby) d += m.result === 'W' ? 1.5 : m.result === 'L' ? -1.5 : 0; // razem z wynikiem daje +-3
   if (m.result === 'L' && (m.lossStreak ?? 0) >= 3) d -= 2;
   if (m.played && m.rating) d += clamp(0.3 * (m.rating - 6.6), -0.6, 0.6); // własny występ
   if (!m.played && m.isRegular && (m.benchedStreak ?? 0) >= 3) d -= 1; // ważny zawodnik bez gry
   return Math.round(d * 100) / 100;
+}
+
+/**
+ * Morale po meczu rozstrzygającym (tieMood z season/cup.js; panel psycholog + trener) [SZAC]: trofeum daje euforię,
+ * awans po karnych ulgę, przegrany finał żal, odpadnięcie faworyta boli bardziej niż odpadnięcie słabszego.
+ */
+function tieDelta(t, sd) {
+  if (t.won) {
+    if (t.legSplit) return 0.8; // awans mimo przegranego rewanżu
+    let d = sd < -1 ? 2.5 : 1.5;
+    if (t.promoted) d = 2.5 + 3;
+    if (t.trophy) d += t.uefa ? 3 : t.super ? 1 : 2;
+    if (t.pens && !t.trophy) d += 0.5;
+    return d;
+  }
+  if (t.final) return -2.5 - (t.pens ? 0.5 : 1);
+  if (t.legSplit) return -1; // wygrany rewanż, ale odpadnięcie
+  if (t.pens) return -1.2;
+  if (sd > 1) return -2.5 - (t.early ? 0.5 : 0);
+  if (sd < -1) return -0.8;
+  return -1.5;
 }
 
 export const EVENT_DELTA = {

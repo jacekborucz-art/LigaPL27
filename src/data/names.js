@@ -66,6 +66,23 @@ const POOLS = {
   LIE: { first: 'Marco Nicolas Jens Andreas Simon Livio Fabio Martin', last: "Frick Büchel Hasler Kaiser Wolfinger Marxer Ospelt Beck" },
   MLT: { first: 'Luke Jean Kurt Zach Ryan Jake Matthew Paul', last: "Borg Camilleri Vella Farrugia Zammit Galea Micallef Grech Attard Mifsud" },
   LUX: { first: 'Laurent Gerson Leandro Vincent Dirk Olivier Mathias Danel', last: "Schmit Muller Weber Hoffmann Wagner Thill Reuter Kremer Barreiro Jans" },
+  // Ameryka Południowa, Afryka, Bliski Wschód: pula zawodników z zagranicy na rynku (src/career/foreignPool.js)
+  URU: { first: 'Agustín Diego Facundo Federico Gastón Joaquín Mathías Nicolás Rodrigo Santiago Sebastián Valentín', last: 'Acosta Álvarez Cabrera Cardozo Correa Díaz Fernández Ferreira Martínez Méndez Olivera Pereira Rodríguez Silva Sosa Suárez' },
+  ECU: { first: 'Anderson Bryan Byron Carlos Cristian Jefferson Jhon José Kevin Pervis Romario Wilmer', last: 'Arboleda Caicedo Cortez Estupiñán Hurtado Mina Montaño Preciado Quiñónez Valencia Vera Zambrano' },
+  PAR: { first: 'Alexis Ángel Antonio Blas Derlis Diego Gustavo Hernán Julio Óscar Ramón Richard', last: 'Alderete Almirón Benítez Cáceres Duarte Giménez González Ortiz Riveros Romero Samudio Villalba' },
+  VEN: { first: 'Alexander Daniel Eduardo Jefferson Josef Luis Miguel Rafael Ronald Salomón Tomás Yangel', last: 'Aristeguieta Casseres Herrera Machís Martínez Moreno Osorio Rincón Rondón Savarino Soteldo Villanueva' },
+  CHI: { first: 'Alexis Benjamín Bruno Claudio Diego Felipe Ignacio Marcelo Matías Nicolás Rodrigo Vicente', last: 'Aránguiz Araya Bravo Castillo Contreras Fuenzalida Muñoz Pavez Reyes Rojas Soto Vargas' },
+  PER: { first: 'André Christian Edison Gianluca Jesús Luis Marcos Miguel Paolo Piero Renato Yoshimar', last: 'Advíncula Aquino Cartagena Flores Guerrero López Peña Quispe Ramos Tapia Trauco Zambrano' },
+  MAR: { first: 'Achraf Adam Amine Anas Ayoub Bilal Hakim Ilias Mehdi Nayef Oussama Yassine Youssef', last: 'Aguerd Amrabat Benali Boufal Bounou El_Idrissi El_Khannouss Ezzalzouli Hakimi Mazraoui Ounahi Saiss Zouhair' },
+  ALG: { first: 'Adam Amine Farès Houssem Ismaël Karim Mehdi Mohamed Nabil Rafik Ramy Riyad Yacine', last: 'Atal Belaïli Bennacer Bensebaini Benrahma Boudaoui Brahimi Chaïbi Feghouli Gouiri Mahrez Mandi Zerrouki' },
+  TUN: { first: 'Ali Aïssa Anis Ellyes Hannibal Mohamed Montassar Naïm Seifeddine Wahbi Yassine Youssef', last: 'Ben_Romdhane Ben_Slimane Dahmen Drager Jaziri Khazri Laïdouni Maaloul Mejbri Msakni Skhiri Talbi' },
+  MLI: { first: 'Abdoulaye Amadou Boubacar Cheick Djibril Hamari Ibrahima Kalifa Mamadou Moussa Yves', last: 'Bissouma Camara Coulibaly Diaby Diarra Doucouré Haïdara Koné Samassékou Sangaré Touré Traoré' },
+  GUI: { first: 'Abdoulaye Alhassane Amadou Ibrahima Ilaix Mohamed Morlaye Naby Serhou Seydouba', last: 'Bah Bangoura Camara Cissé Conté Diallo Guirassy Keïta Kouyaté Soumah Sylla Touré' },
+  COD: { first: 'Arthur Cédric Chancel Dieumerci Gaël Jonathan Meschack Samuel Silas Théo Yoane', last: 'Bakambu Bolasie Elia Kakuta Kayembe Masuaku Mbemba Mbuku Moutoussamy Tuanzebe Wissa Mukau' },
+  LBN: { first: 'Ali Bassel Hassan Hussein Joan Karim Mohamad Nader Rabih Soony Walid', last: 'Atwi Ayass Daher El_Helwe Haidar Hammoud Kdouh Maatouk Melki Saad Tneich Zein' },
+  JOR: { first: 'Ahmad Anas Baha Ehsan Ibrahim Musa Mahmoud Nizar Saleem Yazan Yousef', last: 'Al-Arab Al-Mardi Al-Naimat Al-Rawabdeh Al-Taamari Haddad Nasib Olwan Saadeh Samir Sharara' },
+  IRQ: { first: 'Aimar Ali Amjad Bashar Hussein Ibrahim Mohanad Osama Saad Zidane', last: 'Adnan Al-Hamadi Attwan Bayesh Hadi Jassim Natiq Rashid Resan Tariq Yousif' },
+  SYR: { first: 'Ahmad Amro Fahd Ibrahim Mahmoud Mardik Mohammad Omar Pablo Simon', last: 'Al-Khatib Al-Mawas Al-Somah Hamdan Kharbin Midani Oussou Sabbagh Shibli Youssef' },
 };
 
 export const NATIONALITIES = Object.keys(POOLS);
@@ -119,6 +136,7 @@ export const NAT_NAMES = {
   GHA: 'Ghana', CMR: 'Kamerun', SEN: 'Senegal', CIV: 'Wybrzeże Kości Słoniowej', BRA: 'Brazylia', ARG: 'Argentyna',
   COL: 'Kolumbia', SWE: 'Szwecja', NOR: 'Norwegia', DEN: 'Dania', FIN: 'Finlandia', ISL: 'Islandia',
   ENG: 'Anglia', SCO: 'Szkocja', WAL: 'Walia', NIR: 'Irlandia Północna', IRL: 'Irlandia', ITA: 'Włochy', TUR: 'Turcja', GRE: 'Grecja', AZE: 'Azerbejdżan', HUN: 'Węgry', CYP: 'Cypr', ISR: 'Izrael', BUL: 'Bułgaria', ARM: 'Armenia', SUI: 'Szwajcaria', GIB: 'Gibraltar', KAZ: 'Kazachstan', ROU: 'Rumunia', AND: 'Andora', ALB: 'Albania', FRO: 'Wyspy Owcze', MDA: 'Mołdawia', KOS: 'Kosowo', EST: 'Estonia', LIE: 'Liechtenstein', MLT: 'Malta', LUX: 'Luksemburg',
+  URU: 'Urugwaj', ECU: 'Ekwador', PAR: 'Paragwaj', VEN: 'Wenezuela', CHI: 'Chile', PER: 'Peru', MAR: 'Maroko', ALG: 'Algieria', TUN: 'Tunezja', MLI: 'Mali', GUI: 'Gwinea', COD: 'DR Konga', LBN: 'Liban', JOR: 'Jordania', IRQ: 'Irak', SYR: 'Syria',
 };
 
 export const EU = new Set(['POL', 'ESP', 'POR', 'CRO', 'SVN', 'SVK', 'CZE', 'LTU', 'LVA', 'NED', 'BEL', 'GER', 'AUT', 'FRA', 'SWE', 'DEN', 'FIN']);

@@ -323,3 +323,91 @@
 .tf-limit__who { flex: 1; min-width: 0; display: grid; grid-template-columns: 40px minmax(0, 1fr) 34px; gap: var(--space-2); align-items: center; min-height: 48px; padding: 4px var(--space-3); border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .tf-limit__who:hover { background: color-mix(in srgb, var(--tint) 10%, transparent); }
 .tf-limit__who:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+
+/* Wypożyczenia (src/ui/loansView.js, docs/wypozyczenia.md): formularz warunków, stan wypożyczenia, sekcja w Kontraktach */
+.ln-form .ln-h { flex: 1 1 100%; }
+.ln-h { margin: var(--space-2) 0 6px; font: 700 var(--step-0)/1.2 var(--font-display); }
+.ln-checks { display: flex; flex-direction: column; gap: 6px; flex: 1 1 100%; }
+.tf-offer .ln-check { flex: 0 0 auto; flex-direction: row; align-items: center; gap: 8px; min-height: 32px; color: var(--text); }
+.tf-offer .ln-check input { width: 20px; height: 20px; min-height: 0; margin: 0; padding: 0; accent-color: var(--tf-info); }
+.ln-help { flex: 1 1 100%; font-size: var(--step--1); color: var(--text-muted); }
+.ln-help summary { cursor: pointer; min-height: 32px; display: flex; align-items: center; font-weight: 600; color: var(--text); }
+.ln-help dl { margin: 6px 0 0; display: grid; gap: 6px; }
+.ln-help dt { font-weight: 700; color: var(--text); }
+.ln-help dd { margin: 0; }
+.ln-facts { margin: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
+.ln-facts div { display: grid; grid-template-columns: minmax(6rem, 38%) minmax(0, 1fr); gap: 8px; padding: 5px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); font-size: var(--step--1); }
+.ln-facts dt { color: var(--text-muted); }
+.ln-facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.ln-btns { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ln-p .ln-btns { margin-top: var(--space-2); }
+.ln-note { font-size: var(--step--1); color: var(--text-muted); }
+.ln-count { display: flex; flex-direction: column; gap: 2px; margin: 0 0 var(--space-2); }
+.ln-count b { font: 700 var(--step-1)/1.2 var(--font-display); }
+.ln-count small { font-size: var(--step--1); color: var(--text-muted); }
+.ln-sec { margin-top: var(--space-3); }
+.ln-list, .ln-offers { list-style: none; margin: 0 0 var(--space-2); padding: 0; display: grid; gap: 2px; }
+.ln-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 6px 4px; }
+.ln-row + .ln-row, .ln-offers li + li { border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.ln-who { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 44px; padding: 2px 4px; border: 0; background: none; color: inherit; text-align: left; font: inherit; cursor: pointer; border-radius: var(--radius-s); }
+.ln-who:hover { background: color-mix(in srgb, var(--text) 7%, transparent); }
+.ln-who:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.ln-who .pos { min-width: 40px; }
+.ln-name { min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ln-name em { display: flex; align-items: center; gap: 4px; font-style: normal; font-weight: 400; font-size: var(--step--1); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ln-play { display: flex; flex-direction: column; align-items: flex-end; font-size: var(--step--1); white-space: nowrap; }
+.ln-play b { font: 700 var(--step-0)/1.1 var(--font-display); }
+.ln-play small { color: var(--text-muted); }
+.ln-tags { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; }
+.ln-tags:empty { display: none; }
+.ln-row > .ln-btns { grid-column: 1 / -1; }
+.ln-row > .ln-btns:empty { display: none; }
+.ln-offers li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 10px; align-items: center; padding: 6px 2px; }
+.ln-offers li > div { display: flex; flex-direction: column; min-width: 0; }
+.ln-offers small { font-size: var(--step--1); color: var(--text-muted); }
+.ln-offers li > .ln-btns { grid-column: 1 / -1; }
+@media (min-width: 760px) {
+  .ln-row { grid-template-columns: minmax(0, 1.4fr) auto minmax(0, 1fr) auto; }
+  .ln-tags, .ln-row > .ln-btns { grid-column: auto; }
+  .ln-offers li { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .ln-offers li > .ln-btns { grid-column: auto; }
+}
+
+/* Transfery w toku, umowy od 1 lipca, prośby o transfer (src/ui/transferDealsView.js, docs/transfery.md) */
+.td-view { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); align-items: start; }
+.td-col { display: grid; gap: var(--space-3); min-width: 0; }
+@media (min-width: 1100px) { .td-view { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); } }
+.td-deals { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.td-deal { --c: var(--tf-info); display: grid; gap: 6px; min-width: 0; padding: 10px 12px; border-radius: var(--radius-s);
+  background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--c); }
+.td-deal[data-state="ok"] { --c: var(--tf-good); }
+.td-deal[data-state="fail"] { --c: var(--tf-bad); }
+.td-deal__head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; min-width: 0; }
+.td-deal__head .pos { min-width: 40px; }
+.td-deal__who { display: flex; flex-direction: column; min-width: 0; }
+.td-deal__who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-deal__who em { font-style: normal; font-size: var(--step--1); color: var(--text-muted); overflow-wrap: anywhere; }
+.td-deal__fee { font: 700 var(--step-0)/1.1 var(--font-display); white-space: nowrap; color: color-mix(in srgb, var(--tf-good) 55%, var(--text)); }
+.td-deal__meta { margin: 0; font-size: var(--step--1); color: var(--text-muted); }
+.td-deal .btn { justify-self: start; }
+.td-bar { display: flex; gap: 3px; }
+.td-bar i { flex: 1; height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--line) 85%, transparent); }
+.td-bar i[data-s="done"] { background: var(--tf-good); }
+.td-bar i[data-s="now"] { background: var(--tf-warn); }
+.td-bar i[data-s="fail"] { background: var(--tf-bad); }
+.td-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.td-h { margin: var(--space-2) 0 var(--space-1); font-size: var(--step--1); color: var(--text-muted); }
+.td-h:first-of-type { margin-top: 0; }
+.td-pre { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid color-mix(in srgb, var(--c) 25%, var(--line)); }
+.td-pre:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.td-flag { display: inline-block; flex: none; width: 32px; height: 32px; border-radius: 50%; background: color-mix(in srgb, var(--tf-misc) 22%, var(--surface)); border: 2px solid color-mix(in srgb, var(--tf-misc) 55%, var(--line)); }
+@media (prefers-reduced-motion: no-preference) { .td-bar i { transition: background-color .2s ease; } }
+
+/* Z zagranicy (src/career/foreignPool.js): filtr regionu, klub i kraj, wolny zamiast ceny */
+.fp-regions { flex-basis: 100%; }
+.fp-club { display: inline-flex; flex-direction: column; max-width: 220px; line-height: 1.2; }
+.fp-club > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-club small { color: var(--text-muted); font-size: var(--step--1); }
+.xl td.fp-nat { white-space: nowrap; }
+.fp-free { color: var(--tf-good); font-weight: 600; }
+.tf-facts b .fp-fact { font-size: var(--step-0); }

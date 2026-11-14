@@ -13,7 +13,7 @@ import { DOMESTIC, FIFA_WINDOWS, UEFA, POLISH_EUROPE_2026, SEASON, SEASON_YEAR, 
 import { createSuperCupEU, superCupEUFixture, HOLDERS_2026 } from './superCupEU.js';
 import { roundDates, buildLeague } from './schedule.js';
 import { standings } from './standings.js';
-import { createCup, drawRound, winnerOf, superCupFixture, PP_ROUNDS, PP_NAMES } from './cup.js';
+import { createCup, drawRound, winnerOf, superCupFixture, PP_ROUNDS, PP_NAMES, moodResult, compRank, tieMood } from './cup.js';
 import { squadOf } from '../world/worldGen.js';
 import { ephemeralSquad } from '../world/ephemeral.js';
 import { quickMatch, quickKnockout } from '../engine/quickSim.js';
@@ -151,6 +151,8 @@ function tableTermFor(game, clubId, comp, cache) {
 
 /** Model ocen meczów w tle (playQuick); fromEngineResult sprowadza oceny pełnego silnika do tej skali. */
 export const QUICK_RATING = { base: 6.4, goal: 0.9, assist: 0.5, assistShare: 0.72, yellow: -0.3, red: -1.2 };
+/** Waga pozycji przy asyście w meczu w tle (realne udziały: skrzydłowi i ofensywni pomocnicy najwięcej, bramkarz około 0,5%). */
+const ASSIST_W = { BR: 0.04, ŚO: 0.3, BO: 1.1, WB: 1.3, DP: 0.7, ŚP: 1.2, OP: 1.9, SP: 1.6, SN: 1.8, NAP: 1.2 };
 
 /**
  * Waga meczu w tle 0-3 jak ranga w studiu (match/studio.js matchRank), tanio: finał i Superpuchar 3, puchary UEFA,
@@ -158,10 +160,11 @@ export const QUICK_RATING = { base: 6.4, goal: 0.9, assist: 0.5, assistShare: 0.
  */
 export function quickRank(game, f, cache = new Map()) {
   if (f.comp === 'friendly') return 0;
-  if (f.comp === 'super' || f.round === 'F') return 3;
-  if (f.comp === 'uefa') return 2;
   const H = anyClub(f.home); const A = anyClub(f.away);
-  if (H?.region && H.region === A?.region && H.parent !== A.id && A.parent !== H.id) return 2;
+  const derby = !!(H?.region && H.region === A?.region && H.parent !== A.id && A.parent !== H.id);
+  const cr = compRank(f); // puchary wg rundy i stanu dwumeczu, ta sama skala co studio (matchRank) i odprawy
+  if (cr != null) return Math.max(cr, derby ? 2 : 0);
+  if (derby) return 2;
   if (LEAGUE_COMPS.includes(f.comp) && cache.has(f.comp)) {
     const t = cache.get(f.comp);
     const ih = t.findIndex((r) => r.id === f.home); const ia = t.findIndex((r) => r.id === f.away);
@@ -202,7 +205,11 @@ export function playQuick(game, f, rng, cache = new Map()) {
     const find = (id) => out.find((x) => x.id === id);
     for (const id of r.scorers[s]) {
       const x = find(id); if (x) x.g++;
-      if (rng.chance(QUICK_RATING.assistShare) && out.length > 1) { const as = rng.pick(out.filter((y) => y.id !== id)); as.a++; }
+      if (rng.chance(QUICK_RATING.assistShare) && out.length > 1) {
+        // Asystujący według pozycji i umiejętności podań (jak w pełnym silniku: bramkarz praktycznie nigdy)
+        const as = rng.weighted(out.filter((y) => y.id !== id), (y) => { const q = byId.get(y.id); return (ASSIST_W[q?.pos] ?? 1) * ((q?.attr?.POD ?? 10) + (q?.attr?.DOS ?? 10) + (q?.attr?.WIZ ?? 10)) / 30; });
+        as.a++;
+      }
     }
     for (let i = 0; i < r.yellow[s]; i++) rng.weighted(out, (x) => (byId.get(x.id).attr?.AGR ?? 10) * (x.yc ? 0.4 : 1)).yc++;
     for (let i = 0; i < r.red[s]; i++) rng.weighted(out, (x) => byId.get(x.id).attr?.AGR ?? 10).rc = 1;
@@ -291,10 +298,13 @@ function aiPostMatchTalk(game, f, clubId, s, res, squad, played) {
   const mem = (game.aiSpeech ??= {});
   const gf = res.score[s]; const ga = res.score[1 - s];
   const xg = res.stats?.xg ?? [0, 0];
-  let tone = aiChooseSpeech(coachStyle(game, clubId), { phase: 'post', diff: gf - ga, xgDiff: (xg[s] ?? 0) - (xg[1 - s] ?? 0), memory: mem[clubId] });
+  const dec = moodResult(f, s);
+  const dd = dec === 'W' ? Math.max(1, gf - ga) : dec === 'L' ? Math.min(-1, gf - ga) : gf - ga; // awans po karnych to nie remis
+  let tone = aiChooseSpeech(coachStyle(game, clubId), { phase: 'post', diff: dd, xgDiff: (xg[s] ?? 0) - (xg[1 - s] ?? 0), memory: mem[clubId] });
   const talk = (t) => postMatchBriefing({
     players, tone: t, memory: mem[clubId], seed: `${game.seed}:${f.id}:po-meczu-ai:${clubId}`,
-    ctx: { score: { for: gf, against: ga }, xgFor: xg[s] ?? 0, xgAgainst: xg[1 - s] ?? 0, ratings: Object.fromEntries(res.players[s].map((x) => [x.id, x.rating])), rank: f.derby ? 2 : f.comp === 'pp' ? 1 : 0, clubId },
+    // ranga i rozstrzygnięcie jak u gracza (wcześniej Superpuchar, puchary UEFA i finały miały rangę 0 lub 1, a seria karnych była remisem)
+    ctx: { score: { for: gf, against: ga }, decided: moodResult(f, s), firstLeg: f.comp === 'uefa' && f.leg === 1 && f.round !== 'league', xgFor: xg[s] ?? 0, xgAgainst: xg[1 - s] ?? 0, ratings: Object.fromEntries(res.players[s].map((x) => [x.id, x.rating])), rank: Math.max(f.derby ? 2 : 0, quickRank(game, f)), clubId },
   });
   // Motywacja trenera (docs/trener-ai-atrybuty.md): dobry trener częściej trafia z tonem (ocenia wszystkie, jak
   // podpowiedź asystenta gracza), słaby czasem źle czyta szatnię i mówi coś gorszego niż zwykle; siła odprawy
@@ -316,6 +326,15 @@ function aiPostMatchTalk(game, f, clubId, s, res, squad, played) {
   const fx = (d) => (!mot ? d : d > 0 ? d * (1 + COACH.postFx * mot) : d * (1 - COACH.postFx * mot));
   for (const p of players) { const m = r.morale[p.id]; if (m) p.morale = applyMorale(p.morale ?? 12, fx(m.delta)); }
   mem[clubId] = closeMatchMemory(r.memory);
+}
+
+/** Porażki z rzędu klubu włącznie z bieżącym meczem (bez sparingów; rozstrzygnięcie jak moodResult). */
+function lossStreakOf(game, clubId, f) {
+  const past = (game.fixtures || []).filter((x) => x !== f && x.played && x.result && x.comp !== 'friendly' && (x.home === clubId || x.away === clubId) && x.date <= f.date)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  let n = 1;
+  for (const x of past) { if (moodResult(x, x.home === clubId ? 0 : 1) !== 'L') break; n++; }
+  return n;
 }
 
 function yellowSuspension(comp, count) {
@@ -347,7 +366,9 @@ export function applyResult(game, f, res, rng) {
     const squad = squadOf(game.world, clubId);
     const played = new Map(res.players[s].map((x) => [x.id, x]));
     const mine = clubId === game.clubId;
-    const result = res.score[s] > res.score[1 - s] ? 'W' : res.score[s] < res.score[1 - s] ? 'L' : 'D';
+    const result = moodResult(f, s); // mecz rozstrzygający: awans albo trofeum także po karnych i w dwumeczu
+    const tie = tieMood(f, s);
+    const lossStreak = result === 'L' ? lossStreakOf(game, clubId, f) : 0; // wcześniej nie liczony: kara za serię porażek nie działała
     const diff = s === 0 ? res.strengthDiff : -res.strengthDiff;
     for (const p of squad) {
       // Odbycie pauzy: klub zagrał mecz w tych rozgrywkach
@@ -357,7 +378,7 @@ export function applyResult(game, f, res, rng) {
       }
       const x = played.get(p.id);
       const friendly = f.comp === 'friendly'; // sparing: bez statystyk sezonu, formy, kartek i pauz
-      if (!friendly) p.morale = applyMorale(p.morale ?? 12, afterMatchDelta({ result, strengthDiff: diff, derby: f.derby, played: !!x, rating: x?.rating, isRegular: (p.season?.apps ?? 0) >= 5 }));
+      if (!friendly) p.morale = applyMorale(p.morale ?? 12, afterMatchDelta({ result, tie, strengthDiff: diff, derby: f.derby, lossStreak, played: !!x, rating: x?.rating, isRegular: (p.season?.apps ?? 0) >= 5 }));
       if (!x) continue;
       // Statystyki w podziale na rozgrywki (także sparingi) i historia klubowa (mecze o punkty), src/season/history.js
       const grp = statGroup(f.comp);

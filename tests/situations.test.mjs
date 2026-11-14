@@ -139,7 +139,7 @@ test('Czerwona po wykorzystaniu wszystkich zmian i kontuzja bez zmian: gra w 10 
   for (let i = 0; i < runs; i++) {
     const { M, T, from } = setup(`injall${i}`, { min: 85 });
     T.subsUsed = T.subsLimit;
-    const x = T.players.find((y) => y.on && y.slot.pos === 'ŚO');
+    const x = fieldPlayers(T).find((y) => y.slot.pos === 'ŚO'); // bez zawodnika, który wcześniej dostał czerwoną
     const before = fieldPlayers(T).length; // wcześniejsza czerwona w tym ziarnie jest możliwa
     injure(M, T, x, false, { injury: HARD });
     step(M);
@@ -278,10 +278,37 @@ test('Zdarzenia dla UI mają czytelne dane (kartki, VAR, urazy, zmiany, taktyka)
       if (e.type === 'tactic') { tactics++; assert.ok(e.by && e.shape && e.text); }
     });
   }
-  for (const d of ['goalDisallowed', 'penaltyCancelled', 'penaltyAwarded']) assert.ok(decisions.has(d), d);
+  for (const d of ['goalDisallowed', 'penaltyAwarded']) assert.ok(decisions.has(d), d);
+  assert.ok(!decisions.has('penaltyCancelled'), 'karnego sędziego VAR nie odwołuje');
   assert.ok(decisions.has('redCancelled') || decisions.has('redCard'));
   assert.ok(reds.has('second') && reds.size >= 3, [...reds].join());
   assert.ok(tactics > 0 && injuries > 0);
+});
+
+test('VAR: gol z karnego nigdy nieodwołany, karny sędziego zatrzymuje grę, analiza przed każdym werdyktem, protesty w polu karnym', () => {
+  const verdicts = new Set(); let claims = 0; let claimReviews = 0; let pens = 0;
+  for (let i = 0; i < 400; i++) {
+    const M = createMatch({ seed: `var${i}`, home: side(EK[i % 18].id), away: side(EK[(i + 5) % 18].id), ctx: { var: true } });
+    runToEnd(M);
+    M.events.forEach((e, k) => {
+      const prev = M.events[k - 1];
+      if (e.type === 'goal' && e.how === 'PEN') {
+        const after = M.events.slice(k + 1, k + 4);
+        assert.ok(!after.some((y) => y.type === 'varOverturn' && y.decision === 'goalDisallowed'), `mecz ${i}: gol z karnego odwołany`);
+      }
+      if (e.type === 'penalty') { pens++; assert.ok(e.pause >= 3, 'karny: pauza na napięcie'); }
+      if (e.type === 'penaltyClaim') { claims++; assert.ok(e.text); if (M.events[k + 1]?.type === 'varCheck') claimReviews++; }
+      // werdykt (zmiana albo utrzymanie decyzji) zawsze po analizie VAR
+      if (e.type === 'varOverturn' || (e.type === 'varCheck' && e.confirmed)) {
+        verdicts.add(e.decision);
+        assert.equal(prev.type, 'varCheck', `mecz ${i}: werdykt bez analizy (${e.decision})`);
+        assert.ok(!prev.confirmed, `mecz ${i}: analiza przed werdyktem`);
+      }
+    });
+  }
+  for (const d of ['goalConfirmed', 'goalDisallowed', 'redConfirmed', 'noPenalty', 'penaltyAwarded']) assert.ok(verdicts.has(d), d);
+  assert.ok(claims > 20 && claimReviews > 5, `protesty ${claims}, analizy ${claimReviews}`);
+  assert.ok(pens > 100, `karne ${pens}`);
 });
 
 test('2000 meczów: limity zmian i okien, jeden bramkarz, niezmienniki statystyk, 3-5 zmian na drużynę', () => {

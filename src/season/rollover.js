@@ -23,7 +23,10 @@ import { allocateEuropeanSpots } from './europeAccess.js';
 import { COUNTRY_COEF_2026, UCOMP_NAMES } from './uefa.js';
 import { FIFA_WINDOWS_ALL } from './national.js';
 import { initClub, seasonSummary, FIN } from '../career/finance.js';
+import { academyMods } from '../career/infrastructure.js';
 import { addFreeAgents } from '../career/transfers.js';
+import { returnLoansAtRollover } from '../career/loans.js';
+import { applyPreContracts } from '../career/preContracts.js'; // umowy od 1 lipca (docs/transfery.md)
 import { boardGoal, jobOffers, ensureBoard } from '../career/board.js';
 import { coachesNewSeason } from '../career/coaches.js';
 import { coachMarketNewSeason } from '../career/coachMarket.js';
@@ -91,17 +94,7 @@ function ageOn(p, date) {
 
 function processPlayers(game, oldEnd, newStart, rng, report) {
   const W = game.world;
-  const mineBefore = new Set(W.clubs[game.clubId]?.squad ?? []);
-  // Powroty z wypożyczeń
-  for (const p of Object.values(W.players)) {
-    if (!p.loan) continue;
-    const from = p.loan.from;
-    if (W.clubs[p.clubId]) W.clubs[p.clubId].squad = W.clubs[p.clubId].squad.filter((id) => id !== p.id);
-    if (W.clubs[from]) { W.clubs[from].squad.push(p.id); p.clubId = from; } else { p.clubId = null; }
-    p.contract = { ...p.contract, wage: p.loan.wage }; p.wage = p.contract.wage;
-    if (mineBefore.has(p.id)) report.loansBack.push(p.name);
-    delete p.loan;
-  }
+  // Powroty z wypożyczeń: wcześniej, przed rozwiązaniem kadr spadkowiczów do III ligi (returnLoansAtRollover)
   // Statystyki sezonu wyzerowane (historia wyżej), kartki zerowane, wiek
   for (const p of Object.values(W.players)) {
     p.season = { apps: 0, subs: 0, min: 0, g: 0, a: 0, yc: 0, rc: 0, rating: 0, motm: 0, cs: 0 };
@@ -157,10 +150,13 @@ function processAcademy(game, newStart, rng, report) {
         if (cid === game.clubId) report.promotedYouth.push(`${p.name} (${p.pos})`);
       } else delete W.players[id];
     }
-    const n = rng.int(3, 5);
+    // Akademia klubu (career/infrastructure.js): liczba i jakość juniorów, szansa na talent względem poziomu startowego
+    const am = academyMods(game, cid);
+    const n = Math.max(1, rng.int(3, 5) + am.extra);
     for (let i = 0; i < n; i++) {
       const [pos, side] = rng.pick(SQUAD_LAYOUT);
-      const p = genPlayer(rng, { id: `${cid}-a${SEASON_YEAR}-${i + 1}`, L: c.L, pos, age: rng.int(16, 17), slotOffset: -1.0, nat: 'POL', tier: Math.min(3, c.tier), side: side ?? null, club: c, date: newStart });
+      const p = genPlayer(rng, { id: `${cid}-a${SEASON_YEAR}-${i + 1}`, L: c.L, pos, age: rng.int(16, 17), slotOffset: -1.0 + am.offset, nat: 'POL', tier: Math.min(3, c.tier), side: side ?? null, club: c, date: newStart });
+      if (am.talent > 0 && p.hidden && new Rng(`talent:${game.seed}:${p.id}`).next() < am.talent) p.hidden.POT = Math.min(20, Math.round((p.hidden.POT + 1.5) * 10) / 10);
       p.squad = 'Y';
       W.players[p.id] = p; club.academy.push(p.id);
       if (cid === game.clubId) report.newYouth.push(`${p.name} (${p.pos}, ${p.age} lat)`);
@@ -179,7 +175,7 @@ export function fillSquad(game, cid, target, date, rng, report = null) {
     const needs = squadDeficits(squad).filter((n) => n.scope === 'squad');
     if (!needs.length && squad.length >= target) break;
     const g = needs.find((n) => n.group !== 'ALL')?.group ?? rng.pick(['DEF', 'MID', 'ATT', 'MID', 'DEF']);
-    const fit = game.market.free.map((id) => W.players[id]).filter((p) => p && groupOf(p) === g && p.ovr <= c.L + 0.8 && p.ovr >= c.L - 3)
+    const fit = game.market.free.map((id) => W.players[id]).filter((p) => p && !p.transfer && groupOf(p) === g && p.ovr <= c.L + 0.8 && p.ovr >= c.L - 3)
       .sort((a, b) => Math.abs(a.ovr - (c.L + 0.2)) - Math.abs(b.ovr - (c.L + 0.2)))[0];
     let p = fit;
     if (p) {
@@ -234,6 +230,11 @@ export function rolloverSeason(game) {
   const polishEurope = europe.spots.map(({ club, comp, entry, path, via }) => ({ club, comp, entry, ...(path ? { path } : {}), via }));
   setSeasonYear(year, { windows: FIFA_WINDOWS_ALL, polishEurope });
   applyLeagueState(game);
+  // Powroty z wypożyczeń kończących się 30 czerwca i z udziałem klubów spadających do III ligi; obowiązek albo opcja
+  // wykupu zamienia wypożyczenie w transfer (src/career/loans.js). Wypożyczenia na rok trwają dalej.
+  const loansBack = returnLoansAtRollover(game, oldEnd, newStart);
+  // Prekontrakty: zawodnicy przechodzą do nowych klubów, zanim wygasną ich kontrakty (src/career/preContracts.js)
+  const pre = applyPreContracts(game, newStart);
   // Spadkowicze do III ligi (nie symulowanej) tracą stałą kadrę: lepsi zawodnicy trafiają do wolnych
   for (const c of CLUBS_PL) {
     if (c.tier <= 3 || !game.world.clubs[c.id] || c.id === game.clubId) continue;
@@ -257,7 +258,7 @@ export function rolloverSeason(game) {
   for (const c of CLUBS_PL) if (c.tier === 4 && c.weight == null) c.weight = 5;
 
   // Zawodnicy i kadry
-  const report = { expired: [], retired: [], loansBack: [], promotedYouth: [], newYouth: [], signed: [] };
+  const report = { expired: [], retired: [], loansBack, promotedYouth: [], newYouth: [], signed: [] };
   processPlayers(game, oldEnd, newStart, rng.fork('zawodnicy'), report);
   processAcademy(game, newStart, rng.fork('akademia'), report);
   for (const p of Object.values(game.world.players)) if (p.clubId) p.value = marketValue(p, { tier: Math.min(3, clubById(p.clubId)?.tier ?? 3), date: newStart });
@@ -338,6 +339,8 @@ export function rolloverSeason(game) {
   }));
   msgs.push(createMessage({ date: newStart, key: `europa:${year}`, category: 'competitions', from: 'UEFA', priority: 'info', subject: `Europejskie puchary ${SEASON}`, body: `Polska w rankingu krajów UEFA: ${europe.rank}. miejsce.\n\n${europe.spots.map((s) => `${name(s.club)}: ${UCOMP_NAMES[s.comp]}, ${s.entry === 'LP' ? 'faza ligowa' : `runda ${s.entry}`} (${s.via})`).join('\n')}` }));
   const squadLines = [
+    pre.in.length ? `Dołączyli na podstawie umów od 1 lipca: ${pre.in.join(', ')}.` : '',
+    pre.out.length ? `Odeszli na podstawie umów od 1 lipca: ${pre.out.join(', ')}.` : '',
     report.expired.length ? `Odeszli po wygaśnięciu kontraktu: ${report.expired.join(', ')}.` : '',
     report.retired.length ? `Zakończyli kariery: ${report.retired.join(', ')}.` : '',
     report.loansBack.length ? `Wrócili do klubów po wypożyczeniu: ${report.loansBack.join(', ')}.` : '',

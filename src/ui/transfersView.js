@@ -18,12 +18,20 @@ import { trustLabel, tablePos } from '../career/board.js';
 import { fansSummary } from '../career/fans.js';
 import { canSign, YOUTH_EXEMPT_AGE, KEEP_MAX, PRESSURE_DAYS } from '../career/squadLimit.js';
 import { limitStatus, toggleKeep, ageWord } from '../career/squadLimitSystem.js';
+import { boardCaps, appealStatus } from '../career/boardRequests.js';
+import { loanInForm, loanOutPanel, loanedInPanel, loanedOutPanels, loansSection, loanInAction, handleLoanAction, isLoanAction, isLoanedOut } from './loansView.js'; // wypożyczenia (docs/wypozyczenia.md)
+import { dealsView, dealTags, ownDealPanels, otherDealPanel, handleDealAction } from './transferDealsView.js'; // W toku, prekontrakty, prośby (docs/transfery.md)
+import { effectiveAsk } from '../career/mindset.js';
+import { checkUserPre } from '../career/preContracts.js';
+import { DOMESTIC } from '../config/calendar2026.js';
+import { isPoolContracted, poolClubLabel, poolSellerClub, REGION_FILTERS, regionOf } from '../career/foreignPool.js'; // zawodnicy z zagranicy
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size = 20) => (clubById(id) ? crestHtml(clubById(id), { size, clubsById }) : '');
 const groupOf = (p) => GROUP[p.pos] ?? 'MID';
-export const TF_TABS = [['rynek', 'Rynek'], ['oferty', 'Oferty'], ['kontrakty', 'Kontrakty'], ['finanse', 'Finanse'], ['zarzad', 'Zarząd']];
-const LISTS = [['transfer', 'Lista transferowa'], ['loan', 'Do wypożyczenia'], ['free', 'Wolni'], ['search', 'Wyszukaj']];
+// Finanse i Zarząd są w zakładce Klub (src/ui/klubView.js); funkcje widoków eksportowane stąd
+export const TF_TABS = [['rynek', 'Rynek'], ['oferty', 'Oferty'], ['wtoku', 'W toku'], ['kontrakty', 'Kontrakty']];
+const LISTS = [['transfer', 'Lista transferowa'], ['loan', 'Do wypożyczenia'], ['free', 'Wolni'], ['abroad', 'Z zagranicy'], ['search', 'Wyszukaj']];
 const POS_FILTERS = [['all', 'Wszyscy'], ['GK', 'Bramkarze'], ['DEF', 'Obrońcy'], ['MID', 'Pomocnicy'], ['ATT', 'Napastnicy']];
 export const isTransferAction = (act) => typeof act === 'string' && act.startsWith('tf-');
 const ovrTxt = (p) => Math.round(p.ovr);
@@ -89,14 +97,14 @@ const posBadge = (p) => `<span class="pos" data-g="${groupOf(p)}">${esc(p.pos)}<
 const clubCell = (id) => (id ? `<span class="tf-club">${crest(id, 16)}<span>${esc(clubById(id)?.name ?? '')}</span></span>` : '<span class="tf-club tf-club--none">bez klubu</span>');
 
 /** Kafelek liczby z barwą znaczeniową (m: good, warn, bad, info, misc). */
-function kpi(label, value, sub = '', m = 'info', extra = '') {
+export function kpi(label, value, sub = '', m = 'info', extra = '') {
   return `<div class="tf-kpi" data-m="${m}"><small>${esc(label)}</small><b>${value}</b>${extra}${sub ? `<small>${sub}</small>` : ''}</div>`;
 }
 /** Panel z odcieniem i kolorowym paskiem u góry. */
-function panel(title, tone, body, { count = null, cls = '', attrs = '' } = {}) {
+export function panel(title, tone, body, { count = null, cls = '', attrs = '' } = {}) {
   return `<section class="tf-p${cls ? ` ${cls}` : ''}" data-t="${tone}" ${attrs}><h3>${esc(title)}${count != null ? ` <span>${count}</span>` : ''}</h3>${body}</section>`;
 }
-const meter = (pct, tone) => `<span class="tf-meter" data-t="${tone}" aria-hidden="true"><i style="width:${Math.max(0, Math.min(100, Math.round(pct)))}%"></i></span>`;
+export const meter = (pct, tone) => `<span class="tf-meter" data-t="${tone}" aria-hidden="true"><i style="width:${Math.max(0, Math.min(100, Math.round(pct)))}%"></i></span>`;
 
 /** Nagłówek kolumny tabeli z sortowaniem; kolejny kierunek zapisany w data-dir (handler nie zna stanu ekranu). */
 function th(scope, k, label, sort, { title = '', cls = '', first = 'desc' } = {}) {
@@ -149,8 +157,14 @@ function marketRows(game, list, pos, ui) {
     return searchPlayers(game, { pos, maxPrice: Number(f.maxPrice) || Infinity, maxAge: Number(f.maxAge) || 99, minOvr: Number(f.minOvr) || 0, tier: f.tier ?? 'all', text: f.text ?? '' })
       .map(({ p, price, nfs }) => ({ p, price: nfs ? null : price, reasons: game.market.listed[p.id]?.reasons ?? [] }));
   }
+  if (list === 'abroad') { // z zagranicy (src/career/foreignPool.js): wolni i z kontraktem, filtr regionu
+    const region = ui.tfRegion ?? 'all';
+    const tier = clubById(game.clubId)?.tier ?? 1;
+    return marketLists(game).abroad.filter((x) => (pos === 'all' || groupOf(x.p) === pos) && (region === 'all' || regionOf(x.p.nat) === region))
+      .map((x) => ({ p: x.p, price: x.p.free ? 0 : askingPrice(game, x.p), wage: x.p.free ? effectiveAsk(x.p, tier) : x.p.contract?.wage ?? 0, reasons: [] }));
+  }
   return marketLists(game)[list].filter((x) => pos === 'all' || groupOf(x.p) === pos)
-    .map((x) => ({ p: x.p, price: list === 'free' ? x.p.askWage ?? 0 : list === 'loan' ? x.p.contract?.wage ?? 0 : askingPrice(game, x.p), reasons: list === 'free' ? [] : x.reasons ?? [] }));
+    .map((x) => ({ p: x.p, price: list === 'free' ? effectiveAsk(x.p, clubById(game.clubId)?.tier ?? 1) : list === 'loan' ? x.p.contract?.wage ?? 0 : askingPrice(game, x.p), reasons: list === 'free' ? [] : x.reasons ?? [] }));
 }
 
 const SHORT_WHY = { 'Nadmiar zawodników na pozycji': 'nadmiar na pozycji', 'Poza szeroką kadrą meczową': 'poza kadrą meczową', 'Klub rozwiązuje kontrakt': 'klub rozwiązuje kontrakt' };
@@ -174,11 +188,39 @@ function marketTable(game, rows, list, sort, total) {
       <td class="xl__ovr">${ovrTxt(p)}</td><td class="tf-num tf-price">${x.price == null ? '<span class="tf-nfs">nie na sprzedaż</span>' : `${fmtZl(x.price)}${free || list === 'loan' ? '<small>/tydz.</small>' : ''}`}</td>
       <td>${p.age}</td>${free ? '' : `<td class="tf-l">${clubCell(p.clubId)}</td>`}<td class="tf-num">${fmtZl(p.value ?? 0)}</td>${free ? '' : `<td>${p.contract?.until ? esc(fmtDate(p.contract.until)) : '-'}</td>`}
       <td>${tag(x.will, willTone(x.will))}</td>
-      <td class="tf-l tf-why">${whyTags(x.reasons, free && recentlyMoved(p, game.date)) || '<span class="xl__z">·</span>'}</td></tr>`;
+      <td class="tf-l tf-why">${(whyTags(x.reasons, free && recentlyMoved(p, game.date)) + dealTags(game, p)) || '<span class="xl__z">·</span>'}</td></tr>`;
   }).join('');
   const note = total > rows.length ? `Pokazano ${rows.length} z ${total}. Zawęź listę pozycją albo sortowaniem.` : `${total} ${total === 1 ? 'zawodnik' : 'zawodników'}.`;
   return `<p class="xl-note">${note} Kliknij nazwisko, żeby otworzyć kartę z ofertą.</p>
     <div class="xl-wrap tf-xl" tabindex="0" aria-label="Zawodnicy na rynku, tabela przewijana w poziomie"><table class="xl"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+}
+
+/** Pochodzenie zawodnika z puli: klub i kraj albo „bez klubu”. */
+function originCell(p) {
+  if (!isPoolContracted(p)) return '<span class="tf-club tf-club--none">bez klubu</span>';
+  const a = p.abroad;
+  return `<span class="fp-club" title="${esc(poolClubLabel(p))}"><span>${esc(a.club)}</span><small>${esc(a.countryName ?? NAT_NAMES[a.country] ?? a.country)}</small></span>`;
+}
+
+/** Tabela „Z zagranicy”: narodowość, klub i kraj, cena albo „wolny”, pensja. */
+function abroadTable(game, rows, sort, total) {
+  const head = `<tr>${th('m', 'pos', 'Poz.', sort, { cls: 'xl__pos', first: 'asc' })}${th('m', 'name', 'Zawodnik', sort, { cls: 'xl__nm', first: 'asc' })}${th('m', 'ovr', 'OVR', sort, { title: 'Ocena ogólna 1-20' })}
+    ${th('m', 'nat', 'Narodowość', sort, { cls: 'tf-l', first: 'asc' })}${th('m', 'club', 'Klub (kraj)', sort, { cls: 'tf-l', first: 'asc' })}${th('m', 'price', 'Cena', sort, { title: 'Cena wywoławcza klubu zagranicznego; wolny bez odstępnego', cls: 'tf-num', first: 'asc' })}
+    ${th('m', 'wage', 'Pensja', sort, { title: 'Pensja w obecnym klubie albo oczekiwana pensja wolnego, tygodniowo', cls: 'tf-num' })}${th('m', 'age', 'Wiek', sort, { first: 'asc' })}${th('m', 'until', 'Kontrakt do', sort, { first: 'asc' })}
+    ${th('m', 'will', 'Nastawienie', sort, { title: 'Czy zawodnik chce przejść do twojego klubu', first: 'asc' })}<th scope="col" class="tf-l">Uwagi</th></tr>`;
+  const body = rows.map((x) => {
+    const { p } = x;
+    return `<tr data-pid="${esc(p.id)}"><td class="xl__pos">${posBadge(p)}</td>
+      <th scope="row" class="xl__nm"><button data-act="tf-open" data-id="${esc(p.id)}" data-pid="${esc(p.id)}"><span>${esc(p.name)}</span></button></th>
+      <td class="xl__ovr">${ovrTxt(p)}</td><td class="tf-l fp-nat">${esc(NAT_NAMES[p.nat] ?? p.nat)}</td><td class="tf-l">${originCell(p)}</td>
+      <td class="tf-num tf-price">${p.free ? '<span class="fp-free">wolny</span>' : fmtZl(x.price)}</td><td class="tf-num">${fmtZl(x.wage)}<small>/tydz.</small></td>
+      <td>${p.age}</td><td>${p.contract?.until ? esc(fmtDate(p.contract.until)) : '-'}</td>
+      <td>${tag(x.will, willTone(x.will))}</td>
+      <td class="tf-l tf-why">${dealTags(game, p) || (game.market.talks[p.id]?.accepted ? tag('oferta przyjęta', 'good') : '<span class="xl__z">·</span>')}</td></tr>`;
+  }).join('');
+  const note = total > rows.length ? `Pokazano ${rows.length} z ${total}. Zawęź listę pozycją, regionem albo sortowaniem.` : `${total} ${total === 1 ? 'zawodnik' : 'zawodników'}.`;
+  return `<p class="xl-note">${note} Kliknij nazwisko, żeby otworzyć kartę z ofertą.</p>
+    <div class="xl-wrap tf-xl" tabindex="0" aria-label="Zawodnicy z zagranicy, tabela przewijana w poziomie"><table class="xl"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
 }
 
 function marketView(game, ui) {
@@ -186,7 +228,8 @@ function marketView(game, ui) {
   const pos = ui.tfPos ?? 'all';
   const sort = ui.tfSort?.k ? ui.tfSort : { k: 'ovr', dir: 'desc' };
   const chips = `<div class="tf-bar"><div class="chips">${LISTS.map(([k, l]) => `<button class="chip" data-act="tf-list" data-l="${k}" aria-pressed="${list === k}">${l}</button>`).join('')}</div>
-    <div class="chips chips--sm">${POS_FILTERS.map(([k, l]) => `<button class="chip" data-act="tf-pos" data-p="${k}" aria-pressed="${pos === k}">${l}</button>`).join('')}</div></div>`;
+    <div class="chips chips--sm">${POS_FILTERS.map(([k, l]) => `<button class="chip" data-act="tf-pos" data-p="${k}" aria-pressed="${pos === k}">${l}</button>`).join('')}</div>
+    ${list === 'abroad' ? `<div class="chips chips--sm fp-regions" aria-label="Region">${REGION_FILTERS.map(([k, l]) => `<button class="chip" data-act="tf-region" data-r="${k}" aria-pressed="${(ui.tfRegion ?? 'all') === k}">${l}</button>`).join('')}</div>` : ''}</div>`;
   let form = '';
   if (list === 'search') {
     const f = ui.tfFilter ?? {};
@@ -202,11 +245,13 @@ function marketView(game, ui) {
   const needWill = sort.k === 'will';
   const withWill = (x) => ({ ...x, will: playerWillingness(game, x.p).verdict });
   const val = (x, k) => (k === 'pos' ? POS_ORDER.indexOf(x.p.pos) : k === 'name' ? x.p.name : k === 'ovr' ? x.p.ovr : k === 'price' ? (x.price ?? Infinity)
-    : k === 'age' ? x.p.age : k === 'club' ? (clubById(x.p.clubId)?.name ?? '') : k === 'value' ? x.p.value ?? 0 : k === 'until' ? (x.p.contract?.until ?? '9999')
+    : k === 'age' ? x.p.age : k === 'club' ? (clubById(x.p.clubId)?.name ?? x.p.abroad?.club ?? '') : k === 'value' ? x.p.value ?? 0 : k === 'until' ? (x.p.contract?.until ?? '9999')
+      : k === 'nat' ? (NAT_NAMES[x.p.nat] ?? x.p.nat) : k === 'wage' ? x.wage ?? 0
       : k === 'will' ? ['chętny', 'otwarty', 'niechętny', 'odmowa'].indexOf(x.will) : 0);
   const sorted = sortBy(needWill ? all.map(withWill) : all, sort, val).slice(0, 80);
   const rows = needWill ? sorted : sorted.map(withWill);
-  const table = all.length ? marketTable(game, rows, list, sort, all.length) : `<p class="tf-empty">${list === 'search' ? 'Brak zawodników dla tych filtrów.' : 'Lista jest pusta.'}</p>`;
+  const table = all.length ? (list === 'abroad' ? abroadTable(game, rows, sort, all.length) : marketTable(game, rows, list, sort, all.length))
+    : `<p class="tf-empty">${list === 'search' || list === 'abroad' ? 'Brak zawodników dla tych filtrów.' : 'Lista jest pusta.'}</p>`;
   return `${moneyStrip(game)}
     <div class="tf-grid tf-grid--table">
       <div class="tf-main">${chips}${form}${table}</div>
@@ -217,8 +262,9 @@ function marketView(game, ui) {
 function marketHelp(list) {
   const t = {
     transfer: 'Zawodnicy wystawieni przez kluby. Cena jest punktem wyjścia: klub przyjmie ofertę bliską cenie, przy niższej złoży kontrofertę. Po zgodzie klubu rozmawiasz z zawodnikiem o kontrakcie.',
-    loan: 'Kluby chętnie wypożyczają młodych i rezerwowych do końca sezonu. Ty ustalasz, jaką część pensji pokrywasz.',
+    loan: 'Kluby chętnie wypożyczają młodych i rezerwowych na rundę, sezon albo rok. Ty ustalasz część pensji, którą pokrywasz, i dodatkowe warunki: opcję albo obowiązek wykupu, prawo pierwokupu.',
     free: 'Wolni zawodnicy nie kosztują odstępnego. Podpiszesz ich także poza oknem transferowym.',
+    abroad: 'Obcokrajowcy zainteresowani grą w Polsce, głównie z Ameryki Południowej, Afryki i Bałkanów. Wolnych podpiszesz od razu. Za zawodnika z kontraktem płacisz odstępne klubowi zagranicznemu: słabsze ligi sprzedają taniej, mocniejsze oraz Hiszpania i Portugalia drożej. Po zgodzie klubu rozmawiasz o kontrakcie, a transfer trwa kilka dni dłużej (certyfikat ITC i podróż). Lista odnawia się przed każdym oknem.',
     search: 'Szukasz w kadrach wszystkich klubów. Trzech najlepszych zawodników klubu nie jest na sprzedaż, chyba że mają klauzulę odstępnego.',
   }[list];
   return panel('Jak to działa', 'info', `<p class="tf-p__txt">${esc(t)}</p>`);
@@ -241,7 +287,7 @@ function cardHead(game, p, extra = '') {
   return `<header class="tf-ch" data-pid="${esc(p.id)}">
     <span class="tf-ch__crest">${p.clubId ? crest(p.clubId, 48) : ''}</span>
     <div class="tf-ch__who"><h2>${esc(p.name)}</h2>
-      <p>${posBadge(p)} <span>${esc(POS_NAMES?.[p.pos] ?? p.pos)}, ${p.age} lat, ${esc(NAT_NAMES[p.nat] ?? p.nat)}${p.clubId ? `, ${esc(clubById(p.clubId)?.name)}` : ', wolny zawodnik'}</span></p>
+      <p>${posBadge(p)} <span>${esc(POS_NAMES?.[p.pos] ?? p.pos)}, ${p.age} lat, ${esc(NAT_NAMES[p.nat] ?? p.nat)}${p.clubId ? `, ${esc(clubById(p.clubId)?.name)}` : isPoolContracted(p) ? `, ${esc(poolClubLabel(p))}` : ', wolny zawodnik'}</span></p>
       ${extra}</div>
     <b class="tf-ch__ovr" title="Ocena ogólna 1-20"><small>OVR</small>${ovrTxt(p)}</b>
   </header>`;
@@ -251,34 +297,40 @@ const fact = (k, v, m = '') => `<li${m ? ` data-m="${m}"` : ''}><small>${esc(k)}
 function playerCard(game, p, ui) {
   const mine = p.clubId === game.clubId;
   if (mine) return ownCard(game, p, ui);
+  if (isLoanedOut(p, game.clubId)) return loanedOutCard(game, p, ui);
   const listed = game.market.listed[p.id];
   const price = askingPrice(game, p);
   const will = playerWillingness(game, p);
   const talk = game.market.talks[p.id];
-  const free = !p.clubId;
+  const abroad = isPoolContracted(p); // kontrakt w klubie zagranicznym (src/career/foreignPool.js)
+  const free = !p.clubId && !abroad;
   const nfs = notForSale(game, p) && !p.contract?.clause;
   const cap = canSign(game);
   const open = inWindow(game.date);
   const actions = [];
   if (free) actions.push(`<p class="tf-p__txt">Wolny zawodnik: bez odstępnego, rozmawiasz od razu o kontrakcie.</p><button class="btn btn--primary" data-act="tf-negotiate" data-id="${esc(p.id)}">Rozmawiaj o kontrakcie</button>`);
+  else if (p.loan) actions.push(`<p class="tf-p__txt">Wypożyczony z ${esc(clubById(p.loan.from)?.name ?? '')} do ${esc(fmtDate(p.loan.until))}. Klub wypożyczający nie może go sprzedać ani wypożyczyć dalej; o transferze porozmawiasz po jego powrocie.</p>`);
   else if (talk?.accepted) actions.push(`<p class="notice">Klub przyjął ofertę ${fmtZl(talk.accepted)}.</p><button class="btn btn--primary" data-act="tf-negotiate" data-id="${esc(p.id)}">Rozmawiaj z zawodnikiem</button>`);
   else if (!nfs) {
     actions.push(`<div class="tf-offer"><label>Oferta odstępnego (zł)<input id="tfFee" type="number" min="0" step="10000" value="${talk?.counter ?? Math.round(price * 0.9 / 10000) * 10000}"></label>
       <button class="btn btn--primary" data-act="tf-offer" data-id="${esc(p.id)}" ${open ? '' : 'disabled'}>Złóż ofertę</button></div>
       <p class="hint">Cena klubu: ${fmtZl(price)}.${talk?.counter ? ` Kontroferta klubu: ${fmtZl(talk.counter)}.` : ''}${open ? '' : ' Okno transferowe jest zamknięte.'}</p>`);
   } else actions.push('<p class="tf-p__txt">Klub nie chce sprzedać tego zawodnika (jeden z trzech najlepszych w kadrze, bez klauzuli odstępnego).</p>');
-  if (!free && (listed?.kind === 'loan' || (p.age <= 21 && !nfs))) {
-    actions.push(`<div class="tf-offer tf-offer--loan"><label>Wypożyczenie: część pensji<select id="tfShare">${[50, 75, 100].map((s) => `<option value="${s}">${s} %</option>`).join('')}</select></label>
-      <button class="btn btn--quiet" data-act="tf-loan" data-id="${esc(p.id)}" ${open ? '' : 'disabled'}>Wypożycz do końca sezonu</button></div>`);
-  }
+  if (!free && !abroad && !p.loan && (listed?.kind === 'loan' || (p.age <= 21 && !nfs))) actions.push(loanInForm(game, p, open));
+  const dp = otherDealPanel(game, p); // transakcja w toku, umowa od 1 lipca (transferDealsView.js)
+  if (dp.blocked) actions.length = 0;
+  if (dp.html) actions.push(dp.html);
   const blocked = will.verdict === 'odmowa' || !cap.ok;
+  const appeal = game.board?.requests?.vetoes?.some((v) => v.playerId === p.id && v.status === 'open') ? appealStatus(game, p.id) : null; // weto zarządu
   const deal = `${ui.tfMsg ? `<p class="notice">${esc(ui.tfMsg)}</p>` : ''}
+    ${appeal?.ok ? `<button class="btn btn--quiet" data-act="br-appeal" data-id="${esc(p.id)}">Odwołaj się od weta zarządu</button>` : ''}
     ${!cap.ok ? `<p class="notice notice--err">${esc(cap.text)}</p>` : cap.warn ? `<p class="notice">${esc(cap.text)}</p>` : ''}
     ${will.verdict === 'odmowa' ? '<p class="notice notice--err">Zawodnik nie chce rozmawiać o przejściu do twojego klubu.</p>' : cap.ok ? actions.join('') : ''}`;
   const notes = [
     ...(listed ? [`Wystawiony: ${listed.reasons.join(', ').toLowerCase()}`] : []),
     ...(recentlyMoved(p, game.date) ? ['Dopiero zmienił klub'] : []),
     ...(p.contract?.clause ? [`Klauzula odstępnego: ${fmtZl(p.contract.clause)}`] : []),
+    ...(abroad ? ['Gra za granicą: transfer trwa kilka dni dłużej (certyfikat ITC i podróż)'] : []),
   ];
   return `<div class="tf-back"><button class="btn btn--quiet btn--sm" data-act="tf-close">Wróć do listy</button></div>
     <div class="tf-grid tf-card">
@@ -286,9 +338,10 @@ function playerCard(game, p, ui) {
         ${cardHead(game, p, `<button class="btn btn--quiet btn--sm" data-act="extplayer" data-id="${esc(p.id)}">Profil i statystyki</button>`)}
         <ul class="tf-facts">
           ${fact('Wartość', fmtZl(p.value))}
-          ${free ? fact('Oczekuje', `ok. ${fmtZl(p.askWage ?? 0)}<small> tygodniowo</small>`, 'warn') : fact('Cena klubu', nfs ? 'nie na sprzedaż' : fmtZl(price), nfs ? 'bad' : 'good')}
+          ${free ? fact('Oczekuje', `ok. ${fmtZl(effectiveAsk(p, clubById(game.clubId)?.tier ?? 1))}<small> tygodniowo</small>`, 'warn') : fact('Cena klubu', nfs ? 'nie na sprzedaż' : fmtZl(price), nfs ? 'bad' : 'good')}
           ${free ? '' : fact('Pensja', `${fmtZl(p.contract.wage)}<small> tygodniowo</small>`)}
           ${free ? '' : fact('Kontrakt do', esc(fmtDate(p.contract.until)))}
+          ${abroad ? fact('Klub', `<span class="fp-fact">${esc(poolClubLabel(p))}</span>`, 'info') : ''}
           ${fact('Reputacja', esc(reputationLabel(p.rep ?? 30)), 'misc')}
           ${fact('Nastawienie', esc(will.verdict), willTone(will.verdict))}
         </ul>
@@ -306,14 +359,14 @@ function playerCard(game, p, ui) {
 function ownCard(game, p, ui) {
   const listedPrice = game.market.userListed[p.id];
   const ml = monthsLeft(game, p);
-  const canRenew = !p.loan && ml <= RENEW_WINDOW_MONTHS;
+  const canRenew = !p.loan && ml <= RENEW_WINDOW_MONTHS && !p.preContract;
   const L = limitStatus(game);
   const kept = L.case?.keep.includes(p.id);
   const target = L.targets.some((x) => x.id === p.id);
   const limitNote = target || kept ? `<p class="notice${target ? ' notice--err' : ''}">${target ? `Zarząd wskaże tego zawodnika, jeśli kadra nie zmieści się w limicie (${L.counted}/${L.soft}).` : 'Osłoniłeś tego zawodnika przed działaniem zarządu.'}</p>${L.case ? `<button class="btn btn--quiet btn--sm" data-act="tf-keep" data-id="${esc(p.id)}">${kept ? 'Zdejmij osłonę' : 'Osłoń przed zarządem'}</button>` : ''}` : '';
   const mor = Math.round(p.morale ?? 12);
   const renew = canRenew ? `<p class="tf-p__txt">Kontrakt kończy się ${esc(fmtDate(p.contract.until))}. Możesz rozmawiać o przedłużeniu.</p><button class="btn btn--primary" data-act="tf-renew" data-id="${esc(p.id)}">Przedłuż kontrakt</button>`
-    : `<p class="tf-p__txt">${p.loan ? 'Zawodnik wypożyczony: kontrakt należy do jego klubu.' : `Rozmowy o przedłużeniu najwcześniej ${RENEW_WINDOW_MONTHS} miesięcy przed końcem kontraktu.`}</p>`;
+    : `<p class="tf-p__txt">${p.loan ? 'Zawodnik wypożyczony: kontrakt należy do jego klubu.' : p.preContract ? 'Zawodnik ma umowę z innym klubem od 1 lipca.' : `Rozmowy o przedłużeniu najwcześniej ${RENEW_WINDOW_MONTHS} miesięcy przed końcem kontraktu.`}</p>`;
   const sell = p.loan ? '' : listedPrice ? `<p class="tf-p__txt">Na liście transferowej za <b>${fmtZl(listedPrice)}</b>.</p><button class="btn btn--quiet" data-act="tf-unlist" data-id="${esc(p.id)}">Zdejmij z listy</button>`
     : `<div class="tf-offer"><label>Cena na liście (zł)<input id="tfPrice" type="number" min="0" step="10000" value="${Math.round(p.value * 1.2 / 10000) * 10000}"></label><button class="btn btn--quiet" data-act="tf-list-own" data-id="${esc(p.id)}">Wystaw na listę</button></div>`;
   const release = p.loan ? '' : ui.tfConfirm === p.id ? `<p class="notice notice--err">Rozwiązanie kontraktu kosztuje ${fmtZl(releaseCost(game, p))}.</p><button class="btn btn--quiet" data-act="tf-release-ok" data-id="${esc(p.id)}">Potwierdź rozwiązanie</button>`
@@ -324,7 +377,9 @@ function ownCard(game, p, ui) {
     p.renewRefused ? tag('odmówił przedłużenia', 'bad') : '',
     p.transferRequest ? tag('prosi o transfer', 'warn') : '',
     listedPrice ? tag('na liście transferowej', 'warn') : '',
+    dealTags(game, p),
   ].filter(Boolean).join('');
+  const busy = !!p.transfer; // transakcja w toku: bez listy i rozwiązania kontraktu
   return `<div class="tf-back"><button class="btn btn--quiet btn--sm" data-act="tf-close">Wróć do listy</button></div>
     <div class="tf-grid tf-card">
       <div class="tf-main">
@@ -341,10 +396,27 @@ function ownCard(game, p, ui) {
         ${limitNote}
       </div>
       <aside class="tf-side tf-actions">
+        ${ownDealPanels(game, p, ui)}
+        ${p.loan ? loanedInPanel(game, p) : ''}
         ${panel('Przedłużenie kontraktu', canRenew ? 'good' : 'info', renew)}
-        ${p.loan ? '' : panel('Lista transferowa', 'warn', sell)}
-        ${p.loan ? '' : panel('Rozwiązanie kontraktu', 'bad', release)}
+        ${p.loan || busy ? '' : loanOutPanel(game, p)}
+        ${p.loan || busy ? '' : panel('Lista transferowa', 'warn', sell)}
+        ${p.loan || busy ? '' : panel('Rozwiązanie kontraktu', 'bad', release)}
       </aside>
+    </div>`;
+}
+
+/** Karta zawodnika wypożyczonego z klubu gracza (gra w innym klubie, kontrakt u nas). */
+function loanedOutCard(game, p, ui) {
+  const L = loanedOutPanels(game, p);
+  return `<div class="tf-back"><button class="btn btn--quiet btn--sm" data-act="tf-close">Wróć do listy</button></div>
+    <div class="tf-grid tf-card">
+      <div class="tf-main">
+        ${cardHead(game, p, `<p class="tf-tags">${tag(`wypożyczony do ${clubById(p.clubId)?.name ?? ''}`, 'info')}</p>`)}
+        ${ui.tfMsg ? `<p class="notice">${esc(ui.tfMsg)}</p>` : ''}
+        ${L.main}
+      </div>
+      <aside class="tf-side tf-actions">${L.side}</aside>
     </div>`;
 }
 
@@ -370,7 +442,8 @@ function contractsView(game, ui) {
       p.renewRefused ? tag('odmówił przedłużenia', 'bad') : '',
       p.transferRequest ? tag('prosi o transfer', 'warn') : '',
       L.targets.some((x) => x.id === p.id) ? tag('wskazany przez zarząd', 'bad') : '',
-      !p.loan && ml <= RENEW_WINDOW_MONTHS && !p.renewRefused ? tag('można przedłużyć', 'good') : '',
+      !p.loan && ml <= RENEW_WINDOW_MONTHS && !p.renewRefused && !p.preContract ? tag('można przedłużyć', 'good') : '',
+      dealTags(game, p),
     ].filter(Boolean).join('');
     return `<tr data-pid="${esc(p.id)}"><td class="xl__pos">${posBadge(p)}</td>
       <th scope="row" class="xl__nm"><button data-act="tf-open" data-id="${esc(p.id)}" data-pid="${esc(p.id)}"><span>${esc(p.name)}</span></button></th>
@@ -388,8 +461,10 @@ function contractsView(game, ui) {
   return `${moneyStrip(game)}
     <div class="tf-grid tf-grid--table">
       <div class="tf-main">
+        ${ui.tfMsg ? `<p class="notice">${esc(ui.tfMsg)}</p>` : ''}
         <p class="xl-note">Płace ${fmtZl(bill)} tygodniowo z budżetu ${fmtZl(c.wageBudget)}. Kontrakty kończące się w ciągu 6 miesięcy na czerwono, w ciągu roku na bursztynowo. Kliknij nazwisko, żeby przedłużyć, wystawić albo rozwiązać kontrakt.</p>
         <div class="xl-wrap tf-xl" tabindex="0" aria-label="Kontrakty zawodników, tabela przewijana w poziomie"><table class="xl"><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table></div>
+        ${loansSection(game)}
       </div>
       <aside class="tf-side" aria-label="Kontrakty i limit kadry">${endPanel}${limitPanel(game)}</aside>
     </div>`;
@@ -401,30 +476,34 @@ function offersView(game) {
   const mine = Object.entries(game.market.talks).map(([id, t]) => ({ p: game.world.players[id], t })).filter((x) => x.p && x.p.clubId !== game.clubId);
   const hist = game.market.history.filter((h) => h.from === game.clubId || h.to === game.clubId).slice(0, 20);
   const all = game.market.history.slice(0, 40);
-  const terms = (h) => (h.kind === 'loan' ? 'wypożyczenie' : h.fee ? fmtZl(h.fee) : h.kind === 'release' ? 'rozwiązanie' : 'wolny transfer');
+  const terms = (h) => (h.kind === 'loan' ? 'wypożyczenie' : h.fee ? fmtZl(h.fee) : h.kind === 'release' ? 'rozwiązanie' : h.kind === 'pre' ? 'umowa od 1 lipca' : 'wolny transfer');
+  const toCell = (h) => (h.toName ? `<span class="tf-club">${esc(h.toName)}</span>` : h.to ? clubCell(h.to) : '<span class="tf-club tf-club--none">bez klubu</span>');
   const incoming = open.length ? `<ul class="tf-offers">${open.map((o) => {
     const p = game.world.players[o.playerId];
+    const who = o.foreign ? o.foreign.name : clubById(o.from).name;
+    const whom = p ? `${p.pos} ${p.name}` : 'zawodnika';
+    const what = o.foreign ? `${o.foreign.countryName ?? o.foreign.country}: chce ${whom}, pensja ok. ${fmtZl(o.foreign.wage)} tygodniowo` : o.pre ? `chce ${whom} już teraz (umowa od 1 lipca)` : `chce ${whom}`;
     return `<li class="tf-incoming" data-pid="${esc(o.playerId)}">
-      <div class="tf-incoming__who">${crest(o.from, 32)}<div><b>${esc(clubById(o.from).name)}</b><span>chce ${p ? `${esc(p.pos)} ${esc(p.name)}` : 'zawodnika'}</span></div></div>
+      <div class="tf-incoming__who">${o.foreign ? '<span class="td-flag" aria-hidden="true"></span>' : crest(o.from, 32)}<div><b>${esc(who)}</b><span>${esc(what)}</span></div></div>
       <div class="tf-incoming__fee"><b>${fmtZl(o.fee)}</b><small>ważna do ${esc(fmtDate(o.expires))}${p ? `, wartość ${fmtZl(p.value)}` : ''}</small></div>
-      <span class="tf-btns"><button class="btn btn--primary btn--sm" data-act="tf-answer" data-o="${esc(o.id)}" data-a="accept">Przyjmij</button>${o.raised ? '' : `<button class="btn btn--quiet btn--sm" data-act="tf-answer" data-o="${esc(o.id)}" data-a="more">Żądaj więcej</button>`}<button class="btn btn--quiet btn--sm" data-act="tf-answer" data-o="${esc(o.id)}" data-a="reject">Odrzuć</button></span>
+      <span class="tf-btns"><button class="btn btn--primary btn--sm" data-act="tf-answer" data-o="${esc(o.id)}" data-a="accept">Przyjmij</button>${o.raised || o.pre ? '' : `<button class="btn btn--quiet btn--sm" data-act="tf-answer" data-o="${esc(o.id)}" data-a="more">Żądaj więcej</button>`}<button class="btn btn--quiet btn--sm" data-act="tf-answer" data-o="${esc(o.id)}" data-a="reject">Odrzuć</button></span>
     </li>`;
   }).join('')}</ul>` : '<p class="tf-p__txt">Brak ofert. Kluby składają je w oknie transferowym, częściej za zawodników z listy transferowej.</p>';
   const talks = mine.length ? `<ul class="tf-mini">${mine.map(({ p, t }) => {
     const [txt, k] = t.accepted ? [`przyjęta: ${fmtZl(t.accepted)}`, 'good'] : t.until ? [`przerwa do ${fmtDate(t.until)}`, 'bad'] : t.counter ? [`klub chce ${fmtZl(t.counter)}`, 'warn'] : ['odrzucona', 'bad'];
-    return `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${esc(p.name)}<em>${esc(clubById(p.clubId)?.name ?? 'bez klubu')}</em></span><small data-k="${k}">${esc(txt)}</small></button></li>`;
+    return `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${esc(p.name)}<em>${esc(clubById(p.clubId)?.name ?? (isPoolContracted(p) ? poolClubLabel(p) : 'bez klubu'))}</em></span><small data-k="${k}">${esc(txt)}</small></button></li>`;
   }).join('')}</ul>` : '<p class="tf-p__txt">Nie prowadzisz rozmów. Ofertę złożysz z karty zawodnika na Rynku.</p>';
   const listedOwn = Object.entries(game.market.userListed).map(([id, price]) => ({ p: game.world.players[id], price })).filter((x) => x.p && x.p.clubId === game.clubId);
   const ownListed = listedOwn.length ? `<ul class="tf-mini">${listedOwn.map(({ p, price }) => `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${esc(p.name)}<em>OVR ${ovrTxt(p)}, wartość ${fmtZl(p.value)}</em></span><small>${fmtZl(price)}</small></button></li>`).join('')}</ul>`
     : '<p class="tf-p__txt">Nikogo nie wystawiłeś. Zrobisz to w karcie zawodnika (zakładka Kontrakty).</p>';
   const ownMoves = hist.length ? `<ul class="tf-mini tf-mini--moves">${hist.map((h) => {
     const sold = h.from === game.clubId;
-    return `<li${game.world.players[h.playerId] ? ` data-pid="${esc(h.playerId)}"` : ''}><div><span class="tf-dir" data-k="${sold ? 'out' : 'in'}">${sold ? 'Odszedł' : 'Przyszedł'}</span><span>${esc(h.name)}<em>${esc(sold ? `do ${h.to ? clubById(h.to)?.name ?? '' : 'bez klubu'}` : `z ${h.from ? clubById(h.from)?.name ?? '' : 'wolny'}`)}, ${esc(shortDate(h.date))}</em></span><b>${esc(terms(h))}</b></div></li>`;
+    return `<li${game.world.players[h.playerId] ? ` data-pid="${esc(h.playerId)}"` : ''}><div><span class="tf-dir" data-k="${sold ? 'out' : 'in'}">${sold ? 'Odszedł' : 'Przyszedł'}</span><span>${esc(h.name)}<em>${esc(sold ? `do ${h.toName ?? (h.to ? clubById(h.to)?.name ?? '' : 'bez klubu')}` : `z ${h.from ? clubById(h.from)?.name ?? '' : h.fromName ?? 'wolny'}`)}, ${esc(shortDate(h.date))}</em></span><b>${esc(terms(h))}</b></div></li>`;
   }).join('')}</ul>` : '<p class="tf-p__txt">Jeszcze żadnych.</p>';
   const recent = all.length ? `<div class="xl-wrap tf-xl tf-xl--hist" tabindex="0" aria-label="Ostatnie transfery w Polsce, tabela przewijana w poziomie"><table class="xl"><thead><tr>
       <th scope="col" class="xl__nm">Zawodnik</th><th scope="col">Poz.</th><th scope="col" class="tf-num">Kwota</th><th scope="col" class="tf-l">Z klubu</th><th scope="col" class="tf-l">Do klubu</th><th scope="col">Data</th></tr></thead>
     <tbody>${all.map((h) => `<tr${game.world.players[h.playerId] ? ` data-pid="${esc(h.playerId)}"` : ''}${h.from === game.clubId || h.to === game.clubId ? ' class="is-mine"' : ''}><th scope="row" class="xl__nm"><span class="tf-nm">${esc(h.name)}</span></th><td>${esc(h.pos)}</td>
-      <td class="tf-num tf-fee" data-k="${h.fee ? 'fee' : 'free'}">${esc(terms(h))}</td><td class="tf-l">${h.from ? clubCell(h.from) : '<span class="tf-club tf-club--none">wolny</span>'}</td><td class="tf-l">${h.to ? clubCell(h.to) : '<span class="tf-club tf-club--none">bez klubu</span>'}</td><td>${esc(shortDate(h.date))}</td></tr>`).join('')}</tbody></table></div>`
+      <td class="tf-num tf-fee" data-k="${h.fee ? 'fee' : 'free'}">${esc(terms(h))}</td><td class="tf-l">${h.from ? clubCell(h.from) : h.fromName ? `<span class="tf-club">${esc(h.fromName)}</span>` : '<span class="tf-club tf-club--none">wolny</span>'}</td><td class="tf-l">${toCell(h)}</td><td>${esc(shortDate(h.date))}</td></tr>`).join('')}</tbody></table></div>`
     : '<p class="tf-p__txt">Brak.</p>';
   return `<div class="tf-grid tf-grid--offers">
       <div class="tf-main tf-stack">
@@ -464,7 +543,34 @@ function monthsChart(c) {
     }).join('')}</ol>`;
 }
 
-function financeView(game) {
+/**
+ * Plan sezonu a wykonanie (prawa kolumna Finansów): roczny plan klubu (clubPlan) wobec wpływów i kosztów od lipca,
+ * z częścią sezonu, która minęła. Premia za miejsce w lidze i nagrody przychodzą po rozstrzygnięciach.
+ */
+function planPanel(game, c, s) {
+  const p = c.plan;
+  if (!p) return '';
+  const [y, m] = game.date.split('-').map(Number);
+  const done = Math.min(12, Math.max(1, (m >= 7 ? m - 6 : m + 6))) / 12; // miesiące od lipca (bieżący liczony)
+  const row = (label, plan, actual, dir) => {
+    const ratio = plan > 0 ? actual / plan : 0;
+    const ahead = dir === 'in' ? ratio >= done - 0.05 : ratio <= done + 0.05;
+    return `<div class="klub-plan__row"><span>${esc(label)}<small> plan ${fmtZl(plan)}</small></span><span>${fmtZl(actual)}</span><b data-k="${ahead ? 'pos' : 'neg'}">${Math.round(ratio * 100)}%</b></div>`;
+  };
+  const inn = s.in ?? {}; const out = s.out ?? {};
+  const rows = [
+    row('Dzień meczowy', p.tickets, inn.tickets ?? 0, 'in'),
+    row('Prawa TV i podział ligi', p.tv, inn.tv ?? 0, 'in'),
+    row('Sponsorzy', p.sponsor, inn.sponsor ?? 0, 'in'),
+    ...(p.owner ? [row('Właściciel', p.owner, inn.owner ?? 0, 'in')] : []),
+    row('Pensje', p.wages, out.wages ?? 0, 'out'),
+    row('Koszty klubu i obiektów', p.ops + (p.upkeep ?? 0) - (p.upkeepBase ?? 0), (out.ops ?? 0) + (out.upkeep ?? 0), 'out'),
+  ].join('');
+  void y;
+  return panel('Plan sezonu a wykonanie', 'misc', `<p class="tf-p__txt">Minęło ${Math.round(done * 100)}% sezonu. Zielony procent: zgodnie z planem albo lepiej. Premia za miejsce w lidze (plan ${fmtZl(p.merit ?? 0)}) i nagrody wpływają po rozstrzygnięciach.</p><div class="klub-plan">${rows}</div>`);
+}
+
+export function financeView(game) {
   const c = game.finance.clubs[game.clubId];
   const s = seasonSummary(c);
   const m = monthSummary(c, game.date.slice(0, 7));
@@ -490,12 +596,13 @@ function financeView(game) {
           <p class="tf-sum tf-sum--net"><span>Wynik miesiąca</span><b class="${m.net < 0 ? 'neg' : ''}">${m.net >= 0 ? '+' : ''}${fmtZl(m.net)}</b></p>`)}
       </div>
       <div class="tf-stack">
-        ${panel('Ostatnie operacje', 'info', `<ul class="tf-log">${c.log.slice(0, 15).map((l) => `<li><time>${esc(shortDate(l.date))}</time><span>${esc(l.note)}</span><b data-k="${l.dir}">${l.dir === 'out' ? '-' : '+'}${fmtZl(l.amount)}</b></li>`).join('') || '<li><span>Brak.</span></li>'}</ul>`)}
+        ${planPanel(game, c, s)}
+        ${panel('Ostatnie operacje', 'info', `<ul class="tf-log">${c.log.slice(0, 12).map((l) => `<li><time>${esc(shortDate(l.date))}</time><span>${esc(l.note)}</span><b data-k="${l.dir}">${l.dir === 'out' ? '-' : '+'}${fmtZl(l.amount)}</b></li>`).join('') || '<li><span>Brak.</span></li>'}</ul>`)}
       </div>
     </div>`;
 }
 
-function boardView(game) {
+export function boardView(game) {
   const B = game.board; const M = game.manager;
   const t = tablePos(game, game.clubId);
   const trustM = B.trust >= 55 ? 'good' : B.trust >= 40 ? 'info' : B.trust >= 25 ? 'warn' : 'bad';
@@ -532,23 +639,28 @@ function fansPanel(game) {
 
 // ------------------------------------------------------------ Wejście
 export function renderTransfers(game, ui = {}) {
-  const tab = ui.tfTab ?? 'rynek';
-  const tabs = `<div class="subtabs subtabs--5" role="tablist">${TF_TABS.map(([k, l]) => `<button role="tab" data-act="tf-tab" data-t="${k}" aria-selected="${tab === k}">${l}</button>`).join('')}</div>`;
+  const tab = TF_TABS.some(([k]) => k === ui.tfTab) ? ui.tfTab : 'rynek';
+  const tabs = `<div class="subtabs" role="tablist">${TF_TABS.map(([k, l]) => `<button role="tab" data-act="tf-tab" data-t="${k}" aria-selected="${tab === k}">${l}</button>`).join('')}</div>`;
   const p = ui.tfPlayer && game.world.players[ui.tfPlayer];
   let body;
-  if (p && (tab === 'rynek' || tab === 'kontrakty' || tab === 'oferty')) body = playerCard(game, p, ui);
+  if (p && (tab === 'rynek' || tab === 'kontrakty' || tab === 'oferty' || tab === 'wtoku')) body = playerCard(game, p, ui);
   else if (tab === 'oferty') body = offersView(game);
+  else if (tab === 'wtoku') body = dealsView(game, ui);
   else if (tab === 'kontrakty') body = contractsView(game, ui);
-  else if (tab === 'finanse') body = financeView(game);
-  else if (tab === 'zarzad') body = boardView(game);
   else body = marketView(game, ui);
   return `<div class="tfx" data-tab="${esc(tab)}"><div class="tfx__head"><h2>Transfery</h2>${windowBadge(game)}</div>${tabs}${body}</div>`;
 }
 
-/** Limity rozmów o kontrakcie: wolne miejsce w budżecie płac (+ obecna pensja przy przedłużeniu) i premia za podpis. */
+/**
+ * Limity rozmów o kontrakcie: wolne miejsce w budżecie płac (+ obecna pensja przy przedłużeniu) i premia za podpis.
+ * board: progi zarządu (weto, src/career/boardRequests.js): pensja, długość, koszt kontraktu, premia, prowizja.
+ */
 export function negotiationLimits(game, kind, p) {
   const room = wageRoom(game.finance, game.world, game.clubId) + (kind === 'renew' ? p.contract.wage : 0);
-  return { maxWage: Math.max(room, kind === 'renew' ? p.contract.wage : 0), maxSignOn: Math.round(spendable(game.finance, game.clubId) * 0.25 / 1000) * 1000 };
+  return {
+    maxWage: Math.max(room, kind === 'renew' ? p.contract.wage : 0), maxSignOn: Math.round(spendable(game.finance, game.clubId) * 0.25 / 1000) * 1000,
+    board: boardCaps(game, game.clubId, p, kind),
+  };
 }
 
 /**
@@ -556,12 +668,14 @@ export function negotiationLimits(game, kind, p) {
  * Zwraca { ui, save, negotiate?: { kind, playerId, fromClub, fee, limits }, resolveOffer?: offerId }.
  */
 export function handleTransferAction(game, act, ds = {}, root = null) {
+  if (isLoanAction(act)) return handleLoanAction(game, act, ds, root);
   const val = (sel, d) => root?.querySelector(sel)?.value ?? d;
   const p = ds.id ? game.world.players[ds.id] : null;
   switch (act) {
     case 'tf-tab': return { ui: { tfTab: ds.t, tfPlayer: null, tfMsg: null, tfConfirm: null } };
     case 'tf-list': return { ui: { tfList: ds.l, tfPlayer: null, tfMsg: null } };
     case 'tf-pos': return { ui: { tfPos: ds.p } };
+    case 'tf-region': return { ui: { tfRegion: ds.r } }; // filtr listy „Z zagranicy”
     case 'tf-sort': {
       const sort = { k: ds.k, dir: ds.dir === 'asc' ? 'asc' : 'desc' };
       return { ui: ds.s === 'c' ? { tfCSort: sort } : { tfSort: sort } };
@@ -578,20 +692,29 @@ export function handleTransferAction(game, act, ds = {}, root = null) {
       const r = offerForPlayer(game, p.id, fee);
       return { ui: { tfMsg: r.text }, save: true };
     }
-    case 'tf-loan': {
-      const r = loanIn(game, p.id, Number(val('#tfShare', ds.share)) || 50);
-      return { ui: { tfMsg: r.text, ...(r.ok ? { tfPlayer: null, tfTab: 'kontrakty' } : {}) }, save: r.ok, squadChanged: r.ok };
-    }
+    case 'tf-loan': return loanInAction(game, p, ds, root); // warunki wypożyczenia: src/ui/loansView.js
     case 'tf-negotiate': {
       const t = game.market.talks[p.id];
-      const fee = p.clubId ? t?.accepted ?? 0 : 0;
-      if (p.clubId && !t?.accepted) return { ui: { tfMsg: 'Najpierw dogadaj się z klubem.' } };
-      if (p.clubId && !inWindow(game.date)) return { ui: { tfMsg: 'Okno transferowe jest zamknięte.' } };
+      const abroad = isPoolContracted(p); // klub zagraniczny: odstępne jak przy klubie AI, fromClub to opis klubu
+      const sold = !!p.clubId || abroad;
+      const fee = sold ? t?.accepted ?? 0 : 0;
+      if (sold && !t?.accepted) return { ui: { tfMsg: 'Najpierw dogadaj się z klubem.' } };
+      if (sold && !inWindow(game.date)) return { ui: { tfMsg: 'Okno transferowe jest zamknięte.' } };
+      if (!sold && lateFree(game, p)) return { ui: { tfMsg: 'Zawodnik został wolny po zamknięciu okna transferowego. Zgłosisz go dopiero w następnym oknie (FIFA RSTP art. 6.1).' } };
+      if (p.transfer) return { ui: { tfMsg: 'Zawodnik jest w trakcie transferu.' } };
       const cap = canSign(game);
       if (!cap.ok) return { ui: { tfMsg: cap.text } };
-      return { ui: {}, negotiate: { kind: 'sign', playerId: p.id, fromClub: p.clubId ?? null, fee, limits: negotiationLimits(game, 'sign', p) } };
+      return { ui: {}, negotiate: { kind: 'sign', playerId: p.id, fromClub: abroad ? poolSellerClub(p) : p.clubId ?? null, fee, limits: negotiationLimits(game, 'sign', p) } };
     }
     case 'tf-renew': return { ui: {}, negotiate: { kind: 'renew', playerId: p.id, fromClub: null, fee: 0, limits: negotiationLimits(game, 'renew', p) } };
+    case 'tf-pre': { // umowa od 1 lipca (src/career/preContracts.js)
+      const chk = checkUserPre(game, p);
+      if (!chk.ok) return { ui: { tfMsg: chk.text } };
+      return { ui: {}, negotiate: { kind: 'sign', playerId: p.id, fromClub: p.clubId, fee: 0, pre: true, limits: negotiationLimits(game, 'sign', p) } };
+    }
+    case 'tf-wish': // podwyżka przy prośbie o transfer otwiera rozmowy o przedłużeniu z bonusem do chęci pozostania
+      if (ds.a === 'raise') return { ui: {}, negotiate: { kind: 'renew', playerId: p.id, fromClub: null, fee: 0, stayBonus: 0.15, limits: negotiationLimits(game, 'renew', p) } };
+      return handleDealAction(game, act, ds);
     case 'tf-list-own': {
       const price = Math.max(0, Number(val('#tfPrice', ds.price)) || Math.round(p.value * 1.2));
       game.market.userListed[p.id] = price;
@@ -608,6 +731,13 @@ export function handleTransferAction(game, act, ds = {}, root = null) {
       const r = answerIncoming(game, ds.o, ds.a);
       return { ui: { tfMsg: r.text }, save: true, resolveOffer: ds.o, squadChanged: !!r.sold, note: r.text };
     }
-    default: return { ui: {} };
+    default: return handleDealAction(game, act, ds) ?? { ui: {} };
   }
+}
+
+/** Wolny zawodnik bez klubu od dnia po zamknięciu ostatniego okna: poza oknem nie do zgłoszenia (FIFA RSTP art. 6.1). */
+export function lateFree(game, p) {
+  if (inWindow(game.date) || !p.freeSince) return false;
+  const last = (DOMESTIC.transferWindows ?? []).filter((w) => w.to < game.date).map((w) => w.to).sort().at(-1);
+  return !!last && p.freeSince > last;
 }

@@ -215,3 +215,12 @@ test('Odejście gwiazdy klubu gracza: krytyka kibiców i wzrost presji; podsumow
   assert.ok(typeof s.moodLabel === 'string' && typeof s.levelLabel === 'string');
   assert.ok(s.recent.some((e) => e.kind === 'starSale'));
 });
+
+test('Zwycięzca rozstrzygnięcia: seria karnych i dwumecz (wynik pierwszego meczu)', async () => {
+  const { tieWinner } = await import('../src/career/fans.js');
+  assert.equal(tieWinner({ home: 'a', away: 'b', result: { score: [1, 1], shootout: [4, 3] } }), 'a');
+  assert.equal(tieWinner({ home: 'a', away: 'b', result: { score: [1, 1], shootout: { goals: [2, 4] } } }), 'b');
+  // rewanż wygrany 1:0, ale pierwszy mecz przegrany 0:2 (gole obecnego gospodarza i gościa): awansuje gość
+  assert.equal(tieWinner({ home: 'a', away: 'b', knockout: { firstLeg: [0, 2] }, result: { score: [1, 0] } }), 'b');
+  assert.equal(tieWinner({ home: 'a', away: 'b', result: { score: [2, 2] } }), null);
+});

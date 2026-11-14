@@ -39,7 +39,7 @@ export function playerAt(tactics, loc) {
   return null;
 }
 
-const offReason = (p) => (p.injuryDays > 0 ? 'kontuzja' : p.suspended > 0 ? 'zawieszenie' : p.callUp ? 'zgrupowanie reprezentacji' : p.onLoanOut ? 'wypożyczenie' : 'niedostępny');
+const offReason = (p) => (p.injuryDays > 0 ? 'kontuzja' : p.suspended > 0 ? 'zawieszenie' : p.callUp ? 'zgrupowanie reprezentacji' : p.loanBlock ? 'mecz z klubem macierzystym (zakaz w umowie wypożyczenia)' : 'niedostępny');
 const fail = (reason) => ({ ok: false, reason });
 
 /**

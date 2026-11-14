@@ -5,13 +5,15 @@
 import { Rng, clamp } from '../core/rng.js';
 import { QS, sampleScore } from '../engine/quickSim.js';
 import DATA from '../data/reprezentacje.json' with { type: 'json' };
+import { worldTeam } from './worldNations.js';
 import { addPlayerMatch, quickRating } from './history.js';
 
 export const NT = DATA.reprezentacje.filter((t) => t.status === 'aktywna');
 const BY_CODE = new Map(NT.map((t) => [t.kod, t]));
 const BY_NAME = new Map(NT.map((t) => [t.nazwa, t.kod]));
-export const ntName = (code) => BY_CODE.get(code)?.nazwa ?? code;
-export const ntTeam = (code) => BY_CODE.get(code) ?? null;
+// Reprezentacje spoza Europy (CONMEBOL, CONCACAF, OFC) z worldNations.js, gdy nie ma ich w reprezentacje.json
+export const ntName = (code) => BY_CODE.get(code)?.nazwa ?? worldTeam(code)?.nazwa ?? code;
+export const ntTeam = (code) => BY_CODE.get(code) ?? worldTeam(code);
 export const FIFA_WINDOWS_ALL = DATA.oknaFIFA.map((o) => ({ from: o.od, to: o.do, matches: o.mecze }));
 const UEFA_CODES = NT.filter((t) => t.konfederacja === 'UEFA').map((t) => t.kod);
 export const NT_COMP_NAMES = { LN: 'Liga Narodów', LNQF: 'Liga Narodów, ćwierćfinał', LNAB: 'Liga Narodów, baraż A/B', LNBC: 'Liga Narodów, baraż B/C', LNF: 'Liga Narodów, Final Four', EQ: 'Eliminacje Euro 2028' };

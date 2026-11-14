@@ -30,6 +30,7 @@ import { FRIENDLY_DEFAULTS } from '../engine/match/rules.js';
 import { legsTerm, overloadTerm } from '../training/load.js';
 import { staleNote } from '../training/variety.js';
 import { daysBetween } from '../training/state.js';
+import { REPORT_FREQS, ensureAssistantReport, setReportFreq, nextReportDate } from '../career/assistantReport.js';
 
 const WD = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
 const TABS = [['pulpit', 'Pulpit'], ['tydzien', 'Tydzień'], ['obozy', 'Obozy'], ['sparingi', 'Sparingi'], ['zawodnicy', 'Zawodnicy'], ['obciazenia', 'Obciążenia'], ['sztab', 'Sztab'], ['rozwoj', 'Rozwój']];
@@ -573,7 +574,20 @@ function staffTab(game) {
       <div class="tr-q"><b>${s.q}</b>${meter(s.q, 20, s.q >= 14 ? 'ok' : s.q >= 8 ? 'mid' : 'bad')}<small>${esc(staffLabel(s.q))}</small></div>
       <p>${esc(eff[k](s.q))}</p>
     </section>`;
-  }).join('')}</div>`;
+  }).join('')}</div>${reportSetting(game)}`;
+}
+
+/** Częstotliwość okresowego raportu asystenta o drużynie (src/career/assistantReport.js). */
+function reportSetting(game) {
+  const st = ensureAssistantReport(game);
+  const chips = Object.entries(REPORT_FREQS).map(([k, f]) => `<button class="chip" data-act="tr-arep" data-v="${k}" aria-pressed="${st.freq === k}">${esc(f.label)}</button>`).join('');
+  const next = nextReportDate(game);
+  return `<section class="tr-card tr-arep" data-t="info" aria-labelledby="tr-arep-h">
+    <header class="tr-card__head"><h3 id="tr-arep-h">Raport asystenta o drużynie</h3>${st.sentOn ? `<span class="tr-card__badge">ostatni ${esc(shortDate(st.sentOn))}</span>` : ''}</header>
+    <p>Atmosfera w szatni, obciążenia i odpoczynek, ryzyko urazów, rozmowy i rozwój młodych. Im lepszy asystent, tym więcej zauważy i dokładniej oceni.</p>
+    <div class="chips chips--wrap" role="group" aria-label="Częstotliwość raportu">${chips}</div>
+    <p class="muted">${next ? `Kolejny raport ok. ${esc(fmtDate(next))}; w dniu meczu raport czeka do następnego dnia.` : 'Raport wyłączony.'} Raport o zawodniku: prawy przycisk albo przytrzymanie na zawodniku, Raport asystenta.</p>
+  </section>`;
 }
 
 // ------------------------------------------------------------ Rozwój i zgranie
@@ -854,6 +868,7 @@ export function handleTrainingAction(game, act, ds = {}) {
     case 'tr-resetweek': return { ui: {}, save: resetWeek(game, ds.date) };
     case 'tr-accent': if (ACCENTS[ds.v]) T.settings.accent = ds.v; return { ui: {}, save: true };
     case 'tr-load': if (LOAD_LEVELS[ds.v]) T.settings.load = ds.v; return { ui: {}, save: true };
+    case 'tr-arep': return { ui: {}, save: setReportFreq(game, ds.v) };
     case 'tr-player': return { ui: { trPlayer: ds.id }, save: false };
     case 'tr-pback': return { ui: { trPlayer: null }, save: false };
     case 'tr-report': return { ui: { trReport: Number(ds.i) }, save: false };

@@ -289,3 +289,35 @@ W sezonie 2026/27 nie ma potwierdzonych sparingów Polski. Okna IX/X i XI 2026 w
 - https://www.unionesarda.it/en/italy39-s-under-21-team-crushes-poland-6-2-and-qualifies-for-euro-2027-e5lycqix
 - https://www.flashscore.pl/wiadomosci/kadra-u21-jedzie-na-euro-grekom-brak-o-jednej-bramki-by-stracic-nas-do-barazy/4nvAjWdk/
 - https://insideworldfootball.com/?p=159101
+
+## Reprezentacje spoza Europy: CONMEBOL, CONCACAF, OFC (Nov 13, 2026)
+
+Plik danych `src/data/reprezentacje_swiat.json` (generator `tools/federacje_gen.cjs`), w pamięci gry `src/season/worldNations.js`: `FEDERATIONS`, `WORLD_NT`, `worldTeam(kod)`, `federationTeams(konf, { zone, onlyFifa })`, `topTeams(konf, n)`. `ntName` i `ntTeam` w `national.js` znają też te reprezentacje. Podstawa pod mistrzostwa kontynentalne w tle (Copa América, Złoty Puchar CONCACAF, Liga Narodów CONCACAF, Puchar Narodów Oceanii).
+
+- **CONMEBOL (10):** wszyscy członkowie.
+- **CONCACAF (41):** strefa północnoamerykańska NAFU (3), środkowoamerykańska UNCAF (7), karaibska CFU (31). Gwadelupa, Martynika, Gujana Francuska, Saint-Martin, Sint Maarten i Bonaire należą do CONCACAF, ale nie do FIFA (`czlonekFIFA: false`).
+- **OFC (13):** 11 członków FIFA i 2 członków stowarzyszonych spoza FIFA (Kiribati, Tuvalu). Australia gra w AFC od 2006 roku.
+- **Siła:** wzór L z rozdz. 2 (ta sama skala co Europa). Elo to szacunki (eloratings.net niedostępne), z wyjątkiem krajów obecnych już w `reprezentacje.json` (Argentyna, Brazylia, Kolumbia, Ekwador, Urugwaj, Paragwaj, Wenezuela, Chile, Meksyk, USA, Kanada, Panama), które mają te same Elo i L. Gwiazdka oznacza członka spoza FIFA.
+
+| Federacja | L od najsilniejszej |
+|---|---|
+| CONMEBOL | Argentyna 16,7; Brazylia 16,1; Kolumbia 15,8; Ekwador 15,4; Urugwaj 15,3; Paragwaj 14,9; Wenezuela 13,9; Peru 13,7; Chile 13,6; Boliwia 12,8 |
+| CONCACAF | Meksyk 14,9; USA 14,7; Kanada 14,3; Panama 13,9; Kostaryka 13,4; Jamajka 13,3; Curaçao 13,0; Honduras 12,9; Haiti 12,9; Surinam 12,6; Gwatemala 12,4; Trynidad i Tobago 12,4; Salwador 12,1; Nikaragua 11,3; Martynika* 11,3; Gwadelupa* 11,2; Dominikana 11,0; Gujana 10,8; Kuba 10,7; Bermudy 10,4; Gujana Francuska* 10,2; Portoryko 10,2; Saint Kitts i Nevis 10,0; Grenada 9,9; Antigua i Barbuda 9,7; Belize 9,6; Saint Lucia 9,6; Saint Vincent i Grenadyny 9,5; Barbados 9,2; Aruba 8,9; Dominika 8,8; Saint-Martin* 8,6; Kajmany 8,4; Bahamy 8,1; Sint Maarten* 8,1; Montserrat 8,0; Bonaire* 7,7; Turks i Caicos 7,3; Brytyjskie Wyspy Dziewicze 7,2; Wyspy Dziewicze Stanów Zjednoczonych 6,9; Anguilla 6,5 |
+| OFC | Nowa Zelandia 13,1; Nowa Kaledonia 10,2; Wyspy Salomona 9,8; Fidżi 9,5; Tahiti 9,4; Vanuatu 9,0; Papua-Nowa Gwinea 8,6; Samoa 7,3; Tonga 7,0; Wyspy Cooka 6,9; Samoa Amerykańskie 6,5; Kiribati* 6,5; Tuvalu* 6,5 |
+
+Do weryfikacji przy dostępie do źródeł: aktualne Elo (eloratings.net) i ranking FIFA nowych reprezentacji (pole `rankingFIFA: null`), terminy kolejnych edycji Copa América i Pucharu Narodów Oceanii.
+
+### Afryka (CAF) i Azja (AFC), Nov 13, 2026
+
+Ten sam plik i moduł (`reprezentacje_swiat.json`, `worldNations.js`). Strefy są w polu `strefa`.
+
+- **CAF (56):** 54 członków FIFA w 6 strefach: Afryka Północna UNAF (5), Afryka Zachodnia WAFU A (9) i WAFU B (7), Afryka Środkowa UNIFFAC (8), Afryka Wschodnia CECAFA (11), Afryka Południowa COSAFA (14). Do tego Reunion i Zanzibar jako członkowie stowarzyszeni spoza FIFA.
+- **AFC (47):** 46 członków FIFA i Mariany Północne (spoza FIFA) w 5 strefach: Azja Zachodnia, czyli Bliski Wschód WAFF (12), Azja Środkowa CAFA (6), Azja Południowa SAFF (7), Azja Wschodnia EAFF (10), Azja Południowo-Wschodnia AFF z Australią (12).
+- **Azja Mniejsza:** Turcja gra w UEFA, podobnie jak Izrael, Kazachstan, Gruzja, Armenia i Azerbejdżan, więc są w `reprezentacje.json`, nie tutaj.
+- **Siła:** jak wyżej. Kraje obecne w `reprezentacje.json` (Maroko, Senegal, Egipt, Nigeria, Wybrzeże Kości Słoniowej, Algieria, Tunezja, Kamerun, Mali, RPA, Japonia, Iran, Korea Płd., Australia) mają te same Elo i L.
+- **Turnieje do rozgrywania w tle:** Puchar Narodów Afryki, Mistrzostwa Narodów Afryki (CHAN), Puchar Azji (terminy kolejnych edycji do weryfikacji).
+
+| Federacja | L od najsilniejszej (* spoza FIFA) |
+|---|---|
+| CAF | Maroko 15,6; Senegal 15,0; Egipt 14,2; Wybrzeże Kości Słoniowej 14,2; Algieria 14,0; Nigeria 14,0; Tunezja 13,6; Mali 13,6; Kamerun 13,6; RPA 13,4; Demokratyczna Republika Konga 13,3; Ghana 13,1; Republika Zielonego Przylądka 12,9; Burkina Faso 12,9; Gwinea 12,6; Gabon 12,3; Angola 12,3; Zambia 12,1; Benin 12,0; Uganda 12,0; Mauretania 11,8; Gwinea Równikowa 11,8; Libia 11,7; Madagaskar 11,7; Gambia 11,6; Gwinea Bissau 11,6; Kenia 11,6; Namibia 11,6; Togo 11,5; Tanzania 11,5; Mozambik 11,5; Zimbabwe 11,5; Sierra Leone 11,3; Kongo 11,3; Sudan 11,3; Niger 11,2; Komory 11,1; Republika Środkowoafrykańska 10,9; Malawi 10,9; Liberia 10,8; Burundi 10,8; Rwanda 10,8; Botswana 10,7; Etiopia 10,4; Lesotho 10,3; Eswatini 10,1; Czad 9,3; Sudan Południowy 9,3; Reunion* 9,3; Zanzibar* 8,9; Mauritius 8,9; Wyspy Świętego Tomasza i Książęca 8,5; Dżibuti 7,7; Erytrea 7,7; Seszele 7,7; Somalia 7,3 |
+| AFC | Japonia 15,3; Iran 14,5; Korea Płd. 14,4; Australia 14,4; Uzbekistan 13,6; Arabia Saudyjska 13,3; Jordania 13,2; Irak 13,1; Katar 12,9; Zjednoczone Emiraty Arabskie 12,8; Oman 12,5; Syria 12,3; Chiny 12,3; Bahrajn 12,1; Palestyna 12,0; Tajlandia 12,0; Wietnam 11,9; Korea Płn. 11,8; Liban 11,7; Tadżykistan 11,7; Kirgistan 11,6; Indonezja 11,6; Kuwejt 11,5; Malezja 11,2; Turkmenistan 10,8; Indie 10,8; Jemen 10,5; Hongkong 10,5; Filipiny 10,1; Mjanma 9,7; Afganistan 9,6; Tajwan 9,6; Singapur 9,6; Bangladesz 9,1; Nepal 8,5; Malediwy 8,5; Kambodża 8,1; Mongolia 7,7; Laos 7,7; Pakistan 7,1; Bhutan 6,9; Guam 6,9; Brunei 6,9; Sri Lanka 6,7; Makau 6,5; Mariany Północne* 6,5; Timor Wschodni 6,5 |

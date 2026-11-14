@@ -30,6 +30,7 @@ export const ICONS = {
   mecz: '<circle cx="12" cy="12" r="8"/><path d="M12 7l3.5 2.5-1.3 4.1H9.8L8.5 9.5zM12 4v3M20 10l-4.5-.5M17 19l-2.8-5.4M7 19l2.8-5.4M4 10l4.5-.5"/>',
   transfery: '<path d="M4 8h13l-3-3M20 16H7l3 3"/>',
   trening: '<path d="M4 18l4-4 3 3 7-8M14 9h4v4"/>',
+  klub: '<path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M9 12h6M12 9v6"/>',
 };
 
 export function icon(name) {

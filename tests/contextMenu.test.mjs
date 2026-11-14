@@ -39,7 +39,7 @@ const top = (m) => m.items.filter((x) => !x.sep).map((x) => x.label);
 const outIds = (g) => squadOf(g.world, g.clubId).map((p) => p.id).filter((id) => !g.tactics.xi.includes(id) && !g.tactics.bench.includes(id));
 
 // Akcje, które obsługuje app.js (kliknięcia data-act); prefiksy tf-, tt-, tr- mają własne handlery widoków.
-const APP_ACTS = new Set(['tab', 'tsub', 'player', 'tpick', 'tmove', 'tbench', 'tunbench', 'tcancel', 'tinfo', 'trole', 'extplayer']);
+const APP_ACTS = new Set(['tab', 'tsub', 'player', 'tpick', 'tmove', 'tbench', 'tunbench', 'tcancel', 'tinfo', 'trole', 'extplayer', 'arep']);
 const TF_ACTS = new Set(['tf-open', 'tf-offer', 'tf-loan', 'tf-negotiate', 'tf-renew', 'tf-list-own', 'tf-unlist', 'tf-keep', 'tf-release']);
 const TR_ACTS = new Set(['tr-tab', 'tr-player', 'tr-focus', 'tr-mode', 'tr-pos', 'tr-prog']);
 
@@ -78,7 +78,7 @@ test('Kadra: własny zawodnik ma profil, skład meczowy, rozmowę, trening i kon
   const p = g.world.players[g.tactics.xi[4]];
   p.contract.until = '2029-06-30';
   const m = menu(g, p.id, 'squad');
-  assert.deepEqual(top(m), ['Profil zawodnika', 'Statystyki i historia', 'Skład meczowy', 'Rozmowa indywidualna', 'Trening indywidualny', 'Przedłuż kontrakt', 'Wystaw na listę transferową', 'Rozwiąż kontrakt…']);
+  assert.deepEqual(top(m), ['Profil zawodnika', 'Raport asystenta', 'Statystyki i historia', 'Skład meczowy', 'Rozmowa indywidualna', 'Trening indywidualny', 'Przedłuż kontrakt', 'Wystaw na listę transferową', 'Rozwiąż kontrakt…']);
   assert.ok(m.items[0].primary, 'profil jak zwykłe kliknięcie wiersza');
   assert.deepEqual(m.items[0].run.steps.map((s) => s.act), ['tab', 'tsub', 'player']);
   assert.match(find(m, 'Przedłuż kontrakt').disabled, /^Rozmowy możliwe od Dec 1, 2027$/);
@@ -96,11 +96,11 @@ test('Kadra: własny zawodnik ma profil, skład meczowy, rozmowę, trening i kon
   assert.match(find(m3, 'Przedłuż kontrakt').disabled, /Wypożyczony z/);
 });
 
-test('Akademia: tylko profil i trening indywidualny', () => {
+test('Akademia: tylko profil, raport asystenta i trening indywidualny', () => {
   const g = newGame();
   const a = academyOf(g.world, g.clubId)[0];
   const m = menu(g, a.id, 'squad');
-  assert.deepEqual(top(m), ['Profil zawodnika', 'Akcent indywidualny', 'Obciążenie', 'Nauka pozycji', 'Program', 'Ustawienia treningu']);
+  assert.deepEqual(top(m), ['Profil zawodnika', 'Raport asystenta', 'Akcent indywidualny', 'Obciążenie', 'Nauka pozycji', 'Program', 'Ustawienia treningu']);
   assert.equal(m.note, 'Akademia');
 });
 
@@ -227,7 +227,7 @@ test('Trening: akcent, obciążenie i nauka pozycji jako opcje wyboru; akcje dzi
   const g = newGame();
   const p = g.world.players[g.tactics.xi[6]];
   const m = menu(g, p.id, 'training');
-  assert.deepEqual(top(m), ['Akcent indywidualny', 'Obciążenie', 'Nauka pozycji', 'Program', 'Ustawienia treningu', 'Raport rozwoju', 'Profil zawodnika', 'Rozmowa indywidualna', 'Kontrakt i transfer']);
+  assert.deepEqual(top(m), ['Akcent indywidualny', 'Obciążenie', 'Nauka pozycji', 'Program', 'Ustawienia treningu', 'Raport rozwoju', 'Profil zawodnika', 'Raport asystenta', 'Rozmowa indywidualna', 'Kontrakt i transfer']);
   assert.ok(find(m, 'Ustawienia treningu').primary);
   const rest = find(m, 'Odpoczynek');
   assert.equal(rest.checked, false);

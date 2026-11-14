@@ -37,9 +37,12 @@ import { shirtNumbers, kitColors } from './career/shirts.js';
 import { playerStatsHtml } from './ui/playerStatsView.js';
 import { renderClubView, hasClubView } from './ui/clubView.js';
 import { renderTransfers, handleTransferAction, isTransferAction } from './ui/transfersView.js';
+import { renderClubHub, handleClubAction, isClubAction } from './ui/klubView.js';
 import { renderTalks, handleTalkAction, isTalkAction } from './ui/talksView.js';
 import { ensureCareer } from './career/careerSystem.js';
-import { completeTransfer, fmtZl } from './career/transfers.js';
+import { fmtZl } from './career/transfers.js';
+import { startDeal, expectedRegistration } from './career/transferDeals.js'; // transfer jako proces (docs/transfery.md)
+import { signUserPre } from './career/preContracts.js';
 import { trustLabel } from './career/board.js';
 import { spendable, wageBill, monthSummary } from './career/finance.js';
 import { teamMorale, moraleLabel } from './career/morale.js';
@@ -50,6 +53,8 @@ import { runDecision } from './core/decisions.js';
 import { startNegotiation, renderNegotiation, handleNegotiationAction, isNegotiationAction, readNegotiationForm, refreshNegotiationHints } from './ui/negotiationView.js';
 import { bindContextTrigger, openMenu, showToast } from './ui/contextMenu.js';
 import { playerMenu } from './ui/playerMenus.js';
+import { renderAssistantReport } from './ui/assistantReportView.js';
+import { ensureAssistantReport } from './career/assistantReport.js';
 import { renderMenu, renderCareer, newCareerState, maybePlayIntro, readTheme, applyTheme, nextTheme, nameError, ageError, profileOf, randomCoach, updateCoachPreview, setFieldError, isNationality, managerName, AGE_MIN, AGE_MAX } from './ui/menuView.js';
 
 const app = document.getElementById('app');
@@ -79,6 +84,7 @@ const TABS = [
   { id: 'rozgrywki', label: 'Rozgrywki' },
   { id: 'poczta', label: 'Poczta' },
   { id: 'transfery', label: 'Transfery' },
+  { id: 'klub', label: 'Klub' },
   { id: 'trening', label: 'Trening' },
 ];
 
@@ -123,6 +129,7 @@ function ensureGameShape(g) {
   ensureTraining(g);
   ensureCareer(g);
   ensureHistory(g); // historia meczów drużyny gracza (stare zapisy: bieżący sezon z terminarza)
+  ensureAssistantReport(g); // raport asystenta: częstotliwość i dziennik urazów (stare zapisy: co 2 tygodnie)
   if (!g.inbox.length) {
     g.inbox = [];
     const today = g.date;
@@ -239,6 +246,8 @@ function renderHub() {
 }
 
 function renderTab(tab, g, club) {
+  // Raport asystenta o zawodniku (menu zawodnika): pełna strona w bieżącej zakładce
+  if (state.repOpen && g.world.players[state.repOpen]?.clubId === g.clubId) return renderAssistantReport(g, state.repOpen);
   // Profil zawodnika innego klubu (z karty transferowej albo z menu): tylko podgląd, bez danych wewnętrznych klubu
   const ext = state.extPlayer && g.world.players[state.extPlayer.id];
   if (!ext && state.extClub) return renderClubView(g, state.extClub);
@@ -250,6 +259,7 @@ function renderTab(tab, g, club) {
   if (tab === 'poczta') return renderMail(g);
   if (tab === 'trening') return renderTraining(g, state);
   if (tab === 'transfery') return state.ng ? renderNegotiation(g, state.ng) : renderTransfers(g, state);
+  if (tab === 'klub') return renderClubHub(g, state);
   if (tab === 'rozgrywki') return renderCompetitions(g, { comp: state.cComp ?? ['ekstraklasa', 'liga1', 'liga2'][club.tier - 1], view: state.cView, round: state.cRound, filter: state.uFilter, draw: state.uDraw });
   if (tab === 'kadra') {
     const sub = `<div class="subtabs" role="tablist"><button role="tab" data-act="tsub" data-s="players" aria-selected="${state.sqSub === 'players'}">Zawodnicy</button><button role="tab" data-act="tsub" data-s="tactics" aria-selected="${state.sqSub === 'tactics'}">Skład i taktyka</button><button role="tab" data-act="tsub" data-s="talks" aria-selected="${state.sqSub === 'talks'}">Rozmowy</button></div>`;
@@ -429,7 +439,7 @@ function dashBoard(g, table) {
       ${rev ? `<li><span>Ostatnia ocena, ${esc(shortDate(rev.date))}</span><b data-sign="${rev.delta > 0 ? 'up' : rev.delta < 0 ? 'down' : ''}">${rev.delta > 0 ? '+' : ''}${esc(String(rev.delta).replace('.', ','))}</b></li>` : '<li><span>Pierwsza ocena zarządu</span><b>1. dnia miesiąca</b></li>'}
       ${fans ? `<li><span>Kibice</span><b>${esc(fans)}</b></li>` : ''}
     </ul>`;
-  return dashPanel('board', 'board', 'Zarząd', body, dashLink('transfery', 'Zarząd', 'zarzad'));
+  return dashPanel('board', 'board', 'Zarząd', body, dashLink('klub', 'Zarząd', 'zarzad'));
 }
 
 function dashFinance(g) {
@@ -452,7 +462,7 @@ function dashFinance(g) {
       <small>${bill > c.wageBudget ? `ponad budżet ${esc(fmtZl(c.wageBudget))}` : `z budżetu ${esc(fmtZl(c.wageBudget))}`}</small>
     </div>
     <p class="dash-note">Bilans miesiąca: <span data-sign="${month.net > 0 ? 'up' : month.net < 0 ? 'down' : ''}">${esc(signedZl(month.net))}</span></p>`;
-  return dashPanel('fin', 'fin', 'Finanse', body, dashLink('transfery', 'Finanse', 'finanse'));
+  return dashPanel('fin', 'fin', 'Finanse', body, dashLink('klub', 'Finanse', 'finanse'));
 }
 
 function dashWindow(g) {
@@ -748,6 +758,8 @@ async function runDays() {
   const g = state.game;
   state.running = true;
   renderHub();
+  const squadKey = () => (g.world?.clubs?.[g.clubId]?.squad ?? []).join(',');
+  const squadBefore = squadKey(); // transakcje w toku kończą się w pętli dni (career/transferDeals.js)
   let reason = 'limit';
   for (let i = 0; i < 120 && state.running; i++) {
     const r = continueUntilStop(g, { maxDays: 1 });
@@ -762,6 +774,7 @@ async function runDays() {
     if (r.reason !== 'limit') { reason = r.reason; break; }
   }
   state.running = false;
+  if (squadKey() !== squadBefore) afterSquadChange(g);
   // Po Dalej zawsze Pulpit (nowe wiadomości i decyzje widać w panelu Poczta i w pasku decyzji na Pulpicie)
   if (reason === 'message' || reason === 'decision') { state.tab = 'pulpit'; state.fx = null; state.extPlayer = null; state.extClub = null; state.mailOpen = null; }
   await save();
@@ -931,6 +944,7 @@ async function newGame(slot, clubId, profile = null) {
   state.game = game;
   state.slot = slot;
   state.nc = null;
+  state.repOpen = null;
   await save();
   state.screen = 'hub';
   state.tab = 'pulpit'; // po podpisaniu kontraktu start na Pulpicie
@@ -956,6 +970,13 @@ async function dispatchAct(el, { root = app } = {}) {
     render();
     return;
   }
+  if (isClubAction(act) && state.game) {
+    const r = handleClubAction(state.game, act, el.dataset, root);
+    Object.assign(state, r.ui ?? {});
+    if (r.save) await save();
+    render();
+    return;
+  }
   if (isTransferAction(act) && state.game) {
     const r = handleTransferAction(state.game, act, el.dataset, root);
     Object.assign(state, r.ui ?? {});
@@ -972,11 +993,13 @@ async function dispatchAct(el, { root = app } = {}) {
   if (isNegotiationAction(act) && state.game && state.ng) {
     const r = handleNegotiationAction(state.game, state.ng, act, el.dataset, readNegotiationForm(app));
     const d = r.done;
-    if (d?.accepted && d.kind === 'sign') {
+    if (d?.accepted && d.kind === 'sign' && d.pre) {
+      state.tfMsg = signUserPre(state.game, d.playerId, d.contract).text; // umowa od 1 lipca (career/preContracts.js)
+    } else if (d?.accepted && d.kind === 'sign') {
       const p = state.game.world.players[d.playerId];
-      completeTransfer(state.game, { playerId: d.playerId, to: state.game.clubId, fee: d.fee ?? 0, contract: d.contract, kind: d.fromClub ? 'transfer' : 'free' });
-      afterSquadChange(state.game);
-      state.tfMsg = `${p.name} podpisał kontrakt.`;
+      // Po rozmowach: testy medyczne i zgłoszenie (zakładka Transfery, W toku)
+      const deal = startDeal(state.game, { playerId: d.playerId, to: state.game.clubId, fee: d.fee ?? 0, contract: d.contract, kind: d.fromClub ? 'transfer' : 'free', stage: 'medical' });
+      state.tfMsg = deal ? `${p.name} zgodził się na warunki. Teraz testy medyczne, zgłoszenie spodziewane ${fmtDate(expectedRegistration(deal))}.` : `${p.name} jest już w trakcie innej transakcji.`;
     } else if (d?.accepted) state.tfMsg = 'Kontrakt przedłużony.';
     state.ng = r.ng; // null = powrót do Transferów
     if (r.save || d) await save();
@@ -1046,7 +1069,7 @@ async function dispatchAct(el, { root = app } = {}) {
       await new Promise((r) => setTimeout(r, matchMedia('(prefers-reduced-motion: reduce)').matches ? 150 : 450)); // podpis widoczny przed generowaniem świata
       await newGame(nc.slot, nc.clubId, profileOf(nc));
     }
-    if (act === 'tab') { state.tab = el.dataset.tab; state.mailOpen = null; state.playerOpen = null; state.fx = null; state.extPlayer = null; state.extClub = null; if (el.dataset.sub) state.tfTab = el.dataset.sub; render(); }
+    if (act === 'tab') { state.tab = el.dataset.tab; state.mailOpen = null; state.playerOpen = null; state.repOpen = null; state.fx = null; state.extPlayer = null; state.extClub = null; if (el.dataset.sub) { if (state.tab === 'klub') state.kTab = el.dataset.sub; else state.tfTab = el.dataset.sub; } render(); }
     // Terminarz i wyniki (Pulpit > Pokaż wszystko): sezon, rozgrywki, miejsce meczu
     if (act === 'fixtures') { state.tab = 'pulpit'; state.fx = { season: null, comp: 'all', venue: 'all' }; render(); window.scrollTo({ top: 0 }); app.querySelector('.fxs h2')?.setAttribute('tabindex', '-1'); app.querySelector('.fxs h2')?.focus({ preventScroll: true }); }
     if (act === 'fxback') { state.fx = null; render(); app.querySelector('[data-act="fixtures"]')?.focus(); }
@@ -1094,6 +1117,8 @@ async function dispatchAct(el, { root = app } = {}) {
     if (act === 'sqsort') { const k = el.dataset.k; state.sqSort = state.sqSort?.k === k ? { k, dir: state.sqSort.dir === 'desc' ? 'asc' : 'desc' } : { k, dir: k === 'name' || k === 'pos' ? 'asc' : 'desc' }; render(); }
     if (act === 'player') { state.playerOpen = el.dataset.id; render(); window.scrollTo({ top: 0 }); }
     if (act === 'squadback') { state.playerOpen = null; render(); }
+    if (act === 'arep') { state.repOpen = el.dataset.id; render(); window.scrollTo({ top: 0 }); }
+    if (act === 'arepback') { state.repOpen = null; render(); }
     if (act === 'extplayer') {
       const id = el.dataset.id; const pl = state.game?.world.players[id];
       if (pl && pl.clubId === state.game.clubId) { state.extPlayer = null; state.tab = 'kadra'; state.sqSub = 'players'; state.playerOpen = id; }
@@ -1140,13 +1165,13 @@ async function dispatchAct(el, { root = app } = {}) {
       g.inbox = resolveMessage(g.inbox, el.dataset.id, el.dataset.a);
       const extra = runDecision(g, m, el.dataset.a);
       if (extra.length) g.inbox = addMessages(g.inbox, extra).inbox;
-      if (m?.refs?.kind === 'incomingOffer' || m?.refs?.kind === 'jobOffer') afterSquadChange(g);
+      if (m?.refs?.kind === 'incomingOffer' || m?.refs?.kind === 'jobOffer' || m?.refs?.kind === 'moveWish' || m?.refs?.kind?.startsWith('loan')) afterSquadChange(g); // loan*: wypożyczenia (career/loans.js)
       await save(); render();
     }
     if (act === 'load' || act === 'continue') {
       const rec = await store.loadSlot(slot);
       if (!rec) throw new Error('Ten slot jest pusty.');
-      state.game = ensureGameShape(rec.game); state.slot = slot; state.screen = 'hub'; state.tab = 'pulpit'; state.confirmDel = null; render();
+      state.game = ensureGameShape(rec.game); state.slot = slot; state.screen = 'hub'; state.tab = 'pulpit'; state.confirmDel = null; state.repOpen = null; render();
     }
     // Usunięcie zapisu: potwierdzenie w wierszu slotu (bez okna przeglądarki)
     if (act === 'delete') { state.confirmDel = slot; state.menuFocus = `[data-act="deleteNo"][data-slot="${slot}"]`; render(); }

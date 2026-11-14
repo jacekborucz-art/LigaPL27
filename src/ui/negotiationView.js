@@ -15,6 +15,7 @@ import { anyClub } from '../season/season.js';
 import { DOMESTIC } from '../config/calendar2026.js';
 import { POS_NAMES } from '../data/attributes.js';
 import { Rng, clamp } from '../core/rng.js';
+import { contractIssues, recordVeto, appealStatus, appealVeto, boardCaps } from '../career/boardRequests.js';
 import { esc, fmtDate } from './dom.js';
 
 export const isNegotiationAction = (act) => typeof act === 'string' && act.startsWith('ng-');
@@ -98,17 +99,18 @@ export function negotiationContext(game, { kind, player, club, fromClub, rival =
 // ------------------------------------------------------------ Oferta (szkic w formularzu)
 function emptyLimits(limits = {}) {
   const num = (v) => (Number.isFinite(v) && v >= 0 ? v : Infinity);
-  return { maxWage: num(limits.maxWage), maxSignOn: num(limits.maxSignOn) };
+  return { maxWage: num(limits.maxWage), maxSignOn: num(limits.maxSignOn), board: limits.board ?? null };
 }
 
 function defaultDraft(player, view, limits, hasAgent, club) {
   const age = player.age ?? 25;
   let wage = player.contract?.wage || player.wage || marketWage(player.ovr ?? 10, club.tier ?? 1);
   if (wage > limits.maxWage) wage = floorTo(limits.maxWage, 100);
+  if (limits.board && wage > limits.board.wage) wage = floorTo(limits.board.wage, 100); // próg zarządu (weto)
   wage = roundTo(wage, 100);
   return normalizeOffer({
     wage,
-    years: age <= 23 ? 4 : age <= 29 ? 3 : age <= 32 ? 2 : 1,
+    years: Math.min(age <= 23 ? 4 : age <= 29 ? 3 : age <= 32 ? 2 : 1, limits.board?.years ?? MAX_YEARS),
     role: view.expectedRole,
     agentFee: hasAgent ? roundTo(0.07 * wage * 52, 1000) : 0, // rynkowy standard prowizji
   });
@@ -152,6 +154,18 @@ export function offerIssues(ng, draft = ng.draft) {
   return out;
 }
 
+/** Naruszenia progów zarządu (weto): ofertę można wysłać, ale zarząd jej nie zatwierdzi. Lista { code, text }. */
+export function boardIssues(ng, draft = ng.draft) {
+  return ng.limits?.board ? contractIssues(ng.limits.board, draft) : [];
+}
+
+/** Opis progów zarządu w formularzu. */
+function boardLine(B) {
+  if (!B) return '';
+  const parts = [`pensja do ${formatZl(B.wage)} tygodniowo`, `kontrakt najwyżej na ${yearsLabel(B.years)}`, `łączny koszt do ${formatZl(B.total)}`];
+  return B.override ? `Zarząd po odwołaniu zgodził się na te warunki (do ${fmtDate(B.override.until)}).` : `Zarząd zatwierdzi: ${parts.join(', ')}.`;
+}
+
 /** Oferta słowami (kwestia gracza w rozmowie i podsumowanie kontroferty). */
 export function offerSummary(o) {
   const parts = [`${formatZl(o.wage)} tygodniowo`, yearsLabel(o.years), `rola: ${ROLE_LABELS[o.role]}`];
@@ -177,7 +191,7 @@ export function offerSummary(o) {
  * save: true, gdy odmowa zmieniła zawodnika (odmowa przedłużenia zapisuje renewRefused).
  */
 export function startNegotiation(game, opts = {}) {
-  const { kind = 'sign', playerId, limits = {}, fee = 0, rival = null, relegationRisk } = opts;
+  const { kind = 'sign', playerId, limits = {}, fee = 0, rival = null, relegationRisk, pre = false, stayBonus = 0 } = opts;
   const player = game.world?.players?.[playerId];
   if (!player) return { ok: false, reason: 'noPlayer', text: 'Nie ma takiego zawodnika.', save: false };
   const club = resolveClub(game.clubId);
@@ -188,6 +202,7 @@ export function startNegotiation(game, opts = {}) {
 
   const fromClub = kind === 'sign' ? resolveClub(opts.fromClub ?? null) : null;
   const ctx = negotiationContext(game, { kind, player, club, fromClub, rival, relegationRisk });
+  if (stayBonus) { ctx.stayBonus = stayBonus; ctx.forceRenew = true; } // podwyżka przy prośbie o transfer (career/moveWish.js)
   const rng = new Rng(`${game.seed}:ng:${playerId}:${game.date}`);
   const r = openNegotiation({ kind, player, club, fromClub, date: game.date, rng, mode: 'player', ctx });
   if (!r.ok) {
@@ -200,13 +215,13 @@ export function startNegotiation(game, opts = {}) {
   const L = emptyLimits(limits);
   const hasAgent = s.d.agentType !== 'brak';
   const ng = {
-    kind, playerId, fromClub: fromClub?.id ?? null, fromClubName: fromClub?.name ?? null, fee: Math.max(0, fee || 0),
+    kind, playerId, fromClub: fromClub?.id ?? null, fromClubName: fromClub?.name ?? null, fee: pre ? 0 : Math.max(0, fee || 0), pre: !!pre,
     clubId: club.id, clubName: club.name, date: game.date,
     session: s, limits: L, hasAgent,
     draft: defaultDraft(player, view, L, hasAgent, club),
     log: [],
     counter: null, counterType: null, demand: null,
-    error: null, notice: null, done: null,
+    error: null, notice: null, done: null, veto: null,
   };
   pushLine(ng, r.opening);
   return { ok: true, ng };
@@ -251,6 +266,14 @@ export function handleNegotiationAction(game, ng, act, dataset = {}, form = null
       return propose(game, ng, 'Przyjmuję te warunki.');
     case 'ng-propose':
       return propose(game, ng, null);
+    case 'ng-appeal': {
+      // Odwołanie od weta zarządu (raz na zawodnika w oknie, najwyżej dwa w sezonie)
+      const r = appealVeto(game, ng.playerId, game.date);
+      if (r.approved) ng.limits.board = boardCaps(game, game.clubId, game.world.players[ng.playerId], ng.kind);
+      ng.veto = null;
+      if (r.approved) ng.notice = r.text; else ng.error = r.text;
+      return { ng, done: null, save: r.ok };
+    }
     case 'ng-bluff': {
       if (!s.view().canCallBluff) return stay();
       pushMe(ng, 'Proszę pokazać tę ofertę. Nie wierzę, że istnieje.');
@@ -289,6 +312,15 @@ function propose(game, ng, meText) {
     ng.error = `${issues.join(' ')} Oferty nie można wysłać.`;
     return { ng, done: null, save: false };
   }
+  // Weto zarządu: oferta ponad progi nie trafia do zawodnika, zarząd pisze list (można się odwołać)
+  const veto = boardIssues(ng);
+  if (veto.length) {
+    const v = recordVeto(game, { playerId: ng.playerId, kind: 'contract', issues: veto, offer: ng.draft, date: game.date });
+    ng.error = v.text;
+    ng.veto = { appeal: appealStatus(game, ng.playerId, game.date).ok };
+    return { ng, done: null, save: true };
+  }
+  ng.veto = null;
   const s = ng.session;
   pushMe(ng, meText ? `${meText} ${offerSummary(ng.draft)}.` : `Proponuję: ${offerSummary(ng.draft)}.`);
   const res = s.propose(ng.draft);
@@ -310,7 +342,7 @@ function finish(game, ng) {
   ng.demand = null;
   ng.done = {
     accepted: !!outcome?.accepted, outcome, contract: outcome?.contract ?? null,
-    kind: ng.kind, playerId: ng.playerId, fromClub: ng.fromClub, fee: ng.fee,
+    kind: ng.kind, playerId: ng.playerId, fromClub: ng.fromClub, fee: ng.fee, pre: !!ng.pre,
   };
   return { ng, done: ng.done, save: true };
 }
@@ -340,9 +372,10 @@ export function refreshNegotiationHints(root, ng) {
   if (!ng || ng.done) return;
   const form = readNegotiationForm(root);
   if (!form) return;
-  const issues = offerIssues(ng, mergeDraft(ng.draft, form));
+  const draft = mergeDraft(ng.draft, form);
+  const issues = offerIssues(ng, draft);
   const box = root.querySelector('[data-ng-warn]');
-  if (box) box.innerHTML = warnHtml(issues);
+  if (box) box.innerHTML = warnHtml(issues) + boardWarnHtml(boardIssues(ng, draft));
   const btn = root.querySelector('[data-act="ng-propose"]');
   if (btn) btn.disabled = issues.length > 0;
 }
@@ -350,6 +383,10 @@ export function refreshNegotiationHints(root, ng) {
 // ------------------------------------------------------------ Widok
 const warnHtml = (issues) => (issues.length
   ? `<p class="notice notice--err ng-warn">${esc(issues.join(' '))} Oferty nie można wysłać.</p>`
+  : '');
+
+const boardWarnHtml = (issues) => (issues.length
+  ? `<p class="notice ng-board" data-veto>Zarząd zawetuje tę ofertę: ${esc(issues.map((x) => x.text).join(' '))}</p>`
   : '');
 
 function fact(label, value, tone = '') {
@@ -363,8 +400,9 @@ function header(game, ng, player, view) {
   const c = player.contract;
   const contractLine = ng.kind === 'renew'
     ? (c ? `Obecny kontrakt: ${formatZl(c.wage)} tygodniowo do ${fmtDate(c.until)}` : 'Bez kontraktu')
-    : ng.fromClub && c ? `Kontrakt w obecnym klubie: ${formatZl(c.wage)} tygodniowo do ${fmtDate(c.until)}` : 'Wolny zawodnik: bez kwoty odstępnego';
-  const title = ng.kind === 'renew' ? 'Przedłużenie kontraktu' : 'Rozmowy o transferze';
+    : ng.pre && c ? `Kontrakt w obecnym klubie kończy się ${fmtDate(c.until)}. Nowa umowa od ${fmtDate(`${c.until.slice(0, 4)}-07-01`)}, bez kwoty odstępnego.`
+      : ng.fromClub && c ? `Kontrakt w obecnym klubie: ${formatZl(c.wage)} tygodniowo do ${fmtDate(c.until)}` : 'Wolny zawodnik: bez kwoty odstępnego';
+  const title = ng.kind === 'renew' ? 'Przedłużenie kontraktu' : ng.pre ? 'Umowa od 1 lipca (prekontrakt)' : 'Rozmowy o transferze';
   return `
   <header class="panel ng-head">
     <div class="ng-who">
@@ -401,12 +439,14 @@ function counterCard(ng) {
   if (!ng.counter || ng.done) return '';
   const c = ng.counter;
   const over = offerIssues(ng, c);
+  const veto = boardIssues(ng, c);
   const title = ng.counterType === 'ultimatum' ? 'Ultimatum' : ng.counterType === 'demand' ? 'Żądanie' : 'Kontroferta';
   const dem = ng.demand ? `<p class="muted">Chodzi o: ${esc(DEMAND_LABELS[ng.demand.element] ?? ng.demand.element)}.</p>` : '';
   return `<div class="ng-counter" data-type="${esc(ng.counterType ?? '')}">
     <h4>${esc(title)}</h4>${dem}
     <p>${esc(offerSummary(c))}</p>
     ${over.length ? `<p class="notice notice--err">${esc(over.join(' '))} Tych warunków nie można przyjąć.</p>` : ''}
+    ${!over.length && veto.length ? `<p class="notice ng-board">Zarząd nie zatwierdzi tych warunków: ${esc(veto.map((x) => x.text).join(' '))}</p>` : ''}
     <div class="ng-actions">
       <button class="btn btn--primary" data-act="ng-take" ${over.length ? 'disabled' : ''}>Przyjmij te warunki</button>
       <button class="btn btn--quiet" data-act="ng-fill">Wpisz do formularza</button>
@@ -438,6 +478,7 @@ function offerForm(ng, view) {
   return `<section class="panel ng-offer" aria-label="Twoja oferta">
     <h3>Twoja oferta</h3>
     <p class="ng-limits">Limit klubu: ${esc(lim)}.</p>
+    ${L.board ? `<p class="ng-limits ng-limits--board">${esc(boardLine(L.board))}</p>` : ''}
     <div class="ng-form" data-ng-form role="group" aria-label="Warunki oferty">
       <div class="ng-field ng-field--wage">
         <label for="ng-f-wage">Pensja tygodniowa (zł)</label>
@@ -462,9 +503,10 @@ function offerForm(ng, view) {
       </div>
       ${ng.hasAgent ? numField('agentFee', 'Prowizja agenta (zł)', d.agentFee, { step: 1000 }) : ''}
     </div>
-    <div data-ng-warn aria-live="polite">${warnHtml(issues)}</div>
+    <div data-ng-warn aria-live="polite">${warnHtml(issues)}${boardWarnHtml(boardIssues(ng))}</div>
     <div class="ng-actions">
       <button class="btn btn--primary" data-act="ng-propose" ${issues.length ? 'disabled' : ''}>Złóż ofertę</button>
+      ${ng.veto?.appeal ? '<button class="btn btn--quiet" data-act="ng-appeal">Odwołaj się od weta zarządu</button>' : ''}
       ${view.canCallBluff ? '<button class="btn btn--quiet" data-act="ng-bluff">Sprawdź blef</button>' : ''}
       <button class="btn btn--quiet" data-act="ng-walk">Zakończ rozmowy</button>
     </div>
@@ -491,7 +533,8 @@ function outcomePanel(ng) {
   if (accepted && contract) {
     const note = ng.kind === 'renew'
       ? 'Nowy kontrakt obowiązuje od dziś. Zawodnik pamięta obietnicę roli.'
-      : 'Zawodnik zgodził się na warunki. Transfer domyka klub.';
+      : ng.pre ? 'Zawodnik zgodził się na warunki. Umowa zacznie obowiązywać 1 lipca, do tego czasu gra w swoim klubie.'
+        : 'Zawodnik zgodził się na warunki. Transfer domyka klub.';
     return `<section class="panel ng-result" data-result="ok" aria-label="Wynik rozmów">
       <h3>Porozumienie</h3>
       <p>${esc(note)}</p>

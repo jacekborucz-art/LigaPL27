@@ -84,11 +84,13 @@ export function willingnessToJoin(ctx) {
   // Jak bardzo zawodnik "przerasta" klub docelowy. Weterani patrzą mniej na reputację, a bardziej na pieniądze.
   const ageW = player.age >= 31 ? 0.6 : player.age <= 23 ? 0.85 : 1;
   const ambW = player.persona === 'Ambitny' ? 1.4 : player.persona === 'Spokojny' ? 0.8 : 1;
-  const gap = (player.rep - toRep) * ageW * ambW;
+  // Nastawienie D (src/career/mindset.js): długo bez klubu albo bez ofert zawodnik obniża wymagania
+  const D = clamp(player.stepDown ?? 0, 0, 1);
+  const gap = (player.rep - toRep) * ageW * ambW - 25 * D;
   const step = (toRep - fromRep) * ageW; // awans albo regres względem obecnego klubu
 
   // Twarda odmowa: klub wyraźnie poniżej poziomu zawodnika.
-  if (gap > 30) {
+  if (gap > 30 + 20 * D) {
     return {
       score: 0, verdict: 'odmowa', wageDemand: null,
       reasons: ['Nie rozważa przejścia: reputacja klubu jest dużo niższa niż jego'],
@@ -103,9 +105,10 @@ export function willingnessToJoin(ctx) {
 
   const tierDiff = (ctx.toTier ?? 1) - (ctx.fromTier ?? 1);
   if (tierDiff > 0) {
-    s -= 0.35 * tierDiff * Math.max(0.5, player.rep / 40) * ageW; // im lepszy, tym bardziej nie chce niżej
-    reasons.push('Nie chce grać w niższej lidze');
+    s -= 0.35 * tierDiff * Math.max(0.5, player.rep / 40) * ageW * (1 - D); // im lepszy, tym bardziej nie chce niżej
+    if (D < 0.6) reasons.push('Nie chce grać w niższej lidze');
   }
+  if (D >= 0.25) reasons.push(player.free ? 'Długo bez klubu, obniżył wymagania' : 'Brak ofert, obniżył wymagania');
   if (tierDiff < 0) s += 0.3;
   if (ctx.toEurope && !ctx.fromEurope) { s += 0.35; reasons.push('Kusi go gra w europejskich pucharach'); }
   if (!ctx.toEurope && ctx.fromEurope && player.rep >= 45) { s -= 0.3; reasons.push('Straciłby grę w pucharach'); }

@@ -9,7 +9,7 @@ export const K = {
   failCorner: { POZ: 0.34, SKR: 0.50, KON: 0.20, DYS: 0.40 },
   failOffside: { POZ: 0.11, SKR: 0.05, KON: 0.20, DYS: 0 },
   offsideTick: 0.032,
-  penPerAction: 0.0082, penConv: 0.78,
+  penPerAction: 0.0074, penConv: 0.78, // 0.0082 x 0.9: karnych sędziego VAR już nie odwołuje (wcześniej 10 %)
   xg: {
     POZ: [[0.62, 0.03, 0.08], [0.28, 0.09, 0.22], [0.10, 0.25, 0.55]],
     SKR: [[0.60, 0.03, 0.07], [0.32, 0.08, 0.18], [0.08, 0.22, 0.45]],
@@ -25,10 +25,14 @@ export const K = {
   homeCreate: 1.15, awayCreate: 0.90, homeCardMul: 0.88, awayCardMul: 1.15,
   ogPerMatch: 0.08,
   injTick: 4.3e-4, injContact: 0.004, // kontakt 0.012 -> 0.004: ok. 0,45 urazu widocznego w meczu (cel ok. 0,4)
-  // VAR (ekspert_sedzia A4): anulowany gol, karny odwołany, karny podyktowany po VAR (na nieudaną akcję
-  // w polu karnym), czerwona dodana po VAR (na żółtą za faul), czerwona zmieniona na żółtą, druga żółta cofnięta
-  varGoalCancel: 0.04, varPenAdd: 0.0015, varPenCancel: 0.10, varRedAdd: 0.008, varRedCancel: 0.08, varSecondYellowCancel: 0.03,
+  // VAR (ekspert_sedzia A4): anulowany gol (nigdy z karnego), karny podyktowany po VAR (po proteście w polu karnym),
+  // czerwona dodana po VAR (na żółtą za faul), czerwona zmieniona na żółtą, druga żółta cofnięta.
+  // Karnego podyktowanego przez sędziego VAR nie odwołuje.
+  varGoalCancel: 0.04, varRedAdd: 0.008, varRedCancel: 0.08, varSecondYellowCancel: 0.03,
   varGoalConfirm: 0.10, // widoczne sprawdzenie gola zakończone uznaniem [SZAC]
+  // Sytuacja w polu karnym bez gwizdka: protest zawodników, czasem analiza VAR (tyle karnych po VAR co wcześniej: 0,008 x 0,5 x 0,375 = 0,0015)
+  penClaim: 0.008, penClaimReview: 0.5, penClaimAward: 0.375,
+  varRedCheck: 0.12, // widoczne sprawdzenie bezpośredniej czerwonej zakończone utrzymaniem decyzji [SZAC]
   postShare: 0.03, // część strzałów niecelnych z dużym xG trafia w słupek lub poprzeczkę
   // Statystyki dodatkowe [SZAC] (PLAN 3.1)
   passesPerMinute: 8.6, passAcc: 0.785, goalKickOnFail: 0.2, throwInTick: 0.44, goalKickPerMiss: 0.9,

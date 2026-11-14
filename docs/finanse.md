@@ -1,6 +1,6 @@
 # Finanse klubów: realne pensje, przychody i budżety
 
-Stan: Nov 10, 2026. Dotyczy `src/data/finanse_klubow.js`, `src/career/finance.js`, `marketWage` i `estimateValue` w `src/career/negotiation.js`, `marketValue` w `src/world/playerGen.js`, finansów w `src/season/rollover.js` i `src/career/careerSystem.js`. Narzędzie kalibracji: `node tools/kalibracja-finansow.mjs [ziarna]`.
+Stan: Nov 13, 2026. Dotyczy `src/data/finanse_klubow.js`, `src/career/finance.js`, `src/career/prizes.js`, `src/career/sponsors.js`, `marketWage` i `estimateValue` w `src/career/negotiation.js`, `marketValue` w `src/world/playerGen.js`, finansów w `src/season/rollover.js` i `src/career/careerSystem.js`. Narzędzie kalibracji: `node tools/kalibracja-finansow.mjs [ziarna]`.
 
 Cel: pensje i budżety w realnej skali polskich lig (wcześniej ok. 1/6 rzeczywistości), przychody z danych konkretnych klubów, bogaci właściciele i sponsorzy, nagrody UEFA i Pucharu Polski w pełnych kwotach, gospodarka stabilna przez wiele sezonów.
 
@@ -32,11 +32,13 @@ Oznaczenia: **[SZAC]** to szacunek albo założenie balansowe. Liczby bez oznacz
 
 | Dane | Wartość | Źródło |
 |---|---|---|
-| Wypłaty Ekstraklasy SA za 2025/26 | 301 125 761 zł dla 18 klubów | https://wzabrzu.info/ekstraklasa-podzielila-ponad-301-mln-zl-gornik-zabrze-z-drugim-najwyzszym-przelewem/, https://xyz.pl/ekstraklasa-wyplacila-klubom-rekordowe-pieniadze-ponad-301-mln-zl-do-podzialu/ |
+| Wypłaty Ekstraklasy SA za 2025/26 | 301 125 761 zł dla 18 klubów, lista kwot klubów (Lech na szczycie) | https://wzabrzu.info/ekstraklasa-podzielila-ponad-301-mln-zl-gornik-zabrze-z-drugim-najwyzszym-przelewem/, https://xyz.pl/ekstraklasa-wyplacila-klubom-rekordowe-pieniadze-ponad-301-mln-zl-do-podzialu/, https://gol24.pl/ekstraklasa-sa-podzielila-3011-mln-zlotych-pomiedzy-kluby-kto-ile-dostal-lech-na-szczycie-lista/ar/c2-19139911 |
+| Struktura podziału | część stała 50 %, wynik sportowy 33,5 %, ranking historyczny 14 %, Młodzieżowiec 2,5 % | https://sportowefakty.wp.pl/pilka-nozna/1262941/rekordowe-pieniadze-ekstraklasa-zatwierdzila-budzet |
 | Część stała | 8 222 700 zł na klub (148 mln zł) | https://www.90minut.pl/news/341/news3419297-Ekstraklasa-SA-ustalila-podzial-wynagrodzen-dla-klubow-za-sezon-2025-26.html |
-| Mistrz (Lech) | 36,8 mln zł: część stała 8,2, wynik sportowy 22,6, ranking historyczny 4,4, Młodzieżowiec ok. 1 | https://www.sportmarketing.pl/finanse/114316/kluby-otrzymaly-z-ekstraklasy-ponad-300-mln-zl-za-sezon-2025-2026/ |
-| Inne kluby | Górnik 29,7, Jagiellonia 26,5, Raków 21,7, GKS Katowice 18,0, Legia 16,7, Pogoń 16,0, Piast 12,7 mln zł | https://wzabrzu.info/ekstraklasa-podzielila-ponad-301-mln-zl-gornik-zabrze-z-drugim-najwyzszym-przelewem/ |
+| Mistrz (Lech) | 36,8 mln zł: część stała 8,2, wynik sportowy 22,6, ranking historyczny 4,4, Młodzieżowiec 1,69 | https://www.sportmarketing.pl/finanse/114316/kluby-otrzymaly-z-ekstraklasy-ponad-300-mln-zl-za-sezon-2025-2026/ |
+| Inne kluby | Górnik 29,7, Jagiellonia 26,5, Raków 21,7, GKS Katowice 18,0, Legia 16,7, Zagłębie 16,04, Piast 12,7 mln zł | https://wzabrzu.info/ekstraklasa-podzielila-ponad-301-mln-zl-gornik-zabrze-z-drugim-najwyzszym-przelewem/ |
 | Spadkowicze | dodatkowa rekompensata 1 mln zł | https://www.90minut.pl/news/341/news3419297-Ekstraklasa-SA-ustalila-podzial-wynagrodzen-dla-klubow-za-sezon-2025-26.html |
+| 1 Liga 2025/26 (PZPN) | ok. 27 mln zł z praw telewizyjnych i marketingowych, średnio 1,5 mln zł na klub; bez znalezionej premii za miejsce | https://prawosportowe.pl/a/podzial-pieniedzy-dla-klubow-pilkarskich-z-tytulu-praw-marketingowych-i-telewizyjnych-w-sezonie-20252026 |
 | Umowa TV 2023/24-2026/27 (Canal+, sublicencja TVP) | ok. 1,3 mld zł za 4 sezony (ok. 325 mln zł rocznie, wyliczenie); przetarg na 2027-31 w toku | https://www.wirtualnemedia.pl/ekstraklasa-transmisje-canal-nowy-kontrakt-jaka-wartosc-warunki-umowy,7169760534394497a, https://www.sportcal.com/media/ekstraklasa-rights-for-2027-31-cycle-out-to-tender/ |
 
 ### 1.3 1 Liga 2025/26 (Grant Thornton, "Finansowa pierwsza liga 2025/2026", listopad 2026)
@@ -65,10 +67,14 @@ Uwaga: płace I drużyny z raportu Grant Thornton (koszt pracodawcy z premiami) 
 | Dane | Wartość | Źródło |
 |---|---|---|
 | Liga Mistrzów 2025/26 | faza ligowa 18,62 mln EUR, wygrana 2,1, remis 0,7, 1/8 finału 11, ćwierćfinał 12,5, półfinał 15, finał 18,5 | https://www.beinsports.com/en-us/soccer/uefa-champions-league/articles/uefa-confirms-prize-distribution-for-2025-26-champions-league-2025-08-27 |
-| Liga Europy | faza ligowa 4,31 mln EUR, wygrana 0,45, remis 0,15 | https://www.footballtransfers.com/en/transfer-news/eu-uefa-europa-league/europa-league-prize-money-2025-26 |
-| Liga Konferencji | faza ligowa 3,17 mln EUR, wygrana 0,4, remis 0,133 | https://www.footballtransfers.com/en/transfer-news/eu-uefa-conference-league/europa-conference-league-prize-money-2025-26 |
+| Liga Europy | faza ligowa 4,31 mln EUR, wygrana 0,45, remis 0,15; baraże 0,3, 1/8 finału 1,75, ćwierćfinał 2,5, półfinał 4, finał 7, zdobywca dodatkowo 6 | https://www.footballtransfers.com/en/transfer-news/eu-uefa-europa-league/europa-league-prize-money-2025-26, https://www.footballtransfers.com/en/transfer-news/football-finance/uefa-prize-money/2026/04/europa-conference-league-prize-money-2025-26 |
+| Liga Konferencji | faza ligowa 3,17 mln EUR, wygrana 0,4, remis 0,133; baraże 0,2, 1/8 finału 0,8, ćwierćfinał 1,3, półfinał 2,5, finał 4, zdobywca dodatkowo 3 | https://www.footballtransfers.com/en/transfer-news/eu-uefa-conference-league/europa-conference-league-prize-money-2025-26, https://www.footballtransfers.com/en/transfer-news/football-finance/uefa-prize-money/2026/04/europa-conference-league-prize-money-2025-26 |
+| Liga Mistrzów, kwoty za etap | faza ligowa 18,62, awans do 1/8 11, do ćwierćfinału 12,5, do półfinału 15, do finału 18,5, zdobywca dodatkowo 6,5 mln EUR (potwierdzone przez właściciela gry, Nov 13, 2026; zgodne z grą) | |
+| Wypłaty solidarnościowe UEFA | kluby odpadające w eliminacjach i kluby bez pucharów dostają wypłaty solidarnościowe; w grze 0,26 mln EUR raz w sezonie dla odpadających w eliminacjach, ok. 0,1 mln EUR dla klubu Ekstraklasy bez pucharów [SZAC] | https://www.uefa.com/news-media/news/02a7-212bf41887e6-459c11329667-1000--solidarity-payments-to-non-competing-clubs-strengthening-com/ |
 | Eliminacje UEFA | 2024/25: odpadnięcie z LK w Q1 0,15, Q2 0,35, Q3 0,55, PO 0,75 mln EUR; od 2025/26 dodatkowo 175 tys. EUR za każdą rozegraną rundę | https://editorial.uefa.com/resources/028b-1a7880138a24-7a993e2e33d1-1000/20240322_circular_2024_13_en.pdf, https://editorial.uefa.com/resources/029a-1e0b5460b86d-31e6cad26358-1000/20250616_circular_2025_32_en.pdf |
-| Puchar Polski 2025/26 | pula 10 mln zł, zdobywca 5 mln zł, finalista 1 mln zł (wcześniej 760 tys.), stawki rund wcześniejszych w propozycji zmian: 65 tys. (I runda), 95 tys. (1/16), 170 tys. zł (1/8) | https://en.wikipedia.org/wiki/2025%E2%80%9326_Polish_Cup, https://xyz.pl/puchar-polski-do-zmiany-wiecej-pieniedzy-dla-slabszych-i-nowy-system-losowania/ |
+| Puchar Polski 2025/26 | pula 10 mln zł, zdobywca 5 mln zł, finalista 1 mln zł (wcześniej 760 tys.) | https://en.wikipedia.org/wiki/2025%E2%80%9326_Polish_Cup, https://xyz.pl/puchar-polski-do-zmiany-wiecej-pieniedzy-dla-slabszych-i-nowy-system-losowania/ |
+| Puchar Polski 2026/27 | kwota łączna (netto) według najdalszej rundy: odpadnięcie w I rundzie 15 tys. zł, w 1/16 45 tys., w 1/8 90 tys., w ćwierćfinale 190 tys., w półfinale 380 tys., finalista 1 mln, zdobywca 5 mln zł | https://xyz.pl/?p=246917, https://gramgrubo.pl/puchar-polski-26-27-nagrody-ile-zarobi-zwyciezca/ |
+| Superpuchar Polski 2026 | bez stałej nagrody | |
 
 ### 1.6 Frekwencja, stadiony, transfery, właściciele
 
@@ -137,13 +143,13 @@ OVR 10 to ok. 250 tys. EUR, OVR 12 ok. 1 mln EUR, OVR 14,5 ok. 7 mln EUR; młody
 
 | Źródło | Wzór | Kiedy |
 |---|---|---|
-| Prawa TV, część stała | Ekstraklasa 8,22 mln zł + ranking historyczny 4,4 mln x (prestiż / 10)^1,5; 1 Liga 2,0 mln [SZAC]; 2 Liga 0,4 mln [SZAC] | co miesiąc 1/12 |
-| Prawa TV, wynik sportowy | Ekstraklasa 22,6 mln x 0,82^(miejsce - 1) (mistrz 22,6, 5. miejsce 10,2, 10. 3,8, 18. 0,8 mln zł) [SZAC poza mistrzem]; 1 Liga 1,5 mln x 0,85^(m-1); 2 Liga 0,3 mln x 0,85^(m-1); spadkowicze z Ekstraklasy (16.-18.) + 1 mln zł | po ostatniej kolejce |
-| Sponsorzy | 75 % komercji z danych [SZAC] | co miesiąc |
+| Prawa TV, część stała | Ekstraklasa 8,22 mln zł + ranking historyczny 4,4 mln x (prestiż / 10)^1,5; 1 Liga 1,5 mln (PZPN: 27 mln zł na 18 klubów); 2 Liga 0,4 mln [SZAC] | co miesiąc 1/12 |
+| Prawa TV, wynik sportowy | Ekstraklasa: część liniowa 5,7 mln zł za 1. miejsce, o 0,3 mln mniej za każde kolejne (najmniej 0,6 mln), plus premia 17 / 13,5 / 10 / 2,5 mln zł za miejsca 1-4 [SZAC: rozkład]. Mistrz 22,7, 2. miejsce 18,9, 3. 15,1, 4. 7,3, 5. 4,5, 10. 3,0, 18. 0,6 mln zł; razem 99,7 mln zł (33,5 % z 301,1 mln to 100,9 mln). Spadkowicze z Ekstraklasy (16.-18.) + 1 mln zł. 1 Liga: premia 0,3 / 0,2 / 0,1 mln za miejsca 1-3, 2 Liga 0,15 / 0,1 / 0,05 mln [SZAC] | po ostatniej kolejce |
+| Sponsorzy | umowy sponsorskie (rozdz. Sponsorzy); pula na start gry 75 % komercji z danych [SZAC] | co miesiąc 1/12 każdej umowy, premie po wyniku |
 | Koszulki, catering, inne | 25 % komercji [SZAC] | co miesiąc |
 | Dzień meczowy | pojemność x zapełnienie x zł na widza x ranga; zapełnienie wychodzi od realnej średniej (frekwencja / pojemność) i zmienia się z rangą meczu (puchary UEFA x1,35, Superpuchar x1,1, wczesne rundy PP x0,7, finał PP na PGE Narodowym), formą, miejscem, rywalem i derbami; ceny: UEFA x1,4, PP x0,6, finał PP x1,2 [SZAC]; sparingi x0,12 | po meczu |
 | Właściciel i dotacje | dopłata z danych / 12; skarbiec na start sezonu; pokrycie długów klubu AI | co miesiąc, 1 lipca, 1. dnia miesiąca |
-| Nagrody | UEFA w pełnych kwotach (tabela 1.5, kurs 4,25 zł/EUR); Puchar Polski: PRE 30 tys., 1/32 60 tys., 1/16 100 tys., 1/8 170 tys., ćwierćfinał 300 tys. zł [SZAC], awans do finału 1 mln zł, wygrany finał 4 mln zł (razem 5 mln zł dla zdobywcy) | po meczu |
+| Nagrody | UEFA w pełnych kwotach (tabela 1.5, kurs 4,25 zł/EUR), premia dla zdobywcy LM, LE, LK po finale; wypłata solidarnościowa UEFA 15 grudnia (odpadnięcie w eliminacjach 0,26 mln EUR, klub Ekstraklasy bez pucharów 0,1 mln EUR [SZAC]); Puchar Polski 2026/27 według najdalszej rundy (tabela 1.5, runda wstępna jak I runda [SZAC]): po każdym meczu zwycięzca dostaje przyrost do kwoty kolejnej rundy, przegrany wyrównanie do kwoty rundy, w której odpadł; Superpuchar Polski bez nagrody | po meczu |
 | Sprzedaż zawodników | odstępne | przy transferze |
 
 Po zmianie ligi komercja, frekwencja, ceny i docelowe płace przeliczają się mnożnikami (Ekstraklasa / 1 Liga / 2 Liga / III liga): komercja 1 / 0,55 / 0,3 / 0,15, frekwencja 1 / 0,75 / 0,55 / 0,4, ceny 1 / 0,7 / 0,5 / 0,4, płace 1 / 0,4 / 0,15 / 0,08 [SZAC].
@@ -168,6 +174,8 @@ Stabilność bez decyzji gracza:
 ### 3.5 API
 
 `finance.js` zachowuje wszystkie dotychczasowe eksporty (`book`, `financeDay`, `matchIncome`, `attendanceFill`, `spendable`, `wageRoom`, `wageBill`, `monthSummary`, `seasonSummary`, `FIN_LABELS`, `initClub`, `createFinance`, `stadiumCapacity`, `uefaPrize`, `PP_PRIZE`, `FIN`). Nowe: `clubPlan(club)` (roczny plan klubu: tv, merit, sponsor, other, tickets, owner, wages, ops, domestic, net, cap, att, perFan, skarbiec, ownerType, ownerName, sponsorLevel), `meritTv(tier, pos)`, `initClub(world, club, { balance, date, ai })`, `attendanceFill(f, homeRow, awayClub, homeFin)` (czwarty argument opcjonalny). Klub w `F.clubs` ma pole `plan`. Nowe rodzaje wpisów: `owner` (Właściciel i dotacje), `invest` (Spłata długów i inwestycje); etykiety dla `camps` i `fines` dla obozów i kar PZPN (kary za kibiców oraz kary dla trenera za słowa o sędziach, docs/konferencja-prasowa.md rozdz. 5). Premia za miejsce w lidze to teraz wpis `tv`, nie `prize`. Plik danych: `FINANSE_KLUBOW`, `DOMYSLNE`, `clubFinanceData(club)`, `payLevel(club)`, `EUR_PLN`. `negotiation.js`: `marketWage(ovr, tier, foreign, level)`, stałe `WAGE_BASE`, `WAGE_SLOPE`, `WAGE_MAX`, `TIER_WAGE`, `VALUE_BASE_EUR`, `VALUE_SLOPE`.
+
+Nagrody i sponsorzy (Nov 13, 2026): `FIN.MERIT[tier]` to teraz `{ first, step, min, top }` (część liniowa i premia za podium), API `meritTv(tier, pos)` bez zmian. `PP_PRIZE[runda]` to kwota łączna dla klubu, którego najdalszą rundą jest ta runda (`W`: zdobywca). `src/career/prizes.js`: `ppPrizeDue(round, won, playedEarlier)`, `bookCupPrize(F, fixtures, f)`, `bookUefaWinner(F, f)`, `uefaSolidarity(game, date)`; `uefaPrize(comp, 'W')` dla zdobywcy LM, LE, LK, `uefaPrize('SOL', 'Q' | 'NP')`. `F.solidarity` (rok sezonu z wypłatą), `F.sponsorContracts` (gdy true, `financeDay` nie księguje płaskiej kwoty sponsorów). `src/career/sponsors.js`: stan `game.sponsors`, opis w rozdz. Sponsorzy.
 
 ## 4. Kalibracja: wyniki
 
@@ -239,6 +247,55 @@ Górnik zagrał w tym przebiegu w fazie ligowej Ligi Mistrzów: 104,1 mln zł na
 
 Po 10 sezonach (lipiec 2036) salda w Ekstraklasie: Legia 183,9, Lech 113,7, Widzew 93,8, Raków 79,7, Wieczysta 42,4, Wisła Kraków 41,9, Górnik 37,2, Motor 27,5 mln zł; żaden klub nie ma ujemnego salda na starcie żadnego sezonu. Salda czołówki zatrzymują się na poziomie 100-180 mln zł (rok przychodów) zamiast rosnąć liniowo; w starym modelu Legia miała po 5 sezonach 63,8 mln zł przy gospodarce w skali 1/6, czyli w realnej skali ok. 380 mln zł i dalszy wzrost. Siła lig w `node tools/multiseason.mjs widzew 5 5` jest stabilna (średnia OVR 14 najlepszych w Ekstraklasie 11,67 na starcie, 11,82 po 5 sezonach), bez ujemnych sald.
 
+### 4.6 Nagrody i sponsorzy: przed i po (Nov 13, 2026)
+
+`node tools/kalibracja-finansow.mjs 4` daje identyczny wynik przed i po zmianie (narzędzie liczy płace, których zmiana nie dotyczy). Symulacja 3 sezonów (ziarno 5, Widzew trenera, bez decyzji gracza), przychody wszystkich klubów w mln zł:
+
+| Sezon | TV przed | TV po | Sponsorzy przed | Sponsorzy po | Przychody przed | Przychody po |
+|---|---|---|---|---|---|---|
+| 2026/27 | 373,7 | 332,4 | 501,7 | 520,0 | 1 867,2 | 1 913,7 |
+| 2027/28 | 374,3 | 332,6 | 499,4 | 539,6 | 1 804,4 | 1 768,8 |
+| 2028/29 | 373,7 | 330,5 | 500,9 | 534,6 | 1 815,5 | 1 799,3 |
+
+Podział Ekstraklasy za wynik sportowy spada z ok. 122 do 99,7 mln zł (mistrz bez zmian, środek tabeli mniej), 1 Liga traci ok. 1 mln zł na klub (1,5 mln z PZPN zamiast 2,0 mln [SZAC] i mniejszej premii za miejsce). Sponsorzy dają 4-8 % więcej niż płaska kwota: premie i atrakcyjność (puchary UEFA, trofea) podnoszą umowy czołówki. Średnie saldo klubów Ekstraklasy po sezonach: przed 29,9 / 35,7 / 34,6, po 33,0 / 35,5 / 38,0 mln zł; żaden klub nie ma ujemnego salda. Nagrody różnią się między przebiegami głównie przez wyniki w pucharach UEFA.
+
+## Sponsorzy
+
+Stan: Nov 13, 2026. Kod: `src/career/sponsors.js` (system dnia `sponsors`, po systemie kariery), widok `src/ui/sponsorsView.js` (Klub > Sponsorzy, akcja `sp-pick`), style `src/styles/klub.css`. Wszystkie liczby w tym rozdziale to [SZAC] (założenia panelu ekspertów, do kalibracji).
+
+**Pula i miejsca.** Pula sponsorów klubu to `plan.sponsor` (75 % komercji). Dzieli się na umowy według miejsc: sponsor główny na koszulce 40 % (umowy 2-5 lat), rękaw i plecy 15 % (1-3), nazwa stadionu 10 % (3-10, tylko przy stadionie od 15 tys. miejsc; klub miasta, czyli stadion miejski, dostaje połowę), dostawca strojów 10 % (3-5), pakiet partnerów 25 % (rok, odnawia się sam co lipiec). Niewykorzystana część nazwy stadionu przechodzi do pakietu partnerów. Na start gry suma umów równa się `plan.sponsor` (kalibracja bez zmian), a końce umów są rozłożone na 1-3 sezony. Umowy z początku gry w wariancie z premiami mają premie w 1/4 zwykłej wysokości, bo kwota stała jest pełna.
+
+**Umowa:** `{ id, slot, name, industry, annual, years, start, end, variant, growth, bonuses: { title, uefaLeague, cup, top3 }, relegation: { cut, terminate } }`. Firmy są fikcyjne (nazwa i branża, np. "Bank Regionalny Północ" (bank)). Co miesiąc klub dostaje 1/12 rocznej kwoty każdej umowy (wpis `sponsor`), premie trafiają do księgi jako `sponsor` z opisem "Premia sponsora: ...".
+
+**Oferta:** wartość = udział miejsca x `plan.sponsor` x A x losowo 0,92-1,08, gdzie
+
+```text
+A = 1 + 0,03 x (cel - miejsce) + 0,15 x UEFA + 0,10 x trofeum + 0,003 x (nastroje kibiców - 55), w granicach 0,75-1,40
+UEFA: 1 w fazie ligowej, 0,5 w eliminacjach; trofeum: mistrzostwo albo Puchar Polski w ostatnim sezonie
+miejsce: bieżąca tabela po 5 kolejkach, wcześniej miejsce z poprzedniego sezonu w tej samej lidze
+```
+
+| Wariant | Kwota stała | Premie (część wartości oferty) | Lata | Spadek |
+|---|---|---|---|---|
+| Stała kwota | 100 % | brak | 3 | obniżka 50 % albo zerwanie |
+| Z premiami | 75 % | mistrzostwo +40 %, faza ligowa UEFA +30 %, Puchar Polski +15 %, podium +10 % | 2 | obniżka 40 % |
+| Długoterminowa | 90 %, co roku +3 % | podium +5 % | 5 | obniżka 30 %, bez zerwania |
+
+Długość umowy mieści się w zakresie miejsca (np. rękaw najwyżej 3 lata, stroje najmniej 3).
+
+**Zdarzenia:**
+
+- Wygaśnięcie (1 lipca): gracz dostaje w poczcie ofertę z trzema wariantami (wybór w poczcie albo w zakładce Klub > Sponsorzy), ważną 14 dni; bez decyzji zarząd podpisuje stałą kwotę. Połowa ofert pochodzi od dotychczasowego sponsora. Pakiet partnerów odnawia się sam, partner dodatkowy odchodzi.
+- Awans: sponsor główny i rękaw +50 % od razu (klauzula awansu), w ciągu 14 dni oferty na wolne miejsca i umowy kończące się w tym sezonie.
+- Spadek: obniżki z klauzul; umowa z klauzulą rozwiązania zostaje zerwana z szansą 35 % (wtedy oferta na wolne miejsce); pakiet partnerów -30 %.
+- Faza ligowa UEFA albo trofeum: jedno dodatkowe zdarzenie, podwyżka u sponsora głównego o 10 % albo oferta nowego partnera (2-4 % puli).
+- Losowo: kłopoty sponsora (3 % na sezon dla każdej umowy, zerwanie przed czasem i oferta na wolne miejsce w ciągu 14 dni), nowy mały partner 1-2 razy w sezonie (1-3 % puli, rok). Najwyżej jedno zdarzenie losowe albo dodatkowe w miesiącu; wygaśnięcia, awans i spadek nie mają limitu.
+- Premie: mistrzostwo i podium po ostatniej kolejce ligi (także w 1 i 2 Lidze), Puchar Polski po finale, faza ligowa UEFA na początku miesiąca, w którym klub w niej gra; każda raz w sezonie.
+
+**Kluby AI** mają te same umowy bez widoku: oferty podpisują od razu, wariant według celu sezonu (cel do 3. miejsca: z premiami, walka o utrzymanie: długoterminowa, pozostałe: stała kwota). Wszystkie klauzule działają tak samo.
+
+**Stare zapisy:** bez `game.sponsors` umowy powstają przy pierwszym dniu albo otwarciu zakładki; jeśli w bieżącym miesiącu księga ma już płaską kwotę sponsorów, umowy zaczynają płacić od kolejnego miesiąca. Koszt: ok. 0,1 s na sezon symulacji wszystkich klubów.
+
 ## 5. Ograniczenia i dalsze kroki
 
 - Brak amortyzacji kart zawodniczych, podatków i kredytów. Realne kluby częściej mają straty; w grze nadwyżka idzie w spłatę długów i inwestycje.
@@ -250,3 +307,69 @@ Po 10 sezonach (lipiec 2036) salda w Ekstraklasie: Legia 183,9, Lech 113,7, Widz
 ## Limit kadry
 
 Odprawy i sprzedaże zarządu przy zbyt dużej kadrze (docs/limit-kadry.md) trafiają do księgi jako `release` (odprawa, zdejmowana też z budżetu transferowego) i `sales` (sprzedaż za 60 % wartości). Kluby AI płacą odprawy tylko wtedy, gdy stać je na nie (`spendable`), poza przekroczeniem maksimum kadry.
+
+## Prośby do zarządu i weto
+
+Kod: `src/career/boardRequests.js` (logika, system dnia `boardRequests`, order 51), `src/ui/boardRequestsView.js` (panel w zakładce Klub > Zarząd, prawa kolumna `.klub-side`, akcje `br-ask`, `br-appeal`), style `src/styles/klub.css` (klasy `.br-*`). Stan w zapisie: `game.board.requests` (tworzony leniwie: `log`, `conds`, `vetoes`, `overrides`, `appeals`, `goalSeason`, `ownerPaid`). Testy: `tests/boardRequests.test.mjs`. Wszystkie liczby w tym rozdziale to [SZAC].
+
+### Prośby gracza
+
+| Prośba | Kwota | Kiedy | Skutek zgody |
+|---|---|---|---|
+| Większy budżet transferowy | +10, +25, +50 % budżetu albo dowolna (przy zerowym budżecie odniesieniem jest 5 % przychodów krajowych) | w oknie transferowym albo do 30 dni przed jego otwarciem | `transferBudget` rośnie o przyznaną kwotę |
+| Większy budżet płac | +10, +25, +50 % tygodniowego budżetu płac albo dowolna | jak wyżej | `wageBudget` rośnie |
+| Przesunięcie do budżetu płac | 10, 25, 50 % budżetu transferowego (min. 100 tys. zł) | zawsze | 1 mln zł budżetu transferowego daje 1 mln / 104 zł tygodniowo w płacach; zgoda zawsze, gdy wskaźnik płac po przesunięciu mieści się w 80 % |
+| Niższy cel sezonu | o jeden poziom (np. puchary -> środek tabeli) | raz w sezonie, przed 1 listopada | nowy cel w `game.board.goal` |
+
+Częstotliwość: najwyżej jedna prośba w tygodniu i trzy w miesiącu kalendarzowym; ta sama sprawa najwcześniej po 30 dniach, po odmowie po 60, po zgodzie (pełnej albo częściowej) po 90. Budżety po zmianie sezonu liczy od nowa `initClub`, więc przyznane kwoty obowiązują do końca sezonu.
+
+Decyzja jest deterministyczna (ziarno `prosba:${seed}:${data}:${rodzaj}`):
+
+```
+S = 0,6 x (zaufanie - 50)
+  + clamp(3 x (cel - miejsce), -15, 15)           od 4. kolejki, wcześniej 0
+  + clamp(10 x ((saldo - rezerwa) / koszt - 1), -20, 15)   rezerwa = (płace + koszty klubu) / 12
+  + wskaźnik płac (tylko budżet płac): W > 0,80 -40; 0,70-0,80 -15; poniżej 0,60 +10
+  + (ambicja - 10) + 1,5 x (zasobność - 10)       cechy właściciela, src/career/owners.js
+  - 25 x kwota / obecny budżet
+  + 5 w oknie transferowym, -10 poza nim
+  + los od -5 do 5
+```
+
+Koszt dla salda: budżet transferowy w całości, płace tygodniowe razy liczba tygodni do końca sezonu (co najmniej 13). W = roczne płace I drużyny / (przychody krajowe + średnia sprzedaż zawodników z ostatnich 3 sezonów), bez dopłat właściciela; przy prośbie o płace liczony dla budżetu płac powiększonego o kwotę.
+
+Werdykt: S >= 20 zgoda; 5-20 częściowa zgoda (udział 0,3 + 0,5 x (S - 5) / 15 kwoty); od -10 do 5 zgoda warunkowa ("jeśli 1 dnia miesiąca za co najmniej 4 tygodnie drużyna będzie na N. miejscu lub wyżej, dostanie Pan 80 % kwoty"; N = cel sezonu albo obecne miejsce, jeśli lepsze; warunek sprawdza comiesięczna ocena zarządu, list z wynikiem); poniżej -10 odmowa. Przy W > 0,80 budżet płac jest możliwy tylko wtedy, gdy właściciel ma zasobność co najmniej 14 i pokrywa koszt ze skarbca (wpis `owner` w księdze, najwyżej skarbiec na sezon). Niższy cel: ten sam wzór, ale składnik tabeli z odwrotnym znakiem (zarząd łatwiej obniża cel drużynie wyraźnie pod celem), właściciel -1,5 x (ambicja - 10), stała -5 zamiast kwoty, bez składnika okna; zgoda od S >= 10, bez wariantów pośrednich.
+
+Zaufanie: odmowa -1; prośba przy zaufaniu poniżej 35 albo co najmniej 4 miejsca pod celem dodatkowo -2; niespełniony warunek -1. Zgoda na ponad 20 % budżetu podnosi cel sezonu o jedno miejsce ("pieniądze zobowiązują"). Każda odpowiedź to list w poczcie (kategoria Zarząd, nadawca i podpis "Zarząd klubu") z kwotami, powodami i datą, od której można wrócić do sprawy.
+
+Kluby AI nie piszą próśb. 2 lipca i 2 stycznia każdy klub AI ma liczone S dla +25 % budżetu transferowego (zaufanie 50, cel z siły kadry, bez limitów częstotliwości); przy S >= 20 budżet rośnie o tę kwotę.
+
+### Weto zarządu
+
+Progi (`boardCaps`), mnożone przez typ właściciela s (bogaty właściciel 1,2, oszczędny, czyli zasobność do 6, 0,9, miasto, spółka i pozostali 1,0, rezerwy 0,8):
+
+| Próg | Wartość |
+|---|---|
+| Pensja | najwyżej max(1,5 x najwyższa pensja w kadrze, 1,3 x pensja rynkowa `marketWage`) x s; bogaty i ambitny właściciel (zasobność i ambicja co najmniej 14) 1,8 zamiast 1,5; przy przedłużeniu co najmniej 1,15 x obecna pensja |
+| Pensja a budżet | najwyżej 25 % tygodniowego budżetu płac x s |
+| Koszt kontraktu | pensja x 52 x lata + premia za podpis + prowizja najwyżej 15 % rocznych przychodów krajowych x s |
+| Odstępne | weto, gdy ponad 2 x s x `estimateValue` i ponad 1 mln zł; ostrzeżenie od 1,5 x s; weto, gdy ponad 40 % przychodów krajowych x s, chyba że pokrywa to skarbiec właściciela |
+| Wiek i długość | 33+ najwyżej 1 rok, 31-32 dwa, 29-30 trzy, do 28 pięć; bramkarze o rok dłużej (maks. 5) |
+| Premia za podpis | najwyżej 50 % x s pensji z pierwszego roku |
+| Prowizja agenta | najwyżej 10 % x s wartości kontraktu (pensje) |
+
+Gdzie działa: `negotiationLimits` (src/ui/transfersView.js) zwraca progi w polu `board`; ekran rozmów pokazuje je pod limitem klubu, ostrzega przy wpisywaniu i przycina domyślną ofertę. Oferta ponad progi (także przyjęcie kontroferty) nie trafia do zawodnika: zarząd wysyła list z weta (np. "Proponowana pensja 180 tys. zł tygodniowo jest o 64 % wyższa od najwyższej w kadrze (110 tys. zł). Zaakceptujemy najwyżej 135 tys. zł.") i runda się nie liczy. `offerForPlayer` sprawdza odstępne przed odpowiedzią klubu sprzedającego (weto albo ostrzeżenie w tekście odpowiedzi).
+
+Odwołanie: raz na zawodnika w oknie (poza oknem: do otwarcia następnego), najwyżej dwa w sezonie; przycisk na ekranie rozmów, w karcie zawodnika na rynku i w panelu "Weta zarządu". Decyzja z tego samego S, w którym zamiast składnika kwoty jest -25 x przekroczenie progu (największe względne), a koszt to odstępne albo koszt kontraktu; zgoda od S >= 10. Zgoda kosztuje 3 punkty zaufania i zatwierdza dokładnie zawetowane warunki do końca okna (poza oknem na 30 dni), odmowa kosztuje 5.
+
+Kluby AI: te same progi wieku, długości, pensji i kosztu kontraktu w `aiNegotiate` (budżet `{ wage, maxYears, total }`: oferta i przyjmowana kontroferta skracane do progu), przy zakupach (`aiBuy`: odstępne ponad progi wypada z listy kandydatów), przedłużeniach (`aiRenewals`) i kupnie zawodnika gracza (`answerIncoming`). Domyślna oferta AI (4/3/2/1 rok wg wieku) już mieści się w progach, więc zmienia się głównie przyjmowanie kontrofert i pensje najlepiej opłacanych.
+
+## Infrastruktura
+
+Stadion, baza treningowa i akademia mają poziomy 1-10 (pełny opis, skala, źródła i wzory: docs/infrastruktura.md). Efekty liczą się względem poziomu startowego klubu, więc pierwszy dzień gry jest taki sam jak w modelu z rozdz. 3:
+
+- przychód z widza = naKibica x M(L) / M(L_start), pojemność = pojemność z danych + dobudowane miejsca (w czasie budowy mniej);
+- utrzymanie obiektów zastępuje część kosztów klubu: kredyt = min(utrzymanie na starcie, 0,5 x ops); co miesiąc księgowane są (ops - kredyt) / 12 jako `ops` i (kredyt + przyrost utrzymania) / 12 jako `upkeep` („Utrzymanie obiektów”) [SZAC];
+- inwestycje gracza: 20 % udziału klubu na start, reszta w ratach co miesiąc (`infra`, „Inwestycje w obiekty”); miasto i bogaty właściciel dokładają według typu właściciela [SZAC];
+- kluby AI kierują połowę corocznej kwoty `invest` (rozdz. 3.4) na projekty: licencja, baza, akademia, stadion (tylko przy zapełnieniu od 92 %), nie wyżej niż poziom 8 [SZAC];
+- licencja (Ekstraklasa: stadion od 4 i 4 500 miejsc, baza od 3, akademia od 3; 1 Liga: stadion od 3, akademia od 2; 2 Liga: stadion od 2): sezon na rozpoczęcie inwestycji, potem kara 1 mln zł (`fines`) [SZAC].

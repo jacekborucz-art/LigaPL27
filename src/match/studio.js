@@ -6,6 +6,7 @@
 // Studio nie przegląda świata: dostaje tylko dwie drużyny, ich kadry, tabelę i listę zdarzeń meczu.
 // Wartości balansowe oznaczone [SZAC]. Opis: docs/odprawy-studio.md.
 
+import { compRank } from '../season/cup.js';
 import { Rng, clamp } from '../core/rng.js';
 import { assessLineup } from '../engine/positions.js';
 import { expectedGoals, outcomeProbs, QS } from '../engine/quickSim.js';
@@ -38,7 +39,7 @@ function ycOf(p, comp = 'league') {
   if (p.yc && typeof p.yc === 'object') return p.yc[comp] ?? 0;
   return typeof p.yc === 'number' ? p.yc : 0;
 }
-const isAvailable = (p, comp) => !(injuryDaysOf(p) > 0 && !injuryPlayable(p)) && !(suspOf(p, comp) > 0) && !p.callUp && !p.onLoanOut;
+const isAvailable = (p, comp) => !(injuryDaysOf(p) > 0 && !injuryPlayable(p)) && !(suspOf(p, comp) > 0) && !p.callUp && !p.loanBlock && !p.transfer?.hold;
 const nameOf = (p) => p.name ?? String(p.id);
 /** Polska odmiana liczebników: 1 gol, 2 gole, 5 goli, 22 gole. */
 export function plural(n, one, few, many) {
@@ -86,8 +87,13 @@ export function matchRank(ctx) {
     if (late && nearDrop(home.position, home.points) && nearDrop(away.position, away.points)) bump(2, 'relegation');
     if (late && home.position <= 2 && away.position <= 2 && Math.abs((home.points ?? 0) - (away.points ?? 0)) <= 4) bump(2, 'title');
   }
-  const LABELS = { final: 'Finał', uefa: 'Mecz w pucharach UEFA', derby: 'Derby', klasyk: 'Klasyk', relegation: 'Mecz o utrzymanie', title: 'Mecz o mistrzostwo', cup: 'Mecz pucharowy' };
-  const label = tags.length ? tags.map((x) => LABELS[x]).join(', ') : 'Mecz ligowy';
+  // Puchary: ranga wg rundy i stanu dwumeczu (compRank, ta sama skala co mecze w tle i odprawa AI), derby co najmniej 2
+  const cr = comp.comp ? compRank({ comp: comp.comp, round: comp.round, ucomp: comp.ucomp, knockout: comp.firstLeg ? { firstLeg: comp.firstLeg } : null }) : null;
+  if (cr != null) level = Math.max(cr, tags.includes('derby') || tags.includes('klasyk') ? 2 : 0);
+  const LABELS = { final: 'Finał', uefa: 'Mecz w pucharach UEFA', derby: 'Derby', klasyk: 'Klasyk', relegation: 'Mecz o utrzymanie', title: 'Mecz o mistrzostwo', cup: comp.playoff ? 'Baraż o awans' : 'Mecz pucharowy' };
+  // Sparing nie jest meczem ligowym (wcześniej etykieta „Mecz ligowy” trafiała też do sparingów)
+  const fallback = comp.type === 'friendly' ? 'Sparing' : 'Mecz ligowy';
+  const label = tags.length ? tags.map((x) => LABELS[x]).join(', ') : fallback;
   return { level, label, tags };
 }
 
@@ -444,14 +450,44 @@ export function assistantReport({ user, opp, comp = 'league', stage = 'main', us
 
 // ================================================================ Oczekiwania zarządu i kibiców
 
-export function expectations({ pWin, pDraw, rank, board = {}, fans = {}, userForm, comp = 'league' }) {
+/** Czy w tych rozgrywkach gra się o punkty (liga i faza ligowa UEFA). Puchar, finał, baraż i sparing: nie. */
+export function hasPoints(competition = {}) {
+  const t = competition.type || 'league';
+  return t === 'league' || (t === 'uefa' && competition.round === 'league');
+}
+
+/**
+ * Oczekiwanie zarządu przed meczem, zależne od rozgrywek (docs/odprawy-kontekst.md). Wcześniej każdy mecz poza
+ * Pucharem Polski dostawał tekst ligowy („Zarząd liczy na trzy punkty”), także sparing, Superpuchar i dwumecz UEFA.
+ * competition: { type, stage, round, leg, playoff } jak compInfo w matchday.js.
+ */
+export function boardExpectation(pWin, competition = {}) {
+  const t = competition.type || 'league';
+  const fav = pWin >= 0.5;
+  if (t === 'friendly') return 'Zarząd nie rozlicza sparingów z wyniku. Liczy się przygotowanie drużyny.';
+  if (competition.playoff) {
+    if (competition.stage === 'final') return fav ? 'Zarząd oczekuje awansu do wyższej ligi.' : 'Zarząd liczy na walkę o awans do wyższej ligi.';
+    return fav ? 'Zarząd oczekuje awansu do finału baraży.' : 'Zarząd liczy na walkę o finał baraży.';
+  }
+  if (t === 'supercup' || competition.stage === 'final') return fav ? 'Zarząd oczekuje zdobycia trofeum.' : 'Zarząd liczy na walkę o trofeum.';
+  if (t === 'uefa') {
+    if (competition.round === 'league') return pWin >= 0.55 ? 'Zarząd liczy na komplet punktów w fazie ligowej.' : pWin >= 0.3 ? 'Zarząd liczy na punkty w fazie ligowej.' : 'Zarząd chce zobaczyć walkę z mocnym rywalem.';
+    if (competition.leg === 1) return fav ? 'Zarząd liczy na zaliczkę przed rewanżem.' : 'Zarząd liczy na wynik, który zostawi szanse w rewanżu.';
+    return fav ? 'Zarząd oczekuje awansu.' : 'Zarząd liczy na walkę o awans.';
+  }
+  if (t === 'cup') {
+    if (competition.round === 'SF') return fav ? 'Zarząd oczekuje awansu do finału.' : 'Zarząd liczy na walkę o finał.';
+    return fav ? 'Zarząd oczekuje awansu do kolejnej rundy.' : 'Zarząd liczy na walkę o awans.';
+  }
+  if (pWin >= 0.6) return 'Zarząd oczekuje pewnego zwycięstwa.';
+  if (pWin >= 0.45) return 'Zarząd liczy na trzy punkty.';
+  if (pWin >= 0.3) return 'Zarząd przyjmie remis, ale liczy na więcej.';
+  return 'Zarząd nie wymaga punktów, chce zobaczyć walkę.';
+}
+
+export function expectations({ pWin, pDraw, rank, board = {}, fans = {}, userForm, comp = 'league', competition = null }) {
   const lines = [];
-  let boardText;
-  if (comp === 'cup') boardText = pWin >= 0.5 ? 'Zarząd oczekuje awansu do kolejnej rundy.' : 'Zarząd liczy na walkę o awans.';
-  else if (pWin >= 0.6) boardText = 'Zarząd oczekuje pewnego zwycięstwa.';
-  else if (pWin >= 0.45) boardText = 'Zarząd liczy na trzy punkty.';
-  else if (pWin >= 0.3) boardText = 'Zarząd przyjmie remis, ale liczy na więcej.';
-  else boardText = 'Zarząd nie wymaga punktów, chce zobaczyć walkę.';
+  const boardText = boardExpectation(pWin, competition ?? { type: comp });
   if (rank?.tags?.includes('derby')) lines.push('Derbów się nie przegrywa. Zarząd i kibice mówią to jednym głosem.');
   if ((board.trust ?? 60) < 25) lines.push('Twoja posada jest zagrożona. Porażka może zakończyć pracę w klubie.');
   else if ((board.trust ?? 60) < 40) lines.push('Zarząd traci cierpliwość. Potrzebny jest dobry wynik.');
@@ -471,7 +507,7 @@ const HEADLINES = [
   // ---- przed meczem
   ['pre-derby-1', 'pre', 'derby', 'Derby! {home} i {away} grają o coś więcej niż trzy punkty'],
   ['pre-derby-2', 'pre', 'derby', 'Miasto żyje jednym meczem: {home} kontra {away}'],
-  ['pre-derby-3', 'pre', 'derby', 'Przed derbami: kto będzie rządził w mieście?'],
+  ['pre-derby-3', 'pre', 'derby', 'Przed derbami: kto tym razem będzie górą?'],
   ['pre-klasyk-1', 'pre', 'klasyk', 'Klasyk polskiej piłki: {home} kontra {away}'],
   ['pre-final-1', 'pre', 'final', 'Finał {comp}: {home} i {away} o krok od trofeum'],
   ['pre-final-2', 'pre', 'final', 'Jeden mecz, jedno trofeum. {home} i {away} gotowe na finał'],
@@ -523,6 +559,19 @@ const HEADLINES = [
   ['post-win-2', 'post', 'userWin', 'Trzy punkty zostają u nas. {user} górą'],
   ['post-win-3', 'post', 'userWin', 'Plan wykonany: {user} wygrywa {uScore}'],
   ['post-win-4', 'post', 'userWin', '{scorer} daje zwycięstwo drużynie {user}'],
+  ['post-trophy-1', 'post', 'trophy', 'Trofeum dla drużyny {user}: {title}'],
+  ['post-trophy-2', 'post', 'trophy', '{user} z trofeum! Wielki wieczór w historii klubu'],
+  ['post-lf-1', 'post', 'lostFinal', 'Finał przegrany. {user} bez trofeum'],
+  ['post-lf-2', 'post', 'lostFinal', '{opp} z trofeum, {user} z niedosytem'],
+  ['post-prom-1', 'post', 'promoted', 'Awans! {user} zagra w wyższej lidze'],
+  ['post-sow-1', 'post', 'shootoutWin', 'Nerwy ze stali: {user} wygrywa serię rzutów karnych {pens}'],
+  ['post-sow-2', 'post', 'shootoutWin', 'Loteria jedenastek dla drużyny {user}'],
+  ['post-sol-1', 'post', 'shootoutLoss', 'Okrutne rzuty karne. {user} przegrywa serię {pens}'],
+  ['post-sol-2', 'post', 'shootoutLoss', 'Zabrakło zimnej krwi: {opp} lepszy w serii jedenastek'],
+  ['post-adv-1', 'post', 'advance', 'Awans wywalczony: {user} w kolejnej rundzie'],
+  ['post-adv-2', 'post', 'advance', '{user} gra dalej: {title}'],
+  ['post-out-1', 'post', 'out', 'Koniec przygody: {opp} eliminuje drużynę {user}'],
+  ['post-out-2', 'post', 'out', '{user} żegna się z rozgrywkami: {title}'],
   ['post-big-1', 'post', 'bigWin', 'Pogrom! {user} rozbija rywala {uScore}'],
   ['post-big-2', 'post', 'bigWin', 'Lekcja futbolu: {user} bez litości dla rywala'],
   ['post-draw-1', 'post', 'userDraw', 'Podział punktów: {home} {score} {away}'],
@@ -551,7 +600,7 @@ const HEADLINES = [
   ['post-upw-2', 'post', 'upsetWin', 'Niespodzianka kolejki: {user} górą'],
   ['post-upl-1', 'post', 'upsetLoss', 'Wpadka faworyta. {user} traci punkty'],
   ['post-upl-2', 'post', 'upsetLoss', 'Blamaż! {opp} ogrywa faworyta'],
-  ['post-dw-1', 'post', 'derbyWin', 'Derby wygrane! {user} rządzi w mieście'],
+  ['post-dw-1', 'post', 'derbyWin', 'Derby wygrane! Kibice {user} świętują'],
   ['post-dw-2', 'post', 'derbyWin', 'Święto na trybunach: derby dla drużyny {user}'],
   ['post-dl-1', 'post', 'derbyLoss', 'Porażka w derbach boli podwójnie'],
   ['post-dl-2', 'post', 'derbyLoss', 'Derby dla rywala. {user} musi przełknąć gorycz'],
@@ -578,13 +627,45 @@ export const HEADLINE_TEMPLATES = HEADLINES;
 
 // Waga dopasowania: im ważniejsza sytuacja, tym większa szansa na nagłówek dnia. 'any' = 1, reszta domyślnie 3. [SZAC]
 const HEADLINE_PRIORITY = {
-  final: 6, derby: 6, derbyWin: 6, derbyLoss: 6, hatTrick: 6,
+  trophy: 7, promoted: 7, final: 6, derby: 6, derbyWin: 6, derbyLoss: 6, hatTrick: 6, lostFinal: 6, shootoutWin: 6, shootoutLoss: 6, advance: 5, out: 5,
   uefa: 5, relegation: 5, title: 5, klasyk: 5, comeback: 5, upsetWin: 5, upsetLoss: 5, heavyLoss: 5, bigWin: 5, lateWinner: 5,
   unluckyLoss: 4, varControversy: 4, redCard: 4, boardPressureLoss: 4, boardPressure: 4, injuryCrisis: 4,
   any: 1,
 };
 const prio = (h) => HEADLINE_PRIORITY[h.flag] ?? 3;
+
+// Ranga meczu pucharowego dla reakcji zarządu i kibiców (briefings.js kind) [SZAC]
+const TIE_WEIGHT = {
+  cupEarly: 0.6, cupQF: 0.8, cupSemi: 1, cupFinal: 1.3, supercup: 1, uefaQual: 0.9, uefaKO: 1.1, uefaSemi: 1.3,
+  uefaFinal: 1.6, uefaSuper: 1.3, playoffSemi: 1.2, playoffFinal: 1.5,
+};
+function tieVerdict(tie, so) {
+  const pens = so ? ' po rzutach karnych' : '';
+  return {
+    trophy: `Trofeum zdobyte${pens}.`, lostFinal: `Finał przegrany${pens}.`, promoted: `Awans do wyższej ligi${pens}.`,
+    adv: `Awans do kolejnej rundy${pens}.`, padv: `Awans do finału baraży${pens}.`, out: `Odpadnięcie z rozgrywek${pens}.`, pout: `Odpadnięcie z baraży${pens}.`,
+  }[tie.outcome] ?? 'Wynik oddaje przebieg meczu.';
+}
+function tieBoardText(tie, d) {
+  const o = tie.outcome;
+  if (o === 'trophy') return d >= 6 ? `Zarząd świętuje trofeum: ${tie.title}.` : `Zarząd cieszy się z trofeum: ${tie.title}.`;
+  if (o === 'promoted') return 'Zarząd świętuje awans do wyższej ligi.';
+  if (o === 'adv' || o === 'padv') return d >= 4 ? 'Zarząd jest zachwycony awansem.' : 'Zarząd jest zadowolony z awansu.';
+  if (o === 'lostFinal') return d > -2 ? 'Zarząd docenia drogę do finału, mimo porażki.' : 'Zarząd jest rozczarowany przegranym finałem.';
+  return d > -2 ? 'Zarząd przyjmuje odpadnięcie ze zrozumieniem.' : d > -5 ? 'Zarząd jest rozczarowany odpadnięciem.' : 'Zarząd jest wściekły po odpadnięciu i oczekuje wyjaśnień.';
+}
+function tieFansText(tie, d, so) {
+  const o = tie.outcome;
+  if (o === 'trophy') return so ? 'Kibice szaleją po serii rzutów karnych i świętują trofeum.' : 'Kibice świętują trofeum i śpiewają nazwisko trenera.';
+  if (o === 'promoted') return 'Miasto świętuje awans do wyższej ligi.';
+  if (o === 'adv' || o === 'padv') return so ? 'Kibice szaleją po wygranej serii rzutów karnych.' : d >= 5 ? 'Kibice świętują awans.' : 'Kibice cieszą się z awansu.';
+  if (o === 'lostFinal') return d > -3 ? 'Kibice dziękują drużynie za drogę do finału.' : 'Kibice są rozczarowani przegranym finałem.';
+  if (so) return d > -6 ? 'Kibice przeżywają odpadnięcie po rzutach karnych, ale dziękują za walkę.' : 'Kibice nie mogą przeboleć odpadnięcia po rzutach karnych. Z trybun słychać gwizdy.';
+  return d > -2 ? 'Kibice żegnają rozgrywki bez większych pretensji.' : d > -6 ? 'Z trybun słychać gwizdy po odpadnięciu.' : 'Kibice żądają zmian po odpadnięciu.';
+}
 export const HEADLINE_MEMORY = 5; // nagłówek nie wraca przez 5 meczów
+
+const NO_POINTS_RE = /punkt|kolejk/i;
 
 function fill(text, vars) {
   return text.replace(/\{(\w+)\}/g, (_, k) => vars[k]);
@@ -597,11 +678,13 @@ function canFill(text, vars) {
  * Wybór nagłówków bez powtórzeń. history: tablica tablic id (ostatnie mecze), exclude: id użyte w tym meczu.
  * Najpierw nagłówki dopasowane do sytuacji (waga 3), potem ogólne (waga 1).
  */
-export function pickHeadlines(phase, flags, vars, { history = [], exclude = [], seed = 'media', n = 3 } = {}) {
+export function pickHeadlines(phase, flags, vars, { history = [], exclude = [], seed = 'media', n = 3, points = true } = {}) {
   const recent = new Set([...history.slice(-HEADLINE_MEMORY).flat(), ...exclude]);
   const rng = new Rng(`${seed}|naglowki|${phase}`);
   const flagSet = new Set([...flags, 'any']);
-  let pool = HEADLINES.filter((h) => h.phase === phase && flagSet.has(h.flag) && !recent.has(h.id) && canFill(h.text, vars));
+  // Puchar, finał, baraż, sparing: bez nagłówków o punktach i kolejce (points: false)
+  const fits = (h) => points || !NO_POINTS_RE.test(h.text);
+  let pool = HEADLINES.filter((h) => h.phase === phase && flagSet.has(h.flag) && !recent.has(h.id) && canFill(h.text, vars) && fits(h));
   const out = [];
   while (out.length < n && pool.length) {
     // nagłówek dnia: z najważniejszej dostępnej sytuacji; kolejne losowane z wagą ważności
@@ -620,7 +703,7 @@ export function pickHeadlines(phase, flags, vars, { history = [], exclude = [], 
   if (out.length < n) {
     const old = history.flat().filter((id, i, a) => a.indexOf(id) === i);
     for (const id of old) {
-      const h = HEADLINES.find((x) => x.id === id && x.phase === phase && canFill(x.text, vars) && !exclude.includes(x.id));
+      const h = HEADLINES.find((x) => x.id === id && x.phase === phase && canFill(x.text, vars) && fits(x) && !exclude.includes(x.id));
       if (h && !out.includes(h)) out.push(h);
       if (out.length >= n) break;
     }
@@ -673,7 +756,7 @@ export function preMatchStudio(ctx) {
     user, opp, comp: compType, stage, userStrength: userIsHome ? strH : strA, oppStrength: userIsHome ? strA : strH,
   });
   const exp = expectations({
-    pWin, pDraw: odds.draw, rank, board: ctx.board, fans: ctx.fans, userForm: userIsHome ? formH : formA, comp: compType,
+    pWin, pDraw: odds.draw, rank, board: ctx.board, fans: ctx.fans, userForm: userIsHome ? formH : formA, comp: compType, competition: ctx.competition ?? null,
   });
 
   // flagi nagłówków
@@ -696,7 +779,7 @@ export function preMatchStudio(ctx) {
     home: home.name, away: away.name, user: user.name, opp: opp.name, comp: ctx.competition?.name ?? 'Pucharu',
     ref: ctx.referee?.name, oppStar: oppKey[0]?.name, h2hLeader: h2h.leader === home.id ? home.name : h2h.leader === away.id ? away.name : null,
   };
-  const headlines = pickHeadlines('pre', flags, vars, { history: ctx.headlineHistory || [], seed: `${ctx.seed ?? 'studio'}|${home.id}|${away.id}|${ctx.date}`, n: 2 });
+  const headlines = pickHeadlines('pre', flags, vars, { history: ctx.headlineHistory || [], seed: `${ctx.seed ?? 'studio'}|${home.id}|${away.id}|${ctx.date}`, n: 2, points: hasPoints(ctx.competition) });
 
   const lineupView = (lu) => lu.map(({ player, group }) => ({ id: player.id, name: nameOf(player), pos: player.pos, group, outOfPosition: GROUP[player.pos] !== group }));
   return {
@@ -741,7 +824,8 @@ function normEvent(e) {
 const VAR_TEXT = {
   goalDisallowed: 'VAR anuluje gola',
   penaltyAwarded: 'Po analizie VAR sędzia dyktuje rzut karny',
-  penaltyCancelled: 'VAR odwołuje rzut karny',
+  penaltyCancelled: 'VAR odwołuje rzut karny', // tylko w starych zapisach: karnego sędziego VAR już nie odwołuje
+  secondYellowCancelled: 'VAR anuluje drugą żółtą kartkę',
   redCard: 'Po analizie VAR czerwona kartka',
   redCancelled: 'VAR zamienia czerwoną kartkę na żółtą',
 };
@@ -860,12 +944,18 @@ export function postMatchStudio(ctx) {
   if (res === 'P' && xgd >= 0.7) verdict = 'Byliśmy lepsi, ale zabrakło skuteczności.';
   else if (res === 'W' && xgd <= -0.7) verdict = 'Zwycięstwo szczęśliwe: rywal stworzył więcej sytuacji.';
   else if (res === 'R' && Math.abs(xgd) >= 0.8) verdict = xgd > 0 ? 'Powinniśmy wygrać ten mecz.' : 'Remis to dla nas dobry wynik.';
+  // Mecz pucharowy: rozstrzygnięcie (awans, trofeum, odpadnięcie, seria rzutów karnych) zamiast oceny remisu
+  const tie = ctx.tie?.outcome ? ctx.tie : null;
+  const so = ctx.tie?.shootout ?? null; // [gracz, rywal]
+  const tieWon = tie ? !!tie.won : null;
+  if (tie) verdict = tieVerdict(tie, so);
 
   // kontrowersje: VAR, czerwone, karne
   const controversies = [];
   for (const e of events) {
     const doubt = e.wrong ? '. Powtórki sugerują błąd sędziego' : '';
     if (e.type === 'varOverturn') controversies.push({ min: e.min, kind: 'var', text: `${minLabel(e)} ${varText(e)}${doubt}.` });
+    if (e.type === 'varCheck' && e.decision === 'noPenalty') controversies.push({ min: e.min, kind: 'var', text: `${minLabel(e)} Protest w polu karnym drużyny ${names[e.side]}: VAR nie dopatrzył się przewinienia.` });
     if (e.type === 'red') controversies.push({ min: e.min, kind: 'red', text: `${minLabel(e)} ${e.name} (${names[e.side]}) wyrzucony z boiska${e.reason === 'przemoc' ? ' za brutalny faul' : e.second ? ' po drugiej żółtej kartce' : ''}${doubt}.` });
     if (e.type === 'penalty') controversies.push({ min: e.min, kind: 'penalty', text: `${minLabel(e)} Rzut karny dla drużyny ${names[e.side]}${e.wrong ? ', decyzja mocno dyskusyjna' : ''}.` });
   }
@@ -875,17 +965,37 @@ export function postMatchStudio(ctx) {
   const pWin = ctx.pre?.pWin ?? 0.4; const pDraw = ctx.pre?.pDraw ?? 0.27;
   const expPts = 3 * pWin + pDraw;
   const derby = !!rank.tags?.includes('derby');
-  let boardDelta = 3 * (pts - expPts);
-  if (derby) boardDelta += res === 'W' ? 2 : res === 'P' ? -2 : 0;
-  boardDelta = Math.round(clamp(boardDelta, -10, 10));
   const margin = gU - gO;
-  let fansDelta = 4 * (pts - expPts) + (derby ? (res === 'W' ? 4 : res === 'P' ? -4 : 0) : 0) + (margin >= 3 ? 2 : margin <= -3 ? -3 : 0);
+  const won = tie ? tieWon : res === 'W'; const lost = tie ? !tieWon : res === 'P';
+  let boardDelta; let fansDelta;
+  if (tie) {
+    // Awans, trofeum albo odpadnięcie wg rangi meczu i szans przed meczem (pAdv); seria karnych to rozstrzygnięcie, nie remis [SZAC]
+    const w = TIE_WEIGHT[tie.kind] ?? 1; const pAdv = tie.pAdv ?? 0.5;
+    if (tieWon) {
+      boardDelta = Math.max(1, 6 * (1 - pAdv) * w) + (tie.outcome === 'trophy' ? 3 : 0) + (tie.outcome === 'promoted' ? 6 : 0);
+      fansDelta = Math.max(2, 8 * (1 - pAdv) * w) + (tie.outcome === 'trophy' ? 5 : 0) + (tie.outcome === 'promoted' ? 8 : 0) + (so ? 1 : 0);
+    } else {
+      // przegrany finał: zarząd i kibice doceniają drogę do finału; seria karnych boli mniej niż porażka w meczu
+      const soft = (tie.outcome === 'lostFinal' ? 0.6 : 1) * (so ? 0.8 : 1);
+      boardDelta = -6 * pAdv * w * soft; fansDelta = -8 * pAdv * w * soft;
+    }
+  } else {
+    const k = ctx.tie?.knockout && ctx.tie.leg === 1 ? 0.6 : 1; // pierwszy mecz dwumeczu: nic jeszcze nie jest rozstrzygnięte
+    boardDelta = 3 * (pts - expPts) * k;
+    fansDelta = 4 * (pts - expPts) * k;
+  }
+  if (derby) { boardDelta += won ? 2 : lost ? -2 : 0; fansDelta += won ? 4 : lost ? -4 : 0; }
+  fansDelta += margin >= 3 ? 2 : margin <= -3 ? -3 : 0;
+  boardDelta = Math.round(clamp(boardDelta, -10, 10));
   fansDelta = Math.round(clamp(fansDelta, -15, 15));
-  const boardText = boardDelta >= 4 ? 'Zarząd jest zachwycony wynikiem.' : boardDelta >= 1 ? 'Zarząd jest zadowolony.'
-    : boardDelta > -2 ? 'Zarząd przyjmuje wynik bez emocji.' : boardDelta > -5 ? 'Zarząd jest rozczarowany.' : 'Zarząd jest wściekły i oczekuje wyjaśnień.';
-  const fansText = fansDelta >= 5 ? 'Kibice świętują i śpiewają nazwisko trenera.' : fansDelta >= 1 ? 'Kibice są zadowoleni.'
-    : fansDelta > -2 ? 'Kibice rozchodzą się bez większych emocji.' : fansDelta > -6 ? 'Z trybun słychać gwizdy.' : 'Kibice żądają zmian. Na trybunach pojawiły się obraźliwe transparenty.';
-  const mediaTone = pts - expPts >= 1.5 || margin >= 3 ? 'entuzjazm' : pts - expPts >= 0.3 ? 'uznanie' : pts - expPts > -1 ? 'neutralnie' : margin <= -3 ? 'drwina' : 'krytyka';
+  const boardText = tie ? tieBoardText(tie, boardDelta)
+    : boardDelta >= 4 ? 'Zarząd jest zachwycony wynikiem.' : boardDelta >= 1 ? 'Zarząd jest zadowolony.'
+      : boardDelta > -2 ? 'Zarząd przyjmuje wynik bez emocji.' : boardDelta > -5 ? 'Zarząd jest rozczarowany.' : 'Zarząd jest wściekły i oczekuje wyjaśnień.';
+  const fansText = tie ? tieFansText(tie, fansDelta, so)
+    : fansDelta >= 5 ? 'Kibice świętują i śpiewają nazwisko trenera.' : fansDelta >= 1 ? 'Kibice są zadowoleni.'
+      : fansDelta > -2 ? 'Kibice rozchodzą się bez większych emocji.' : fansDelta > -6 ? 'Z trybun słychać gwizdy.' : 'Kibice żądają zmian. Na trybunach pojawiły się obraźliwe transparenty.';
+  const mediaTone = tie ? (tieWon ? (['trophy', 'promoted'].includes(tie.outcome) || tie.pAdv <= 0.5 ? 'entuzjazm' : 'uznanie') : tie.pAdv >= 0.6 ? 'krytyka' : 'neutralnie')
+    : pts - expPts >= 1.5 || margin >= 3 ? 'entuzjazm' : pts - expPts >= 0.3 ? 'uznanie' : pts - expPts > -1 ? 'neutralnie' : margin <= -3 ? 'drwina' : 'krytyka';
   const MEDIA = {
     entuzjazm: 'Media rozpisują się o świetnym występie.', uznanie: 'Media chwalą zespół.', neutralnie: 'Media komentują mecz spokojnie.',
     krytyka: 'Media krytykują drużynę i trenera.', drwina: 'Media nie zostawiają na drużynie suchej nitki.',
@@ -926,7 +1036,10 @@ export function postMatchStudio(ctx) {
   }
 
   // nagłówki
-  const flags = [res === 'W' ? 'userWin' : res === 'R' ? 'userDraw' : 'userLoss'];
+  const flags = [res === 'W' ? 'userWin' : res === 'R' ? (so ? null : 'userDraw') : 'userLoss'].filter(Boolean);
+  if (so) flags.push(so[0] > so[1] ? 'shootoutWin' : 'shootoutLoss');
+  if (tie) flags.push({ trophy: 'trophy', lostFinal: 'lostFinal', promoted: 'promoted', adv: 'advance', padv: 'advance', out: 'out', pout: 'out' }[tie.outcome]);
+  if (tie && tieWon && tie.pAdv <= 0.3) flags.push('upsetWin');
   if (margin >= 3) flags.push('bigWin');
   if (margin <= -3) flags.push('heavyLoss');
   if (gH + gA === 0) flags.push('goalless');
@@ -949,16 +1062,21 @@ export function postMatchStudio(ctx) {
   const vars = {
     home: home.name, away: away.name, user: names[us], opp: names[them], score: `${gH}:${gA}`, uScore: `${gU}:${gO}`,
     scorer: scorerName, motm: motm?.name, redPlayer: redE?.name, ref: ctx.referee?.name, hatTrick, winner: res === 'W' ? names[us] : null,
+    title: ctx.tie?.title || null, pens: so ? `${so[0]}:${so[1]}` : null,
   };
   const headlines = pickHeadlines('post', flags, vars, {
-    history: ctx.headlineHistory || [], exclude: ctx.pre?.headlineIds || [], seed: `${ctx.seed ?? 'studio'}|${home.id}|${away.id}|${ctx.date}`, n: 3,
+    history: ctx.headlineHistory || [], exclude: ctx.pre?.headlineIds || [], seed: `${ctx.seed ?? 'studio'}|${home.id}|${away.id}|${ctx.date}`, n: 3, points: hasPoints(ctx.competition),
   });
   const matchIds = [...(ctx.pre?.headlineIds || []), ...headlines.map((x) => x.id)];
   const view = (t) => ({ ...t, xg: r2(t.xg) });
 
   return {
     date: formatDate(ctx.date),
-    result: { home: home.name, away: away.name, score: `${gH}:${gA}`, halftime: ht, forUser: res, label: res === 'W' ? 'Zwycięstwo' : res === 'R' ? 'Remis' : 'Porażka' },
+    result: {
+      home: home.name, away: away.name, score: so ? `${gH}:${gA}, k. ${userIsHome ? so[0] : so[1]}:${userIsHome ? so[1] : so[0]}` : `${gH}:${gA}`, halftime: ht, forUser: res,
+      decided: tie ? (tieWon ? 'W' : 'P') : res, outcome: tie?.outcome ?? null,
+      label: so ? (so[0] > so[1] ? 'Zwycięstwo po rzutach karnych' : 'Porażka po rzutach karnych') : res === 'W' ? 'Zwycięstwo' : res === 'R' ? 'Remis' : 'Porażka',
+    },
     keyMoments: keyMoments(events, names),
     motm: motm ? { id: motm.id, name: motm.name, team: names[motm.side], rating: motm.rating } : null,
     ratings: ratingsView,
@@ -978,6 +1096,8 @@ export function postMatchStudio(ctx) {
     // dane dla odprawy pomeczowej i konferencji (briefings.js)
     forBriefing: {
       score: { for: gU, against: gO },
+      decided: tie ? (tieWon ? 'W' : 'L') : null, // rozstrzygnięcie (awans, trofeum, odpadnięcie) dla efektu odprawy pomeczowej
+      firstLeg: !!(ctx.tie?.knockout && ctx.tie.leg === 1),
       xgFor: xgU,
       xgAgainst: xgO,
       rank: rank.level ?? 0,

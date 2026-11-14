@@ -12,11 +12,18 @@ import { anyClub } from '../season/season.js';
 import { SEASON_START, SEASON_YEAR } from '../config/calendar2026.js';
 import { winnerOf } from '../season/cup.js';
 import { standings } from '../season/standings.js';
-import { createFinance, financeDay, book, matchIncome, attendanceFill, uefaPrize, PP_PRIZE, stadiumCapacity, meritTv, clubPlan, FIN } from './finance.js';
+import { createFinance, financeDay, book, matchIncome, attendanceFill, uefaPrize, stadiumCapacity, meritTv, clubPlan, FIN } from './finance.js';
+import { bookCupPrize, bookUefaWinner, uefaSolidarity } from './prizes.js'; // nagrody PP, UEFA (docs/finanse.md)
+import './sponsors.js'; // umowy sponsorskie (docs/finanse.md, Sponsorzy)
 import { createMarket, marketWeek, answerIncoming, aiRenewals, inWindow, windowOf, fmtZl, SEASON_END } from './transfers.js';
 import { ensureBoard, boardMonth, seasonGoalFor, trustLabel } from './board.js';
 import './squadLimitSystem.js'; // limit kadry i nacisk zarządu (docs/limit-kadry.md)
+import './boardRequests.js'; // prośby do zarządu, warunki i budżety klubów AI (docs/finanse.md)
 import { ensureCoachMarket, fireCoach, hireCoach } from './coachMarket.js'; // rynek trenerów AI i właściciele (docs/trenerzy-i-wlasciciele.md)
+import { ensureInfra } from './infrastructure.js'; // stadion, baza, akademia (docs/infrastruktura.md)
+import { ensureLoans } from './loans.js'; // wypożyczenia: systemy dnia i stare zapisy (docs/wypozyczenia.md)
+import { ensureTransferState } from './transferSystem.js'; // transakcje w toku, prekontrakty, prośby o transfer, zagranica (docs/transfery.md)
+import { foreignOfferMessage } from './foreignMarket.js';
 
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
 
@@ -25,7 +32,10 @@ export function ensureCareer(game) {
   if (!game.finance) game.finance = createFinance(game.world);
   // Zapis sprzed kalibracji finansów (docs/finanse.md): plan sezonu z danych klubu
   for (const [id, c] of Object.entries(game.finance.clubs)) if (!c.plan && clubById(id)) { c.plan = clubPlan(clubById(id)); c.tier = c.plan.tier; }
+  ensureInfra(game); // stary zapis: poziomy startowe; nowe plany sezonu: pojemność, przychód z widza, utrzymanie
   if (!game.market) createMarket(game);
+  ensureLoans(game);
+  ensureTransferState(game);
   ensureBoard(game);
   ensureCoaches(game); // trenerzy klubów AI z atrybutami (stary zapis: profile z ziarna gry, te same nazwiska)
   ensureCoachMarket(game); // pula wolnych trenerów (stary zapis: tworzona z ziarna gry)
@@ -46,16 +56,13 @@ function matchMoney(game, date) {
     f.fin = true;
     // Kibice: nastroje, bojkoty, zamknięte sektory i mecze bez publiczności (src/career/fans.js)
     const fill = attendanceFill(f, rowOf(f.home), anyClub(f.away), f.neutral ? null : F.clubs[f.home]) * attendanceModifier(game, f.home, f);
-    f.attendance = Math.round((f.neutral ? 58000 : stadiumCapacity(clubById(f.home) ?? anyClub(f.home))) * fill / 100) * 100;
+    f.attendance = Math.round((f.neutral ? 58000 : F.clubs[f.home]?.plan?.cap ?? stadiumCapacity(clubById(f.home) ?? anyClub(f.home))) * fill / 100) * 100;
     const [h0, a0] = matchIncome(F, f, fill);
     const mul = f.comp === 'friendly' ? 0.12 : 1; // sparing: bilety symboliczne
     const h = h0 * mul; const a = a0 * mul;
     book(F, f.home, f.date, 'in', 'tickets', h);
     if (a) book(F, f.away, f.date, 'in', 'tickets', a);
-    if (f.comp === 'pp') {
-      const w = winnerOf(f);
-      book(F, w, f.date, 'in', 'prize', f.round === 'F' ? PP_PRIZE.W : PP_PRIZE[f.round] ?? 20000, `Puchar Polski: ${f.round === 'F' ? 'zwycięstwo' : 'awans'}`);
-    }
+    if (f.comp === 'pp') bookCupPrize(F, game.fixtures, f); // kwota według najdalszej rundy, także dla przegranego
     if (f.comp === 'uefa') {
       const first = f.leg === 1 || f.round === 'F' || (f.round === 'league' && f.md === 1);
       for (const [s, id] of [[0, f.home], [1, f.away]]) {
@@ -67,10 +74,11 @@ function matchMoney(game, date) {
           if (me > op) book(F, id, f.date, 'in', 'prize', uefaPrize(f.ucomp, 'win')); else if (me === op) book(F, id, f.date, 'in', 'prize', uefaPrize(f.ucomp, 'draw'));
         }
       }
+      bookUefaWinner(F, f); // finał LM, LE, LK: premia dla zdobywcy
     }
   }
   // Premia za miejsce z centralnego podziału ligi po ostatniej kolejce (Ekstraklasa SA 2025/26: mistrz 22,6 mln zł,
-  // dalej coraz mniej; spadkowicze z Ekstraklasy dostają rekompensatę). 1 i 2 Liga [SZAC]. Model: docs/finanse.md.
+  // część liniowa i premia za podium; spadkowicze z Ekstraklasy dostają rekompensatę). 1 i 2 Liga [SZAC]. Model: docs/finanse.md.
   for (const comp of Object.values(TIER_COMP)) {
     F.merit = F.merit ?? {};
     if (F.merit[comp]) continue;
@@ -90,7 +98,7 @@ function matchMoney(game, date) {
 const msg = (date, o) => createMessage({ date, category: 'board', from: 'Zarząd', priority: 'info', ...o });
 
 function offerMessage(game, o, date) {
-  const p = game.world.players[o.playerId]; const buyer = clubById(o.from);
+  const p = game.world.players[o.playerId]; const buyer = clubById(o.from) ?? { name: o.foreign?.name ?? 'Klub zagraniczny' };
   return createMessage({
     date, key: `oferta:${o.id}:${o.fee}`, category: 'transfers', from: buyer.name, priority: 'important',
     subject: `Oferta za ${p.name}: ${fmtZl(o.fee)}`,
@@ -104,6 +112,7 @@ registerDecision('incomingOffer', (game, m, action) => {
   const r = answerIncoming(game, m.refs.offerId, action);
   const o = game.market.offers.find((x) => x.id === m.refs.offerId);
   const out = [createMessage({ date: game.date, category: 'transfers', from: 'Dyrektor sportowy', priority: 'info', subject: 'Odpowiedź na ofertę', body: r.text })];
+  if (r.reopen && o?.foreign) { out.push(foreignOfferMessage(game, o, game.date)); return out; }
   if (r.reopen && o) out.push(offerMessage(game, o, game.date));
   return out;
 });
@@ -156,6 +165,7 @@ registerDailySystem({
       }
     }
     matchMoney(game, date);
+    uefaSolidarity(game, date); // 15 grudnia: wypłaty solidarnościowe UEFA (src/career/prizes.js)
     const dow = new Date(`${date}T12:00:00Z`).getUTCDay();
     const w = windowOf(date);
     // Okno transferowe: otwarcie, tygodniowy rynek, oferty
@@ -163,7 +173,7 @@ registerDailySystem({
       const { moves, offers } = marketWeek(game, date);
       for (const o of offers) messages.push(offerMessage(game, o, date));
       const mineMoves = moves.filter((x) => x.from === game.clubId);
-      if (moves.length) messages.push(createMessage({ date, key: `rynek:${date}`, category: 'transfers', from: 'Rynek transferowy', priority: 'info', subject: `Transfery tygodnia (${moves.length})`, body: moves.slice(0, 12).map((x) => `${x.name} (${x.pos}): ${anyClub(x.from)?.name ?? 'wolny zawodnik'} -> ${anyClub(x.to).name}${x.fee ? `, ${fmtZl(x.fee)}` : ''}`).join('\n') + (mineMoves.length ? '' : '') }));
+      if (moves.length) messages.push(createMessage({ date, key: `rynek:${date}`, category: 'transfers', from: 'Rynek transferowy', priority: 'info', subject: `Transfery tygodnia (${moves.length})`, body: moves.slice(0, 12).map((x) => `${x.name} (${x.pos}): ${anyClub(x.from)?.name ?? x.origin?.name ?? 'wolny zawodnik'} -> ${anyClub(x.to).name}${x.fee ? `, ${fmtZl(x.fee)}` : ''}`).join('\n') + (mineMoves.length ? '' : '') }));
     }
     // Wygasłe oferty
     for (const o of game.market.offers) if (o.status === 'open' && o.expires < date) o.status = 'expired';
@@ -185,7 +195,7 @@ registerDailySystem({
       if (date >= `${SEASON_YEAR + 1}-01-01` && date <= `${SEASON_YEAR + 1}-06-01`) aiRenewals(game, date);
       if (date === `${SEASON_YEAR + 1}-01-01`) {
         const exp = squadOf(game.world, game.clubId).filter((p) => p.contract?.until === SEASON_END && !p.loan);
-        if (exp.length) messages.push(createMessage({ date, key: `kontrakty:${SEASON_YEAR + 1}`, category: 'transfers', from: 'Dyrektor sportowy', priority: 'important', subject: `Kontrakty kończące się w czerwcu (${exp.length})`, body: `${exp.map((p) => `${p.name} (${p.pos}, ${p.age} lat)`).join(', ')}.\n\nPrzedłuż ważnych zawodników w zakładce Transfery, Kontrakty. Od 1 stycznia mogą rozmawiać z innymi klubami.` }));
+        if (exp.length) messages.push(createMessage({ date, key: `kontrakty:${SEASON_YEAR + 1}`, category: 'transfers', from: 'Dyrektor sportowy', priority: 'important', subject: `Kontrakty kończące się w czerwcu (${exp.length})`, body: `${exp.map((p) => `${p.name} (${p.pos}, ${p.age} lat)`).join(', ')}.\n\nPrzedłuż ważnych zawodników w zakładce Transfery, Kontrakty. Od 1 stycznia mogą rozmawiać z innymi klubami i podpisać umowę od 1 lipca (prekontrakt). Kluby muszą nas o tym informować.` }));
       }
     }
     if (w && date === w.to) messages.push(createMessage({ date, key: `okno-koniec:${date}`, category: 'transfers', from: 'Rynek transferowy', priority: 'info', subject: 'Dziś zamyka się okno transferowe', body: 'Po dzisiejszym dniu transfery będą możliwe dopiero w kolejnym oknie. Wolnych zawodników można podpisywać zawsze.' }));
