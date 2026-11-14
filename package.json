@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Prywatny manager piłkarski (PWA): Ekstraklasa, 1 Liga, 2 Liga, puchary europejskie.",
+  "description": "Prywatny manager piłkarski (PWA): Ekstraklasa, 1 Liga, 2 Liga, III liga, puchary europejskie.",
   "scripts": {
     "start": "python3 -m http.server 8080",
     "test": "node --test tests/*.test.mjs",

@@ -15,7 +15,7 @@ const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 /** Rodzaj rozgrywek do filtra i koloru znacznika. */
 export function compKind(row) {
   const c = row.c;
-  if (c === 'ekstraklasa' || c === 'liga1' || c === 'liga2') return 'liga';
+  if (c === 'ekstraklasa' || c === 'liga1' || c === 'liga2' || c?.startsWith('liga3-')) return 'liga';
   if (c?.startsWith('playoff')) return 'baraze';
   if (c === 'pp') return 'pp';
   if (c === 'super') return 'super';
@@ -25,7 +25,7 @@ export function compKind(row) {
 }
 export const KIND_LABELS = { liga: 'Liga', baraze: 'Baraże', pp: 'Puchar Polski', super: 'Superpuchar', uefa: 'Puchary europejskie', friendly: 'Sparingi', other: 'Inne' };
 const KIND_ORDER = ['liga', 'baraze', 'pp', 'super', 'uefa', 'friendly', 'other'];
-const SHORT = { ekstraklasa: 'Ekstr.', liga1: '1 Liga', liga2: '2 Liga', pp: 'PP', super: 'Superp.', friendly: 'Sparing' };
+const SHORT = { ekstraklasa: 'Ekstr.', liga1: '1 Liga', liga2: '2 Liga', 'liga3-1': 'III liga', 'liga3-2': 'III liga', 'liga3-3': 'III liga', 'liga3-4': 'III liga', pp: 'PP', super: 'Superp.', friendly: 'Sparing' };
 export const VENUES = [['H', 'U siebie'], ['A', 'Wyjazd'], ['N', 'Neutralny']];
 const VENUE_LABEL = Object.fromEntries(VENUES);
 const RES_WORD = { W: 'Wygrana', R: 'Remis', P: 'Porażka' };
@@ -54,7 +54,7 @@ function tagFull(row) {
 function roundText(row) {
   const label = rowLabel(row);
   if (row.c === 'friendly') return 'Mecz towarzyski';
-  if (['ekstraklasa', 'liga1', 'liga2'].includes(row.c)) return `${row.r}. kolejka`;
+  if (['ekstraklasa', 'liga1', 'liga2'].includes(row.c) || String(row.c).startsWith('liga3-')) return `${row.r}. kolejka`;
   return label.replace(/^[^,]+,\s*/, '');
 }
 

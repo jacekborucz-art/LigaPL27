@@ -76,7 +76,7 @@ export const FINES_EUR = {
 };
 
 const ULTRAS_F = [0, 0.15, 0.4, 0.8, 1.3, 1.9];
-const COMP_F = { ekstraklasa: 1, liga1: 0.8, liga2: 0.55, pp: 0.8, uefa: 1.3, super: 1 };
+const COMP_F = { ekstraklasa: 1, liga1: 0.8, liga2: 0.55, 'liga3-1': 0.4, 'liga3-2': 0.4, 'liga3-3': 0.4, 'liga3-4': 0.4, pp: 0.8, uefa: 1.3, super: 1 }; // III liga [SZAC]
 
 // ------------------------------------------------------------ Profil kibiców
 

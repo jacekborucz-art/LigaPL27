@@ -67,7 +67,7 @@ const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const state = { screen: 'start', slot: null, game: null, tab: 'pulpit', tier: 1, notice: null, mailCat: null, mailOpen: null, running: false, sqFilter: 'all', playerOpen: null, sqSub: 'players', tSel: null, matchNotes: [], cComp: null, cView: 'table', cRound: null, lastResult: null, uFilter: 'pl', uDraw: null, nc: null, confirmDel: null, theme: readTheme(), menuFocus: null, fx: null };
 const WIDE_PICK = '(min-width: 1024px)';
 
-const benchSizeFor = (g) => COMPETITIONS[['ekstraklasa', 'liga1', 'liga2'][clubById(g.clubId).tier - 1]].benchSize;
+const benchSizeFor = (g) => COMPETITIONS[compOfClub(clubById(g.clubId)) ?? 'ekstraklasa']?.benchSize ?? 9;
 const nextFixture = (g) => (g.fixtures || []).filter((f) => !f.played && (f.home === g.clubId || f.away === g.clubId)).sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? '')))[0];
 /** Kadra gracza z pauzami w rozgrywkach najbliższego meczu. */
 const mySquad = (g) => squadFor(g, g.clubId, nextFixture(g)?.comp ?? 'ekstraklasa');

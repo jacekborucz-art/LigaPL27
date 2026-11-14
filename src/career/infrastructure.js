@@ -406,7 +406,7 @@ const num = (x) => (Math.round(x * 100) / 100).toFixed(2).replace('.', ',');
 /** Mecze ligowe na własnym stadionie: zapełnienie do średniej sezonu. */
 function trackFill(game) {
   for (const f of game.fixtures ?? []) {
-    if (!f.played || f.infF || !f.attendance || f.neutral || !['ekstraklasa', 'liga1', 'liga2'].includes(f.comp)) continue;
+    if (!f.played || f.infF || !f.attendance || f.neutral || !(['ekstraklasa', 'liga1', 'liga2'].includes(f.comp) || f.comp.startsWith('liga3-'))) continue;
     f.infF = 1;
     const I = infraOf(game, f.home); const cap = game.finance?.clubs?.[f.home]?.plan?.cap;
     if (!I || !cap) continue;

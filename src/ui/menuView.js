@@ -207,7 +207,7 @@ export function renderMenu(ctx) {
     <main class="menu" id="main">
       <section class="menu__lead" aria-labelledby="menu-title">
         ${lockupHtml({ id: 'menu-title' })}
-        <p class="menu__tagline">Polski manager piłkarski. Ekstraklasa, 1 Liga i 2 Liga, Puchar Polski i europejskie puchary. Sezon ${esc(SEASON)}.</p>
+        <p class="menu__tagline">Polski manager piłkarski. Ekstraklasa, 1 Liga, 2 Liga i III liga, Puchar Polski i europejskie puchary. Sezon ${esc(SEASON)}.</p>
         <nav aria-label="Menu główne"><ul class="menu__list" data-menu>${items.join('')}</ul></nav>
       </section>
       <section class="saves" id="saves" aria-labelledby="saves-title">
@@ -395,7 +395,9 @@ export function setFieldError(root, id, msg) {
 
 // ------------------------------------------------------------ Krok 2: klub
 function strengthOf(club) {
-  const avg = { 1: 11.5, 2: 10, 3: 8.5 }[club.tier];
+  // III liga: średnia siła grupy klubu (4 grupy o różnym poziomie)
+  const grp = club.tier === 4 ? CLUBS_PL.filter((c) => c.tier === 4 && c.group === club.group) : [];
+  const avg = club.tier === 4 ? grp.reduce((s, c) => s + c.L, 0) / Math.max(1, grp.length) : { 1: 11.5, 2: 10, 3: 8.5 }[club.tier];
   const d = club.L - avg;
   return d >= 0.7 ? 'Faworyt' : d >= 0.2 ? 'Czołówka' : d > -0.25 ? 'Środek' : d > -0.45 ? 'Dół tabeli' : 'Outsider';
 }

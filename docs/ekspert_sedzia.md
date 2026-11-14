@@ -756,7 +756,7 @@ Dopisane na prośbę koordynatora (Nov 10, 2026). Znaczniki pewności jak w sekc
 2. Gdy P spada do ligi, w której gra R, to R automatycznie spada ligę niżej.
 3. R nie może awansować do ligi P; jej miejsce awansowe przechodzi na następny klub w tabeli.
 
-Numeracja poziomów w kodzie: Ekstraklasa = 1, 1 Liga = 2, 2 Liga = 3, III liga = 4 (niesymulowana, pula), IV liga = 5 (poza grą).
+Numeracja poziomów w kodzie: Ekstraklasa = 1, 1 Liga = 2, 2 Liga = 3, III liga = 4 (od Nov 14, 2026 grywalna: 4 grupy po 18 ze stałymi kadrami, rozgrywki `liga3-1` ... `liga3-4`, szczegóły w docs/iii-liga.md), IV liga = 5 (poza grą: kadry tylko na mecz w Pucharze Polski, pula awansów do III ligi).
 
 ## D2. Co mówi PZPN (stan badania)
 

@@ -615,7 +615,7 @@ const BANK = [
   },
 ];
 // Mecz o punkty (liga): w pucharach, sparingach i Superpucharze odpowiedzi nie mówią o punktach (docs/odprawy-kontekst.md)
-const isLeagueCtx = (c) => ['ekstraklasa', 'liga1', 'liga2'].includes(c?.comp);
+const isLeagueCtx = (c) => ['ekstraklasa', 'liga1', 'liga2'].includes(c?.comp) || String(c?.comp ?? '').startsWith('liga3-');
 // Pytania przed meczem (konferencja przedmeczowa, dzień przed meczem w prawdziwym kalendarzu)
 const PRE_BANK = [
   {
@@ -1066,6 +1066,7 @@ const COMP_TIER = { ekstraklasa: 1, liga1: 2, liga2: 3, l1: 1, l2: 2, l3: 3 };
 export function disciplineTier(comp, clubTier = 1) {
   if (!comp || comp === 'friendly' || comp === 'uefa') return null;
   if (COMP_TIER[comp]) return COMP_TIER[comp];
+  if (String(comp).startsWith('liga3-')) return 3; // III liga: kary jak w 2 Lidze [SZAC]
   if (comp === 'pp' || comp === 'super') return Math.min(3, clubTier ?? 1);
   return Math.min(3, clubTier ?? 1);
 }
