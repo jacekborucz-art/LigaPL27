@@ -60,16 +60,80 @@ export function autoPickXI(squad, formation) {
   return xi;
 }
 
-/** Ławka: rezerwowy bramkarz, potem po jednym z każdej linii, reszta wg OVR. */
-export function autoPickBench(squad, xi, benchSize) {
+// Role na ławce w kolejności pokrycia (docs/sklad-lawki.md): środek obrony, boczny obrońca, środek pomocy,
+// skrzydło lub ofensywny pomocnik, napastnik.
+export const BENCH_ROLES = [['ŚO'], ['BO', 'WB'], ['DP', 'ŚP'], ['BP', 'SN', 'OP'], ['NAP']];
+const BENCH_COVER_PROF = 70; // najniższa biegłość zawodnika uniwersalnego na roli bez nominalnego
+const BENCH_ROLE_MAX = 3; // najwyżej tylu zawodników jednej roli przy dobieraniu wolnych miejsc
+const BENCH_VERSATILE = 0.1; // [SZAC] dodatek OVR za każdą inną rolę z biegłością co najmniej 85
+const BENCH_SECOND_GK = 12; // od takiej ławki wolne miejsce bez zawodników z pola może zająć drugi bramkarz
+const roleOf = (p) => BENCH_ROLES.findIndex((r) => r.includes(p.pos));
+/** Wartość zawodnika z pola na roli: najlepsza pozycja roli (OVR z karą pozycji) i biegłość. */
+const roleFit = (p, role) => role.reduce((best, pos) => {
+  const prof = proficiency(p, pos);
+  const v = p.ovr * posEff(prof);
+  return v > best.v ? { v, prof } : best;
+}, { v: -Infinity, prof: 0 });
+
+/**
+ * Ławka (asystent gracza i AI, te same zasady): jeden rezerwowy bramkarz, potem pokrycie ról (ŚO, boczny obrońca,
+ * środek pomocy, skrzydło lub OP, napastnik), reszta najlepsi z pola (najwyżej 3 z jednej roli). Drugi bramkarz
+ * tylko przy ławce 12, gdy nie ma już nikogo z pola. keep: zawodnicy już na ławce (np. wybrani przez gracza), zostają i liczą się
+ * do pokrycia. Remis wartości rozstrzyga identyfikator, więc wynik jest powtarzalny.
+ */
+export function autoPickBench(squad, xi, benchSize, keep = []) {
+  if (!(benchSize > 0)) return [];
   const inXI = new Set(xi.filter(Boolean));
-  const rest = squad.filter((p) => isAvailable(p) && !inXI.has(p.id)).sort((a, b) => b.ovr - a.ovr);
-  const bench = [];
-  const take = (pred) => { const p = rest.find((x) => pred(x) && !bench.includes(x.id)); if (p) bench.push(p.id); };
-  take((p) => GROUP[p.pos] === 'GK');
-  for (const g of ['DEF', 'MID', 'ATT']) take((p) => GROUP[p.pos] === g);
-  for (const p of rest) { if (bench.length >= benchSize) break; if (!bench.includes(p.id)) bench.push(p.id); }
-  return bench.slice(0, benchSize);
+  const byId = new Map(squad.map((p) => [p.id, p]));
+  const bench = [...new Set(keep)].filter((id) => byId.has(id) && !inXI.has(id) && isAvailable(byId.get(id))).slice(0, benchSize);
+  const cond = new Map();
+  const condOf = (p) => { if (!cond.has(p.id)) cond.set(p.id, conditionTerms(p).total); return cond.get(p.id); };
+  const byIdTie = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  const rest = () => squad.filter((p) => isAvailable(p) && !inXI.has(p.id) && !bench.includes(p.id));
+  const full = () => bench.length >= benchSize;
+  // 1. Rezerwowy bramkarz
+  if (!full() && !bench.some((id) => byId.get(id).pos === 'BR')) {
+    const gk = rest().filter((p) => p.pos === 'BR').sort((a, b) => (b.ovr + condOf(b)) - (a.ovr + condOf(a)) || byIdTie(a, b))[0];
+    if (gk) bench.push(gk.id);
+  }
+  // 2. Pokrycie ról: najpierw nominalny, gdy go brak, uniwersalny z biegłością co najmniej 70
+  for (const role of BENCH_ROLES) {
+    if (full()) break;
+    if (bench.some((id) => role.includes(byId.get(id).pos))) continue;
+    const cands = rest().filter((p) => p.pos !== 'BR').map((p) => ({ p, ...roleFit(p, role) }))
+      .filter((c) => c.prof >= BENCH_COVER_PROF);
+    const natural = cands.filter((c) => role.includes(c.p.pos));
+    const cand = (natural.length ? natural : cands)
+      .sort((a, b) => (b.v + condOf(b.p)) - (a.v + condOf(a.p)) || byIdTie(a.p, b.p))[0];
+    if (cand) bench.push(cand.p.id);
+  }
+  // 3. Wolne miejsca: najlepsi z pola (najlepsza rola, stan zawodnika, mały dodatek za uniwersalność)
+  const fillValue = (p) => {
+    let best = -Infinity; let extra = 0;
+    BENCH_ROLES.forEach((role, i) => {
+      const f = roleFit(p, role);
+      best = Math.max(best, f.v);
+      if (i !== roleOf(p) && f.prof >= 85) extra++;
+    });
+    return best + condOf(p) + BENCH_VERSATILE * extra;
+  };
+  const outfield = rest().filter((p) => p.pos !== 'BR').map((p) => ({ p, v: fillValue(p) }))
+    .sort((a, b) => b.v - a.v || byIdTie(a.p, b.p));
+  const perRole = (r) => bench.filter((id) => roleOf(byId.get(id)) === r).length;
+  for (const pass of [true, false]) {
+    for (const { p } of outfield) {
+      if (full()) break;
+      if (bench.includes(p.id)) continue;
+      if (pass && perRole(roleOf(p)) >= BENCH_ROLE_MAX) continue;
+      bench.push(p.id);
+    }
+  }
+  // 4. Drugi bramkarz tylko przy ławce 12 i tylko wtedy, gdy nie ma już nikogo z pola (przy 7 i 9 miejsce zostaje puste)
+  for (const p of rest().filter((x) => x.pos === 'BR').sort((a, b) => b.ovr - a.ovr || byIdTie(a, b))) {
+    if (full() || benchSize < BENCH_SECOND_GK) break;
+    bench.push(p.id);
+  }
+  return bench;
 }
 
 const score = (p, keys) => keys.reduce((s, k) => s + (p.attr?.[k] ?? 0), 0);
@@ -187,7 +251,8 @@ export function refreshTactics(tactics, squad, { benchSize = 12 } = {}) {
       if (cand) { t.xi[i] = cand.id; used.add(cand.id); t.bench = t.bench.filter((id) => id !== cand.id); changes.push(`${cand.name} wchodzi do składu (${f.slots[i].pos})`); }
     }
   }
-  if (t.bench.length < Math.min(benchSize, 7)) t = { ...t, bench: autoPickBench(squad, t.xi, benchSize) };
+  // Krótka ławka: wybrani przez gracza zostają, asystent dobiera tylko brakujące miejsca (docs/sklad-lawki.md)
+  if (t.bench.length < Math.min(benchSize, 7)) t = { ...t, bench: autoPickBench(squad, t.xi, benchSize, t.bench) };
   const roles = autoRoles(squad, t.xi);
   for (const r of ['captain', 'penalty', 'freeKick', 'corner']) if (!t[r] || !t.xi.includes(t[r])) t[r] = roles[r];
   return { tactics: t, changes };
