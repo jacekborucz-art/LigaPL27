@@ -94,6 +94,8 @@ sceny + clamp(0,25 x różnica scen, 0, 4), czerwona kartka za przemoc -1,5, spa
 3. Rezerwowi tracą reputację (pełna kara za brak minut).
 4. Marka krajowa klubu zmienia się co sezon (wyniki wobec oczekiwań, trofea, puchary), do tego renoma europejska z P5.
 5. Bez zasiewania historycznych meczów w kadrze: wszyscy startują z danych gry (reprezentanci zyskują w trakcie gry).
+6. Polski klub, który latami wygrywa ligę i gra w Lidze Mistrzów (P5 ok. 90-100), może mieć zawodników z reputacją 85-89.
+   Premie z trofeów i pucharów zostają bez przycinania, mimo że propozycja zakładała 85+ dopiero przy P5 ok. 130.
 
 ## 4. Kalibracja (Widzew, ziarno 5, 10 sezonów, `node tools/multiseason.mjs widzew 5 10`) [SZAC]
 
