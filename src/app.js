@@ -401,7 +401,7 @@ function renderTab(tab, g, club) {
   if (tab === 'kadra') {
     const sub = `<div class="subtabs" role="tablist"><button role="tab" data-act="tsub" data-s="players" aria-selected="${state.sqSub === 'players'}">Zawodnicy</button><button role="tab" data-act="tsub" data-s="tactics" aria-selected="${state.sqSub === 'tactics'}">Skład i taktyka</button><button role="tab" data-act="tsub" data-s="talks" aria-selected="${state.sqSub === 'talks'}">Rozmowy</button><button role="tab" data-act="tsub" data-s="report" aria-selected="${state.sqSub === 'report'}">Raport ogólny</button></div>`;
     if (state.sqSub === 'talks') return sub + renderTalks(g, state);
-    if (state.sqSub === 'report') return sub + renderTeamReport(g, { msg: state.trepMsg ?? '' });
+    if (state.sqSub === 'report') return sub + renderTeamReport(g, { msg: state.trepMsg ?? '', sel: state.trepSel ?? 0 });
     if (state.sqSub === 'tactics') {
       queueMicrotask(mountTacticsScreen); // po wstawieniu HTML: okno atrybutów i fokus
       return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), info: state.tInfo, msg: state.tMsg, numbers: shirtNumbers(g, g.clubId, squadOf(g.world, g.clubId)), kit: kitColors(clubById(g.clubId)), infoExtra: state.tInfo && g.world.players[state.tInfo] ? playerStatsHtml(g.world.players[state.tInfo], g) : '' });
@@ -1277,8 +1277,9 @@ async function dispatchAct(el, { root = app } = {}) {
     if (act === 'arep') { state.repOpen = el.dataset.id; render(); window.scrollTo({ top: 0 }); }
     if (act === 'arepback') { state.repOpen = null; render(); }
     // Raport ogólny o drużynie: na prośbę trenera (co 14 dni) i otwarcie z poczty
-    if (act === 'trep-req') { const r = requestTeamReport(g); state.trepMsg = r.ok ? 'Sztab przygotował nowy raport.' : r.msg; if (r.ok) await save(); render(); }
-    if (act === 'trep-open') { state.tab = 'kadra'; state.sqSub = 'report'; state.mailOpen = null; state.playerOpen = null; state.repOpen = null; state.trepMsg = ''; render(); window.scrollTo({ top: 0 }); }
+    if (act === 'trep-req') { const r = requestTeamReport(g); state.trepMsg = r.ok ? 'Sztab przygotował nowy raport.' : r.msg; if (r.ok) state.trepSel = 0; if (r.ok) await save(); render(); }
+    if (act === 'trep-sel') { state.trepSel = Number(el.dataset.i) || 0; state.trepMsg = ''; render(); }
+    if (act === 'trep-open') { state.tab = 'kadra'; state.sqSub = 'report'; state.trepSel = 0; state.mailOpen = null; state.playerOpen = null; state.repOpen = null; state.trepMsg = ''; render(); window.scrollTo({ top: 0 }); }
     if (act === 'extplayer') {
       const id = el.dataset.id; const pl = state.game?.world.players[id];
       if (pl && pl.clubId === state.game.clubId) { state.extPlayer = null; state.tab = 'kadra'; state.sqSub = 'players'; state.playerOpen = id; }

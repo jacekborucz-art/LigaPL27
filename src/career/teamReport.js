@@ -39,6 +39,7 @@ export const TREP = {
   formGain: 0.25, // propozycja innej formacji od przewagi ok. 0,25 pkt średniej oceny jedenastki
   gapDrop: 2, // luka w głębi składu: najlepszy zmiennik słabszy o 2 pkt albo bez nominalnej pozycji
   maxRecs: 5,
+  keep: 3, // archiwum: 3 ostatnie raporty (bieżący i 2 starsze)
 };
 
 export const STAFF_ATTRS = {
@@ -98,15 +99,25 @@ export function sectionQ(sk) {
 const detectChance = (q) => clamp(AREP.detect.base + AREP.detect.perQ * q, AREP.detect.min, AREP.detect.max);
 
 // ------------------------------------------------------------ Stan w zapisie
-/** Stan w zapisie: { v, club, cur (gotowy raport), prev (skrót poprzedniego), month }. Migracja w miejscu. */
+/**
+ * Stan w zapisie: { v, club, cur (najnowszy raport), arch (starsze raporty, od najnowszego), prev (skrót poprzedniego),
+ * month }. Archiwum razem z bieżącym: najwyżej TREP.keep raportów (decyzja właściciela z Nov 16, 2026). Migracja w miejscu.
+ */
 export function ensureTeamReport(game) {
   if (!game) return null;
   if (!game.teamReport || typeof game.teamReport !== 'object') game.teamReport = {};
   const s = game.teamReport;
-  if (s.club !== (game.clubId ?? null)) Object.assign(s, { cur: null, prev: null, month: null, club: game.clubId ?? null });
+  if (s.club !== (game.clubId ?? null)) Object.assign(s, { cur: null, arch: [], prev: null, month: null, club: game.clubId ?? null });
   s.v = TREP.version;
   s.cur ??= null; s.prev ??= null; s.month ??= null;
+  s.arch = Array.isArray(s.arch) ? s.arch.slice(0, TREP.keep - 1) : [];
   return s;
+}
+
+/** Raporty w archiwum od najnowszego (bieżący pierwszy), najwyżej TREP.keep. */
+export function reportList(game) {
+  const s = ensureTeamReport(game);
+  return s.cur ? [s.cur, ...s.arch] : [];
 }
 
 /** Czy można poprosić o nowy raport: { ok, from (data, od której można) }. */
@@ -127,7 +138,7 @@ function digest(r) {
 
 function store(game, r) {
   const s = ensureTeamReport(game);
-  if (s.cur) s.prev = digest(s.cur);
+  if (s.cur) { s.prev = digest(s.cur); s.arch = [s.cur, ...s.arch].slice(0, TREP.keep - 1); }
   s.cur = r;
   return r;
 }
@@ -265,7 +276,7 @@ export function buildTeamReport(game, date = game.date, id = date) {
     verdict = diff >= 3 ? 'punktujemy ponad stan' : diff <= -3 ? 'punktujemy poniżej możliwości kadry' : 'wyniki odpowiadają sile kadry';
     paper = `${rs.prec === 'vague' ? `Na papierze kadra jest ${rankWord(paperRank, n)}` : `Na papierze kadra na ok. ${paperRank}. miejsce`}; ${verdict}.`;
   }
-  const results = { ...rs, pos: row?.pos ?? null, played: row?.played ?? 0, form, lines: [...resLines, gameLine, luck, paper].filter(Boolean), paperRank };
+  const results = { ...rs, pos: row?.played ? row.pos : null, played: row?.played ?? 0, pts: row?.played ? row.points : null, form, lines: [...resLines, gameLine, luck, paper].filter(Boolean), paperRank };
 
   // 3. Styl i taktyka
   const ts = sec('asystent', Q.tactics);

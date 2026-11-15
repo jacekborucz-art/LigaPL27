@@ -13,7 +13,7 @@ import { Rng } from '../src/core/rng.js';
 import { runDecision } from '../src/core/decisions.js';
 import '../src/season/dailySystems.js';
 import {
-  TREP, STAFF_ATTRS, staffAttrs, buildTeamReport, ensureTeamReport, requestTeamReport, canRequest, reportMessage, TEAM_REPORT_SYSTEM,
+  TREP, STAFF_ATTRS, staffAttrs, buildTeamReport, ensureTeamReport, requestTeamReport, canRequest, reportMessage, TEAM_REPORT_SYSTEM, reportList,
 } from '../src/career/teamReport.js';
 import { renderTeamReport } from '../src/ui/teamReportView.js';
 
@@ -150,4 +150,28 @@ test('stary zapis bez stanu raportu, zmiana klubu i zawodnik bez kontraktu', () 
   assert.equal(ensureTeamReport(g).cur, null);
   // Klub bez stałej kadry (np. po zwolnieniu): system nic nie robi
   assert.deepEqual(TEAM_REPORT_SYSTEM.run({ ...g, clubId: 'brak' }, '2026-08-05'), {});
+});
+
+test('archiwum: 3 ostatnie raporty od najnowszego, porównanie i wybór starszego raportu', () => {
+  const g = newGame(9);
+  playTo(g, '2026-10-10'); // raporty z lipca, sierpnia, września i października
+  const st = ensureTeamReport(g);
+  assert.ok(g.inbox.filter((m) => m.key?.startsWith('trep:')).length >= 4);
+  const list = reportList(g);
+  assert.equal(list.length, TREP.keep);
+  assert.equal(st.arch.length, TREP.keep - 1);
+  for (let i = 1; i < list.length; i++) assert.ok(list[i - 1].date > list[i].date);
+  const html = renderTeamReport(g);
+  assert.match(html, /Porównanie raportów/);
+  assert.match(html, /data-act="trep-sel"/);
+  assert.doesNotMatch(html, BAD_TEXT);
+  const old = renderTeamReport(g, { sel: 2 });
+  assert.match(old, /Raport archiwalny/);
+  assert.doesNotMatch(old, BAD_TEXT);
+  // Zły indeks: najnowszy raport
+  assert.doesNotMatch(renderTeamReport(g, { sel: 7 }), /Raport archiwalny/);
+  // Stary zapis z jednym raportem bez archiwum
+  delete st.arch;
+  assert.equal(reportList(g).length, 1);
+  assert.doesNotMatch(renderTeamReport(g), /Porównanie raportów/);
 });

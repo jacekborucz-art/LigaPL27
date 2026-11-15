@@ -100,8 +100,9 @@ mechanice się nie zmienia. Ten sam wzór działa dla każdego klubu (kluby AI r
   gdzie jest pełny raport.
 - MUST: na żądanie przycisk „Poproś o nowy raport”, gdy ostatni raport ma co najmniej 14 dni [SZAC]. Raport miesięczny
   nie przychodzi, jeśli raport na żądanie powstał w ostatnich 7 dniach.
-- Stan: `game.teamReport = { v, club, cur, prev, month }`. `cur` to gotowy raport (dane widoku, ok. 5-8 KB), `prev`
-  skrót do porównania (siła formacji, miejsce, zgranie). Zmiana klubu czyści stan. Stary zapis dostaje pusty stan
+- Stan: `game.teamReport = { v, club, cur, arch, prev, month }`. `cur` to gotowy raport (dane widoku, ok. 5-8 KB), `prev`
+  skrót do porównania (siła formacji, miejsce, zgranie). `arch`: 2 starsze pełne raporty (razem z `cur` najwyżej 3,
+  starsze są usuwane). Zmiana klubu czyści stan. Stary zapis dostaje pusty stan
   (`ensureTeamReport`, także w `ensureGameShape`).
 - Koszt: liczenie tylko dla klubu gracza, raz w miesiącu albo na żądanie (siła ok. 18 kadr i 12 formacji, kilka ms).
   Bez wpływu na mecze, trening i kluby AI; własne ziarna, nie zużywa strumieni losowości gry.
@@ -111,7 +112,8 @@ mechanice się nie zmienia. Ten sam wzór działa dla każdego klubu (kluby AI r
 - MUST: Kadra, nowa podzakładka „Raport ogólny” (obok Zawodnicy, Skład i taktyka, Rozmowy).
 - MUST: wiadomość w poczcie po każdym raporcie.
 - SHOULD: atrybuty asystenta i analityka na kartach w Trening, Sztab.
-- LATER: link z Pulpitu, archiwum raportów (3 ostatnie), raport rundy (zima, lato) z porównaniem do celu zarządu,
+- Zrobione (decyzja z Nov 16, 2026): archiwum 3 ostatnich raportów z wyborem i porównaniem, rozdział 10.
+- LATER: link z Pulpitu, raport rundy (zima, lato) z porównaniem do celu zarządu,
   raport skauta o lukach (nazwiska z rynku), wykres siły formacji w czasie.
 
 ## 7. Wartość dla gracza (decyzje)
@@ -147,3 +149,15 @@ błąd miejsca w lidze w pozycjach, odsetek dokładnie trafionych miejsc):
 
 Klub ze środka tabeli ma ciaśniej ułożonych sąsiadów, więc nawet dobry sztab myli się tam częściej o jedno miejsce.
 Dlatego przy średniej pewności raport podaje przedział miejsc, a przy niskiej tylko słowa.
+
+## 10. Decyzje właściciela (Nov 16, 2026)
+
+1. Raport na żądanie zostaje co 14 dni (`TREP.cooldown`).
+2. Rozrzut atrybutów asystenta i analityka zostaje ±3 (`TREP.attrMax`), np. asystent 14: ocena zawodników 17, analiza
+   taktyczna 11.
+3. Archiwum: tak. W zapisie są 3 ostatnie raporty (`TREP.keep`, bieżący i 2 starsze, ok. 8 KB każdy); starsze są
+   usuwane. W widoku: przyciski „Archiwum” z datami raportów (starszy raport otwiera się z uwagą, że stan drużyny mógł
+   się zmienić) i karta „Porównanie raportów” (od najstarszego): miejsce w lidze z punktami, forma, miejsce każdej
+   formacji w lidze, zgranie, pewność raportu. Miejsca formacji pokazane z dokładnością tamtego raportu: liczba,
+   przedział albo słowa, np. „obrona 13. w sierpniu, 8. w październiku”. Stary zapis z jednym raportem: bez porównania,
+   archiwum rośnie z kolejnymi raportami.

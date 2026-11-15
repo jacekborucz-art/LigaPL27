@@ -3,7 +3,7 @@
 // trójka). Każda część ma podpis członka sztabu i pewność (trzy kreski, jak w raporcie o zawodniku). Style: `.trep`
 // w src/styles/assistant.css (te same kolory znaczeniowe co raport asystenta).
 import { esc, fmtDate } from './dom.js';
-import { ensureTeamReport, canRequest } from '../career/teamReport.js';
+import { ensureTeamReport, canRequest, reportList } from '../career/teamReport.js';
 
 const DOTS = { exact: 3, approx: 2, vague: 1 };
 const RES_WORD = { W: 'wygrana', R: 'remis', P: 'porażka' };
@@ -94,14 +94,52 @@ function authorsHtml(r) {
     </div>`).join('')}</div>`;
 }
 
-/** Ekran raportu (HTML). msg: komunikat po kliknięciu „Poproś o nowy raport”. */
-export function renderTeamReport(game, { msg = '' } = {}) {
+/** Miejsce formacji krótko, z dokładnością tamtego raportu (do tabeli porównania). */
+function shortRank(x) {
+  if (!x) return 'brak danych';
+  if (x.prec === 'exact') return `${x.rank}.`;
+  if (x.prec === 'approx') return `${Math.max(1, x.rank - 1)}.-${Math.min(x.n, x.rank + 1)}.`;
+  return x.text;
+}
+
+/** Wybór raportu z archiwum (3 ostatnie). */
+function archiveNav(list, sel) {
+  if (list.length < 2) return '';
+  return `<nav class="trep-arch" aria-label="Archiwum raportów"><span class="trep-arch__k">Archiwum</span><div class="chips chips--wrap" role="group">${list.map((x, i) => `<button class="chip" data-act="trep-sel" data-i="${i}" aria-pressed="${i === sel}">${esc(fmtDate(x.date))}${i === 0 ? ', najnowszy' : ''}</button>`).join('')}</div></nav>`;
+}
+
+/** Porównanie kluczowych liczb w raportach z archiwum (od najstarszego). */
+function compareHtml(list) {
+  if (list.length < 2) return '';
+  const cols = [...list].reverse();
+  const unit = (r, k) => shortRank(r.units?.rows?.find((x) => x.k === k));
+  const rows = [
+    ['Miejsce w lidze', (r) => (r.results?.pos && r.results?.played ? `${r.results.pos}.${r.results.pts != null ? ` (${r.results.pts} pkt)` : ''}` : 'przed startem ligi')],
+    ['Forma', (r) => (r.results?.form?.length ? r.results.form.join(' ') : 'brak meczów')],
+    ...['GK', 'DEF', 'MID', 'ATT'].map((k) => [cols[0].units?.rows?.find((x) => x.k === k)?.label ?? k, (r) => unit(r, k)]),
+    ['Zgranie', (r) => (r.tactics?.cohLabel ?? 'brak danych').toLowerCase()],
+    ['Pewność raportu', (r) => r.confidence?.word ?? 'brak danych'],
+  ];
+  return `<section class="arep-card trep-card trep-card--cmp" data-t="misc" aria-labelledby="trep-cmp">
+    <header class="arep-card__head"><h3 id="trep-cmp">Porównanie raportów</h3></header>
+    <div class="trep-cmp"><table>
+      <thead><tr><th scope="col">Stan na</th>${cols.map((r) => `<th scope="col">${esc(fmtDate(r.date))}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map(([k, f]) => `<tr><th scope="row">${esc(k)}</th>${cols.map((r) => `<td>${esc(f(r))}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table></div>
+    <p class="arep-note">Miejsca formacji w lidze z dokładnością każdego raportu: liczba przy wysokiej pewności, przedział przy średniej, słowa przy niskiej.</p>
+  </section>`;
+}
+
+/** Ekran raportu (HTML). msg: komunikat po kliknięciu „Poproś o nowy raport”; sel: raport z archiwum (0 = najnowszy). */
+export function renderTeamReport(game, { msg = '', sel = 0 } = {}) {
   const st = ensureTeamReport(game);
   const can = canRequest(game);
   const reqBtn = `<button class="btn ${st.cur ? 'btn--quiet' : 'btn--primary'}" data-act="trep-req"${can.ok ? '' : ' disabled'}>Poproś o nowy raport</button>`;
   const reqNote = can.ok ? '' : `<small class="muted">Kolejny raport na prośbę najwcześniej ${esc(fmtDate(can.from))}.</small>`;
   const note = msg ? `<p class="notice" role="status">${esc(msg)}</p>` : '';
-  const r = st.cur;
+  const list = reportList(game);
+  const i = list[sel] ? sel : 0;
+  const r = list[i] ?? null;
   if (!r) {
     return `<div class="arep trep trep--empty">${note}
       <section class="trep-intro">
@@ -113,6 +151,8 @@ export function renderTeamReport(game, { msg = '' } = {}) {
     </div>`;
   }
   return `<div class="arep trep" data-prec="${esc(r.confidence.prec)}">${note}
+    ${archiveNav(list, i)}
+    ${i > 0 ? `<p class="notice">Raport archiwalny z ${esc(fmtDate(r.date))}: stan drużyny mógł się od tego czasu zmienić.</p>` : ''}
     <header class="trep__head">
       <div class="trep__title">
         <h2>Raport ogólny o drużynie</h2>
@@ -131,6 +171,7 @@ export function renderTeamReport(game, { msg = '' } = {}) {
       ${recsHtml(game, r.recs)}
     </section>
     ${unitsHtml(r.units)}
+    ${compareHtml(list)}
     <div class="arep__grid">
       ${card('results', 'Wyniki i gra', `${formHtml(r.results.form)}${lines(r.results.lines)}`, r.results, { tone: 'info' })}
       ${card('tactics', 'Styl i taktyka', lines(r.tactics.lines), r.tactics, { tone: 'misc', extra: r.tactics.by2 })}

@@ -207,3 +207,18 @@
   .trep-depth__row { grid-template-columns: 170px minmax(0, 1fr) minmax(0, 1.4fr); gap: 12px; align-items: baseline; padding: 7px 4px; }
   .trep-depth__row--head { display: grid; padding-top: 0; font: 600 12.5px/1.2 var(--font-body); color: var(--text-muted); }
 }
+
+/* Archiwum raportów i porównanie (3 ostatnie raporty) */
+.trep-arch { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.trep-arch__k { font: 600 var(--step--1)/1.2 var(--font-body); color: var(--text-muted); }
+.trep-cmp { overflow-x: auto; }
+.trep-cmp table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: var(--step--1); }
+.trep-cmp thead th:first-child { width: 30%; }
+.trep-cmp th, .trep-cmp td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: baseline; overflow-wrap: anywhere; }
+.trep-cmp thead th { font: 700 var(--step-0)/1.2 var(--font-display); }
+.trep-cmp tbody th { font-weight: 600; color: var(--text-muted); }
+.trep-cmp td:last-child { font-weight: 600; }
+.trep-cmp tr:last-child th, .trep-cmp tr:last-child td { border-bottom: 0; }
+@media (max-width: 480px) {
+  .trep-cmp th, .trep-cmp td { padding: 6px 4px; }
+}
