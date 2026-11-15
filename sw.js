@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-bc86dd4cff';
+const VERSION = 'v0.3-b5fbf51488';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -158,7 +158,7 @@ const FILES = [
   ['./src/match/pressSystem.js', 'f08d4d2743'],
   ['./src/match/studio.js', '2d03fdb107'],
   ['./src/season/cup.js', '830ec558a6'],
-  ['./src/season/dailySystems.js', 'b04acbce37'],
+  ['./src/season/dailySystems.js', '565bfaf2cc'],
   ['./src/season/europe.js', 'fb7489f63d'],
   ['./src/season/europeAccess.js', '81a4d6f9bd'],
   ['./src/season/history.js', 'cb2f7c138c'],
@@ -205,7 +205,7 @@ const FILES = [
   ['./src/training/load.js', '029d414e92'],
   ['./src/training/plan.js', 'fa1087808c'],
   ['./src/training/scouting.js', 'a87919efba'],
-  ['./src/training/sessions.js', '59c03ef5ee'],
+  ['./src/training/sessions.js', '4bff887e3b'],
   ['./src/training/staff.js', '353719e359'],
   ['./src/training/state.js', '6a29641d23'],
   ['./src/training/variety.js', '31ec815b77'],

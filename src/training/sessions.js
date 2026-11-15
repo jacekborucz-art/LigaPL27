@@ -107,8 +107,14 @@ export function trackPreparation(game, date, official, ctx, day, messages) {
   if (ctx.camp && ctx.camp.from === date) {
     messages.push(msg(date, 'Asystent trenera', 'info', `Wyjazd na obóz: ${ctx.camp.place}`, `Drużyna zaczyna ${HALF_NAMES[ctx.camp.half].toLowerCase()} (${ctx.camp.days} dni, do ${fmtDate(ctx.camp.to)}). Na obozie zajęcia dają więcej, zgranie rośnie szybciej, a ryzyko urazu jest mniejsze.`, `campstart:${ctx.camp.key}`));
   }
-  if (date === w.open && !(T.camps ?? []).some((x) => x.key === w.key && !x.cancelled) && w.length >= CAMP.minDays) {
-    messages.push(msg(date, 'Asystent trenera', 'info', `${HALF_NAMES[half]}: czas na decyzję`, `Okres przygotowawczy trwa do ${fmtDate(w.start)}. Obóz możemy zorganizować między ${fmtDate(w.from)} a ${fmtDate(w.to)} (ekran Trening, zakładka Obozy). Bez obozu drużyna zacznie rundę z niższą formą bazową.`, `campremind:${w.key}`));
+  // Przystanki „Dalej” (priorytet important): początek okresu przygotowawczego i ostatnie dni na rezerwację obozu
+  const booked = (T.camps ?? []).some((x) => x.key === w.key && !x.cancelled);
+  if (date === w.open && !booked && w.length >= CAMP.minDays) {
+    messages.push(msg(date, 'Asystent trenera', 'important', `${HALF_NAMES[half]}: czas na decyzję`, `Okres przygotowawczy trwa do ${fmtDate(w.start)}. Obóz możemy zorganizować między ${fmtDate(w.from)} a ${fmtDate(w.to)} (ekran Trening, zakładka Obozy). Bez obozu drużyna zacznie rundę z niższą formą bazową.`, `campremind:${w.key}`));
+  }
+  const lastCall = addDays(w.to, -(CAMP.minDays + 2)); // jeszcze 3 dni na rezerwację najkrótszego obozu
+  if (date === lastCall && lastCall > w.open && !booked && w.length >= CAMP.minDays) {
+    messages.push(msg(date, 'Asystent trenera', 'important', `${HALF_NAMES[half]}: ostatnie dni na rezerwację`, `Najkrótszy obóz (${CAMP.minDays} dni) musi skończyć się do ${fmtDate(w.to)}, więc na rezerwację zostały 3 dni (ekran Trening, zakładka Obozy). Potem drużyna przygotuje się do rundy tylko w klubie.`, `camplast:${w.key}`));
   }
   // Forma bazowa liczona w dniu pierwszego meczu rundy
   if (date >= w.start && c.cb?.key !== w.key) {

@@ -3,7 +3,7 @@
 
 import { registerDailySystem, addDays } from '../core/gameLoop.js';
 import { createMessage } from '../core/inbox.js';
-import { DOMESTIC, UEFA, FIFA_WINDOWS, POLISH_EUROPE_2026, SEASON_START, SEASON } from '../config/calendar2026.js';
+import { DOMESTIC, UEFA, FIFA_WINDOWS, POLISH_EUROPE_2026, SEASON_START, SEASON, SEASON_YEAR } from '../config/calendar2026.js';
 import { LEAGUE_NAMES, clubById, leagueLabel } from '../data/clubs_pl.js';
 import { seasonGoalFor } from '../career/board.js';
 import { fmtDate } from '../ui/dom.js';
@@ -113,7 +113,38 @@ registerDailySystem({
   },
 });
 
-// 4. Zapowiedź meczu klubu gracza dzień wcześniej
+// 4. Koniec rundy (przystanek „Dalej”): dzień po ostatnim meczu o punkty jesieni i po ostatniej kolejce ligi wiosną
+const isLeagueComp = (c) => c === 'ekstraklasa' || c === 'liga1' || c === 'liga2' || c?.startsWith('liga3-');
+registerDailySystem({
+  id: 'roundEnd', order: 41,
+  run(state, date) {
+    const mine = (state.fixtures || []).filter((f) => f.comp !== 'friendly' && f.date && (f.home === state.clubId || f.away === state.clubId));
+    if (!mine.length) return {};
+    const ny = `${SEASON_YEAR + 1}-01-01`;
+    const winter = DOMESTIC.transferWindows?.[1];
+    const lastAutumn = mine.filter((f) => f.date < ny).map((f) => f.date).sort().at(-1);
+    if (lastAutumn && date === addDays(lastAutumn, 1)) {
+      const spring = mine.map((f) => f.date).filter((d) => d >= ny).sort()[0];
+      return { messages: [msg(date, {
+        key: `round-end:${SEASON}:jesien`, category: 'staff', from: 'Asystent trenera', priority: 'important',
+        subject: 'Koniec rundy jesiennej',
+        body: `Runda jesienna za nami. ${spring ? `Wiosną gramy od ${fmtDate(spring)}. ` : ''}${winter ? `Zimowe okno transferowe: ${fmtDate(winter.from)} - ${fmtDate(winter.to)}. ` : ''}W przerwie warto zarezerwować obóz zimowy (Trening, zakładka Obozy) i przejrzeć kadrę.`,
+      })] };
+    }
+    const lastLeague = mine.filter((f) => isLeagueComp(f.comp)).map((f) => f.date).sort().at(-1);
+    if (lastLeague && lastLeague >= ny && date === addDays(lastLeague, 1)) {
+      const more = mine.some((f) => !f.played && f.date >= date);
+      return { messages: [msg(date, {
+        key: `round-end:${SEASON}:wiosna`, category: 'staff', from: 'Asystent trenera', priority: 'important',
+        subject: 'Koniec sezonu ligowego',
+        body: `Ostatnia kolejka ligi za nami.${more ? ' Przed nami jeszcze mecze o stawkę (puchar albo baraże).' : ''} Nowy sezon zaczyna się 1 lipca: warto już planować kadrę, kontrakty i letnie okno transferowe.`,
+      })] };
+    }
+    return {};
+  },
+});
+
+// 5. Zapowiedź meczu klubu gracza dzień wcześniej
 registerDailySystem({
   id: 'matchPreview', order: 40,
   run(state, date) {

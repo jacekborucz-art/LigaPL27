@@ -110,6 +110,35 @@ test('Brak obozu zimą: wyraźna kara wobec obozu w Turcji (siła, urazy, ostro�
   assert.ok(TR.trainingInjuryChance(pl, { ...ctx, campQ: 1 }) < TR.trainingInjuryChance(pl, ctx), 'na obozie mniej urazów');
 });
 
+test('Przerwa zimowa: Dalej zatrzymuje się na końcu rundy, przy obozie (start i ostatnie dni) i przy otwarciu okna', () => {
+  const g = newGame('widzew', 5);
+  const rng = new Rng('przystanki');
+  const stops = new Map();
+  let guard = 0;
+  while (g.date < '2027-02-03' && guard++ < 4000) {
+    const a = primaryAction(g);
+    if (a.kind === 'play') { const f = a.match; if (f.comp === 'friendly' || !f.away || !f.home) { f.played = true; f.result = { score: [1, 1] }; } else applyResult(g, f, playQuick(g, f, rng), rng); continue; }
+    if (a.kind === 'decide') { g.inbox = g.inbox.map((m) => ({ ...m, resolved: true })); continue; }
+    const r = continueUntilStop(g, { maxDays: 120 });
+    if (r.reason === 'message') stops.set(g.date, r.days.at(-1).added.map((m) => m.key ?? ''));
+  }
+  const ny = '2027-01-01';
+  const lastAutumn = official(g).map((f) => f.date).filter((d) => d < ny).sort().at(-1);
+  const w = TR.campWindow(g, 'winter');
+  const at = (date, key) => (stops.get(date) ?? []).some((k) => k.startsWith(key));
+  assert.ok(at(addDays(lastAutumn, 1), 'round-end:'), `koniec rundy ${addDays(lastAutumn, 1)}`);
+  assert.ok(at(w.open, 'campremind:'), `obóz ${w.open}`);
+  assert.ok(at(addDays(w.to, -(CAMP.minDays + 2)), 'camplast:'), 'ostatnie dni na rezerwację');
+  assert.ok(at('2027-02-01', 'tw-open:'), 'otwarcie okna');
+  // Po rezerwacji obozu nie ma już przypomnienia „ostatnie dni”
+  const h = newGame('widzew', 5);
+  h.date = w.open;
+  assert.ok(TR.bookCamp(h, { half: 'winter', dest: 'polska', days: 7, from: TR.campStarts(h, 'winter', 7)[0] }).ok);
+  h.date = addDays(w.to, -(CAMP.minDays + 3));
+  continueUntilStop(h, { maxDays: 1 });
+  assert.ok(!h.inbox.some((m) => m.key?.startsWith('camplast:')));
+});
+
 test('Kluby AI jadą na obóz same według możliwości: bogaci zimą do Turcji i Hiszpanii', () => {
   const g = newGame('widzew');
   const rich = ['legia', 'lech', 'rakow'].map((id) => TR.aiCampChoice(g, id, 'winter'));
