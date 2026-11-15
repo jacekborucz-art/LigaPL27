@@ -870,7 +870,7 @@ async function playMyMatch() {
   const bench = COMPETITIONS[tierComp]?.benchSize ?? 12;
   const cfgFor = (id, squad, tactics, ai) => ({ club: anyClub(id), squad, tactics, ai, coach: coachStyle(g, id) });
   const mine = cfgFor(g.clubId, mySquad(g), g.tactics, false);
-  const theirs = cfgFor(oppId, oppSquad, createTactics(oppSquad, { benchSize: bench }), true);
+  const theirs = cfgFor(oppId, oppSquad, createTactics(oppSquad, { benchSize: bench, benchGk: COMPETITIONS[f.comp]?.benchGk ?? 1 }), true);
   // Trener rywala z atrybutami i asystent gracza (docs/trener-ai-atrybuty.md)
   const rank = f.comp === 'pp' ? (f.round === 'F' ? 3 : 1) : f.comp === 'super' ? 3 : f.comp === 'uefa' ? 2 : 0;
   if (f.comp !== 'friendly') theirs.coachQ = matchCoach(coachOf(g, oppId, oppClub), { rank, rng: formRng(g, f.id, oppId) });

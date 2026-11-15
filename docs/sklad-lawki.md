@@ -58,8 +58,8 @@ po 25 zawodników z kilkoma nieobecnymi). Przy ławce 9 w 173 przypadkach zostaj
    co najmniej 70 (np. DP na ŚO). Brak nawet takiego: rola zostaje pusta, a miejsce idzie do puli ogólnej.
 4. Mała ławka (7): bramkarz i pięć ról, jedno miejsce wolne. Ławka 9: trzy wolne. Ławka 12: sześć wolnych.
 5. Wolne miejsca: najlepsi zawodnicy z pola według wartości na najlepszej dla nich pozycji plus stan zawodnika.
-6. Ławka ustawiona przez gracza zostaje. Asystent tylko usuwa niedostępnych (jak dotąd), a przy uzupełnianiu krótkiej
-   ławki dobiera brakujących według tych zasad, licząc już siedzących (np. nie doda bramkarza, gdy gracz go wpisał).
+6. Ławka ustawiona przez gracza zostaje. Asystent usuwa niedostępnych i od razu zajmuje ich miejsca według tych zasad,
+   licząc już siedzących (np. nie doda bramkarza, gdy gracz go wpisał). Zobacz decyzje właściciela niżej.
 7. Wynik powtarzalny: przy równej wartości decyduje identyfikator zawodnika.
 
 ## Zasady (SHOULD, wdrożone, bo małe)
@@ -67,10 +67,22 @@ po 25 zawodników z kilkoma nieobecnymi). Przy ławce 9 w 173 przypadkach zostaj
 - Najwyżej 3 zawodników z tej samej roli na ławce przy dobieraniu wolnych miejsc (limit znika, gdy nie ma innych).
 - Uniwersalność: mały dodatek do wartości za każdą inną rolę, w której zawodnik ma biegłość co najmniej 85 [SZAC: 0,1 OVR za rolę].
 
-## Na później (LATER) i decyzje właściciela
+## Decyzje właściciela (Nov 15, 2026, wdrożone)
 
-- Trzeci bramkarz przy ławce 12 w pucharach europejskich (praktyka UEFA): obecnie nie. Do decyzji.
-- Uzupełnianie ławki po każdej kontuzji, nie tylko gdy spadnie poniżej 7: dziś gracz z ławką 9, z której wypadł ŚO, gra
-  z 8 rezerwowymi bez ŚO. Zmiana dotknęłaby ławki gracza, więc do decyzji.
+1. Trzeci bramkarz w pucharach UEFA: tak. W meczach Ligi Mistrzów, Ligi Europy, Ligi Konferencji (i Superpucharu
+   Europy, ten sam regulamin UEFA) automatyczna ławka 12 ma zawsze dwóch rezerwowych bramkarzy, gdy są dostępni, kosztem
+   jednego zawodnika z pola. Drugi bramkarz wchodzi po pokryciu ról, przed wolnymi miejscami. Ustawienie: `benchGk: 2`
+   w `COMPETITIONS.uefa` (`src/config/competitions.js`). Rozgrywki krajowe bez zmian. Te same zasady dla asystenta
+   gracza (tryb asystenta) i klubów AI.
+2. Uzupełnianie od razu: gdy zawodnik wypada z ławki (kontuzja, kartka, powołanie, przejście do jedenastki za
+   nieobecnego), asystent od razu zajmuje to miejsce według zasad ławki (np. najpierw brakujący ŚO), a pozostali
+   wybrani przez gracza zostają. Gracz widzi to w zmianach składu („X wchodzi na ławkę (ŚO)”). Miejsca, których gracz
+   sam nie obsadził, zostają puste (ławka poniżej 7 jest nadal dobierana do pełnej).
+
+Uwaga: ręczna ławka gracza w meczu UEFA nie dostaje drugiego bramkarza na siłę. Dostaje go ławka ustawiana przez
+asystenta (tryb asystenta) i ławka rywala. Przy uzupełnianiu wolnego miejsca w meczu UEFA najpierw idą brakujące role.
+
+## Na później (LATER)
+
 - Młodzieżowiec na ławce (minuty dla młodych, przepis o młodzieżowcu), skłonność do urazów, „zmiennik od zadań specjalnych”
   (szybki skrzydłowy przy przegrywaniu), bramkarz od karnych w pucharach.

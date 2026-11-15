@@ -60,7 +60,7 @@ export const COMPETITIONS = {
     extraTime: false, penalties: true, // [ZAŁOŻENIE] przy remisie od razu karne
   },
   uefa: {
-    ...matchRules, benchSize: 12, var: true, listA: 25, homegrownMin: 8, awayGoals: false,
+    ...matchRules, benchSize: 12, benchGk: 2, var: true, listA: 25, homegrownMin: 8, awayGoals: false, // benchGk: trzeci bramkarz w protokole (docs/sklad-lawki.md)
     yellowSuspension: {
       qualifying: { first: 3, thenEvery: 2 },
       main: { first: 4, thenEvery: 2 },

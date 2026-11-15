@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-112cac0027';
+const VERSION = 'v0.3-bc86dd4cff';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -78,7 +78,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', '251ed2c158'],
+  ['./src/app.js', 'ecf7921933'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '45f14cb64d'],
@@ -120,7 +120,7 @@ const FILES = [
   ['./src/career/transferSystem.js', '91a3d49d4c'],
   ['./src/career/transfers.js', 'cfee366370'],
   ['./src/config/calendar2026.js', '7af3df5b12'],
-  ['./src/config/competitions.js', '27b3c95b94'],
+  ['./src/config/competitions.js', '1ba35856b2'],
   ['./src/core/decisions.js', 'b9fda961b7'],
   ['./src/core/gameLoop.js', 'd572502469'],
   ['./src/core/inbox.js', '689fd5b609'],
@@ -138,7 +138,7 @@ const FILES = [
   ['./src/data/names.js', '7195dbc1a8'],
   ['./src/data/reprezentacje.json', '551a9d5bdd'],
   ['./src/data/reprezentacje_swiat.json', '29c3c96adf'],
-  ['./src/engine/lineup.js', '0caa9856c3'],
+  ['./src/engine/lineup.js', '02cc769918'],
   ['./src/engine/match/coach.js', '2cc9ca6593'],
   ['./src/engine/match/constants.js', 'b111feef02'],
   ['./src/engine/match/control.js', 'b17907f777'],
@@ -151,9 +151,9 @@ const FILES = [
   ['./src/engine/positions.js', 'ee736ff7cc'],
   ['./src/engine/quickSim.js', '0dbcfcdd5b'],
   ['./src/engine/teamStrength.js', '4e3625ab2f'],
-  ['./src/match/aiPlan.js', '865da43514'],
+  ['./src/match/aiPlan.js', '2f958da775'],
   ['./src/match/briefings.js', '259a9a1c24'],
-  ['./src/match/matchday.js', '778e01b1b9'],
+  ['./src/match/matchday.js', '6326b07562'],
   ['./src/match/press.js', 'a0c01d2832'],
   ['./src/match/pressSystem.js', 'f08d4d2743'],
   ['./src/match/studio.js', '2d03fdb107'],

@@ -80,8 +80,10 @@ const roleFit = (p, role) => role.reduce((best, pos) => {
  * środek pomocy, skrzydło lub OP, napastnik), reszta najlepsi z pola (najwyżej 3 z jednej roli). Drugi bramkarz
  * tylko przy ławce 12, gdy nie ma już nikogo z pola. keep: zawodnicy już na ławce (np. wybrani przez gracza), zostają i liczą się
  * do pokrycia. Remis wartości rozstrzyga identyfikator, więc wynik jest powtarzalny.
+ * gks: liczba rezerwowych bramkarzy (2 w pucharach UEFA, benchGk w src/config/competitions.js); drugi wchodzi po
+ * pokryciu ról, przed wolnymi miejscami.
  */
-export function autoPickBench(squad, xi, benchSize, keep = []) {
+export function autoPickBench(squad, xi, benchSize, keep = [], { gks = 1 } = {}) {
   if (!(benchSize > 0)) return [];
   const inXI = new Set(xi.filter(Boolean));
   const byId = new Map(squad.map((p) => [p.id, p]));
@@ -91,11 +93,13 @@ export function autoPickBench(squad, xi, benchSize, keep = []) {
   const byIdTie = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   const rest = () => squad.filter((p) => isAvailable(p) && !inXI.has(p.id) && !bench.includes(p.id));
   const full = () => bench.length >= benchSize;
-  // 1. Rezerwowy bramkarz
-  if (!full() && !bench.some((id) => byId.get(id).pos === 'BR')) {
+  const addGk = (n) => {
+    if (full() || bench.filter((id) => byId.get(id).pos === 'BR').length >= n) return;
     const gk = rest().filter((p) => p.pos === 'BR').sort((a, b) => (b.ovr + condOf(b)) - (a.ovr + condOf(a)) || byIdTie(a, b))[0];
     if (gk) bench.push(gk.id);
-  }
+  };
+  // 1. Rezerwowy bramkarz
+  addGk(1);
   // 2. Pokrycie ról: najpierw nominalny, gdy go brak, uniwersalny z biegłością co najmniej 70
   for (const role of BENCH_ROLES) {
     if (full()) break;
@@ -107,6 +111,8 @@ export function autoPickBench(squad, xi, benchSize, keep = []) {
       .sort((a, b) => (b.v + condOf(b.p)) - (a.v + condOf(a.p)) || byIdTie(a.p, b.p))[0];
     if (cand) bench.push(cand.p.id);
   }
+  // 2b. Puchary UEFA: drugi rezerwowy bramkarz (trzeci bramkarz w protokole, praktyka przy 12 rezerwowych)
+  if (gks >= 2) addGk(2);
   // 3. Wolne miejsca: najlepsi z pola (najlepsza rola, stan zawodnika, mały dodatek za uniwersalność)
   const fillValue = (p) => {
     let best = -Infinity; let extra = 0;
@@ -150,13 +156,14 @@ export function autoRoles(squad, xi) {
   };
 }
 
-export function createTactics(squad, { formation = DEFAULT_FORMATION, benchSize = 12, instructions } = {}) {
+/** benchGk: liczba rezerwowych bramkarzy (COMPETITIONS[comp].benchGk, 2 w pucharach UEFA). */
+export function createTactics(squad, { formation = DEFAULT_FORMATION, benchSize = 12, instructions, benchGk = 1 } = {}) {
   const f = formationById(formation);
   const xi = autoPickXI(squad, f);
   return {
     formation: f.id,
     xi,
-    bench: autoPickBench(squad, xi, benchSize),
+    bench: autoPickBench(squad, xi, benchSize, [], { gks: benchGk }),
     instructions: { ...defaultInstructions(), ...(instructions || {}) },
     ...autoRoles(squad, xi),
   };
@@ -233,7 +240,7 @@ export function checkTactics(tactics, squad, { benchSize = 12 } = {}) {
  * Przed meczem i po wczytaniu: usuwa niedostępnych i uzupełnia puste miejsca (asystent).
  * Zwraca nową taktykę i listę zmian do pokazania graczowi.
  */
-export function refreshTactics(tactics, squad, { benchSize = 12 } = {}) {
+export function refreshTactics(tactics, squad, { benchSize = 12, benchGk = 1 } = {}) {
   const byId = new Map(squad.map((p) => [p.id, p]));
   const changes = [];
   const ok = (id) => id && byId.has(id) && isAvailable(byId.get(id));
@@ -251,8 +258,15 @@ export function refreshTactics(tactics, squad, { benchSize = 12 } = {}) {
       if (cand) { t.xi[i] = cand.id; used.add(cand.id); t.bench = t.bench.filter((id) => id !== cand.id); changes.push(`${cand.name} wchodzi do składu (${f.slots[i].pos})`); }
     }
   }
-  // Krótka ławka: wybrani przez gracza zostają, asystent dobiera tylko brakujące miejsca (docs/sklad-lawki.md)
-  if (t.bench.length < Math.min(benchSize, 7)) t = { ...t, bench: autoPickBench(squad, t.xi, benchSize, t.bench) };
+  // Ławka (docs/sklad-lawki.md): wybrani przez gracza zostają. Miejsce zwolnione przez niedostępnego albo przez
+  // przejście do jedenastki asystent od razu zajmuje według zasad ławki (np. najpierw brakujący ŚO). Miejsca, których
+  // gracz sam nie obsadził, zostają puste, chyba że ławka ma mniej niż 7 zawodników (wtedy dobór do pełnej ławki).
+  const target = t.bench.length < Math.min(benchSize, 7) ? benchSize : Math.min(benchSize, tactics.bench.length);
+  if (t.bench.length < target) {
+    const bench = autoPickBench(squad, t.xi, target, t.bench, { gks: benchGk });
+    for (const id of bench) if (!t.bench.includes(id)) changes.push(`${byId.get(id).name} wchodzi na ławkę (${byId.get(id).pos})`);
+    t = { ...t, bench };
+  }
   const roles = autoRoles(squad, t.xi);
   for (const r of ['captain', 'penalty', 'freeKick', 'corner']) if (!t[r] || !t.xi.includes(t[r])) t[r] = roles[r];
   return { tactics: t, changes };

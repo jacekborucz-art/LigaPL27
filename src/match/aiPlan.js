@@ -25,26 +25,26 @@ function fitOf(squad, tactics) {
 }
 
 /**
- * Taktyka AI na mecz. opts: { formation, benchSize, cq (matchCoach: skl), rng (ziarno planu), oppSquad }.
+ * Taktyka AI na mecz. opts: { formation, benchSize, benchGk (rezerwowi bramkarze), cq (matchCoach: skl), rng (ziarno planu), oppSquad }.
  * Zwraca { tactics, plan: { kind: 'good'|'bad'|'xi'|null, text } }. Bez profilu albo przy s = 0: createTactics.
  */
-export function aiPlanTactics(squad, { formation = '4231', benchSize = 12, cq = null, rng = null, oppSquad = null } = {}) {
+export function aiPlanTactics(squad, { formation = '4231', benchSize = 12, benchGk = 1, cq = null, rng = null, oppSquad = null } = {}) {
   const s = cq?.skl ?? 0;
-  const base = () => createTactics(squad, { formation, benchSize });
+  const base = () => createTactics(squad, { formation, benchSize, benchGk });
   if (!s || !rng || !squad?.length) return { tactics: base(), plan: null };
   const P = COACH.plan;
   if (s < 0) {
     // Błąd w ocenie zawodników: odchylenie oceny każdego zawodnika (stałe w tym meczu), więc czasem gra słabszy
     const sd = P.xiNoise * -s;
     const seen = squad.map((p) => ({ ...p, ovr: p.ovr + rng.gauss(0, sd) }));
-    let tactics = createTactics(seen, { formation, benchSize });
+    let tactics = createTactics(seen, { formation, benchSize, benchGk });
     let text = 'trener postawił na zawodników w słabszej dyspozycji';
     let kind = 'xi';
     if (rng.chance(P.bad * -s)) {
       const opts = ['long', 'slow', '343'];
       const pick = opts[rng.int(0, opts.length - 1)];
       if (pick === '343') {
-        const t = createTactics(seen, { formation: '343', benchSize });
+        const t = createTactics(seen, { formation: '343', benchSize, benchGk });
         if (fitOf(squad, t) < fitOf(squad, tactics)) { tactics = t; text = 'trener upiera się przy ustawieniu 3-4-3, choć kadra do niego nie pasuje'; kind = 'bad'; }
       } else if (pick === 'long') {
         tactics = { ...tactics, instructions: { ...tactics.instructions, passing: 'long' } }; text = 'gramy długimi piłkami do napastnika'; kind = 'bad';

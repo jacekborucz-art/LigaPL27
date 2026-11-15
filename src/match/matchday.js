@@ -238,9 +238,9 @@ function teamCtx(game, clubId, comp, table, tactics) {
  * na stałe, więc pasywny gracz po kilku kontuzjach grał rezerwowymi do końca sezonu.
  * tactics.assistant === true: skład przed każdym meczem wybiera asystent, tak jak w klubach AI (formacja i instrukcje gracza).
  */
-export function matchTactics(game, squad, benchSize) {
+export function matchTactics(game, squad, benchSize, benchGk = 1) {
   const prev = game.tactics;
-  if (prev.assistant) return { ...createTactics(squad, { formation: prev.formation, instructions: prev.instructions, benchSize }), assistant: true };
+  if (prev.assistant) return { ...createTactics(squad, { formation: prev.formation, instructions: prev.instructions, benchSize, benchGk }), assistant: true };
   const subs = { ...(game.tacticsSubs ?? {}) }; // miejsce w jedenastce -> { orig: zastąpiony, sub: zastępca }
   const byId = new Map(squad.map((p) => [p.id, p]));
   const out = (id) => { const p = byId.get(id); return !p || !isAvailable(p); };
@@ -265,7 +265,7 @@ export function matchTactics(game, squad, benchSize) {
     if (!bench.includes(s.sub) && byId.has(s.sub)) bench = [...bench.slice(0, Math.max(0, benchSize - 1)), s.sub];
     delete subs[i];
   }
-  const { tactics } = refreshTactics({ ...prev, xi, bench }, squad, { benchSize });
+  const { tactics } = refreshTactics({ ...prev, xi, bench }, squad, { benchSize, benchGk });
   tactics.xi.forEach((id, i) => {
     if (!xi[i] || id === xi[i]) return;
     subs[i] = subs[i] ? { ...subs[i], sub: id } : { orig: xi[i], sub: id };
@@ -285,8 +285,9 @@ export function startMatchday(game, f) {
   const table = LEAGUE_COMPS.includes(comp)
     ? standings(game.fixtures.filter((x) => x.comp === comp), compClubIds(comp)) : null;
   const benchSize = (LEAGUE_COMPS.includes(comp) ? COMPETITIONS[comp].benchSize : 12);
+  const benchGk = COMPETITIONS[comp]?.benchGk ?? 1; // puchary UEFA: dwóch rezerwowych bramkarzy (docs/sklad-lawki.md)
   const mySquad = squadFor(game, game.clubId, comp);
-  game.tactics = matchTactics(game, mySquad, benchSize);
+  game.tactics = matchTactics(game, mySquad, benchSize, benchGk);
   const oppSquad = squadFor(game, oppId, comp);
   // Sparing: na ławce cała dostępna kadra do 14 zawodników u obu drużyn (docs/sparingi-i-karne.md, rozdz. 4).
   // Ustawienia gracza (game.tactics) się nie zmieniają: dodatkowi rezerwowi dochodzą tylko na ten mecz.
@@ -300,7 +301,7 @@ export function startMatchday(game, f) {
   const oppQ = comp === 'friendly' ? null : matchCoach(oppCoach, { rank: rank0, rng: formRng(game, f.id, oppId) });
   const myQ = matchCoach(assistantProfile(staffQ(game, game.clubId, 'asystent'), clubById(game.clubId)?.tier), { rank: rank0, rng: formRng(game, f.id, game.clubId) });
   const formation = aiPreMatchFormation(game, f, { userSide, mySquad, oppSquad, comp });
-  const { tactics: oppTactics, plan: oppPlan } = aiPlanTactics(oppSquad, { formation, benchSize: matchBench, cq: oppQ, rng: new Rng(`ai-plan:${game.seed}:${f.id}`), oppSquad: mySquad });
+  const { tactics: oppTactics, plan: oppPlan } = aiPlanTactics(oppSquad, { formation, benchSize: matchBench, benchGk, cq: oppQ, rng: new Rng(`ai-plan:${game.seed}:${f.id}`), oppSquad: mySquad });
   const weather = weatherFor(f.date, rng);
   const pitch = rng.weighted(['doskonala', 'dobra', 'zla', 'sztuczna'], (p) => ({ doskonala: 2, dobra: 6, zla: weather.type === 'deszcz' || weather.type === 'snieg' ? 2 : 0.5, sztuczna: 0.6 })[p]);
   const referee = { name: rng.pick(REFEREES), strictness: Math.round(Math.max(0.7, Math.min(1.4, rng.gauss(1, 0.13))) * 100) / 100 };

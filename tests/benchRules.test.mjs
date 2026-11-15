@@ -5,6 +5,8 @@ import { generateWorld, squadOf } from '../src/world/worldGen.js';
 import { FORMATIONS } from '../src/data/formations.js';
 import { createTactics, refreshTactics, autoPickBench, BENCH_ROLES } from '../src/engine/lineup.js';
 import { aiPlanTactics } from '../src/match/aiPlan.js';
+import { matchTactics } from '../src/match/matchday.js';
+import { COMPETITIONS } from '../src/config/competitions.js';
 import { isAvailable } from '../src/career/squad.js';
 import { Rng } from '../src/core/rng.js';
 
@@ -105,7 +107,7 @@ test('Gracz i AI: ta sama funkcja ławki (asystent gracza = klub AI z przeciętn
   }
 });
 
-test('Stary zapis: ręczna ławka gracza zostaje (nawet z dwoma bramkarzami), asystent usuwa tylko niedostępnych', () => {
+test('Stary zapis: ręczna ławka gracza zostaje (nawet z dwoma bramkarzami), niedostępny od razu zastąpiony według zasad', () => {
   const squad = scenario(clubIds[1], 0, 0);
   const t = createTactics(squad, { benchSize: 9 });
   const free = squad.filter((p) => !t.xi.includes(p.id));
@@ -115,10 +117,53 @@ test('Stary zapis: ręczna ławka gracza zostaje (nawet z dwoma bramkarzami), as
   assert.equal(manual.bench.length, 9);
   const r = refreshTactics(manual, squad, { benchSize: 9 });
   assert.deepEqual(r.tactics.bench, manual.bench);
-  // jeden z ręcznie wybranych kontuzjowany: znika, reszta bez zmian (8 >= 7, bez dobierania)
+  // jeden z ręcznie wybranych kontuzjowany: znika, a jego miejsce asystent od razu zajmuje według zasad (najpierw ŚO)
   const hurt = squad.map((p) => (p.id === others[0] ? { ...p, injuryDays: 3 } : p));
   const r2 = refreshTactics(manual, hurt, { benchSize: 9 });
-  assert.deepEqual(r2.tactics.bench, manual.bench.filter((id) => id !== others[0]));
+  const kept = manual.bench.filter((id) => id !== others[0]);
+  assert.equal(r2.tactics.bench.length, 9);
+  for (const id of kept) assert.ok(r2.tactics.bench.includes(id));
+  const added = squad.find((p) => p.id === r2.tactics.bench.find((id) => !kept.includes(id)));
+  if (free.some((p) => p.pos === 'ŚO')) assert.equal(added.pos, 'ŚO');
+  assert.ok(r2.changes.some((c) => c.includes('wchodzi na ławkę')));
+});
+
+test('Uzupełnianie od razu: wypada ŚO z ławki 9, wchodzi inny ŚO, pozostali wybrani zostają', () => {
+  const squad = scenario(clubIds[3], 0, 0);
+  const t = createTactics(squad, { benchSize: 9 });
+  const cbs = squad.filter((p) => p.pos === 'ŚO' && !t.xi.includes(p.id));
+  assert.ok(cbs.length >= 2, 'w kadrze co najmniej dwóch ŚO poza jedenastką');
+  const onBench = cbs.find((p) => t.bench.includes(p.id));
+  const hurt = squad.map((p) => (p.id === onBench.id ? { ...p, suspended: 1 } : p));
+  const { tactics } = refreshTactics(t, hurt, { benchSize: 9 });
+  assert.equal(tactics.bench.length, 9);
+  assert.ok(!tactics.bench.includes(onBench.id));
+  for (const id of t.bench) if (id !== onBench.id) assert.ok(tactics.bench.includes(id));
+  assert.ok(benchPlayers(hurt, tactics).some((p) => p.pos === 'ŚO'));
+});
+
+test('Miejsce, którego gracz sam nie obsadził, zostaje puste (ławka 8 z 9 bez nieobecnych)', () => {
+  const squad = scenario(clubIds[4], 0, 0);
+  const t = createTactics(squad, { benchSize: 9 });
+  const short = { ...t, bench: t.bench.slice(0, 8) };
+  assert.deepEqual(refreshTactics(short, squad, { benchSize: 9 }).tactics.bench, short.bench);
+});
+
+test('Puchary UEFA: ławka 12 z dwoma rezerwowymi bramkarzami, gracz i AI tak samo; w kraju jeden', () => {
+  for (const clubId of clubIds.slice(0, 20)) {
+    const squad = scenario(clubId, 0, 0);
+    const gkFree = squad.filter((p) => p.pos === 'BR').length - 1;
+    const user = createTactics(squad, { benchSize: 12, benchGk: 2 });
+    const ai = aiPlanTactics(squad, { formation: user.formation, benchSize: 12, benchGk: 2 }).tactics;
+    assert.deepEqual(ai.bench, user.bench);
+    const bench = benchPlayers(squad, user);
+    assert.equal(bench.filter((p) => p.pos === 'BR').length, Math.min(2, gkFree), clubId);
+    assert.equal(bench.length, 12);
+    const free = squad.filter((p) => !user.xi.includes(p.id));
+    for (const role of BENCH_ROLES) if (free.some((p) => role.includes(p.pos))) assert.ok(bench.some((p) => role.includes(p.pos)), `${clubId} ${role}`);
+    const home = createTactics(squad, { benchSize: 12 });
+    assert.ok(benchPlayers(squad, home).filter((p) => p.pos === 'BR').length <= 1 || !restOf(squad, home).some((p) => p.pos !== 'BR'));
+  }
 });
 
 test('Krótka ławka: wybrani przez gracza zostają, asystent dobiera brakujących według zasad', () => {
@@ -140,4 +185,15 @@ test('Ławka 0 (ocena rywala w planie AI) i pusta kadra', () => {
   const squad = scenario(clubIds[0], 0, 0);
   assert.deepEqual(createTactics(squad, { benchSize: 0 }).bench, []);
   assert.deepEqual(autoPickBench([], [], 9), []);
+});
+
+test('Mecz UEFA w trybie asystenta: dwóch rezerwowych bramkarzy, mecz ligowy: jeden', () => {
+  assert.equal(COMPETITIONS.uefa.benchGk, 2);
+  assert.equal(COMPETITIONS.ekstraklasa.benchGk, undefined);
+  const squad = scenario(clubIds[5], 0, 0);
+  const game = { tactics: { ...createTactics(squad, { benchSize: 12 }), assistant: true } };
+  const eu = matchTactics(game, squad, 12, COMPETITIONS.uefa.benchGk);
+  assert.equal(benchPlayers(squad, eu).filter((p) => p.pos === 'BR').length, 2);
+  const pl = matchTactics(game, squad, 12, COMPETITIONS.ekstraklasa.benchGk ?? 1);
+  assert.equal(benchPlayers(squad, pl).filter((p) => p.pos === 'BR').length, 1);
 });
