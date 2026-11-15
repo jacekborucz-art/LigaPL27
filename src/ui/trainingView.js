@@ -29,6 +29,7 @@ import { setFriendlyRules, friendlyRulesOf, friendlyRuleTags, FRIENDLY_RULE_TEXT
 import { FRIENDLY_DEFAULTS } from '../engine/match/rules.js';
 import { legsTerm, overloadTerm } from '../training/load.js';
 import { staleNote } from '../training/variety.js';
+import { focusAttrs } from '../training/development.js';
 import { daysBetween } from '../training/state.js';
 import { REPORT_FREQS, ensureAssistantReport, setReportFreq, nextReportDate } from '../career/assistantReport.js';
 
@@ -483,7 +484,9 @@ function playerEditor(game, p) {
   const gk = p.pos === 'BR';
   const groups = Object.entries(ATTR_GROUPS).filter(([k]) => (gk ? true : k !== 'gk'));
   const focusChips = [['', 'Brak'], ...groups].map(([k, v]) => `<button class="chip" data-act="tr-focus" data-id="${esc(p.id)}" data-v="${k}" aria-pressed="${(t.focus ?? '') === k}">${esc(v)}</button>`).join('');
-  const attrBtns = Object.keys(ATTRS).filter((a) => gk || ATTRS[a].group !== 'gk').map((a) => `<button data-act="tr-focus" data-id="${esc(p.id)}" data-v="${a}" aria-pressed="${t.focus === a}" title="${esc(ATTRS[a].name)}">${a} <b>${p.attr[a]}</b></button>`).join('');
+  // Atrybuty objęte akcentem (grupa albo pojedynczy) lekko podświetlone: te mogą rosnąć szybciej
+  const boosted = new Set(focusAttrs(t.focus));
+  const attrBtns = Object.keys(ATTRS).filter((a) => gk || ATTRS[a].group !== 'gk').map((a) => `<button data-act="tr-focus" data-id="${esc(p.id)}" data-v="${a}" aria-pressed="${t.focus === a}"${boosted.has(a) && t.focus !== a ? ' data-boost' : ''} title="${esc(ATTRS[a].name)}${boosted.has(a) ? ', objęty akcentem' : ''}">${a} <b>${p.attr[a]}</b></button>`).join('');
   const posBtns = gk ? '<p class="muted">Bramkarz nie uczy się gry w polu.</p>' : `<div class="tr-posgrid">${POSITIONS.filter((x) => x !== 'BR' && x !== p.pos).map((x) => {
     const prof = Math.round(proficiency(p, x));
     return `<button data-act="tr-pos" data-id="${esc(p.id)}" data-v="${x}" aria-pressed="${t.pos === x}" ${prof >= 90 ? 'disabled' : ''}><b>${x}</b><small>${prof} %</small></button>`;

@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-f994c1519c';
+const VERSION = 'v0.3-eb771f879a';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -192,7 +192,7 @@ const FILES = [
   ['./src/styles/menu.css', '67aa361469'],
   ['./src/styles/negotiation.css', '949f233adc'],
   ['./src/styles/tokens.css', 'a7865d38be'],
-  ['./src/styles/training.css', '9ca4bf6b2b'],
+  ['./src/styles/training.css', 'ac3c7a123a'],
   ['./src/styles/transfers.css', '6ab469db99'],
   ['./src/training/aiClubs.js', '6d6d0c4122'],
   ['./src/training/camps.js', '751dd1d81f'],
@@ -236,7 +236,7 @@ const FILES = [
   ['./src/ui/tacticsMoves.js', 'b4b7f2ea58'],
   ['./src/ui/tacticsView.js', '1d8ca1b0b0'],
   ['./src/ui/talksView.js', 'e2780aa122'],
-  ['./src/ui/trainingView.js', 'a43bec1211'],
+  ['./src/ui/trainingView.js', 'ecf17f4ac2'],
   ['./src/ui/transferDealsView.js', 'a13fa703b3'],
   ['./src/ui/transfersView.js', 'a32a1c958c'],
   ['./src/world/ephemeral.js', '216b6bcdd9'],

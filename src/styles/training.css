@@ -283,6 +283,8 @@
 }
 .tr-attrs button { text-align: center; font-family: var(--font-display); }
 .tr-attrs b { color: var(--text-muted); font-weight: 600; }
+.tr-attrs [data-boost] { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.tr-attrs [data-boost] b { color: var(--text); }
 .tr-posgrid button { display: grid; text-align: center; }
 .tr-posgrid small { color: var(--text-muted); }
 .tr-posgrid button:disabled { opacity: 0.45; cursor: default; }
