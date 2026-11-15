@@ -74,9 +74,12 @@ export function advanceDay(state) {
 
 /**
  * „Dalej”: przewija dni do pierwszego przystanku.
- * Przystanek: mecz klubu gracza, wiadomość ważna lub pilna, decyzja do podjęcia, limit dni.
+ * Przystanek: mecz klubu gracza, 2 dni przed meczem (czas na skład, trening i odprawę), wiadomość ważna lub pilna,
+ * decyzja do podjęcia, limit dni.
  * onDay(day) pozwala UI pokazać datę i wydarzenia każdego mijanego dnia.
  */
+export const PRE_MATCH_STOP_DAYS = 2;
+
 export function continueUntilStop(state, { maxDays = 60, onDay } = {}) {
   const days = [];
   if (pendingDecisions(state.inbox || []).length) return { reason: 'decision', days };
@@ -86,6 +89,7 @@ export function continueUntilStop(state, { maxDays = 60, onDay } = {}) {
     days.push(day);
     onDay?.(day);
     if (clubMatchOn(state, state.date)) return { reason: 'match', days };
+    if (clubMatchOn(state, addDays(state.date, PRE_MATCH_STOP_DAYS))) return { reason: 'prematch', days };
     if (day.added.some((m) => PRIORITY[m.priority] >= PRIORITY.important)) return { reason: 'message', days };
   }
   return { reason: 'limit', days };

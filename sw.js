@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-0864eee72a';
+const VERSION = 'v0.3-f994c1519c';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -78,7 +78,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', '0773affd9e'],
+  ['./src/app.js', '4d283c5490'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '45f14cb64d'],
@@ -121,7 +121,7 @@ const FILES = [
   ['./src/config/calendar2026.js', '7af3df5b12'],
   ['./src/config/competitions.js', '27b3c95b94'],
   ['./src/core/decisions.js', 'b9fda961b7'],
-  ['./src/core/gameLoop.js', '4a8caba62e'],
+  ['./src/core/gameLoop.js', 'd572502469'],
   ['./src/core/inbox.js', '689fd5b609'],
   ['./src/core/rng.js', '3712174b88'],
   ['./src/core/store.js', 'adb3d58f02'],
@@ -178,7 +178,7 @@ const FILES = [
   ['./src/season/thirdLeague.js', 'f019155fab'],
   ['./src/season/uefa.js', '4a0c9dc052'],
   ['./src/season/worldNations.js', '6003d36e12'],
-  ['./src/styles/app.css', '27cd95be2a'],
+  ['./src/styles/app.css', 'c221ffbfa2'],
   ['./src/styles/assistant.css', 'ad4ca3b469'],
   ['./src/styles/base.css', 'f2fee58203'],
   ['./src/styles/club.css', '6615e08e49'],

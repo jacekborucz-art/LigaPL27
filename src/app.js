@@ -741,10 +741,16 @@ function mailRow(m, today, openId) {
   </button></li>`;
 }
 
-function mailReader(g, m) {
+/** Następna nieprzeczytana wiadomość w bieżącej kategorii: dalej w liście od otwartej, potem od początku. */
+function nextUnreadId(list, currentId) {
+  const i = list.findIndex((x) => x.id === currentId);
+  return [...list.slice(i + 1), ...list.slice(0, Math.max(0, i))].find((x) => !x.read && x.id !== currentId)?.id ?? null;
+}
+
+function mailReader(g, m, nextId) {
   const [ab, label] = MAIL_CAT[m.category] ?? ['?', CATEGORIES[m.category] ?? ''];
   return `<article class="mail-view" data-cat="${esc(m.category)}" aria-labelledby="mail-h">
-    <button class="btn btn--quiet btn--sm mail-back" data-act="mailback">Wróć do skrzynki</button>
+    <p class="mail-view__nav"><button class="btn btn--quiet btn--sm mail-back" data-act="mailback">Wróć do skrzynki</button>${nextId ? `<button class="btn btn--quiet btn--sm" data-act="mail" data-id="${esc(nextId)}">Następna nieprzeczytana</button>` : ''}</p>
     <header class="mail-view__head">
       <span class="mail-row__av" aria-hidden="true">${esc(ab)}</span>
       <div class="mail-view__meta">
@@ -768,13 +774,14 @@ function renderMail(g) {
   const list = filterInbox(g.inbox, state.mailCat);
   const pending = pendingDecisions(g.inbox).length;
   const unread = unreadCount(g.inbox);
+  const nextId = nextUnreadId(list, open?.id ?? null);
   return `<div class="mailx ${open ? 'is-reading' : ''}">
-    <div class="mail-head"><h2>Poczta <small class="muted">${g.inbox.length} wiadomości${unread ? `, ${unread} nieprzeczytanych` : ''}</small></h2><span class="mail-tools"><button class="btn btn--quiet btn--sm" data-act="readall">Oznacz jako przeczytane</button><button class="btn btn--quiet btn--sm" data-act="mailprune" data-m="read">Usuń przeczytane</button><button class="btn btn--quiet btn--sm" data-act="mailprune" data-m="old">Usuń starsze niż 30 dni</button></span></div>
+    <div class="mail-head"><h2>Poczta <small class="muted">${g.inbox.length} wiadomości${unread ? `, ${unread} nieprzeczytanych` : ''}</small></h2><span class="mail-tools">${nextId && !open ? `<button class="btn btn--primary btn--sm" data-act="mail" data-id="${esc(nextId)}">Pierwsza nieprzeczytana</button>` : ''}<button class="btn btn--quiet btn--sm" data-act="readall">Oznacz jako przeczytane</button><button class="btn btn--quiet btn--sm" data-act="mailprune" data-m="read">Usuń przeczytane</button><button class="btn btn--quiet btn--sm" data-act="mailprune" data-m="old">Usuń starsze niż 30 dni</button></span></div>
     ${pending ? `<p class="notice">Masz ${pending} ${pending === 1 ? 'wiadomość wymagającą' : 'wiadomości wymagające'} odpowiedzi.</p>` : ''}
     <div class="chips">${chips}</div>
     <div class="mailx__panes">
       <ul class="mail-list" aria-label="Wiadomości">${list.map((m) => mailRow(m, g.date, open?.id)).join('') || '<li class="mail-empty">Brak wiadomości w tej kategorii.</li>'}</ul>
-      <div class="mailx__read">${open ? mailReader(g, open) : '<p class="mail-pick">Wybierz wiadomość z listy, żeby ją przeczytać.</p>'}</div>
+      <div class="mailx__read">${open ? mailReader(g, open, nextId) : '<p class="mail-pick">Wybierz wiadomość z listy, żeby ją przeczytać.</p>'}</div>
     </div>
     <p class="hint mailx__hint">Stare przeczytane wiadomości gra usuwa sama co tydzień. Wiadomości z decyzją do podjęcia zostają.</p>
   </div>`;
@@ -914,7 +921,7 @@ async function runDays() {
   state.running = false;
   if (squadKey() !== squadBefore) afterSquadChange(g);
   // Po Dalej zawsze Pulpit (nowe wiadomości i decyzje widać w panelu Poczta i w pasku decyzji na Pulpicie)
-  if (reason === 'message' || reason === 'decision') { state.tab = 'pulpit'; state.fx = null; state.extPlayer = null; state.extClub = null; state.mailOpen = null; }
+  if (reason === 'message' || reason === 'decision' || reason === 'prematch') { state.tab = 'pulpit'; state.fx = null; state.extPlayer = null; state.extClub = null; state.mailOpen = null; }
   await save();
   renderHub();
 }

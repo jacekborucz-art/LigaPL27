@@ -285,6 +285,8 @@
 .mail-pick { margin: 0; padding: var(--space-6) var(--space-4); text-align: center; color: var(--text-muted); border: 1px dashed var(--line); border-radius: var(--radius-m); }
 .mail-view { padding: var(--space-4) var(--space-5) var(--space-5); background: var(--surface); border-radius: var(--radius-m); border-top: 4px solid var(--mc); }
 .mail-back { margin-bottom: var(--space-3); }
+.mail-view__nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 var(--space-3); }
+.mail-view__nav .mail-back { margin-bottom: 0; }
 .mail-view__head { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 14px; align-items: start; padding-bottom: var(--space-3); border-bottom: 1px solid var(--line); }
 .mail-view__head .mail-row__av { width: 46px; height: 46px; font-size: 15px; }
 .mail-view__cat { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; }
@@ -314,6 +316,7 @@
   .mailx.is-reading .mail-list { display: block; }
   .mailx .chips { display: flex; }
   .mail-back { display: none; }
+  .mail-view__nav:not(:has(.btn:not(.mail-back))) { display: none; }
   .mailx .mail-view { position: sticky; top: var(--space-3); }
 }
 

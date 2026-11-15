@@ -39,6 +39,17 @@ test('Dalej: dni mijają same, pętla zatrzymuje się w dniu meczu i przycisk zm
   assert.throws(() => advanceDay(s), /rozegraj/);
 });
 
+test('Dalej zatrzymuje się 2 dni przed meczem, kolejne Dalej idzie do dnia meczu', () => {
+  const s = newState('widzew');
+  let r;
+  do { r = continueUntilStop(s); } while (r.reason !== 'prematch' && r.reason !== 'match');
+  assert.equal(r.reason, 'prematch');
+  assert.equal(s.date, '2026-07-22');
+  assert.equal(primaryAction(s).kind, 'continue');
+  do { r = continueUntilStop(s); } while (r.reason !== 'match');
+  assert.equal(s.date, '2026-07-24');
+});
+
 test('Po rozegraniu meczu można iść dalej', () => {
   const s = newState('widzew');
   while (continueUntilStop(s).reason !== 'match');
