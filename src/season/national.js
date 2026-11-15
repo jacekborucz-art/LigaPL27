@@ -7,6 +7,7 @@ import { QS, sampleScore } from '../engine/quickSim.js';
 import DATA from '../data/reprezentacje.json' with { type: 'json' };
 import { worldTeam } from './worldNations.js';
 import { addPlayerMatch, quickRating } from './history.js';
+import { addRepEvent } from '../career/reputation.js';
 import { liveTeam } from './intl/ratings.js';
 import { windowsNear } from './intl/windows.js';
 
@@ -224,6 +225,7 @@ export function assignPlay(N, m, called, players, rng) {
     const team = ntTeam(code);
     const mine = called.filter((c) => c.team === code && !c.u21).map((c) => players[c.id]).filter(Boolean);
     if (!mine.length) continue;
+    const tour = new Set(called.filter((c) => c.team === code && c.tour).map((c) => c.id)); // turniej finałowy
     const playedNow = [];
     for (const p of mine) {
       const start = rng.chance(sigmoid((callScore(p) - team.L) * 1.2));
@@ -231,6 +233,7 @@ export function assignPlay(N, m, called, players, rng) {
       if (!minutes) continue;
       p.intl = p.intl ?? { caps: 0, goals: 0, team: code };
       p.intl.caps++; p.ntMinutes = (p.ntMinutes ?? 0) + minutes;
+      if (p.intl.caps === 1) addRepEvent(p, 'firstCap'); // debiut w kadrze A (docs/reputacja.md)
       playedNow.push({ p, minutes, g: 0, a: 0 });
     }
     // Gole drużyny: część dla naszych zawodników wg pozycji i minut, reszta dla kolegów spoza naszej gry
@@ -241,6 +244,7 @@ export function assignPlay(N, m, called, players, rng) {
       if (!playedNow.length || !rng.chance(wMine / (wMine + wRest))) continue;
       const x = rng.weighted(playedNow, (y) => (SCORE_W[y.p.pos] ?? 0.5) * y.minutes);
       x.p.intl.goals++; x.p.ntGoals = (x.p.ntGoals ?? 0) + 1; x.g++;
+      addRepEvent(x.p, tour.has(x.p.id) ? 'tournamentGoal' : 'ntGoal');
       (m.result.ourScorers ??= []).push({ id: x.p.id, name: x.p.name, team: code });
     }
     recordNtStats(m, side, playedNow);
@@ -361,9 +365,11 @@ function callupDay(N, date, players, rng, out, { windows = windowsNear(date), te
       if (c.u21) { p.intlU21 = (p.intlU21 ?? 0) + (mins > 0 ? 1 : 0); }
       if (far && !c.tour) {
         p.intl = p.intl ?? { caps: 0, goals: 0, team: c.team }; p.intl.caps += mins > 0 ? 1 : 0;
+        if (mins > 0 && p.intl.caps === 1) addRepEvent(p, 'firstCap');
         if (mins > 0) addPlayerMatch(p, 'R', { minutes: mins, rating: null }); // mecze poza symulacją: występ bez oceny
       }
       c.minutes = mins; c.goals = p.ntGoals ?? 0;
+      if (c.tour && !c.u21 && mins > 0 && p.intl) p.intl.tn = (p.intl.tn ?? 0) + 1; // turniej finałowy z występem (reputacja)
       if (rng.chance(0.03) && !(p.injuryDays > 0)) {
         const days = rng.int(5, 24);
         p.injuryDays = days; p.injury = { name: rng.pick(['uraz mięśnia uda', 'skręcenie stawu skokowego', 'stłuczenie kolana']), days, cat: days > 14 ? 'medium' : 'light', since: date, nt: true };

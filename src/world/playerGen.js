@@ -6,7 +6,8 @@ import { clamp } from '../core/rng.js';
 import { OFF, VARIANTS, OUTFIELD_ATTRS, GK_ATTRS, ovrAt, RELATED } from '../data/attributes.js';
 import { randomName, EU } from '../data/names.js';
 import { generatePersonality } from '../career/personality.js';
-import { initialReputation } from '../career/reputation.js';
+import { generatedReputation, clubStage } from '../career/reputation.js';
+import { clubById } from '../data/clubs_pl.js';
 import { marketWage, VALUE_BASE_EUR, VALUE_SLOPE } from '../career/negotiation.js';
 import { payLevel, EUR_PLN } from '../data/finanse_klubow.js';
 
@@ -47,8 +48,11 @@ export function marketValue(p, { tier = 1, date = '2026-07-01' } = {}) {
   return Math.max(10000, Math.round(v / 5000) * 5000);
 }
 
+/** Szum startowej reputacji (poza zapisem gry): drugie przejście generatora kadry nie losuje ponownie. */
+export const REP_NOISE = new WeakMap();
+
 /**
- * opts: { id, L, pos, age, slotOffset, nat, tier, side, club, date, startYear }
+ * opts: { id, L, pos, age, slotOffset, nat, tier, side, club, date, startYear, m (oczekiwany udział minut) }
  * rng: Rng (strumień klubu, żeby kluby były niezależne od siebie)
  */
 export function genPlayer(rng, opts) {
@@ -134,7 +138,13 @@ export function genPlayer(rng, opts) {
   p.wage = p.contract.wage;
   p.value = marketValue(p, { tier, date });
   if (rng.chance(0.4)) p.contract.clause = Math.round((p.value * r(2.5, 4)) / 10000) * 10000;
-  p.rep = initialReputation({ ovr, age, caps: 0, titles: 0, europeApps: 0 }, club, rng);
+  // Reputacja tym samym wzorem co co miesiąc (docs/reputacja.md). Losowanie szumu zostaje w tym samym miejscu
+  // strumienia RNG (sd 3 przeskalowane do 2), więc reszta zawodnika i kolejne losowania się nie zmieniają.
+  const repNoise = rng.gauss(0, 3) * (2 / 3);
+  const S = clubStage(club);
+  p.rep = generatedReputation(p, S, { m: opts.m ?? 0.4, noise: repNoise });
+  REP_NOISE.set(p, repNoise);
+  if (!clubById(club.id)) p.rs = Math.round(S); // scena dla zawodnika bez polskiego klubu (wolny, zagranica)
   const pers = generatePersonality(p, rng);
   p.traits = pers.traits;
   p.agent = pers.agent;

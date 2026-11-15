@@ -19,7 +19,7 @@ import DATA from '../data/kluby_uefa.json' with { type: 'json' };
 const round = (x, step = 5000) => Math.round(x / step) * step;
 
 export const FOREIGN = {
-  pBase: 0.025, // tygodniowa szansa oferty za zawodnika o reputacji 40 [SZAC] (spec 0,006; kalibracja do 25-40 sprzedaży z Ekstraklasy)
+  pBase: 0.033, // tygodniowa szansa oferty za zawodnika o reputacji 40 [SZAC] (spec 0,006; kalibracja do 25-40 sprzedaży z Ekstraklasy; 0,025 przed dynamiczną reputacją, docs/reputacja.md)
   repMin: 40, youngAge: 23, youngPot: 13,
   feeLo: 0.9, feeHi: 1.35, wageLo: 1.5, wageHi: 3.0,
   sellRatio: 0.85, // klub AI sprzedaje, gdy kwota >= 0,85 ceny wywoławczej

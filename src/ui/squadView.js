@@ -12,6 +12,23 @@ import { formChartHtml, formHistory, formBand } from './formChart.js';
 import { positionMapHtml } from './positionMap.js';
 import { playerStatsHtml } from './playerStatsView.js';
 
+/**
+ * Reputacja z trendem (docs/reputacja.md): liczba, poziom i zmiana w ostatnim miesiącu oraz od początku sezonu.
+ * Zawodnik bez danych o zmianie (stary zapis, pierwszy miesiąc gry) ma samą liczbę i poziom.
+ */
+export function repHtml(p) {
+  const rep = p.rep ?? 30;
+  const month = Math.round(p.repD ?? 0);
+  const season = p.repY != null ? Math.round(rep - p.repY) : 0;
+  const sg = (n) => (n > 0 ? `+${n}` : String(n));
+  const parts = [];
+  if (month) parts.push(`${sg(month)} w miesiącu`);
+  if (season && season !== month) parts.push(`${sg(season)} w sezonie`);
+  const dir = (month || season) > 0 ? 'up' : 'down';
+  const trend = parts.length ? ` <small class="rep-trend" data-t="${dir}"><span aria-hidden="true">${dir === 'up' ? '▲' : '▼'}</span> ${esc(parts.join(', '))}</small>` : '';
+  return `${esc(reputationLabel(rep))} (${Math.round(rep)})${trend}`;
+}
+
 export const SQUAD_FILTERS = [
   ['all', 'Wszyscy'], ['GK', 'Bramkarze'], ['DEF', 'Obrońcy'], ['MID', 'Pomocnicy'], ['ATT', 'Napastnicy'], ['academy', 'Akademia'],
 ];
@@ -257,7 +274,7 @@ export function renderPlayerProfile(p, opts = {}) {
         <h3>Charakter</h3>
         <ul class="plain-list">
           <li><span class="k">Osobowość</span><span>${esc(p.persona)}</span></li>
-          <li><span class="k">Reputacja</span><span>${esc(reputationLabel(p.rep))}</span></li>
+          <li><span class="k">Reputacja</span><span>${repHtml(p)}</span></li>
           ${traitPhrases(p.traits).map((t) => `<li><span class="k"></span><span>${esc(t)}</span></li>`).join('')}
           <li><span class="k">Potencjał</span><span>Oceni skauting</span></li>
         </ul>

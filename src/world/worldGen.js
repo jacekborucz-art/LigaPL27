@@ -5,7 +5,8 @@
 import { Rng } from '../core/rng.js';
 import { CLUBS_PL } from '../data/clubs_pl.js';
 import { pickNationality } from '../data/names.js';
-import { genPlayer } from './playerGen.js';
+import { genPlayer, REP_NOISE } from './playerGen.js';
+import { generatedReputation, clubStage, roleShare } from '../career/reputation.js';
 import { GAME_START } from '../config/calendar2026.js';
 
 // Kadra 25 zawodników: [pozycja, strona]. Gwarancje: 3 BR, 8 obrońców (w tym 2 lewych), 9 pomocników, 5 napastników.
@@ -63,6 +64,10 @@ export function generateClubSquad(club, rootRng, date) {
     p.squad = 'Y';
     academy.push(p);
   }
+  // Drugie przejście (bez losowania): reputacja z oczekiwanej roli w kadrze, więc pierwszy miesiąc gry nie robi skoku
+  const S = clubStage(club);
+  [...players].sort((a, b) => b.ovr - a.ovr).forEach((p, i) => { p.rep = generatedReputation(p, S, { m: roleShare(i), noise: REP_NOISE.get(p) ?? 0 }); });
+  for (const p of academy) p.rep = generatedReputation(p, S, { m: 0, noise: REP_NOISE.get(p) ?? 0 });
   return { players, academy };
 }
 

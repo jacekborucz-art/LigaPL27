@@ -47,6 +47,7 @@ import { canPromote, promoteYouth } from './career/academy.js'; // wychowankowie
 import { applyPack, restoreOriginals, exportPack, packFileName, parsePack, importPack, importSummary } from './career/editor.js';
 import { renderTalks, handleTalkAction, isTalkAction } from './ui/talksView.js';
 import { ensureCareer } from './career/careerSystem.js';
+import { ensureReputation } from './career/reputationSystem.js'; // dynamiczna reputacja (docs/reputacja.md)
 import { fmtZl } from './career/transfers.js';
 import { startDeal, expectedRegistration } from './career/transferDeals.js'; // transfer jako proces (docs/transfery.md)
 import { signUserPre } from './career/preContracts.js';
@@ -258,6 +259,7 @@ function ensureGameShape(g) {
   ensureIntl(g, addDays(g.date, 1)); // silnik reprezentacji (zapisy sprzed wiecznego kalendarza: nadrobienie w tle)
   ensureTraining(g);
   ensureCareer(g);
+  ensureReputation(g); // stare zapisy: stan reputacji bez zmiany p.rep (zbieżność łagodnie, co miesiąc)
   ensureHistory(g); // historia meczów drużyny gracza (stare zapisy: bieżący sezon z terminarza)
   ensureAssistantReport(g); // raport asystenta: częstotliwość i dziennik urazów (stare zapisy: co 2 tygodnie)
   if (!g.inbox.length) {

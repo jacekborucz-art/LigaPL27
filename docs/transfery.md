@@ -129,7 +129,7 @@ do decyzji zawodnika używamy reputacji w skali polskich klubów (prestiż x 7 +
 reputację niższą niż polskim klubom (Widzew 81, liga turecka 43) i zawodnicy nigdy by nie wyjeżdżali.
 Tygodniowo w oknie, zawodnik z reputacją >= 40 albo do 23 lat z POT >= 13:
 `pF = pBase (1 + (rep - 40)/15) x (do 25 lat 1,5; 30+ lat 0,4) x (średnia ocena >= 7,0 ? 1,5 : 1)`,
-spec pBase = 0,006, po kalibracji 0,025. Kwota `wartość x U(0,9; 1,35)`, pensja `pensja x U(1,5; 3,0)`.
+spec pBase = 0,006, po kalibracji 0,025, od dynamicznej reputacji 0,033 (rezerwowi Ekstraklasy mają niższą reputację, `docs/reputacja.md`). Kwota `wartość x U(0,9; 1,35)`, pensja `pensja x U(1,5; 3,0)`.
 Klub AI sprzedaje, gdy kwota >= 0,85 ceny dla zagranicy (wartość x mnożnik reputacji; trzech najlepszych po pełnej
 cenie wywoławczej) albo zawodnik prosi o transfer, nigdy poniżej minimum kadry. Gracz dostaje ofertę w poczcie
 i w zakładce Oferty (najwyżej 2 otwarte naraz). Co druga sprzedaż za granicę dodaje do wolnych jednego

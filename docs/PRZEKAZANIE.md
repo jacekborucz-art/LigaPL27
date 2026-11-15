@@ -356,5 +356,8 @@ nowa sesja musi utworzyć własny zapis (nowa kariera w grze, eksport do pliku).
 - **Limity agentów:** agenci w tle czasem trafiali na limit użycia; wtedy wznawiać ich przez SendMessage, a w razie
   żądania commita od hooka robić kopię na `wip-agenci`, nie na `main`.
 - **Długie testy w narzędziu Bash:** domyślny limit 120 s ucina `npm test`; używać większego limitu lub tła.
+- **Reputacja: `p.caps` to martwe pole generatora (zawsze 0).** Mecze w kadrze są w `p.intl.caps`. `clubReputation`
+  ma skalę krajową (Legia 95 = Bayern 95), więc do widoczności w Europie służy scena (`clubStage`), nie ta liczba
+  (`docs/reputacja.md`).
 - **Commit przed sprawdzeniem wyniku testów:** raz potok `&&` zrobił commit mimo 2 nieudanych testów (grep zwrócił 0).
   Sprawdzać wynik testów osobno przed commitem.

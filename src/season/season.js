@@ -28,6 +28,7 @@ import { aiChooseSpeech, postMatchBriefing, closeMatchMemory, POST_TONES } from 
 import { coachOf, coachStyle, matchCoach, quickCoachTerm, formRng, assistantProfile, motivationSkill, COACH } from '../career/coaches.js';
 import { staffQ } from '../training/staff.js';
 import { statGroup, addPlayerMatch, syncSpell, recordTeamMatch, CLUB_GROUPS } from './history.js';
+import { matchRepEvents } from '../career/reputation.js';
 
 export { LEAGUE_COMPS, L3_COMPS, isL3Comp, compOfClub, compClubIds };
 const ALL_CLUBS = [...CLUBS_PL, ...CLUBS_L3, ...CLUBS_L4, ...UEFA_CLUBS];
@@ -400,6 +401,7 @@ export function applyResult(game, f, res, rng) {
       // Statystyki w podziale na rozgrywki (także sparingi) i historia klubowa (mecze o punkty), src/season/history.js
       const grp = statGroup(f.comp);
       addPlayerMatch(p, grp, x);
+      if (!friendly) matchRepEvents(p, f, x); // zdarzenia reputacji (docs/reputacja.md)
       if (CLUB_GROUPS.includes(grp)) { const sp = syncSpell(p, f.date); if (sp) { sp.m++; sp.g += x.g; } }
       if (friendly) {
         p.fresh = clamp(Math.round((p.fresh ?? 95) - 24 * (x.minutes / 90)), 35, 100);
@@ -667,3 +669,4 @@ import '../career/careerSystem.js';
 import '../career/fansSystem.js';
 import './rollover.js';
 import '../career/acclimatization.js';
+import '../career/reputationSystem.js'; // dynamiczna reputacja zawodników i klubów (docs/reputacja.md)

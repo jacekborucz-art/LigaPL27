@@ -3,6 +3,7 @@
 // Wszystkie liczby to wartości balansowe [SZAC], do strojenia w testach sezonu.
 
 import { clamp } from '../core/rng.js';
+import UEFA_DATA from '../data/kluby_uefa.json' with { type: 'json' };
 
 export const REP_LEVELS = [
   { min: 85, label: 'Światowa gwiazda' },
@@ -34,41 +35,150 @@ export function baseFromOvr(ovr) {
 // Reputacja klubu zależy od marki (prestiż 1-10) i od ligi, w której klub teraz gra.
 const TIER_REP = { 1: 25, 2: 12, 3: 0 };
 
-/** Reputacja klubu 0-100. Na start z prestiżu i ligi, potem aktualizowana wynikami (club.rep). */
-export function clubReputation(club) {
-  return club.rep ?? Math.min(100, club.prestige * 7 + (TIER_REP[club.tier ?? 1] ?? 0));
+/** Marka krajowa bez wyników: prestiż i liga (skala, na której skalibrowane są transfery). */
+export function clubBaseReputation(club) {
+  return Math.min(100, club.prestige * 7 + (TIER_REP[club.tier ?? 1] ?? 0));
 }
+
+/** Reputacja klubu 0-100. Na start z prestiżu i ligi, potem z wyników sezonów (club.rep, docs/reputacja.md). */
+export function clubReputation(club) {
+  return club.rep ?? clubBaseReputation(club);
+}
+
+// ------------------------------------------------------------ Reputacja dynamiczna (docs/reputacja.md)
+// Wszystkie liczby [SZAC], kalibracja: tools/multiseason.mjs (rozkład reputacji per liga, inflacja w 10 sezonach).
+export const REP = {
+  rise: 0.10, // wzrost: 10 % luki do celu na miesiąc (decyzja właściciela)
+  fall: 0.06, // spadek: 6 % luki na miesiąc, sława się „klei” (decyzja właściciela)
+  surplus: 0.2, // nad kolanem sceny zostaje 20 % nadwyżki (decyzja właściciela)
+  stagePull: 0.1, // gra w dużym klubie dosypuje 10 % różnicy do sceny
+  noise: 0.4, // miesięczny szum medialny (odchylenie)
+  addCap: 18, // suma dodatków (forma, kadra, trofea, puchary)
+};
+/** Widoczność ligi (ta sama skala co p.rep): 1 Liga, 2 Liga, III liga, IV liga. Ekstraklasa ze współczynnika Polski. */
+export const LEAGUE_VIS = { 2: 26, 3: 17, 4: 10, 5: 6 };
+export const POL_COEF_BASE = 35;
+/** Gole i asysty na 90 minut przeciętnego zawodnika pozycji (bramkarz tylko przez ocenę). */
+export const GA_EXPECTED = { NAP: 0.45, SN: 0.40, OP: 0.35, BP: 0.30, ŚP: 0.15, WB: 0.12, DP: 0.08, BO: 0.08, ŚO: 0.05, BR: 0 };
+/** Punkty trofeów (okno 3 sezonów z wagą 1 / 0,6 / 0,3). */
+export const TROPHY_PTS = { champion: 3, cup: 1.5, LK: 4, LE: 6, LM: 10 };
+export const TROPHY_W = [1, 0.6, 0.3];
+
+// Renoma europejska na start: współczynnik klubu z danych UEFA, inne polskie kluby z prestiżu (Legia 25, Wisła 20)
+const POLISH_COEF = new Map(UEFA_DATA.polskieKlubyUEFA2026.map((k) => [k.id, k.wspolczynnik]));
+const FOREIGN_COEF = new Map(UEFA_DATA.kluby.map((k) => [k.id, k.wspolczynnik]));
+export function startClubPoints(club) {
+  if (!club) return 0;
+  if (POLISH_COEF.has(club.id)) return POLISH_COEF.get(club.id);
+  if (FOREIGN_COEF.has(club.id)) return FOREIGN_COEF.get(club.id);
+  if (club.coef != null) return club.coef;
+  return Math.max(0, ((club.prestige ?? 0) - 5) * 5);
+}
+
+/** Renoma europejska K z punktów UEFA klubu z 5 sezonów (P5). */
+export const euroRenown = (P5) => 10 * Math.log(1 + Math.max(0, P5) / 10);
+
+/** Punkty P5 klubu: dynamiczne z game.repState (polskie kluby), inaczej dane startowe. */
+export function clubP5(club, game = null) {
+  const pts = game?.repState?.clubPts?.[club?.id];
+  return pts ? pts.reduce((a, b) => a + b, 0) : startClubPoints(club);
+}
+
+const isForeignClub = (club) => !!club && (club.foreign || club.id === 'zagranica' || String(club.id).startsWith('zagranica:'));
 
 /**
- * Reputacja docelowa: do niej zawodnik dąży co miesiąc.
- * p: { ovr, age, caps, titles, europeApps, avgRating, apps }
+ * Scena S: widoczność klubu i ligi w skali europejskiej (ta sama skala co p.rep).
+ * S = widoczność ligi + renoma europejska klubu + marka krajowa.
  */
-export function targetReputation(p, club) {
-  let t = baseFromOvr(p.ovr);
-  t += Math.min(15, 1.5 * Math.sqrt(p.caps || 0)); // reprezentacja
-  t += Math.min(8, 2 * (p.titles || 0)); // trofea
-  t += Math.min(5, 0.25 * (p.europeApps || 0)); // mecze w pucharach
-  if ((p.apps || 0) >= 8 && p.avgRating) t += clamp((p.avgRating - 6.7) * 8, -6, 8); // forma sezonu
-  t += 0.15 * (clubReputation(club) - t); // klub "podnosi" albo "obniża" rozpoznawalność
-  if (p.age < 21) t -= 4; // młody: mniej znany niż wskazuje talent
-  return clamp(t, 1, 99);
+export function clubStage(club, game = null) {
+  if (!club) return LEAGUE_VIS[4];
+  if (isForeignClub(club)) {
+    const V = 30 + 9 * ((club.L ?? 11) - 11);
+    const B = clamp(0.1 * ((club.rep ?? clubBaseReputation({ prestige: club.prestige ?? 3, tier: 1 })) - 60), -3, 4);
+    return V + euroRenown(clubP5(club, game)) + B;
+  }
+  const tier = club.tier ?? 1;
+  const coef = game?.countryCoef?.POL ?? POL_COEF_BASE;
+  const V = tier === 1 ? 39 + 0.25 * (coef - POL_COEF_BASE) : LEAGUE_VIS[tier] ?? LEAGUE_VIS[5];
+  const B = clamp(0.1 * (clubReputation(club) - 60), -3, 4);
+  return V + euroRenown(clubP5(club, game)) + B;
 }
 
-/** Startowa reputacja przy generowaniu świata (z małym szumem). */
-export function initialReputation(p, club, rng) {
-  return Math.round(clamp(targetReputation(p, club) + (rng ? rng.gauss(0, 3) : 0), 1, 99));
+/** Kolano kadry: reprezentant z siłą kadry L (Polska 14 -> 57, Francja 16,6 -> 80). */
+export const ntKnee = (L) => 30 + 9 * ((L ?? 11) - 11);
+
+/**
+ * Reputacja docelowa (czysta funkcja, wejście z gotowymi liczbami). Do niej zawodnik dąży co miesiąc.
+ * c: { ovr, age, pos, m (udział minut 0-1), avg (średnia ocen albo null), n (liczba ocen), ga90, min (minuty),
+ *      caps, recentCaps (24 mies.), tourn (turnieje finałowe), troph (punkty trofeów), euroApps (24 mies.),
+ *      S (scena), ntL (siła kadry L albo null) }
+ * Zwraca { t, X, S, C }.
+ */
+export function targetReputationV2(c) {
+  const A = baseFromOvr(c.ovr);
+  const R = -7 + 11 * Math.min(1, (c.m ?? 0) / 0.65);
+  const n = c.n ?? 0;
+  const form = c.avg != null && n > 0 ? clamp((c.avg - 6.7) * 8 * n / (n + 8), -6, 8) : 0;
+  const ga = c.ga90 != null ? clamp(8 * (c.ga90 - (GA_EXPECTED[c.pos] ?? 0.15)), -2, 4) * Math.min(1, (c.min ?? 0) / 1500) : 0;
+  const caps = c.caps ?? 0;
+  const N = Math.min(10, 1.5 * Math.sqrt(caps)) + Math.min(4, 2 * (c.tourn ?? 0));
+  const T = Math.min(8, c.troph ?? 0);
+  const euro = c.euroApps ?? 0;
+  const Eu = Math.min(6, 0.3 * euro);
+  const Ag = c.age <= 20 ? -4 : c.age === 21 ? -2 : 0;
+  const X = A + R + Math.min(REP.addCap, form + ga + N + T + Eu) + Ag;
+  const S = c.S;
+  let C = S + 6 + Math.min(4, 0.3 * euro);
+  const rc = c.recentCaps ?? 0;
+  if (rc >= 3 && c.ntL != null) { const w = Math.min(1, rc / 8); C = Math.max(C, w * ntKnee(c.ntL) + (1 - w) * C); }
+  let t = X <= C ? X : C + REP.surplus * (X - C);
+  t += REP.stagePull * Math.max(0, S - t);
+  return { t: clamp(t, 1, 99), X, S, C };
 }
 
-/** Miesięczna aktualizacja z bezwładnością + zdarzenia (gol w derbach, powołanie, czerwona za przemoc). */
-export function monthlyUpdate(rep, p, club, events = 0) {
-  const target = targetReputation(p, club);
-  return Math.round(clamp(rep + 0.12 * (target - rep) + events, 1, 99) * 10) / 10;
+/** Miesięczny krok: asymetria wzrostu i spadku, zdarzenia ważone sceną, szum medialny. */
+export function stepReputation(rep, target, ev = 0, S = 40, noise = 0) {
+  const k = target > rep ? REP.rise : REP.fall;
+  const v = rep + k * (target - rep) + ev * (0.6 + S / 100) + noise;
+  return Math.round(clamp(v, 1, 99) * 10) / 10;
 }
 
+/** Zdarzenia miesiąca (punkty reputacji przed wagą sceny), zbierane w p.repEv i doliczane przy aktualizacji [SZAC]. */
 export const REP_EVENTS = {
-  goalInFinal: 2, goalInEurope: 0.6, motmEurope: 0.8, firstCap: 2, goalForCountry: 1,
-  titleWon: 3, longInjuryMonth: -0.5, violentRed: -1.5, relegated: -2,
+  hatTrick: 1, cupFinalGoal: 1.5, euroFinalGoal: 3, euroGoal: 0.4, euroGoalMain: 0.6, euroMotm: 0.6,
+  firstCap: 2, ntGoal: 0.8, tournamentGoal: 2, title: 2, topScorer: 3, violentRed: -1.5, scandal: -1, relegated: -2,
 };
+
+/** Zapisuje zdarzenie zawodnikowi (mult: np. derby x1,5; transfer: wartość podana wprost w mult przy key 'move'). */
+export function addRepEvent(p, key, mult = 1) {
+  if (!p) return;
+  const v = key === 'move' ? mult : (REP_EVENTS[key] ?? 0) * mult;
+  if (!v) return;
+  p.repEv = Math.round(((p.repEv ?? 0) + v) * 100) / 100;
+}
+
+/** Zdarzenia meczu o punkty (z applyResult): hat-trick, gole w finałach i pucharach, zawodnik meczu, czerwona za przemoc. */
+export function matchRepEvents(p, f, x) {
+  if (x.g >= 3) addRepEvent(p, 'hatTrick', f.derby ? 1.5 : 1);
+  if (f.comp === 'pp' && f.round === 'F' && x.g) addRepEvent(p, 'cupFinalGoal');
+  if (f.comp === 'uefa') {
+    if (x.g) {
+      if (f.round === 'F') addRepEvent(p, 'euroFinalGoal');
+      else addRepEvent(p, ['Q1', 'Q2', 'Q3', 'PO'].includes(f.round) ? 'euroGoal' : 'euroGoalMain', x.g);
+    }
+    if (x.motm) addRepEvent(p, 'euroMotm');
+  }
+  if (x.rc && x.redReason === 'violent') addRepEvent(p, 'violentRed');
+}
+
+/** Oczekiwany udział minut z miejsca w kadrze po OVR (generator i zawodnicy bez danych): 1-11, 12-16, 17+. */
+export const roleShare = (rank) => (rank < 11 ? 0.8 : rank < 16 ? 0.4 : 0.12);
+
+/** Reputacja nowego zawodnika: ten sam wzór co co miesiąc, wejścia oczekiwane (forma 6,7, bez trofeów). */
+export function generatedReputation(p, S, { m = 0.4, noise = 0 } = {}) {
+  const { t } = targetReputationV2({ ovr: p.ovr, age: p.age, pos: p.pos, m, avg: null, n: 0, ga90: null, min: 0, caps: p.intl?.caps ?? 0, S });
+  return Math.round(clamp(t + noise, 1, 99));
+}
 
 /**
  * Czy zawodnik chce przejść do klubu. Strona zawodnika (zgoda klubu sprzedającego liczona osobno).

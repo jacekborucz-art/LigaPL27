@@ -102,9 +102,13 @@ Kod: `src/career/reputation.js`, testy: `tests/reputation.test.mjs`.
 | Gwiazda w Europie | 70-84 | Kluby z LM |
 | Światowa gwiazda | 85+ | Elita |
 
-- **Skąd się bierze:** OVR (krzywa: 1 Liga ok. 30, Ekstraklasa ok. 40, reprezentant ok. 58, elita ok. 82), występy w reprezentacji, trofea, mecze w pucharach, średnia ocen w sezonie, reputacja klubu (lekkie przyciąganie) oraz kara dla młodych (mniej znani, niż wskazuje talent).
-- **Jak się zmienia:** raz w miesiącu zbliża się o 12 % do wartości docelowej. Do tego zdarzenia: gol w finale, pierwsze powołanie, tytuł, czerwona za przemoc, spadek z ligi, długa kontuzja.
-- **Reputacja klubu:** na start z prestiżu i ligi (`prestiż*7 + bonus ligi`), potem z wyników: miejsce wobec oczekiwań, trofea, puchary.
+Pełny opis modelu, liczby i decyzje właściciela: `docs/reputacja.md` (kod `src/career/reputationSystem.js`).
+
+- **Skąd się bierze (cel miesiąca):** OVR (krzywa: 1 Liga ok. 30, Ekstraklasa ok. 40, reprezentant ok. 58, elita ok. 82), rola (udział minut z 12 miesięcy: rezerwowy traci), forma (średnia ocen, gole i asysty wobec pozycji), mecze w kadrze A i turnieje finałowe, trofea z 3 sezonów, mecze w pucharach z 24 miesięcy, kara dla młodych.
+- **Scena:** cel jest ograniczony widocznością klubu: liga (Ekstraklasa ze współczynnika Polski), renoma europejska klubu (punkty UEFA z 5 sezonów) i marka krajowa. Nad kolanem sceny zostaje 20 % nadwyżki, więc gwiazda średniego klubu Ekstraklasy kończy na „Uznany w Europie”, a 85+ wymaga klubu z regularną grą w Lidze Mistrzów. Reprezentant ma kolano z siły swojej kadry.
+- **Jak się zmienia:** raz w miesiącu (1. dnia) wzrost o 10 % luki do celu, spadek o 6 % (sława się klei). Do tego zdarzenia ważone sceną: hat-trick, gol w finale, gole i zawodnik meczu w pucharach, debiut i gole w kadrze, mistrzostwo, król strzelców, transfer do większego klubu, czerwona za przemoc, spadek z ligi. Ten sam wzór dla gracza i AI, generator świata liczy startową reputację tym samym wzorem.
+- **Reputacja klubu:** na start z prestiżu i ligi (`prestiż*7 + bonus ligi`), potem co sezon z wyników (miejsce wobec oczekiwań, mistrzostwo, Puchar Polski, renoma europejska), 25 % zmiany na sezon. Osobno renoma europejska z punktów UEFA klubu z 5 sezonów.
+- **W profilu zawodnika:** poziom, liczba i trend (zmiana w miesiącu i w sezonie). Wiadomość od asystenta przy dużej zmianie zawodnika gracza (5 punktów w miesiącu albo nowy poziom).
 
 **Wpływ na transfery:**
 - **Zgoda zawodnika** zależy od różnicy reputacji między nim a klubem, kroku w górę albo w dół względem obecnego klubu, niższej ligi, gry w pucharach, szansy na grę w podstawie, końca kontraktu, niezadowolenia, wieku i osobowości (ambitny patrzy bardziej na reputację). Werdykt: chętny, otwarty, niechętny albo odmowa, z podanymi powodami („Uważa ten klub za zbyt słaby dla siebie”, „Kusi go gra w europejskich pucharach”).
@@ -112,7 +116,7 @@ Kod: `src/career/reputation.js`, testy: `tests/reputation.test.mjs`.
 - **Pieniądze pomagają tylko częściowo:** podwyższona pensja ma ograniczony wpływ (u weteranów większy), więc słaby klub nie kupi gwiazdy samą pensją.
 - **Wyższe żądania:** im większa różnica reputacji, tym wyższa żądana pensja.
 - **Trudniej wykupić:** klub sprzedający żąda za znanego zawodnika więcej (od reputacji 35 w górę +1,2 % ceny za punkt).
-- **Wartość rynkowa** dostaje mnożnik z reputacji (0,8-1,6).
+- **Wartość rynkowa** nie używa mnożnika reputacji (OVR i forma są już w `marketValue`); reputacja działa przez cenę wywoławczą.
 
 **Inne skutki reputacji:** szansa powołania do reprezentacji, zainteresowanie innych klubów, spadek morale znanego zawodnika na ławce, frekwencja i przychody z koszulek (lekko).
 

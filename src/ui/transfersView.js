@@ -8,6 +8,7 @@ import { crestHtml } from './crest.js';
 import { esc, fmtDate, fmtDay } from './dom.js';
 import { GROUP } from '../career/squad.js';
 import { reputationLabel } from '../career/reputation.js';
+import { repHtml } from './squadView.js'; // reputacja z trendem (docs/reputacja.md)
 import { RENEW_WINDOW_MONTHS } from '../career/negotiation.js';
 import {
   marketLists, searchPlayers, askingPrice, notForSale, playerWillingness, offerForPlayer, answerIncoming, loanIn,
@@ -342,7 +343,7 @@ function playerCard(game, p, ui) {
           ${free ? '' : fact('Pensja', `${fmtZl(p.contract.wage)}<small> tygodniowo</small>`)}
           ${free ? '' : fact('Kontrakt do', esc(fmtDate(p.contract.until)))}
           ${abroad ? fact('Klub', `<span class="fp-fact">${esc(poolClubLabel(p))}</span>`, 'info') : ''}
-          ${fact('Reputacja', esc(reputationLabel(p.rep ?? 30)), 'misc')}
+          ${fact('Reputacja', repHtml(p), 'misc')}
           ${fact('Nastawienie', esc(will.verdict), willTone(will.verdict))}
         </ul>
         <div class="tf-cols">

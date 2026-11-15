@@ -897,6 +897,12 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 .fch { --fch-up: #1E7A43; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .fch { --fch-up: #7BD69A; } }
 :root[data-theme="dark"] .fch { --fch-up: #7BD69A; }
+/* Trend reputacji w profilu zawodnika (docs/reputacja.md) */
+.rep-trend { --rep-up: #1E7A43; margin-left: 4px; font-size: var(--step--1); font-family: var(--font-body); font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+.rep-trend[data-t="up"] { color: var(--rep-up); }
+.rep-trend[data-t="down"] { color: var(--bad-text); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .rep-trend { --rep-up: #7BD69A; } }
+:root[data-theme="dark"] .rep-trend { --rep-up: #7BD69A; }
 
 /* ================= Kadra > Zawodnicy: widoki Przegląd / Atrybuty i forma / Statystyki (src/ui/squadView.js) ================= */
 .sqx__bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); margin-bottom: var(--space-2); }

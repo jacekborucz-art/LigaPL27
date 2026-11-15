@@ -17,6 +17,7 @@ import { book, wageRoom } from './finance.js';
 import { boardCaps } from './boardRequests.js';
 import { spellsOf, syncSpell } from '../season/history.js';
 import { completeTransfer, addFreeAgents, fmtZl } from './transfers.js';
+import { playerStage, moveRepEvent } from './reputationSystem.js'; // transfer do większej sceny (docs/reputacja.md)
 import { fmtDate } from '../ui/dom.js';
 
 export const DEAL_STAGES = ['agreed', 'terms', 'medical', 'travel', 'announce', 'registered'];
@@ -212,12 +213,14 @@ export function medicalOutcome(game, d) {
 /** Zgłoszenie: zawodnik przechodzi do nowego klubu (albo wyjeżdża za granicę). */
 function register(game, d, date, out, lastMinute = false) {
   const p = game.world.players[d.pid];
+  const S0 = p ? playerStage(game, p) : 0;
   if (d.foreign) completeAbroad(game, d, date);
   else {
     const e = completeTransfer(game, { playerId: d.pid, to: d.to, fee: d.fee, contract: d.contract, kind: d.kind === 'free' ? 'free' : 'transfer', date, fromName: d.origin?.name ?? null });
     if (d.early) e.early = true;
   }
   if (lastMinute) d.lastMinute = true;
+  if (p && d.from) moveRepEvent(game, p, S0); // tylko zmiana klubu (wolny zawodnik nie ma sceny do porównania)
   closeDeal(game, d, 'registered', null, date, out);
   if (d.foreign) {
     stat(game, 'abroad'); if (clubById(d.from)?.tier === 1) stat(game, 'abroadEk'); if (d.from === game.clubId) stat(game, 'abroadUser');

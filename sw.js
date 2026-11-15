@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-eb771f879a';
+const VERSION = 'v0.3-2053ea7401';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -78,7 +78,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', '4d283c5490'],
+  ['./src/app.js', '251ed2c158'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '45f14cb64d'],
@@ -93,7 +93,7 @@ const FILES = [
   ['./src/career/fans.js', '737d9449e9'],
   ['./src/career/fansSystem.js', 'ced36b7dd1'],
   ['./src/career/finance.js', '7bfcaffca1'],
-  ['./src/career/foreignMarket.js', '0f97d489c5'],
+  ['./src/career/foreignMarket.js', '69f8495b89'],
   ['./src/career/foreignPool.js', '48d9c4bd5d'],
   ['./src/career/infrastructure.js', 'ad72396773'],
   ['./src/career/loans.js', '6b12fbe674'],
@@ -106,7 +106,8 @@ const FILES = [
   ['./src/career/personality.js', 'f490724de6'],
   ['./src/career/preContracts.js', '8c71401605'],
   ['./src/career/prizes.js', 'eed7f4e394'],
-  ['./src/career/reputation.js', 'a4c944bd7a'],
+  ['./src/career/reputation.js', '76035a1c80'],
+  ['./src/career/reputationSystem.js', '68df5d28ba'],
   ['./src/career/shirts.js', '848f4d409c'],
   ['./src/career/sponsors.js', 'e59ba257b8'],
   ['./src/career/squad.js', '03afaad727'],
@@ -115,7 +116,7 @@ const FILES = [
   ['./src/career/talkDialog.js', '8751a88a9d'],
   ['./src/career/teamTalks.js', '77a6f9a15c'],
   ['./src/career/threat.js', 'bd519d5790'],
-  ['./src/career/transferDeals.js', '9b9c502c9a'],
+  ['./src/career/transferDeals.js', '116a88df52'],
   ['./src/career/transferSystem.js', '91a3d49d4c'],
   ['./src/career/transfers.js', 'cfee366370'],
   ['./src/config/calendar2026.js', '7af3df5b12'],
@@ -168,17 +169,17 @@ const FILES = [
   ['./src/season/intl/windows.js', '5a2ab9590f'],
   ['./src/season/leagueComps.js', 'a9c6fba075'],
   ['./src/season/leagues.js', '0844dc0aba'],
-  ['./src/season/national.js', '00bfdf4837'],
+  ['./src/season/national.js', '1b51378924'],
   ['./src/season/nationalSystem.js', '56b1056ddd'],
-  ['./src/season/rollover.js', '35bdac99e5'],
+  ['./src/season/rollover.js', '7d45b3d4e4'],
   ['./src/season/schedule.js', 'a608f6730f'],
-  ['./src/season/season.js', '76b4b6a517'],
+  ['./src/season/season.js', '0464402201'],
   ['./src/season/standings.js', 'b3bdff91e2'],
   ['./src/season/superCupEU.js', 'f728d6d300'],
   ['./src/season/thirdLeague.js', 'f019155fab'],
   ['./src/season/uefa.js', '4a0c9dc052'],
   ['./src/season/worldNations.js', '6003d36e12'],
-  ['./src/styles/app.css', 'c221ffbfa2'],
+  ['./src/styles/app.css', '262c4f3168'],
   ['./src/styles/assistant.css', 'ad4ca3b469'],
   ['./src/styles/base.css', 'f2fee58203'],
   ['./src/styles/club.css', '6615e08e49'],
@@ -230,7 +231,7 @@ const FILES = [
   ['./src/ui/playerStatsView.js', '00e99b6845'],
   ['./src/ui/positionMap.js', 'ef2c032d52'],
   ['./src/ui/sponsorsView.js', '93ea7f72b4'],
-  ['./src/ui/squadView.js', '1938fb780b'],
+  ['./src/ui/squadView.js', '8b43e2d37f'],
   ['./src/ui/sysMenu.js', '4f6ef33b7b'],
   ['./src/ui/tacticsDrag.js', '1d6819c303'],
   ['./src/ui/tacticsMoves.js', 'b4b7f2ea58'],
@@ -238,10 +239,10 @@ const FILES = [
   ['./src/ui/talksView.js', 'e2780aa122'],
   ['./src/ui/trainingView.js', 'ecf17f4ac2'],
   ['./src/ui/transferDealsView.js', 'a13fa703b3'],
-  ['./src/ui/transfersView.js', 'a32a1c958c'],
+  ['./src/ui/transfersView.js', 'd9db1d983f'],
   ['./src/world/ephemeral.js', '216b6bcdd9'],
-  ['./src/world/playerGen.js', '66bf8542ca'],
-  ['./src/world/worldGen.js', 'f854a29b2c'],
+  ['./src/world/playerGen.js', '7033b8b243'],
+  ['./src/world/worldGen.js', '494992346d'],
   // AUTO-FILES-END
 ];
 

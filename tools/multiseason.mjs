@@ -16,9 +16,28 @@ g.world = generateWorld(seed); g.season = createSeason(seed, { playerClub: clubI
 g.tactics = createTactics(squadOf(g.world, clubId), { benchSize: 12 }); ensureCareer(g); processDay(g);
 const avg = (t) => { const ids = CLUBS_PL.filter((c) => c.tier === t).map((c) => c.id); const xs = ids.flatMap((id) => squadOf(g.world, id).sort((a, b) => b.ovr - a.ovr).slice(0, 14).map((p) => p.ovr)); return (xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(2); };
 console.log('start', SEASON, 'OVR top14:', avg(1), avg(2), avg(3), 'zawodników', Object.keys(g.world.players).length);
+// Reputacja (docs/reputacja.md): rozkład u regularnych (>= 1800 min w lidze) per liga, zawodnicy EK z rep >= 70,
+// regularni EK 22+ z rep < 25, najwyżsi, renoma europejska polskich klubów (P5)
+const qt = (a, f) => { const s = [...a].sort((x, y) => x - y); return s.length ? Math.round(s[Math.min(s.length - 1, Math.floor(f * s.length))]) : '-'; };
+function repReport(label) {
+  const out = [];
+  for (const t of [1, 2, 3, 4]) {
+    const reg = []; const all = [];
+    for (const c of CLUBS_PL.filter((x) => x.tier === t)) for (const p of squadOf(g.world, c.id)) { all.push(p.rep); if ((p.st?.L?.[1] ?? 0) >= 1800) reg.push(p.rep); }
+    out.push(`L${t} reg n=${reg.length} p10/50/90 ${qt(reg, 0.1)}/${qt(reg, 0.5)}/${qt(reg, 0.9)} (wszyscy p50 ${qt(all, 0.5)})`);
+  }
+  const ek = CLUBS_PL.filter((c) => c.tier === 1).flatMap((c) => squadOf(g.world, c.id));
+  const hi = ek.filter((p) => p.rep >= 70).length;
+  const low = ek.filter((p) => (p.st?.L?.[1] ?? 0) >= 1800 && p.age >= 22 && p.rep < 25).length;
+  const top = Object.values(g.world.players).filter((p) => p.clubId).sort((a, b) => b.rep - a.rep).slice(0, 5).map((p) => `${p.last} ${p.clubId} ${Math.round(p.rep)}`).join(', ');
+  const P5 = g.repState?.clubPts ? CLUBS_PL.filter((c) => c.tier === 1).map((c) => [c.id, Math.round((g.repState.clubPts[c.id] ?? []).reduce((a, b) => a + b, 0))]).sort((a, b) => b[1] - a[1]).slice(0, 5).map((x) => x.join(':')).join(' ') : '-';
+  console.log(`  REP ${label}: ${out.join(' | ')}\n      EK rep>=70: ${hi}, EK regularni 22+ rep<25: ${low}, top: ${top}\n      P5: ${P5}`);
+}
+repReport('start');
 const end = `${2026 + seasons}-07-02`;
 let t0 = performance.now();
 while (g.date < end) {
+  if (g.date.endsWith('-06-30')) repReport(`koniec ${SEASON}`);
   for (const f of g.fixtures.filter((x) => x.date === g.date && !x.played && (x.home === g.clubId || x.away === g.clubId))) { const rng = new Rng('g' + f.id); applyResult(g, f, playQuick(g, f, rng), rng); }
   // decyzje blokujące (zwolnienie): wybierz pierwszą ofertę
   for (const m of g.inbox.filter((m) => !m.resolved && m.actions?.length && !m.optional)) { m.resolved = true; console.log('  DECYZJA', g.date, m.subject, m.actions.map((a) => a.id).join(',')); runDecision(g, m, m.actions[0].id); }

@@ -33,6 +33,7 @@ import { coachesNewSeason } from '../career/coaches.js';
 import { coachMarketNewSeason } from '../career/coachMarket.js';
 import { fmtDate } from '../ui/dom.js';
 import { archivePlayerSeason, archiveSeasonMatches, syncSpell } from './history.js';
+import { reputationSeasonEnd, applyClubRep } from '../career/reputationSystem.js'; // docs/reputacja.md
 
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
 const groupOf = (p) => GROUP[p.pos] ?? 'MID';
@@ -44,6 +45,7 @@ export function applySeasonState(game) {
   const y = game.seasonYear ?? 2026;
   setSeasonYear(y, { windows: seasonWindows(y), polishEurope: y === 2026 ? null : game.season?.polishEurope ?? [] });
   applyLeagueState(game);
+  applyClubRep(game); // marka krajowa klubów z zapisu (club.rep), po ustaleniu lig
 }
 
 // ------------------------------------------------------------ Wyniki sezonu
@@ -167,7 +169,7 @@ function processAcademy(game, newStart, rng, report) {
     const n = Math.max(1, rng.int(3, 5) + am.extra);
     for (let i = 0; i < n; i++) {
       const [pos, side] = rng.pick(SQUAD_LAYOUT);
-      const p = genPlayer(rng, { id: `${cid}-a${SEASON_YEAR}-${i + 1}`, L: c.L, pos, age: rng.int(16, 17), slotOffset: -1.0 + am.offset, nat: 'POL', tier: Math.min(4, c.tier), side: side ?? null, club: c, date: newStart });
+      const p = genPlayer(rng, { id: `${cid}-a${SEASON_YEAR}-${i + 1}`, L: c.L, pos, age: rng.int(16, 17), slotOffset: -1.0 + am.offset, nat: 'POL', tier: Math.min(4, c.tier), side: side ?? null, club: c, date: newStart, m: 0 });
       if (am.talent > 0 && p.hidden && new Rng(`talent:${game.seed}:${p.id}`).next() < am.talent) p.hidden.POT = Math.min(20, Math.round((p.hidden.POT + 1.5) * 10) / 10);
       p.squad = 'Y';
       W.players[p.id] = p; club.academy.push(p.id);
@@ -219,6 +221,8 @@ export function rolloverSeason(game) {
   const tiers4 = Object.fromEntries(Object.entries(moves.tiers).filter(([, t]) => t <= 4));
   const errors = validateTiers(tiers4, moves.groups);
   const europe = polandNextSeason(game, res);
+  // Reputacja: punkty UEFA klubów, marka krajowa, trofea i zdarzenia zawodników (przed archiwizacją statystyk i zmianą lig)
+  reputationSeasonEnd(game, res, moves);
   archiveSeasonMatches(game, oldSeason); // historia meczów drużyny gracza: sezon zamknięty przed nowym terminarzem
   // Statystyki zawodników do p.history przed ruchami końca sezonu (spadki do IV ligi, powroty z wypożyczeń),
   // więc wiersz należy do klubu, w którym zawodnik kończył sezon
@@ -250,6 +254,7 @@ export function rolloverSeason(game) {
   const polishEurope = europe.spots.map(({ club, comp, entry, path, via }) => ({ club, comp, entry, ...(path ? { path } : {}), via }));
   setSeasonYear(year, { windows: seasonWindows(year), polishEurope });
   applyLeagueState(game);
+  applyClubRep(game);
   // Powroty z wypożyczeń kończących się 30 czerwca i z udziałem klubów spadających do IV ligi; obowiązek albo opcja
   // wykupu zamienia wypożyczenie w transfer (src/career/loans.js). Wypożyczenia na rok trwają dalej.
   const loansBack = returnLoansAtRollover(game, oldEnd, newStart);
