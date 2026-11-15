@@ -32,6 +32,7 @@ import { staleNote } from '../training/variety.js';
 import { focusAttrs } from '../training/development.js';
 import { daysBetween } from '../training/state.js';
 import { REPORT_FREQS, ensureAssistantReport, setReportFreq, nextReportDate } from '../career/assistantReport.js';
+import { staffAttrs, STAFF_ATTRS } from '../career/teamReport.js'; // atrybuty asystenta i analityka (raport ogólny)
 
 const WD = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
 const TABS = [['pulpit', 'Pulpit'], ['tydzien', 'Tydzień'], ['obozy', 'Obozy'], ['sparingi', 'Sparingi'], ['zawodnicy', 'Zawodnicy'], ['obciazenia', 'Obciążenia'], ['sztab', 'Sztab'], ['rozwoj', 'Rozwój']];
@@ -576,6 +577,7 @@ function staffTab(game) {
       <p class="panel__lead">${esc(s.name ?? '')}</p>
       <div class="tr-q"><b>${s.q}</b>${meter(s.q, 20, s.q >= 14 ? 'ok' : s.q >= 8 ? 'mid' : 'bad')}<small>${esc(staffLabel(s.q))}</small></div>
       <p>${esc(eff[k](s.q))}</p>
+      ${STAFF_ATTRS[k] ? `<p class="muted">Raport ogólny: ${Object.entries(staffAttrs(game, game.clubId, k)).map(([a, v]) => `${esc(STAFF_ATTRS[k][a].toLowerCase())} ${v}`).join(', ')}</p>` : ''}
     </section>`;
   }).join('')}</div>${reportSetting(game)}`;
 }

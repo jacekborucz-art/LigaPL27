@@ -136,7 +136,7 @@ export const STAFF_ROLES = {
   fizyczny: { name: 'Trener przygotowania fizycznego', effect: 'Ryzyko urazu na treningu x(1.2 - 0.02 q), regeneracja +(6 + 0.2 q), rozwój cech fizycznych, wolniejszy spadek po 29 latach' },
   bramkarze: { name: 'Trener bramkarzy', effect: 'Rozwój bramkarzy x(0.75 + 0.025 q)' },
   mlodziez: { name: 'Trener młodzieży', effect: 'Rozwój do 21 lat i akademii x(0.75 + 0.025 q), szansa skoku rozwojowego x(0.5 + 0.05 q)' },
-  analityk: { name: 'Analityk wideo', effect: 'Bonus analizy rywala 0.04 + 0.006 q punktu na mecz, dokładność raportów' },
+  analityk: { name: 'Główny analityk', effect: 'Bonus analizy rywala 0.04 + 0.006 q punktu na mecz, dokładność raportów' },
 };
 
 export const staffMul = {

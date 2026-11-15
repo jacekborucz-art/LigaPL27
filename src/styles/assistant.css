@@ -110,3 +110,100 @@
 @media (min-width: 1600px) {
   .hub__main:has(.arep) { max-width: 1600px; }
 }
+
+/* Raport ogólny o drużynie (src/ui/teamReportView.js): te same karty i kolory co raport o zawodniku.
+   Mocny element jeden: pasek siły formacji (nasza ocena, kreska średniej ligi, bursztynowa kreska czołowej trójki
+   w kolorze tablicy LED). Reszta spokojna: karty z podpisem członka sztabu i pewnością. */
+.trep__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); }
+.trep__title { flex: 1 1 260px; min-width: 0; }
+.trep__title h2, .trep-intro h2 { margin: 0; font: 700 var(--step-3)/1.05 var(--font-display); }
+.trep__title .muted { margin: 2px 0 0; font-size: var(--step--1); }
+.trep-req { display: grid; gap: 4px; justify-items: start; }
+.trep-req .btn[disabled] { opacity: .55; cursor: not-allowed; }
+.trep-intro { display: grid; gap: var(--space-2); max-width: 70ch; padding: 16px; border-radius: var(--radius-m); background: var(--surface); border-left: 4px solid var(--accent); }
+.trep-intro p { margin: 0; }
+
+.trep-authors { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
+.trep-author { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px; padding: 8px 12px; border-radius: var(--radius-m); background: var(--surface); border: 1px solid var(--line); }
+.trep-author__who { display: grid; min-width: 0; }
+.trep-author__who b { font: 700 var(--step-1)/1.1 var(--font-display); }
+.trep-author__who small { font-size: 12.5px; color: var(--text-muted); }
+.trep-author__attrs { display: flex; gap: 6px; margin: 0; flex-wrap: wrap; }
+.trep-author__attrs > div { display: flex; align-items: baseline; gap: 6px; padding: 3px 9px; border-radius: 999px; background: var(--surface-stripe); }
+.trep-author__attrs dt { font-size: 12.5px; color: var(--text-muted); }
+.trep-author__attrs dd { margin: 0; font: 700 var(--step-0)/1 var(--font-display); }
+
+/* Pasek siły formacji */
+.trep-units { display: grid; gap: var(--space-2); padding: 12px 14px 14px; border-radius: var(--radius-m); background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--accent); }
+.trep-units__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.trep-units__head h3 { margin: 0; font: 700 var(--step-1)/1.15 var(--font-display); }
+.trep-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; font-size: 12.5px; color: var(--text-muted); }
+.trep-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.trep-key { display: inline-block; width: 14px; height: 10px; border-radius: 2px; }
+.trep-key--fill { background: var(--ar-info); }
+.trep-key--lg { width: 3px; height: 14px; background: var(--text); }
+.trep-key--top { width: 3px; height: 14px; background: var(--led); }
+.trep-units__list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.trep-unit { display: grid; grid-template-columns: 76px minmax(0, 1fr); grid-template-areas: "k rail" "v v"; gap: 4px 10px; align-items: center; }
+.trep-unit__k { grid-area: k; font: 700 var(--step-0)/1.1 var(--font-display); }
+.trep-rail { grid-area: rail; position: relative; height: 16px; border-radius: 3px; background: var(--surface-stripe); box-shadow: inset 0 0 0 1px var(--line); }
+.trep-rail__fill { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--t); }
+.trep-rail__tick { position: absolute; top: -4px; bottom: -4px; width: 3px; margin-left: -1.5px; border-radius: 1px; }
+.trep-rail__tick--lg { background: var(--text); }
+.trep-rail__tick--top { background: var(--led); box-shadow: 0 0 0 1px color-mix(in srgb, var(--trybuna) 35%, transparent); }
+.trep-unit__v { grid-area: v; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
+.trep-unit__v b { font-weight: 600; }
+.trep-unit__v small { font-size: 12.5px; color: var(--text-muted); }
+.trep-unit[data-t="bad"] .trep-unit__v b { color: color-mix(in srgb, var(--t) 75%, var(--text)); }
+.trep-unit__v .trep-trend[data-d="up"] { color: color-mix(in srgb, var(--ar-good) 75%, var(--text)); }
+.trep-unit__v .trep-trend[data-d="down"] { color: color-mix(in srgb, var(--ar-bad) 75%, var(--text)); }
+
+/* Podpis części */
+.trep-sign { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px 10px; margin-top: auto; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 12.5px; color: var(--text-muted); }
+.trep-sign__p { display: inline-flex; align-items: center; gap: 8px; }
+.trep-sign[data-prec="exact"] { --t: var(--ar-good); }
+.trep-sign[data-prec="approx"] { --t: var(--ar-warn); }
+.trep-sign[data-prec="vague"] { --t: var(--ar-bad); }
+.trep-sign .arep__dots i { width: 12px; height: 5px; }
+
+.trep-lines { display: grid; gap: 6px; margin: 0; padding: 0 0 0 18px; }
+.trep-lines li { line-height: 1.4; }
+.trep-set { grid-column: 2; font-size: 12.5px; color: var(--text-muted); }
+
+/* Forma: ostatnie wyniki */
+.trep-form { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0; }
+.trep-form small { margin-left: 6px; font-size: 12px; color: var(--text-muted); }
+.trep-form__r { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: var(--radius-s); font: 700 13px/1 var(--font-display); color: #fff; }
+.trep-form__r[data-r="W"] { background: #24733F; }
+.trep-form__r[data-r="R"] { background: #5E6A62; }
+.trep-form__r[data-r="P"] { background: #B3202F; }
+
+/* Najbliżsi rywale */
+.trep-rivals { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.trep-rivals li { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 8px 10px; border-radius: var(--radius-s); background: var(--surface); border-left: 4px solid var(--t); }
+.trep-rivals small { display: block; font-size: 12.5px; color: var(--text-muted); }
+.trep-rivals__when { font-size: 12.5px; color: var(--text-muted); }
+.trep-rivals .trep-rivals__when small { display: inline; margin-left: 6px; }
+.trep-rivals__v { font-weight: 600; }
+.trep-rivals .trep-rivals__v small { display: inline; }
+
+/* Głębia składu */
+.trep-depth { display: grid; }
+.trep-depth__row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.trep-depth__row:last-child { border-bottom: 0; }
+.trep-depth__row--head { display: none; }
+.trep-depth__row[data-gap] { background: linear-gradient(90deg, color-mix(in srgb, var(--ar-warn) 12%, transparent), transparent 70%); }
+.trep-depth__pos { display: flex; align-items: center; gap: 8px; }
+.trep-depth__pos small { color: var(--text-muted); font-size: 12.5px; }
+.trep-depth__st, .trep-depth__bk { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.trep-depth__st .trep-who { font-weight: 600; }
+.trep-who small { color: var(--text-muted); font-weight: 400; }
+.trep-who.is-out { text-decoration: line-through; text-decoration-color: var(--ar-bad); }
+.trep-gap { flex-basis: 100%; font-style: normal; font-size: 12.5px; font-weight: 600; color: var(--warn-text); }
+
+@media (min-width: 720px) {
+  .trep-authors { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .trep-unit { grid-template-columns: 90px minmax(0, 1fr) minmax(0, 38%); grid-template-areas: "k rail v"; }
+  .trep-depth__row { grid-template-columns: 170px minmax(0, 1fr) minmax(0, 1.4fr); gap: 12px; align-items: baseline; padding: 7px 4px; }
+  .trep-depth__row--head { display: grid; padding-top: 0; font: 600 12.5px/1.2 var(--font-body); color: var(--text-muted); }
+}

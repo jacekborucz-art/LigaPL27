@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-b5fbf51488';
+const VERSION = 'v0.3-3b69ced48a';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -78,7 +78,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', 'ecf7921933'],
+  ['./src/app.js', 'aa78a6df76'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '45f14cb64d'],
@@ -114,6 +114,7 @@ const FILES = [
   ['./src/career/squadLimit.js', '8c60ef88b2'],
   ['./src/career/squadLimitSystem.js', 'f25b8c5a64'],
   ['./src/career/talkDialog.js', '8751a88a9d'],
+  ['./src/career/teamReport.js', '22df2cc8c2'],
   ['./src/career/teamTalks.js', '77a6f9a15c'],
   ['./src/career/threat.js', 'bd519d5790'],
   ['./src/career/transferDeals.js', '116a88df52'],
@@ -180,7 +181,7 @@ const FILES = [
   ['./src/season/uefa.js', '4a0c9dc052'],
   ['./src/season/worldNations.js', '6003d36e12'],
   ['./src/styles/app.css', '262c4f3168'],
-  ['./src/styles/assistant.css', 'ad4ca3b469'],
+  ['./src/styles/assistant.css', 'ecb907dcd9'],
   ['./src/styles/base.css', 'f2fee58203'],
   ['./src/styles/club.css', '6615e08e49'],
   ['./src/styles/contextmenu.css', '55d14f38c2'],
@@ -198,7 +199,7 @@ const FILES = [
   ['./src/training/aiClubs.js', '6d6d0c4122'],
   ['./src/training/camps.js', '751dd1d81f'],
   ['./src/training/cohesion.js', 'f7d022d0c3'],
-  ['./src/training/config.js', '0281465316'],
+  ['./src/training/config.js', 'e04019646c'],
   ['./src/training/development.js', 'edac83c475'],
   ['./src/training/friendlies.js', 'e0cff67119'],
   ['./src/training/index.js', '5a1004f622'],
@@ -237,7 +238,8 @@ const FILES = [
   ['./src/ui/tacticsMoves.js', 'b4b7f2ea58'],
   ['./src/ui/tacticsView.js', '1d8ca1b0b0'],
   ['./src/ui/talksView.js', 'e2780aa122'],
-  ['./src/ui/trainingView.js', 'ecf17f4ac2'],
+  ['./src/ui/teamReportView.js', '46e9999e91'],
+  ['./src/ui/trainingView.js', '27c802ed59'],
   ['./src/ui/transferDealsView.js', 'a13fa703b3'],
   ['./src/ui/transfersView.js', 'd9db1d983f'],
   ['./src/world/ephemeral.js', '216b6bcdd9'],

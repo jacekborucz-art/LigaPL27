@@ -63,6 +63,8 @@ import { bindContextTrigger, openMenu, showToast } from './ui/contextMenu.js';
 import { playerMenu } from './ui/playerMenus.js';
 import { renderAssistantReport } from './ui/assistantReportView.js';
 import { ensureAssistantReport } from './career/assistantReport.js';
+import { ensureTeamReport, requestTeamReport } from './career/teamReport.js'; // raport ogólny o drużynie (docs/raport-druzyny.md)
+import { renderTeamReport } from './ui/teamReportView.js';
 import { renderMenu, renderCareer, newCareerState, maybePlayIntro, readTheme, applyTheme, nextTheme, nameError, ageError, profileOf, randomCoach, updateCoachPreview, setFieldError, isNationality, managerName, AGE_MIN, AGE_MAX } from './ui/menuView.js';
 
 const app = document.getElementById('app');
@@ -262,6 +264,7 @@ function ensureGameShape(g) {
   ensureReputation(g); // stare zapisy: stan reputacji bez zmiany p.rep (zbieżność łagodnie, co miesiąc)
   ensureHistory(g); // historia meczów drużyny gracza (stare zapisy: bieżący sezon z terminarza)
   ensureAssistantReport(g); // raport asystenta: częstotliwość i dziennik urazów (stare zapisy: co 2 tygodnie)
+  ensureTeamReport(g); // raport ogólny o drużynie (stare zapisy: pusty stan, pierwszy raport od 3. dnia miesiąca)
   if (!g.inbox.length) {
     g.inbox = [];
     const today = g.date;
@@ -396,8 +399,9 @@ function renderTab(tab, g, club) {
   if (tab === 'klub') return renderClubHub(g, state);
   if (tab === 'rozgrywki') return renderCompetitions(g, { comp: state.cComp ?? compOfClub(club) ?? 'ekstraklasa', view: state.cView, round: state.cRound, filter: state.uFilter, draw: state.uDraw });
   if (tab === 'kadra') {
-    const sub = `<div class="subtabs" role="tablist"><button role="tab" data-act="tsub" data-s="players" aria-selected="${state.sqSub === 'players'}">Zawodnicy</button><button role="tab" data-act="tsub" data-s="tactics" aria-selected="${state.sqSub === 'tactics'}">Skład i taktyka</button><button role="tab" data-act="tsub" data-s="talks" aria-selected="${state.sqSub === 'talks'}">Rozmowy</button></div>`;
+    const sub = `<div class="subtabs" role="tablist"><button role="tab" data-act="tsub" data-s="players" aria-selected="${state.sqSub === 'players'}">Zawodnicy</button><button role="tab" data-act="tsub" data-s="tactics" aria-selected="${state.sqSub === 'tactics'}">Skład i taktyka</button><button role="tab" data-act="tsub" data-s="talks" aria-selected="${state.sqSub === 'talks'}">Rozmowy</button><button role="tab" data-act="tsub" data-s="report" aria-selected="${state.sqSub === 'report'}">Raport ogólny</button></div>`;
     if (state.sqSub === 'talks') return sub + renderTalks(g, state);
+    if (state.sqSub === 'report') return sub + renderTeamReport(g, { msg: state.trepMsg ?? '' });
     if (state.sqSub === 'tactics') {
       queueMicrotask(mountTacticsScreen); // po wstawieniu HTML: okno atrybutów i fokus
       return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), info: state.tInfo, msg: state.tMsg, numbers: shirtNumbers(g, g.clubId, squadOf(g.world, g.clubId)), kit: kitColors(clubById(g.clubId)), infoExtra: state.tInfo && g.world.players[state.tInfo] ? playerStatsHtml(g.world.players[state.tInfo], g) : '' });
@@ -763,6 +767,7 @@ function mailReader(g, m, nextId) {
     </header>
     <div class="mail-view__body">${mailBodyHtml(m.body)}</div>
     ${needsAnswer(m) ? `<section class="mail-decide"><h3>Twoja decyzja</h3><div class="mail-actions">${m.actions.map((a, i) => `<button class="btn ${i === 0 ? 'btn--primary' : 'btn--quiet'}" data-act="mailaction" data-id="${esc(m.id)}" data-a="${esc(a.id)}">${esc(a.label)}</button>`).join('')}</div></section>` : ''}
+    ${m.refs?.kind === 'teamReport' ? '<p class="mail-view__foot"><button class="btn btn--sm" data-act="trep-open">Otwórz pełny raport</button></p>' : ''}
     ${m.chosen ? `<p class="mail-chosen">Twoja odpowiedź: <b>${esc(m.actions.find((a) => a.id === m.chosen)?.label ?? '')}</b></p>` : ''}
     ${canDelete(m) ? `<p class="mail-view__foot"><button class="btn btn--quiet btn--sm" data-act="maildel" data-id="${esc(m.id)}">Usuń wiadomość</button></p>` : ''}
   </article>`;
@@ -1271,6 +1276,9 @@ async function dispatchAct(el, { root = app } = {}) {
     if (act === 'squadback') { state.playerOpen = null; render(); }
     if (act === 'arep') { state.repOpen = el.dataset.id; render(); window.scrollTo({ top: 0 }); }
     if (act === 'arepback') { state.repOpen = null; render(); }
+    // Raport ogólny o drużynie: na prośbę trenera (co 14 dni) i otwarcie z poczty
+    if (act === 'trep-req') { const r = requestTeamReport(g); state.trepMsg = r.ok ? 'Sztab przygotował nowy raport.' : r.msg; if (r.ok) await save(); render(); }
+    if (act === 'trep-open') { state.tab = 'kadra'; state.sqSub = 'report'; state.mailOpen = null; state.playerOpen = null; state.repOpen = null; state.trepMsg = ''; render(); window.scrollTo({ top: 0 }); }
     if (act === 'extplayer') {
       const id = el.dataset.id; const pl = state.game?.world.players[id];
       if (pl && pl.clubId === state.game.clubId) { state.extPlayer = null; state.tab = 'kadra'; state.sqSub = 'players'; state.playerOpen = id; }
@@ -1291,7 +1299,7 @@ async function dispatchAct(el, { root = app } = {}) {
       render(); window.scrollTo({ top: 0 });
     }
     if (act === 'clubback') { state.extClub = null; state.extPlayer = null; render(); }
-    if (act === 'tsub') { state.sqSub = el.dataset.s; state.tSel = null; state.tInfo = null; state.tMsg = ''; state.playerOpen = null; state.ttResult = null; state.ttMeeting = null; render(); }
+    if (act === 'tsub') { state.sqSub = el.dataset.s; state.trepMsg = ''; state.tSel = null; state.tInfo = null; state.tMsg = ''; state.playerOpen = null; state.ttResult = null; state.ttMeeting = null; render(); }
     if (act === 'tcancel') { state.tSel = null; state.tMsg = ''; renderTacticsAfter('[data-act="tauto"]'); }
     if (act === 'tform') { g.tactics = changeFormation(g.tactics, mySquad(g), el.dataset.f); state.tSel = null; state.tMsg = ''; await save(); renderTacticsAfter(); }
     if (act === 'tauto') { g.tactics = createTactics(mySquad(g), { formation: g.tactics.formation, benchSize: benchSizeFor(g), instructions: g.tactics.instructions }); state.tSel = null; state.tMsg = 'Asystent ustawił skład.'; await save(); renderTacticsAfter(); }
