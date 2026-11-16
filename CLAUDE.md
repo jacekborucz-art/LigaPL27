@@ -21,6 +21,8 @@ Przed pracą przeczytaj `docs/PRZEKAZANIE.md` (role agentów, decyzje, pułapki)
 0. Wersja gry w `src/config/version.js` (`GAME_VERSION`, widać ją w Opcjach): każda poprawka gry podnosi liczbę po kropce o 1
    (v1.11 Beta -> v1.12 Beta -> ... -> v1.99 -> v1.100). Pierwszą liczbę i dopisek (Beta) zmienia tylko właściciel.
    Numer wersji wpisz też na końcu opisu commita, np. „... (v1.12 Beta)”.
+   Wyjątek: mała poprawka, która dopracowuje ostatnią zmianę na prośbę właściciela (np. „usuń puste miejsca w tym panelu”),
+   wchodzi do bieżącej wersji bez podnoszenia numeru. W razie wątpliwości zapytaj.
 1. `npm test` (trwa ponad 2 min: limit 600000 ms albo tło). Sprawdź wynik osobno, nie w potoku `&&`.
 2. `npm run sw` po dodaniu, usunięciu lub zmianie dowolnego pliku gry (inaczej telefony nie dostaną zmiany).
 3. Commit po polsku, jedno zdanie o efekcie dla gracza, bez prefiksów feat/fix:

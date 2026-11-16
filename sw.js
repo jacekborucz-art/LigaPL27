@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-7bb4b1e787';
+const VERSION = 'v0.3-e96ebde769';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -78,7 +78,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', '1d1e982e84'],
+  ['./src/app.js', 'ec6cf2a7b4'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '45f14cb64d'],
@@ -187,7 +187,7 @@ const FILES = [
   ['./src/styles/base.css', 'f2fee58203'],
   ['./src/styles/club.css', '6615e08e49'],
   ['./src/styles/contextmenu.css', '55d14f38c2'],
-  ['./src/styles/dashboard.css', 'c37821d257'],
+  ['./src/styles/dashboard.css', 'e950cf99bc'],
   ['./src/styles/editor.css', '3037084983'],
   ['./src/styles/fonts.css', '372f3ee1fc'],
   ['./src/styles/history.css', 'baa48b28de'],
@@ -227,6 +227,7 @@ const FILES = [
   ['./src/ui/infraView.js', '4e5e3a7751'],
   ['./src/ui/klubView.js', 'd55225df54'],
   ['./src/ui/loansView.js', '21eb434f9f'],
+  ['./src/ui/masonry.js', 'abee5a105a'],
   ['./src/ui/matchdayView.js', '55e7327fde'],
   ['./src/ui/menuView.js', 'f7dc955d9f'],
   ['./src/ui/nationalView.js', '92d610d773'],

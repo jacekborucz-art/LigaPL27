@@ -15,6 +15,7 @@ import { createSeason, compLabel, applyResult, fromEngineResult, squadFor, anyCl
 import { standings, zonesFor } from './season/standings.js';
 import { renderCompetitions } from './ui/competitionsView.js';
 import { fixturesPanelBody, renderFixtures } from './ui/fixturesView.js';
+import { mountDashMasonry } from './ui/masonry.js';
 import { ensureHistory } from './season/history.js';
 import { createMatch, runToEnd } from './engine/match/match.js';
 import { Rng } from './core/rng.js';
@@ -384,6 +385,7 @@ function renderHub() {
     <div class="ticker" id="ticker" aria-live="polite"></div>
   </div>`;
   mountDrawAnimation(app);
+  mountDashMasonry(app); // Pulpit bez pustych pól pod krótszymi panelami (src/ui/masonry.js)
 }
 
 function renderTab(tab, g, club) {

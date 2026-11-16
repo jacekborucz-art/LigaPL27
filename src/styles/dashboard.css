@@ -60,7 +60,6 @@
 }
 /* „Ten tydzień” i Poczta w jednej kolumnie, jeden pod drugim (bez pustego miejsca pod krótkim panelem) */
 .dash-side { grid-area: side; display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
-.dash-side > .dash-p--mail { flex: 1 1 auto; }
 .dash-hero { grid-area: hero; }
 .dash-p--table { grid-area: table; }
 .dash-p--squad { grid-area: squad; }
@@ -70,42 +69,44 @@
 .dash-p--window { grid-area: window; }
 .dash-p--todo { grid-area: todo; }
 
+/* Od 640 px: układ „murowany” (src/ui/masonry.js). Wiersze po 4 px, panel zajmuje tyle wierszy, ile ma wysokości
+   (plus odstęp --dash-gap), każdy panel ma stałą kolumnę, a dense dosuwa go w tej kolumnie do góry. Bez JS
+   panele i tak stoją w dobrych kolumnach, tylko z odstępem 4 px. */
 @container dash (min-width: 640px) {
   .dash__grid {
+    --dash-gap: var(--space-4);
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-areas:
-      "hero hero"
-      "side side"
-      "fix table"
-      "fix board"
-      "squad fin"
-      "squad window";
+    grid-template-areas: none;
+    grid-auto-rows: 4px;
+    grid-auto-flow: row dense;
+    gap: 0 var(--space-4);
+    align-items: start;
   }
+  .dash .dash__grid > * { grid-area: auto; } /* mocniej niż grid-area paneli w innych arkuszach (np. history.css) */
+  .dash__grid > .dash-hero, .dash__grid > .dash-side { grid-column: 1 / -1; }
+  .dash__grid > .dash-p--fix, .dash__grid > .dash-p--squad { grid-column: 1; }
+  .dash__grid > .dash-p--table, .dash__grid > .dash-p--board, .dash__grid > .dash-p--fin, .dash__grid > .dash-p--window { grid-column: 2; }
   .dash .dash-t tr.dash-row--11 { display: table-row; }
 }
 @container dash (min-width: 940px) {
   .dash__grid {
-    gap: var(--space-5) var(--space-4);
+    --dash-gap: var(--space-5);
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.15fr);
-    grid-template-areas:
-      "hero  hero   side"
-      "fix   squad  side"
-      "fix   squad  side"
-      "table board  side"
-      "table fin    window";
   }
+  .dash__grid > .dash-hero { grid-column: 1 / 3; }
+  .dash__grid > .dash-side, .dash__grid > .dash-p--window { grid-column: 3; }
+  .dash__grid > .dash-p--fix, .dash__grid > .dash-p--table { grid-column: 1; }
+  .dash__grid > .dash-p--squad, .dash__grid > .dash-p--board, .dash__grid > .dash-p--fin { grid-column: 2; }
   .dash .dash-t tr.dash-row--all { display: table-row; }
   .dash .dash-side .dash-mail li.dash-more { display: list-item; }
 }
 @container dash (min-width: 1380px) {
-  .dash__grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    grid-template-areas:
-      "hero  hero   side  table"
-      "fix   squad  side  table"
-      "fix   squad  side  board"
-      "fin   window side  board";
-  }
+  .dash__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .dash__grid > .dash-hero { grid-column: 1 / 3; }
+  .dash__grid > .dash-side { grid-column: 3; }
+  .dash__grid > .dash-p--fix, .dash__grid > .dash-p--fin { grid-column: 1; }
+  .dash__grid > .dash-p--squad, .dash__grid > .dash-p--window { grid-column: 2; }
+  .dash__grid > .dash-p--table, .dash__grid > .dash-p--board { grid-column: 4; }
   .dash .dash-abs li.dash-more { display: grid; }
   .dash .dash-mail li.dash-more { display: list-item; }
 }
