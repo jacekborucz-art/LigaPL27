@@ -29,6 +29,7 @@ import { coachOf, coachStyle, matchCoach, quickCoachTerm, formRng, assistantProf
 import { staffQ } from '../training/staff.js';
 import { statGroup, addPlayerMatch, syncSpell, recordTeamMatch, CLUB_GROUPS } from './history.js';
 import { matchRepEvents } from '../career/reputation.js';
+import { refStrictFor, refereeAfterMatch } from '../career/referees.js';
 
 export { LEAGUE_COMPS, L3_COMPS, isL3Comp, compOfClub, compClubIds };
 const ALL_CLUBS = [...CLUBS_PL, ...CLUBS_L3, ...CLUBS_L4, ...UEFA_CLUBS];
@@ -210,7 +211,7 @@ export function playQuick(game, f, rng, cache = new Map()) {
   const rank = quickRank(game, f, cache);
   home.coachTerm = quickCoach(game, f, f.home, rank);
   away.coachTerm = quickCoach(game, f, f.away, rank);
-  const ctx = { neutral: !!f.neutral, refStrict: 0.85 + rng.next() * 0.35 };
+  const ctx = { neutral: !!f.neutral, refStrict: refStrictFor(game, f) }; // sędzia z puli (src/career/referees.js), średnia listy 1,0
   const r = f.knockout ? quickKnockout(home, away, ctx, rng, f.knockout) : quickMatch(home, away, ctx, rng);
   // Zawodnicy w meczu: jedenastka z symulacji; kartki rozdzielone wg agresji, asysty do partnerów
   const lineups = r.xi;
@@ -464,6 +465,7 @@ export function applyResult(game, f, res, rng) {
       } else (game.season.playoffs.winners ??= {})[f.id] = f.leg === 2 ? tieWinner(f) : w;
     }
   }
+  refereeAfterMatch(game, f, res); // statystyki sezonu sędziego i ukryta nota obserwatora (src/career/referees.js)
   recordTeamMatch(game, f); // historia meczów drużyny gracza (tylko jej mecze)
   return msgs;
 }

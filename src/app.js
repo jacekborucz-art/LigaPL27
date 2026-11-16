@@ -69,6 +69,7 @@ import { ensureTeamReport, requestTeamReport } from './career/teamReport.js'; //
 import { renderTeamReport } from './ui/teamReportView.js';
 import { ensureWeeklyTodo, buildWeeklyTodo, noteTodoSeen, todoBadge, snoozeTodo, unhideTodo } from './career/weeklyTodo.js'; // lista „Do zrobienia w tym tygodniu” (docs/do-zrobienia.md)
 import { todoPanelBody, renderTodo } from './ui/todoView.js';
+import { ensureReferees, refStrictFor } from './career/referees.js'; // pula sędziów i obsada meczów (docs/sedziowie.md)
 import { renderMenu, renderCareer, newCareerState, maybePlayIntro, readTheme, applyTheme, nextTheme, nameError, ageError, profileOf, randomCoach, updateCoachPreview, setFieldError, isNationality, managerName, AGE_MIN, AGE_MAX } from './ui/menuView.js';
 
 const app = document.getElementById('app');
@@ -271,6 +272,7 @@ function ensureGameShape(g) {
   ensureAssistantReport(g); // raport asystenta: częstotliwość i dziennik urazów (stare zapisy: co 2 tygodnie)
   ensureTeamReport(g); // raport ogólny o drużynie (stare zapisy: pusty stan, pierwszy raport od 3. dnia miesiąca)
   ensureWeeklyTodo(g); // lista „Do zrobienia” (stare zapisy: pusty stan odłożonych spraw)
+  ensureReferees(g); // pula sędziów (stare zapisy: pula z ziarna gry, obsada od najbliższej kolejki)
   if (!g.inbox.length) {
     g.inbox = [];
     const today = g.date;
@@ -920,7 +922,7 @@ async function playMyMatch() {
     seed: `${g.seed}:${f.id}`,
     home: mySide === 0 ? mine : theirs,
     away: mySide === 0 ? theirs : mine,
-    ctx: { neutral: !!f.neutral, var: f.comp === 'ekstraklasa' || f.comp === 'super' || f.round === 'SF' || f.round === 'F', rank: f.comp === 'pp' ? (f.round === 'F' ? 3 : 1) : f.comp === 'super' ? 2 : 0, refStrict: 0.85 + new Rng(f.id).next() * 0.35,
+    ctx: { neutral: !!f.neutral, var: f.comp === 'ekstraklasa' || f.comp === 'super' || f.round === 'SF' || f.round === 'F', rank: f.comp === 'pp' ? (f.round === 'F' ? 3 : 1) : f.comp === 'super' ? 2 : 0, refStrict: refStrictFor(g, f),
       // Superpuchar od razu na karne, dwumecz z wynikiem 1. meczu, sparing wg zasad z terminarza (docs/sparingi-i-karne.md)
       knockout: ['single', 'penaltiesOnly'].includes(f.knockout) ? f.knockout : f.knockout?.firstLeg ? { firstLeg: [...f.knockout.firstLeg] } : false,
       friendlyRules: f.comp === 'friendly' ? { ...(f.friendlyRules ?? {}) } : undefined },
@@ -1129,6 +1131,7 @@ async function newGame(slot, clubId, profile = null) {
   game.tactics = createTactics(squadOf(game.world, clubId), { benchSize: benchSizeFor(game) });
   ensureTraining(game);
   ensureCareer(game);
+  ensureReferees(game);
   processDay(game);
   state.game = game;
   state.slot = slot;

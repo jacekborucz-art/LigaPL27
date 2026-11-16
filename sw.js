@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-635e3cbab9';
+const VERSION = 'v0.3-d611797010';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -78,7 +78,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', 'd493389944'],
+  ['./src/app.js', '56975856f6'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '45f14cb64d'],
@@ -106,6 +106,7 @@ const FILES = [
   ['./src/career/personality.js', 'f490724de6'],
   ['./src/career/preContracts.js', '8c71401605'],
   ['./src/career/prizes.js', 'eed7f4e394'],
+  ['./src/career/referees.js', '4a2d4c8ccb'],
   ['./src/career/reputation.js', '76035a1c80'],
   ['./src/career/reputationSystem.js', '68df5d28ba'],
   ['./src/career/shirts.js', '848f4d409c'],
@@ -156,7 +157,7 @@ const FILES = [
   ['./src/engine/teamStrength.js', '4e3625ab2f'],
   ['./src/match/aiPlan.js', '2f958da775'],
   ['./src/match/briefings.js', '259a9a1c24'],
-  ['./src/match/matchday.js', '6326b07562'],
+  ['./src/match/matchday.js', '417dd2e734'],
   ['./src/match/press.js', 'a0c01d2832'],
   ['./src/match/pressSystem.js', 'f08d4d2743'],
   ['./src/match/studio.js', '2d03fdb107'],
@@ -176,7 +177,7 @@ const FILES = [
   ['./src/season/nationalSystem.js', '56b1056ddd'],
   ['./src/season/rollover.js', '889127b698'],
   ['./src/season/schedule.js', 'a608f6730f'],
-  ['./src/season/season.js', '0464402201'],
+  ['./src/season/season.js', '66d4c3b7a5'],
   ['./src/season/standings.js', 'b3bdff91e2'],
   ['./src/season/superCupEU.js', 'f728d6d300'],
   ['./src/season/thirdLeague.js', 'f019155fab'],

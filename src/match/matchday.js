@@ -42,8 +42,8 @@ import { addMessages, createMessage } from '../core/inbox.js';
 import { applyMorale } from '../career/morale.js';
 import { isAvailable } from '../career/squad.js';
 import { compClubIds } from '../season/leagueComps.js';
+import { matchReferee } from '../career/referees.js';
 
-const REFEREES = ['Marek Wierzbicki', 'Tomasz Kwiecień', 'Paweł Sokołowski', 'Krzysztof Malec', 'Bartosz Frankowski-Nowak', 'Damian Kos', 'Jarosław Przybył', 'Łukasz Szczepan', 'Piotr Lasyk-Kral', 'Szymon Marcinek', 'Wojciech Myć-Ostrowski', 'Karol Arys-Wolny', 'Daniel Stefański-Mróz', 'Sebastian Jarzębak', 'Mariusz Złotek-Bąk'];
 
 /** Pogoda zależna od miesiąca (prosto, deterministycznie z meczu). */
 export function weatherFor(date, rng) {
@@ -304,7 +304,7 @@ export function startMatchday(game, f) {
   const { tactics: oppTactics, plan: oppPlan } = aiPlanTactics(oppSquad, { formation, benchSize: matchBench, benchGk, cq: oppQ, rng: new Rng(`ai-plan:${game.seed}:${f.id}`), oppSquad: mySquad });
   const weather = weatherFor(f.date, rng);
   const pitch = rng.weighted(['doskonala', 'dobra', 'zla', 'sztuczna'], (p) => ({ doskonala: 2, dobra: 6, zla: weather.type === 'deszcz' || weather.type === 'snieg' ? 2 : 0.5, sztuczna: 0.6 })[p]);
-  const referee = { name: rng.pick(REFEREES), strictness: Math.round(Math.max(0.7, Math.min(1.4, rng.gauss(1, 0.13))) * 100) / 100 };
+  const referee = matchReferee(game, f); // sędzia z puli i obsady (src/career/referees.js)
   const hasVar = comp === 'ekstraklasa' || comp === 'super' || comp === 'uefa' || (comp === 'pp' && ['SF', 'F'].includes(f.round));
   const h2h = (game.fixtures || []).filter((x) => x.played && x.result && ((x.home === f.home && x.away === f.away) || (x.home === f.away && x.away === f.home)))
     .map((x) => ({ date: x.date, home: x.home, away: x.away, score: x.result.score }));

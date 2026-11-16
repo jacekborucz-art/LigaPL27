@@ -8,6 +8,7 @@ import { Rng } from '../src/core/rng.js';
 import { CLUBS_PL } from '../src/data/clubs_pl.js';
 import { runDecision } from '../src/core/decisions.js';
 import { squadDeficits } from '../src/career/squad.js';
+import { squadCount } from '../src/career/squadLimit.js';
 import { ensureCareer } from '../src/career/careerSystem.js';
 import { createFinance, seasonSummary, spendable } from '../src/career/finance.js';
 import {
@@ -45,7 +46,9 @@ test('Sezon bez decyzji gracza: żaden klub nie bankrutuje, kadry 22-30 bez brak
     const f = g.finance.clubs[c.id];
     assert.ok(f.balance >= 0, `${c.id}: saldo ${f.balance}`);
     const sq = squadOf(g.world, c.id);
-    assert.ok(sq.length >= 22 && sq.length <= 30, `${c.id}: kadra ${sq.length}`);
+    // Górna granica jak w limicie kadry (docs/limit-kadry.md): wychowankowie do 21 lat się nie liczą
+    const cnt = squadCount(g, c.id);
+    assert.ok(sq.length >= 22 && (sq.length <= 30 || cnt.counted <= cnt.hard), `${c.id}: kadra ${sq.length} (liczonych ${cnt.counted}, maksimum ${cnt.hard})`);
     assert.deepEqual(squadDeficits(sq).filter((n) => n.scope === 'squad'), [], c.id);
     assert.ok(sq.every((p) => p.clubId === c.id), `${c.id}: zawodnik z innym clubId`);
   }
