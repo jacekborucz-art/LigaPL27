@@ -23,7 +23,11 @@ Przed pracą przeczytaj `docs/PRZEKAZANIE.md` (role agentów, decyzje, pułapki)
    Numer wersji wpisz też na końcu opisu commita, np. „... (v1.12 Beta)”.
    Wyjątek: mała poprawka, która dopracowuje ostatnią zmianę na prośbę właściciela (np. „usuń puste miejsca w tym panelu”),
    wchodzi do bieżącej wersji bez podnoszenia numeru. W razie wątpliwości zapytaj.
-1. `npm test` (trwa ponad 2 min: limit 600000 ms albo tło). Sprawdź wynik osobno, nie w potoku `&&`.
+1. Poprawki wizualne (tylko CSS, układ, teksty i HTML widoków w `src/ui/`, bez zmian logiki gry): bez pełnego `npm test`.
+   Wystarczy `node --test` dla testów danego widoku (np. `tests/sysMenu.test.mjs`) i `tests/core.test.mjs` (sw.js),
+   jeden zrzut ekranu PC i telefonu. Przeglądarkę testową czyść przez CDP `Network.clearBrowserCache` i wyrejestrowanie
+   service workera. Zmiany logiki i funkcjonalności: zawsze pełny `npm test` jak niżej.
+   `npm test` (trwa ponad 2 min: limit 600000 ms albo tło). Sprawdź wynik osobno, nie w potoku `&&`.
 2. `npm run sw` po dodaniu, usunięciu lub zmianie dowolnego pliku gry (inaczej telefony nie dostaną zmiany).
 3. Commit po polsku, jedno zdanie o efekcie dla gracza, bez prefiksów feat/fix:
    `git -c user.name="Jacek Borucz" -c user.email=jacekborucz@gmail.com commit ...` (zawsze ten adres).
