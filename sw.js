@@ -257,7 +257,14 @@ const FILES = [
 ];
 
 const scope = self.registration.scope;
-const keyOf = (path, hash) => new URL(`${path}?v=${hash}`, scope).href;
+// index.html pod adresem './': Cloudflare Pages przekierowuje /index.html na / (308), a odpowiedź po przekierowaniu
+// podana jako strona główna przeglądarka odrzuca (gra nie startowała przy drugim otwarciu).
+const keyOf = (path, hash) => new URL(`${path === './index.html' ? './' : path}?v=${hash}`, scope).href;
+/** Odpowiedź po przekierowaniu zamieniona na zwykłą (bez flagi redirected), żeby nadawała się dla nawigacji. */
+async function clean(res) {
+  if (!res.redirected) return res;
+  return new Response(await res.blob(), { status: res.status, statusText: res.statusText, headers: res.headers });
+}
 const BY_URL = new Map(FILES.map(([path, hash]) => [new URL(path, scope).href, keyOf(path, hash)]));
 BY_URL.set(scope, BY_URL.get(new URL('./index.html', scope).href)); // './' to index.html
 
@@ -271,8 +278,8 @@ self.addEventListener('install', (event) => {
         const key = todo[next++];
         if (await cache.match(key)) continue;
         const old = await caches.match(key); // ten sam plik w poprzedniej wersji: bez sieci
-        if (old) { await cache.put(key, old); continue; }
-        const res = await fetch(key, { cache: 'no-cache' });
+        if (old && !old.redirected) { await cache.put(key, old); continue; }
+        const res = await clean(await fetch(key, { cache: 'no-cache' }));
         if (!res.ok) throw new Error(`${key}: ${res.status}`);
         await cache.put(key, res);
       }
@@ -301,8 +308,8 @@ self.addEventListener('fetch', (event) => {
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
     const hit = await cache.match(key);
-    if (hit) return hit;
-    const res = await fetch(key, { cache: 'no-cache' });
+    if (hit && !hit.redirected) return hit; // stary wpis po przekierowaniu: pobierz od nowa
+    const res = await clean(await fetch(key, { cache: 'no-cache' }));
     if (res.ok) cache.put(key, res.clone());
     return res;
   })());
