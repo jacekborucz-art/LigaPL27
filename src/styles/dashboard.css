@@ -382,6 +382,16 @@
   .dash-stats b { text-align: right; }
 }
 .dash-abs { display: grid; margin: 0; padding: 0; list-style: none; }
+/* Rozwiń / Zwiń dłuższe listy w panelu (Stan kadry) */
+.dash-fold summary { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; margin-top: 4px; font-size: var(--step--1); font-weight: 600; color: var(--pa, var(--accent)); cursor: pointer; list-style: none; }
+.dash-fold summary::-webkit-details-marker { display: none; }
+.dash-fold summary::after { content: ""; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: translateY(-2px) rotate(45deg); }
+.dash-fold[open] summary::after { transform: translateY(2px) rotate(-135deg); }
+.dash-fold summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+.dash-fold__close, .dash-fold[open] .dash-fold__open { display: none; }
+.dash-fold[open] .dash-fold__close { display: inline; }
+.dash-fold[open] summary { order: 2; }
+.dash-fold[open] { display: flex; flex-direction: column; }
 .dash-abs li { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); min-height: 36px; border-bottom: 1px solid var(--line); }
 .dash-abs li:last-child { border-bottom: 0; }
 .dash-abs .pos { min-width: 40px; }

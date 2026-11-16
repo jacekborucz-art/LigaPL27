@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-88fc51ea90';
+const VERSION = 'v0.3-7bb4b1e787';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -78,7 +78,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', 'd68610e6d2'],
+  ['./src/app.js', '1d1e982e84'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '45f14cb64d'],
@@ -123,7 +123,7 @@ const FILES = [
   ['./src/career/weeklyTodo.js', 'd99508c0c3'],
   ['./src/config/calendar2026.js', '7af3df5b12'],
   ['./src/config/competitions.js', '1ba35856b2'],
-  ['./src/config/version.js', '554811750c'],
+  ['./src/config/version.js', '4a30aaf9a9'],
   ['./src/core/decisions.js', 'b9fda961b7'],
   ['./src/core/gameLoop.js', 'd572502469'],
   ['./src/core/inbox.js', '689fd5b609'],
@@ -187,7 +187,7 @@ const FILES = [
   ['./src/styles/base.css', 'f2fee58203'],
   ['./src/styles/club.css', '6615e08e49'],
   ['./src/styles/contextmenu.css', '55d14f38c2'],
-  ['./src/styles/dashboard.css', '8f689a509d'],
+  ['./src/styles/dashboard.css', 'c37821d257'],
   ['./src/styles/editor.css', '3037084983'],
   ['./src/styles/fonts.css', '372f3ee1fc'],
   ['./src/styles/history.css', 'baa48b28de'],
@@ -222,7 +222,7 @@ const FILES = [
   ['./src/ui/dom.js', '0ce16300f6'],
   ['./src/ui/editorView.js', '99219af4c4'],
   ['./src/ui/europeView.js', '15e2d036f2'],
-  ['./src/ui/fixturesView.js', 'c8f73ab496'],
+  ['./src/ui/fixturesView.js', 'c12490e48a'],
   ['./src/ui/formChart.js', '9d81bc96d3'],
   ['./src/ui/infraView.js', '4e5e3a7751'],
   ['./src/ui/klubView.js', 'd55225df54'],

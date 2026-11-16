@@ -533,7 +533,7 @@ function dashHero(g, club, next, tableOf) {
 
 /** Terminarz: ostatnie wyniki i najbliższe mecze z rozgrywkami i miejscem meczu (src/ui/fixturesView.js). */
 function dashFixtures(g) {
-  return dashPanel('fix', 'fix', 'Terminarz', fixturesPanelBody(g), '<button class="dash-link" data-act="fixtures">Pokaż wszystko</button>');
+  return dashPanel('fix', 'fix', 'Terminarz', fixturesPanelBody(g, { morePast: 0 }),'<button class="dash-link" data-act="fixtures">Pokaż wszystko</button>');
 }
 
 function dashTable(g, club, table) {
@@ -664,14 +664,17 @@ function dashSquad(g) {
     .sort((a, b) => (b.injuryDays ?? 0) - (a.injuryDays ?? 0));
   const why = (p) => (p.injuryDays > 0 ? ['inj', `uraz, ${p.injuryDays} ${daysWord(p.injuryDays)}`]
     : p.suspended > 0 ? ['susp', `pauza, ${p.suspended} ${plural(p.suspended, 'mecz', 'mecze', 'meczów')}`] : ['call', 'reprezentacja']);
-  const list = out.slice(0, 5).map((p) => {
+  const absRow = (p) => {
     const [k, txt] = why(p);
     return `<li data-pid="${esc(p.id)}" data-why="${k}"><span class="pos" data-g="${GROUP[p.pos] ?? 'MID'}">${esc(p.pos)}</span><span class="dash-abs__name">${esc(p.name)}</span><span class="dash-abs__why" data-k="${k}">${esc(txt)}</span></li>`;
-  }).join('');
+  };
+  // Dłuższe listy: pierwsze wiersze widać od razu, reszta pod „Rozwiń” (details, bez stanu w grze)
+  const foldList = (items, show, row, label) => `<ul class="dash-abs">${items.slice(0, show).map(row).join('')}</ul>${items.length > show
+    ? `<details class="dash-fold"><summary><span class="dash-fold__open">Rozwiń: jeszcze ${items.length - show} ${label}</span><span class="dash-fold__close">Zwiń</span></summary><ul class="dash-abs">${items.slice(show).map(row).join('')}</ul></details>` : ''}`;
   const freshBand = fresh == null ? '' : fresh >= 80 ? 'good' : fresh >= 65 ? 'mid' : 'low';
   const ending = squadOf(g.world, g.clubId).filter((p) => !p.loan && p.contract?.until && daysBetween(g.date, p.contract.until) <= 365)
     .sort((a, b) => a.contract.until.localeCompare(b.contract.until) || b.ovr - a.ovr);
-  const endList = ending.slice(0, 6).map((p, k) => `<li${k >= 3 ? ' class="dash-more"' : ''} data-pid="${esc(p.id)}" data-why="contract"><span class="pos" data-g="${GROUP[p.pos] ?? 'MID'}">${esc(p.pos)}</span><span class="dash-abs__name">${esc(p.name)}</span><span class="dash-abs__why" data-k="contract">${esc(fmtDate(p.contract.until))}</span></li>`).join('');
+  const endRow = (p) => `<li data-pid="${esc(p.id)}" data-why="contract"><span class="pos" data-g="${GROUP[p.pos] ?? 'MID'}">${esc(p.pos)}</span><span class="dash-abs__name">${esc(p.name)}</span><span class="dash-abs__why" data-k="contract">${esc(fmtDate(p.contract.until))}</span></li>`;
   // Limit kadry (docs/limit-kadry.md): ostrzeżenie, gdy kadra jest ponad limitem zarządu albo biegnie termin
   const L = limitStatus(g);
   const lc = L.case;
@@ -687,9 +690,9 @@ function dashSquad(g) {
       <li><span>Zgranie</span><b>${esc(coh.label)}</b></li>
     </ul>
     <h4 class="dash-sub">Niedostępni${out.length ? ` (${out.length})` : ''}</h4>
-    ${out.length ? `<ul class="dash-abs">${list}</ul>${out.length > 5 ? `<p class="dash-note">i jeszcze ${out.length - 5}</p>` : ''}` : '<p class="dash-note dash-note--ok">Wszyscy zawodnicy są do dyspozycji.</p>'}
+    ${out.length ? foldList(out, 4, absRow, plural(out.length - 4, 'zawodnika', 'zawodników', 'zawodników')) : '<p class="dash-note dash-note--ok">Wszyscy zawodnicy są do dyspozycji.</p>'}
     ${limitHtml ? '' : `<p class="dash-note">Limit kadry: ${L.counted} z ${L.soft} (maksimum ${L.hard}), bez ${L.exempt.length} ${plural(L.exempt.length, 'wychowanka', 'wychowanków', 'wychowanków')} do 21 lat.</p>`}
-    ${ending.length ? `<h4 class="dash-sub">Kontrakt kończy się w ciągu roku (${ending.length})</h4><ul class="dash-abs">${endList}</ul>` : ''}`;
+    ${ending.length ? `<h4 class="dash-sub">Kontrakt kończy się w ciągu roku (${ending.length})</h4>${foldList(ending, 5, endRow, plural(ending.length - 5, 'zawodnika', 'zawodników', 'zawodników'))}` : ''}`;
   return dashPanel('squad', 'squad', 'Stan kadry', body, dashLink('kadra', 'Kadra'));
 }
 

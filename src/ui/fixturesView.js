@@ -90,15 +90,14 @@ const todayLine = (today) => `<li class="fxr-now" aria-label="Dziś, ${esc(fmtDa
  * Treść panelu „Terminarz”: 3 ostatnie wyniki, kreska „dziś”, 5 najbliższych meczów. Dodatkowe wiersze
  * (do 5 wyników i 8 meczów, klasa fxr--x) pokazuje CSS, gdy panel zajmuje na Pulpicie dwa rzędy siatki.
  */
-export function fixturesPanelBody(game, { past = 3, next = 5, morePast = 2, moreNext = 3 } = {}) {
+export function fixturesPanelBody(game, { past = 3, next = 5, morePast = 2, moreNext = 2 } = {}) {
   ensureHistory(game);
   const rows = teamFixtures(game);
   const played = rows.filter((r) => r.played);
   const plan = rows.filter((r) => !r.played);
   const head = played.slice(-(past + morePast));
-  // Mniej rozegranych meczów (początek sezonu): wolne wiersze dla kolejnych meczów
-  const spare = past + morePast - head.length;
-  const tail = plan.slice(0, next + moreNext + spare);
+  // Najwyżej 7 kolejnych meczów (telefon 5, szeroki Pulpit 7); na początku sezonu wszystkie 7 widać od razu
+  const tail = plan.slice(0, next + moreNext);
   next += Math.max(0, past - head.length);
   const xPast = Math.max(0, head.length - past);
   if (!head.length && !tail.length) return '<p class="dash-note">Brak meczów w tym sezonie. Terminarz pojawi się po losowaniu albo w nowym sezonie.</p>';
