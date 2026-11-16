@@ -117,3 +117,11 @@ test('Klub > Finanse i Zarząd: kafelki z barwą znaczeniową i panele', async (
   assert.match(board, /Oceny zarządu/);
   assert.match(board, /Kibice/);
 });
+
+test('Kontrakty: status „do wypożyczenia” przy zawodniku, dla którego szukamy klubu', () => {
+  const g = newGame('widzew', 33);
+  const p = squadOf(g.world, 'widzew').find((x) => !x.loan);
+  g.market.loanAsks = { ...(g.market.loanAsks ?? {}), [p.id]: { due: g.date } };
+  const html = renderTransfers(g, { tfTab: 'kontrakty' });
+  assert.match(html, /do wypożyczenia, szukamy klubu/);
+});

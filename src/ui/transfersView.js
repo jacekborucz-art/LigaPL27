@@ -20,6 +20,7 @@ import { fansSummary } from '../career/fans.js';
 import { canSign, YOUTH_EXEMPT_AGE, KEEP_MAX, PRESSURE_DAYS } from '../career/squadLimit.js';
 import { limitStatus, toggleKeep, ageWord } from '../career/squadLimitSystem.js';
 import { boardCaps, appealStatus } from '../career/boardRequests.js';
+import { openLoanOffers } from '../career/loans.js'; // status „szukamy klubu na wypożyczenie” w tabeli kadry
 import { loanInForm, loanOutPanel, loanedInPanel, loanedOutPanels, loansSection, loanInAction, handleLoanAction, isLoanAction, isLoanedOut } from './loansView.js'; // wypożyczenia (docs/wypozyczenia.md)
 import { dealsView, dealTags, ownDealPanels, otherDealPanel, handleDealAction } from './transferDealsView.js'; // W toku, prekontrakty, prośby (docs/transfery.md)
 import { effectiveAsk } from '../career/mindset.js';
@@ -124,6 +125,12 @@ function sortBy(list, sort, val) {
 }
 const willTone = (v) => (v === 'chętny' ? 'good' : v === 'otwarty' ? 'info' : v === 'niechętny' ? 'warn' : 'bad');
 const tag = (txt, k = 'info') => `<span class="tf-tag" data-k="${k}">${esc(txt)}</span>`;
+/** Wypożyczenie z klubu: oferty do decyzji albo dyrektor sportowy szuka klubu (panel Wypożycz na karcie zawodnika). */
+function loanTag(game, p) {
+  const n = openLoanOffers(game, p.id).length;
+  if (n) return tag(`do wypożyczenia, ${n} ${n === 1 ? 'oferta' : n < 5 ? 'oferty' : 'ofert'}`, 'warn');
+  return game.market.loanAsks?.[p.id] ? tag('do wypożyczenia, szukamy klubu', 'info') : '';
+}
 
 /** Pasek nad zakładkami: stan okna transferowego. */
 function windowBadge(game) {
@@ -439,6 +446,7 @@ function contractsView(game, ui) {
     const k = ml <= 6 ? 'bad' : ml <= 12 ? 'warn' : 'ok';
     const st = [
       game.market.userListed[p.id] ? tag(`na liście, ${fmtZl(game.market.userListed[p.id])}`, 'warn') : '',
+      loanTag(game, p),
       p.loan ? tag(`wypożyczony z ${clubById(p.loan.from)?.name ?? ''}`, 'info') : '',
       p.renewRefused ? tag('odmówił przedłużenia', 'bad') : '',
       p.transferRequest ? tag('prosi o transfer', 'warn') : '',
