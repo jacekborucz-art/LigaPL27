@@ -175,8 +175,10 @@
   .hub__head { grid-column: 1 / -1; }
   .nav {
     position: sticky;
-    top: 0;
     inset: auto;
+    top: 0; /* po inset: inset: auto kasował top i menu przewijało się z Pulpitem */
+    max-height: 100dvh;
+    overflow-y: auto;
     height: auto;
     align-self: start;
     display: flex;
