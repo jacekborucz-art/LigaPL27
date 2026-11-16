@@ -138,6 +138,11 @@ const devF = (L) => 0.94 + 0.018 * (L - 1);
 const injF = (L) => 1.1 - 0.02 * L;
 const youthF = (L) => 0.92 + 0.016 * L;
 const juniors = (L) => 2 + Math.round(L / 3);
+/** Miejsca w akademii według poziomu (decyzja właściciela Nov 16, 2026: amatorska 3-5, światowa 24). [SZAC] */
+export const ACADEMY_CAP = [3, 5, 7, 9, 11, 13, 15, 18, 21, 24];
+export const academyCapacity = (L) => ACADEMY_CAP[clamp(Math.round(L ?? 3), 1, MAX_LEVEL) - 1];
+/** Miejsca w akademii klubu. Bez danych infrastruktury (np. beniaminek z IV ligi w dniu przełomu sezonu): poziom startowy. */
+export const academyCapOf = (game, id) => academyCapacity(game?.infra?.clubs?.[id]?.academy ?? startLevels(clubById(id)).academy);
 export const stadiumMul = (L) => lvl('stadium', L).M;
 
 /** Baza treningowa: mnożniki rozwoju i urazów na treningu, dodatek do regeneracji (względem startu). */

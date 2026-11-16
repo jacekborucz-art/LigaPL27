@@ -9,7 +9,7 @@ import { clubById, LEAGUE_NAMES } from '../data/clubs_pl.js';
 import {
   TRACKS, TRACK_NAMES, LEVELS, MAX_LEVEL, PL_CEILING, LICENCE, INFRA,
   infraOf, ensureInfra, quote, startProject, capacityOf, seatRoom, seasonFill, licenceNeeds,
-  trainingMods, academyMods, stadiumMul, ownerLabel, upkeepAt,
+  trainingMods, academyMods, academyCapacity, stadiumMul, ownerLabel, upkeepAt,
 } from '../career/infrastructure.js';
 
 const n0 = (x) => Math.round(x).toLocaleString('pl-PL'); // tysiące ze spacją nierozdzielającą
@@ -45,6 +45,7 @@ function effects(game, id, track) {
   }
   const a = academyMods(game, id);
   return [
+    `Miejsc w akademii: ${academyCapacity(I.academy)} (na najwyższym poziomie 24)`,
     `Juniorów co roku: ${3 + a.extra}-${5 + a.extra}`,
     `Jakość juniorów ${a.offset >= 0 ? '+' : ''}${x2(a.offset)} pkt`,
     `Szansa na wyjątkowy talent: ${Math.round(a.talent * 100)} % na juniora`,

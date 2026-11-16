@@ -16,6 +16,7 @@ import {
 import { SESSIONS, INTENSITY, INT_ORDER, ACCENTS, LOAD_LEVELS, STAFF_ROLES, PROGRAMS, MODES, staffMul, COH } from '../training/config.js';
 import { mondayOf, ageAt } from '../training/state.js';
 import { squadOf, academyOf } from '../world/worldGen.js';
+import { academyCapOf } from '../career/infrastructure.js'; // miejsca w akademii według poziomu
 import { reportPrecision } from '../training/staff.js';
 import { formatZl } from '../career/negotiation.js';
 import { clubById, CLUBS_PL } from '../data/clubs_pl.js';
@@ -531,7 +532,7 @@ function playersTab(game, ui) {
   return `<p class="muted">Dotknij zawodnika, żeby ustawić akcent, naukę pozycji, program albo lżejszy trening.</p>
     <h3 class="tr-sechead">Pierwsza drużyna <small>${squad.length} zawodników, plan indywidualny: ${withPlan}</small></h3>
     <div class="tr-plist">${squad.map((x) => playerRow(x, game)).join('')}</div>
-    <h3 class="tr-sechead">Akademia <small>${academy.length} juniorów</small></h3><p class="muted">Juniorzy trenują z trenerem młodzieży według planu akademii. Akcent indywidualny działa także u nich.</p>
+    <h3 class="tr-sechead">Akademia <small>${academy.length} z ${academyCapOf(game, game.clubId)} miejsc</small></h3><p class="muted">Juniorzy trenują z trenerem młodzieży według planu akademii. Akcent indywidualny działa także u nich.</p>
     <div class="tr-plist">${academy.map((x) => playerRow(x, game)).join('') || '<p class="muted">Brak juniorów.</p>'}</div>`;
 }
 

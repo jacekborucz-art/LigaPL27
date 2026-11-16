@@ -73,6 +73,11 @@ Utrudnienia w czasie budowy: podniesienie standardu -10 % pojemności (budowa po
 | 9 | Akademia europejska | 60 | 24 | 25 |
 | 10 | Akademia światowa | 150 | 30 | 50 |
 
+Miejsca w akademii (decyzja właściciela Nov 16, 2026) [SZAC]: poziom 1-10 daje 3, 5, 7, 9, 11, 13, 15, 18, 21, 24 juniorów
+(`ACADEMY_CAP`, `src/career/infrastructure.js`). Co sezon 1 lipca przychodzi nabór 3-5 juniorów (więcej przy lepszej akademii),
+19-latkowie przechodzą do kadry albo odchodzą, a gdy akademia jest pełna, odchodzi junior, który najmniej rokuje
+(najniższy potencjał, przy równym starszy), nie najsłabszy dziś (`processAcademy`, `src/season/rollover.js`).
+
 Polskie kluby kończą realnie na stadionie 7, bazie 8 i akademii 7-8 (oznaczenie „szczyt w Polsce” na drabinie poziomów: stadion 7, baza 8, akademia 8). Poziomy 9 i 10 to odniesienia światowe.
 
 ## 3. Poziomy startowe

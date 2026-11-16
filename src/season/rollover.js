@@ -24,7 +24,7 @@ import { allocateEuropeanSpots } from './europeAccess.js';
 import { COUNTRY_COEF_2026, UCOMP_NAMES } from './uefa.js';
 import { seasonWindows } from './intl/windows.js';
 import { initClub, seasonSummary, FIN } from '../career/finance.js';
-import { academyMods } from '../career/infrastructure.js';
+import { academyMods, academyCapOf } from '../career/infrastructure.js';
 import { addFreeAgents } from '../career/transfers.js';
 import { returnLoansAtRollover } from '../career/loans.js';
 import { applyPreContracts } from '../career/preContracts.js'; // umowy od 1 lipca (docs/transfery.md)
@@ -175,7 +175,11 @@ function processAcademy(game, newStart, rng, report) {
       W.players[p.id] = p; club.academy.push(p.id);
       if (cid === game.clubId) report.newYouth.push(`${p.name} (${p.pos}, ${p.age} lat)`);
     }
-    while (club.academy.length > 10) { const worst = academyOf(W, cid).sort((a, b) => a.ovr - b.ovr)[0]; club.academy = club.academy.filter((x) => x !== worst.id); delete W.players[worst.id]; }
+    // Pełna akademia (miejsca według poziomu akademii, 3-24): odchodzi junior, który najmniej rokuje (najniższy
+    // potencjał POT), a przy równym starszy. Wcześniej odpadał najsłabszy dziś (najniższy OVR), czyli świeży 16-latek.
+    const outlook = (p) => p.hidden?.POT ?? p.ovr;
+    const cap = academyCapOf(game, cid);
+    while (club.academy.length > cap) { const worst = academyOf(W, cid).sort((a, b) => outlook(a) - outlook(b) || b.age - a.age)[0]; club.academy = club.academy.filter((x) => x !== worst.id); delete W.players[worst.id]; }
   }
 }
 

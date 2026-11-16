@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-de5a72bbfa';
+const VERSION = 'v0.3-f3bf769f71';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -95,7 +95,7 @@ const FILES = [
   ['./src/career/finance.js', '7bfcaffca1'],
   ['./src/career/foreignMarket.js', '69f8495b89'],
   ['./src/career/foreignPool.js', '48d9c4bd5d'],
-  ['./src/career/infrastructure.js', 'ad72396773'],
+  ['./src/career/infrastructure.js', 'b07deb348c'],
   ['./src/career/loans.js', '6b12fbe674'],
   ['./src/career/mindset.js', 'b8a1c39ce7'],
   ['./src/career/morale.js', '941048776c'],
@@ -123,7 +123,7 @@ const FILES = [
   ['./src/career/weeklyTodo.js', 'd99508c0c3'],
   ['./src/config/calendar2026.js', '7af3df5b12'],
   ['./src/config/competitions.js', '1ba35856b2'],
-  ['./src/config/version.js', 'ac90bdd65e'],
+  ['./src/config/version.js', '9367379215'],
   ['./src/core/decisions.js', 'b9fda961b7'],
   ['./src/core/gameLoop.js', 'd572502469'],
   ['./src/core/inbox.js', '689fd5b609'],
@@ -174,7 +174,7 @@ const FILES = [
   ['./src/season/leagues.js', '0844dc0aba'],
   ['./src/season/national.js', '1b51378924'],
   ['./src/season/nationalSystem.js', '56b1056ddd'],
-  ['./src/season/rollover.js', '7d45b3d4e4'],
+  ['./src/season/rollover.js', '889127b698'],
   ['./src/season/schedule.js', 'a608f6730f'],
   ['./src/season/season.js', '0464402201'],
   ['./src/season/standings.js', 'b3bdff91e2'],
@@ -225,7 +225,7 @@ const FILES = [
   ['./src/ui/europeView.js', '15e2d036f2'],
   ['./src/ui/fixturesView.js', 'c12490e48a'],
   ['./src/ui/formChart.js', '9d81bc96d3'],
-  ['./src/ui/infraView.js', '4e5e3a7751'],
+  ['./src/ui/infraView.js', '1cb8fd20bf'],
   ['./src/ui/klubView.js', 'd55225df54'],
   ['./src/ui/loansView.js', '21eb434f9f'],
   ['./src/ui/masonry.js', 'abee5a105a'],
@@ -245,7 +245,7 @@ const FILES = [
   ['./src/ui/talksView.js', 'e2780aa122'],
   ['./src/ui/teamReportView.js', 'c01abc57b6'],
   ['./src/ui/todoView.js', 'bd4d7aa1c4'],
-  ['./src/ui/trainingView.js', '5eff0a7334'],
+  ['./src/ui/trainingView.js', '45fb5d0fd9'],
   ['./src/ui/transferDealsView.js', 'a13fa703b3'],
   ['./src/ui/transfersView.js', '3ed2d11f29'],
   ['./src/world/ephemeral.js', '216b6bcdd9'],

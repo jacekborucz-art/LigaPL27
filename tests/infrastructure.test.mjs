@@ -248,3 +248,11 @@ test('Widok: kafelki, trzy karty z drabiną poziomów, potwierdzenie, start inwe
   assert.equal(handleClubAction(g, 'inf-cancel', {}).ui.infAsk, null);
   assert.equal(handleClubAction(g, 'inf-confirm', { track: 'training' }).save, false, 'drugi projekt na tym samym torze');
 });
+
+test('Akademia: miejsca według poziomu, od 3 (brak akademii) do 24 (akademia światowa), rosnąco', async () => {
+  const { academyCapacity, ACADEMY_CAP } = await import('../src/career/infrastructure.js');
+  assert.equal(academyCapacity(1), 3);
+  assert.equal(academyCapacity(2), 5);
+  assert.equal(academyCapacity(10), 24);
+  assert.ok(ACADEMY_CAP.every((v, i) => i === 0 || v > ACADEMY_CAP[i - 1]));
+});
