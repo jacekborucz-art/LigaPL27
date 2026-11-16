@@ -12,6 +12,19 @@ Przed pracą przeczytaj `docs/PRZEKAZANIE.md` (role agentów, decyzje, pułapki)
 - Przed naprawą sprawdź, czy podobny problem już był (`docs/PRZEKAZANIE.md` rozdział 7, historia commitów), i powiedz o tym.
 - Nie udawaj, że działa: najpierw testy i sprawdzenie w przeglądarce (PC 1600 px, telefon 390 px), potem raport.
 
+## Agenci: model i wysiłek
+- Każdy agent dostaje model i poziom wysiłku dopasowany do zadania. Przed uruchomieniem pokaż właścicielowi
+  listę agentów z modelem i wysiłkiem i czekaj na zatwierdzenie.
+- Dobór:
+  - Opus, wysiłek high: projektowanie mechaniki i balansu, silnik meczu, kalibracja, wdrożenia dużych zmian logiki,
+    kontrola jakości (QA) i weryfikacja cudzej pracy.
+  - Sonnet, wysiłek medium: research i burza mózgów ekspertów, notatki z kodu, projekt wyglądu,
+    średnie wdrożenia (nowy widok, poprawki w kilku plikach).
+  - Haiku, wysiłek low: proste wyszukiwanie w kodzie, zbieranie danych z plików, drobne poprawki tekstów i stylów,
+    uruchamianie testów i symulacji z gotowych skryptów.
+- Gdy kilku agentów pracuje równolegle, każdy może mieć inny model, np. projekt (Opus, high) i research (Sonnet, medium).
+- Wątpliwość co do trudności: wyższy model.
+
 ## Zasady gry (nie łamać)
 - Bez kont, logowania, serwera, Google Drive i Web Share.
 - Bez sztucznych sufitów i suwaków trudności: wynik = mechanika + RNG. Gracz i AI mają te same zasady.
