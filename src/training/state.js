@@ -87,6 +87,7 @@ export function ensureTraining(game) {
   const inSeason = (game.fixtures || []).some((f) => f.played && (f.home === game.clubId || f.away === game.clubId));
   for (const clubId of Object.keys(game.world.clubs)) {
     if (!T.staff[clubId]) T.staff[clubId] = generateStaffFor(game, clubId);
+    else if (!T.staff[clubId].kierownik) T.staff[clubId].kierownik = generateStaffFor(game, clubId).kierownik; // stare zapisy: kierownik drużyny z ziarna gry
     if (!T.clubs[clubId]) {
       const mine = clubId === game.clubId;
       const form = mine ? (game.tactics?.formation ?? '4231') : '4231';

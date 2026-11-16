@@ -1,4 +1,6 @@
-// Sztab szkoleniowy: 5 ról z jakością 1-20 (asystent, przygotowanie fizyczne, bramkarze, młodzież, analityk).
+// Sztab szkoleniowy: 6 ról z jakością 1-20 (asystent, przygotowanie fizyczne, bramkarze, młodzież, analityk,
+// kierownik drużyny). Kierownik drużyny (ostatni w kolejności losowania, więc pozostałe role bez zmian) odpowiada
+// za sprawy organizacyjne na liście „Do zrobienia” (src/career/weeklyTodo.js).
 // Na start każdy klub dostaje sztab zależny od prestiżu i ligi (deterministycznie z ziarna gry).
 // Wpływ jakości na trening, rozwój, urazy i raporty: STAFF_ROLES i staffMul w config.js.
 

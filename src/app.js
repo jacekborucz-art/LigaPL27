@@ -65,6 +65,8 @@ import { renderAssistantReport } from './ui/assistantReportView.js';
 import { ensureAssistantReport } from './career/assistantReport.js';
 import { ensureTeamReport, requestTeamReport } from './career/teamReport.js'; // raport ogólny o drużynie (docs/raport-druzyny.md)
 import { renderTeamReport } from './ui/teamReportView.js';
+import { ensureWeeklyTodo, buildWeeklyTodo, noteTodoSeen, todoBadge, snoozeTodo, unhideTodo } from './career/weeklyTodo.js'; // lista „Do zrobienia w tym tygodniu” (docs/do-zrobienia.md)
+import { todoPanelBody, renderTodo } from './ui/todoView.js';
 import { renderMenu, renderCareer, newCareerState, maybePlayIntro, readTheme, applyTheme, nextTheme, nameError, ageError, profileOf, randomCoach, updateCoachPreview, setFieldError, isNationality, managerName, AGE_MIN, AGE_MAX } from './ui/menuView.js';
 
 const app = document.getElementById('app');
@@ -265,6 +267,7 @@ function ensureGameShape(g) {
   ensureHistory(g); // historia meczów drużyny gracza (stare zapisy: bieżący sezon z terminarza)
   ensureAssistantReport(g); // raport asystenta: częstotliwość i dziennik urazów (stare zapisy: co 2 tygodnie)
   ensureTeamReport(g); // raport ogólny o drużynie (stare zapisy: pusty stan, pierwszy raport od 3. dnia miesiąca)
+  ensureWeeklyTodo(g); // lista „Do zrobienia” (stare zapisy: pusty stan odłożonych spraw)
   if (!g.inbox.length) {
     g.inbox = [];
     const today = g.date;
@@ -362,7 +365,8 @@ function renderHub() {
   const g = state.game;
   const club = clubById(g.clubId);
   const unread = unreadCount(g.inbox);
-  const nav = TABS.map((t) => `<button class="nav__btn" data-act="tab" data-tab="${t.id}" aria-current="${state.tab === t.id ? 'page' : 'false'}">${icon(t.id)}<span>${esc(t.label)}</span>${t.id === 'poczta' && unread ? `<span class="badge" aria-label="${unread} nieprzeczytanych">${unread > 99 ? '99+' : unread}</span>` : ''}</button>`).join('');
+  const urgent = state.tab !== 'pulpit' ? todoBadge(g).n : 0; // pilne sprawy tygodnia (na Pulpicie widać panel)
+  const nav = TABS.map((t) => `<button class="nav__btn" data-act="tab" data-tab="${t.id}" aria-current="${state.tab === t.id ? 'page' : 'false'}">${icon(t.id)}<span>${esc(t.label)}</span>${t.id === 'poczta' && unread ? `<span class="badge" aria-label="${unread} nieprzeczytanych">${unread > 99 ? '99+' : unread}</span>` : ''}${t.id === 'pulpit' && urgent ? `<span class="badge" aria-label="${urgent} ${urgent === 1 ? 'pilna sprawa' : 'pilne sprawy'} w tym tygodniu">${urgent > 9 ? '9+' : urgent}</span>` : ''}</button>`).join('');
   app.innerHTML = `
   <div class="hub">
     <header class="hub__head">
@@ -392,6 +396,7 @@ function renderTab(tab, g, club) {
     const extClub = ext.clubId ? clubById(ext.clubId) : null;
     return renderPlayerProfile(ext, { leagueOvrs: leagueOvrs(g, extClub?.tier ?? club.tier), clubName: extClub?.name ?? 'Wolny zawodnik', date: g.date, game: g, foreign: true, back: { act: 'extback', label: 'Wróć' } });
   }
+  if (tab === 'pulpit' && state.todo) { const res = buildWeeklyTodo(g); noteTodoSeen(g, res); return renderTodo(res, state); }
   if (tab === 'pulpit') return state.fx ? renderFixtures(g, state.fx) : renderDashboard(g, club);
   if (tab === 'poczta') return renderMail(g);
   if (tab === 'trening') return renderTraining(g, state);
@@ -443,6 +448,7 @@ const DASH_ICONS = {
   fin: '<ellipse cx="12" cy="6.5" rx="7" ry="2.8"/><path d="M5 6.5v5.5c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V6.5M5 12v5.5c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V12"/>',
   squad: '<path d="M9.5 4h5v5.5H20v5h-5.5V20h-5v-5.5H4v-5h5.5z"/>',
   fix: '<rect x="4" y="5" width="16" height="15" rx="1.5"/><path d="M4 10h16M8.5 3v4M15.5 3v4M8 14h3M13 14h3M8 17h3"/>',
+  todo: '<rect x="5" y="4.5" width="14" height="16.5" rx="1.5"/><path d="M9.5 3h5v3h-5zM8.5 12.5l2.2 2.2 4.8-4.8"/>',
 };
 const dashIcon = (k) => (DASH_ICONS[k] ? `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${DASH_ICONS[k]}</svg>` : icon(k));
 // data-sub: docelowa podzakładka (np. Transfery > Finanse), gdy obsługa kliknięcia ją uwzględni
@@ -696,6 +702,15 @@ function dashMail(g) {
   return dashPanel('mail', 'poczta', `Poczta${unread ? ` <span class="dash-p__count">${unread} ${plural(unread, 'nowa', 'nowe', 'nowych')}</span>` : ''}`, body, dashLink('poczta', 'Cała poczta'));
 }
 
+/** Ten tydzień: najważniejsze sprawy z listy „Do zrobienia” (pełny widok: src/ui/todoView.js). */
+function dashTodo(g) {
+  const res = buildWeeklyTodo(g);
+  noteTodoSeen(g, res);
+  const n = res.items.length;
+  const title = `Ten tydzień${res.counts.pilne ? ` <span class="dash-p__count">${res.counts.pilne} ${plural(res.counts.pilne, 'pilna', 'pilne', 'pilnych')}</span>` : ''}`;
+  return dashPanel('todo', 'todo', title, todoPanelBody(res), `<button class="dash-link" data-act="todo">${n ? `Wszystko (${n})` : 'Lista'}</button>`);
+}
+
 function renderDashboard(g, club) {
   const tableOf = dashTables(g);
   const table = tableOf(club);
@@ -706,6 +721,7 @@ function renderDashboard(g, club) {
     ${decideBar}
     <div class="dash__grid">
       ${dashHero(g, club, nextFixture(g), tableOf)}
+      ${dashTodo(g)}
       ${dashFixtures(g)}
       ${dashTable(g, club, table)}
       ${dashSquad(g)}
@@ -928,7 +944,7 @@ async function runDays() {
   state.running = false;
   if (squadKey() !== squadBefore) afterSquadChange(g);
   // Po Dalej zawsze Pulpit (nowe wiadomości i decyzje widać w panelu Poczta i w pasku decyzji na Pulpicie)
-  if (reason === 'message' || reason === 'decision' || reason === 'prematch') { state.tab = 'pulpit'; state.fx = null; state.extPlayer = null; state.extClub = null; state.mailOpen = null; }
+  if (reason === 'message' || reason === 'decision' || reason === 'prematch') { state.tab = 'pulpit'; state.fx = null; state.todo = null; state.extPlayer = null; state.extClub = null; state.mailOpen = null; }
   await save();
   renderHub();
 }
@@ -1226,10 +1242,24 @@ async function dispatchAct(el, { root = app } = {}) {
       await new Promise((r) => setTimeout(r, matchMedia('(prefers-reduced-motion: reduce)').matches ? 150 : 450)); // podpis widoczny przed generowaniem świata
       await newGame(nc.slot, nc.clubId, profileOf(nc));
     }
-    if (act === 'tab') { state.tab = el.dataset.tab; state.mailOpen = null; state.playerOpen = null; state.repOpen = null; state.fx = null; state.extPlayer = null; state.extClub = null; if (el.dataset.sub) { if (state.tab === 'klub') state.kTab = el.dataset.sub; else state.tfTab = el.dataset.sub; } render(); }
+    if (act === 'tab') { state.tab = el.dataset.tab; state.mailOpen = null; state.playerOpen = null; state.repOpen = null; state.fx = null; state.todo = null; state.extPlayer = null; state.extClub = null; if (el.dataset.sub) { if (state.tab === 'klub') state.kTab = el.dataset.sub; else state.tfTab = el.dataset.sub; } render(); }
     // Terminarz i wyniki (Pulpit > Pokaż wszystko): sezon, rozgrywki, miejsce meczu
     if (act === 'fixtures') { state.tab = 'pulpit'; state.fx = { season: null, comp: 'all', venue: 'all' }; render(); window.scrollTo({ top: 0 }); app.querySelector('.fxs h2')?.setAttribute('tabindex', '-1'); app.querySelector('.fxs h2')?.focus({ preventScroll: true }); }
     if (act === 'fxback') { state.fx = null; render(); app.querySelector('[data-act="fixtures"]')?.focus(); }
+    // Do zrobienia w tym tygodniu (Pulpit > Ten tydzień): pełny widok, przejście do ekranu sprawy, odkładanie
+    if (act === 'todo') { state.tab = 'pulpit'; state.fx = null; state.todo = true; state.todoArea = null; state.todoMsg = null; render(); window.scrollTo({ top: 0 }); app.querySelector('#todo-h')?.focus({ preventScroll: true }); }
+    if (act === 'todoback') { state.todo = null; state.todoMsg = null; render(); app.querySelector('[data-act="todo"]')?.focus(); }
+    if (act === 'todo-area') { state.todoArea = el.dataset.a || null; state.todoMsg = null; render(); app.querySelector(`[data-act="todo-area"][data-a="${CSS.escape(el.dataset.a ?? '')}"]`)?.focus({ preventScroll: true }); }
+    if (act === 'todo-go') {
+      const it = buildWeeklyTodo(g).items.find((x) => x.key === el.dataset.key);
+      if (it?.act?.steps?.length) { state.todo = null; state.todoMsg = null; await runMenuItem({ run: it.act }, it.pid ?? ''); window.scrollTo({ top: 0 }); }
+    }
+    if (act === 'todo-snooze' || act === 'todo-unhide') {
+      const r = act === 'todo-snooze' ? snoozeTodo(g, el.dataset.key, el.dataset.m) : unhideTodo(g, el.dataset.key);
+      state.todoMsg = r.text;
+      if (r.ok) await save();
+      render(); app.querySelector('.todo [role="status"]')?.focus?.();
+    }
     if (act === 'fxseason' || act === 'fxcomp' || act === 'fxvenue') {
       const key = { fxseason: ['season', 's'], fxcomp: ['comp', 'k'], fxvenue: ['venue', 'v'] }[act];
       state.fx = { ...(state.fx ?? {}), [key[0]]: el.dataset[key[1]], ...(act === 'fxseason' ? { comp: 'all', venue: 'all' } : act === 'fxcomp' ? { venue: 'all' } : {}) };
@@ -1247,7 +1277,7 @@ async function dispatchAct(el, { root = app } = {}) {
         await save();
         state.screen = a.match.home && a.match.away ? 'matchday' : 'match'; render();
       }
-      else if (a.kind === 'decide') { state.tab = 'pulpit'; state.fx = null; state.extPlayer = null; state.extClub = null; render(); }
+      else if (a.kind === 'decide') { state.tab = 'pulpit'; state.fx = null; state.todo = null; state.extPlayer = null; state.extClub = null; render(); }
       else await runDays();
     }
     if (act === 'stop') state.running = false;
@@ -1360,7 +1390,7 @@ async function dispatchAct(el, { root = app } = {}) {
     // Błąd widoku w trakcie kariery: zostajemy w grze (widok podglądu zamknięty), zamiast wyrzucać na ekran startowy
     if (state.game && state.screen === 'hub') {
       console.error(err);
-      state.extPlayer = null; state.extClub = null; state.repOpen = null; state.fx = null;
+      state.extPlayer = null; state.extClub = null; state.repOpen = null; state.fx = null; state.todo = null;
       try { render(); window.alert(`Nie udało się otworzyć tego widoku: ${err.message}`); return; } catch (e2) { console.error(e2); }
     }
     state.notice = err.message; state.screen = 'start'; render();

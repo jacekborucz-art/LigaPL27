@@ -137,6 +137,7 @@ export const STAFF_ROLES = {
   bramkarze: { name: 'Trener bramkarzy', effect: 'Rozwój bramkarzy x(0.75 + 0.025 q)' },
   mlodziez: { name: 'Trener młodzieży', effect: 'Rozwój do 21 lat i akademii x(0.75 + 0.025 q), szansa skoku rozwojowego x(0.5 + 0.05 q)' },
   analityk: { name: 'Główny analityk', effect: 'Bonus analizy rywala 0.04 + 0.006 q punktu na mecz, dokładność raportów' },
+  kierownik: { name: 'Kierownik drużyny', effect: 'Sprawy organizacyjne (kontrakty, licencje, terminy, okno, obozy): dokładność i terminowość listy „Do zrobienia”' },
 };
 
 export const staffMul = {

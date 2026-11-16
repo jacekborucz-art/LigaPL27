@@ -56,7 +56,7 @@
   display: grid;
   gap: var(--space-4);
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "hero" "fix" "table" "squad" "mail" "board" "fin" "window";
+  grid-template-areas: "hero" "todo" "fix" "table" "squad" "mail" "board" "fin" "window";
 }
 .dash-hero { grid-area: hero; }
 .dash-p--table { grid-area: table; }
@@ -65,12 +65,14 @@
 .dash-p--board { grid-area: board; }
 .dash-p--fin { grid-area: fin; }
 .dash-p--window { grid-area: window; }
+.dash-p--todo { grid-area: todo; }
 
 @container dash (min-width: 640px) {
   .dash__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-areas:
       "hero hero"
+      "todo todo"
       "fix table"
       "fix board"
       "squad fin"
@@ -84,10 +86,11 @@
     gap: var(--space-5) var(--space-4);
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.15fr);
     grid-template-areas:
-      "hero  hero   table"
+      "hero  hero   todo"
+      "fix   squad  todo"
       "fix   squad  table"
-      "fix   board  window"
-      "mail  mail   fin";
+      "mail  board  table"
+      "mail  fin    window";
   }
   .dash .dash-t tr.dash-row--all { display: table-row; }
 }
@@ -95,9 +98,10 @@
   .dash__grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     grid-template-areas:
-      "hero  hero  table board"
-      "fix   squad table fin"
-      "fix   mail  table window";
+      "hero  hero  todo  table"
+      "fix   squad todo  table"
+      "fix   squad board fin"
+      "mail  mail  board window";
   }
   .dash .dash-abs li.dash-more { display: grid; }
   .dash .dash-mail li.dash-more { display: list-item; }

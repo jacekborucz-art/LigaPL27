@@ -32,6 +32,7 @@ import { staleNote } from '../training/variety.js';
 import { focusAttrs } from '../training/development.js';
 import { daysBetween } from '../training/state.js';
 import { REPORT_FREQS, ensureAssistantReport, setReportFreq, nextReportDate } from '../career/assistantReport.js';
+import { detectChance, shiftChance, delaySd } from '../career/weeklyTodo.js'; // kierownik drużyny: dokładność listy „Do zrobienia”
 import { staffAttrs, STAFF_ATTRS } from '../career/teamReport.js'; // atrybuty asystenta i analityka (raport ogólny)
 
 const WD = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
@@ -569,6 +570,7 @@ function staffTab(game) {
     bramkarze: (q) => `rozwój bramkarzy x${num(staffMul.gk(q), 2)}`,
     mlodziez: (q) => `rozwój do 21 lat x${num(staffMul.youth(q), 2)}, skok rozwojowy x${num(staffMul.spurt(q), 2)}`,
     analityk: (q) => `analiza rywala +${num(staffMul.prep(q), 3)} pkt na mecz`,
+    kierownik: (q) => `lista „Do zrobienia”: zauważa ok. ${Math.round(detectChance(q) * 100)} % spraw organizacyjnych w tygodniu, myli pilność w ${Math.round(shiftChance(q) * 100)} %, ${delaySd(q) * 0.8 < 0.5 ? 'przypomina na czas' : `przypomina średnio ${num(delaySd(q) * 0.8, 1)} dnia później`}`,
   };
   return `<div class="tr-staff">${Object.entries(STAFF_ROLES).map(([k, r]) => {
     const s = st[k] ?? { q: 10, name: 'Brak' };
