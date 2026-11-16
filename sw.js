@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-1091747827';
+const VERSION = 'v0.3-88fc51ea90';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -123,6 +123,7 @@ const FILES = [
   ['./src/career/weeklyTodo.js', 'd99508c0c3'],
   ['./src/config/calendar2026.js', '7af3df5b12'],
   ['./src/config/competitions.js', '1ba35856b2'],
+  ['./src/config/version.js', '554811750c'],
   ['./src/core/decisions.js', 'b9fda961b7'],
   ['./src/core/gameLoop.js', 'd572502469'],
   ['./src/core/inbox.js', '689fd5b609'],
@@ -181,7 +182,7 @@ const FILES = [
   ['./src/season/thirdLeague.js', 'f019155fab'],
   ['./src/season/uefa.js', '4a0c9dc052'],
   ['./src/season/worldNations.js', '6003d36e12'],
-  ['./src/styles/app.css', '262c4f3168'],
+  ['./src/styles/app.css', '034ccdbbdd'],
   ['./src/styles/assistant.css', '87577f8aa4'],
   ['./src/styles/base.css', 'f2fee58203'],
   ['./src/styles/club.css', '6615e08e49'],
@@ -192,7 +193,7 @@ const FILES = [
   ['./src/styles/history.css', 'baa48b28de'],
   ['./src/styles/klub.css', '4bff48a9a2'],
   ['./src/styles/matchday.css', '87959cd153'],
-  ['./src/styles/menu.css', '67aa361469'],
+  ['./src/styles/menu.css', 'cdd4f24b98'],
   ['./src/styles/negotiation.css', '949f233adc'],
   ['./src/styles/todo.css', 'd7bb59a735'],
   ['./src/styles/tokens.css', 'a7865d38be'],
@@ -227,7 +228,7 @@ const FILES = [
   ['./src/ui/klubView.js', 'd55225df54'],
   ['./src/ui/loansView.js', '21eb434f9f'],
   ['./src/ui/matchdayView.js', '55e7327fde'],
-  ['./src/ui/menuView.js', '5d6dc1f91b'],
+  ['./src/ui/menuView.js', 'f7dc955d9f'],
   ['./src/ui/nationalView.js', '92d610d773'],
   ['./src/ui/negotiationView.js', '82b6da6b0d'],
   ['./src/ui/playerMenus.js', '416420ba16'],
@@ -235,7 +236,7 @@ const FILES = [
   ['./src/ui/positionMap.js', 'ef2c032d52'],
   ['./src/ui/sponsorsView.js', '93ea7f72b4'],
   ['./src/ui/squadView.js', '8b43e2d37f'],
-  ['./src/ui/sysMenu.js', '4f6ef33b7b'],
+  ['./src/ui/sysMenu.js', 'f9d44b16bf'],
   ['./src/ui/tacticsDrag.js', '1d6819c303'],
   ['./src/ui/tacticsMoves.js', 'b4b7f2ea58'],
   ['./src/ui/tacticsView.js', '1d8ca1b0b0'],

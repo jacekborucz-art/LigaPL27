@@ -1238,6 +1238,8 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 .sysdlg__row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .sysdlg__msg { margin: var(--space-2) 0; padding: 8px 12px; border-radius: var(--radius-s); background: color-mix(in srgb, var(--murawa, #2E8A4E) 14%, var(--surface)); font-size: var(--step--1); }
 .sysdlg__x { margin-top: var(--space-3); }
+.sysdlg__ver { display: flex; width: fit-content; align-items: baseline; gap: 8px; margin: var(--space-2) 0 0; padding: 6px 12px; border: 1px solid var(--line); border-radius: var(--radius-s); font-size: var(--step--1); color: var(--text-muted); }
+.sysdlg__ver b { color: var(--text); font: 700 var(--step-0)/1 var(--font-display); font-variant-numeric: tabular-nums; }
 .sysdlg__themes { display: grid; gap: var(--space-2); margin: 0 0 var(--space-2); padding: 0; border: 0; }
 .sysdlg__themes legend { margin-bottom: var(--space-2); font-weight: 600; }
 .sysdlg__opt { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-s); cursor: pointer; }

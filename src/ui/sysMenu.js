@@ -3,6 +3,7 @@
 
 import { esc, icon } from './dom.js';
 import { THEMES } from './menuView.js';
+import { GAME_VERSION } from '../config/version.js';
 
 
 /** Trzy przyciski u dołu bocznego menu (PC). */
@@ -34,7 +35,8 @@ export function sysDialogHtml(kind, ctx = {}) {
       </fieldset>
       <section class="sysdlg__sec"><h3>Edytor</h3>
         <p class="sysdlg__note">Zmień nazwy klubów, stadiony, finanse oraz dane i atrybuty zawodników. Zmiany zapiszesz jako datapack.</p>
-        <button class="btn btn--primary" data-act="sys-editor">Edytor</button></section>${close}`;
+        <button class="btn btn--primary" data-act="sys-editor">Edytor</button></section>
+      <p class="sysdlg__ver">Wersja gry <b>${esc(GAME_VERSION)}</b></p>${close}`;
   }
   // Zapis
   return `<h2 id="sysTitle">Zapis gry</h2>

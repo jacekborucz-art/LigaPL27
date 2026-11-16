@@ -12,6 +12,7 @@ import { rivalry, fmtZl } from '../career/fans.js';
 import { Rng } from '../core/rng.js';
 import { crestHtml } from './crest.js';
 import { esc, fmtDate } from './dom.js';
+import { GAME_VERSION } from '../config/version.js';
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -219,6 +220,7 @@ export function renderMenu(ctx) {
           <input type="file" accept="application/json,.json" data-act="import" class="sr-only">
         </label>
         <p class="saves__note">Zapisy zostają w tej przeglądarce. Gra działa bez internetu.</p>
+        <p class="menu__ver">Wersja gry <b>${esc(GAME_VERSION)}</b></p>
       </section>
     </main>
   </div>`;

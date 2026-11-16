@@ -20,3 +20,15 @@ test('Zapis: tylko zapis pliku, bez udostępniania i bez Google Drive', () => {
   assert.match(html, /data-act="sys-file"/);
   assert.ok(!/sys-share|Google Drive/.test(html));
 });
+
+test('Opcje: okienko z wersją gry w formacie vX.Y (z ewentualnym dopiskiem)', async () => {
+  const { GAME_VERSION } = await import('../src/config/version.js');
+  assert.match(GAME_VERSION, /^v\d+\.\d+( \S+)?$/);
+  assert.match(sysDialogHtml('options', { theme: 'auto' }), new RegExp(`Wersja gry <b>${GAME_VERSION}</b>`));
+});
+
+test('Ekran startowy: wersja gry pod listą zapisów', async () => {
+  const { GAME_VERSION } = await import('../src/config/version.js');
+  const { renderMenu } = await import('../src/ui/menuView.js');
+  assert.match(renderMenu({ slots: [] }), new RegExp(`Wersja gry <b>${GAME_VERSION}</b>`));
+});
