@@ -16,6 +16,7 @@ import { standings, zonesFor } from './season/standings.js';
 import { renderCompetitions } from './ui/competitionsView.js';
 import { fixturesPanelBody, renderFixtures } from './ui/fixturesView.js';
 import { mountDashMasonry } from './ui/masonry.js';
+import { readDaySpeed, saveDaySpeed, dayDelayMs } from './ui/daySpeed.js';
 import { ensureHistory } from './season/history.js';
 import { createMatch, runToEnd } from './engine/match/match.js';
 import { Rng } from './core/rng.js';
@@ -72,7 +73,7 @@ import { renderMenu, renderCareer, newCareerState, maybePlayIntro, readTheme, ap
 
 const app = document.getElementById('app');
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
-const state = { screen: 'start', slot: null, game: null, tab: 'pulpit', tier: 1, notice: null, mailCat: null, mailOpen: null, running: false, sqFilter: 'all', playerOpen: null, sqSub: 'players', tSel: null, matchNotes: [], cComp: null, cView: 'table', cRound: null, lastResult: null, uFilter: 'pl', uDraw: null, nc: null, confirmDel: null, theme: readTheme(), menuFocus: null, fx: null };
+const state = { screen: 'start', slot: null, game: null, tab: 'pulpit', tier: 1, notice: null, mailCat: null, mailOpen: null, running: false, sqFilter: 'all', playerOpen: null, sqSub: 'players', tSel: null, matchNotes: [], cComp: null, cView: 'table', cRound: null, lastResult: null, uFilter: 'pl', uDraw: null, nc: null, confirmDel: null, theme: readTheme(), daySpeed: readDaySpeed(), menuFocus: null, fx: null };
 const WIDE_PICK = '(min-width: 1024px)';
 
 const benchSizeFor = (g) => COMPETITIONS[compOfClub(clubById(g.clubId)) ?? 'ekstraklasa']?.benchSize ?? 9;
@@ -122,7 +123,7 @@ function openSys(kind) {
     dlg = app.querySelector('#sysDlg');
     dlg.addEventListener('close', () => { sys.kind = null; sys.msg = null; });
   }
-  dlg.innerHTML = sysDialogHtml(kind, { theme: state.theme, slot: state.slot, msg: sys.msg, busy: sys.busy });
+  dlg.innerHTML = sysDialogHtml(kind, { theme: state.theme, speed: state.daySpeed, slot: state.slot, msg: sys.msg, busy: sys.busy });
   if (!dlg.open) dlg.showModal();
   dlg.querySelector('h2')?.setAttribute('tabindex', '-1');
 }
@@ -136,6 +137,7 @@ async function sysAction(act, el) {
   if (act === 'sys-save') { sys.msg = null; return openSys('save'); }
   if (act === 'sys-close') return closeSys();
   if (act === 'sys-theme') { state.theme = el.dataset.t; applyTheme(state.theme); return openSys('options'); }
+  if (act === 'sys-speed') { state.daySpeed = el.dataset.v; saveDaySpeed(state.daySpeed); return openSys('options'); }
   if (act === 'sys-editor') {
     closeSys(); state.running = false;
     state.ed ??= newEditorState(); state.ed.msg = null; state.ed.errors = null; state.ed.draft = null;
@@ -953,7 +955,7 @@ async function runDays() {
       if (led) led.textContent = fmtDate(g.date);
       const tick = document.getElementById('ticker');
       if (tick && day.added.length) tick.textContent = `${fmtDate(day.date)}: ${day.added[0].subject}`;
-      await new Promise((res) => setTimeout(res, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 110));
+      await new Promise((res) => setTimeout(res, dayDelayMs(state.daySpeed, matchMedia('(prefers-reduced-motion: reduce)').matches))); // Opcje: tempo upływu dni
     }
     if (r.reason !== 'limit') { reason = r.reason; break; }
   }
@@ -1104,6 +1106,7 @@ app.addEventListener('input', (ev) => {
 
 app.addEventListener('change', async (ev) => {
   if (ev.target.matches?.('input[data-act="sys-theme"]')) { await sysAction('sys-theme', ev.target); return; } // Opcje: motyw
+  if (ev.target.matches?.('input[data-act="sys-speed"]')) { await sysAction('sys-speed', ev.target); return; } // Opcje: tempo dni
   const sel = ev.target.closest('select[data-act="trole"]');
   if (!sel) return;
   await setRole(sel.dataset.role, sel.value);

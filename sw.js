@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-18ebfd0c8d';
+const VERSION = 'v0.3-de5a72bbfa';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -78,7 +78,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', '6c9de3b13f'],
+  ['./src/app.js', 'd493389944'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '45f14cb64d'],
@@ -123,7 +123,7 @@ const FILES = [
   ['./src/career/weeklyTodo.js', 'd99508c0c3'],
   ['./src/config/calendar2026.js', '7af3df5b12'],
   ['./src/config/competitions.js', '1ba35856b2'],
-  ['./src/config/version.js', '4a30aaf9a9'],
+  ['./src/config/version.js', 'ac90bdd65e'],
   ['./src/core/decisions.js', 'b9fda961b7'],
   ['./src/core/gameLoop.js', 'd572502469'],
   ['./src/core/inbox.js', '689fd5b609'],
@@ -219,6 +219,7 @@ const FILES = [
   ['./src/ui/competitionsView.js', '23279d53aa'],
   ['./src/ui/contextMenu.js', 'd50b3ed2cd'],
   ['./src/ui/crest.js', '2f2602adb8'],
+  ['./src/ui/daySpeed.js', '73d29c5b52'],
   ['./src/ui/dom.js', '0ce16300f6'],
   ['./src/ui/editorView.js', '99219af4c4'],
   ['./src/ui/europeView.js', '15e2d036f2'],
@@ -237,7 +238,7 @@ const FILES = [
   ['./src/ui/positionMap.js', 'ef2c032d52'],
   ['./src/ui/sponsorsView.js', '93ea7f72b4'],
   ['./src/ui/squadView.js', '8b43e2d37f'],
-  ['./src/ui/sysMenu.js', 'f9d44b16bf'],
+  ['./src/ui/sysMenu.js', 'fc1677717f'],
   ['./src/ui/tacticsDrag.js', '1d6819c303'],
   ['./src/ui/tacticsMoves.js', 'b4b7f2ea58'],
   ['./src/ui/tacticsView.js', '1d8ca1b0b0'],

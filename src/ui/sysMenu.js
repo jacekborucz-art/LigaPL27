@@ -4,6 +4,7 @@
 import { esc, icon } from './dom.js';
 import { THEMES } from './menuView.js';
 import { GAME_VERSION } from '../config/version.js';
+import { DAY_SPEEDS } from './daySpeed.js';
 
 
 /** Trzy przyciski u dołu bocznego menu (PC). */
@@ -32,6 +33,10 @@ export function sysDialogHtml(kind, ctx = {}) {
     return `<h2 id="sysTitle">Opcje</h2>
       <fieldset class="sysdlg__themes"><legend>Jasność motywu</legend>
         ${Object.entries(THEMES).map(([k, l]) => `<label class="sysdlg__opt"><input type="radio" name="sysTheme" value="${k}" data-act="sys-theme" data-t="${k}" ${ctx.theme === k ? 'checked' : ''}><span>${esc(l)}${k === 'auto' ? '<small>jak w systemie</small>' : ''}</span></label>`).join('')}
+      </fieldset>
+      <fieldset class="sysdlg__themes"><legend>Tempo upływu dni</legend>
+        ${Object.entries(DAY_SPEEDS).map(([k, l]) => `<label class="sysdlg__opt"><input type="radio" name="sysSpeed" value="${k}" data-act="sys-speed" data-v="${k}" ${(ctx.speed ?? 'std') === k ? 'checked' : ''}><span>${esc(l)}${k === 'std' ? '<small>dni mijają szybko</small>' : ''}</span></label>`).join('')}
+        <p class="sysdlg__note">Wolniejsze tempo daje czas, żeby przyciskiem Zatrzymaj zatrzymać grę na wybranej dacie.</p>
       </fieldset>
       <section class="sysdlg__sec"><h3>Edytor</h3>
         <p class="sysdlg__note">Zmień nazwy klubów, stadiony, finanse oraz dane i atrybuty zawodników. Zmiany zapiszesz jako datapack.</p>

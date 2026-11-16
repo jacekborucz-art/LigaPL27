@@ -32,3 +32,13 @@ test('Ekran startowy: wersja gry pod listą zapisów', async () => {
   const { renderMenu } = await import('../src/ui/menuView.js');
   assert.match(renderMenu({ slots: [] }), new RegExp(`Wersja gry <b>${GAME_VERSION}</b>`));
 });
+
+test('Opcje: tempo upływu dni (Bez zmian, 1, 2, 3 s) i pauza między dniami', async () => {
+  const { dayDelayMs, DAY_SPEEDS } = await import('../src/ui/daySpeed.js');
+  const opt = sysDialogHtml('options', { theme: 'auto', speed: '2' });
+  assert.equal((opt.match(/data-act="sys-speed"/g) ?? []).length, Object.keys(DAY_SPEEDS).length);
+  assert.match(opt, /value="2"[^>]*checked/);
+  assert.equal(dayDelayMs('std'), 110);
+  assert.equal(dayDelayMs('std', true), 0);
+  assert.equal(dayDelayMs('3', true), 3000);
+});
