@@ -130,7 +130,7 @@
 .tf-offer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-2); margin: 0 0 var(--space-2); }
 .tf-offer label { flex: 1 1 10rem; }
 .tf-offer input { width: 100%; }
-.tf-offer--loan { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid color-mix(in srgb, var(--c) 25%, var(--line)); }
+.tf-offer--loan { margin-top: calc(var(--hub-top, 0px) + var(--space-3)); padding-top: calc(var(--hub-top, 0px) + var(--space-3)); border-top: 1px solid color-mix(in srgb, var(--c) 25%, var(--line)); }
 .tf-deal .hint { margin: 0; }
 .tf-actions .tf-p .btn { align-self: flex-start; }
 
@@ -263,7 +263,7 @@
   .tfx .subtabs { justify-content: flex-start; }
   .tfx .subtabs button { flex: 0 0 auto; min-width: 128px; padding: 0 20px; font-size: var(--step-0); }
   .tf-grid { grid-template-columns: minmax(0, 1fr) 340px; gap: var(--space-4); }
-  .tf-side { position: sticky; top: var(--space-3); }
+  .tf-side { position: sticky; top: calc(var(--hub-top, 0px) + var(--space-3)); }
   /* Rynek i Kontrakty: tabela potrzebuje szerokości, panele boczne pod nią aż do 1600 px */
   .tf-grid.tf-grid--table { grid-template-columns: minmax(0, 1fr); }
   .tf-grid--table .tf-side { position: static; }
@@ -346,7 +346,7 @@
 .ln-count { display: flex; flex-direction: column; gap: 2px; margin: 0 0 var(--space-2); }
 .ln-count b { font: 700 var(--step-1)/1.2 var(--font-display); }
 .ln-count small { font-size: var(--step--1); color: var(--text-muted); }
-.ln-sec { margin-top: var(--space-3); }
+.ln-sec { margin-top: calc(var(--hub-top, 0px) + var(--space-3)); }
 .ln-list, .ln-offers { list-style: none; margin: 0 0 var(--space-2); padding: 0; display: grid; gap: 2px; }
 .ln-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 6px 4px; }
 .ln-row + .ln-row, .ln-offers li + li { border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
@@ -399,7 +399,7 @@
 .td-acts { display: flex; flex-wrap: wrap; gap: 6px; }
 .td-h { margin: var(--space-2) 0 var(--space-1); font-size: var(--step--1); color: var(--text-muted); }
 .td-h:first-of-type { margin-top: 0; }
-.td-pre { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid color-mix(in srgb, var(--c) 25%, var(--line)); }
+.td-pre { margin-top: calc(var(--hub-top, 0px) + var(--space-3)); padding-top: calc(var(--hub-top, 0px) + var(--space-3)); border-top: 1px solid color-mix(in srgb, var(--c) 25%, var(--line)); }
 .td-pre:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
 .td-flag { display: inline-block; flex: none; width: 32px; height: 32px; border-radius: 50%; background: color-mix(in srgb, var(--tf-misc) 22%, var(--surface)); border: 2px solid color-mix(in srgb, var(--tf-misc) 55%, var(--line)); }
 @media (prefers-reduced-motion: no-preference) { .td-bar i { transition: background-color .2s ease; } }

@@ -46,7 +46,7 @@
 .sp-c__cl { margin: 6px 0 0; font-size: var(--step--1); line-height: 1.45; }
 
 /* Oferty: trzy warianty obok siebie od szerokości tabletu */
-.sp-o + .sp-o { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--line); }
+.sp-o + .sp-o { margin-top: calc(var(--hub-top, 0px) + var(--space-3)); padding-top: calc(var(--hub-top, 0px) + var(--space-3)); border-top: 1px solid var(--line); }
 .sp-o__head { display: flex; flex-direction: column; margin: 0 0 var(--space-2); }
 .sp-o__head b { font: 700 var(--step-0)/1.25 var(--font-display); }
 .sp-o__head small { color: var(--text-muted); font-size: var(--step--1); line-height: 1.35; }
@@ -67,7 +67,7 @@
 /* PC: umowy po lewej, oferty i historia po prawej */
 @media (min-width: 1280px) {
   .sp-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: var(--space-4); }
-  .sp-side { position: sticky; top: var(--space-3); }
+  .sp-side { position: sticky; top: calc(var(--hub-top, 0px) + var(--space-3)); }
 }
 
 /* Zakładka Klub (src/ui/klubView.js). Reguły podzakładek z własnym prefiksem:
@@ -139,7 +139,7 @@
 }
 @media (min-width: 1280px) {
   .inf-grid { grid-template-columns: minmax(0, 1fr) 360px; gap: var(--space-4); }
-  .inf-side { position: sticky; top: var(--space-3); }
+  .inf-side { position: sticky; top: calc(var(--hub-top, 0px) + var(--space-3)); }
 }
 @media (min-width: 1600px) {
   .inf-main { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -157,7 +157,7 @@
 .klub-plan__row b[data-k="neg"] { color: color-mix(in srgb, var(--tf-bad) 75%, var(--text)); }
 @media (min-width: 1200px) {
   .klub-cols { grid-template-columns: minmax(0, 1fr) 420px; }
-  .klub-cols .klub-side { position: sticky; top: var(--space-3); }
+  .klub-cols .klub-side { position: sticky; top: calc(var(--hub-top, 0px) + var(--space-3)); }
   .klub-main .tf-board { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
   .klub-main .tf-board__rev { grid-row: span 2; }
 }

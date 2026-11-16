@@ -386,6 +386,18 @@ function renderHub() {
   </div>`;
   mountDrawAnimation(app);
   mountDashMasonry(app); // Pulpit bez pustych pól pod krótszymi panelami (src/ui/masonry.js)
+  trackHeadHeight();
+}
+
+/** Nagłówek stoi w miejscu (position: sticky): jego wysokość w --hub-top, pod nią przyklejają się menu i panele boczne. */
+let headObserver = null;
+function trackHeadHeight() {
+  const head = app.querySelector('.hub__head');
+  if (!head) return;
+  const set = () => document.documentElement.style.setProperty('--hub-top', `${Math.round(head.getBoundingClientRect().height)}px`);
+  set();
+  headObserver?.disconnect();
+  if (typeof ResizeObserver !== 'undefined') { headObserver = new ResizeObserver(set); headObserver.observe(head); }
 }
 
 function renderTab(tab, g, club) {

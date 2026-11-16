@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-52627ee9d1';
+const VERSION = 'v0.3-18e2713590';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -78,7 +78,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', 'ec6cf2a7b4'],
+  ['./src/app.js', '6c9de3b13f'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '45f14cb64d'],
@@ -182,7 +182,7 @@ const FILES = [
   ['./src/season/thirdLeague.js', 'f019155fab'],
   ['./src/season/uefa.js', '4a0c9dc052'],
   ['./src/season/worldNations.js', '6003d36e12'],
-  ['./src/styles/app.css', '95ce36dd38'],
+  ['./src/styles/app.css', '2db7cd1492'],
   ['./src/styles/assistant.css', '87577f8aa4'],
   ['./src/styles/base.css', 'f2fee58203'],
   ['./src/styles/club.css', '6615e08e49'],
@@ -191,14 +191,14 @@ const FILES = [
   ['./src/styles/editor.css', '3037084983'],
   ['./src/styles/fonts.css', '372f3ee1fc'],
   ['./src/styles/history.css', 'baa48b28de'],
-  ['./src/styles/klub.css', '4bff48a9a2'],
+  ['./src/styles/klub.css', '932d181b46'],
   ['./src/styles/matchday.css', '87959cd153'],
   ['./src/styles/menu.css', 'cdd4f24b98'],
   ['./src/styles/negotiation.css', '949f233adc'],
   ['./src/styles/todo.css', 'd7bb59a735'],
   ['./src/styles/tokens.css', 'a7865d38be'],
-  ['./src/styles/training.css', 'ac3c7a123a'],
-  ['./src/styles/transfers.css', '6ab469db99'],
+  ['./src/styles/training.css', 'ac4ad097d3'],
+  ['./src/styles/transfers.css', '1a9fbc4bc5'],
   ['./src/training/aiClubs.js', '6d6d0c4122'],
   ['./src/training/camps.js', '751dd1d81f'],
   ['./src/training/cohesion.js', 'f7d022d0c3'],

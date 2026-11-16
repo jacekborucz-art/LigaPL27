@@ -458,7 +458,7 @@
   .tr-cols--side { grid-template-columns: minmax(0, 2.2fr) minmax(300px, 1fr); }
   .tr-cols--dev { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); }
   .tr-cols--dev .tr-dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .tr-cols > .tr-col:last-child:not(:first-child) { position: sticky; top: var(--space-3); }
+  .tr-cols > .tr-col:last-child:not(:first-child) { position: sticky; top: calc(var(--hub-top, 0px) + var(--space-3)); }
   .tr-cols--camps > .tr-col:last-child:not(:first-child), .tr-cols--fr > .tr-col:last-child:not(:first-child) { position: static; }
   .tr-plist { grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); column-gap: var(--space-3); }
   .tr-plist .tr-prow, .tr-plist .tr-prow:nth-child(even) { background: var(--surface); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line) 60%, transparent); }
