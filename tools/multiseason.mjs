@@ -59,6 +59,7 @@ staffReport(2026); youthSnap();
 const end = `${2026 + seasons}-07-02`;
 let t0 = performance.now();
 while (g.date < end) {
+  if (g.date.endsWith('-09-30') && g.staff) { const S = g.staff; console.log(`  SZTAB 30 wrz: ${[1, 2, 3, 4].map((t) => { const xs = CLUBS_PL.filter((c) => c.tier === t && S.clubs[c.id]).map((c) => c.id); const n = xs.map((id) => S.clubs[id].length); const ml = xs.reduce((a, id) => a + (g.training.staff[id]?.mlodziez?.q ?? 0), 0) / Math.max(1, xs.length); return `L${t} osób ${(n.reduce((a, b) => a + b, 0) / Math.max(1, n.length)).toFixed(1)} (najmniej ${Math.min(...n)}), młodzież q ${ml.toFixed(1)}`; }).join(' | ')}`); }
   if (g.date.endsWith('-06-30')) { repReport(`koniec ${SEASON}`); console.log(`  ROZWÓJ MŁODYCH (do 21 lat, przyrost OVR w sezonie): ${youthReport()}`); staffReport(+g.date.slice(0, 4) - 1); }
   for (const f of g.fixtures.filter((x) => x.date === g.date && !x.played && (x.home === g.clubId || x.away === g.clubId))) { const rng = new Rng('g' + f.id); applyResult(g, f, playQuick(g, f, rng), rng); }
   // decyzje blokujące (zwolnienie): wybierz pierwszą ofertę

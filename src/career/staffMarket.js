@@ -55,7 +55,7 @@ export const STAFF_MARKET = {
   // Limit całego sztabu: clamp(round(B + (rep - R0) / 12 + F), MIN, MAX), F = clamp(1,5 log2(przychód / D0), -1,5, 2,5)
   limit: {
     B: { 1: 9, 2: 6, 3: 4.5, 4: 3 }, R0: { 1: 60, 2: 40, 3: 22, 4: 12 }, D0: { 1: 45e6, 2: 8e6, 3: 3e6, 4: 1e6 },
-    MIN: { 1: 7, 2: 5, 3: 4, 4: 3 }, MAX: { 1: 18, 2: 9, 3: 7, 4: 5 }, repDiv: 12, fK: 1.5, fMin: -1.5, fMax: 2.5,
+    MIN: { 1: 7, 2: 5, 3: 4, 4: 4 }, MAX: { 1: 18, 2: 9, 3: 7, 4: 5 }, repDiv: 12, fK: 1.5, fMin: -1.5, fMax: 2.5, // III liga od 4 osób (decyzja właściciela, Nov 16, 2026)
   },
   // Kolejność obsadzania (k-te wystąpienie roli = k-ta osoba w roli): plan sztabu klubu w granicach limitu
   plan: {
@@ -684,28 +684,11 @@ export function makeOffer(game, args = {}) {
   if (!S) return res('none');
   const p = S.people[args.pid];
   if (!p) return res('none');
-  if (!game.world.clubs[clubId] || !clubById(clubId)) return res('club');
-  if (p.club === clubId) return res('own');
-  if (p.signed && daysBetween(p.signed, date) < K.offer.lockDays) return res('locked');
-  if (p.club) { const b = poachBlocker(game, S, clubId, p, date); if (b) return res(b); }
   const years = Math.round(args.years ?? 2);
-  if (!(years >= 1 && years <= 3) && !(years === 0 && +date.slice(5, 7) < 7)) return res('years');
   const wage = r100(args.wage ?? expectedWage(p, date));
-  if (wage < K.offer.minShare * expectedWage(p, date)) { seasonStats(S, game).rejected++; return res('low'); }
-  const mine = S.offers.filter((o) => o.pid === p.id);
-  if (mine.some((o) => o.club === clubId)) return res('dup');
-  if (mine.length >= K.offer.perPerson) return res('many');
-  const user = clubId === game.clubId;
-  const maxPend = user ? K.offer.userMax : ([6, 7, 12, 1].includes(+date.slice(5, 7)) ? K.offer.aiMaxWindow : K.offer.aiMax);
-  if (pendingOf(S, clubId).length >= maxPend) return res('pending');
-  const L = limitInfo(game, clubId);
-  const R = L.roles[p.role];
-  if (!R.max) return res('role');
-  if (L.used >= L.limit) return res('limit');
-  if (R.n + R.pending >= R.max) return res('roleFull');
-  const cool = S.cool[`${clubId}:${p.id}`];
-  if (cool && cool > date) return res('cool');
-  if (wage > budgetRoomFor(game, clubId, p.role)) return res('budget');
+  const why = offerBlocker(game, S, p, clubId, date, years, wage);
+  if (why === 'low') seasonStats(S, game).rejected++;
+  if (why) return res(why);
   const lead = (args.lead ?? true) && rankIn(game, clubId, p) === 1; // lider tylko, gdy byłby najlepszy w roli
   const offer = { id: `so:${p.id}:${clubId}:${date}`, pid: p.id, club: clubId, role: p.role, wage, years, lead: !!lead, until: contractUntil(date, years), date };
   S.offers.push(offer);
@@ -727,6 +710,44 @@ export function makeOffer(game, args = {}) {
     }
   }
   return res('ok', { offer, decideOn: S.decide[p.id] });
+}
+
+/** Powód, dla którego klub nie może złożyć oferty (klucz STAFF_REASONS), albo null. Bez zmian w stanie gry. */
+function offerBlocker(game, S, p, clubId, date, years, wage) {
+  if (!game.world.clubs[clubId] || !clubById(clubId)) return 'club';
+  if (p.club === clubId) return 'own';
+  if (p.signed && daysBetween(p.signed, date) < K.offer.lockDays) return 'locked';
+  if (p.club) { const b = poachBlocker(game, S, clubId, p, date); if (b) return b; }
+  if (!(years >= 1 && years <= 3) && !(years === 0 && +date.slice(5, 7) < 7)) return 'years';
+  if (wage < K.offer.minShare * expectedWage(p, date)) return 'low';
+  const mine = S.offers.filter((o) => o.pid === p.id);
+  if (mine.some((o) => o.club === clubId)) return 'dup';
+  if (mine.length >= K.offer.perPerson) return 'many';
+  const user = clubId === game.clubId;
+  const maxPend = user ? K.offer.userMax : ([6, 7, 12, 1].includes(+date.slice(5, 7)) ? K.offer.aiMaxWindow : K.offer.aiMax);
+  if (pendingOf(S, clubId).length >= maxPend) return 'pending';
+  const L = limitInfo(game, clubId);
+  const R = L.roles[p.role];
+  if (!R.max) return 'role';
+  if (L.used >= L.limit) return 'limit';
+  if (R.n + R.pending >= R.max) return 'roleFull';
+  const cool = S.cool[`${clubId}:${p.id}`];
+  if (cool && cool > date) return 'cool';
+  if (wage > budgetRoomFor(game, clubId, p.role)) return 'budget';
+  return null;
+}
+
+/**
+ * Sprawdzenie oferty bez jej składania (formularz w UI): te same warunki co makeOffer, w tej samej kolejności.
+ * args: { pid, wage, years, clubId = game.clubId, date = game.date }. Zwraca { ok, reason, text }.
+ */
+export function checkOffer(game, args = {}) {
+  const S = ensureStaff(game);
+  const clubId = args.clubId ?? game.clubId;
+  const date = args.date ?? game.date;
+  const p = S?.people?.[args.pid];
+  const reason = !p ? 'none' : offerBlocker(game, S, p, clubId, date, Math.round(args.years ?? 2), r100(args.wage ?? expectedWage(p, date))) ?? 'ok';
+  return { ok: reason === 'ok', reason, text: STAFF_REASONS[reason] ?? reason };
 }
 
 /** Klub AI blokuje odejście ważnej osoby (lider bez zastępcy w roli) częściej niż pomocnika. */
@@ -1088,19 +1109,32 @@ export function aiRenewals(game, date) {
     const seen = {};
     for (const { role, k } of staffPlan(clubId, 99)) { const x = byRole[role]?.[k - 1]; if (x) { order.push(x); seen[x.id] = true; } }
     for (const p of ppl) if (!seen[p.id]) order.push(p);
+    const renew = (p) => {
+      const wage = aiWage(game, clubId, p, date);
+      const years = tierOf(clubId) === 1 ? 2 : 1;
+      const rng = new Rng(`sztab-przedluz:${game.seed}:${p.id}:${date}`);
+      const { u } = offerUtility(game, p, { club: clubId, wage, years }, date, rng);
+      if (u + K.util.stay < K.util.u0) return false;
+      p.wage = wage; p.until = `${+end.slice(0, 4) + years}-06-30`;
+      seasonStats(S, game).renewed++;
+      return true;
+    };
     order.forEach((p, i) => {
       if (p.until !== end) return;
       const helper = rankIn(game, clubId, p) > 1;
       if (i >= limit || p.age >= K.pool.noRenewAge || (helper && p.q < K.ai.helperMinQ) || !roleCap(clubId, p.role)) return;
       if (!helper && p.q < target - K.ai.weak && CORE.includes(p.role)) return; // słaby lider: klub szuka lepszego
-      const wage = aiWage(game, clubId, p, date);
-      const years = tierOf(clubId) === 1 ? 2 : 1;
-      const rng = new Rng(`sztab-przedluz:${game.seed}:${p.id}:${date}`);
-      const { u } = offerUtility(game, p, { club: clubId, wage, years }, date, rng);
-      if (u + K.util.stay < K.util.u0) return;
-      p.wage = wage; p.until = `${+end.slice(0, 4) + years}-06-30`;
-      seasonStats(S, game).renewed++;
+      renew(p);
     });
+    // Minimum ligi (III liga od 4 osób): gdy po wygaśnięciu umów zostałoby mniej osób, klub przedłuża kolejne
+    // (w kolejności planu, także słabszych), żeby od 1 lipca nie zejść poniżej minimum bez zastępstwa
+    const min = K.limit.MIN[tierOf(clubId)];
+    let left = ppl.filter((p) => p.until && p.until > end).length;
+    for (const p of order) {
+      if (left >= min) break;
+      if (p.until !== end || p.age >= K.pool.noRenewAge || !roleCap(clubId, p.role)) continue;
+      if (renew(p)) left++;
+    }
     updatePay(game, clubId);
   }
 }
@@ -1265,6 +1299,41 @@ export function listFreeStaff(game, filters = {}) {
       wage: { lo: r100(w * 0.9), mid: w, hi: r100(w * 1.1) }, idleDays: p.free ? daysBetween(p.free, date) : 0,
       offers: offers.length, decideOn: S.decide[id] ?? null, mine: offers.some((o) => o.club === game.clubId),
     });
+  }
+  return rows.sort((a, b) => b.q.v - a.q.v || a.name.localeCompare(b.name));
+}
+
+/**
+ * Osoby pracujące w innych klubach (podbieranie) dla klubu gracza, te same filtry co listFreeStaff.
+ * Wiersze jak w listFreeStaff oraz { club, until, comp (rekompensata 3 pensje), blocked (klucz STAFF_REASONS albo null) }.
+ * Pensja obecna osoby nie jest pokazywana dokładnie (tylko przez oczekiwania).
+ */
+export function listClubStaff(game, filters = {}) {
+  const S = ensureStaff(game);
+  if (!S) return [];
+  const date = game.date;
+  const rows = [];
+  for (const [clubId, ids] of Object.entries(S.clubs)) {
+    if (clubId === game.clubId || !game.world.clubs[clubId]) continue;
+    for (const id of ids) {
+      const p = S.people[id];
+      if (!p) continue;
+      if (filters.role && p.role !== filters.role) continue;
+      if (filters.foreign === true && !isForeign(p)) continue;
+      if (filters.foreign === false && isForeign(p)) continue;
+      const q = seenQuality(game, p, game.clubId);
+      if (filters.minQ != null && q.v < filters.minQ) continue;
+      const w = expectedWage(p, date);
+      if (filters.maxWage != null && w * 0.9 > filters.maxWage) continue;
+      const offers = S.offers.filter((o) => o.pid === id);
+      if (filters.noOffers && offers.length) continue;
+      rows.push({
+        id, name: p.name, nat: p.nat, age: p.age, role: p.role, roleName: roleName(p.role), q,
+        wage: { lo: r100(w * 0.9), mid: w, hi: r100(w * 1.1) }, idleDays: 0,
+        offers: offers.length, decideOn: S.decide[id] ?? null, mine: offers.some((o) => o.club === game.clubId),
+        club: clubId, until: p.until, comp: poachCompensation(p), blocked: poachBlocker(game, S, game.clubId, p, date),
+      });
+    }
   }
   return rows.sort((a, b) => b.q.v - a.q.v || a.name.localeCompare(b.name));
 }

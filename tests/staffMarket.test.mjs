@@ -24,7 +24,7 @@ import '../src/season/dailySystems.js';
 import {
   STAFF_MARKET as K, ensureStaff, combineQ, personQ, expectedWage, staffLimit, staffBudget, makeOffer, decideDay, fireStaff,
   severanceOf, refreshPool, listFreeStaff, offerUtility, offerHint, clubAppeal, rosterOf, syncStaff, renewStaff, contractUntil,
-  staffSummary, seasonStats, aiStaffWeek, halfKeyOf,
+  staffSummary, seasonStats, aiStaffWeek, halfKeyOf, computeLimit, aiRenewals, staffPlan,
 } from '../src/career/staffMarket.js';
 
 const CLUB = 'widzew';
@@ -473,6 +473,29 @@ test('Nowy sezon: wygasłe umowy na listę wolnych, wiek +1, limity, sztab klub�
   assert.ok(!g.staff.clubs[gone] && goneStaff.every((id) => g.staff.pool.includes(id)));
   g.world.clubs[gone] = { squad: [], academy: [] };
   ensureStaff(g);
-  assert.ok(rosterOf(g, gone).length >= 3);
+  assert.ok(rosterOf(g, gone).length >= 4, 'III liga: co najmniej 4 osoby');
   void generateStaffFor;
+});
+
+test('III liga: limit sztabu 4-5 osób, a klub AI przedłuża umowy, żeby od 1 lipca nie zejść poniżej 4', () => {
+  const g = fresh();
+  assert.equal(K.limit.MIN[4], 4);
+  const l4 = CLUBS_PL.filter((c) => c.tier === 4 && g.world.clubs[c.id] && c.id !== CLUB).map((c) => c.id);
+  for (const id of l4) {
+    const lim = computeLimit(g, id);
+    assert.ok(lim >= 4 && lim <= 5, `${id}: limit ${lim}`);
+  }
+  // Klub z 6 osobami po migracji, limit 4: dwie pierwsze osoby planu mają 65 lat (bez przedłużenia), a osoby spoza limitu
+  // normalnie nie dostają nowej umowy; minimum ligi wymusza przedłużenie dwóch kolejnych
+  const id = l4.find((x) => rosterOf(g, x).length >= 6);
+  g.staff.limit[id] = 4;
+  const end = '2027-06-30';
+  const plan = staffPlan(id, 99).filter(({ k }) => k === 1).map(({ role }) => role);
+  const ros = rosterOf(g, id).sort((a, b) => plan.indexOf(a.role) - plan.indexOf(b.role));
+  ros.forEach((p, i) => { p.until = end; p.age = i < 2 ? 66 : 45; p.q = 6; });
+  g.date = '2027-06-01';
+  aiRenewals(g, g.date);
+  const kept = rosterOf(g, id).filter((p) => p.until > end);
+  assert.ok(kept.length >= 4, `po przedłużeniach ${kept.length} osób (minimum 4)`);
+  assert.ok(kept.every((p) => p.age < 65), 'bez przedłużeń dla 65+');
 });

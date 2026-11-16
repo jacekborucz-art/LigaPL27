@@ -38,6 +38,7 @@ import { applySeasonState } from './season/rollover.js';
 import { ensureThirdLeague } from './season/thirdLeague.js';
 import { ensureTraining, trainingMatchInput, teamCohesion } from './training/index.js';
 import { renderTraining, handleTrainingAction, isTrainingAction } from './ui/trainingView.js';
+import { handleStaffAction, handleStaffField, isStaffAction, offerPreview } from './ui/staffView.js'; // Trening > Sztab
 import { shirtNumbers, kitColors } from './career/shirts.js';
 import { playerStatsHtml } from './ui/playerStatsView.js';
 import { renderClubView, hasClubView } from './ui/clubView.js';
@@ -230,6 +231,33 @@ app.addEventListener('keydown', (ev) => {
   if (ev.key !== 'Enter' || state.screen !== 'editor' || !ev.target.matches?.('[data-ed-form] input')) return;
   ev.preventDefault();
   app.querySelector('[data-act="ed-save-club"], [data-act="ed-save-player"]')?.click();
+});
+
+// Trening > Sztab: pola filtrów rynku i formularza oferty (data-st-field), Esc zamyka okno zwolnienia,
+// strzałki przełączają zakładki drugiego poziomu
+app.addEventListener('change', async (ev) => {
+  const f = ev.target.closest?.('[data-st-field]');
+  if (!f || !state.game) return;
+  const r = handleStaffField(state.game, f.dataset.stField, f.type === 'checkbox' ? f.checked : f.value, state);
+  Object.assign(state, r.ui ?? {});
+  const box = r.preview ? app.querySelector('#st-preview') : null;
+  if (box) { box.innerHTML = offerPreview(state.game, state); return; }
+  render();
+  if (r.focus) app.querySelector(r.focus)?.focus({ preventScroll: true });
+});
+app.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape' && state.trStaffAsk && app.querySelector('.st-ask')) {
+    ev.preventDefault(); ev.stopPropagation(); // nie wychodzi do menu głównego
+    dispatchAct({ dataset: { act: 'st-fire-no', id: state.trStaffAsk } });
+    return;
+  }
+  const tab = ev.target.closest?.('.st-subs [role="tab"]');
+  if (!tab || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(ev.key)) return;
+  ev.preventDefault();
+  const tabs = [...app.querySelectorAll('.st-subs [role="tab"]')];
+  const i = tabs.indexOf(tab);
+  const j = ev.key === 'Home' ? 0 : ev.key === 'End' ? tabs.length - 1 : (i + (ev.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+  tabs[j].click();
 });
 
 // ---------- Zapis ----------
@@ -1198,6 +1226,15 @@ async function dispatchAct(el, { root = app } = {}) {
     state.ng = r.ng; // null = powrót do Transferów
     if (r.save || d) await save();
     render();
+    return;
+  }
+  if (isStaffAction(act) && state.game) {
+    const r = handleStaffAction(state.game, act, el.dataset, state);
+    Object.assign(state, { tab: 'trening', trTab: 'sztab' }, r.ui ?? {});
+    if (r.save) await save();
+    render();
+    if (r.top) window.scrollTo({ top: 0 });
+    if (r.focus) app.querySelector(r.focus)?.focus({ preventScroll: !r.top && act !== 'st-fire-ask' });
     return;
   }
   if (isTrainingAction(act) && state.game) {

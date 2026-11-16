@@ -175,7 +175,7 @@ export function collectTodo(game, date = game.date) {
   // 3a. Wakat w rdzeniu sztabu (fakt): asystent, przygotowanie fizyczne, bramkarze, kierownik drużyny
   for (const role of coreVacancies(game, clubId)) {
     fact({ key: `sztab-wakat:${role}`, type: 'staff', from: 'Zarząd', area: 'club', due: null, prio: 'wazne', title: `Wakat w sztabie: ${STAFF_ROLES[role].name.toLowerCase()}`,
-      why: 'Obowiązki przejął trener, więc ta część pracy idzie słabiej. Zatrudnij kogoś w zakładce Trening, Sztab.', act: { steps: [{ act: 'tab', tab: 'trening' }, { act: 'tr-tab', tab: 'sztab' }] } });
+      why: 'Obowiązki przejął trener, więc ta część pracy idzie słabiej. Zatrudnij kogoś w zakładce Trening, Sztab.', act: { steps: [{ act: 'tab', tab: 'trening' }, { act: 'tr-tab', tab: 'sztab' }, { act: 'st-find', role }] } });
   }
 
   // 4. Okno transferowe: ostatnie 3 dni to fakt, wcześniejsze przypomnienie (do 7 dni) daje kierownik drużyny
