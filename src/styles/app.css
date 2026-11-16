@@ -972,6 +972,10 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 .xl .xl__pos { position: sticky; left: 0; z-index: 1; width: 52px; text-align: left; }
 .xl .xl__nm { position: sticky; left: 52px; z-index: 1; text-align: left; box-shadow: 1px 0 0 var(--line); }
 .xl thead .xl__pos, .xl thead .xl__nm { z-index: 3; }
+/* Pasek co drugiego wiersza jest w ciemnym motywie półprzezroczysty: przyklejone kolumny dostają pełne tło pod spodem,
+   inaczej przewijane kolumny prześwitują przez pozycję i nazwisko */
+.xl tbody tr:nth-child(even) .xl__pos, .xl tbody tr:nth-child(even) .xl__nm { background: linear-gradient(var(--surface-stripe), var(--surface-stripe)), var(--surface); }
+.xl tbody tr:hover .xl__pos, .xl tbody tr:hover .xl__nm { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
 .xl__nm button { display: inline-flex; align-items: center; gap: 6px; max-width: 200px; padding: 0; border: 0; background: none; color: var(--text); font: 600 var(--step--1)/1.2 var(--font-body); text-align: left; cursor: pointer; }
 .xl__nm button span { overflow: hidden; text-overflow: ellipsis; }
 .xl__nm button:hover span { text-decoration: underline; }
