@@ -22,7 +22,7 @@ Przed pracą przeczytaj `docs/PRZEKAZANIE.md` (role agentów, decyzje, pułapki)
    (v1.11 Beta -> v1.12 Beta -> ... -> v1.99 -> v1.100). Pierwszą liczbę i dopisek (Beta) zmienia tylko właściciel.
    Numer wersji wpisz też na końcu opisu commita, np. „... (v1.12 Beta)”.
    Wyjątek: mała poprawka, która dopracowuje ostatnią zmianę na prośbę właściciela (np. „usuń puste miejsca w tym panelu”),
-   wchodzi do bieżącej wersji bez podnoszenia numeru. W razie wątpliwości zapytaj.
+   wchodzi do bieżącej wersji bez podnoszenia numeru. Przed podniesieniem numeru zawsze zapytaj właściciela (jedno pytanie: „podnieść wersję?”).
 1. Poprawki wizualne (tylko CSS, układ, teksty i HTML widoków w `src/ui/`, bez zmian logiki gry): bez pełnego `npm test`.
    Wystarczy `node --test` dla testów danego widoku (np. `tests/sysMenu.test.mjs`) i `tests/core.test.mjs` (sw.js),
    jeden zrzut ekranu PC i telefonu. Przeglądarkę testową czyść przez CDP `Network.clearBrowserCache` i wyrejestrowanie
