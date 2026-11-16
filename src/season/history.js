@@ -17,6 +17,7 @@ export const STAT_GROUPS = [
   ['L', 'Liga'],
   ['P', 'Puchar Polski'],
   ['E', 'Puchary europejskie'],
+  ['D', 'Druga drużyna klubu'], // mecze w rezerwach albo w pierwszej drużynie poza drużyną kontraktu (src/career/reserves.js)
   ['R', 'Reprezentacja'],
   ['T', 'Towarzyskie'],
 ];

@@ -14,7 +14,8 @@ import { createSuperCupEU, superCupEUFixture, HOLDERS_2026 } from './superCupEU.
 import { roundDates, buildLeague } from './schedule.js';
 import { standings } from './standings.js';
 import { createCup, drawRound, winnerOf, tieWinner, superCupFixture, PP_ROUNDS, PP_NAMES, moodResult, compRank, tieMood } from './cup.js';
-import { LEAGUE_COMPS, TIER_COMP, L3_COMPS, isL3Comp, compOfClub, compClubIds } from './leagueComps.js';
+import { LEAGUE_COMPS, TIER_COMP, L3_COMPS, isL3Comp, compOfClub, compClubIds, classKeyOfComp, LEAGUE_CLASS_KEYS, rulesCompOfClass } from './leagueComps.js';
+import { familySquad, matchGuests, noteFamilyMatch, serveFamilySuspensions, closeFixture } from '../career/reserves.js';
 import { reserveMayPlayIn } from './leagues.js';
 import { squadOf } from '../world/worldGen.js';
 import { ephemeralSquad } from '../world/ephemeral.js';
@@ -35,7 +36,8 @@ export { LEAGUE_COMPS, L3_COMPS, isL3Comp, compOfClub, compClubIds };
 const ALL_CLUBS = [...CLUBS_PL, ...CLUBS_L3, ...CLUBS_L4, ...UEFA_CLUBS];
 const CLUB_INDEX = new Map(ALL_CLUBS.map((c) => [c.id, c]));
 export const anyClub = (id) => CLUB_INDEX.get(id) ?? null;
-export const suspKey = (comp) => (LEAGUE_COMPS.includes(comp) ? 'league' : comp === 'pp' ? 'cup' : comp);
+// Rejestr kartek i pauz: liga per klasa (ekstraklasa, liga1, liga2, liga3), baraże w klasie klubu (clubId), PP 'cup', UEFA 'uefa'
+export const suspKey = (comp, clubId = null) => classKeyOfComp(comp, clubId ? tierOf(clubId) : null);
 
 // ------------------------------------------------------------ Tworzenie sezonu
 /** Daty pucharowe klubów (Superpuchar, eliminacje UEFA), żeby liga nie wypadła dzień obok. */
@@ -151,11 +153,23 @@ export function compLabel(f) {
 }
 
 // ------------------------------------------------------------ Kadry na mecz
-/** Kadra klubu na mecz w danych rozgrywkach (pauzy liczą się osobno dla ligi i pucharu). */
-export function squadFor(game, clubId, comp) {
-  const key = suspKey(comp);
-  const base = game.world.clubs[clubId] ? squadOf(game.world, clubId) : ephemeralSquad(anyClub(clubId), SEASON);
-  return base.map((p) => (p.susp?.[key] ? { ...p, suspended: p.susp[key] } : (p.suspended ? { ...p, suspended: 0 } : p)));
+/**
+ * Kadra klubu na mecz w danych rozgrywkach (pauzy liczą się osobno dla klasy ligowej, pucharu i UEFA).
+ * Klub z rezerwami (src/career/reserves.js): dochodzą przydzieleni z drugiej drużyny na mecz f (bez f: najbliższy mecz
+ * w comp), własni niedostępni z zasad klubu dostają teamBlock. ycLeague: żółte w klasie meczu dla studia (cards; domyślnie
+ * bez podanego meczu, czyli w widokach; mecze w tle bez kopii zawodników, szybciej).
+ */
+export function squadFor(game, clubId, comp, f = null, { cards = !f } = {}) {
+  const key = suspKey(comp, clubId);
+  const own = game.world.clubs[clubId] ? squadOf(game.world, clubId) : ephemeralSquad(anyClub(clubId), SEASON);
+  const base = game.world.clubs[clubId] ? familySquad(game, clubId, comp, own, f) : own;
+  const cls = cards && LEAGUE_CLASS_KEYS.includes(key);
+  return base.map((p) => {
+    const yl = cls ? (p.yc?.[key] ?? 0) : 0;
+    if (p.susp?.[key]) return { ...p, suspended: p.susp[key], ...(yl ? { ycLeague: yl } : {}) };
+    if (p.suspended) return { ...p, suspended: 0, ...(yl ? { ycLeague: yl } : {}) };
+    return yl ? { ...p, ycLeague: yl } : p;
+  });
 }
 
 function tableTermFor(game, clubId, comp, cache) {
@@ -206,8 +220,8 @@ function quickCoach(game, f, clubId, rank) {
 
 /** Mecz w tle (AI vs AI) szybką symulacją. */
 export function playQuick(game, f, rng, cache = new Map()) {
-  const home = { squad: squadFor(game, f.home, f.comp), tableTerm: tableTermFor(game, f.home, f.comp, cache) };
-  const away = { squad: squadFor(game, f.away, f.comp), tableTerm: tableTermFor(game, f.away, f.comp, cache) };
+  const home = { squad: squadFor(game, f.home, f.comp, f), tableTerm: tableTermFor(game, f.home, f.comp, cache) };
+  const away = { squad: squadFor(game, f.away, f.comp, f), tableTerm: tableTermFor(game, f.away, f.comp, cache) };
   const rank = quickRank(game, f, cache);
   home.coachTerm = quickCoach(game, f, f.home, rank);
   away.coachTerm = quickCoach(game, f, f.away, rank);
@@ -377,19 +391,27 @@ function yellowSuspension(comp, count) {
 export function applyResult(game, f, res, rng) {
   f.played = true;
   f.result = { score: res.score, scorers: res.scorers, shootout: res.shootout, extraTime: res.extraTime, stats: res.stats };
-  const key = suspKey(f.comp);
-  const compRules = LEAGUE_COMPS.includes(f.comp) ? f.comp : f.comp === 'pp' ? 'pucharPolski' : f.comp === 'uefa' ? 'uefa' : null;
   const msgs = [];
+  const inSquad = new Set(); // kadra meczowa obu drużyn (przydziały z rezerw: wykorzystane albo przepadłe)
   [f.home, f.away].forEach((clubId, s) => {
     if (!game.world.clubs[clubId]) return; // kluby bez stałej kadry: bez zapisu
-    const squad = squadOf(game.world, clubId);
+    // Klucz kartek: klasa ligi (baraże w klasie klubu), PP, UEFA; reguły żółtych klasy (baraże jak liga)
+    const key = suspKey(f.comp, clubId);
+    const compRules = LEAGUE_COMPS.includes(f.comp) ? f.comp : f.comp.startsWith('playoff') ? rulesCompOfClass(key) : f.comp === 'pp' ? 'pucharPolski' : f.comp === 'uefa' ? 'uefa' : null;
     const played = new Map(res.players[s].map((x) => [x.id, x]));
+    // Zawodnicy drugiej drużyny klubu przydzieleni na ten mecz (src/career/reserves.js): zapis tylko, gdy zagrali
+    const guests = matchGuests(game, f, clubId);
+    const squad = guests.length ? [...squadOf(game.world, clubId), ...guests.filter((p) => played.has(p.id))] : squadOf(game.world, clubId);
+    for (const id of played.keys()) inSquad.add(id);
+    for (const p of guests) inSquad.add(p.id);
     const mine = clubId === game.clubId;
     const result = moodResult(f, s); // mecz rozstrzygający: awans albo trofeum także po karnych i w dwumeczu
     const tie = tieMood(f, s);
     const lossStreak = result === 'L' ? lossStreakOf(game, clubId, f) : 0; // wcześniej nie liczony: kara za serię porażek nie działała
     const diff = s === 0 ? res.strengthDiff : -res.strengthDiff;
     for (const p of squad) {
+      const guest = p.clubId !== clubId; // gra w drugiej drużynie klubu (statystyki osobno, kontrakt bez zmian)
+      const tell = mine || p.clubId === game.clubId; // wiadomości o zawodnikach gracza także z meczów rezerw
       // Odbycie pauzy: klub zagrał mecz w tych rozgrywkach
       if (p.susp?.[key] > 0 && !played.has(p.id)) {
         p.susp[key]--;
@@ -399,10 +421,11 @@ export function applyResult(game, f, res, rng) {
       const friendly = f.comp === 'friendly'; // sparing: bez statystyk sezonu, formy, kartek i pauz
       if (!friendly) p.morale = applyMorale(p.morale ?? 12, afterMatchDelta({ result, tie, strengthDiff: diff, derby: f.derby, lossStreak, played: !!x, rating: x?.rating, isRegular: (p.season?.apps ?? 0) >= 5 }));
       if (!x) continue;
-      // Statystyki w podziale na rozgrywki (także sparingi) i historia klubowa (mecze o punkty), src/season/history.js
-      const grp = statGroup(f.comp);
+      // Statystyki w podziale na rozgrywki (także sparingi) i historia klubowa (mecze o punkty), src/season/history.js;
+      // mecz w drugiej drużynie klubu w grupie 'D' (bez historii klubowej i reputacji)
+      const grp = guest ? 'D' : statGroup(f.comp);
       addPlayerMatch(p, grp, x);
-      if (!friendly) matchRepEvents(p, f, x); // zdarzenia reputacji (docs/reputacja.md)
+      if (!friendly && !guest) matchRepEvents(p, f, x); // zdarzenia reputacji (docs/reputacja.md)
       if (CLUB_GROUPS.includes(grp)) { const sp = syncSpell(p, f.date); if (sp) { sp.m++; sp.g += x.g; } }
       if (friendly) {
         p.fresh = clamp(Math.round((p.fresh ?? 95) - 24 * (x.minutes / 90)), 35, 100);
@@ -416,7 +439,10 @@ export function applyResult(game, f, res, rng) {
         }
         continue;
       }
-      const ss = p.season ?? (p.season = { apps: 0, subs: 0, min: 0, g: 0, a: 0, yc: 0, rc: 0, rating: 0, motm: 0, cs: 0 });
+      // Sezon w drużynie klubu kontraktu w p.season; mecze w drugiej drużynie klubu w p.season.oth (bez wpływu na
+      // udział minut, strzelców ligi i rozmowy o grze)
+      const ss0 = p.season ?? (p.season = { apps: 0, subs: 0, min: 0, g: 0, a: 0, yc: 0, rc: 0, rating: 0, motm: 0, cs: 0 });
+      const ss = guest ? (ss0.oth ??= { apps: 0, min: 0, g: 0, a: 0, yc: 0, rc: 0, rating: 0, motm: 0 }) : ss0;
       ss.apps++; ss.min += x.minutes; ss.g += x.g; ss.a += x.a; ss.yc += x.yc ? 1 : 0; ss.rc += x.rc;
       ss.ratingSum = (ss.ratingSum ?? 0) + x.rating; ss.rating = Math.round((ss.ratingSum / ss.apps) * 100) / 100;
       if (x.motm) ss.motm++;
@@ -435,24 +461,28 @@ export function applyResult(game, f, res, rng) {
           const games = yellowSuspension(compRules, p.yc[key]);
           if (games) {
             p.susp[key] = (p.susp[key] ?? 0) + games;
-            if (mine) msgs.push(['important', `Pauza: ${p.name}`, `${p.name} otrzymał ${p.yc[key]}. żółtą kartkę i nie zagra w ${games === 1 ? 'kolejnym meczu' : `${games} kolejnych meczach`} (${key === 'league' ? 'liga' : key === 'uefa' ? 'puchary europejskie' : 'Puchar Polski'}).`]);
+            if (tell) msgs.push(['important', `Pauza: ${p.name}`, `${p.name} otrzymał ${p.yc[key]}. żółtą kartkę i nie zagra w ${games === 1 ? 'kolejnym meczu' : `${games} kolejnych meczach`} (${LEAGUE_CLASS_KEYS.includes(key) ? (guest ? `liga, ${COMPETITIONS[f.comp]?.name ?? 'druga drużyna klubu'}` : 'liga') : key === 'uefa' ? 'puchary europejskie' : 'Puchar Polski'}).`]);
           }
         }
         if (x.rc) {
           const games = RED_BAN[x.redReason] ?? rng.weighted([1, 2, 3], (g) => ({ 1: 0.6, 2: 0.3, 3: 0.1 })[g]);
           p.susp[key] = (p.susp[key] ?? 0) + games;
-          if (mine) msgs.push(['important', `Czerwona kartka: ${p.name}`, `${p.name} został ukarany ${games === 1 ? '1 meczem' : `${games} meczami`} zawieszenia.`]);
+          if (tell) msgs.push(['important', `Czerwona kartka: ${p.name}`, `${p.name} został ukarany ${games === 1 ? '1 meczem' : `${games} meczami`} zawieszenia${guest ? ' (tylko w rozgrywkach tego meczu, PZPN)' : ''}.`]);
         }
       }
       const md = x.injury ? healDays(game, p.clubId, x.injury.days) : 0; // fizjoterapeuta klubu skraca przerwę
       if (x.injury && !(p.injuryDays >= md)) { // dłuższa przerwa (np. pogłębiony uraz grany z bólem) zastępuje krótszą
         p.injuryDays = md;
         p.injury = { ...x.injury, days: md, since: f.date };
-        if (mine) msgs.push(['important', `Kontuzja: ${p.name}`, `${p.name}: ${x.injury.name}. Przerwa potrwa ok. ${md} dni (powrót ok. ${fmtDate(addDays(f.date, md))}).`]);
+        if (tell) msgs.push(['important', `Kontuzja: ${p.name}`, `${p.name}: ${x.injury.name}. Przerwa potrwa ok. ${md} dni (powrót ok. ${fmtDate(addDays(f.date, md))}).`]);
       }
     }
     if (!mine && f.comp !== 'friendly') aiPostMatchTalk(game, f, clubId, s, res, squad, played);
+    // Klub z rezerwami: pauzy drugiej drużyny w tej klasie, weekend i 48 h, liczniki PZPN (src/career/reserves.js)
+    serveFamilySuspensions(game, f, clubId, key, played);
+    noteFamilyMatch(game, f, clubId, played, guests);
   });
+  closeFixture(game, f, inSquad);
   if (f.comp === 'pp' || f.comp === 'super' || f.comp.startsWith('playoff')) {
     const w = winnerOf(f);
     if (f.comp === 'pp') {

@@ -6,6 +6,7 @@ import { GAME_START, SEASON, POLISH_EUROPE_2026, DOMESTIC } from './config/calen
 import { crestHtml } from './ui/crest.js';
 import { esc, fmtDate, fmtDay, weekday, icon } from './ui/dom.js';
 import { migratePosCodes } from './engine/positions.js'; // zapisy sprzed zmiany kodu SP -> BP
+import { ensureReserves } from './career/reserves.js';
 import * as store from './core/store.js';
 import { hashString } from './core/rng.js';
 import { CATEGORIES, unreadCount, markRead, markAllRead, resolveMessage, filterInbox, pendingDecisions, addMessages, pruneInbox, canDelete } from './core/inbox.js';
@@ -274,6 +275,7 @@ function ensureGameShape(g) {
   applySeasonState(g); // kalendarz i ligi sezonu zapisanego w grze
   applyPack(g); // edytor: nazwy klubów i stadiony z datapacku gry (docs/edytor.md)
   if (!g.world) g.world = generateWorld(g.seed);
+  ensureReserves(g); // rezerwy (src/career/reserves.js); stare zapisy: kartki 'league' do klasy ligi klubu zawodnika
   if (!g.tactics) g.tactics = createTactics(mySquad(g), { benchSize: benchSizeFor(g) });
   else g.tactics = refreshTactics(g.tactics, mySquad(g), { benchSize: benchSizeFor(g) }).tactics;
   if (!Array.isArray(g.inbox)) g.inbox = [];

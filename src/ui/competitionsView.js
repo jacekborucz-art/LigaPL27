@@ -3,7 +3,7 @@ import { CLUBS_PL } from '../data/clubs_pl.js';
 import { COMPETITIONS } from '../config/competitions.js';
 import { standings, zonesFor } from '../season/standings.js';
 import { anyClub, LEAGUE_COMPS } from '../season/season.js';
-import { compClubIds, isL3Comp, L3_COMPS } from '../season/leagueComps.js';
+import { compClubIds, isL3Comp, L3_COMPS, classKeyOfComp } from '../season/leagueComps.js';
 import { L3_GROUP_NAMES, clubById } from '../data/clubs_pl.js';
 import { PP_ROUNDS, PP_NAMES, winnerOf } from '../season/cup.js';
 import { crestHtml } from './crest.js';
@@ -111,7 +111,7 @@ function statsView(game, comp) {
   return `<div class="stats-grid">
     ${list('Strzelcy', top((p) => p.season?.g ?? 0, 15), (p) => p.season.g)}
     ${list('Asysty', top((p) => p.season?.a ?? 0), (p) => p.season.a)}
-    ${list('Żółte kartki', top((p) => p.yc?.league ?? 0), (p) => p.yc.league)}
+    ${list('Żółte kartki', top((p) => p.yc?.[classKeyOfComp(comp)] ?? 0), (p) => p.yc[classKeyOfComp(comp)])}
     ${list('Średnia ocen (min. 5 meczów)', top((p) => p.season?.rating ?? 0, 10, (p) => (p.season?.apps ?? 0) >= 5), (p) => p.season.rating.toFixed(2))}
     <section class="stat-sec"><h3>Kontuzjowani</h3>${injured.length ? `<ol class="stat-list">${injured.map((p) => `<li>${crest(p.clubId, 18)}<span>${esc(p.name)}<small>${esc(p.injury?.name ?? '')}</small></span><b>${p.injuryDays} dni</b></li>`).join('')}</ol>` : '<p class="hint">Brak kontuzjowanych.</p>'}</section>
   </div>`;

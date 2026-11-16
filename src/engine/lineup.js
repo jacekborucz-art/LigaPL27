@@ -21,7 +21,7 @@ export function slotValue(player, slot) {
  */
 export function autoPickXI(squad, formation) {
   const slots = formation.slots;
-  const pool = squad.filter(isAvailable);
+  const pool = squad.filter((p) => isAvailable(p) && !p.benchOnly); // benchOnly: 23+ z pierwszej drużyny ponad limit 3 w jedenastce rezerw
   const xi = new Array(slots.length).fill(null);
   const used = new Set();
   const order = [0, ...slots.map((_, i) => i).filter((i) => i !== 0)]; // slot 0 = BR

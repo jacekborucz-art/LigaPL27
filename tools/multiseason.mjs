@@ -56,11 +56,32 @@ function staffReport(year) {
   console.log(`      podbieranie próby AI-AI ${st.poachTry?.aiai ?? 0} / AI od gracza ${st.poachTry?.aiuser ?? 0} / gracz od AI ${st.poachTry?.userai ?? 0}; udane ${st.poached?.aiai ?? 0} / ${st.poached?.aiuser ?? 0} / ${st.poached?.userai ?? 0}; blokady ${st.blocked ?? 0}, zerwane umowy ${st.broke ?? 0}; lista wolnych ${S.pool.length}`);
 }
 staffReport(2026); youthSnap();
+// Kartki w ligach (żółte i czerwone na mecz ligi, z p.st.L zawodników klubów danej ligi) i rezerwy (docs/rezerwy.md):
+// delegowania i powołania AI w sezonie, awarie, naruszenia zasady weekendu i 48 h (muszą być 0), kadry rezerw
+function cardsReport() {
+  const comps = { 1: ['ekstraklasa'], 2: ['liga1'], 3: ['liga2'], 4: ['liga3-1', 'liga3-2', 'liga3-3', 'liga3-4'] };
+  return [1, 2, 3, 4].map((t) => {
+    const ids = new Set(CLUBS_PL.filter((c) => c.tier === t).map((c) => c.id));
+    const m = g.fixtures.filter((f) => f.played && comps[t].includes(f.comp)).length || 1;
+    let yc = 0; let rc = 0;
+    for (const p of Object.values(g.world.players)) if (ids.has(p.clubId)) { yc += p.st?.L?.[6] ?? 0; rc += p.st?.L?.[7] ?? 0; }
+    return `L${t} żółte/mecz ${(yc / m).toFixed(2)}, czerwone/mecz ${(rc / m).toFixed(3)}`;
+  }).join(' | ');
+}
+function reservesReport() {
+  const st = g.reserves?.stats?.[SEASON];
+  const res = CLUBS_PL.filter((c) => c.parent && g.world.clubs[c.id]).map((c) => squadOf(g.world, c.id).length);
+  const pl = Object.values(g.world.players).filter((p) => p.season?.oth?.apps);
+  console.log(`  KARTKI ${SEASON}: ${cardsReport()}`);
+  if (!st) return console.log('  REZERWY: brak modułu');
+  console.log(`  REZERWY ${SEASON}: delegowania AI ${st.aiDown}, powołania AI ${st.aiUp} (awarie ${st.emergency}, juniorzy akademii ${st.acad}), gracz w dół ${st.down - st.aiDown}, w górę ${st.up - st.aiUp}; odmowy ${st.refused}, eskalacje zatwierdzone ${st.forced} / odrzucone ${st.escNo}; wykorzystane ${st.used}, przepadłe ${st.voided}; naruszenia weekendu ${st.viol}, 48 h ${st.viol48}`);
+  console.log(`      kadry rezerw (${res.length} drużyn) min/śr/max ${Math.min(...res)}/${(res.reduce((a, b) => a + b, 0) / res.length).toFixed(1)}/${Math.max(...res)}; zawodników z meczami w drugiej drużynie ${pl.length}, średnio ${(pl.reduce((a, p) => a + p.season.oth.apps, 0) / Math.max(1, pl.length)).toFixed(1)} meczu`);
+}
 const end = `${2026 + seasons}-07-02`;
 let t0 = performance.now();
 while (g.date < end) {
   if (g.date.endsWith('-09-30') && g.staff) { const S = g.staff; console.log(`  SZTAB 30 wrz: ${[1, 2, 3, 4].map((t) => { const xs = CLUBS_PL.filter((c) => c.tier === t && S.clubs[c.id]).map((c) => c.id); const n = xs.map((id) => S.clubs[id].length); const ml = xs.reduce((a, id) => a + (g.training.staff[id]?.mlodziez?.q ?? 0), 0) / Math.max(1, xs.length); return `L${t} osób ${(n.reduce((a, b) => a + b, 0) / Math.max(1, n.length)).toFixed(1)} (najmniej ${Math.min(...n)}), młodzież q ${ml.toFixed(1)}`; }).join(' | ')}`); }
-  if (g.date.endsWith('-06-30')) { repReport(`koniec ${SEASON}`); console.log(`  ROZWÓJ MŁODYCH (do 21 lat, przyrost OVR w sezonie): ${youthReport()}`); staffReport(+g.date.slice(0, 4) - 1); }
+  if (g.date.endsWith('-06-30')) { reservesReport(); repReport(`koniec ${SEASON}`); console.log(`  ROZWÓJ MŁODYCH (do 21 lat, przyrost OVR w sezonie): ${youthReport()}`); staffReport(+g.date.slice(0, 4) - 1); }
   for (const f of g.fixtures.filter((x) => x.date === g.date && !x.played && (x.home === g.clubId || x.away === g.clubId))) { const rng = new Rng('g' + f.id); applyResult(g, f, playQuick(g, f, rng), rng); }
   // decyzje blokujące (zwolnienie): wybierz pierwszą ofertę
   for (const m of g.inbox.filter((m) => !m.resolved && m.actions?.length && !m.optional)) { m.resolved = true; console.log('  DECYZJA', g.date, m.subject, m.actions.map((a) => a.id).join(',')); runDecision(g, m, m.actions[0].id); }

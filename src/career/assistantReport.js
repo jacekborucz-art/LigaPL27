@@ -13,6 +13,7 @@ import { registerDailySystem, addDays, clubMatchOn } from '../core/gameLoop.js';
 import { createMessage } from '../core/inbox.js';
 import { squadOf, academyOf } from '../world/worldGen.js';
 import { clubById, CLUBS_PL } from '../data/clubs_pl.js';
+import { classKeyOfTier } from '../season/leagueComps.js';
 import { ATTRS, OFF, POS_NAMES, ovrAt } from '../data/attributes.js';
 import { proficiency, POSITIONS } from '../engine/positions.js';
 import { staffOf, staffQ, staffLabel } from '../training/staff.js';
@@ -278,7 +279,8 @@ export function scoutLine(game, p) {
 const playedGames = (game) => (game.fixtures ?? []).filter((f) => f.played && (f.home === game.clubId || f.away === game.clubId)).length;
 const minutesShare = (p, games) => (games ? clamp((p.season?.min ?? 0) / (games * 90), 0, 1) : null);
 const avgForm = (p) => (Array.isArray(p.form) && p.form.length ? p.form.reduce((a, b) => a + b, 0) / p.form.length : null);
-const ycLeague = (p) => (p.yc && typeof p.yc === 'object' ? p.yc.league ?? 0 : 0);
+// Żółte w lidze: rejestr klasy rozgrywkowej klubu zawodnika (PZPN, src/season/leagueComps.js)
+const ycLeague = (p) => (p.yc && typeof p.yc === 'object' ? p.yc[classKeyOfTier(clubById(p.clubId)?.tier)] ?? 0 : 0);
 
 const leagueCache = new WeakMap();
 /** Średnie atrybuty na pozycji w lidze klubu (poziom ligi) i posortowane OVR ligi (miejsce zawodnika). */

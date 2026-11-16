@@ -24,3 +24,25 @@ export function compClubIds(comp) {
 }
 /** Wszystkie rozgrywki ligowe danego poziomu (III liga: 4 grupy). */
 export const compsOfTier = (tier) => (tier === 4 ? L3_COMPS : TIER_COMP[tier] ? [TIER_COMP[tier]] : []);
+
+// Rejestr kartek i pauz ligowych per klasa rozgrywkowa (Regulamin 1-3 Ligi PZPN art. 13 ust. 4-5, Regulamin
+// Dyscyplinarny art. 20 par. 1): Ekstraklasa, 1 Liga, 2 Liga i III liga (wszystkie grupy) osobno. Baraże liczą się do
+// klasy klubu (baraż o 2 Ligę: klub III ligi w 'liga3', klub 2 Ligi w 'liga2'). Puchar Polski 'cup', UEFA 'uefa'.
+export const CLASS_KEYS = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2', 4: 'liga3' };
+export const LEAGUE_CLASS_KEYS = Object.values(CLASS_KEYS);
+/** Klucz klasy dla poziomu ligi (1-4); null poza ligami z kadrami. */
+export const classKeyOfTier = (tier) => CLASS_KEYS[tier] ?? null;
+/** Rozgrywki z regułami kartek klasy (COMPETITIONS): liga, a dla III ligi pierwsza grupa (te same progi). */
+export const rulesCompOfClass = (key) => (key === 'liga3' ? L3_COMPS[0] : key && LEAGUE_CLASS_KEYS.includes(key) ? key : null);
+/**
+ * Klucz rejestru kartek dla meczu w rozgrywkach comp; clubTier potrzebny w barażach (klasa klubu).
+ * Liga: klasa ligi. Baraże: klasa klubu (bez niej klasa ligi, z której są baraże). PP 'cup', reszta bez zmian.
+ */
+export function classKeyOfComp(comp, clubTier = null) {
+  if (typeof comp !== 'string') return comp;
+  if (isL3Comp(comp)) return 'liga3';
+  if (comp === 'ekstraklasa' || comp === 'liga1' || comp === 'liga2') return comp;
+  if (comp.startsWith('playoff-')) return classKeyOfTier(clubTier) ?? comp.slice(8);
+  if (comp === 'pp') return 'cup';
+  return comp;
+}

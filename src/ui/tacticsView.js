@@ -19,7 +19,7 @@ const band = (prof) => (prof >= 85 ? 'ok' : prof >= 60 ? 'mid' : 'bad');
 const few = (n) => n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14);
 const freeText = (n) => (n === 1 ? 'Zostało 1 miejsce' : few(n) ? `Zostały ${n} miejsca` : `Zostało ${n} miejsc`);
 const matchesWord = (n) => (n === 1 ? 'mecz' : few(n) ? 'mecze' : 'meczów');
-const unavailableReason = (p) => (p.injuryDays > 0 ? `kontuzja, ${p.injuryDays} dni` : p.suspended > 0 ? 'zawieszony' : p.callUp ? 'reprezentacja' : p.loanBlock ? 'mecz z klubem macierzystym' : '');
+const unavailableReason = (p) => (p.injuryDays > 0 ? `kontuzja, ${p.injuryDays} dni` : p.suspended > 0 ? 'zawieszony' : p.callUp ? 'reprezentacja' : p.loanBlock ? 'mecz z klubem macierzystym' : p.teamBlock ? 'druga drużyna klubu' : '');
 const freshBand = (f) => (f >= 80 ? 'good' : f >= 65 ? 'mid' : 'low');
 /** Świeżość (pionowy pasek) i morale (kropka) obok nazwiska. */
 function condHtml(p) {
@@ -207,7 +207,7 @@ function renderPlayerInfo(p, tactics, f, extra = '') {
   const where = slot ? `Pierwszy skład: ${slot.pos}, ${prof}% na tej pozycji` : benchIdx >= 0 ? 'Ławka rezerwowych' : 'Poza kadrą meczową';
   const health = p.injuryDays > 0 ? `Kontuzja, ok. ${p.injuryDays} dni`
     : p.suspended > 0 ? `Zawieszony, ${p.suspended} ${matchesWord(p.suspended)}`
-      : p.callUp ? 'Na zgrupowaniu reprezentacji' : p.loanBlock ? 'Nie zagra z klubem macierzystym (umowa wypożyczenia)' : 'Do dyspozycji';
+      : p.callUp ? 'Na zgrupowaniu reprezentacji' : p.loanBlock ? 'Nie zagra z klubem macierzystym (umowa wypożyczenia)' : p.teamBlock ? 'Gra w drugiej drużynie klubu (rezerwy)' : 'Do dyspozycji';
   const fact = (k, v, attr = '') => `<div${attr}><dt>${k}</dt><dd>${v}</dd></div>`;
   const fresh = Math.round(p.fresh ?? 95);
   return `<dialog class="tdet" open aria-labelledby="tdet-h">

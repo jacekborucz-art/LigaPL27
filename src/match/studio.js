@@ -32,14 +32,16 @@ export function formatDate(iso) {
 const injuryDaysOf = (p) => p.injury?.days ?? p.injuryDays ?? 0;
 const injuryPlayable = (p) => !!p.injury?.playable;
 function suspOf(p, comp = 'league') {
+  if (typeof p.suspended === 'number') return p.suspended; // squadFor: pauza w rozgrywkach meczu (klasa ligi, puchar, UEFA)
   if (p.susp && typeof p.susp === 'object') return p.susp[comp] ?? 0;
   return p.suspended ?? 0;
 }
 function ycOf(p, comp = 'league') {
+  if (comp === 'league' && typeof p.ycLeague === 'number') return p.ycLeague; // squadFor: żółte w klasie ligi meczu
   if (p.yc && typeof p.yc === 'object') return p.yc[comp] ?? 0;
   return typeof p.yc === 'number' ? p.yc : 0;
 }
-const isAvailable = (p, comp) => !(injuryDaysOf(p) > 0 && !injuryPlayable(p)) && !(suspOf(p, comp) > 0) && !p.callUp && !p.loanBlock && !p.transfer?.hold;
+const isAvailable = (p, comp) => !(injuryDaysOf(p) > 0 && !injuryPlayable(p)) && !(suspOf(p, comp) > 0) && !p.callUp && !p.loanBlock && !p.transfer?.hold && !p.teamBlock;
 const nameOf = (p) => p.name ?? String(p.id);
 /** Polska odmiana liczebników: 1 gol, 2 gole, 5 goli, 22 gole. */
 export function plural(n, one, few, many) {

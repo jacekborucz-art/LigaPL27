@@ -29,8 +29,8 @@ function effective(p, group, ctx) {
 export function pickXI(squad, shape = DEFAULT_SHAPE, ctx = {}) {
   const missing = squad
     .filter((p) => !isAvailable(p))
-    .map((p) => ({ player: p, reason: p.injuryDays > 0 ? 'kontuzja' : p.suspended > 0 ? 'zawieszenie' : p.callUp ? 'reprezentacja' : 'niedostępny' }));
-  const pool = squad.filter(isAvailable);
+    .map((p) => ({ player: p, reason: p.injuryDays > 0 ? 'kontuzja' : p.suspended > 0 ? 'zawieszenie' : p.callUp ? 'reprezentacja' : p.teamBlock ? 'druga drużyna klubu' : 'niedostępny' }));
+  const pool = squad.filter((p) => isAvailable(p) && !p.benchOnly); // benchOnly: 23+ z pierwszej drużyny ponad limit w jedenastce rezerw
   const used = new Set();
   const xi = [];
   const fill = (group, allowOthers) => {

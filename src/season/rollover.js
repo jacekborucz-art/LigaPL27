@@ -11,6 +11,7 @@ import { genPlayer, marketValue } from '../world/playerGen.js';
 import { pickNationality } from '../data/names.js';
 import { setSeasonYear, SEASON, SEASON_YEAR, SEASON_END, SEASON_START } from '../config/calendar2026.js';
 import { GROUP, SQUAD_TARGETS, decideRetirement, squadDeficits } from '../career/squad.js';
+import { reservesNewSeason } from '../career/reserves.js';
 import { marketWage } from '../career/negotiation.js';
 import { payLevel } from '../data/finanse_klubow.js';
 import { createTactics } from '../engine/lineup.js';
@@ -281,6 +282,7 @@ export function rolloverSeason(game) {
   const report = { expired: [], retired: [], loansBack, promotedYouth: [], newYouth: [], signed: [] };
   processPlayers(game, oldEnd, newStart, rng.fork('zawodnicy'), report);
   processAcademy(game, newStart, rng.fork('akademia'), report);
+  reservesNewSeason(game); // rezerwy: przydziały wygasają, pauzy z klas do klasy drużyny w nowym sezonie (src/career/reserves.js)
   for (const p of Object.values(game.world.players)) if (p.clubId) p.value = marketValue(p, { tier: Math.min(4, clubById(p.clubId)?.tier ?? 4), date: newStart });
   addFreeAgents(game, 45, newStart, `lato-${year}`); // 126 klubów z kadrami (było 30 przy 54)
   addFreeAgents(game, 8, newStart, `import-${year}`, { imports: true }); // było 22: wolni z zagranicy przychodzą też z puli (career/foreignPool.js)

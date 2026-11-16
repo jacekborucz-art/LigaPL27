@@ -188,6 +188,7 @@ Z `docs/PLAN.md` (wcześniejsza sesja, Nov 10, 2026):
 - **Brak przepisu o młodzieżowcu** (decyzja użytkownika). Od 2025/26 w Polsce i tak nie ma kar, jest program premiowy.
 - **Rezerwy:** zawsze co najmniej ligę niżej niż pierwsza drużyna; reguła PZPN włączona: rezerwy najwyżej w 2 Lidze
   (`reserveMaxTier = 3`, `reserveMayPlayIn()`). Rezerwy nie grają w Pucharze Polski (założenie).
+  Delegowanie na mecz i powołania z rezerw (model A, zasady PZPN, awaria, eskalacja, kartki per klasa): `docs/rezerwy.md`.
 - **Kluby UEFA** z prawdziwymi nazwami, bez herbów i bez prawdziwych zawodników; kadry zagraniczne generowane z ziarna.
 - **Brak dublowania miejsc w pucharach** (miejsce przechodzi na finalistę PP lub dalej w tabeli).
 - **Wyniki i statystyki zawsze z wyliczenia** (dziennik zdarzeń), rozbudowa przez rejestr modyfikatorów i hooki.

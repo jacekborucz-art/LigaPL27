@@ -231,6 +231,9 @@ export function ensureInfra(game) {
 /** Braki licencyjne klubu dla jego obecnej ligi: [{ track, need, have, text }]. */
 export function licenceNeeds(game, id) {
   const club = clubById(id); const I = infraOf(game, id);
+  // Rezerwy korzystają z obiektów pierwszej drużyny i nie inwestują same (aiInvest je pomija), więc bez wymogów licencji:
+  // wcześniej rezerwy po awansie do 2 Ligi dostawały co rok karę 1 mln zł, której nie mogły uniknąć
+  if (club?.parent) return [];
   const req = club && I ? LICENCE[club.tier] : null;
   if (!req) return [];
   const out = [];

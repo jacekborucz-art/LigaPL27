@@ -133,7 +133,7 @@ test('Pełny sezon: wszystkie mecze rozegrane, puchar ma zwycięzcę, baraże ro
   const goals = players.reduce((s, p) => s + (p.season?.g ?? 0), 0);
   const leagueGoals = g.fixtures.filter((f) => LEAGUE_COMPS.includes(f.comp)).reduce((s, f) => s + f.result.score[0] + f.result.score[1], 0);
   assert.ok(goals >= leagueGoals * 0.95, `gole zawodników ${goals}, gole w ligach ${leagueGoals}`);
-  assert.ok(players.some((p) => (p.yc?.league ?? 0) >= 4), 'ktoś dostał 4 żółte kartki');
+  assert.ok(players.some((p) => ['ekstraklasa', 'liga1', 'liga2', 'liga3'].some((k) => (p.yc?.[k] ?? 0) >= 4)), 'ktoś dostał 4 żółte kartki (rejestr per klasa)');
   assert.ok(g.inbox.some((m) => m.subject.startsWith('Wyniki ')), 'wiadomości z wynikami kolejek');
   assert.ok(g.inbox.some((m) => m.subject.includes('Losowanie')), 'wiadomości o losowaniu pucharu');
 });
@@ -143,11 +143,11 @@ test('Zawieszony zawodnik nie gra w kolejnym meczu ligowym i odbywa pauzę', () 
   const rng = new Rng('x');
   const f = g.fixtures.find((x) => x.comp === 'ekstraklasa' && x.home !== 'widzew' && x.away !== 'widzew');
   const p = g.world.players[g.world.clubs[f.home].squad[5]];
-  p.susp = { league: 1 };
+  p.susp = { ekstraklasa: 1 }; // rejestr pauz per klasa rozgrywkowa (src/season/leagueComps.js)
   const res = playQuick(g, f, rng);
   assert.ok(!res.players[0].some((x) => x.id === p.id), 'zawieszony nie zagrał');
   applyResult(g, f, res, rng);
-  assert.equal(p.susp.league, 0);
+  assert.equal(p.susp.ekstraklasa, 0);
 });
 
 test('Kontuzja z meczu skraca się co dzień i zawodnik wraca', () => {
