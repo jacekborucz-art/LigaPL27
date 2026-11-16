@@ -58,3 +58,5 @@ Przed pracą przeczytaj `docs/PRZEKAZANIE.md` (role agentów, decyzje, pułapki)
 - Pozycje: BR, ŚO, BO, WB, DP, ŚP, OP, BP, SN, NAP. „SP” w zdarzeniach meczu = stały fragment gry.
 - Poziomy lig: 1 Ekstraklasa, 2 = 1 Liga, 3 = 2 Liga, 4 = III liga, 5 = IV liga.
 - Nazwy pobieranych plików tylko ASCII. Nowe widoki muszą obsłużyć zawodnika bez kontraktu i bez klubu.
+- Wydajność: `npm run perf` (tools/perf.mjs) mierzy czas sezonu i systemów dnia i porównuje z `tools/perf-baseline.json`;
+  `npm run perf -- widzew 5 2027-06-30 --save` zapisuje nowy punkt odniesienia. Nie jest częścią `npm test`.
