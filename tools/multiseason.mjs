@@ -10,6 +10,8 @@ import { ensureCareer } from '../src/career/careerSystem.js';
 import { runDecision } from '../src/core/decisions.js';
 import { SEASON } from '../src/config/calendar2026.js';
 import '../src/season/dailySystems.js';
+// 4. argument „trening”: z modułem treningu (rozwój zawodników, sztab w treningu), wolniej
+if (process.argv[5] === 'trening') await import('../src/training/index.js');
 const clubId = process.argv[2] ?? 'widzew'; const seed = Number(process.argv[3] ?? 5); const seasons = Number(process.argv[4] ?? 3);
 const g = { seed, clubId, date: '2026-07-01', season: '2026/27', inbox: [] };
 g.world = generateWorld(seed); g.season = createSeason(seed, { playerClub: clubId }); g.fixtures = g.season.fixtures;
@@ -34,10 +36,30 @@ function repReport(label) {
   console.log(`  REP ${label}: ${out.join(' | ')}\n      EK rep>=70: ${hi}, EK regularni 22+ rep<25: ${low}, top: ${top}\n      P5: ${P5}`);
 }
 repReport('start');
+// Sztab (docs/sztab.md): osoby na klub i pensje miesięcznie per liga, jakość trenera młodzieży, ruchy w sezonie
+// (zatrudnienia, zwolnienia, wygasłe, podebrania AI-AI / AI od gracza / gracz od AI); rozwój młodych (do 21 lat):
+// średni przyrost OVR w sezonie per liga klubu (porównanie z wersją bez rynku sztabu)
+const youth0 = new Map();
+const youthSnap = () => { youth0.clear(); for (const p of Object.values(g.world.players)) if (p.clubId && (p.age ?? 30) <= 21) youth0.set(p.id, p.ovr); };
+function youthReport() {
+  const by = {};
+  for (const [id, o] of youth0) { const p = g.world.players[id]; const t = CLUBS_PL.find((c) => c.id === p?.clubId)?.tier; if (!p || !t || t > 4) continue; (by[t] ??= []).push(p.ovr - o); }
+  return [1, 2, 3, 4].map((t) => `L${t} ${by[t]?.length ? (by[t].reduce((a, b) => a + b, 0) / by[t].length).toFixed(2) : '-'}`).join(' ');
+}
+function staffReport(year) {
+  const S = g.staff; if (!S) return;
+  const ids = (t) => CLUBS_PL.filter((c) => c.tier === t && S.clubs[c.id]).map((c) => c.id);
+  const per = [1, 2, 3, 4].map((t) => { const xs = ids(t); const n = xs.reduce((a, id) => a + S.clubs[id].length, 0) / Math.max(1, xs.length); const pay = xs.reduce((a, id) => a + (g.finance.clubs[id]?.staffPay ?? 0), 0); const lim = xs.reduce((a, id) => a + (S.limit[id] ?? 0), 0) / Math.max(1, xs.length); const ml = xs.reduce((a, id) => a + (g.training.staff[id]?.mlodziez?.q ?? 0), 0) / Math.max(1, xs.length); return `L${t} osób ${n.toFixed(1)} (limit ${lim.toFixed(1)}), pensje ${Math.round(pay / 1000)} tys./mies., młodzież q ${ml.toFixed(1)}`; });
+  const st = S.stats[year] ?? {};
+  console.log(`  SZTAB ${year}: ${per.join(' | ')}`);
+  console.log(`      zatrudnienia ${st.hires ?? 0} (przywiezieni przez trenera ${st.brought ?? 0}, obcokrajowcy ${st.foreign ?? 0}), zwolnienia ${st.fires ?? 0}, przedłużenia ${st.renewed ?? 0}, oferty ${st.offers ?? 0}, odeszli z listy ${st.gone ?? 0}, zdegradowani liderzy ${st.demoted ?? 0}`);
+  console.log(`      podbieranie próby AI-AI ${st.poachTry?.aiai ?? 0} / AI od gracza ${st.poachTry?.aiuser ?? 0} / gracz od AI ${st.poachTry?.userai ?? 0}; udane ${st.poached?.aiai ?? 0} / ${st.poached?.aiuser ?? 0} / ${st.poached?.userai ?? 0}; blokady ${st.blocked ?? 0}, zerwane umowy ${st.broke ?? 0}; lista wolnych ${S.pool.length}`);
+}
+staffReport(2026); youthSnap();
 const end = `${2026 + seasons}-07-02`;
 let t0 = performance.now();
 while (g.date < end) {
-  if (g.date.endsWith('-06-30')) repReport(`koniec ${SEASON}`);
+  if (g.date.endsWith('-06-30')) { repReport(`koniec ${SEASON}`); console.log(`  ROZWÓJ MŁODYCH (do 21 lat, przyrost OVR w sezonie): ${youthReport()}`); staffReport(+g.date.slice(0, 4) - 1); }
   for (const f of g.fixtures.filter((x) => x.date === g.date && !x.played && (x.home === g.clubId || x.away === g.clubId))) { const rng = new Rng('g' + f.id); applyResult(g, f, playQuick(g, f, rng), rng); }
   // decyzje blokujące (zwolnienie): wybierz pierwszą ofertę
   for (const m of g.inbox.filter((m) => !m.resolved && m.actions?.length && !m.optional)) { m.resolved = true; console.log('  DECYZJA', g.date, m.subject, m.actions.map((a) => a.id).join(',')); runDecision(g, m, m.actions[0].id); }
@@ -52,6 +74,8 @@ while (g.date < end) {
     console.log('  kadry min/max', Math.min(...sizes), Math.max(...sizes), 'ligi', [1, 2, 3, 4].map((t) => CLUBS_PL.filter((c) => c.tier === t).length).join('/'), 'Europa:', g.season.polishEurope.map((e) => `${e.club}:${e.comp}${e.entry}`).join(' '));
     console.log('  wiadomości:', g.inbox.slice(0, 5).map((m) => m.subject).join(' | '));
     console.log('  gracz:', g.clubId, 'liga', CLUBS_PL.find((c) => c.id === g.clubId)?.tier, 'historia', JSON.stringify(g.manager.history));
+    if (g.staff) console.log(`  SZTAB po 1 lipca: wygasłe umowy ${g.staff.stats[g.seasonYear]?.expired ?? 0}, lista wolnych ${g.staff.pool.length}`);
+    youthSnap();
     t0 = performance.now();
   }
 }

@@ -15,7 +15,7 @@ import { applyMorale } from '../career/morale.js';
 import { clubById } from '../data/clubs_pl.js';
 import { squadOf } from '../world/worldGen.js';
 import { SESSIONS, INTENSITY, GK_SESSION, GK_JOIN, LOAD, CAMP, staffMul, AI_PLAN } from './config.js';
-import { staffQ } from './staff.js';
+import { staffQ, healDays, physioInjMul } from './staff.js';
 import { dayContext, autoDay } from './plan.js';
 import { campWindow, halfOf, halfKey, baseFactor, aiCampChoice } from './camps.js';
 import { aiSessionToClub } from './cohesion.js';
@@ -218,7 +218,7 @@ export function processAiDay(game, date) {
     const lack = f ? Math.max(0, 1 - c.cb.base) * f : 0;
     const sharpMul = (1 - 0.5 * lack) * (1 + COACH.train.sharp * tre);
     const im = trainingMods(game, clubId); // baza treningowa: urazy i regeneracja (career/infrastructure.js)
-    const injuryMul = (1 + CAMP.injuryPenalty * lack) * (1 - COACH.train.injury * tre) * im.inj;
+    const injuryMul = (1 + CAMP.injuryPenalty * lack) * (1 - COACH.train.injury * tre) * im.inj * physioInjMul(game, clubId); // fizjoterapeuta: profilaktyka
 
     const team = day.sessions.map((x) => sessionStim(x, campQ, !!camp));
     const st = stimState(c);
@@ -276,6 +276,7 @@ export function processAiDay(game, date) {
           injCtx.baseMul = injuryMul; injCtx.fresh = p.fresh; injCtx.rtp = rtp; injCtx.returning = !rtp && tr.ret != null && today - tr.ret <= 14;
           if (rng.next() < trainingInjuryChance(p, injCtx)) {
             const inj = rollTrainingInjury(p, rng);
+            inj.days = healDays(game, clubId, inj.days); // fizjoterapeuta skraca przerwę
             p.injuryDays = inj.days;
             p.injury = { ...inj, since: date, training: true };
             tr.il = inj.days;

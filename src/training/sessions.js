@@ -15,7 +15,7 @@ import { SESSIONS, INTENSITY, GK_SESSION, GK_JOIN, LOAD, COH, CAMP, FRIENDLY, st
 import { ageAt, defaultPlayerTraining, daysBetween } from './state.js';
 import { dayContext, planDay, matchSets } from './plan.js';
 import { campWindow, halfOf, baseFactor, baseTerm, HALF_NAMES } from './camps.js';
-import { staffQ } from './staff.js';
+import { staffQ, healDays, physioInjMul } from './staff.js';
 import { shiftLog, addLoad, loadSummary, fatigueMul, regenMul, trainingInjuryChance } from './load.js';
 import { applySessionToClub, applyClubMatch, syncTacticsChange } from './cohesion.js';
 import { focusAttrs } from './development.js';
@@ -151,6 +151,7 @@ export function processUserDay(game, date, rng) {
   const fitQ = staffQ(game, clubId, 'fizyczny');
   const tac = staffMul.tac(staffQ(game, clubId, 'asystent'));
   const im = trainingMods(game, clubId); // baza treningowa: regeneracja i urazy (career/infrastructure.js)
+  const physio = physioInjMul(game, clubId); // fizjoterapeuta: profilaktyka urazów (career/staffMarket.js)
   const squad = squadOf(game.world, clubId);
   syncTacticsChange(game);
   const stale = staleEffects(c); // monotonia treningu (variety.js): mniej morale z zajęć, słabszy bodziec
@@ -286,11 +287,12 @@ export function processUserDay(game, date, rng) {
     // Uraz na treningu
     if (sessions.length) {
       const chance = trainingInjuryChance(p, {
-        sessions, age, acwr: sum.acwr, fitQ, campQ, baseMul: prep.injuryMul * im.inj, rtp: t.rtp > 0, fresh: p.fresh, mode: t.mode,
+        sessions, age, acwr: sum.acwr, fitQ, campQ, baseMul: prep.injuryMul * im.inj * physio, rtp: t.rtp > 0, fresh: p.fresh, mode: t.mode,
         returning: t.returnedAt && daysBetween(t.returnedAt, date) <= 14,
       });
       if (chance > 0 && rng.next() < chance) {
         const inj = rollTrainingInjury(p, rng);
+        inj.days = healDays(game, clubId, inj.days); // fizjoterapeuta skraca przerwę
         p.injuryDays = inj.days;
         p.injury = { ...inj, since: date, training: true };
         t.inj = true; t.injLen = inj.days;

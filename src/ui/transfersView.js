@@ -573,7 +573,7 @@ function planPanel(game, c, s) {
     row('Sponsorzy', p.sponsor, inn.sponsor ?? 0, 'in'),
     ...(p.owner ? [row('Właściciel', p.owner, inn.owner ?? 0, 'in')] : []),
     row('Pensje', p.wages, out.wages ?? 0, 'out'),
-    row('Koszty klubu i obiektów', p.ops + (p.upkeep ?? 0) - (p.upkeepBase ?? 0), (out.ops ?? 0) + (out.upkeep ?? 0), 'out'),
+    row('Koszty klubu i obiektów', p.ops + (p.upkeep ?? 0) - (p.upkeepBase ?? 0), (out.ops ?? 0) + (out.upkeep ?? 0) + (out.staff ?? 0), 'out'), // pensje sztabu to część planu kosztów klubu
   ].join('');
   void y;
   return panel('Plan sezonu a wykonanie', 'misc', `<p class="tf-p__txt">Minęło ${Math.round(done * 100)}% sezonu. Zielony procent: zgodnie z planem albo lepiej. Premia za miejsce w lidze (plan ${fmtZl(p.merit ?? 0)}) i nagrody wpływają po rozstrzygnięciach.</p><div class="klub-plan">${rows}</div>`);

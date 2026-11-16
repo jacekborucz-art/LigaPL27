@@ -43,9 +43,10 @@ test('Dzień startu: plan sezonu i efekty bez zmian względem modelu finansów s
     assert.deepEqual(trainingMods(G, id), { dev: 1, inj: 1, rec: 0 }, id);
     assert.deepEqual(academyMods(G, id), { extra: 0, offset: 0, talent: 0, youth: 1 }, id);
   }
-  // Miesięczne koszty klubu i utrzymanie razem równe dawnym kosztom klubu (z dokładnością zaokrągleń)
+  // Miesięczne koszty klubu, utrzymanie i pensje sztabu (src/career/staffMarket.js) razem równe dawnym kosztom klubu
+  // (z dokładnością zaokrągleń)
   const c = G.finance.clubs.legia; const m = c.ledger['2026-07'].out;
-  assert.ok(Math.abs(m.ops + m.upkeep - Math.round(c.plan.ops / 12)) <= 2, 'ops + upkeep = ops / 12');
+  assert.ok(Math.abs(m.ops + m.upkeep + (m.staff ?? 0) - Math.round(c.plan.ops / 12)) <= 2, 'ops + upkeep + staff = ops / 12');
 });
 
 test('Poziomy startowe: czołówka, Ekstraklasa, niższe ligi; wszyscy spełniają licencję na starcie', () => {

@@ -239,7 +239,9 @@ export function financeDay(F, world, date) {
       book(F, id, date, 'in', 'other', p.other / 12);
       book(F, id, date, 'in', 'owner', p.owner / 12);
       // Utrzymanie obiektów (infrastructure.js) zastępuje część kosztów klubu: upkeepBase wyjęty z ops, upkeep osobno
-      book(F, id, date, 'out', 'ops', (p.ops - (p.upkeepBase ?? 0)) / 12);
+      // Pensje sztabu (src/career/staffMarket.js) zastępują część kosztów klubu: staffBase wyjęty z ops, pensje osobno
+      book(F, id, date, 'out', 'ops', (p.ops - (p.upkeepBase ?? 0) - (p.staffOn ? p.staffBase ?? 0 : 0)) / 12);
+      if (p.staffOn) book(F, id, date, 'out', 'staff', c.staffPay ?? 0);
       book(F, id, date, 'out', 'upkeep', (p.upkeep ?? 0) / 12);
     }
   }
@@ -264,6 +266,7 @@ export const FIN_LABELS = {
   wages: 'Pensje', ops: 'Koszty klubu', transfers: 'Transfery', signOn: 'Premie za podpis', agents: 'Prowizje agentów', release: 'Rozwiązania kontraktów',
   invest: 'Spłata długów i inwestycje', camps: 'Obozy przygotowawcze', fines: 'Kary PZPN',
   infra: 'Inwestycje w obiekty', upkeep: 'Utrzymanie obiektów',
+  staff: 'Pensje sztabu', staffComp: 'Rekompensaty za sztab',
 };
 
 /** Ile klub może dziś wydać (budżet transferowy ograniczony saldem). */

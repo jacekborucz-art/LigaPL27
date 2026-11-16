@@ -43,6 +43,9 @@ export const AREP = {
   sdBase: 0.3, sdPerQ: 0.16, sdFam: 0.8,
   exactSd: 1.3, approxSd: 2.3, blindSd: 3.0,
   specialist: 0.3, // waga specjalisty sztabu (fizjo, analityk, trener młodzieży, bramkarzy) w ocenie cechy
+  // Skaut (docs/sztab.md): potencjał zawodników spoza klubu. Jakość oceny 0,3 asystenta + 0,7 skauta, znajomość
+  // zawodnika z obserwacji: polski klub 0,6, zagranica i wolni 0,35. Bez skauta (wakat, jakość 2) ocena zwykle niemożliwa. [SZAC]
+  scoutAssist: 0.3, scoutFam: { pl: 0.6, abroad: 0.35 },
   detect: { base: 0.45, perQ: 0.03, min: 0.5, max: 1, severe: 0.25 }, // szansa, że asystent zauważy sprawę
   items: (q) => 2 + Math.round(q / 5), // najwięcej pozycji w jednej części raportu drużyny
   injLog: 80,
@@ -245,6 +248,30 @@ export function hiddenLine(game, p, key) {
   }
   const b = band(e.v);
   return { key, label, word: WORDS[key][b], range: e.prec === 'exact' ? `ok. ${e.lo}-${e.hi}` : null, tone: TONE(key, b), prec: e.prec, e };
+}
+
+/**
+ * Ocena potencjału zawodnika spoza klubu przez skauta (raport skauta): { key: 'POT', label, word, range, tone, prec, e }.
+ * Ten sam model błędu co ocena asystenta; precyzja rośnie z jakością skauta klubu.
+ */
+export function scoutLine(game, p) {
+  const q = staffQ(game, game.clubId, 'asystent');
+  const qs = staffQ(game, game.clubId, 'skaut');
+  const qe = AREP.scoutAssist * q + (1 - AREP.scoutAssist) * qs;
+  const fam = p.clubId && game.world?.clubs?.[p.clubId] ? AREP.scoutFam.pl : AREP.scoutFam.abroad;
+  const age = ageAt(p, game.date);
+  const sd = estimateSd(qe, fam, { mul: age <= 21 ? 1.15 : 1 });
+  const month = (game.date ?? '2026-07-01').slice(0, 7);
+  const z1 = new Rng(`skaut:${game.seed}:${game.clubId}:${p.id}:POT`).gauss(0, 1);
+  const z2 = new Rng(`skaut:${game.seed}:${game.clubId}:${p.id}:POT:${month}`).gauss(0, 1);
+  const v = clamp(Math.max(trueValue(game, p, 'POT') + sd * (0.8 * z1 + 0.6 * z2), p.ovr), 1, 20);
+  const prec = precisionOf(sd);
+  const hw = prec === 'exact' ? 1 : 2;
+  const c = Math.round(v * 2) / 2;
+  const e = { v: r1(v), lo: clamp(Math.round(c - hw), Math.floor(p.ovr), 20), hi: clamp(Math.round(c + hw), 1, 20), sd: Math.round(sd * 100) / 100, prec, blind: sd > AREP.blindSd };
+  if (e.blind) return { key: 'POT', label: FIELDS.POT.label, word: 'trudno ocenić bez dobrego skauta', range: null, tone: 'info', prec, e };
+  const head = e.v - p.ovr;
+  return { key: 'POT', label: FIELDS.POT.label, word: potentialWord(head), range: prec === 'vague' ? null : `ok. ${e.lo}-${e.hi}`, tone: head >= 1.5 ? 'good' : 'info', prec, e };
 }
 
 // ------------------------------------------------------------ Dane pomocnicze

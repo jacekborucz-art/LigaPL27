@@ -24,6 +24,7 @@ import { applyMorale } from './morale.js';
 import { fmtDate } from '../ui/dom.js';
 import { ownerOf } from './owners.js';
 import { COACH, COACH_KEYS, COACH_STYLES, coachOf, coachAvg, coachLevelFor, replaceCoach } from './coaches.js';
+import { staffOnCoachHire } from './staffMarket.js'; // nowy trener a sztab: przywozi asystenta (docs/sztab.md)
 
 const LEAGUE_COMPS = new Set(ALL_LEAGUE_COMPS);
 
@@ -375,6 +376,7 @@ export function hireCoach(game, clubId, date, { rng = null, inDrop = false, quie
   // Nowa miotła: jednorazowo morale kadry (badania: efekt zmiany trenera jest mały i krótki, docs rozdz. 2.6)
   for (const id of game.world.clubs[clubId].squad) { const pl = game.world.players[id]; if (pl) pl.morale = applyMorale(pl.morale ?? 12, MARKET.bounceMorale); }
   updateBoost(game, clubId, next, date);
+  staffOnCoachHire(game, clubId, next, date);
   const messages = [];
   if (best?.src) {
     // Klub, któremu podebrano trenera: asystent tymczasowo, potem własne poszukiwania

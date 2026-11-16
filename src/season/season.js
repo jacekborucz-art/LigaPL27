@@ -26,7 +26,7 @@ import { fmtDate } from '../ui/dom.js';
 import { UEFA_CLUBS, createUefa } from './uefa.js';
 import { aiChooseSpeech, postMatchBriefing, closeMatchMemory, POST_TONES } from '../match/briefings.js';
 import { coachOf, coachStyle, matchCoach, quickCoachTerm, formRng, assistantProfile, motivationSkill, COACH } from '../career/coaches.js';
-import { staffQ } from '../training/staff.js';
+import { staffQ, healDays } from '../training/staff.js';
 import { statGroup, addPlayerMatch, syncSpell, recordTeamMatch, CLUB_GROUPS } from './history.js';
 import { matchRepEvents } from '../career/reputation.js';
 import { refStrictFor, refereeAfterMatch } from '../career/referees.js';
@@ -409,9 +409,10 @@ export function applyResult(game, f, res, rng) {
         p.matchDebt = Math.max(p.matchDebt ?? 0, Math.round(24 * (x.minutes / 90)));
         p.sharp = clamp(Math.round((p.sharp ?? 70) + 12 * (x.minutes / 90)), 0, 100);
         p.lastMatch = f.date;
-        if (x.injury && !(p.injuryDays >= x.injury.days)) { // dłuższa przerwa (np. pogłębiony uraz grany z bólem) zastępuje krótszą
-          p.injuryDays = x.injury.days; p.injury = { ...x.injury, since: f.date };
-          if (mine) msgs.push(['important', `Kontuzja w sparingu: ${p.name}`, `${p.name}: ${x.injury.name}. Przerwa potrwa ok. ${x.injury.days} dni.`]);
+        const fd = x.injury ? healDays(game, p.clubId, x.injury.days) : 0; // fizjoterapeuta klubu skraca przerwę
+        if (x.injury && !(p.injuryDays >= fd)) { // dłuższa przerwa (np. pogłębiony uraz grany z bólem) zastępuje krótszą
+          p.injuryDays = fd; p.injury = { ...x.injury, days: fd, since: f.date };
+          if (mine) msgs.push(['important', `Kontuzja w sparingu: ${p.name}`, `${p.name}: ${x.injury.name}. Przerwa potrwa ok. ${fd} dni.`]);
         }
         continue;
       }
@@ -443,10 +444,11 @@ export function applyResult(game, f, res, rng) {
           if (mine) msgs.push(['important', `Czerwona kartka: ${p.name}`, `${p.name} został ukarany ${games === 1 ? '1 meczem' : `${games} meczami`} zawieszenia.`]);
         }
       }
-      if (x.injury && !(p.injuryDays >= x.injury.days)) { // dłuższa przerwa (np. pogłębiony uraz grany z bólem) zastępuje krótszą
-        p.injuryDays = x.injury.days;
-        p.injury = { ...x.injury, since: f.date };
-        if (mine) msgs.push(['important', `Kontuzja: ${p.name}`, `${p.name}: ${x.injury.name}. Przerwa potrwa ok. ${x.injury.days} dni (powrót ok. ${fmtDate(addDays(f.date, x.injury.days))}).`]);
+      const md = x.injury ? healDays(game, p.clubId, x.injury.days) : 0; // fizjoterapeuta klubu skraca przerwę
+      if (x.injury && !(p.injuryDays >= md)) { // dłuższa przerwa (np. pogłębiony uraz grany z bólem) zastępuje krótszą
+        p.injuryDays = md;
+        p.injury = { ...x.injury, days: md, since: f.date };
+        if (mine) msgs.push(['important', `Kontuzja: ${p.name}`, `${p.name}: ${x.injury.name}. Przerwa potrwa ok. ${md} dni (powrót ok. ${fmtDate(addDays(f.date, md))}).`]);
       }
     }
     if (!mine && f.comp !== 'friendly') aiPostMatchTalk(game, f, clubId, s, res, squad, played);

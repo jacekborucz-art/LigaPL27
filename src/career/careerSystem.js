@@ -27,6 +27,7 @@ import { ensureInfra } from './infrastructure.js'; // stadion, baza, akademia (d
 import { ensureLoans } from './loans.js'; // wypożyczenia: systemy dnia i stare zapisy (docs/wypozyczenia.md)
 import { ensureTransferState } from './transferSystem.js'; // transakcje w toku, prekontrakty, prośby o transfer, zagranica (docs/transfery.md)
 import { foreignOfferMessage } from './foreignMarket.js';
+import { ensureStaff } from './staffMarket.js'; // sztab: zatrudnianie i zwalnianie, pensje sztabu (docs/sztab.md)
 
 
 export function ensureCareer(game) {
@@ -41,6 +42,7 @@ export function ensureCareer(game) {
   ensureBoard(game);
   ensureCoaches(game); // trenerzy klubów AI z atrybutami (stary zapis: profile z ziarna gry, te same nazwiska)
   ensureCoachMarket(game); // pula wolnych trenerów (stary zapis: tworzona z ziarna gry)
+  ensureStaff(game); // osoby sztabu, limity, pensje sztabu w planie (stary zapis: neutralnie, z dzisiejszego sztabu)
 }
 
 // ------------------------------------------------------------ Mecze: bilety i nagrody

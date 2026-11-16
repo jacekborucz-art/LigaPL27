@@ -11,6 +11,16 @@ import { esc, fmtDate } from './dom.js';
 import { formChartHtml, formHistory, formBand } from './formChart.js';
 import { positionMapHtml } from './positionMap.js';
 import { playerStatsHtml } from './playerStatsView.js';
+import { scoutLine } from '../career/assistantReport.js'; // raport skauta: potencjał zawodników spoza klubu (docs/sztab.md)
+
+/** Potencjał w profilu: zawodnik spoza klubu gracza oceniany przez skauta (precyzja z jakości skauta). */
+function potentialText(p, game) {
+  if (!game?.world || !p || p.clubId === game.clubId) return 'Oceni skauting';
+  try {
+    const l = scoutLine(game, p);
+    return esc(`Skaut: ${l.word}${l.range ? ` (${l.range})` : ''}`);
+  } catch { return 'Oceni skauting'; }
+}
 
 /**
  * Reputacja z trendem (docs/reputacja.md): liczba, poziom i zmiana w ostatnim miesiącu oraz od początku sezonu.
@@ -276,7 +286,7 @@ export function renderPlayerProfile(p, opts = {}) {
           <li><span class="k">Osobowość</span><span>${esc(p.persona)}</span></li>
           <li><span class="k">Reputacja</span><span>${repHtml(p)}</span></li>
           ${traitPhrases(p.traits).map((t) => `<li><span class="k"></span><span>${esc(t)}</span></li>`).join('')}
-          <li><span class="k">Potencjał</span><span>Oceni skauting</span></li>
+          <li><span class="k">Potencjał</span><span>${potentialText(p, opts.game)}</span></li>
         </ul>
       </section>
     </div>

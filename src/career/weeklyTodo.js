@@ -16,7 +16,8 @@ import { squadOf } from '../world/worldGen.js';
 import { staffOf, staffQ } from '../training/staff.js';
 import { daysBetween, mondayOf } from '../training/state.js';
 import { loadSummary } from '../training/load.js';
-import { CAMP } from '../training/config.js';
+import { CAMP, STAFF_ROLES } from '../training/config.js';
+import { coreVacancies } from './staffMarket.js'; // wakaty w sztabie (docs/sztab.md)
 import { campWindow, bookingFor, halfOf, HALF_NAMES } from '../training/camps.js';
 import { talkSuggestions, teamSituation, TALK_COOLDOWN } from './teamTalks.js';
 import { canApproach } from './preContracts.js';
@@ -169,6 +170,12 @@ export function collectTodo(game, date = game.date) {
     const due = L.case.deadline;
     fact({ key: `limit-kadry:${L.case.id}`, type: 'limit', from: 'Zarząd', area: 'transfer', due, prio: pPrio(due, 3), title: `Zmniejsz kadrę: ${L.counted} przy limicie ${L.soft}`,
       why: `Zarząd czeka na redukcję kadry do ${fmtDate(due)}. Potem sam wskaże zawodników.`, act: STEPS.transfers('rynek') });
+  }
+
+  // 3a. Wakat w rdzeniu sztabu (fakt): asystent, przygotowanie fizyczne, bramkarze, kierownik drużyny
+  for (const role of coreVacancies(game, clubId)) {
+    fact({ key: `sztab-wakat:${role}`, type: 'staff', from: 'Zarząd', area: 'club', due: null, prio: 'wazne', title: `Wakat w sztabie: ${STAFF_ROLES[role].name.toLowerCase()}`,
+      why: 'Obowiązki przejął trener, więc ta część pracy idzie słabiej. Zatrudnij kogoś w zakładce Trening, Sztab.', act: { steps: [{ act: 'tab', tab: 'trening' }, { act: 'tr-tab', tab: 'sztab' }] } });
   }
 
   // 4. Okno transferowe: ostatnie 3 dni to fakt, wcześniejsze przypomnienie (do 7 dni) daje kierownik drużyny

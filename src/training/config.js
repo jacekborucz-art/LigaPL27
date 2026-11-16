@@ -138,6 +138,9 @@ export const STAFF_ROLES = {
   mlodziez: { name: 'Trener młodzieży', effect: 'Rozwój do 21 lat i akademii x(0.75 + 0.025 q), szansa skoku rozwojowego x(0.5 + 0.05 q)' },
   analityk: { name: 'Główny analityk', effect: 'Bonus analizy rywala 0.04 + 0.006 q punktu na mecz, dokładność raportów' },
   kierownik: { name: 'Kierownik drużyny', effect: 'Sprawy organizacyjne (kontrakty, licencje, terminy, okno, obozy): dokładność i terminowość listy „Do zrobienia”' },
+  // Nowe role (decyzja właściciela, Nov 16, 2026): na końcu, więc losowanie pozostałych ról z ziarna bez zmian
+  fizjoterapeuta: { name: 'Fizjoterapeuta', effect: 'Przerwa po urazie x(1 - 0.01 (q - 3)), od 0.85; ryzyko urazu na treningu x(1 - 0.005 (q - 3)), od 0.92' },
+  skaut: { name: 'Skaut', effect: 'Dokładność oceny potencjału zawodników innych klubów i z zagranicy' },
 };
 
 export const staffMul = {
@@ -150,6 +153,9 @@ export const staffMul = {
   youth: (q) => 0.75 + 0.025 * q,
   spurt: (q) => 0.5 + 0.05 * q,
   prep: (q) => 0.04 + 0.006 * q,
+  // Fizjoterapeuta: wakat (q 3) = dawny stan gry, dobry fizjoterapeuta skraca przerwy i zmniejsza ryzyko urazu [SZAC]
+  heal: (q) => Math.min(1, Math.max(0.85, 1 - 0.01 * (q - 3))),
+  physio: (q) => Math.min(1, Math.max(0.92, 1 - 0.005 * (q - 3))),
 };
 
 /** Programy indywidualne. */

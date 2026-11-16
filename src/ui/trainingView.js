@@ -35,6 +35,7 @@ import { daysBetween } from '../training/state.js';
 import { REPORT_FREQS, ensureAssistantReport, setReportFreq, nextReportDate } from '../career/assistantReport.js';
 import { detectChance, shiftChance, delaySd } from '../career/weeklyTodo.js'; // kierownik drużyny: dokładność listy „Do zrobienia”
 import { staffAttrs, STAFF_ATTRS } from '../career/teamReport.js'; // atrybuty asystenta i analityka (raport ogólny)
+import { staffSummary, listFreeStaff, pendingOffers, makeOffer, fireStaff, renewStaff, severanceOf } from '../career/staffMarket.js'; // zatrudnianie sztabu (docs/sztab.md)
 
 const WD = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
 const TABS = [['pulpit', 'Pulpit'], ['tydzien', 'Tydzień'], ['obozy', 'Obozy'], ['sparingi', 'Sparingi'], ['zawodnicy', 'Zawodnicy'], ['obciazenia', 'Obciążenia'], ['sztab', 'Sztab'], ['rozwoj', 'Rozwój']];
@@ -303,7 +304,7 @@ function dashStaff(game) {
   const list = Object.entries(STAFF_ROLES).map(([k, r]) => ({ k, r, s: st[k] ?? { q: 10, name: 'Brak' } }));
   const avg = list.reduce((a, x) => a + x.s.q, 0) / list.length;
   const weak = list.filter((x) => x.s.q < 8);
-  const body = `<ul class="tr-bars tr-bars--staff">${list.map(({ r, s }) => `<li><span>${esc(r.name)}<small>${esc(s.name ?? '')}</small></span>${meter(s.q, 20, s.q >= 14 ? 'ok' : s.q >= 8 ? 'mid' : 'bad')}<b>${s.q}</b></li>`).join('')}</ul>
+  const body = `<ul class="tr-bars tr-bars--staff">${list.map(({ r, s }) => `<li><span>${esc(r.name)}<small>${esc(s.vacant ? 'wakat' : s.name ?? '')}</small></span>${meter(s.q, 20, s.q >= 14 ? 'ok' : s.q >= 8 ? 'mid' : 'bad')}<b>${Number.isInteger(s.q) ? s.q : num(s.q, 1)}</b></li>`).join('')}</ul>
     ${weak.length ? `<p class="tr-flag" data-t="warn">Słabe ogniwo: ${esc(weak.map((x) => x.r.name.toLowerCase()).join(', '))}.</p>` : ''}`;
   return card('info', 'Sztab', body, { badge: `średnio ${num(avg, 1)} / 20`, foot: tabBtn('sztab', 'Sztab') });
 }
@@ -563,7 +564,7 @@ function loadTab(game) {
 }
 
 // ------------------------------------------------------------ Sztab
-function staffTab(game) {
+function staffTab(game, ui = {}) {
   const st = staffOf(game, game.clubId);
   const eff = {
     asystent: (q) => `zgranie i nauka pozycji x${num(staffMul.tac(q), 2)}, rozwój x${num(staffMul.dev(q), 2)}, raport rozwoju: ${({ exact: 'dokładny', approx: 'przybliżony', vague: 'ogólny' })[reportPrecision(q)]}`,
@@ -572,17 +573,47 @@ function staffTab(game) {
     mlodziez: (q) => `rozwój do 21 lat x${num(staffMul.youth(q), 2)}, skok rozwojowy x${num(staffMul.spurt(q), 2)}`,
     analityk: (q) => `analiza rywala +${num(staffMul.prep(q), 3)} pkt na mecz`,
     kierownik: (q) => `lista „Do zrobienia”: zauważa ok. ${Math.round(detectChance(q) * 100)} % spraw organizacyjnych w tygodniu, myli pilność w ${Math.round(shiftChance(q) * 100)} %, ${delaySd(q) * 0.8 < 0.5 ? 'przypomina na czas' : `przypomina średnio ${num(delaySd(q) * 0.8, 1)} dnia później`}`,
+    fizjoterapeuta: (q) => `przerwa po urazie x${num(staffMul.heal(q), 2)}, ryzyko urazu na treningu x${num(staffMul.physio(q), 2)}`,
+    skaut: (q) => `ocena potencjału zawodników innych klubów: ${({ exact: 'dokładna', approx: 'przybliżona', vague: 'ogólna' })[reportPrecision(q)]}`,
   };
-  return `<div class="tr-staff">${Object.entries(STAFF_ROLES).map(([k, r]) => {
+  const sum = staffSummary(game, game.clubId);
+  const qTxt = (q) => (Number.isInteger(q) ? String(q) : num(q, 1));
+  return `${staffHeader(sum)}<div class="tr-staff">${Object.entries(STAFF_ROLES).map(([k, r]) => {
+    const role = sum.roles[k];
+    if (!role?.max) return ''; // rola niedostępna w tej lidze (skaut w III lidze)
     const s = st[k] ?? { q: 10, name: 'Brak' };
-    return `<section class="tr-card tr-staffcard" data-t="${s.q >= 14 ? 'good' : s.q >= 8 ? 'info' : 'warn'}">
+    return `<section class="tr-card tr-staffcard" data-t="${s.vacant ? 'warn' : s.q >= 14 ? 'good' : s.q >= 8 ? 'info' : 'warn'}">
       <p class="tr-sub">${esc(r.name)}</p>
-      <p class="panel__lead">${esc(s.name ?? '')}</p>
-      <div class="tr-q"><b>${s.q}</b>${meter(s.q, 20, s.q >= 14 ? 'ok' : s.q >= 8 ? 'mid' : 'bad')}<small>${esc(staffLabel(s.q))}</small></div>
-      <p>${esc(eff[k](s.q))}</p>
-      ${STAFF_ATTRS[k] ? `<p class="muted">Raport ogólny: ${Object.entries(staffAttrs(game, game.clubId, k)).map(([a, v]) => `${esc(STAFF_ATTRS[k][a].toLowerCase())} ${v}`).join(', ')}</p>` : ''}
+      <p class="panel__lead">${s.vacant ? `Wakat: obowiązki przejmuje trener (jakość ${esc(qTxt(s.q))})` : esc(s.name ?? '')}</p>
+      <div class="tr-q"><b>${esc(qTxt(s.q))}</b>${meter(s.q, 20, s.q >= 14 ? 'ok' : s.q >= 8 ? 'mid' : 'bad')}<small>${esc(staffLabel(s.q))}</small></div>
+      <p>${esc(eff[k]?.(s.q) ?? r.effect)}</p>
+      ${STAFF_ATTRS[k] && !s.vacant ? `<p class="muted">Raport ogólny: ${Object.entries(staffAttrs(game, game.clubId, k)).map(([a, v]) => `${esc(STAFF_ATTRS[k][a].toLowerCase())} ${esc(qTxt(v))}`).join(', ')}</p>` : ''}
+      ${staffPeople(game, role, ui.trStFire)}
     </section>`;
-  }).join('')}</div>${reportSetting(game)}`;
+  }).join('')}</div>${staffMarketTemp(game)}${reportSetting(game)}`;
+}
+
+// Sztab: wersja robocza zatrudniania (pełny ekran przygotowuje grafik, docs/sztab.md). Kliknięcia: tr-st-*.
+function staffHeader(sum) {
+  return `<p class="muted">Sztab: ${sum.staff} z ${sum.limit} osób${sum.pending ? ` (oferty w toku: ${sum.pending})` : ''}, pensje ${esc(formatZl(sum.pay))} miesięcznie (budżet ${esc(formatZl(sum.budget))}).</p>`;
+}
+
+function staffPeople(game, role, confirm = null) {
+  if (!role.people.length) return '';
+  return `<ul class="plain-list">${role.people.map((p, i) => `<li><span class="k">${i ? 'pomocnik' : 'lider'}</span><span>${esc(p.name)} (${esc(p.nat)}, ${p.age} l.), jakość ${esc(Number.isInteger(p.qNow) ? String(p.qNow) : num(p.qNow, 1))}, ${esc(formatZl(p.wage))} / mies., umowa do ${esc(fmtDate(p.until))}${p.adapt && p.adapt.to > game.date ? `, adaptacja do ${esc(fmtDate(p.adapt.to))}` : ''}
+    ${p.canRenew ? `<button class="btn btn--quiet tr-mini" data-act="tr-st-renew" data-pid="${esc(p.id)}">Przedłuż o rok</button>` : ''}
+    <button class="btn btn--quiet tr-mini" data-act="tr-st-fire" data-pid="${esc(p.id)}"${confirm === p.id ? ' data-ok="1"' : ''}>${confirm === p.id ? 'Potwierdź zwolnienie' : 'Zwolnij'} (odprawa ${esc(formatZl(p.severance))})</button></span></li>`).join('')}</ul>`;
+}
+
+function staffMarketTemp(game) {
+  const pend = pendingOffers(game, game.clubId);
+  const rows = listFreeStaff(game).slice(0, 12);
+  const q = (x) => (x.prec === 'exact' ? String(x.lo) : x.prec === 'approx' ? `${x.lo}-${x.hi}` : x.label.toLowerCase());
+  return `<section class="tr-card" data-t="info"><header class="tr-card__head"><h3>Rynek sztabu (wersja robocza)</h3></header>
+    ${pend.length ? `<p>Oferty w toku: ${pend.map((x) => `${esc(x.person?.name ?? '')}, decyzja ${esc(fmtDate(x.decideOn))}`).join('; ')}.</p>` : ''}
+    <ul class="plain-list">${rows.map((r) => `<li><span class="k">${esc(r.roleName)}</span><span>${esc(r.name)} (${esc(r.nat)}, ${r.age} l.), jakość ${esc(q(r.q))}, oczekuje ${esc(formatZl(r.wage.lo))}-${esc(formatZl(r.wage.hi))} / mies.${r.offers ? `, rozważa oferty: ${r.offers}` : ''}
+      ${r.mine ? '' : `<button class="btn btn--quiet tr-mini" data-act="tr-st-offer" data-pid="${esc(r.id)}">Oferta (2 lata)</button>`}</span></li>`).join('')}</ul>
+    <p class="muted">Oferta wiąże do decyzji kandydata (2-3 dni). Pełny ekran zatrudniania pojawi się wkrótce.</p></section>`;
 }
 
 /** Częstotliwość okresowego raportu asystenta o drużynie (src/career/assistantReport.js). */
@@ -823,7 +854,7 @@ function friendliesTab(game, ui) {
 
 const TAB_BODY = {
   pulpit: (g) => dashboardTab(g), tydzien: weekTab, obozy: campsTab, sparingi: friendliesTab, zawodnicy: playersTab,
-  obciazenia: (g) => loadTab(g), sztab: (g) => staffTab(g), rozwoj: devTab,
+  obciazenia: (g) => loadTab(g), sztab: (g, ui) => staffTab(g, ui), rozwoj: devTab,
 };
 
 /** Ekran „Trening” (HTML). ui: { trTab, trWeek, trDay, trPlayer, trReport }. Domyślna zakładka: Pulpit. */
@@ -854,7 +885,7 @@ export function handleTrainingAction(game, act, ds = {}) {
   const player = ds.id ? game.world.players[ds.id] : null;
   const pt = player?.training;
   switch (act) {
-    case 'tr-tab': return { ui: { trTab: ds.tab, trDay: null, trPlayer: null, trNotice: null }, save: false };
+    case 'tr-tab': return { ui: { trTab: ds.tab, trDay: null, trPlayer: null, trNotice: null, trStFire: null }, save: false };
     // Skrót z pulpitu: zakładka z wybranym dniem (bieżący tydzień) albo zawodnikiem
     case 'tr-go': {
       const tab = TABS.some(([k]) => k === ds.tab) ? ds.tab : 'pulpit';
@@ -927,6 +958,16 @@ export function handleTrainingAction(game, act, ds = {}) {
       const r = cancelFriendly(game, ds.id);
       return { ui: { trNotice: r.ok ? 'Sparing odwołany.' : r.error }, save: r.ok };
     }
+    // Sztab (wersja robocza): oferta, zwolnienie (drugie kliknięcie potwierdza), przedłużenie
+    case 'tr-st-offer': { const r = makeOffer(game, { pid: ds.pid, years: 2 }); return { ui: { trNotice: r.ok ? `Oferta złożona. Decyzja do ${fmtDate(r.decideOn)}.` : r.text, trStFire: null }, save: r.ok }; }
+    case 'tr-st-fire': {
+      const p = game.staff?.people?.[ds.pid];
+      if (!p) return { ui: {}, save: false };
+      if (ds.ok !== '1') return { ui: { trNotice: `Zwolnić: ${p.name}? Odprawa ${formatZl(severanceOf(p, game.date))}. Kliknij Zwolnij jeszcze raz, żeby potwierdzić.`, trStFire: p.id }, save: false };
+      const r = fireStaff(game, p.id);
+      return { ui: { trNotice: r.text, trStFire: null }, save: r.ok };
+    }
+    case 'tr-st-renew': { const r = renewStaff(game, { pid: ds.pid, years: 1 }); return { ui: { trNotice: r.text, trStFire: null }, save: r.ok || r.reason === 'refused' }; }
     default: return { ui: {}, save: false };
   }
 }

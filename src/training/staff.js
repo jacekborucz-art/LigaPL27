@@ -7,7 +7,7 @@
 import { Rng, clamp } from '../core/rng.js';
 import { clubById } from '../data/clubs_pl.js';
 import { randomName } from '../data/names.js';
-import { STAFF_ROLES } from './config.js';
+import { STAFF_ROLES, staffMul } from './config.js';
 
 export const ROLE_IDS = Object.keys(STAFF_ROLES);
 
@@ -41,6 +41,19 @@ export const staffQ = (game, clubId, role) => staffOf(game, clubId)[role]?.q ?? 
 export function staffLabel(q) {
   return q >= 17 ? 'Klasa światowa' : q >= 14 ? 'Bardzo dobry' : q >= 11 ? 'Dobry' : q >= 8 ? 'Przeciętny' : q >= 5 ? 'Słaby' : 'Bardzo słaby';
 }
+
+// Fizjoterapeuta (src/career/staffMarket.js): klub bez tej roli w widoku (stary zapis przed migracją) jak wakat
+const PHYSIO_VACANT = 3;
+const physioQ = (game, clubId) => staffOf(game, clubId).fizjoterapeuta?.q ?? PHYSIO_VACANT;
+
+/** Długość przerwy po urazie z fizjoterapeutą klubu (najmniej 1 dzień). */
+export function healDays(game, clubId, days) {
+  if (!days || days <= 0) return days;
+  return Math.max(1, Math.round(days * staffMul.heal(physioQ(game, clubId))));
+}
+
+/** Mnożnik ryzyka urazu na treningu od fizjoterapeuty klubu. */
+export const physioInjMul = (game, clubId) => staffMul.physio(physioQ(game, clubId));
 
 /** Dokładność raportów: dokładny (od 14), przybliżony (8-13), ogólny (poniżej 8). */
 export function reportPrecision(q) {
