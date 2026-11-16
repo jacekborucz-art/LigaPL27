@@ -47,20 +47,21 @@ const signerText = (it, signers) => {
   return it.from ?? '';
 };
 
-/** Wiersze panelu „Ten tydzień” na Pulpicie (najwyżej 4, czwarty od 1380 px). */
+/** Wiersze panelu „Ten tydzień” na Pulpicie (najwyżej 5, reszta pod przyciskiem „Więcej”). */
+export const TODO_PANEL_MAX = 5;
 export function todoPanelBody(res) {
   const items = res.items;
   if (!items.length) return '<p class="dash-note dash-note--ok">Na ten tydzień nic nie czeka. Sztab nie zgłosił żadnych spraw.</p>';
-  const rows = items.slice(0, 4).map((it, k) => {
+  const rows = items.slice(0, TODO_PANEL_MAX).map((it) => {
     const g = dueGroup(it, res);
     const who = it.role ? ROLE_SHORT[it.role] : it.type === 'mail' ? 'poczta' : (it.from ?? '').toLowerCase();
-    return `<li${k >= 3 ? ' class="dash-more"' : ''}><button class="dash-todo__row" data-act="todo-go" data-key="${esc(it.key)}" data-kind="${it.hard ? 'fact' : 'staff'}" data-due="${g}" data-prio="${it.prio}">
+    return `<li><button class="dash-todo__row" data-act="todo-go" data-key="${esc(it.key)}" data-kind="${it.hard ? 'fact' : 'staff'}" data-due="${g}" data-prio="${it.prio}">
       ${it.hard ? '<span class="dash-decide__card" aria-hidden="true"></span>' : '<span class="dash-todo__bib" aria-hidden="true"></span>'}
       <span class="dash-todo__txt"><b>${esc(it.title)}</b><small>${it.prio === 'pilne' ? '<span class="dash-todo__pilne">pilne</span> ' : ''}${esc(dueText(it, res))}, ${esc(who)}</small></span>
     </button></li>`;
   }).join('');
-  const rest = items.length - Math.min(items.length, 3);
-  return `<ul class="dash-todo">${rows}</ul>${rest > 0 ? `<p class="dash-note">i jeszcze ${rest} ${plural(rest, 'sprawa', 'sprawy', 'spraw')} w tym tygodniu</p>` : ''}`;
+  const rest = items.length - Math.min(items.length, TODO_PANEL_MAX);
+  return `<ul class="dash-todo">${rows}</ul>${rest > 0 ? `<p class="dash-todo__more"><button class="btn btn--quiet btn--sm" data-act="todo">Więcej (jeszcze ${rest} ${plural(rest, 'sprawa', 'sprawy', 'spraw')})</button></p>` : ''}`;
 }
 
 function itemHtml(it, res) {

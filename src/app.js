@@ -696,7 +696,7 @@ function dashSquad(g) {
 function dashMail(g) {
   const unread = unreadCount(g.inbox);
   const pend = pendingDecisions(g.inbox);
-  const latest = g.inbox.slice(0, 8);
+  const latest = g.inbox.slice(0, 12); // telefon 5, szeroki Pulpit (kolumna pod „Ten tydzień”) do 12
   const body = `${pend.length ? `<button class="dash-decide" data-act="mail" data-id="${esc(pend[0].id)}"><span class="dash-decide__card" aria-hidden="true"></span>${pend.length} ${plural(pend.length, 'wiadomość czeka', 'wiadomości czekają', 'wiadomości czeka')} na twoją decyzję</button>` : ''}
     <ul class="mail-list stripes dash-mail">${latest.map((m, k) => (k >= 5 ? mailRow(m, g.date).replace('<li>', '<li class="dash-more">') : mailRow(m, g.date))).join('') || '<li class="mail-empty">Brak wiadomości.</li>'}</ul>`;
   return dashPanel('mail', 'poczta', `Poczta${unread ? ` <span class="dash-p__count">${unread} ${plural(unread, 'nowa', 'nowe', 'nowych')}</span>` : ''}`, body, dashLink('poczta', 'Cała poczta'));
@@ -721,11 +721,10 @@ function renderDashboard(g, club) {
     ${decideBar}
     <div class="dash__grid">
       ${dashHero(g, club, nextFixture(g), tableOf)}
-      ${dashTodo(g)}
+      <div class="dash-side">${dashTodo(g)}${dashMail(g)}</div>
       ${dashFixtures(g)}
       ${dashTable(g, club, table)}
       ${dashSquad(g)}
-      ${dashMail(g)}
       ${dashBoard(g, table)}
       ${dashFinance(g)}
       ${dashWindow(g)}

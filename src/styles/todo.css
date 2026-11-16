@@ -22,7 +22,8 @@
 .dash-p--todo .dash-p__body > .dash-note { padding: var(--space-3) var(--space-4); }
 .dash-todo { display: grid; margin: 0; padding: 0; list-style: none; }
 .dash-todo li { border-bottom: 1px solid var(--line); }
-.dash-todo li.dash-more { display: none; }
+.dash-todo__more { margin: 0; padding: var(--space-2) var(--space-4) var(--space-3); }
+.dash-todo__more .btn { min-height: 40px; }
 .dash-todo__row {
   display: flex; align-items: center; gap: var(--space-3);
   width: 100%; min-height: 52px; padding: 8px var(--space-4);
@@ -36,7 +37,6 @@
 .dash-todo__txt b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dash-todo__txt small { font-size: 12px; color: var(--text-muted); overflow-wrap: anywhere; }
 .dash-todo__pilne { color: var(--todo-over); font-weight: 700; }
-@container dash (min-width: 1380px) { .dash .dash-todo li.dash-more { display: block; } }
 
 /* ---------- Pełny widok ---------- */
 .hub__main:has(> .todo) { max-width: 1320px; }

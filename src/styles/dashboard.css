@@ -56,8 +56,11 @@
   display: grid;
   gap: var(--space-4);
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "hero" "todo" "fix" "table" "squad" "mail" "board" "fin" "window";
+  grid-template-areas: "hero" "side" "fix" "table" "squad" "board" "fin" "window";
 }
+/* „Ten tydzień” i Poczta w jednej kolumnie, jeden pod drugim (bez pustego miejsca pod krótkim panelem) */
+.dash-side { grid-area: side; display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.dash-side > .dash-p--mail { flex: 1 1 auto; }
 .dash-hero { grid-area: hero; }
 .dash-p--table { grid-area: table; }
 .dash-p--squad { grid-area: squad; }
@@ -72,12 +75,11 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-areas:
       "hero hero"
-      "todo todo"
+      "side side"
       "fix table"
       "fix board"
       "squad fin"
-      "squad window"
-      "mail mail";
+      "squad window";
   }
   .dash .dash-t tr.dash-row--11 { display: table-row; }
 }
@@ -86,22 +88,23 @@
     gap: var(--space-5) var(--space-4);
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.15fr);
     grid-template-areas:
-      "hero  hero   todo"
-      "fix   squad  todo"
-      "fix   squad  table"
-      "mail  board  table"
-      "mail  fin    window";
+      "hero  hero   side"
+      "fix   squad  side"
+      "fix   squad  side"
+      "table board  side"
+      "table fin    window";
   }
   .dash .dash-t tr.dash-row--all { display: table-row; }
+  .dash .dash-side .dash-mail li.dash-more { display: list-item; }
 }
 @container dash (min-width: 1380px) {
   .dash__grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     grid-template-areas:
-      "hero  hero  todo  table"
-      "fix   squad todo  table"
-      "fix   squad board fin"
-      "mail  mail  board window";
+      "hero  hero   side  table"
+      "fix   squad  side  table"
+      "fix   squad  side  board"
+      "fin   window side  board";
   }
   .dash .dash-abs li.dash-more { display: grid; }
   .dash .dash-mail li.dash-more { display: list-item; }

@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-73291c30fe';
+const VERSION = 'v0.3-1091747827';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -78,7 +78,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', 'd82bfa0099'],
+  ['./src/app.js', 'd68610e6d2'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '45f14cb64d'],
@@ -186,7 +186,7 @@ const FILES = [
   ['./src/styles/base.css', 'f2fee58203'],
   ['./src/styles/club.css', '6615e08e49'],
   ['./src/styles/contextmenu.css', '55d14f38c2'],
-  ['./src/styles/dashboard.css', 'ec507f38c5'],
+  ['./src/styles/dashboard.css', '8f689a509d'],
   ['./src/styles/editor.css', '3037084983'],
   ['./src/styles/fonts.css', '372f3ee1fc'],
   ['./src/styles/history.css', 'baa48b28de'],
@@ -194,7 +194,7 @@ const FILES = [
   ['./src/styles/matchday.css', '87959cd153'],
   ['./src/styles/menu.css', '67aa361469'],
   ['./src/styles/negotiation.css', '949f233adc'],
-  ['./src/styles/todo.css', '6e7743f7fa'],
+  ['./src/styles/todo.css', 'd7bb59a735'],
   ['./src/styles/tokens.css', 'a7865d38be'],
   ['./src/styles/training.css', 'ac3c7a123a'],
   ['./src/styles/transfers.css', '6ab469db99'],
@@ -241,7 +241,7 @@ const FILES = [
   ['./src/ui/tacticsView.js', '1d8ca1b0b0'],
   ['./src/ui/talksView.js', 'e2780aa122'],
   ['./src/ui/teamReportView.js', 'c01abc57b6'],
-  ['./src/ui/todoView.js', '072f03d97b'],
+  ['./src/ui/todoView.js', 'bd4d7aa1c4'],
   ['./src/ui/trainingView.js', '5eff0a7334'],
   ['./src/ui/transferDealsView.js', 'a13fa703b3'],
   ['./src/ui/transfersView.js', 'd9db1d983f'],
