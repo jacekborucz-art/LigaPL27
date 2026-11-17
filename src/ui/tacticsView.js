@@ -58,7 +58,7 @@ const hitsWord = (n) => (n !== 1 && few(n) ? 'pasują' : 'pasuje');
  * strengthOpen: rozwinięta siła składu (tylko wide).
  * rzChips: plakietki rezerw (src/ui/reservesView.js, rzChipFn), rzStrip: pasek rezerw nad ławką (klub bez rezerw: brak).
  */
-export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg = '', numbers = null, kit = null, infoExtra = '', rzChips = null, rzStrip = '', cards = null, wide = false, strengthOpen = true }) {
+export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg = '', numbers = null, kit = null, infoExtra = '', rzChips = null, rzStrip = '', cards = null, wide = false, strengthOpen = true, assistant = true }) {
   const byId = new Map(squad.map((p) => [p.id, p]));
   const f = formationById(tactics.formation);
   const check = checkTactics(tactics, squad, { benchSize });
@@ -205,7 +205,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
       <div class="pitch2" ${kit ? `style="--kit:${kit.shirt};--kit-ink:${kit.ink};--kit-trim:${kit.trim}"` : ''} role="group" aria-label="Boisko, formacja ${esc(f.name)}">${slotsHtml}</div>
       <p class="tac__msg${msg ? ' is-msg' : ''}" role="status">${esc(status)}</p>
       <div class="tac__actions">
-        <button class="btn btn--quiet" data-act="tauto">Ustaw automatycznie</button>
+        <button class="btn btn--quiet" data-act="tauto"${assistant ? '' : ' disabled title="W sztabie nie ma asystenta trenera"'}>Poproś asystenta</button>${assistant ? '' : '<p class="hint">Brak asystenta trenera w sztabie (zatrudnisz go w Trening, Sztab).</p>'}
         ${sel ? '<button class="btn btn--quiet" data-act="tcancel">Anuluj wybór</button>' : ''}
       </div>
       ${wide ? strengthHtml : ''}

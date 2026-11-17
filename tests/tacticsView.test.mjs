@@ -93,3 +93,11 @@ test('Telefon bez zmian układu: bez przycisku zwijania i bez paska karty; PC: b
   // bez pauzy em w nowych tekstach
   for (const h of [phone, pc]) assert.ok(!h.includes(String.fromCharCode(8212)));
 });
+
+test('Przycisk „Poproś asystenta”: aktywny z asystentem w sztabie, wyłączony bez niego', () => {
+  const withA = view({});
+  assert.match(withA, /data-act="tauto">Poproś asystenta</);
+  const noA = view({ assistant: false });
+  assert.match(noA, /data-act="tauto" disabled[^>]*>Poproś asystenta</);
+  assert.match(noA, /Brak asystenta trenera w sztabie/);
+});

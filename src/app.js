@@ -17,6 +17,9 @@ import { standings, zonesFor } from './season/standings.js';
 import { renderCompetitions } from './ui/competitionsView.js';
 import { fixturesPanelBody, renderFixtures } from './ui/fixturesView.js';
 import { mountDashMasonry } from './ui/masonry.js';
+import { rosterOf } from './career/staffMarket.js';
+/** Czy klub ma asystenta trenera (przycisk „Poproś asystenta”); stary zapis bez danych sztabu: tak. */
+const hasAssistant = (g) => !g.staff || rosterOf(g, g.clubId).some((p) => p.role === 'asystent');
 import { readDaySpeed, saveDaySpeed, dayDelayMs } from './ui/daySpeed.js';
 import { ensureHistory } from './season/history.js';
 import { createMatch, runToEnd } from './engine/match/match.js';
@@ -464,7 +467,7 @@ function renderTab(tab, g, club) {
     if (state.sqSub === 'tactics') {
       queueMicrotask(mountTacticsScreen); // po wstawieniu HTML: okno atrybutów i fokus
       const wide = matchMedia(WIDE_INFO).matches;
-      return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), info: state.tInfo, msg: state.tMsg, numbers: shirtNumbers(g, g.clubId, squadOf(g.world, g.clubId)), kit: kitColors(clubById(g.clubId)), cards: tCardsFor(g, wide), wide, strengthOpen: tUi.strOpen, rzChips, rzStrip: rzOn ? reservesStrip(g) : '' });
+      return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), info: state.tInfo, msg: state.tMsg, numbers: shirtNumbers(g, g.clubId, squadOf(g.world, g.clubId)), kit: kitColors(clubById(g.clubId)), cards: tCardsFor(g, wide), wide, strengthOpen: tUi.strOpen, assistant: hasAssistant(g), rzChips, rzStrip: rzOn ? reservesStrip(g) : '' });
     }
     const ovrs = leagueOvrs(g, club.tier);
     const p = state.playerOpen && g.world.players[state.playerOpen];
@@ -1519,7 +1522,8 @@ async function dispatchAct(el, { root = app } = {}) {
     if (act === 'tsub') { state.sqSub = el.dataset.s; state.rzAsk = null; state.rzMsg = null; state.trepMsg = ''; state.tSel = null; state.tInfo = null; state.tCards = []; state.tMsg = ''; state.playerOpen = null; state.ttResult = null; state.ttMeeting = null; render(); }
     if (act === 'tcancel') { state.tSel = null; state.tMsg = ''; renderTacticsAfter('[data-act="tauto"]'); }
     if (act === 'tform') { g.tactics = changeFormation(g.tactics, mySquad(g), el.dataset.f); state.tSel = null; state.tMsg = ''; await save(); renderTacticsAfter(); }
-    if (act === 'tauto') { g.tactics = createTactics(mySquad(g), { formation: g.tactics.formation, benchSize: benchSizeFor(g), instructions: g.tactics.instructions }); state.tSel = null; state.tMsg = 'Asystent ustawił skład.'; await save(); renderTacticsAfter(); }
+    if (act === 'tauto' && !hasAssistant(g)) { state.tMsg = 'W sztabie nie ma asystenta trenera. Zatrudnisz go w Trening, Sztab.'; renderTacticsAfter(); }
+    else if (act === 'tauto') { g.tactics = createTactics(mySquad(g), { formation: g.tactics.formation, benchSize: benchSizeFor(g), instructions: g.tactics.instructions }); state.tSel = null; state.tMsg = 'Asystent ustawił skład.'; await save(); renderTacticsAfter(); }
     if (act === 'tinstr') { g.tactics = setInstruction(g.tactics, el.dataset.i, el.dataset.v); await save(); renderTacticsAfter(); }
     if (act === 'tunbench') {
       const name = tCtx(g).byId.get(el.dataset.id)?.name ?? 'Zawodnik';
