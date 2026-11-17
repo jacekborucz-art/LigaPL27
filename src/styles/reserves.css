@@ -17,17 +17,25 @@
 .rz { display: grid; gap: var(--space-4); min-width: 0; text-transform: none; }
 .rz-head { margin-bottom: 0; }
 /* Nagłówek z zakładkami drugiego poziomu: tytuł po lewej, „Mecz” i „Kadra rezerw” po prawej (na telefonie pod spodem) */
-.rz-top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-2) var(--space-4); margin-bottom: var(--space-3); }
-.rz-top__ttl { display: grid; gap: 2px; min-width: 0; flex: 1 1 260px; }
+.rz-top { display: grid; gap: var(--space-3); margin-bottom: 0; }
+.rz-top__ttl { display: grid; gap: 2px; min-width: 0; }
 .rz-top__ttl h2 { margin: 0; }
 .rz-top .muted { overflow-wrap: anywhere; }
-.rz-tabs { display: flex; gap: 2px; flex: 0 0 auto; max-width: 100%; border-bottom: 1px solid var(--line); }
-.rz-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 16px; border: 0; background: none; font: 700 var(--step-0)/1 var(--font-display); color: var(--text-muted); border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap; }
-.rz-tabs button small { min-width: 22px; padding: 2px 6px; border-radius: 999px; background: var(--surface); font: 700 var(--step--1)/1.2 var(--font-body); font-variant-numeric: tabular-nums; color: var(--text-muted); }
-.rz-tabs [aria-selected="true"] { color: var(--text); border-bottom-color: var(--rz); background: color-mix(in srgb, var(--rz) 10%, transparent); }
+/* Zakładki jak w segregatorze: aktywna ma tło i ramkę karty i zlewa się z nią (bez linii między nimi), nieaktywne siedzą nieco za nią */
+.rz-tabs { display: flex; align-items: flex-end; gap: 4px; max-width: 100%; margin: var(--space-1) 0 -1px; padding: 0; position: relative; z-index: 1; }
+.rz-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px; border: 1px solid var(--line); border-bottom-color: var(--line); border-radius: 12px 12px 0 0; background: color-mix(in srgb, var(--text) 9%, var(--surface)); font: 700 var(--step-0)/1 var(--font-display); color: var(--text-muted); cursor: pointer; white-space: nowrap; position: relative; top: 2px; }
+.rz-tabs button:hover { color: var(--text); background: color-mix(in srgb, var(--text) 5%, var(--surface)); }
+.rz-tabs button small { min-width: 22px; padding: 2px 6px; border-radius: 999px; background: var(--bg); font: 700 var(--step--1)/1.2 var(--font-body); font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.rz-tabs [aria-selected="true"] { min-height: 48px; top: 0; z-index: 2; color: var(--text); background: var(--bg); border-color: var(--line); border-bottom-color: var(--bg); box-shadow: inset 0 3px 0 var(--rz); }
 .rz-tabs [aria-selected="true"] small { background: var(--rz); color: var(--rz-ink); }
-.rz-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-@media (max-width: 600px) { .rz-tabs { width: 100%; } .rz-tabs button { flex: 1; padding: 0 8px; } }
+.rz-tabs button:focus-visible { outline: 2px solid var(--focus); outline-offset: -3px; }
+.rz-card { position: relative; min-width: 0; padding: var(--space-4); border: 1px solid var(--line); border-radius: 0 var(--radius-s) var(--radius-s) var(--radius-s); background: var(--bg); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); align-content: start; }
+.rz-card > .sqx__bar { margin-bottom: 0; }
+@media (max-width: 600px) {
+  .rz-tabs { width: 100%; padding: 0; gap: 2px; }
+  .rz-tabs button { flex: 1; padding: 0 8px; }
+  .rz-card { padding: var(--space-3); }
+}
 .rz-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .rz-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
 .rz-main, .rz-side { display: grid; gap: var(--space-4); align-content: start; min-width: 0; }

@@ -429,12 +429,15 @@ function askDialog(game, ctx, ask, avail) {
 }
 
 // ------------------------------------------------------------ Ekran
-/** Nagłówek Rezerw: tytuł i linia drużyny po lewej, zakładki „Mecz” i „Kadra rezerw” (z liczbą) po prawej. */
+/** Nagłówek Rezerw: tytuł i linia drużyny, pod nimi zakładki „Mecz” i „Kadra rezerw” (z liczbą) po lewej, doczepione do karty (rzCard). */
 export function rzHead(view, count, line) {
   const tabs = [['match', 'Mecz', ''], ['squad', 'Kadra rezerw', count != null ? `<small>${esc(String(count))}</small>` : '']];
   return `<div class="rz-top"><div class="rz-top__ttl"><h2>Rezerwy</h2><span class="muted">${esc(line)}</span></div>
-    <div class="rz-tabs" role="tablist" aria-label="Widok rezerw">${tabs.map(([k, v, b]) => `<button role="tab" data-act="rzview" data-v="${k}" aria-selected="${view === k}" tabindex="${view === k ? 0 : -1}">${esc(v)}${b}</button>`).join('')}</div></div>`;
+    <div class="rz-tabs" role="tablist" aria-label="Widok rezerw">${tabs.map(([k, v, b]) => `<button role="tab" id="rz-tab-${k}" data-act="rzview" data-v="${k}" aria-selected="${view === k}" aria-controls="rz-panel" tabindex="${view === k ? 0 : -1}">${esc(v)}${b}</button>`).join('')}</div></div>`;
 }
+
+/** Karta pod zakładkami (role=tabpanel): obwiedzie treść widoku, aktywna zakładka łączy się z jej lewym górnym rogiem. */
+export const rzCard = (view, inner) => `<div class="rz-card" id="rz-panel" role="tabpanel" aria-labelledby="rz-tab-${view}">${inner}</div>`;
 
 /** Podzakładka Kadra > Rezerwy (HTML). Klub bez rezerw: wyjaśnienie (R.reason). */
 export function renderReserves(game, ui = {}) {
@@ -465,14 +468,14 @@ export function renderReserves(game, ui = {}) {
     const msg = ui.rzMsg ? `<p class="rz-msg" role="status">${esc(ui.rzMsg)}</p>` : '';
     return `<div class="rz">
       ${rzHead('match', squadOf(game.world, ctx.R.id).length, `${ctx.R.name}, ${leagueLabel(anyClub(ctx.R.id)) || ''}${pos}${coach}`)}
-      ${alarm}${msg}
+      ${rzCard('match', `${alarm}${msg}
       <div class="rz-grid">
         <div class="rz-main">
           ${weekStrip(game, ctx, dl)}
           <div class="rz-cols">${downList(game, ctx, dl, ui, chips)}${upList(game, ctx, dl, avail, chips)}</div>
         </div>
         <div class="rz-side">${meters(ctx, dl, avail, game)}${ask}${squadOverview(game, ctx, dl, ui)}</div>
-      </div>
+      </div>`)}
     </div>`;
   } catch (err) {
     return `<div class="rz"><p class="rz-empty">Nie udało się wczytać rezerw.</p><button class="btn btn--quiet" data-act="rz-retry">Spróbuj jeszcze raz</button></div>`;

@@ -30,7 +30,7 @@ import { addDays } from './core/gameLoop.js';
 import { generateWorld, squadOf, academyOf } from './world/worldGen.js';
 import { renderSquadList, renderPlayerProfile } from './ui/squadView.js';
 import { renderTactics } from './ui/tacticsView.js';
-import { renderReserves, rzHead, handleReservesAction, isReservesAction, reservesStrip, rzChipFn, hasReserves } from './ui/reservesView.js'; // Kadra > Rezerwy
+import { renderReserves, rzHead, rzCard, handleReservesAction, isReservesAction, reservesStrip, rzChipFn, hasReserves } from './ui/reservesView.js'; // Kadra > Rezerwy
 import { resolveMove, resolveTap, parseLoc, locKey, playerAt, sameLoc } from './ui/tacticsMoves.js';
 import { mountTacticsDrag } from './ui/tacticsDrag.js';
 import { createTactics, changeFormation, setInstruction, refreshTactics, removeFromBench, checkTactics } from './engine/lineup.js';
@@ -470,7 +470,7 @@ function renderTab(tab, g, club) {
         if (rp && rp.clubId === R.id) return renderPlayerProfile(rp, { leagueOvrs: leagueOvrs(g, anyClub(R.id)?.tier ?? club.tier), clubName: R.name, date: g.date, game: g });
         const rsq = squadOf(g.world, R.id);
         const rAvg = rsq.length ? (rsq.reduce((s, p) => s + p.age, 0) / rsq.length).toFixed(1) : '0';
-        return sub + renderSquadList(rsq, { filter: state.sqFilter === 'academy' ? 'all' : state.sqFilter, leagueOvrs: leagueOvrs(g, anyClub(R.id)?.tier ?? club.tier), academy: [], view: state.sqView ?? 'overview', sort: state.sqSort, game: g, clubId: R.id, title: `Kadra rezerw: ${R.name}`, head: rzHead('squad', rsq.length, `${R.name}, ${rsq.length} zawodników, średni wiek ${rAvg}`) });
+        return sub + renderSquadList(rsq, { filter: state.sqFilter === 'academy' ? 'all' : state.sqFilter, leagueOvrs: leagueOvrs(g, anyClub(R.id)?.tier ?? club.tier), academy: [], view: state.sqView ?? 'overview', sort: state.sqSort, game: g, clubId: R.id, title: `Kadra rezerw: ${R.name}`, head: rzHead('squad', rsq.length, `${R.name}, ${rsq.length} zawodników, średni wiek ${rAvg}`), card: (inner) => rzCard('squad', inner) });
       }
       return sub + renderReserves(g, state);
     }

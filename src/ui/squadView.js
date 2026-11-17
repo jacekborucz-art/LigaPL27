@@ -206,20 +206,20 @@ function squadAside(players, tier = null) {
   </aside>`;
 }
 
-export function renderSquadList(players, { filter = 'all', leagueOvrs = [], academy = [], view = 'overview', sort = null, game = null, rzChips = null, clubId = null, title = 'Kadra', head = null } = {}) {
+export function renderSquadList(players, { filter = 'all', leagueOvrs = [], academy = [], view = 'overview', sort = null, game = null, rzChips = null, clubId = null, title = 'Kadra', head = null, card = null } = {}) {
   const tier = tierOf(clubId ?? game?.clubId);
   const list = filter === 'academy' ? academy : players.filter((p) => filter === 'all' || GROUP[p.pos] === filter);
   const sorted = view === 'overview' ? [...list].sort(defaultOrder) : sortList(list, sort);
   const avgAge = players.length ? (players.reduce((s, p) => s + p.age, 0) / players.length).toFixed(1) : '0';
   const chips = SQUAD_FILTERS.map(([k, v]) => `<button class="chip" data-act="sqfilter" data-f="${k}" aria-pressed="${filter === k}">${esc(v)}</button>`).join('');
   const views = `<div class="seg sqv" role="tablist" aria-label="Widok listy">${SQUAD_VIEWS.map(([k, v]) => `<button role="tab" data-act="sqview" data-v="${k}" aria-selected="${view === k}">${esc(v)}</button>`).join('')}</div>`;
-  const top = `${head ?? `<div class="mail-head sqx__head"><h2>${esc(title)}</h2><span class="muted">${players.length} zawodników, średni wiek ${avgAge}</span></div>`}
-    <div class="sqx__bar">${views}<div class="chips">${chips}</div></div>`;
+  const bar = `<div class="sqx__bar">${views}<div class="chips">${chips}</div></div>`;
+  const wrap = (inner) => card ? `${head}${card(inner)}` : `${head ?? `<div class="mail-head sqx__head"><h2>${esc(title)}</h2><span class="muted">${players.length} zawodników, średni wiek ${avgAge}</span></div>`}${inner}`; // card: karta z zakładki (Rezerwy)
   if (view === 'attrs' || view === 'stats') {
     const body = !sorted.length ? '<p class="mail-empty">Brak zawodników.</p>' : view === 'attrs' ? attrsTable(sorted, sort, tier) : statsTable(sorted, sort, game?.season?.seasonId ?? game?.season ?? '');
-    return `<div class="sqx sqx--table">${top}${body}</div>`;
+    return `<div class="sqx sqx--table">${wrap(bar + body)}</div>`;
   }
-  return `<div class="sqx sqx--overview">${top}
+  return `<div class="sqx sqx--overview">${wrap(`${bar}
     <div class="sqx__main">
     <div class="sq" role="table" aria-label="Zawodnicy">
       <div class="sq__row sq__head" role="row">
@@ -242,7 +242,7 @@ export function renderSquadList(players, { filter = 'all', leagueOvrs = [], acad
       }).join('') || '<p class="mail-empty">Brak zawodników.</p>'}
     </div>
     ${filter === 'academy' ? '' : squadAside(players, tier)}
-    </div></div>`;
+    </div>`)}</div>`;
 }
 
 export function attrBand(v) {
