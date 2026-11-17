@@ -840,8 +840,14 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
   .hub__main:has(.tac) { max-width: 1440px; }
   .tac {
     grid-template-columns: minmax(300px, 360px) minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas: "form form form" "pitch legend legend" "pitch xi bench" "pitch rz out"; grid-template-rows: auto auto auto 1fr;
+    grid-template-areas: "form form form" "hint legend legend" "pitch xi out" "pitch bench out" "pitch rz out";
+    grid-template-rows: auto auto auto auto 1fr; row-gap: var(--space-3);
   }
+  /* Opis formacji w jednej linii z legendą, pierwszy skład wyrównany do góry z boiskiem; ławka pod składem, poza kadrą obok składu */
+  .tac__form { display: contents; }
+  .tac__form .chips { grid-area: form; }
+  .tac__form .hint { grid-area: hint; align-self: center; }
+  .tac .tp-legend { align-self: center; }
   .tac__lists { display: contents; }
   .tac .tp-legend { grid-area: legend; margin: 0; }
   .tac .tp-sec--xi { grid-area: xi; }
