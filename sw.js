@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-3865955067';
+const VERSION = 'v0.3-ce1d54e561';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -146,7 +146,7 @@ const FILES = [
   ['./src/data/reprezentacje_swiat.json', '29c3c96adf'],
   ['./src/engine/lineup.js', 'aab0693990'],
   ['./src/engine/match/coach.js', '2cc9ca6593'],
-  ['./src/engine/match/constants.js', 'b111feef02'],
+  ['./src/engine/match/constants.js', 'e513a78280'],
   ['./src/engine/match/control.js', 'b17907f777'],
   ['./src/engine/match/core.js', 'c3ab1fed44'],
   ['./src/engine/match/match.js', 'd1ed756f73'],
@@ -155,7 +155,7 @@ const FILES = [
   ['./src/engine/matchStats.js', '71542c9b3b'],
   ['./src/engine/modifiers.js', 'cf8f446d97'],
   ['./src/engine/positions.js', 'ee736ff7cc'],
-  ['./src/engine/quickSim.js', '0dbcfcdd5b'],
+  ['./src/engine/quickSim.js', '9da9751057'],
   ['./src/engine/teamStrength.js', '29de64f3e1'],
   ['./src/match/aiPlan.js', '2f958da775'],
   ['./src/match/briefings.js', '259a9a1c24'],

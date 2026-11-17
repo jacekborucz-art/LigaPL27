@@ -17,7 +17,7 @@ export const QS = {
   XG_PER_SHOT: 0.108, // ok. 2,72 gola / 25 strzałów
   ON_TARGET_NON_GOAL: 0.28,
   CORNERS_PER_SHOT: 0.4,
-  YELLOW_H: 1.89, YELLOW_A: 2.43, RED: 0.095, INJ: 0.45, // razem ok. 4,3 żółtej (Ekstraklasa)
+  YELLOW_H: 1.70, YELLOW_A: 2.19, RED: 0.072, INJ: 0.45, // kartki -10%, drugie żółte rzadziej (Nov 17, 2026), jak pełny silnik
 };
 
 /** Średnie bramek z sił stref (wzór eksperta). */

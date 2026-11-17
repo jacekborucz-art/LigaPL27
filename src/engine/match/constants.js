@@ -20,8 +20,8 @@ export const K = {
   cornerShot: 0.30, cornerXg: [0.04, 0.14], saveCorner: 0.30, blockCorner: 0.33,
   foulTick: 0.27, foulDefShare: 0.78, dangerFK: 0.14,
   fkDirect: 0.45, fkXgD: [0.04, 0.09], fkCrossShot: 0.30, fkXgC: [0.05, 0.15],
-  yellowPerFoul: 0.140, redPerFoul: 0.0027, otherYellowTick: 0.0032, // ŻK/faul 0.14 -> 0.155 (cel 4,3/mecz, PLAN 2.1)
-  bookedFoulMul: 0.4, bookedYellowMul: 0.7,
+  yellowPerFoul: 0.119, redPerFoul: 0.0024, otherYellowTick: 0.0028, // kartki -10% na prośbę właściciela (Nov 17, 2026): ok. 3,7 ŻK/mecz
+  bookedFoulMul: 0.4, bookedYellowMul: 0.5, // z żółtą gra ostrożniej: druga żółta rzadziej (0.7 -> 0.5)
   homeCreate: 1.15, awayCreate: 0.90, homeCardMul: 0.88, awayCardMul: 1.15,
   ogPerMatch: 0.08,
   injTick: 4.3e-4, injContact: 0.004, // kontakt 0.012 -> 0.004: ok. 0,45 urazu widocznego w meczu (cel ok. 0,4)
