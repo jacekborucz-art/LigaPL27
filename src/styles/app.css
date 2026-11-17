@@ -982,6 +982,8 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
   .tcard .tdet__groups { grid-area: attrs; columns: 3; column-gap: var(--space-4); column-fill: balance; }
   .tcard .tdet__groups h4 { break-after: avoid; break-before: column; padding-top: 0 !important; }
   .tcard .tdet__groups h4:first-child { break-before: auto; }
+  /* Bramkarz ma 4 grupy: bez wymuszonych podziałów, przeglądarka wyrówna 3 kolumny (inaczej 4. grupa wchodzi na boisko pozycji) */
+  .tcard .tdet__groups:has(> h4:nth-of-type(4)) h4 { break-before: auto; }
   .tcard .tdet__groups .attrs { break-inside: avoid; }
   .tcard .tdet__groups h4 { margin: 0 0 var(--space-1); padding-top: var(--space-2); }
   .tcard .tdet__groups h4:first-child { padding-top: 0; }
