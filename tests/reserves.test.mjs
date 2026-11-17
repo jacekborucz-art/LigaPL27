@@ -451,3 +451,26 @@ test('Parytet AI: kluby AI delegują w poniedziałki i powołują w awarii, bez 
   // Widzew (gracz) ma rezerwy, ale AI nie decyduje za gracza
   assert.ok(!Object.values(g.world.players).some((p) => p.clubId === 'widzew' && p.season?.oth?.apps));
 });
+
+test('Rezerwy bez 11 zawodników z bramkarzem: tymczasowi zawodnicy tylko na ten mecz, potem znikają', () => {
+  const g = newGame('legia');
+  const f = resFix(g);
+  // Kontuzje: w Legii II zostaje 7 zdrowych z pola, bez bramkarza
+  const own = squad(g, 'legia-ii');
+  const keep = new Set(own.filter((p) => p.pos !== 'BR').slice(0, 7).map((p) => p.id));
+  for (const p of own) if (!keep.has(p.id)) p.injuryDays = 30;
+  const sq = squadFor(g, 'legia-ii', f.comp, f);
+  const temps = sq.filter((p) => p.temp);
+  assert.equal(temps.length, 4, 'brakuje 3 z pola i bramkarza');
+  assert.equal(temps.filter((p) => p.pos === 'BR').length, 1);
+  assert.ok(temps.every((p) => !g.world.players[p.id]), 'tymczasowi poza światem gry');
+  assert.equal(pickXI(sq).xi.length, 11, 'pełna jedenastka');
+  const before = Object.keys(g.world.players).length;
+  const rng = new Rng('t-temp');
+  const res = playQuick(g, f, rng);
+  applyResult(g, f, res, rng);
+  assert.equal(Object.keys(g.world.players).length, before, 'po meczu nikt nie doszedł do świata gry');
+  // Pełna kadra: bez tymczasowych
+  for (const p of own) p.injuryDays = 0;
+  assert.equal(squadFor(g, 'legia-ii', f.comp, f).filter((p) => p.temp).length, 0);
+});

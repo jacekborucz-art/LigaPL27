@@ -19,6 +19,7 @@ import { CLUBS_L3 } from '../data/clubs_l3.js';
 import { CLUBS_L4 } from '../data/clubs_l4.js';
 import { SEASON, SEASON_YEAR } from '../config/calendar2026.js';
 import { squadOf } from '../world/worldGen.js';
+import { ephemeralSquad } from '../world/ephemeral.js';
 import { GROUP, MATCH_MIN, planDeficitFill, isAvailable } from './squad.js';
 import { LEAGUE_COMPS, compOfClub, compClubIds, classKeyOfComp, classKeyOfTier, LEAGUE_CLASS_KEYS } from '../season/leagueComps.js';
 import { knownClub } from '../season/leagues.js';
@@ -742,7 +743,30 @@ export function familySquad(game, clubId, comp, base, f = null) {
   const seniors = clubId === fam.reserve ? guests.filter((p) => ruleAge(p) >= RSV.seniorAge && isAvailable(p)).sort((a, b) => b.ovr - a.ovr) : [];
   const bench = new Set(seniors.slice(RSV.maxSeniorXI).map((p) => p.id));
   for (const p of guests) out.push({ ...p, guest: true, ...(bench.has(p.id) ? { benchOnly: true } : {}) });
+  if (clubId === fam.reserve) out.push(...tempFill(clubId, out));
   return out;
+}
+
+/**
+ * Zabezpieczenie rezerw: gdy po powołaniach do pierwszej drużyny, kontuzjach i pauzach nie ma 11 dostępnych
+ * z bramkarzem, na ten jeden mecz dochodzą zawodnicy tymczasowi (najsłabsi z wygenerowanej kadry klubu, juniorzy
+ * i testowani). Nie ma ich w świecie gry (game.world), więc po meczu znikają: bez statystyk, kontraktów i zapisu.
+ */
+export function tempFill(clubId, squad) {
+  const ok = squad.filter((p) => isAvailable(p) && !p.benchOnly);
+  const needGk = !ok.some((p) => GROUP[p.pos] === 'GK');
+  const needField = Math.max(0, 11 - ok.length - (needGk ? 1 : 0));
+  if (!needGk && !needField) return [];
+  const club = knownClub(clubId);
+  if (!club) return [];
+  const pool = ephemeralSquad(club, SEASON).slice().reverse(); // od najsłabszych (koniec ławki); te same nazwiska w raporcie meczu
+  const out = [];
+  if (needGk) { const gk = pool.find((p) => GROUP[p.pos] === 'GK'); if (gk) out.push(gk); }
+  for (const p of pool) {
+    if (out.length >= needField + (needGk ? 1 : 0)) break;
+    if (GROUP[p.pos] !== 'GK' && !out.includes(p)) out.push(p);
+  }
+  return out.map((p) => ({ ...p, clubId, temp: true }));
 }
 
 /**
