@@ -62,16 +62,17 @@ export const compTag = (row) => `<span class="ctag" data-k="${compKind(row)}" ti
 export const venueTag = (v) => `<span class="vtag" data-v="${v}">${esc(VENUE_LABEL[v])}</span>`;
 const resChip = (r) => `<span class="rchip" data-r="${r}" title="${RES_WORD[r]}"><span aria-hidden="true">${r}</span><span class="sr">${RES_WORD[r]}</span></span>`;
 
-function endCell(r) {
+function endCell(r, season = null) {
   if (!r.played) {
     return `<span class="fxr__end fxr__end--plan">${r.t ? `<span class="fxr__time">${esc(r.t)}</span>` : ''}${r.post ? '<small>przełożony</small>' : ''}</span><span class="rchip" data-r="" aria-hidden="true"></span>`;
   }
   const dec = r.decider ? `<small class="fxr__dec" data-won="${r.decider.won ? 1 : 0}">${esc(r.decider.text)}</small>` : '';
-  return `<span class="fxr__end"><span class="fxr__score" aria-label="Wynik ${r.gf}:${r.ga}">${r.gf}:${r.ga}</span>${dec}</span>${resChip(r.res)}`;
+  // Wynik otwiera raport meczu (src/ui/matchReportView.js); sezon z historii: data-s
+  return `<span class="fxr__end"><button class="fxr__score fxr__rep" data-act="mreport" data-fx="${esc(r.id)}"${season ? ` data-s="${esc(season)}"` : ''} aria-label="${esc(`Wynik ${r.gf}:${r.ga}, raport meczu`)}">${r.gf}:${r.ga}</button>${dec}</span>${resChip(r.res)}`;
 }
 
 export function fixtureRowHtml(r, opts) { return rowHtml(r, opts); }
-function rowHtml(r, { wide = false, today = '', extra = false } = {}) {
+function rowHtml(r, { wide = false, today = '', extra = false, season = null } = {}) {
   const isToday = r.d === today;
   const meta = wide
     ? `<span class="fxr__meta">${compTag(r)}<small>${esc(roundText(r))}</small>${venueTag(r.venue)}</span>`
@@ -80,7 +81,7 @@ function rowHtml(r, { wide = false, today = '', extra = false } = {}) {
     <span class="fxr__day" aria-label="${esc(`${weekday(r.d)}, ${fmtDate(r.d)}`)}"><b>${dayNum(r.d)}</b><small>${esc(mon(r.d))}${wide ? `<span class="fxr__wd"> ${esc(wd(r.d))}</span>` : ''}</small></span>
     ${meta}
     <span class="fxr__opp">${crest(r.opp, wide ? 26 : 22)}<span class="fxr__who"><b>${esc(name(r.opp))}</b>${wide ? '' : `<span class="fxr__tags">${compTag(r)}${venueTag(r.venue)}</span>`}</span></span>
-    ${endCell(r)}
+    ${endCell(r, season)}
   </li>`;
 }
 const todayLine = (today) => `<li class="fxr-now" aria-label="Dziś, ${esc(fmtDate(today))}"><span aria-hidden="true">Dziś, ${esc(mon(today))} ${dayNum(today)}</span></li>`;
@@ -163,7 +164,7 @@ export function renderFixtures(game, ui = {}) {
     if (!nowDone && !r.played && r.d >= game.date) { html += todayLine(game.date); nowDone = true; }
     const m = r.d.slice(0, 7);
     if (m !== month) { month = m; html += `<li class="fxs-month"><h3>${esc(mon(r.d))} ${r.d.slice(0, 4)}</h3></li>`; }
-    html += rowHtml(r, { wide: true, today: current ? game.date : '' });
+    html += rowHtml(r, { wide: true, today: current ? game.date : '', season: current ? null : season });
   }
   if (!nowDone && rows.length) html += todayLine(game.date);
   const meName = rows.find((r) => r.me)?.me;

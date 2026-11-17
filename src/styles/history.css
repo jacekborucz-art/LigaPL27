@@ -218,3 +218,104 @@
 @container phst (min-width: 860px) {
   .phst__cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
+
+/* ---------- Raport meczu (src/ui/matchReportView.js): wynik w terminarzu otwiera okno ---------- */
+.ufx__rep, .fxr__rep { margin: 0; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; border-radius: var(--radius-s); }
+button.ufx__s { font: 700 var(--step-1)/1 var(--font-display); }
+button.ufx__mid { font: inherit; color: var(--text-muted); }
+.ufx__rep:hover, .fxr__rep:hover { text-decoration: underline; text-underline-offset: 3px; }
+.ufx__rep:focus-visible, .fxr__rep:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.fxr__rep { min-width: 44px; min-height: 32px; text-align: right; }
+
+.mrdlg { width: min(680px, calc(100vw - 24px)); padding: var(--space-4) var(--space-4) var(--space-5); overscroll-behavior: contain; }
+.mr { display: grid; gap: var(--space-4); }
+.mr-head { display: grid; gap: var(--space-2); text-align: center; }
+.mr-head h2 { margin: 0; font: 700 var(--step-1)/1.1 var(--font-display); color: var(--text-muted); }
+.mr-head h2:focus { outline: none; }
+.mr-head__comp { margin: 0; font-weight: 600; }
+.mr-head__tag { margin: 0; font-size: var(--step--1); color: var(--text-muted); }
+.mr-score { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--space-3); }
+.mr-score__t { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+.mr-score__t b { font: 700 var(--step-0)/1.15 var(--font-display); overflow-wrap: anywhere; }
+.mr-score__res { font: 800 var(--step-3)/1 var(--font-display); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mr-score__res i { padding: 0 4px; font-style: normal; color: var(--text-muted); }
+.mr-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-2) var(--space-3); margin: 0; padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--surface-stripe); }
+.mr-info div { min-width: 0; }
+.mr-info dt { font-size: 11px; color: var(--text-muted); }
+.mr-info dd { margin: 2px 0 0; font-weight: 600; overflow-wrap: anywhere; }
+.mr-sec { display: grid; gap: var(--space-2); }
+.mr-sec h3 { margin: 0; font: 700 var(--step-0)/1.2 var(--font-display); }
+.mr-empty { margin: 0; color: var(--text-muted); font-size: var(--step--1); }
+.mr-note { margin: 0; color: var(--text-muted); font-size: var(--step--1); }
+
+/* Przebieg: gospodarze po lewej, goście po prawej, minuta pośrodku */
+.mr-tl { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.mr-ev { display: grid; grid-template-columns: minmax(0, 1fr) 46px minmax(0, 1fr); align-items: center; min-height: 36px; padding: 3px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+.mr-ev:last-child { border-bottom: 0; }
+.mr-ev__min { grid-column: 2; grid-row: 1; text-align: center; font: 700 var(--step--1)/1 var(--font-display); font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.mr-ev__body { grid-row: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.mr-ev--h .mr-ev__body { grid-column: 1; flex-direction: row-reverse; text-align: right; }
+.mr-ev--a .mr-ev__body { grid-column: 3; }
+.mr-ev__txt { display: grid; min-width: 0; line-height: 1.2; }
+.mr-ev__txt b { font-weight: 600; overflow-wrap: anywhere; }
+.mr-ev__txt small { font-size: 12px; color: var(--text-muted); overflow-wrap: anywhere; }
+.mr-ev__sc { flex: none; padding: 1px 6px; border-radius: var(--radius-s); font: 700 var(--step--1)/1.4 var(--font-display); background: color-mix(in srgb, var(--led) 26%, transparent); font-variant-numeric: tabular-nums; }
+.mr-ev__ico { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; position: relative; color: var(--text); }
+.mr-ev__ico svg { width: 18px; height: 18px; }
+.mr-ev[data-k="inj"] .mr-ev__ico { color: var(--bad-text); }
+.mr-ev.is-serious { background: color-mix(in srgb, var(--kartka-czerwona) 10%, transparent); }
+.mr-ev.is-serious .mr-ev__txt small { color: var(--bad-text); font-weight: 600; }
+.mr-ev[data-k="g"] .mr-ev__txt b, .mr-ev[data-k="o"] .mr-ev__txt b { font-weight: 700; }
+.mr-card { display: inline-block; width: 10px; height: 14px; border-radius: 2px; box-shadow: 0 0 0 1px rgb(0 0 0 / .18); }
+.mr-card--y { background: var(--kartka-zolta); }
+.mr-card--r { background: var(--kartka-czerwona); }
+.mr-card--2 { position: absolute; left: 1px; top: 1px; }
+.mr-card--2b { position: absolute; left: 6px; top: 4px; }
+.mr-var { padding: 0 3px; border-radius: 3px; font: 700 9px/1.6 var(--font-display); letter-spacing: .02em; color: #fff; background: #1E5AA8; }
+
+/* Seria rzutów karnych */
+.mr-pk__sum { margin: 0; font-weight: 600; }
+.mr-pk { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.mr-pk__k { display: flex; gap: 8px; align-items: baseline; width: 50%; font-size: var(--step--1); }
+.mr-pk__k--h { justify-content: flex-end; text-align: right; padding-right: 12px; }
+.mr-pk__k--a { margin-left: 50%; padding-left: 12px; }
+.mr-pk__k small { color: #1E7A43; font-weight: 700; }
+.mr-pk__k[data-ok="0"] small { color: var(--bad-text); }
+
+/* Statystyki: wartości po bokach, pasek udziału */
+.mr-stats { display: grid; gap: var(--space-2); margin: 0; }
+.mr-st { display: grid; grid-template-columns: 56px minmax(0, 1fr) 56px; align-items: center; row-gap: 4px; }
+.mr-st dt { grid-column: 2; grid-row: 1; text-align: center; font-size: var(--step--1); color: var(--text-muted); }
+.mr-st dd { margin: 0; font: 700 var(--step-0)/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.mr-st__h { grid-column: 1; grid-row: 1; }
+.mr-st__a { grid-column: 3; grid-row: 1; text-align: right; }
+.mr-st__bar { grid-column: 1 / -1; grid-row: 2; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--text-muted) 35%, transparent); overflow: hidden; }
+.mr-st__bar span { display: block; width: var(--p); height: 100%; background: var(--accent); }
+
+/* Oceny: zwijane, dwie kolumny na szerokim ekranie */
+.mr-rt summary { cursor: pointer; font: 700 var(--step-0)/1.2 var(--font-display); min-height: 44px; display: flex; align-items: center; gap: var(--space-2); list-style: none; }
+.mr-rt summary::-webkit-details-marker { display: none; }
+.mr-rt summary::after { content: "pokaż"; margin-left: auto; padding: 2px 10px; border: 1px solid var(--line); border-radius: 999px; font: 600 var(--step--1)/1.4 var(--font-body); color: var(--text-muted); }
+.mr-rt[open] summary::after { content: "ukryj"; }
+.mr-rt__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-3); }
+.mr-rt__col h4 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font: 700 var(--step--1)/1.2 var(--font-display); }
+.mr-rt__list { list-style: none; margin: 0; padding: 0; }
+.mr-rt__list li { display: flex; justify-content: space-between; gap: var(--space-2); padding: 4px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); font-size: var(--step--1); }
+.mr-rt__list li small { color: var(--text-muted); }
+.mr-rt__list b { font-variant-numeric: tabular-nums; }
+.mr-rt__list li.is-best b { padding: 0 6px; border-radius: var(--radius-s); background: color-mix(in srgb, var(--led) 30%, transparent); }
+.mr-sc { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+.mr-sc ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: var(--step--1); }
+.mr-sc ul + ul { text-align: right; }
+.mrdlg__x { justify-self: start; }
+.mr-ev__crest { display: none; flex: none; }
+/* Telefon: jedna kolumna (minuta, herb drużyny, opis), zamiast stron gospodarzy i gości */
+@media (max-width: 600px) {
+  .mrdlg { padding: var(--space-3) var(--space-3) var(--space-4); }
+  .mr-info { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: var(--space-2) var(--space-3); }
+  .mr-ev { grid-template-columns: 40px minmax(0, 1fr); }
+  .mr-ev__min { grid-column: 1; text-align: left; }
+  .mr-ev--h .mr-ev__body, .mr-ev--a .mr-ev__body { grid-column: 2; flex-direction: row; text-align: left; }
+  .mr-ev__crest { display: inline-flex; }
+  .mr-ev__sc { margin-left: auto; }
+}

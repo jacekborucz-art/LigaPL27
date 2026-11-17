@@ -20,17 +20,22 @@ export const EUROPE_VIEWS = [['path', 'Przebieg'], ['league', 'Tabela'], ['fixtu
  * Wiersz meczu w pucharach (wyniki w tle, przebieg, Superpuchar Europy).
  * PC: data | gospodarz (do środka) | wynik | gość | dopisek. Telefon: drużyny jedna pod drugą, wynik po prawej.
  */
-export function ufxRow({ cls = '', date = '', home, away, sh = null, sa = null, time = '', sub = '', winner = null, nameOf = name, crestOf = crest, flagOf = flag, link = false }) {
+export function ufxRow({ cls = '', date = '', home, away, sh = null, sa = null, time = '', sub = '', winner = null, nameOf = name, crestOf = crest, flagOf = flag, link = false, report = null }) {
   const w = (id) => (winner ? (winner === id ? ' is-win' : ' is-out') : '');
   const nm = (id) => (link && isPolish(id) ? `<button class="ufx__nm club-link" data-act="club" data-club="${esc(id)}">${esc(nameOf(id))}</button>` : `<span class="ufx__nm">${esc(nameOf(id))}</span>`);
   const team = (id, side) => `<span class="ufx__t ufx__t--${side}${w(id)}">${crestOf(id)}${nm(id)}${flagOf(id)}</span>`;
   const played = sh != null;
+  // Wynik otwiera raport meczu (report: id meczu); w kolejności klawiatury tylko wynik gospodarzy
+  const rep = played && report != null;
+  const cell = (cls2, v, first) => (rep
+    ? `<button class="${cls2} ufx__rep" data-act="mreport" data-fx="${esc(report)}"${first ? ` aria-label="${esc(`Raport meczu: ${nameOf(home)} ${sh}:${sa} ${nameOf(away)}`)}"` : ' tabindex="-1" aria-hidden="true"'}>${v}</button>`
+    : `<${cls2.startsWith('ufx__mid') ? 'span' : 'b'} class="${cls2}">${v}</${cls2.startsWith('ufx__mid') ? 'span' : 'b'}>`);
   return `<li class="ufx ${cls}${played ? '' : ' is-open'}">
     <span class="ufx__date">${date}</span>
     ${team(home, 'h')}
-    <b class="ufx__s ufx__s--h${w(home)}">${played ? sh : ''}</b>
-    <span class="ufx__mid">${played ? ':' : esc(time || 'vs')}</span>
-    <b class="ufx__s ufx__s--a${w(away)}">${played ? sa : ''}</b>
+    ${cell(`ufx__s ufx__s--h${w(home)}`, played ? sh : '', true)}
+    ${cell('ufx__mid', played ? ':' : esc(time || 'vs'), false)}
+    ${cell(`ufx__s ufx__s--a${w(away)}`, played ? sa : '', false)}
     ${team(away, 'a')}
     <small class="ufx__sub">${sub}</small>
   </li>`;
@@ -49,7 +54,7 @@ function matchRow(m, game) {
   const info = [m.leg ? (m.leg === 1 ? '1. mecz' : 'rewanż') : '', m.md ? `${m.md}. kolejka` : '', m.neutral ? 'teren neutralny' : ''].filter(Boolean).join(', ');
   const sub = [r?.shootout ? `karne ${r.shootout[0]}:${r.shootout[1]}` : r?.extraTime ? 'po dogrywce' : '', info].filter(Boolean).join(' · ');
   return ufxRow({ cls: mine ? 'is-me' : pol ? 'is-pl' : '', date: esc(shortDay(m.date)), home: m.home, away: m.away,
-    sh: r ? r.score[0] : null, sa: r ? r.score[1] : null, time: m.time, sub: esc(sub), winner: winnerOfMatch(m) });
+    sh: r ? r.score[0] : null, sa: r ? r.score[1] : null, time: m.time, sub: esc(sub), winner: winnerOfMatch(m), report: m.id });
 }
 
 function tieRow(t, U, game) {
@@ -92,7 +97,7 @@ function superCupEUPanel(game) {
   return `<section class="stat-sec seu"><div class="sec-head"><h3>Superpuchar Europy ${sc.year}</h3></div>
     <p class="hint">${esc(sc.venue.stadium)}, ${esc(sc.venue.city)} (${esc(sc.venue.country)}), ok. ${Math.round(sc.venue.cap / 1000)} tys. miejsc. ${esc(fmtDate(sc.date))}, ${esc(sc.time)}. Zwycięzca Ligi Mistrzów kontra zwycięzca Ligi Europy, przy remisie od razu rzuty karne.</p>
     <ul class="ufxlist">${ufxRow({ cls: isPolish(sc.home) || isPolish(sc.away) ? 'is-pl' : '', date: esc(shortDay(sc.date)), home: sc.home, away: sc.away,
-      sh: r ? r.score[0] : null, sa: r ? r.score[1] : null, time: sc.time, sub: r?.shootout ? `karne ${r.shootout[0]}:${r.shootout[1]}` : '', winner: sc.winner })}</ul></section>`;
+      sh: r ? r.score[0] : null, sa: r ? r.score[1] : null, time: sc.time, sub: r?.shootout ? `karne ${r.shootout[0]}:${r.shootout[1]}` : '', winner: sc.winner, report: sc.id })}</ul></section>`;
 }
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 

@@ -38,6 +38,7 @@ import { createTactics, changeFormation, setInstruction, refreshTactics, removeF
 import { COMPETITIONS } from './config/competitions.js';
 import { mountMatchday } from './ui/matchdayView.js';
 import { mountDrawAnimation } from './ui/europeView.js';
+import { matchReportHtml } from './ui/matchReportView.js'; // raport meczu po kliknięciu wyniku (docs/raport-meczu.md)
 import { ensureUefa, syncSuperCupEU } from './season/europe.js';
 import { ensureNational, ensureIntl } from './season/nationalSystem.js';
 import { applySeasonState } from './season/rollover.js';
@@ -136,6 +137,26 @@ function openSys(kind) {
   dlg.querySelector('h2')?.setAttribute('tabindex', '-1');
 }
 const closeSys = () => app.querySelector('#sysDlg')?.close();
+
+// ---------- Raport meczu (src/ui/matchReportView.js): okno po kliknięciu wyniku ----------
+let reportFrom = null; // przycisk wyniku: fokus wraca po zamknięciu okna
+function openReport(el) {
+  let dlg = app.querySelector('#mrDlg');
+  if (!dlg) {
+    app.insertAdjacentHTML('beforeend', '<dialog id="mrDlg" class="sysdlg mrdlg" aria-labelledby="mrTitle"></dialog>');
+    dlg = app.querySelector('#mrDlg');
+    dlg.addEventListener('close', () => { if (reportFrom?.isConnected) reportFrom.focus({ preventScroll: true }); reportFrom = null; });
+    dlg.addEventListener('click', (ev) => { // dotknięcie tła poza oknem zamyka raport
+      const r = dlg.getBoundingClientRect();
+      if (ev.target === dlg && (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom)) dlg.close();
+    });
+  }
+  reportFrom = el instanceof HTMLElement ? el : null;
+  dlg.innerHTML = matchReportHtml(state.game, { fx: el.dataset.fx, s: el.dataset.s || null });
+  if (!dlg.open) dlg.showModal();
+  dlg.scrollTop = 0;
+  dlg.querySelector('#mrTitle')?.focus({ preventScroll: true });
+}
 // Nazwa pliku bez polskich znaków i spacji (z nimi przeglądarka odrzuca nazwę i zapisuje „download”)
 const slug = (t) => String(t).replace(/[łŁ]/g, (c) => (c === 'ł' ? 'l' : 'L')).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const saveName = () => { const g = state.game; return `LigaPL27-slot${state.slot}-${slug(clubById(g.clubId)?.name ?? g.clubId)}-${g.date}.json`; };
@@ -1253,6 +1274,8 @@ app.addEventListener('click', (ev) => {
 async function dispatchAct(el, { root = app } = {}) {
   const act = el.dataset.act;
   if (act?.startsWith('sys-') && state.game) { await sysAction(act, el); return; } // Opcje, Zapis, Wyjście
+  if (act === 'mreport' && state.game) { openReport(el); return; } // raport meczu (wynik w terminarzu)
+  if (act === 'mreport-close') { app.querySelector('#mrDlg')?.close(); return; }
   if (isEditorAction(act) && state.game && state.screen === 'editor') { await editorAction(act, el); return; }
   if (isTalkAction(act) && state.game) {
     const r = handleTalkAction(state.game, act, el.dataset, root);
@@ -1672,6 +1695,7 @@ matchMedia(WIDE_PICK).addEventListener?.('change', () => {
 document.addEventListener('keydown', (ev) => {
   if (ev.target.closest('input, select, textarea')) return;
   if (state.screen === 'matchday') return;
+  if (ev.target.closest('#mrDlg')) return; // raport meczu: Escape zamyka tylko okno (przeglądarka), Enter nie gra meczu
   if (ev.key === 'Escape' && state.screen === 'career') { ev.preventDefault(); app.querySelector('[data-act="ncBack"]')?.click(); return; }
   if (ev.key === 'Escape' && state.screen === 'start' && state.confirmDel) { app.querySelector('[data-act="deleteNo"]')?.click(); return; }
   if (ev.key === 'Escape' && state.screen === 'editor') { app.querySelector('[data-act="ed-back"]')?.click(); return; } // edytor: powrót do gry

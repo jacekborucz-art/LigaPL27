@@ -85,7 +85,7 @@ function matchRow(f, game) {
   const tag = res && f.knockout && w ? `<span class="ufx__tag">${f.round === 'F' ? 'zdobywca' : 'awans'}</span>` : '';
   const sub = [res?.shootout ? `karne ${res.shootout[0]}:${res.shootout[1]}` : res?.extraTime ? 'po dogrywce' : '', f.postponed && !res ? 'przełożony' : ''].filter(Boolean).join(', ');
   return ufxRow({ cls: mine ? 'is-me' : '', date: `${esc(shortDay(f.date))} ${esc(fmtDay(f.date))}`, home: f.home, away: f.away,
-    sh: res ? res.score[0] : null, sa: res ? res.score[1] : null, time: f.time ?? '', sub: `${esc(sub)}${tag}`, winner: w, nameOf: name, crestOf: (id) => crest(id), flagOf: () => '', link: true });
+    sh: res ? res.score[0] : null, sa: res ? res.score[1] : null, time: f.time ?? '', sub: `${esc(sub)}${tag}`, winner: w, nameOf: name, crestOf: (id) => crest(id), flagOf: () => '', link: true, report: f.id });
 }
 
 function fixturesView(game, comp, round) {

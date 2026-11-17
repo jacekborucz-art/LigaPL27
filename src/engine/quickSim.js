@@ -150,6 +150,7 @@ export function quickKnockout(home, away, ctx, rng, mode = 'single') {
   if (mode === 'single' || mode?.firstLeg) {
     const eH = rng.poisson(lH / 3.3); const eA = rng.poisson(lA / 3.3);
     r.extraTime = true;
+    r.regScore = [...r.score]; // wynik po 90 minutach (raport meczu: gole dogrywki to końcówka listy strzelców)
     r.score = [r.score[0] + eH, r.score[1] + eA];
     r.scorers[0].push(...pickScorers(r._teams[0], eH, rng));
     r.scorers[1].push(...pickScorers(r._teams[1], eA, rng));

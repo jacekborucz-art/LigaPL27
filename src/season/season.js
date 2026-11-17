@@ -32,6 +32,7 @@ import { statGroup, addPlayerMatch, syncSpell, recordTeamMatch, CLUB_GROUPS } fr
 import { matchRepEvents } from '../career/reputation.js';
 import { refStrictFor, refereeAfterMatch } from '../career/referees.js';
 import { noteSuspWhy, clearSuspWhy } from './suspension.js'; // powód pauzy: żółte albo czerwona (znaczniki w Kadrze)
+import { quickEvents, engineEvents, packReport } from './matchReport.js'; // raport meczu (docs/raport-meczu.md)
 
 export { LEAGUE_COMPS, L3_COMPS, isL3Comp, compOfClub, compClubIds };
 const ALL_CLUBS = [...CLUBS_PL, ...CLUBS_L3, ...CLUBS_L4, ...UEFA_CLUBS];
@@ -230,6 +231,7 @@ export function playQuick(game, f, rng, cache = new Map()) {
   const r = f.knockout ? quickKnockout(home, away, ctx, rng, f.knockout) : quickMatch(home, away, ctx, rng);
   // Zawodnicy w meczu: jedenastka z symulacji; kartki rozdzielone wg agresji, asysty do partnerów
   const lineups = r.xi;
+  const goals = [[], []]; // raport meczu: [strzelec, asystent] w kolejności z symulacji (src/season/matchReport.js)
   const players = [0, 1].map((s) => {
     const squad = s === 0 ? home.squad : away.squad;
     const byId = new Map(squad.map((p) => [p.id, p]));
@@ -238,11 +240,14 @@ export function playQuick(game, f, rng, cache = new Map()) {
     const find = (id) => out.find((x) => x.id === id);
     for (const id of r.scorers[s]) {
       const x = find(id); if (x) x.g++;
+      let aid = null;
       if (rng.chance(QUICK_RATING.assistShare) && out.length > 1) {
         // Asystujący według pozycji i umiejętności podań (jak w pełnym silniku: bramkarz praktycznie nigdy)
         const as = rng.weighted(out.filter((y) => y.id !== id), (y) => { const q = byId.get(y.id); return (ASSIST_W[q?.pos] ?? 1) * ((q?.attr?.POD ?? 10) + (q?.attr?.DOS ?? 10) + (q?.attr?.WIZ ?? 10)) / 30; });
         as.a++;
+        aid = as.id;
       }
+      goals[s].push([id, aid]);
     }
     for (let i = 0; i < r.yellow[s]; i++) rng.weighted(out, (x) => (byId.get(x.id).attr?.AGR ?? 10) * (x.yc ? 0.4 : 1)).yc++;
     for (let i = 0; i < r.red[s]; i++) rng.weighted(out, (x) => byId.get(x.id).attr?.AGR ?? 10).rc = 1;
@@ -260,6 +265,8 @@ export function playQuick(game, f, rng, cache = new Map()) {
     score: r.score, scorers: r.scorers, shootout: r.shootout ?? null, extraTime: !!r.extraTime,
     stats: { shots: r.shots, onTarget: r.onTarget, possession: r.possession, xg: r.xg },
     players, strengthDiff: r.model.dH - r.model.dA, quick: true,
+    // Raport meczu: minuty goli, kartek i kontuzji z osobnego ziarna (wynik i skutki meczu bez zmian)
+    ev: quickEvents({ goals, players, extraTime: !!r.extraTime, regScore: r.regScore ?? null }, `${game.seed}:${f.id}`),
   };
 }
 
@@ -316,6 +323,8 @@ export function fromEngineResult(r) {
     score: walkoverScore(r), scorers, shootout: r.shootout?.goals ?? null, extraTime: r.extraTime,
     stats: { shots: [r.stats[0].shots, r.stats[1].shots], onTarget: [r.stats[0].onTarget, r.stats[1].onTarget], possession: [r.stats[0].possession, r.stats[1].possession], xg: [r.stats[0].xg, r.stats[1].xg] },
     players, strengthDiff: 0, quick: false,
+    // Raport meczu: zdarzenia z dziennika silnika (gole, kartki, kontuzje, zmiany, VAR) i seria rzutów karnych
+    ev: engineEvents(r.events), pk: (r.shootout?.kicks ?? []).map((k) => [k.side, k.pid, k.scored ? 1 : 0]), abandoned: !!r.abandoned,
   };
 }
 
@@ -391,7 +400,7 @@ export function yellowSuspension(comp, count) {
  */
 export function applyResult(game, f, res, rng) {
   f.played = true;
-  f.result = { score: res.score, scorers: res.scorers, shootout: res.shootout, extraTime: res.extraTime, stats: res.stats };
+  f.result = { score: res.score, scorers: res.scorers, shootout: res.shootout, extraTime: res.extraTime, stats: res.stats, ...packReport(res, f) };
   const msgs = [];
   const inSquad = new Set(); // kadra meczowa obu drużyn (przydziały z rezerw: wykorzystane albo przepadłe)
   [f.home, f.away].forEach((clubId, s) => {
