@@ -174,11 +174,17 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
   // ---------- Siła składu (PC: zwijana w kolumnie boiska, błędy składu zawsze widoczne nad zwijaną częścią)
   const z = check.rating.zones;
   const zoneList = [['Bramkarz', z.GK], ['Obrona', z.DEF], ['Pomoc', z.MID], ['Atak', z.ATT]];
-  const strengthHtml = `<div class="tac__strength"${wide ? ` data-open="${strengthOpen ? 1 : 0}"` : ''}>
-        ${check.errors.length ? `<div class="notice notice--err" role="alert"><b>Skład nie przejdzie przed meczem:</b><ul class="plain">${check.errors.map((e) => `<li>${esc(e)}</li>`).join('')}</ul></div>` : ''}
-        ${check.warnings.length ? `<div class="notice"><ul class="plain">${check.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
-        ${wide ? `<h3><button class="tac__fold" data-act="tstrength" aria-expanded="${strengthOpen}" aria-controls="tac-str-body"><span>Siła składu</span><span class="tac__fold-sum" aria-hidden="true">${zoneList.map(([, v]) => Math.round(v)).join(' ')}</span><span class="tac__fold-ico" aria-hidden="true"></span></button></h3>` : '<h3>Siła składu</h3>'}
-        <ul class="zones"${wide ? ' id="tac-str-body"' : ''}>
+  const notesHtml = `${check.errors.length ? `<div class="notice notice--err" role="alert"><b>Skład nie przejdzie przed meczem:</b><ul class="plain">${check.errors.map((e) => `<li>${esc(e)}</li>`).join('')}</ul></div>` : ''}
+        ${check.warnings.length ? `<div class="notice"><ul class="plain">${check.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}`;
+  // PC: panel „Siła składu” usunięty (decyzja właściciela Nov 17, 2026), zostają tylko błędy i ostrzeżenia składu.
+  // Telefon bez zmian. strengthOpen i zoneList zostają dla telefonu.
+  void strengthOpen;
+  const strengthHtml = wide
+    ? (notesHtml.trim() ? `<div class="tac__strength tac__notes">${notesHtml}</div>` : '')
+    : `<div class="tac__strength">
+        ${notesHtml}
+        <h3>Siła składu</h3>
+        <ul class="zones">
           ${zoneList.map(([k, v]) => `<li><span>${k}</span><span class="abar"><i data-b="${v >= 13 ? 'top' : v >= 11 ? 'good' : v >= 8 ? 'mid' : 'low'}" style="width:${Math.max(0, Math.min(100, v * 5))}%"></i></span><b>${Math.round(v)}</b></li>`).join('')}
         </ul>
       </div>`;

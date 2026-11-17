@@ -77,7 +77,7 @@ test('Niedostępny zawodnik (kontuzja) jest zawsze „no”, bez odznaki; progi 
   assert.equal(profBand(69), 'weak'); assert.equal(profBand(50), 'weak'); assert.equal(profBand(49), 'no');
 });
 
-test('Telefon bez zmian układu: bez przycisku zwijania i bez paska karty; PC: zwijana siła składu i pływająca karta', () => {
+test('Telefon bez zmian układu: bez przycisku zwijania i bez paska karty; PC: bez panelu siły składu, pływająca karta', () => {
   const pid = tactics.xi[3];
   const phone = view({ info: pid });
   assert.doesNotMatch(phone, /data-act="tstrength"/);
@@ -85,8 +85,8 @@ test('Telefon bez zmian układu: bez przycisku zwijania i bez paska karty; PC: z
   assert.match(phone, /<h3>Siła składu<\/h3>/);
   assert.match(phone, /<dialog class="tdet" open/);
   const pc = view({ wide: true, strengthOpen: false, cards: [{ id: pid, pinned: true, slot: 0 }, { id: tactics.bench[0], pinned: false, slot: 1 }] });
-  assert.match(pc, /class="tac__strength" data-open="0"/);
-  assert.match(pc, /data-act="tstrength" aria-expanded="false"/);
+  assert.doesNotMatch(pc, /Siła składu/); // PC: panel usunięty (Nov 17, 2026), telefon go zachowuje
+  assert.doesNotMatch(pc, /data-act="tstrength"/);
   assert.equal((pc.match(/<dialog class="tdet tcard"/g) ?? []).length, 2);
   assert.match(pc, /data-act="tcardpin" data-id="[^"]+" aria-pressed="true"/);
   assert.match(pc, /data-act="tinfoclose" data-id="/);
