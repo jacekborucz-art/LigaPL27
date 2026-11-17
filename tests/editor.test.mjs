@@ -228,3 +228,28 @@ test('Profil wolnego zawodnika (bez kontraktu) otwiera się bez błędu', async 
   const html = renderPlayerProfile(free, { leagueOvrs: [10, 11, 12], clubName: 'Wolny zawodnik', date: g.date, game: g, foreign: true, back: { act: 'extback', label: 'Wróć' } });
   assert.match(html, /Wolny zawodnik, bez kontraktu/);
 });
+
+test('Nowa kariera z datapackiem: świat z ziarna pliku, zawodnicy i kluby z pliku od startu (inny klub gracza)', () => {
+  const src = game(31);
+  const pid = squadOf(src.world, 'lech')[0].id;
+  editPlayer(src, pid, { first: 'Paczka', last: 'Testowa', attrs: { POD: 19 } });
+  editClub(src, 'lech', { name: 'Lech Paczkowy' });
+  const pack = parsePack(JSON.stringify(exportPack(src, new Date('2026-11-18T10:00:00Z'), { full: true })));
+  restoreOriginals();
+  // Nowa gra jak w app.js newGame: ziarno z pliku, inny klub gracza, potem importPack
+  const g = { seed: pack.seed, clubId: 'legia', date: '2026-07-01', season: '2026/27', inbox: [] };
+  g.world = generateWorld(g.seed);
+  g.season = createSeason(g.seed, { playerClub: 'legia' });
+  g.fixtures = g.season.fixtures;
+  g.tactics = createTactics(squadOf(g.world, 'legia'), { benchSize: 12 });
+  ensureTraining(g); ensureCareer(g);
+  const r = importPack(g, pack);
+  assert.equal(r.otherWorld, false);
+  assert.ok(r.players > 0);
+  const p = g.world.players[pid];
+  assert.equal(p.name, 'Paczka Testowa');
+  assert.equal(p.attr.POD, 19);
+  assert.equal(p.clubId, 'lech', 'ten sam skład klubu co w pliku');
+  assert.equal(clubById('lech').name, 'Lech Paczkowy');
+  restoreOriginals();
+});

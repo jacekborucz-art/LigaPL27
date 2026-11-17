@@ -88,6 +88,15 @@ Wczytanie pełnego pliku działa jak zwykłego: do datapacku gry trafiają tylko
 - Zawodnicy: tylko gdy `seed` pliku = ziarno gry, bo zawodnicy są losowani z ziarna świata. W innym świecie: „Zawodnicy pominięci: inny świat gry”. Zawodników, których już nie ma w grze, edytor pomija; datę urodzenia poza zakresem wieku też.
 - Zmiany łączą się z datapackiem gry, gra zapisuje się od razu, a edytor pokazuje podsumowanie (ile klubów i zawodników zastosowano i pominięto).
 
+## Nowa kariera z datapackiem (Nov 18, 2026)
+
+W Nowej karierze, w kroku wyboru klubu, jest opcjonalne pole „Wczytaj datapack”. Bez pliku kadry są losowane jak dotąd.
+Z plikiem (najlepiej pełny eksport z Edytora):
+- plik jest sprawdzany od razu (`parsePack`), widać nazwę pliku i liczbę klubów i zawodników; nazwy klubów z pliku widać już na liście klubów (`applyPack` na obiektach klubów), „Usuń datapack” przywraca oryginały;
+- po podpisaniu kontraktu `newGame` (src/app.js) losuje świat z ziarna pliku (`pack.seed`), więc identyfikatory i przynależność zawodników do klubów są takie jak w grze, z której wyeksportowano plik; potem `importPack` nakłada kluby (nazwy, stadion, pojemność, finanse) i zawodników (dane, atrybuty, potencjał), skład klubu gracza liczy się od nowa, a w poczcie jest wiadomość z podsumowaniem;
+- plik bez ziarna: zastosowane tylko kluby.
+- Ograniczenie: datapack nie przenosi zawodników między klubami ani nie dodaje nowych (kadry jak w świecie z ziarna pliku). Plik z gry w późniejszym sezonie zawiera zawodników, których w nowym świecie jeszcze nie ma (np. nowi juniorzy): są pomijani.
+
 ## Uproszczenia
 
 - Ekran startowy pokazuje oryginalną nazwę klubu przy slocie zapisu (nazwy z datapacku nakłada dopiero wczytanie gry).

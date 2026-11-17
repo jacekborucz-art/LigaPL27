@@ -503,7 +503,8 @@ function stepClub(nc, { wide }) {
         <div class="ltabs" role="tablist" aria-label="Liga">${tabs}</div>
       </div>
       ${groups}
-      <p class="nc__lead">Siła to kadra na tle ligi. Od niej zależy cel zarządu. Kadry wylosujemy po podpisaniu kontraktu.</p>
+      ${packBox(nc)}
+      <p class="nc__lead">Siła to kadra na tle ligi. Od niej zależy cel zarządu. ${nc.pack ? 'Kadry pochodzą z wczytanego datapacku.' : 'Kadry wylosujemy po podpisaniu kontraktu.'}</p>
       <ul class="cc-grid" id="club-grid" role="tabpanel" aria-labelledby="tier-${nc.tier}">${cards}</ul>
       ${sel && !selInTier ? `<p class="pick2__other">Wybrany klub: ${esc(sel.name)} (${esc(leagueLabel(sel))}).</p>` : ''}
     </div>
@@ -511,6 +512,21 @@ function stepClub(nc, { wide }) {
   </div>`;
   const label = sel ? `Dalej: ${esc(sel.name)}` : 'Dalej: kontrakt';
   return shell(nc, body, `<button class="btn btn--primary nc__next" data-act="pickConfirm">${label}</button>`);
+}
+
+/**
+ * Datapack na start kariery (opcjonalnie, docs/edytor.md): plik z Edytora (najlepiej pełny eksport). Gra startuje
+ * w świecie z ziarna pliku i z jego klubami i zawodnikami; bez pliku kadry są losowane jak dotąd.
+ */
+function packBox(nc) {
+  const P = nc.pack;
+  const info = P
+    ? `<p class="nc-pack__ok"><b>${esc(P.fileName ?? 'Datapack')}</b>: ${P.clubs} klubów, ${P.players} zawodników${P.seed == null ? ' (bez ziarna świata: zastosujemy tylko kluby)' : ''}.</p>
+       <button class="btn btn--quiet btn--sm" data-act="ncPackClear">Usuń datapack</button>`
+    : '<p class="hint">Opcjonalnie: wczytaj datapack z Edytora (Opcje, Edytor, Eksportuj), żeby zacząć z jego kadrami. Bez pliku kadry zostaną wylosowane.</p>';
+  return `<div class="nc-pack">${info}
+    <label class="btn btn--quiet btn--sm nc-pack__load">${P ? 'Wczytaj inny datapack' : 'Wczytaj datapack'}<input type="file" accept=".json,application/json" data-act="nc-pack" hidden></label>
+    ${nc.packMsg ? `<p class="nc-pack__err" role="alert">${esc(nc.packMsg)}</p>` : ''}</div>`;
 }
 
 // ------------------------------------------------------------ Krok 3: kontrakt

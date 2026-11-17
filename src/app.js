@@ -9,7 +9,7 @@ import { migratePosCodes } from './engine/positions.js'; // zapisy sprzed zmiany
 import { ensureReserves, reservesOf } from './career/reserves.js';
 import * as store from './core/store.js';
 import { hashString } from './core/rng.js';
-import { CATEGORIES, unreadCount, markRead, markAllRead, resolveMessage, filterInbox, pendingDecisions, addMessages, pruneInbox, canDelete } from './core/inbox.js';
+import { CATEGORIES, unreadCount, markRead, markAllRead, resolveMessage, filterInbox, pendingDecisions, addMessages, pruneInbox, canDelete, createMessage } from './core/inbox.js';
 import { processDay, primaryAction, continueUntilStop, finishMatch, forgetMessages } from './core/gameLoop.js';
 import './season/dailySystems.js';
 import { createSeason, compLabel, applyResult, fromEngineResult, squadFor, anyClub, LEAGUE_COMPS } from './season/season.js';
@@ -221,6 +221,25 @@ function exportDatapack(full = false) {
   state.ed.msg = full ? `Zapisano plik ${name}: ${Object.keys(pack.clubs).length} klubów, ${Object.keys(pack.players).length} zawodników.` : `Zapisano plik ${name}.`; state.ed.errors = null;
   render();
 }
+
+// Nowa kariera: datapack na start (opcjonalnie). Plik sprawdzany od razu, nakładany w newGame po wylosowaniu świata.
+app.addEventListener('change', async (ev) => {
+  const input = ev.target.closest?.('input[data-act="nc-pack"]');
+  if (!input || !input.files?.[0] || !state.nc) return;
+  const nc = state.nc;
+  try {
+    const file = input.files[0];
+    if (file.size > 40e6) throw new Error('Plik jest za duży jak na datapack.');
+    const pack = parsePack(await file.text());
+    nc.pack = { data: pack, fileName: file.name, clubs: Object.keys(pack.clubs).length, players: Object.keys(pack.players).length, seed: pack.seed };
+    nc.packMsg = '';
+    applyPack({ editor: { clubs: pack.clubs } }); // nazwy klubów z pliku widać już przy wyborze klubu
+  } catch (err) {
+    nc.packMsg = `Nie wczytano pliku: ${err.message}`;
+  }
+  input.value = '';
+  render();
+});
 
 // Wczytanie datapacku, wyszukiwarki i filtry edytora (pola INPUT i SELECT nie przechodzą przez dispatchAct)
 app.addEventListener('change', async (ev) => {
@@ -1237,7 +1256,9 @@ app.addEventListener('change', async (ev) => {
 async function newGame(slot, clubId, profile = null) {
   applySeasonState({});
   restoreOriginals();
-  const seed = hashString(`${clubId}:${Date.now()}:${Math.random()}`);
+  // Datapack z Nowej kariery: świat z ziarna pliku (te same identyfikatory zawodników), potem zmiany z pliku
+  const pack = state.nc?.pack?.data ?? null;
+  const seed = Number.isFinite(pack?.seed) ? pack.seed : hashString(`${clubId}:${Date.now()}:${Math.random()}`);
   const game = {
     seed, clubId, date: GAME_START, season: SEASON, createdAt: new Date().toISOString(),
     inbox: [],
@@ -1251,6 +1272,12 @@ async function newGame(slot, clubId, profile = null) {
   ensureTraining(game);
   ensureCareer(game);
   ensureReferees(game);
+  if (pack) {
+    const r = importPack(game, pack); // kluby (nazwy, stadion, finanse) i zawodnicy (dane, atrybuty) z pliku
+    game.tactics = createTactics(squadOf(game.world, clubId), { benchSize: benchSizeFor(game) });
+    afterSquadChange(game);
+    game.inbox = addMessages(game.inbox, [createMessage({ date: game.date, key: 'datapack-start', category: 'club', from: 'Edytor', priority: 'info', subject: 'Gra z datapackiem', body: `Kariera rozpoczęta z datapackiem ${state.nc?.pack?.fileName ?? ''}. ${importSummary(r)}` })]).inbox;
+  }
   processDay(game);
   state.game = game;
   state.slot = slot;
@@ -1363,6 +1390,7 @@ async function dispatchAct(el, { root = app } = {}) {
       h?.focus({ preventScroll: true });
     }
     if (act === 'theme') { state.theme = nextTheme(state.theme); applyTheme(state.theme); state.menuFocus = '[data-act="theme"]'; render(); }
+    if (act === 'ncPackClear' && state.nc) { state.nc.pack = null; state.nc.packMsg = ''; restoreOriginals(); render(); }
     if (act === 'ncBack') {
       if (!state.nc || state.nc.step <= 1) { state.screen = 'start'; render(); }
       else careerGo(state.nc.step - 1, state.nc.step === 3 && state.nc.clubId ? `[data-club="${state.nc.clubId}"]` : '#nc-first');
