@@ -13,7 +13,7 @@ import { attrGroupsHtml } from './squadView.js';
 import { locKey, playerAt } from './tacticsMoves.js';
 import { esc } from './dom.js';
 import { formChartHtml } from './formChart.js';
-import { positionMapHtml } from './positionMap.js';
+import { positionMapHtml, profBand } from './positionMap.js';
 
 const band = (prof) => (prof >= 85 ? 'ok' : prof >= 60 ? 'mid' : 'bad');
 const few = (n) => n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14);
@@ -34,11 +34,31 @@ const posText = (p) => `${p.pos}${p.side ? ` ${p.side}` : ''}`;
 const dragAttrs = (loc, p) => `data-drag="${esc(locKey(loc))}" data-gname="${esc(p.name)}" data-gpos="${esc(p.pos)}" data-gg="${GROUP[p.pos]}"`;
 
 /**
+ * Zmiennik na miejscu s (pozycja i strona slotu): pasmo biegłości jak w mapie pozycji karty
+ * (opt od 85, ok od 70, weak od 50, niżej albo niedostępny: no). Tylko obliczenie do widoku, zasady gry bez zmian.
+ */
+export function repLevel(p, s) {
+  if (!isAvailable(p)) return { b: 'no', v: 0, nat: false };
+  const v = Math.round(proficiency(p, s.pos, s.side));
+  return { b: profBand(v), v, nat: p.pos === s.pos && (!s.side || !p.side || p.side === 'LP' || p.side === s.side) };
+}
+const REP_WORD = { ok: 'da radę', weak: 'słabo' };
+const repWord = (r) => (r.b === 'opt' ? (r.nat ? 'naturalny' : 'pasuje') : REP_WORD[r.b] ?? '');
+const repAttr = (r) => (r ? ` data-rep="${r.b}"` : '');
+const repAria = (r) => (r && r.b !== 'no' ? `, zmiennik: ${repWord(r)}` : '');
+const repBadge = (r) => (r && r.b !== 'no'
+  ? `<span class="tp-rep">${esc(r.b === 'opt' ? (r.nat ? 'Naturalny' : 'Pasuje') : r.b === 'ok' ? `Da radę ${r.v}%` : `Słabo ${r.v}%`)}</span>` : '');
+const hitsWord = (n) => (n !== 1 && few(n) ? 'pasują' : 'pasuje');
+
+/**
  * sel: null | loc ({ zone: 'xi'|'bench'|'out', idx?, id? }), zob. tacticsMoves.js.
  * info: id zawodnika z otwartym panelem atrybutów. msg: komunikat po ostatnim ruchu.
+ * cards: otwarte karty zawodników [{ id, pinned, slot, extra }] (PC: do dwóch pływających okien; brak: jedna karta z info).
+ * wide: szeroki ekran (PC od 1100 px): zwijana siła składu w kolumnie boiska, karta jako pływające okno.
+ * strengthOpen: rozwinięta siła składu (tylko wide).
  * rzChips: plakietki rezerw (src/ui/reservesView.js, rzChipFn), rzStrip: pasek rezerw nad ławką (klub bez rezerw: brak).
  */
-export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg = '', numbers = null, kit = null, infoExtra = '', rzChips = null, rzStrip = '' }) {
+export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg = '', numbers = null, kit = null, infoExtra = '', rzChips = null, rzStrip = '', cards = null, wide = false, strengthOpen = true }) {
   const byId = new Map(squad.map((p) => [p.id, p]));
   const f = formationById(tactics.formation);
   const check = checkTactics(tactics, squad, { benchSize });
@@ -47,7 +67,21 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
   const selPlayer = selId ? byId.get(selId) : null;
   const inXI = new Set(tactics.xi.filter(Boolean));
   const onBench = new Set(tactics.bench);
-  const infoPlayer = info ? byId.get(info) : null;
+  const openCards = (cards ?? (info ? [{ id: info, pinned: false, slot: 0, extra: infoExtra }] : [])).filter((c) => byId.has(c.id));
+  const openIds = new Set(openCards.map((c) => c.id));
+
+  // ---------- Zmiennicy po wyborze: wybrane miejsce w XI -> kandydaci na to miejsce;
+  // wybrany zawodnik z ławki albo spoza kadry -> miejsca w XI, na których zagra.
+  const selSlot = sel?.zone === 'xi' ? f.slots[sel.idx] ?? null : null;
+  const repAt = (p, slotIdx = null) => {
+    if (selSlot) return p && slotIdx !== sel.idx ? repLevel(p, selSlot) : null;
+    if (selPlayer && slotIdx != null) return repLevel(selPlayer, f.slots[slotIdx]);
+    return null;
+  };
+  const tally = { opt: 0, ok: 0, weak: 0 };
+  const hits = { xi: 0, bench: 0, out: 0 };
+  const count = (r, zone) => { if (r && r.b in tally) { tally[r.b] += 1; if (r.b === 'opt') hits[zone] += 1; } };
+  const hitsHtml = (zone) => (hits[zone] ? ` <span class="tp-sec__hits">${hits[zone]} ${hitsWord(hits[zone])}</span>` : '');
 
   // ---------- Boisko
   const slotsHtml = f.slots.map((s, i) => {
@@ -56,9 +90,11 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
     const p = byId.get(tactics.xi[i]);
     const prof = p ? proficiency(p, s.pos, s.side) : 0;
     const isSel = selKey === key;
+    const r = repAt(p, i);
     const cls = ['slot-btn', p ? `slot-btn--${band(prof)}` : 'slot-btn--empty', s.pos === 'BR' ? 'slot-btn--gk' : '', isSel ? 'is-sel' : ''].filter(Boolean).join(' ');
-    return `<button class="${cls}" style="left:${s.x}%;top:${100 - s.y}%" data-act="tslot" data-loc="${key}" data-drop="${key}" data-handle ${p ? `${dragAttrs(loc, p)} data-pid="${esc(p.id)}"` : ''}
-      aria-pressed="${isSel}" aria-label="${esc(s.pos)}: ${p ? esc(p.name) : 'puste miejsce'}${p && prof < 85 ? `, poza pozycją (${prof}%)` : ''}">
+    return `<button class="${cls}" style="left:${s.x}%;top:${100 - s.y}%" data-act="tslot" data-loc="${key}" data-drop="${key}" data-handle ${p ? `${dragAttrs(loc, p)} data-pid="${esc(p.id)}"` : ''}${repAttr(r)}
+      aria-pressed="${isSel}" aria-label="${esc(s.pos)}: ${p ? esc(p.name) : 'puste miejsce'}${p && prof < 85 ? `, poza pozycją (${prof}%)` : ''}${esc(repAria(r))}">
+      ${r && r.b !== 'no' ? `<span class="slot-btn__rep" aria-hidden="true">${r.v}%</span>` : ''}
       <span class="slot-btn__dot">${p ? (numbers?.get(p.id) ?? Math.round(p.ovr)) : '+'}</span>
       <span class="slot-btn__name">${p ? esc(p.last) : esc(s.pos)}</span>
       ${p && tactics.captain === p.id ? '<span class="slot-btn__c" aria-hidden="true">C</span>' : ''}
@@ -66,7 +102,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
   }).join('');
 
   // ---------- Listy
-  const infoBtn = (p) => `<button class="tp-row__i" data-act="tinfo" data-id="${esc(p.id)}" aria-label="Atrybuty: ${esc(p.name)}" aria-expanded="${info === p.id}">i</button>`;
+  const infoBtn = (p) => `<button class="tp-row__i" data-act="tinfo" data-id="${esc(p.id)}" aria-label="Atrybuty: ${esc(p.name)}" aria-expanded="${openIds.has(p.id)}">i</button>`;
   // Uchwyt (kropki i plakietka pozycji): za niego przeciąga się palcem, reszta wiersza przewija listę.
   const handle = (pos, g) => `<span class="tp-handle" data-handle><span class="tp-grip" aria-hidden="true"></span><span class="pos" data-g="${g}">${esc(pos)}</span></span>`;
 
@@ -75,21 +111,23 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
     const key = locKey(loc);
     const p = byId.get(tactics.xi[i]);
     const isSel = selKey === key;
+    const r = repAt(p, i);
+    count(r, 'xi');
     if (!p) {
-      return `<li class="tp-row tp-row--empty ${isSel ? 'is-sel' : ''}" data-drop="${key}">
+      return `<li class="tp-row tp-row--empty ${isSel ? 'is-sel' : ''}" data-drop="${key}"${repAttr(r)}>
         <button class="tp-row__main" data-act="tpick" data-loc="${key}" aria-pressed="${isSel}">
           <span class="tp-handle tp-handle--none"><span class="tp-grip" aria-hidden="true"></span><span class="pos" data-g="${GROUP[s.pos]}">${esc(s.pos)}</span></span>
-          <span class="tp-row__name">Puste miejsce</span><b></b>
+          <span class="tp-row__name">Puste miejsce${repBadge(r)}</span><b></b>
         </button>
       </li>`;
     }
     const prof = proficiency(p, s.pos, s.side);
     const reason = unavailableReason(p);
     const fit = prof < 100 ? `<small class="tp-fit" data-fit="${band(prof)}">${esc(posText(p))}, ${prof}% na tej pozycji</small>` : '';
-    return `<li class="tp-row ${isSel ? 'is-sel' : ''} ${reason ? 'is-off' : ''}" data-drop="${key}" data-pid="${esc(p.id)}">
+    return `<li class="tp-row ${isSel ? 'is-sel' : ''} ${reason ? 'is-off' : ''}" data-drop="${key}" data-pid="${esc(p.id)}"${repAttr(r)}>
       <button class="tp-row__main" data-act="tpick" data-loc="${key}" ${dragAttrs(loc, p)} aria-pressed="${isSel}">
         ${handle(s.pos, GROUP[s.pos])}
-        <span class="tp-row__name">${esc(p.name)}${tactics.captain === p.id ? ' <abbr class="tp-c" title="Kapitan">C</abbr>' : ''}${reason ? `<small class="tp-off">${esc(reason)}</small>` : fit}${rzChips ? rzChips(p, { short: true }) : ''}</span>
+        <span class="tp-row__name"><span class="tp-row__nm">${esc(p.name)}</span>${tactics.captain === p.id ? ' <abbr class="tp-c" title="Kapitan">C</abbr>' : ''}${reason ? `<small class="tp-off">${esc(reason)}</small>` : fit}${repBadge(r)}${rzChips ? rzChips(p, { short: true }) : ''}</span>
         ${condHtml(p)}<b class="tp-ovr" title="Ocena ogólna w skali 1-20">${Math.round(p.ovr)}</b>
       </button>
       ${infoBtn(p)}
@@ -101,10 +139,12 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
     const reason = unavailableReason(p);
     const isSel = selKey === key;
     const where = loc.zone;
-    return `<li class="tp-row ${isSel ? 'is-sel' : ''} ${reason ? 'is-off' : ''}" data-drop="${esc(key)}" data-pid="${esc(p.id)}">
+    const r = repAt(p);
+    count(r, where);
+    return `<li class="tp-row ${isSel ? 'is-sel' : ''} ${reason ? 'is-off' : ''}" data-drop="${esc(key)}" data-pid="${esc(p.id)}"${repAttr(r)}>
       <button class="tp-row__main" data-act="tpick" data-loc="${esc(key)}" ${dragAttrs(loc, p)} aria-pressed="${isSel}">
         ${handle(posText(p), GROUP[p.pos])}
-        <span class="tp-row__name">${esc(p.name)}${reason ? `<small class="tp-off">${esc(reason)}</small>` : ''}${rzChips ? rzChips(p, { short: true }) : ''}</span>
+        <span class="tp-row__name"><span class="tp-row__nm">${esc(p.name)}</span>${reason ? `<small class="tp-off">${esc(reason)}</small>` : ''}${repBadge(r)}${rzChips ? rzChips(p, { short: true }) : ''}</span>
         ${condHtml(p)}<b class="tp-ovr" title="Ocena ogólna w skali 1-20">${Math.round(p.ovr)}</b>
       </button>
       ${infoBtn(p)}
@@ -125,16 +165,29 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
   const out = squad.filter((p) => !inXI.has(p.id) && !onBench.has(p.id))
     .sort((a, b) => Number(isAvailable(b)) - Number(isAvailable(a)) || byPosition(a, b)).map((p) => row(p, { zone: 'out', id: p.id })).join('');
 
+  const repSum = sel && (tally.opt || tally.ok || tally.weak) ? ` Pasuje: ${tally.opt}, da radę: ${tally.ok}, słabo: ${tally.weak}.` : '';
   const status = msg || (selPlayer
-    ? `Wybrano: ${selPlayer.name}. Wskaż miejsce, na które ma przejść, albo zawodnika do zamiany.`
-    : sel?.zone === 'xi' ? `Wybrano puste miejsce (${f.slots[sel.idx]?.pos}). Wskaż zawodnika z listy.`
+    ? `Wybrano: ${selPlayer.name}. Wskaż miejsce, na które ma przejść, albo zawodnika do zamiany.${repSum}`
+    : sel?.zone === 'xi' ? `Wybrano puste miejsce (${f.slots[sel.idx]?.pos}). Wskaż zawodnika z listy.${repSum}`
       : 'Przeciągnij zawodnika na inne miejsce albo dotknij dwóch miejsc po kolei. Dwuklik na nazwisku pokazuje atrybuty, prawy przycisk albo przytrzymanie nazwiska: więcej opcji.');
 
-  // ---------- Siła składu
+  // ---------- Siła składu (PC: zwijana w kolumnie boiska, błędy składu zawsze widoczne nad zwijaną częścią)
   const z = check.rating.zones;
+  const zoneList = [['Bramkarz', z.GK], ['Obrona', z.DEF], ['Pomoc', z.MID], ['Atak', z.ATT]];
+  const strengthHtml = `<div class="tac__strength"${wide ? ` data-open="${strengthOpen ? 1 : 0}"` : ''}>
+        ${check.errors.length ? `<div class="notice notice--err" role="alert"><b>Skład nie przejdzie przed meczem:</b><ul class="plain">${check.errors.map((e) => `<li>${esc(e)}</li>`).join('')}</ul></div>` : ''}
+        ${check.warnings.length ? `<div class="notice"><ul class="plain">${check.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
+        ${wide ? `<h3><button class="tac__fold" data-act="tstrength" aria-expanded="${strengthOpen}" aria-controls="tac-str-body"><span>Siła składu</span><span class="tac__fold-sum" aria-hidden="true">${zoneList.map(([, v]) => Math.round(v)).join(' ')}</span><span class="tac__fold-ico" aria-hidden="true"></span></button></h3>` : '<h3>Siła składu</h3>'}
+        <ul class="zones"${wide ? ' id="tac-str-body"' : ''}>
+          ${zoneList.map(([k, v]) => `<li><span>${k}</span><span class="abar"><i data-b="${v >= 13 ? 'top' : v >= 11 ? 'good' : v >= 8 ? 'mid' : 'low'}" style="width:${Math.max(0, Math.min(100, v * 5))}%"></i></span><b>${Math.round(v)}</b></li>`).join('')}
+        </ul>
+      </div>`;
   const xiPlayers = tactics.xi.map((id) => byId.get(id)).filter(Boolean);
   const roleSelect = (role, label) => `<label class="role"><span>${label}</span>
     <select data-act="trole" data-role="${role}">${xiPlayers.map((p) => `<option value="${esc(p.id)}" ${tactics[role] === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>`;
+  // Karty zawodników: na PC pływające okna (do dwóch, w kolejności miejsc), na telefonie jedna karta jako arkusz.
+  const cardsHtml = openCards.slice().sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0))
+    .map((c) => renderPlayerInfo(byId.get(c.id), tactics, f, c.extra ?? '', { wide, pinned: !!c.pinned, slot: c.slot ?? 0 })).join('');
 
   return `
   <div class="tac${sel ? ' has-sel' : ''}">
@@ -149,35 +202,27 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
         <button class="btn btn--quiet" data-act="tauto">Ustaw automatycznie</button>
         ${sel ? '<button class="btn btn--quiet" data-act="tcancel">Anuluj wybór</button>' : ''}
       </div>
+      ${wide ? strengthHtml : ''}
     </div>
     <div class="tac__lists">
-      <p class="tp-legend"><span><i class="tp-fresh" data-b="good" style="--f:80%"></i> świeżość</span><span><span class="mdot" data-m="hi"></span> morale</span><span><b>12</b> ocena ogólna (1-20)</span></p>
+      <p class="tp-legend"><span><i class="tp-fresh" data-b="good" style="--f:80%"></i> świeżość</span><span><span class="mdot" data-m="hi"></span> morale</span><span><b>12</b> ocena ogólna (1-20)</span>${wide ? '<span>Dwuklik albo przycisk „i” otwiera kartę zawodnika</span>' : ''}</p>
       <section class="tp-sec tp-sec--xi" aria-labelledby="tp-h-xi">
-        <h3 id="tp-h-xi">Pierwszy skład <span class="muted">${inXI.size} z ${f.slots.length}</span></h3>
+        <h3 id="tp-h-xi">Pierwszy skład <span class="muted">${inXI.size} z ${f.slots.length}</span>${hitsHtml('xi')}</h3>
         <ul class="tp-list">${xiRows}</ul>
       </section>
-      ${rzStrip}
+      ${rzStrip && wide ? `<div class="tac__rz">${rzStrip}</div>` : rzStrip}
       <section class="tp-sec tp-sec--bench" aria-labelledby="tp-h-bench">
-        <h3 id="tp-h-bench">Ławka rezerwowych <span class="muted">${tactics.bench.length} z ${benchSize}</span></h3>
+        <h3 id="tp-h-bench">Ławka rezerwowych <span class="muted">${tactics.bench.length} z ${benchSize}</span>${hitsHtml('bench')}</h3>
         <ul class="tp-list">${bench || (free ? '' : '<li class="mail-empty">Ławka jest pusta.</li>')}${benchAdd}</ul>
       </section>
       <section class="tp-sec tp-out" data-drop="outZone" aria-labelledby="tp-h-out">
-        <h3 id="tp-h-out">Poza kadrą meczową</h3>
+        <h3 id="tp-h-out">Poza kadrą meczową${hitsHtml('out')}</h3>
         <p class="tp-dropnote" aria-hidden="true">Upuść tutaj, żeby zdjąć zawodnika z ławki</p>
         <ul class="tp-list">${out || '<li class="mail-empty">Wszyscy są w kadrze meczowej.</li>'}</ul>
       </section>
     </div>
-    <div class="tac__aside">
-      <div class="tac__strength">
-        ${check.errors.length ? `<div class="notice notice--err" role="alert"><b>Skład nie przejdzie przed meczem:</b><ul class="plain">${check.errors.map((e) => `<li>${esc(e)}</li>`).join('')}</ul></div>` : ''}
-        ${check.warnings.length ? `<div class="notice"><ul class="plain">${check.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
-        <h3>Siła składu</h3>
-        <ul class="zones">
-          ${[['Bramkarz', z.GK], ['Obrona', z.DEF], ['Pomoc', z.MID], ['Atak', z.ATT]].map(([k, v]) => `<li><span>${k}</span><span class="abar"><i data-b="${v >= 13 ? 'top' : v >= 11 ? 'good' : v >= 8 ? 'mid' : 'low'}" style="width:${Math.max(0, Math.min(100, v * 5))}%"></i></span><b>${Math.round(v)}</b></li>`).join('')}
-        </ul>
-      </div>
-      ${infoPlayer ? renderPlayerInfo(infoPlayer, tactics, f, infoExtra) : '<p class="tdet-empty">Kliknij dwukrotnie nazwisko zawodnika albo przycisk „i”, żeby zobaczyć tu jego atrybuty.</p>'}
-    </div>
+    ${wide ? '' : strengthHtml}
+    ${cardsHtml}
   </div>
   <section class="tpanel3 tpanel3--instr" aria-labelledby="tp-h-instr">
   <h3 id="tp-h-instr">Instrukcje</h3>
@@ -198,10 +243,11 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
 }
 
 /**
- * Panel atrybutów. Renderowany jako otwarty <dialog> (obok listy na szerokim ekranie);
- * na węższych ekranach app.js przełącza go w okno modalne (arkusz od dołu na telefonie).
+ * Panel atrybutów. Renderowany jako otwarty <dialog>: na szerokim ekranie (wide) pływające okno niemodalne
+ * z paskiem (przeciąganie, przypięcie, zamknięcie); na węższych ekranach app.js przełącza go w okno modalne
+ * (arkusz od dołu na telefonie).
  */
-function renderPlayerInfo(p, tactics, f, extra = '') {
+function renderPlayerInfo(p, tactics, f, extra = '', { wide = false, pinned = false, slot: cardSlot = 0 } = {}) {
   const slotIdx = tactics.xi.indexOf(p.id);
   const benchIdx = tactics.bench.indexOf(p.id);
   const slot = slotIdx >= 0 ? f.slots[slotIdx] : null;
@@ -212,14 +258,23 @@ function renderPlayerInfo(p, tactics, f, extra = '') {
       : p.callUp ? 'Na zgrupowaniu reprezentacji' : p.loanBlock ? 'Nie zagra z klubem macierzystym (umowa wypożyczenia)' : p.teamBlock ? 'Gra w drugiej drużynie klubu (rezerwy)' : 'Do dyspozycji';
   const fact = (k, v, attr = '') => `<div${attr}><dt>${k}</dt><dd>${v}</dd></div>`;
   const fresh = Math.round(p.fresh ?? 95);
-  return `<dialog class="tdet" open aria-labelledby="tdet-h">
+  const hid = wide ? `tcard-h-${cardSlot}` : 'tdet-h';
+  const bar = wide ? `<div class="tcard__bar">
+      <button class="tcard__grip" type="button" data-tcard-grip aria-label="Przesuń okno zawodnika. Strzałki przesuwają, Shift przesuwa szybciej, Home przywraca położenie"></button>
+      <h3 class="tcard__name" id="${hid}" tabindex="-1">${esc(p.name)}</h3>
+      <button class="tcard__pin" type="button" data-act="tcardpin" data-id="${esc(p.id)}" aria-pressed="${pinned}" aria-label="Przypnij kartę (zostaje przy otwieraniu drugiej, do porównania)" title="Przypnij kartę"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M15 3l6 6-2 1-3 3 1 5-2 2-4-4-5 5-1-1 5-5-4-4 2-2 5 1 3-3z"/></svg></button>
+      <button class="tdet__x" data-act="tinfoclose" data-id="${esc(p.id)}" aria-label="Zamknij kartę zawodnika">×</button>
+      <p class="sr-only" role="status" data-tcard-live></p>
+    </div>` : '';
+  return `<dialog class="tdet${wide ? ' tcard' : ''}" open data-card="${cardSlot}" data-id="${esc(p.id)}" aria-labelledby="${hid}">
+    ${bar}
     <div class="tdet__in">
       <header class="tdet__head">
         <span class="tdet__ovr" aria-label="Ocena ogólna ${Math.round(p.ovr)} w skali 1-20" title="Ocena ogólna w skali 1-20">${Math.round(p.ovr)}</span>
         <span class="pos" data-g="${GROUP[p.pos]}">${esc(posText(p))}</span>
-        <button class="tdet__x" data-act="tinfoclose" aria-label="Zamknij atrybuty">×</button>
+        <button class="tdet__x" data-act="tinfoclose" data-id="${esc(p.id)}" aria-label="Zamknij atrybuty">×</button>
         <div class="tdet__title">
-          <h3 id="tdet-h">${esc(p.name)}</h3>
+          <h3${wide ? '' : ' id="tdet-h"'}>${esc(p.name)}</h3>
           <p>${esc(POS_NAMES[p.pos])}, ${p.age} lat, ${esc(NAT_NAMES[p.nat] ?? p.nat)}</p>
         </div>
       </header>

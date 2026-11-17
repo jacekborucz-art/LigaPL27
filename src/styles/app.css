@@ -576,25 +576,6 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
   .tac__pitch { position: sticky; top: calc(var(--hub-top, 0px) + var(--space-3)); align-self: start; }
 }
 
-/* Duży PC: boisko, listy i panel atrybutów obok siebie */
-@media (min-width: 1280px) {
-  .hub__main:has(.tac) { max-width: 1320px; }
-  .tac {
-    grid-template-columns: minmax(300px, 380px) minmax(320px, 1fr) minmax(270px, 330px);
-    grid-template-areas: "form form form" "pitch lists aside"; grid-template-rows: auto 1fr;
-  }
-  /* Prawa kolumna przyklejona do góry ekranu: otwarty panel atrybutów nad siłą składu. */
-  .tac__aside {
-    grid-area: aside; display: flex; flex-direction: column; gap: var(--space-4); align-self: start;
-    position: sticky; top: calc(var(--hub-top, 0px) + var(--space-3)); max-height: calc(100dvh - var(--hub-top, 0px) - 24px); overflow: auto; scrollbar-width: thin;
-    padding: 4px; margin: -4px; /* miejsce na obrys fokusu */
-  }
-  .tdet { order: -1; flex: none; }
-  .tdet-empty {
-    display: block; margin: 0; padding: var(--space-4);
-    border: 2px dashed var(--line); border-radius: var(--radius-m); color: var(--text-muted); font-size: var(--step--1);
-  }
-}
 .instr { display: grid; gap: var(--space-3); }
 .instr__label { display: block; font-weight: 600; margin-bottom: 4px; }
 .instr .hint { margin: 4px 0 0; font-size: var(--step--1); color: var(--text-muted); }
@@ -836,11 +817,157 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 /* Karta zawodnika na ekranie taktyki: statystyki (ten sam moduł co w profilu) pod atrybutami */
 .tdet__stats .phst { margin-top: var(--space-4); }
 .tdet__stats h2, .tdet__stats h3 { font-size: var(--step-0); }
-/* Szeroki PC: więcej miejsca na kartę zawodnika po prawej, atrybuty w dwóch kolumnach, statystyki pod nimi */
+/* PC (od 1100 px): lewa kolumna przyklejona (boisko, komunikat, przyciski, zwijana siła składu), listy obok.
+   Karta zawodnika to pływające okno (.tcard). Ten sam próg co WIDE_INFO w app.js. */
+@media (min-width: 1100px) {
+  .tac {
+    grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+    grid-template-areas: "form form" "pitch lists"; grid-template-rows: auto 1fr; align-items: start;
+  }
+  .tac__pitch {
+    position: sticky; top: calc(var(--hub-top, 0px) + var(--space-3)); align-self: start;
+    max-height: calc(100dvh - var(--hub-top, 0px) - 24px); overflow-y: auto; scrollbar-width: thin;
+    padding: 4px; margin: -4px; /* miejsce na obrys fokusu */
+  }
+  .tac__pitch > * { flex-shrink: 0; }
+  .tac__pitch > .tac__strength { margin-top: var(--space-2); }
+  /* Na niskim ekranie boisko się zmniejsza, żeby kolumna (boisko, przyciski, siła składu) mieściła się bez przewijania */
+  .tac__pitch .pitch2 { flex: none; max-width: min(460px, max(260px, calc((100dvh - var(--hub-top, 0px) - 330px) * .68))); }
+  .tac__lists > * { min-width: 0; }
+}
+/* Duży PC: boisko | pierwszy skład | ławka; pod składem pas rezerw, pod ławką zawodnicy spoza kadry */
+@media (min-width: 1280px) {
+  .hub__main:has(.tac) { max-width: 1440px; }
+  .tac {
+    grid-template-columns: minmax(300px, 360px) minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: "form form form" "pitch legend legend" "pitch xi bench" "pitch rz out"; grid-template-rows: auto auto auto 1fr;
+  }
+  .tac__lists { display: contents; }
+  .tac .tp-legend { grid-area: legend; margin: 0; }
+  .tac .tp-sec--xi { grid-area: xi; }
+  .tac .tp-sec--bench { grid-area: bench; }
+  .tac__rz { grid-area: rz; }
+  .tac .tp-out { grid-area: out; }
+  .tac .tp-sec + .tp-sec { margin-top: 0; }
+  .tac__rz .rz-strip { margin: 0; }
+}
+
+/* Zwarte wiersze list tylko na PC z myszą (ekran dotykowy zachowuje cele 44-48 px) */
+@media (min-width: 1100px) and (pointer: fine) {
+  .tac { --row-h: 34px; --row-fs: 14px; --pos-w: 38px; }
+  .tac .tp-row__main { min-height: var(--row-h); font: 600 var(--row-fs)/1.2 var(--font-body); }
+  .tac .tp-row__name small { display: inline; margin-left: 6px; font: 400 12px/1 var(--font-body); }
+  .tac .tp-handle .pos { min-width: var(--pos-w); min-height: 22px; }
+  .tac .tp-grip { height: 16px; }
+  .tac .tp-row__main .tp-fresh { width: 4px; height: 16px; }
+  .tac .tp-row__main b { font: 700 15px/1 var(--font-display); min-width: 1.8em; }
+  .tac .tp-row__i, .tac .tp-row__x { width: var(--row-h); }
+  .tac .tp-row__i { font-size: 14px; }
+  .tac .tp-row__x { font-size: 17px; }
+  .tac .tp-sec { padding: 8px 10px 10px; }
+  .tac .tp-sec h3 { font-size: var(--step-0); margin-bottom: var(--space-1); }
+  .tac .tp-row__name .tp-rep { display: inline-flex; margin: 0 0 0 6px; vertical-align: 1px; }
+}
+@media (min-width: 1100px) and (max-width: 1279px) and (pointer: fine) { .tac .tp-row__name small { display: block; margin: 1px 0 0; } }
+/* Od 1280 px skład i ławka stoją obok siebie: w jednej linii skraca się nazwisko i uwaga, a odznaki zostają całe */
+@media (min-width: 1280px) and (pointer: fine) {
+  .tac .tp-row__name { display: flex; align-items: center; gap: 6px; }
+  .tac .tp-row__nm, .tac .tp-row__name small { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .tac .tp-row__nm { flex: 0 1 auto; }
+  .tac .tp-row__name small { flex: 0 2 auto; margin: 0; }
+  .tac .tp-row__name .tp-c, .tac .tp-row__name .tp-rep, .tac .tp-row__name .rz-chips { flex: none; margin: 0; }
+}
+
+/* Zmiennicy po wyborze zawodnika (telefon i PC): poziom z mapy pozycji (85, 70, 50), kolor plus kształt */
+.tac {
+  --rep-opt: #1E7A43; --rep-ok: #3F8F63; --rep-weak: #6B7A70;
+  --rep-wash-opt: color-mix(in srgb, var(--rep-opt) 16%, var(--surface));
+  --rep-wash-ok: color-mix(in srgb, var(--rep-ok) 10%, var(--surface));
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .tac { --rep-opt: #5BD08A; --rep-ok: #7FBF9C; --rep-weak: #9FB0A5; }
+}
+:root[data-theme="dark"] .tac { --rep-opt: #5BD08A; --rep-ok: #7FBF9C; --rep-weak: #9FB0A5; }
+.tp-row.is-sel .tp-row__name { font-weight: 800; }
+.tac.has-sel .tp-row:not(.is-sel):not([data-rep]):not(.tp-add) { opacity: .62; }
+.tp-row[data-rep] { box-shadow: inset 4px 0 0 var(--rep-c); background: var(--rep-w, transparent); }
+.tp-row[data-rep="opt"] { --rep-c: var(--rep-opt); --rep-w: var(--rep-wash-opt); }
+.tp-row[data-rep="ok"] { --rep-c: var(--rep-ok); --rep-w: var(--rep-wash-ok); }
+.tp-row[data-rep="weak"] { --rep-c: var(--rep-weak); box-shadow: inset 0 0 0 1px var(--rep-weak); }
+.tp-row[data-rep="no"] { opacity: .45; }
+.tp-row[data-rep].is-off { opacity: .5; }
+.tp-rep {
+  display: flex; width: fit-content; align-items: center; gap: 4px; margin-top: 2px; padding: 1px 7px; border-radius: 999px;
+  font: 700 11.5px/1.4 var(--font-body); color: var(--rep-c); border: 1px solid currentColor; white-space: nowrap;
+}
+.tp-rep::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.tp-row[data-rep="ok"] .tp-rep::before { background: linear-gradient(90deg, currentColor 50%, transparent 50%); box-shadow: inset 0 0 0 1px currentColor; }
+.tp-row[data-rep="weak"] .tp-rep { border-style: dashed; }
+.tp-row[data-rep="weak"] .tp-rep::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+.tp-sec__hits { margin-left: auto; font: 600 12px/1 var(--font-body); color: var(--rep-opt); }
+/* Boisko: sloty, gdy wybrany jest zawodnik z ławki lub spoza kadry (jasne barwy, bo murawa jest ciemna w obu motywach) */
+.slot-btn[data-rep] .slot-btn__dot { outline: 3px solid var(--rep-c); outline-offset: 3px; }
+.slot-btn[data-rep="opt"] { --rep-c: #A6F0C2; }
+.slot-btn[data-rep="ok"] { --rep-c: #D9F3E3; }
+.slot-btn[data-rep="weak"] { --rep-c: #F3F6F1; }
+.slot-btn[data-rep="ok"] .slot-btn__dot { outline-style: double; outline-width: 5px; }
+.slot-btn[data-rep="weak"] .slot-btn__dot { outline-style: dashed; outline-width: 2px; }
+.slot-btn[data-rep="no"] { opacity: .5; }
+.slot-btn[data-rep="no"] .slot-btn__dot { outline: 0; }
+.tac.has-sel .slot-btn:not(.is-sel):not([data-rep]) { opacity: .6; }
+.slot-btn__rep { position: absolute; left: 50%; top: -17px; transform: translateX(-50%); padding: 0 5px; border-radius: 3px; background: rgba(14,21,17,.8); color: var(--rep-c); font: 700 10.5px/1.4 var(--font-body); white-space: nowrap; pointer-events: none; }
+.slot-btn.is-sel .slot-btn__dot { box-shadow: 0 0 0 7px color-mix(in srgb, var(--led) 35%, transparent), 0 2px 4px rgba(0,0,0,.35); }
+
+/* Siła składu zwijana (przycisk tylko na PC, app.js renderuje go od 1100 px) */
+.tac__fold { display: flex; flex: 1; min-width: 0; align-items: center; gap: 8px; min-height: 34px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.tac__fold-ico { display: block; width: 9px; height: 9px; margin-left: auto; margin-right: 4px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .15s; }
+.tac__fold-sum { display: none; font: 700 14px/1 var(--font-display); color: var(--text-muted); font-variant-numeric: tabular-nums; letter-spacing: .08em; }
+.tac__strength[data-open="0"] .zones { display: none; }
+.tac__strength[data-open="0"] h3 { margin-bottom: 0; }
+.tac__strength[data-open="0"] .tac__fold-sum { display: block; margin-left: auto; }
+.tac__strength[data-open="0"] .tac__fold-ico { margin-left: 8px; transform: rotate(-45deg); }
+@media (prefers-reduced-motion: reduce) { .tac__fold-ico { transition: none; } }
+
+/* Karta zawodnika na PC: pływające okno niemodalne (przeciągane za pasek, strzałki z uchwytu, Esc zamyka) */
+.tcard__bar, .tcard__pin { display: none; }
+@media (min-width: 1100px) {
+  .tdet.tcard {
+    position: fixed; inset: auto; left: var(--cx, auto); top: var(--cy, calc(var(--hub-top, 84px) + 12px)); right: 24px;
+    width: min(460px, calc(100vw - 32px)); max-width: none; max-height: min(82dvh, 760px); margin: 0; padding: 0; z-index: 60; overflow: hidden;
+    display: flex; flex-direction: column;
+    border: 1px solid color-mix(in srgb, var(--line) 80%, var(--text)); border-radius: var(--radius-m);
+    background: color-mix(in srgb, var(--surface) 92%, transparent); color: var(--text);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); opacity: .97;
+    box-shadow: 0 14px 40px rgba(0,0,0,.32), 0 2px 6px rgba(0,0,0,.2);
+  }
+  .tdet.tcard[style*="--cx:"] { right: auto; }
+  .tdet.tcard[data-card="1"]:not([style*="--cx:"]) { left: 40px; right: auto; }
+  .tdet.tcard:focus-within { opacity: 1; z-index: 61; box-shadow: 0 18px 48px rgba(0,0,0,.4), 0 0 0 2px var(--focus); }
+  .tdet.tcard.is-moving { opacity: .88; user-select: none; -webkit-user-select: none; }
+  .tcard .tdet__in { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: var(--space-3) var(--space-4) var(--space-4); }
+  .tcard .tdet__head .tdet__x, .tcard .tdet__title h3 { display: none; } /* nazwisko i zamknięcie są w pasku */
+  .tcard .tdet__groups { columns: 1; }
+  .tcard__bar { flex: none; display: flex; align-items: center; gap: var(--space-2); padding: 6px 8px 6px 4px; cursor: grab; touch-action: none; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--murawa) 12%, var(--surface)); }
+  .tcard.is-moving .tcard__bar { cursor: grabbing; }
+  .tcard__grip { flex: none; width: 28px; height: 28px; border: 0; border-radius: var(--radius-s); background: radial-gradient(circle, currentColor 1.4px, transparent 1.8px) center / 6px 6px; color: var(--text-muted); cursor: inherit; }
+  .tcard__grip:focus-visible, .tcard__pin:focus-visible, .tcard__bar .tdet__x:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
+  .tcard__name { flex: 1; min-width: 0; margin: 0; font: 700 var(--step-1)/1.1 var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tcard__name:focus { outline: 0; }
+  .tcard__name:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .tcard__pin, .tcard__bar .tdet__x { display: grid; place-items: center; flex: none; width: 32px; height: 32px; font-size: 18px; }
+  .tcard__pin { padding: 0; border: 1px solid var(--line); border-radius: var(--radius-s); background: none; color: var(--text); cursor: pointer; }
+  .tcard__pin:hover { background: var(--surface-stripe); }
+  .tcard__pin[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+}
+@media (min-width: 1100px) and (prefers-reduced-motion: no-preference) { .tdet.tcard.is-new { animation: tcard-in 140ms ease-out; } }
+@keyframes tcard-in { from { opacity: 0; transform: translateY(6px); } }
+@supports not (backdrop-filter: blur(1px)) { @media (min-width: 1100px) { .tdet.tcard { background: var(--surface); } } }
+@media (prefers-reduced-transparency: reduce) and (min-width: 1100px) { .tdet.tcard { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; opacity: 1; } }
+
+/* Szeroki PC: szersze kolumny boiska, składu i ławki (karta zawodnika pływa nad nimi) */
 @media (min-width: 1600px) {
   .hub__main:has(.tac) { max-width: 1840px; }
-  .tac { grid-template-columns: minmax(320px, 400px) minmax(380px, 1fr) minmax(480px, 1.15fr); }
-  .tac__aside .tdet .tdet__groups { columns: 2; column-gap: var(--space-5); }
+  .tac { grid-template-columns: minmax(340px, 400px) minmax(0, 1.1fr) minmax(0, 1fr); }
 }
 
 /* ================= Karta zawodnika (Kadra) na PC: panele obok siebie, cała szerokość ================= */

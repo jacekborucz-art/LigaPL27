@@ -99,6 +99,11 @@
 .rz-chip[data-k="age"] { color: var(--warn-text); border-color: color-mix(in srgb, var(--warn-text) 45%, var(--line)); }
 .rz-chip[data-k="susp"], .rz-chip[data-k="no"] { color: var(--bad-text); }
 .tp-row__name .rz-chips { display: flex; margin: 2px 0 0; }
+/* PC z myszą: zwarte wiersze składu, plakietki rezerw w tej samej linii co nazwisko */
+@media (min-width: 1100px) and (pointer: fine) {
+  .tac .tp-row__name .rz-chips { display: inline-flex; flex-wrap: nowrap; margin: 0 0 0 6px; }
+  .tac .tp-row__name .rz-chip { padding: 0 6px; font-size: 12px; }
+}
 .sq__name .rz-chips { margin: 2px 0 0; }
 
 /* Pasek rezerw nad ławką (Skład i taktyka) */

@@ -463,7 +463,8 @@ function renderTab(tab, g, club) {
     if (state.sqSub === 'report') return sub + renderTeamReport(g, { msg: state.trepMsg ?? '', sel: state.trepSel ?? 0 });
     if (state.sqSub === 'tactics') {
       queueMicrotask(mountTacticsScreen); // po wstawieniu HTML: okno atrybutów i fokus
-      return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), info: state.tInfo, msg: state.tMsg, numbers: shirtNumbers(g, g.clubId, squadOf(g.world, g.clubId)), kit: kitColors(clubById(g.clubId)), infoExtra: state.tInfo && g.world.players[state.tInfo] ? playerStatsHtml(g.world.players[state.tInfo], g) : '', rzChips, rzStrip: rzOn ? reservesStrip(g) : '' });
+      const wide = matchMedia(WIDE_INFO).matches;
+      return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), info: state.tInfo, msg: state.tMsg, numbers: shirtNumbers(g, g.clubId, squadOf(g.world, g.clubId)), kit: kitColors(clubById(g.clubId)), cards: tCardsFor(g, wide), wide, strengthOpen: tUi.strOpen, rzChips, rzStrip: rzOn ? reservesStrip(g) : '' });
     }
     const ovrs = leagueOvrs(g, club.tier);
     const p = state.playerOpen && g.world.players[state.playerOpen];
@@ -1007,8 +1008,27 @@ async function runDays() {
 
 
 // ---------- Skład: przeciąganie, wybór dwoma dotknięciami, panel atrybutów ----------
-const WIDE_INFO = '(min-width: 1280px)'; // od tej szerokości panel atrybutów stoi obok listy
-const tUi = { focus: null, infoReturn: null, infoOpened: false, lastTap: null, ctx: null };
+const WIDE_INFO = '(min-width: 1100px)'; // od tej szerokości karta zawodnika to pływające okno, a siła składu się zwija
+const STR_KEY = 'lp27.tac.strength';
+const CARD_KEY = 'lp27.tac.card.';
+function readStrOpen() { try { return localStorage.getItem(STR_KEY) !== '0'; } catch { return true; } }
+function writeStrOpen(open) { try { localStorage.setItem(STR_KEY, open ? '1' : '0'); } catch { /* tryb prywatny: tylko na tę wizytę */ } }
+function readCardPos(slot) {
+  try { const [x, y] = (localStorage.getItem(CARD_KEY + slot) ?? '').split(',').map(Number); return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null; } catch { return null; }
+}
+function writeCardPos(slot, pos) {
+  try { if (pos) localStorage.setItem(CARD_KEY + slot, `${Math.round(pos.x)},${Math.round(pos.y)}`); else localStorage.removeItem(CARD_KEY + slot); } catch { /* bez pamięci: położenie tylko na tę wizytę */ }
+}
+const tUi = { focus: null, infoReturn: null, infoOpened: null, lastTap: null, ctx: null, strOpen: readStrOpen(), cardPos: [readCardPos(0), readCardPos(1)], move: null, liveT: 0 };
+
+/** Otwarte karty zawodników (PC: do dwóch, telefon: jedna) z ich statystykami. state.tInfo: id aktywnej karty. */
+function tCardsFor(g, wide) {
+  let cards = (state.tCards ?? []).filter((c) => g.world.players[c.id]);
+  if (!wide && cards.length > 1) cards = [{ ...(cards.find((c) => c.id === state.tInfo) ?? cards.at(-1)), slot: 0 }];
+  state.tCards = cards;
+  if (!cards.some((c) => c.id === state.tInfo)) state.tInfo = cards.at(-1)?.id ?? null;
+  return cards.map((c) => ({ ...c, extra: playerStatsHtml(g.world.players[c.id], g) }));
+}
 
 /** Kadra i ławka do reguł ruchów (pamiętane dla bieżącej taktyki, bo przeciąganie pyta przy każdym ruchu). */
 function tCtx(g) {
@@ -1032,30 +1052,111 @@ function renderTacticsAfter(focusSel) {
 }
 
 function mountTacticsScreen() {
-  const dlg = app.querySelector('dialog.tdet');
+  const dlgs = [...app.querySelectorAll('dialog.tdet')];
   const opened = tUi.infoOpened;
-  tUi.infoOpened = false;
-  if (dlg && !matchMedia(WIDE_INFO).matches) {
-    dlg.close();
-    dlg.showModal(); // telefon i tablet: arkusz/okno modalne, fokus trafia do przycisku Zamknij
-  } else if (dlg && opened) dlg.querySelector('.tdet__x')?.focus({ preventScroll: true });
-  else if (tUi.focus) app.querySelector(tUi.focus)?.focus({ preventScroll: true });
+  tUi.infoOpened = null;
+  if (dlgs[0] && !matchMedia(WIDE_INFO).matches) {
+    dlgs[0].close();
+    dlgs[0].showModal(); // telefon i tablet: arkusz/okno modalne, fokus trafia do przycisku Zamknij
+  } else {
+    // PC: pływające okna niemodalne, położenie zapamiętane dla każdego z dwóch miejsc
+    for (const d of dlgs) placeCard(d, tUi.cardPos[Number(d.dataset.card)] ?? null);
+    const d = opened && dlgs.find((x) => x.dataset.id === opened);
+    if (d) {
+      d.classList.add('is-new');
+      (d.querySelector('.tcard__name') ?? d.querySelector('.tdet__x'))?.focus({ preventScroll: true });
+    } else if (tUi.focus) app.querySelector(tUi.focus)?.focus({ preventScroll: true });
+  }
   tUi.focus = null;
 }
 
+/** Położenie pływającej karty (--cx, --cy), zawsze w oknie; null: położenie domyślne nad ławką. */
+function placeCard(d, pos) {
+  if (!pos) { d.style.removeProperty('--cx'); d.style.removeProperty('--cy'); return null; }
+  const x = Math.max(8, Math.min(window.innerWidth - 120, pos.x));
+  const y = Math.max(8, Math.min(window.innerHeight - 56, pos.y));
+  d.style.setProperty('--cx', `${Math.round(x)}px`);
+  d.style.setProperty('--cy', `${Math.round(y)}px`);
+  return { x, y };
+}
+
+function moveCard(d, pos) {
+  const slot = Number(d.dataset.card);
+  tUi.cardPos[slot] = placeCard(d, pos);
+  writeCardPos(slot, tUi.cardPos[slot]);
+}
+
 function openInfo(pid, el) {
+  let cards = state.tCards ?? [];
+  if (!cards.some((c) => c.id === pid)) {
+    const fresh = { id: pid, pinned: false, t: Date.now() };
+    const loose = cards.find((c) => !c.pinned);
+    if (!matchMedia(WIDE_INFO).matches) cards = [{ ...fresh, slot: 0 }];
+    // PC: nieprzypięta karta zmienia zawartość (położenie zostaje); obok przypiętej otwiera się druga; trzecia zastępuje starszą
+    else if (loose) cards = cards.map((c) => (c === loose ? { ...fresh, slot: c.slot } : c));
+    else if (cards.length < 2) cards = [...cards, { ...fresh, slot: [0, 1].find((s) => !cards.some((c) => c.slot === s)) }];
+    else { const old = cards.reduce((a, b) => (a.t <= b.t ? a : b)); cards = cards.map((c) => (c === old ? { ...fresh, slot: c.slot } : c)); }
+  }
+  state.tCards = cards;
   state.tInfo = pid;
-  tUi.infoReturn = focusKeyOf(el);
-  tUi.infoOpened = true;
+  tUi.infoReturn = focusKeyOf(el) ?? tUi.infoReturn;
+  tUi.infoOpened = pid;
   renderTacticsAfter();
 }
 
-function closeInfo() {
+function closeInfo(pid = state.tInfo) {
   const back = tUi.infoReturn;
-  state.tInfo = null;
-  tUi.infoReturn = null;
+  state.tCards = (state.tCards ?? []).filter((c) => c.id !== pid);
+  state.tInfo = state.tCards.reduce((a, b) => (!a || b.t > a.t ? b : a), null)?.id ?? null;
+  if (!state.tCards.length) tUi.infoReturn = null;
   renderTacticsAfter(back);
 }
+
+/** Karta na PC: przeciąganie za pasek (mysz, pióro, dotyk) i przesuwanie strzałkami z uchwytu. */
+app.addEventListener('pointerdown', (ev) => {
+  const bar = ev.target.closest?.('.tcard__bar');
+  if (!bar || (ev.pointerType === 'mouse' && ev.button !== 0)) return;
+  if (ev.target.closest('button') && !ev.target.closest('[data-tcard-grip]')) return;
+  const d = bar.closest('dialog.tcard');
+  const r = d.getBoundingClientRect();
+  tUi.move = { d, bar, id: ev.pointerId, dx: ev.clientX - r.left, dy: ev.clientY - r.top, moved: false };
+  bar.setPointerCapture?.(ev.pointerId);
+});
+app.addEventListener('pointermove', (ev) => {
+  const m = tUi.move;
+  if (!m || ev.pointerId !== m.id) return;
+  m.moved = true;
+  m.d.classList.add('is-moving');
+  placeCard(m.d, { x: ev.clientX - m.dx, y: ev.clientY - m.dy });
+});
+const endCardMove = (ev) => {
+  const m = tUi.move;
+  if (!m || ev.pointerId !== m.id) return;
+  tUi.move = null;
+  m.d.classList.remove('is-moving');
+  if (!m.moved) return;
+  const r = m.d.getBoundingClientRect();
+  moveCard(m.d, { x: r.left, y: r.top });
+};
+app.addEventListener('pointerup', endCardMove);
+app.addEventListener('pointercancel', endCardMove);
+app.addEventListener('keydown', (ev) => {
+  const grip = ev.target.closest?.('[data-tcard-grip]');
+  if (!grip) return;
+  const d = grip.closest('dialog.tcard');
+  const step = ev.shiftKey ? 64 : 16;
+  const dir = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[ev.key];
+  if (!dir && ev.key !== 'Home') return;
+  ev.preventDefault();
+  if (ev.key === 'Home') moveCard(d, null);
+  else { const r = d.getBoundingClientRect(); moveCard(d, { x: r.left + dir[0] * step, y: r.top + dir[1] * step }); }
+  clearTimeout(tUi.liveT);
+  tUi.liveT = setTimeout(() => {
+    const live = d.querySelector('[data-tcard-live]');
+    const r = d.getBoundingClientRect();
+    if (live) live.textContent = ev.key === 'Home' ? 'Okno zawodnika wróciło na miejsce.' : `Okno zawodnika: ${Math.round(r.left)} px od lewej, ${Math.round(r.top)} px od góry.`;
+  }, 400);
+});
 
 async function tacticsClick(g, el) {
   const loc = parseLoc(el.dataset.loc);
@@ -1130,7 +1231,9 @@ app.addEventListener('keydown', (ev) => {
 // Escape na ekranie składu: najpierw zamyka panel atrybutów albo anuluje wybór (nie wychodzi do menu).
 app.addEventListener('keydown', (ev) => {
   if (ev.key !== 'Escape' || !tacticsOpen() || ev.target.closest('select')) return;
-  if (state.tInfo) { ev.preventDefault(); ev.stopPropagation(); closeInfo(); }
+  const card = ev.target.closest('dialog.tcard'); // Escape z wnętrza karty zamyka właśnie tę kartę
+  if (card) { ev.preventDefault(); ev.stopPropagation(); closeInfo(card.dataset.id); }
+  else if (state.tInfo) { ev.preventDefault(); ev.stopPropagation(); closeInfo(); }
   else if (state.tSel) { ev.preventDefault(); ev.stopPropagation(); state.tSel = null; state.tMsg = ''; renderTacticsAfter(); }
 });
 // Zamknięcie okna modalnego przez przeglądarkę (Escape) i dotknięcie tła za arkuszem.
@@ -1142,7 +1245,7 @@ app.addEventListener('cancel', (ev) => {
 app.addEventListener('click', (ev) => {
   if (ev.target.matches?.('dialog.tdet') && ev.target.matches(':modal')) closeInfo();
 });
-matchMedia(WIDE_INFO).addEventListener?.('change', () => { if (state.tInfo && tacticsOpen()) render(); });
+matchMedia(WIDE_INFO).addEventListener?.('change', () => { if (tacticsOpen()) render(); });
 
 app.addEventListener('input', (ev) => {
   if (state.ng && ev.target.closest('[data-ng-form]')) refreshNegotiationHints(app, state.ng);
@@ -1413,7 +1516,7 @@ async function dispatchAct(el, { root = app } = {}) {
       render(); window.scrollTo({ top: 0 });
     }
     if (act === 'clubback') { state.extClub = null; state.extPlayer = null; render(); }
-    if (act === 'tsub') { state.sqSub = el.dataset.s; state.rzAsk = null; state.rzMsg = null; state.trepMsg = ''; state.tSel = null; state.tInfo = null; state.tMsg = ''; state.playerOpen = null; state.ttResult = null; state.ttMeeting = null; render(); }
+    if (act === 'tsub') { state.sqSub = el.dataset.s; state.rzAsk = null; state.rzMsg = null; state.trepMsg = ''; state.tSel = null; state.tInfo = null; state.tCards = []; state.tMsg = ''; state.playerOpen = null; state.ttResult = null; state.ttMeeting = null; render(); }
     if (act === 'tcancel') { state.tSel = null; state.tMsg = ''; renderTacticsAfter('[data-act="tauto"]'); }
     if (act === 'tform') { g.tactics = changeFormation(g.tactics, mySquad(g), el.dataset.f); state.tSel = null; state.tMsg = ''; await save(); renderTacticsAfter(); }
     if (act === 'tauto') { g.tactics = createTactics(mySquad(g), { formation: g.tactics.formation, benchSize: benchSizeFor(g), instructions: g.tactics.instructions }); state.tSel = null; state.tMsg = 'Asystent ustawił skład.'; await save(); renderTacticsAfter(); }
@@ -1434,8 +1537,16 @@ async function dispatchAct(el, { root = app } = {}) {
       if (!r.ok) { state.tMsg = r.reason || 'Ten ruch nic nie zmienia.'; renderTacticsAfter(); }
     }
     if (act === 'trole' && el.dataset.id) await setRole(el.dataset.role, el.dataset.id);
-    if (act === 'tinfo') { if (state.tInfo === el.dataset.id) closeInfo(); else openInfo(el.dataset.id, el); }
-    if (act === 'tinfoclose') closeInfo();
+    if (act === 'tinfo') { if (state.tCards?.some((c) => c.id === el.dataset.id)) closeInfo(el.dataset.id); else openInfo(el.dataset.id, el); }
+    if (act === 'tinfoclose') closeInfo(el.dataset.id || state.tInfo);
+    if (act === 'tcardpin') { state.tCards = (state.tCards ?? []).map((c) => (c.id === el.dataset.id ? { ...c, pinned: !c.pinned } : c)); renderTacticsAfter(); }
+    if (act === 'tstrength' && matchMedia(WIDE_INFO).matches) {
+      // Siła składu zwijana tylko na PC, bez pełnego renderu; stan pamiętany w przeglądarce
+      tUi.strOpen = !tUi.strOpen;
+      writeStrOpen(tUi.strOpen);
+      el.closest?.('.tac__strength')?.setAttribute('data-open', tUi.strOpen ? '1' : '0');
+      el.setAttribute?.('aria-expanded', String(tUi.strOpen));
+    }
     if (act === 'mailcat') { state.mailCat = el.dataset.cat || null; render(); }
     if (act === 'readall') { g.inbox = markAllRead(g.inbox); await save(); render(); }
     if (act === 'maildel') { const m = g.inbox.find((x) => x.id === el.dataset.id); if (m && canDelete(m)) forgetMessages(g, { inbox: g.inbox.filter((x) => x !== m), removed: m.key ? [m.key] : [] }); state.mailOpen = null; await save(); render(); }
