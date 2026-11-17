@@ -4,7 +4,7 @@
 import { FORMATIONS, formationById } from '../data/formations.js';
 import { INSTRUCTIONS } from '../data/instructions.js';
 import { proficiency, byPosition } from '../engine/positions.js';
-import { checkTactics } from '../engine/lineup.js';
+import { checkTactics, AUTO_MODES } from '../engine/lineup.js';
 import { GROUP, isAvailable } from '../career/squad.js';
 import { moraleLabel } from '../career/morale.js';
 import { locKey, playerAt } from './tacticsMoves.js';
@@ -202,7 +202,9 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
       <div class="pitch2" ${kit ? `style="--kit:${kit.shirt};--kit-ink:${kit.ink};--kit-trim:${kit.trim}"` : ''} role="group" aria-label="Boisko, formacja ${esc(f.name)}">${slotsHtml}</div>
       <p class="tac__msg${msg ? ' is-msg' : ''}" role="status">${esc(status)}</p>
       <div class="tac__actions">
-        <button class="btn btn--quiet" data-act="tauto"${assistant ? '' : ' disabled title="W sztabie nie ma asystenta trenera"'}>Poproś asystenta</button>${assistant ? '' : '<p class="hint">Brak asystenta trenera w sztabie (zatrudnisz go w Trening, Sztab).</p>'}
+        ${assistant ? `<details class="tac__auto"><summary class="btn btn--quiet">Poproś asystenta</summary>
+          <div class="tac__auto-menu" role="menu">${Object.entries(AUTO_MODES).map(([k, m]) => `<button role="menuitem" data-act="tauto" data-mode="${k}"><b>${esc(m.label)}</b><small>${esc(m.note)}</small></button>`).join('')}</div></details>`
+          : '<button class="btn btn--quiet" data-act="tauto" disabled title="W sztabie nie ma asystenta trenera">Poproś asystenta</button><p class="hint">Brak asystenta trenera w sztabie (zatrudnisz go w Trening, Sztab).</p>'}
         ${sel ? '<button class="btn btn--quiet" data-act="tcancel">Anuluj wybór</button>' : ''}
       </div>
       ${wide ? strengthHtml : ''}

@@ -14,14 +14,36 @@ export function slotValue(player, slot) {
   if (!isAvailable(player)) return -Infinity;
   return player.ovr * posEff(proficiency(player, slot.pos, slot.side)) + conditionTerms(player).total;
 }
+const slotValueBase = slotValue;
+
+/**
+ * Prośby do asystenta o skład (Skład i taktyka, menu „Poproś asystenta”): pierwszeństwo dodawane do wartości
+ * zawodnika na slocie [SZAC]. Skala OVR 1-20, więc dodatki rzędu kilkunastu punktów przeważają nad różnicą umiejętności.
+ */
+export const AUTO_MODES = {
+  best: { label: 'Najmocniejszy skład', note: 'Najlepsi dostępni zawodnicy.' },
+  second: { label: 'Drugi skład', note: 'Zawodnicy spoza najmocniejszej jedenastki, gdy tylko się da.' },
+  young: { label: 'Najmłodsi', note: 'Pierwszeństwo dla najmłodszych, na ich pozycjach.' },
+  fresh: { label: 'Najbardziej wypoczęci', note: 'Pierwszeństwo dla najświeższych.' },
+  minutes: { label: 'Najmniej grający', note: 'Pierwszeństwo dla tych, którzy w sezonie grali najmniej albo wcale.' },
+};
+function modeBonus(mode, squad, formation) {
+  if (mode === 'second') { const first = new Set(autoPickXI(squad, formation).filter(Boolean)); return (p) => (first.has(p.id) ? -40 : 0); }
+  if (mode === 'young') return (p) => 1.5 * Math.max(0, 32 - (p.age ?? 25));
+  if (mode === 'fresh') return (p) => 0.6 * ((p.fresh ?? 95) - 60);
+  if (mode === 'minutes') return (p) => -Math.min(25, 2 * (p.season?.min ?? 0) / 90);
+  return null;
+}
 
 /**
  * Automatyczny wybór jedenastki (asystent i AI): zachłannie po najlepszym dopasowaniu
  * zawodnik-slot, bramkarz najpierw, potem poprawa przez zamiany par.
  */
-export function autoPickXI(squad, formation) {
+export function autoPickXI(squad, formation, { bonus = null } = {}) {
   const slots = formation.slots;
   const pool = squad.filter((p) => isAvailable(p) && !p.benchOnly); // benchOnly: 23+ z pierwszej drużyny ponad limit 3 w jedenastce rezerw
+  // bonus(p): pierwszeństwo z prośby do asystenta (AUTO_MODES), ważone dopasowaniem do pozycji, żeby nie stawiać nikogo nie na swoim miejscu
+  const slotValue = bonus ? (p, slot) => { const v = slotValueBase(p, slot); return v === -Infinity ? v : v + posEff(proficiency(p, slot.pos, slot.side)) * bonus(p); } : slotValueBase;
   const xi = new Array(slots.length).fill(null);
   const used = new Set();
   const order = [0, ...slots.map((_, i) => i).filter((i) => i !== 0)]; // slot 0 = BR
@@ -157,9 +179,9 @@ export function autoRoles(squad, xi) {
 }
 
 /** benchGk: liczba rezerwowych bramkarzy (COMPETITIONS[comp].benchGk, 2 w pucharach UEFA). */
-export function createTactics(squad, { formation = DEFAULT_FORMATION, benchSize = 12, instructions, benchGk = 1 } = {}) {
+export function createTactics(squad, { formation = DEFAULT_FORMATION, benchSize = 12, instructions, benchGk = 1, mode = 'best' } = {}) {
   const f = formationById(formation);
-  const xi = autoPickXI(squad, f);
+  const xi = autoPickXI(squad, f, { bonus: modeBonus(mode, squad, f) });
   return {
     formation: f.id,
     xi,

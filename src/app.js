@@ -34,7 +34,7 @@ import { renderReserves, rzHead, rzCard, handleReservesAction, isReservesAction,
 import { resolveMove, resolveTap, parseLoc, locKey, playerAt, sameLoc } from './ui/tacticsMoves.js';
 import { mountTacticsDrag } from './ui/tacticsDrag.js';
 import { WIDE_CARD, cardPos, placeCard, bindCardDrag } from './ui/playerCard.js';
-import { createTactics, changeFormation, setInstruction, refreshTactics, removeFromBench, checkTactics } from './engine/lineup.js';
+import { createTactics, changeFormation, setInstruction, refreshTactics, removeFromBench, checkTactics, AUTO_MODES } from './engine/lineup.js';
 import { COMPETITIONS } from './config/competitions.js';
 import { mountMatchday } from './ui/matchdayView.js';
 import { mountDrawAnimation } from './ui/europeView.js';
@@ -1503,7 +1503,11 @@ async function dispatchAct(el, { root = app } = {}) {
     if (act === 'tcancel') { state.tSel = null; state.tMsg = ''; renderTacticsAfter('[data-act="tauto"]'); }
     if (act === 'tform') { g.tactics = changeFormation(g.tactics, mySquad(g), el.dataset.f); state.tSel = null; state.tMsg = ''; await save(); renderTacticsAfter(); }
     if (act === 'tauto' && !hasAssistant(g)) { state.tMsg = 'W sztabie nie ma asystenta trenera. Zatrudnisz go w Trening, Sztab.'; renderTacticsAfter(); }
-    else if (act === 'tauto') { g.tactics = createTactics(mySquad(g), { formation: g.tactics.formation, benchSize: benchSizeFor(g), instructions: g.tactics.instructions }); state.tSel = null; state.tMsg = 'Asystent ustawił skład.'; await save(); renderTacticsAfter(); }
+    else if (act === 'tauto') {
+      const mode = AUTO_MODES[el.dataset.mode] ? el.dataset.mode : 'best';
+      g.tactics = createTactics(mySquad(g), { formation: g.tactics.formation, benchSize: benchSizeFor(g), instructions: g.tactics.instructions, mode });
+      state.tSel = null; state.tMsg = `Asystent ustawił skład: ${AUTO_MODES[mode].label.toLowerCase()}.`; await save(); renderTacticsAfter();
+    }
     if (act === 'tinstr') { g.tactics = setInstruction(g.tactics, el.dataset.i, el.dataset.v); await save(); renderTacticsAfter(); }
     if (act === 'tunbench') {
       const name = tCtx(g).byId.get(el.dataset.id)?.name ?? 'Zawodnik';
@@ -1729,6 +1733,29 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     if (state.screen === 'start') location.reload();
   });
 }
+
+// Menu „Poproś asystenta” (details, menu position: fixed): nad przyciskiem, a gdy brak miejsca, pod nim;
+// zamyka się przy przewijaniu, zmianie rozmiaru okna i kliknięciu obok
+document.addEventListener('toggle', (e) => {
+  const d = e.target;
+  if (!d?.classList?.contains('tac__auto') || !d.open) return;
+  const menu = d.querySelector('.tac__auto-menu'); const btn = d.querySelector('summary');
+  if (!menu || !btn) return;
+  const r = btn.getBoundingClientRect(); const h = menu.offsetHeight; const w = menu.offsetWidth;
+  menu.style.left = `${Math.max(16, Math.min(window.innerWidth - w - 16, r.left + r.width / 2 - w / 2))}px`;
+  menu.style.top = `${r.top - h - 6 >= 8 ? r.top - h - 6 : Math.min(r.bottom + 6, window.innerHeight - h - 8)}px`;
+  autoMenuTop = r.top;
+}, true);
+let autoMenuTop = 0;
+const closeAutoMenu = (e) => { for (const d of document.querySelectorAll('.tac__auto[open]')) if (!e || !d.contains(e.target)) d.open = false; };
+// Przewinięcie zamyka menu dopiero, gdy przycisk przesunie się o ponad 24 px (drobne ruchy na telefonie nie zamykają)
+window.addEventListener('scroll', () => {
+  const d = document.querySelector('.tac__auto[open]');
+  const s = d?.querySelector('summary');
+  if (s && Math.abs(s.getBoundingClientRect().top - autoMenuTop) > 24) d.open = false;
+}, true);
+window.addEventListener('resize', () => closeAutoMenu());
+document.addEventListener('pointerdown', (e) => closeAutoMenu(e), true);
 
 applyTheme(state.theme);
 Promise.resolve(render()).then(() => {

@@ -96,8 +96,25 @@ test('Telefon bez zmian układu: bez przycisku zwijania i bez paska karty; PC: b
 
 test('Przycisk „Poproś asystenta”: aktywny z asystentem w sztabie, wyłączony bez niego', () => {
   const withA = view({});
-  assert.match(withA, /data-act="tauto">Poproś asystenta</);
+  assert.match(withA, /<summary class="btn btn--quiet">Poproś asystenta</);
+  for (const m of ['best', 'second', 'young', 'fresh', 'minutes']) assert.match(withA, new RegExp(`data-act="tauto" data-mode="${m}"`));
   const noA = view({ assistant: false });
   assert.match(noA, /data-act="tauto" disabled[^>]*>Poproś asystenta</);
+  assert.doesNotMatch(noA, /data-mode=/);
   assert.match(noA, /Brak asystenta trenera w sztabie/);
+});
+
+test('Prośby do asystenta: drugi skład, najmłodsi, najświeżsi, najmniej grający', () => {
+  const sq = squad.map((p) => ({ ...p }));
+  const best = createTactics(sq, { benchSize: 9 }).xi;
+  const pick = (mode, s = sq) => createTactics(s, { benchSize: 9, mode }).xi;
+  const avg = (xi, fn, s = sq) => xi.map((id) => fn(s.find((p) => p.id === id))).reduce((a, b) => a + b, 0) / xi.length;
+  const second = pick('second');
+  assert.ok(second.filter((id) => best.includes(id)).length <= 3, 'drugi skład prawie bez podstawowych');
+  assert.ok(avg(pick('young'), (p) => p.age) < avg(best, (p) => p.age) - 1, 'młodsza jedenastka');
+  const tired = sq.map((p, i) => ({ ...p, fresh: i % 2 ? 100 : 70 }));
+  assert.ok(avg(pick('fresh', tired), (p) => p.fresh, tired) > avg(createTactics(tired, { benchSize: 9 }).xi, (p) => p.fresh, tired));
+  const played = sq.map((p) => ({ ...p, season: { ...(p.season ?? {}), min: best.includes(p.id) ? 900 : 0 } }));
+  assert.ok(pick('minutes', played).filter((id) => best.includes(id)).length <= 3, 'najmniej grający zamiast podstawowych');
+  for (const m of ['second', 'young', 'fresh', 'minutes']) assert.equal(new Set(pick(m)).size, 11, `${m}: 11 różnych zawodników`);
 });

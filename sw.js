@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-66d9c63410';
+const VERSION = 'v0.3-c8edac3239';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -78,7 +78,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', '3e6a77677d'],
+  ['./src/app.js', '7809b9b766'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '5cc24e938e'],
@@ -144,7 +144,7 @@ const FILES = [
   ['./src/data/names.js', '7195dbc1a8'],
   ['./src/data/reprezentacje.json', '551a9d5bdd'],
   ['./src/data/reprezentacje_swiat.json', '29c3c96adf'],
-  ['./src/engine/lineup.js', 'aab0693990'],
+  ['./src/engine/lineup.js', '3e5e76a9b6'],
   ['./src/engine/match/coach.js', '2cc9ca6593'],
   ['./src/engine/match/constants.js', 'e513a78280'],
   ['./src/engine/match/control.js', 'b17907f777'],
@@ -187,7 +187,7 @@ const FILES = [
   ['./src/season/thirdLeague.js', 'b37f1d8a44'],
   ['./src/season/uefa.js', '4a0c9dc052'],
   ['./src/season/worldNations.js', '6003d36e12'],
-  ['./src/styles/app.css', '681d5957b8'],
+  ['./src/styles/app.css', '0c6e98a89a'],
   ['./src/styles/assistant.css', '87577f8aa4'],
   ['./src/styles/base.css', 'f2fee58203'],
   ['./src/styles/club.css', '6615e08e49'],
@@ -253,7 +253,7 @@ const FILES = [
   ['./src/ui/sysMenu.js', 'fc1677717f'],
   ['./src/ui/tacticsDrag.js', '1d6819c303'],
   ['./src/ui/tacticsMoves.js', '36742ffefc'],
-  ['./src/ui/tacticsView.js', '76dbdf9eb6'],
+  ['./src/ui/tacticsView.js', 'ef2d937cf3'],
   ['./src/ui/talksView.js', '0721af17ae'],
   ['./src/ui/teamReportView.js', 'c01abc57b6'],
   ['./src/ui/todoView.js', 'bd4d7aa1c4'],
