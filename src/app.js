@@ -6,7 +6,7 @@ import { GAME_START, SEASON, POLISH_EUROPE_2026, DOMESTIC } from './config/calen
 import { crestHtml } from './ui/crest.js';
 import { esc, fmtDate, fmtDay, weekday, icon } from './ui/dom.js';
 import { migratePosCodes } from './engine/positions.js'; // zapisy sprzed zmiany kodu SP -> BP
-import { ensureReserves } from './career/reserves.js';
+import { ensureReserves, reservesOf } from './career/reserves.js';
 import * as store from './core/store.js';
 import { hashString } from './core/rng.js';
 import { CATEGORIES, unreadCount, markRead, markAllRead, resolveMessage, filterInbox, pendingDecisions, addMessages, pruneInbox, canDelete } from './core/inbox.js';
@@ -461,7 +461,18 @@ function renderTab(tab, g, club) {
     if (state.sqSub === 'reserves' && !rzOn) state.sqSub = 'players';
     const rzChips = rzOn ? rzChipFn(g) : null;
     const sub = `<div class="subtabs${rzOn ? ' subtabs--5 subtabs--scroll' : ''}" role="tablist"><button role="tab" data-act="tsub" data-s="players" aria-selected="${state.sqSub === 'players'}">Zawodnicy</button><button role="tab" data-act="tsub" data-s="tactics" aria-selected="${state.sqSub === 'tactics'}">Skład i taktyka</button>${rzOn ? `<button role="tab" data-act="tsub" data-s="reserves" aria-selected="${state.sqSub === 'reserves'}">Rezerwy</button>` : ''}<button role="tab" data-act="tsub" data-s="talks" aria-selected="${state.sqSub === 'talks'}">Rozmowy</button><button role="tab" data-act="tsub" data-s="report" aria-selected="${state.sqSub === 'report'}">Raport ogólny</button></div>`;
-    if (state.sqSub === 'reserves') return sub + renderReserves(g, state);
+    if (state.sqSub === 'reserves') {
+      // Rezerwy: „Mecz” (delegowania i powołania) albo „Kadra rezerw” (pełna kadra z atrybutami, jak w Kadrze)
+      const R = reservesOf(g, g.clubId);
+      const rv = state.rzView === 'squad' ? 'squad' : 'match';
+      const tog = `<div class="seg sqv rz-view" role="tablist" aria-label="Widok rezerw">${[['match', 'Mecz'], ['squad', `Kadra rezerw${R.name ? `: ${R.name}` : ''}`]].map(([k, v]) => `<button role="tab" data-act="rzview" data-v="${k}" aria-selected="${rv === k}">${esc(v)}</button>`).join('')}</div>`;
+      if (rv === 'squad' && R.ok) {
+        const rp = state.playerOpen && g.world.players[state.playerOpen];
+        if (rp && rp.clubId === R.id) return renderPlayerProfile(rp, { leagueOvrs: leagueOvrs(g, anyClub(R.id)?.tier ?? club.tier), clubName: R.name, date: g.date, game: g });
+        return sub + tog + renderSquadList(squadOf(g.world, R.id), { filter: state.sqFilter === 'academy' ? 'all' : state.sqFilter, leagueOvrs: leagueOvrs(g, anyClub(R.id)?.tier ?? club.tier), academy: [], view: state.sqView ?? 'overview', sort: state.sqSort, game: g, clubId: R.id, title: `Kadra rezerw: ${R.name}` });
+      }
+      return sub + tog + renderReserves(g, state);
+    }
     if (state.sqSub === 'talks') return sub + renderTalks(g, state);
     if (state.sqSub === 'report') return sub + renderTeamReport(g, { msg: state.trepMsg ?? '', sel: state.trepSel ?? 0 });
     if (state.sqSub === 'tactics') {
@@ -1492,6 +1503,7 @@ async function dispatchAct(el, { root = app } = {}) {
     if (act === 'sqview') { state.sqView = el.dataset.v; state.sqSort = null; render(); }
     if (act === 'sqsort') { const k = el.dataset.k; state.sqSort = state.sqSort?.k === k ? { k, dir: state.sqSort.dir === 'desc' ? 'asc' : 'desc' } : { k, dir: k === 'name' || k === 'pos' ? 'asc' : 'desc' }; render(); }
     if (act === 'player') { state.playerOpen = el.dataset.id; render(); window.scrollTo({ top: 0 }); }
+    if (act === 'rzview') { state.rzView = el.dataset.v === 'squad' ? 'squad' : 'match'; state.playerOpen = null; render(); }
     if (act === 'squadback') { state.playerOpen = null; render(); }
     if (act === 'arep') { state.repOpen = el.dataset.id; render(); window.scrollTo({ top: 0 }); }
     if (act === 'arepback') { state.repOpen = null; render(); }
