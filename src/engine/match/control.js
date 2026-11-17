@@ -6,6 +6,7 @@
 import { emit, ensureGoalkeeper } from './core.js';
 import { onPitch, applyTacticChange, goalkeeper, fieldPlayers } from './teams.js';
 import { INSTRUCTIONS } from '../../data/instructions.js';
+import { playerInstruction, PI_TEAM_LABEL } from '../../data/playerInstructions.js';
 import { SHOUTS, SHOUT_COOLDOWN, SHOUT_DURATION, K, COACHQ } from './constants.js';
 import { unlimitedSubs } from './rules.js';
 
@@ -134,12 +135,30 @@ export function describePatch(T, patch) {
     const opt = ins?.options.find((o) => o.id === v);
     if (ins && opt) parts.push(`${ins.label.toLowerCase()}: ${opt.label}`);
   }
+  // Instrukcje indywidualne: tylko co zmieniono (bez jakości wykonania, która jest ukryta)
+  const pi = [];
+  for (const [pid, o] of Object.entries(patch.playerInstr ?? {})) {
+    const x = [...T.players, ...T.bench].find((y) => String(y.id) === String(pid));
+    const who = x ? last(x) : 'zawodnik';
+    if (o === null) { pi.push(`${who}: ${PI_TEAM_LABEL.toLowerCase()}`); continue; }
+    const what = Object.entries(o).map(([k, v]) => {
+      const def = playerInstruction(k);
+      if (!def) return null;
+      const opt = def.options.find((op) => op.v === v);
+      return `${def.label.toLowerCase()} ${(opt?.label ?? PI_TEAM_LABEL).toLowerCase()}`;
+    }).filter(Boolean);
+    if (what.length) pi.push(`${who}: ${what.join(', ')}`);
+  }
+  if (pi.length) parts.push(`instrukcje indywidualne (${pi.join('; ')})`);
   return parts.join(', ');
 }
 
 /**
- * Zmiana taktyki. patch: { formation?, instructions?, drop?, assign?: { [id]: indeksSlotu }, empty?: [indeksSlotu] }.
+ * Zmiana taktyki. patch: { formation?, instructions?, drop?, assign?: { [id]: indeksSlotu }, empty?: [indeksSlotu],
+ *   playerInstr?: { [id]: { pass, dribble, shoot, cross, tackle, run, press: -1|0|1|null } | null } }.
  * assign i empty: dowolny zawodnik na dowolnym slocie i wybór pustych miejsc w osłabieniu (planShape w teams.js).
+ * playerInstr: instrukcje indywidualne (scalane z dotychczasowymi; 0/null albo zawodnik null: jak drużyna), koszt zgrania
+ * ok. 2 za zawodnika (najwyżej 6), w przerwie bez kosztu (docs/instrukcje-indywidualne.md).
  * opts: { by, reason }. Zwraca { ok, cost, adapt } albo { ok: false, error } bez zmian w meczu.
  * Zdarzenie 'tactic': { patch, by, reason, formation, shape, empty, cost, text }.
  */

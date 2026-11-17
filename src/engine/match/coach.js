@@ -13,6 +13,7 @@ import { formationById } from '../../data/formations.js';
 import { K, KNOCK, COACHQ } from './constants.js';
 import { unlimitedSubs } from './rules.js';
 import { clamp } from '../../core/rng.js';
+import { teamLevel } from '../../data/playerInstructions.js';
 
 const CHECKPOINTS = new Set([46, 55, 60, 65, 70, 75, 80, 85, 88, 95, 100, 105, 110, 115, 119]);
 // Przegląd planu w 1. połowie: trener reaguje, gdy plan wyraźnie nie działa (nie tylko w przerwie) [SZAC]
@@ -528,10 +529,11 @@ function plan(M, side, rng, advice) {
     subs.push({ type: 'sub', out, inc: repl.inc, move: repl.move, why, text, ...extra });
   };
   const mergeTactic = (patch, reason, urgent = false) => {
-    if (!patch || (!patch.formation && !patch.drop && !Object.keys(patch.instructions ?? {}).length)) return;
+    if (!patch || (!patch.formation && !patch.drop && !Object.keys(patch.instructions ?? {}).length && !Object.keys(patch.playerInstr ?? {}).length)) return;
     const p = tactic.patch ?? {};
     tactic.patch = { ...p, ...patch, instructions: { ...(p.instructions ?? {}), ...(patch.instructions ?? {}) } };
     if (!Object.keys(tactic.patch.instructions).length) delete tactic.patch.instructions;
+    if (p.playerInstr || patch.playerInstr) tactic.patch.playerInstr = { ...(p.playerInstr ?? {}), ...(patch.playerInstr ?? {}) };
     tactic.reason = tactic.reason ?? reason;
     tactic.urgent = tactic.urgent || urgent;
   };
@@ -630,6 +632,12 @@ function plan(M, side, rng, advice) {
     const sctx = { reserved, addSub, mergeTactic, left: () => left };
     if (st.friendly) friendlySubs(M, T, st, rng, advice, sctx);
     else planSubs(M, T, st, rng, advice, sctx);
+  }
+  // 4. Instrukcje indywidualne (AI v1): obrońca albo DP z żółtą kartką od 60. minuty gra łagodnie w odbiorze
+  // (po zmianach: bez schodzących; bez wpisu, gdy w tej samej decyzji cała drużyna przechodzi na łagodny odbiór)
+  if (checkpoint && AI_RULES.softTackleBooked && M.minute >= AI_RULES.softTackleFrom) {
+    const pi = softTackleBooked(T, new Set(subs.map((x) => x.out)), { ...T.tactics.instructions, ...(tactic.patch?.instructions ?? {}) });
+    if (pi) mergeTactic({ playerInstr: pi }, 'zawodnik z żółtą kartką: łagodniej w odbiorze');
   }
 
   const out = [...subs.map((s) => ({
@@ -906,6 +914,26 @@ function friendlySubs(M, T, st, rng, advice, ctx) {
 }
 const CHECK_REST = new Set([70, 75, 80, 85]);
 
+// ------------------------------------------------------------ Instrukcje indywidualne (AI v1)
+/** Reguły AI dla instrukcji indywidualnych [SZAC]; softTackleBooked = false tylko w testach (złoty test silnika). */
+export const AI_RULES = { softTackleBooked: true, softTackleFrom: 60 };
+
+/**
+ * Obrońcy i DP z żółtą kartką, którzy nie grają jeszcze łagodnie w odbiorze: { [id]: instrukcje z tackle: -1 } albo null.
+ * Bez zawodników schodzących w tej samej decyzji (out).
+ */
+function softTackleBooked(T, out0 = new Set(), instr = T.tactics.instructions) {
+  const map = T.tactics.playerInstr ?? {};
+  const team = teamLevel('tackle', instr);
+  let out = null;
+  for (const x of fieldPlayers(T)) {
+    if (!x.yc || out0.has(x) || !DEF_ROLE.has(x.slot?.pos)) continue;
+    if ((map[x.id]?.tackle ?? team) <= -1) continue;
+    (out ?? (out = {}))[x.id] = { ...(map[x.id] ?? {}), tackle: -1 };
+  }
+  return out;
+}
+
 // ------------------------------------------------------------ Wykonanie
 function execute(M, side, actions, by) {
   const T = M.teams[side];
@@ -919,7 +947,9 @@ function execute(M, side, actions, by) {
   }
   const t = actions.find((a) => a.type === 'tactic');
   if (t) changeTactics(M, side, t.patch, { by, reason: t.reason });
-  else if ((shuffle || (T.dropIdx.length && fieldPlayers(T).length >= 11)) && by !== 'user') reslot(T); // przestawienie bez kosztu
+  // Same instrukcje indywidualne nie przestawiają zawodników: przestawienie po zmianach jak bez zmiany taktyki
+  const piOnly = t && Object.keys(t.patch).every((k) => k === 'playerInstr');
+  if ((!t || piOnly) && (shuffle || (T.dropIdx.length && fieldPlayers(T).length >= 11)) && by !== 'user') reslot(T); // przestawienie bez kosztu
 }
 
 /**

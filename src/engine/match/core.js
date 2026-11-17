@@ -36,7 +36,7 @@ export function createMatch(cfg) {
     hfa: ctx.neutral ? 0 : 0.7 + 0.3 * ctx.attendance,
     rules: matchRules(ctx),
   };
-  M.teams = [buildTeam(0, cfg.home, rng, ctx), buildTeam(1, cfg.away, rng, ctx)];
+  M.teams = [buildTeam(0, cfg.home, rng, ctx, cfg.seed ?? 'mecz'), buildTeam(1, cfg.away, rng, ctx, cfg.seed ?? 'mecz')];
   if (unlimitedSubs(M)) for (const T of M.teams) { T.subsLimit = UNLIMITED; T.windowsLimit = UNLIMITED; }
   for (const T of M.teams) {
     updateZones(T, M); ensureGoalkeeper(M, T);
@@ -96,12 +96,12 @@ function phasePossession(M) {
   // Podania obu drużyn wg udziału w posiadaniu, stylu i presji rywala
   for (const T of M.teams) {
     const share = T.side === 0 ? pH : 1 - pH;
-    const style = T.P.passing === 'short' ? 1.25 : T.P.passing === 'long' ? 0.8 : 1;
+    const style = T.P.passVolMul; // krótkie 1.25, długie 0.8 (INSTR_NUM), z przesunięciem od instrukcji zawodników
     const n = M.rng.poisson(K.passesPerMinute * share * style);
     if (!n) continue;
     const O = M.teams[1 - T.side];
     const acc = clamp(K.passAcc + 0.012 * (T.avg('POD') - 11) + 0.006 * (T.avg('TEC') - 11)
-      + (T.P.passing === 'short' ? 0.03 : T.P.passing === 'long' ? -0.06 : 0) - (O.P.pressing === 'high' ? 0.03 : 0), 0.6, 0.93);
+      + T.P.passAcc - 0.03 * O.P.pressHigh, 0.6, 0.93);
     let ok = 0;
     for (let i = 0; i < n; i++) if (M.rng.next() < acc) ok++;
     if (ok) emit(M, 'pass', T.side, null, { count: ok });
@@ -111,12 +111,12 @@ function phasePossession(M) {
 
 function phaseOffside(M) {
   const at = M.teams[M.ai]; const df = M.teams[1 - M.ai];
-  if (M.rng.next() < K.offsideTick * df.P.oppOffsideMul) offside(M, at);
+  if (M.rng.next() < K.offsideTick * df.P.oppOffsideMul * at.P.offsideMul) offside(M, at);
 }
 
 function offside(M, at) {
   const xs = onPitch(at, M.minute).filter((x) => ['NAP', 'SN', 'OP', 'BP'].includes(x.slot.pos));
-  const x = xs.length ? pickWeighted(M, xs, (y) => attr(y, 'RUC')) : null;
+  const x = xs.length ? pickWeighted(M, xs, (y) => attr(y, 'RUC') * (y.pi?.offW ?? 1)) : null;
   if (x) { x.offs++; rateEv(x, -0.05); }
   emit(M, 'offside', at.side, x, { text: x ? `Spalony: ${last(x)}.` : 'Spalony.' });
   emit(M, 'freeKick', 1 - at.side, null);
@@ -132,7 +132,7 @@ function phaseFoul(M) {
     const fi = M.rng.next() < K.foulDefShare ? 1 - ai : ai;
     const ft = M.teams[fi];
     const xs = onPitch(ft, M.minute);
-    const x = pickWeighted(M, xs, (y) => (FOUL_W[y.slot.pos] ?? 1) * (attr(y, 'AGR') / 10) * (y.yc ? K.bookedFoulMul : 1) * tiredFoul(y));
+    const x = pickWeighted(M, xs, (y) => (FOUL_W[y.slot.pos] ?? 1) * (attr(y, 'AGR') / 10) * (y.yc ? K.bookedFoulMul : 1) * tiredFoul(y) * (y.pi?.foulW ?? 1));
     x.fouls++;
     emit(M, 'foul', fi, x);
     emit(M, 'freeKick', 1 - fi, null);
@@ -140,10 +140,10 @@ function phaseFoul(M) {
     const cm = (fi === 0 ? K.homeCardMul : K.awayCardMul) ** (M.hfa ? 1 : 0) * r * (0.7 + 0.03 * (x.p.hidden?.TMP ?? 10))
       * (M.ctx.rank >= 2 ? 1.15 : 1) * (M.minute > 80 ? 1.15 : 1) * (sm.yellowMul ?? 1) * (1 + 0.03 * Math.max(0, x.Z));
     let carded = false;
-    if (M.rng.next() < K.redPerFoul * cm * Math.sqrt(r) * ft.P.redPerFoul * ft.P.redMul) {
+    if (M.rng.next() < K.redPerFoul * cm * Math.sqrt(r) * ft.P.redPerFoul * ft.P.redMul * (x.pi?.rc ?? 1)) {
       straightRed(M, ft, x, M.rng.weighted(['sfp', 'violent', 'dogso'], (k) => ({ sfp: 0.6, violent: 0.15, dogso: 0.25 })[k]));
       carded = true;
-    } else if (M.rng.next() < K.yellowPerFoul * cm * ft.P.yellowPerFoul * (x.yc ? K.bookedYellowMul : 1)) {
+    } else if (M.rng.next() < K.yellowPerFoul * cm * ft.P.yellowPerFoul * (x.yc ? K.bookedYellowMul : 1) * (x.pi?.yc ?? 1)) {
       // VAR: rażący faul przeoczony przez sędziego (tylko przy żółtej, analiza przy monitorze)
       if (M.ctx.var && !x.yc && M.rng.next() < K.varRedAdd) {
         varReview(M, fi, x, 'redCard', 'Po analizie VAR sędzia zmienia żółtą kartkę na czerwoną.');
@@ -345,7 +345,7 @@ function phaseAction(M) {
   } else {
     if (defError(M, ai, A, D)) return;
     const xs = onPitch(D, M.minute).filter((y) => y.slot.pos !== 'BR');
-    const x = pickWeighted(M, xs, (y) => attr(y, 'ODB') + attr(y, 'UST'));
+    const x = pickWeighted(M, xs, (y) => (attr(y, 'ODB') + attr(y, 'UST')) * (y.pi?.tackleW ?? 1));
     x.tk++; rateEv(x, 0.08);
     const kind = type === 'SKR' && M.rng.next() < 0.5 ? 'clearance' : M.rng.next() < 0.55 ? 'tackle' : 'interception';
     emit(M, kind, 1 - ai, x);
@@ -373,7 +373,7 @@ function phaseAction(M) {
 /** Rzut karny: faul obrońcy (czasem z kartką), wykonanie (z powtórką i dobitką). */
 function awardPenalty(M, ai, { culprit = null, fouled = null, byVar = false, hand = false } = {}) {
   const A = M.teams[ai]; const D = M.teams[1 - ai];
-  const fouler = culprit ?? pickWeighted(M, onPitch(D, M.minute).filter((y) => y.slot.pos !== 'BR'), (y) => FOUL_W[y.slot.pos] ?? 1);
+  const fouler = culprit ?? pickWeighted(M, onPitch(D, M.minute).filter((y) => y.slot.pos !== 'BR'), (y) => (FOUL_W[y.slot.pos] ?? 1) * (y.pi?.foulW ?? 1));
   const victim = fouled ?? pickWeighted(M, onPitch(A, M.minute), (y) => SHOOT_W[y.slot.pos] ?? 1);
   rateEv(fouler, -0.6); rateEv(victim, 0.3);
   fouler.fouls++;
@@ -393,10 +393,10 @@ function tacticalFoul(M, A, D) {
   const clean = xs.filter((y) => !y.yc);
   const pool = clean.length ? clean : xs;
   const leadingLate = M.score[D.side] > M.score[A.side] && M.minute >= 70;
-  const p = K.tacFoul * (D.P.tackling === 'hard' ? 1.3 : D.P.tackling === 'soft' ? 0.5 : 1) * (leadingLate ? 1.5 : 1) * (clean.length ? 1 : 0.25)
+  const p = K.tacFoul * D.P.tacFoulMul * (leadingLate ? 1.5 : 1) * (clean.length ? 1 : 0.25)
     * (1 + FATIGUE.tacFoulTired * (D.defTired ?? 0)); // zmęczona obrona nie nadąża i częściej przerywa faulem
   if (M.rng.next() >= p) return false;
-  const x = pickWeighted(M, pool, (y) => attr(y, 'AGR') * (y.slot.pos === 'DP' ? 1.5 : 1));
+  const x = pickWeighted(M, pool, (y) => attr(y, 'AGR') * (y.slot.pos === 'DP' ? 1.5 : 1) * (y.pi?.foulW ?? 1));
   x.fouls++;
   emit(M, 'foul', D.side, x, { tactical: true });
   emit(M, 'freeKick', A.side, null);
@@ -439,7 +439,7 @@ function defError(M, ai, A, D) {
   return true;
 }
 
-function dribblePen(A) { return 1 + 0.04 * (A.avg('DRY') - 11); }
+function dribblePen(A) { return (1 + 0.04 * (A.avg('DRY') - 11)) * A.P.penDrawMul; } // penDrawMul: drybling zawodników (instrukcje)
 
 function pickType(M, A, D) {
   const w = {};
@@ -458,13 +458,14 @@ function pickType(M, A, D) {
 function counterBonus(M, A, D, type) {
   let b = 0;
   const tecA = A.avg('TEC');
-  if (D.P.pressing === 'high' && A.P.passing === 'short') b += tecA >= 12 ? 0.35 * Math.min(1, (tecA - 12) / 3) : -0.3 * Math.min(1, (12 - tecA) / 3);
+  // Liczby z INSTR_NUM: 1 = cała drużyna (wysoki pressing, krótkie podania, twardy lub łagodny odbiór), ułamek od zawodników
+  if (D.P.pressHigh && A.P.shortPass) b += D.P.pressHigh * A.P.shortPass * (tecA >= 12 ? 0.35 * Math.min(1, (tecA - 12) / 3) : -0.3 * Math.min(1, (12 - tecA) / 3));
   if (type === 'SKR') b += 0.25 * (A.P.W - D.P.W);
   if (type === 'KON' && A.P.konVsAttack > 1 && (D.P.line === 'high' || D.P.mentality >= 1)) {
     b += 0.4 * clamp(((A.pace?.team ?? A.avg('SZY')) - (D.pace?.team ?? D.avg('SZY')) + 3) / 6, 0, 1); // szybkość z kondycją
   }
-  if (D.P.tackling === 'hard' && A.avg('DRY') >= 13) b -= 0.2;
-  if (D.P.tackling === 'soft') b += 0.2 * clamp((A.avg('DRY') - 11) / 4, 0, 1);
+  if (D.P.tackleHard && A.avg('DRY') >= 13) b -= 0.2 * D.P.tackleHard;
+  if (D.P.tackleSoft) b += 0.2 * D.P.tackleSoft * clamp((A.avg('DRY') - 11) / 4, 0, 1);
   if (type === 'POZ' && D.P.DvsPOZ) b -= D.P.DvsPOZ;
   if (type === 'KON' && D.P.DvsKON) b -= D.P.DvsKON;
   if (A.P.brkPerTec) b += A.P.brkPerTec * (tecA - 11);
@@ -495,7 +496,7 @@ function shot(M, ai, xg, type, header, forced = null) {
   const field = onPitch(A, M.minute).filter((y) => y.slot.pos !== 'BR');
   if (!field.length) return;
   const s = forced ?? pickWeighted(M, field, (y) => (SHOOT_W[y.slot.pos] ?? 1) * (header && y.slot.pos === 'ŚO' ? 3 : 1)
-    * (header ? attr(y, 'GLO') : type === 'DYS' ? attr(y, 'DYS') : attr(y, 'RUC')) / 10);
+    * (header ? attr(y, 'GLO') : type === 'DYS' ? attr(y, 'DYS') : attr(y, 'RUC')) / 10 * (y.pi ? (type === 'DYS' ? y.pi.dysW : y.pi.shotW) : 1));
   let assister = null;
   if (type !== 'DYS' && type !== 'FK' && field.length > 1) {
     // Bramkarz z bardzo małą wagą: rzadka asysta po długim wybiciu, najczęściej przy kontrze (gra nogami NOG)
@@ -504,8 +505,8 @@ function shot(M, ai, xg, type, header, forced = null) {
     assister = pickWeighted(M, others, (y) => (y === gkA
       ? (attr(y, 'NOG') + attr(y, 'WIZ')) * (type === 'KON' ? GK_ASSIST.KON : GK_ASSIST.other)
       : type === 'SKR' || type === 'SP'
-        ? attr(y, 'DOS') * (['BO', 'WB', 'BP', 'SN'].includes(y.slot.pos) ? 2 : y.slot.pos === 'ŚO' ? 0.2 : 0.5)
-        : (attr(y, 'POD') + attr(y, 'WIZ')) * (ASSIST_POS_W[y.slot.pos] ?? 1)));
+        ? attr(y, 'DOS') * (['BO', 'WB', 'BP', 'SN'].includes(y.slot.pos) ? 2 : y.slot.pos === 'ŚO' ? 0.2 : 0.5) * (y.pi?.skrA ?? 1)
+        : (attr(y, 'POD') + attr(y, 'WIZ')) * (ASSIST_POS_W[y.slot.pos] ?? 1) * (y.pi?.othA ?? 1)));
   }
   s.sh++;
   A.threat += 6 * xg;

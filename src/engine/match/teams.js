@@ -6,7 +6,9 @@ import { INSTRUCTIONS } from '../../data/instructions.js';
 import { proficiency, posEff, goalkeeperSlotModifiers, errorMul } from '../positions.js';
 import { evaluate } from '../modifiers.js';
 import { clamp } from '../../core/rng.js';
-import { K, ROLE_SHARE, ZONE_N, FATIGUE_ROLE, KNOCK, FATIGUE } from './constants.js';
+import { K, ROLE_SHARE, ZONE_N, FATIGUE_ROLE, KNOCK, FATIGUE, INSTR_NUM } from './constants.js';
+import { cleanPlayerInstrMap } from '../../data/playerInstructions.js';
+import { refreshPI, clearPI, applyShift, shiftedShare, validatePlayerInstr, mergePlayerInstr, PI } from './playerInstr.js';
 
 const a = (p, k) => p.attr?.[k] ?? p.ovr ?? 10;
 
@@ -52,11 +54,12 @@ function mkPlayer(p, slot, side, rng, ctx, Z = 0) {
   // Uraz sprzed meczu, z którym zawodnik gra z bólem: kara do formy daje modyfikator playingInjured (modifiers.js)
   const knock = p.playingInjured && p.injuryDays > 0 ? makeKnock(p.injury?.name ?? 'stłuczenie', 0, { pre: true, days: p.injuryDays }) : null;
   return {
-    id: p.id, p, slot, side, R: zoneRatings(p), base: evaluate('player', p, { inMatch: true }).total + dayForm + waz,
+    id: p.id, p, slot, side, R: zoneRatings(p), base: evaluate('player', p, { inMatch: true }).total + dayForm + waz, dayForm,
     cond: p.fresh ?? 95, on: !!slot, sentOff: false, subbedOff: false, injury: null, treatedUntil: -1,
     Z, yc: 0, minOn: slot ? 0 : null, minOff: null,
     ev: 0, g: 0, ast: 0, sh: 0, sot: 0, kp: 0, tk: 0, saves: 0, fouls: 0, offs: 0,
     fit: null, prevSlot: null, bookChecked: false, knock, slotIdx: -1, redCode: null,
+    pi: null, piDraw: null, // instrukcje indywidualne (playerInstr.js): efekty i losowania na mecz
   };
 }
 
@@ -85,12 +88,15 @@ export function tacticParams(formation, instructions) {
     foulMul: 1, yellowPerFoul: 1, redPerFoul: 1, penMul: 1, oppInjuryMul: 1, brk: 0, setPieceD: 0,
     DvsPOZ: 0, DvsKON: 0, addedTime: 0, yellowPerMin: 0, oppOffsideMul: 1, redMul: 1, konVsAttack: 1,
     brkPerTec: 0, brkPerAerial: 0, W: formation.W ?? 1, timewasting: false,
+    // Liczby dawnych porównań tekstu (INSTR_NUM) i parametry instrukcji indywidualnych (spalone, wymuszone karne)
+    passVolMul: 1, passAcc: 0, shortPass: 0, pressHigh: 0, tackleHard: 0, tackleSoft: 0, tacFoulMul: 1, offsideMul: 1, penDrawMul: 1,
   };
   addEffect(P, formation.fx); // efekty strukturalne formacji (np. niski blok 4-4-2), docs/taktyka-i-urazy.md
   for (const ins of INSTRUCTIONS) {
     const opt = ins.options.find((o) => o.id === instructions?.[ins.id]) ?? ins.options.find((o) => o.id === ins.default);
     if (opt?.onlyWhenLeading) P.timewasting = true;
     addEffect(P, opt?.effect);
+    addEffect(P, INSTR_NUM[ins.id]?.[opt?.id]);
   }
   P.mentality = Number(instructions?.mentality ?? 0);
   P.passing = instructions?.passing ?? 'mixed';
@@ -99,6 +105,9 @@ export function tacticParams(formation, instructions) {
   P.tackling = instructions?.tackling ?? 'normal';
   return P;
 }
+
+// Liczby z dawnych porównań tekstu (INSTR_NUM): przy zmianie taktyki przełączają się od razu, jak wcześniej teksty
+const NOLERP = ['passVolMul', 'passAcc', 'shortPass', 'pressHigh', 'tackleHard', 'tackleSoft', 'tacFoulMul'];
 
 /** Parametry w trakcie przejścia między taktykami; wynik zapisywany do bufora (bez alokacji co minutę). */
 function lerpParams(from, to, w, out) {
@@ -111,12 +120,15 @@ function lerpParams(from, to, w, out) {
       for (const t of Object.keys(tv)) o[t] = fv[t] + (tv[t] - fv[t]) * w;
     } else out[k] = tv;
   }
+  for (const k of NOLERP) out[k] = to[k];
   return out;
 }
 
 // ------------------------------------------------------------ Drużyna
-export function buildTeam(side, cfg, rng, ctx) {
+export function buildTeam(side, cfg, rng, ctx, seed = 'mecz') {
   const byId = new Map(cfg.squad.map((p) => [p.id, p]));
+  // Instrukcje indywidualne (tylko nadpisania); stare taktyki bez pola: brak instrukcji
+  const playerInstr = cleanPlayerInstrMap(cfg.tactics.playerInstr);
   const formation = formationById(cfg.tactics.formation);
   const z = cfg.zStart || {};
   const players = cfg.tactics.xi
@@ -133,10 +145,15 @@ export function buildTeam(side, cfg, rng, ctx) {
     side, club: cfg.club, ai: !!cfg.ai, coach: cfg.coach ?? 'P',
     // Umiejętności trenera w tym meczu (career/coaches.js matchCoach) i asystenta gracza; brak: zachowanie neutralne
     cq: cfg.coachQ ?? null, assistantCq: cfg.assistantQ ?? null,
-    tactics: { ...cfg.tactics }, formation, players, bench,
+    tactics: { ...cfg.tactics, playerInstr }, formation, players, bench,
     subsUsed: 0, windowsUsed: 0, windowMinute: null, subsLimit: 5, windowsLimit: 3,
     S: clamp(cfg.cohesion ?? 85, 30, 100), lastTacChange: -99,
-    tac: { from: params, to: params, t0: 0, adapt: 0, buf: {} }, P: params,
+    tac: { from: params, to: params, t0: 0, adapt: 0, buf: {} }, P: params, Pbase: params,
+    // Instrukcje indywidualne (playerInstr.js): piOn tylko przy nadpisaniach; sCap: sufit spójności w meczu
+    // Wszystkie pola od początku (stały kształt obiektu drużyny: szybki dostęp w silniku)
+    piOn: Object.keys(playerInstr).length > 0, piVer: 0, piSig: null, piSigArr: null, piShift: null, piBuf: {}, piMemo: { base: null, S: null },
+    piReport: {}, sCap: 100, piSeed: String(seed),
+    piCtx: { ctx, teamMorale: cfg.teamMorale ?? null },
     shout: null, shoutReadyAt: 0, shoutUses: {},
     takers: { penalty: cfg.tactics.penalty, freeKick: cfg.tactics.freeKick, corner: cfg.tactics.corner, captain: cfg.tactics.captain },
     zones: { DEF: 10, MID: 10, ATT: 10, GK: 10, SPA: 10, SPD: 10 },
@@ -199,7 +216,12 @@ function updatePace(T, xs) {
 /** Przeliczenie stref drużyny (co minutę, tanio: 11 zawodników). */
 export function updateZones(T, M) {
   const w = T.tac.adapt ? Math.min(1, (M.minute - T.tac.t0) / T.tac.adapt) : 1;
-  T.P = lerpParams(T.tac.from, T.tac.to, w, T.tac.buf);
+  T.P = T.Pbase = lerpParams(T.tac.from, T.tac.to, w, T.tac.buf);
+  // Instrukcje indywidualne: przesunięcie parametrów drużyny o 1/10 na zawodnika (bez instrukcji nic się nie liczy)
+  if (T.piOn) {
+    refreshPI(T);
+    if (T.piShift) T.P = applyShift(T.Pbase, T.piShift, T.piBuf, T.Pbase !== T.tac.buf, T.piMemo);
+  }
   const xs = onPitch(T, M.minute);
   const missing = 11 - xs.length;
   const cohesion = (100 - T.S) * 0.015;
@@ -211,7 +233,8 @@ export function updateZones(T, M) {
   T.knockPen = knocked >= 2 ? Math.min(KNOCK.teamMax, KNOCK.team * (knocked - 1) ** KNOCK.teamExp) : 0;
   const zones = { DEF: 0, MID: 0, ATT: 0 };
   for (const x of xs) {
-    const share = ROLE_SHARE[x.slot.pos] ?? ROLE_SHARE.ŚP;
+    let share = ROLE_SHARE[x.slot.pos] ?? ROLE_SHARE.ŚP;
+    if (x.pi && (x.pi.fwd || x.pi.back)) share = shiftedShare(share, x.pi); // Pozycja: do przodu albo z tyłu
     for (const zn of ['DEF', 'MID', 'ATT']) if (share[zn]) zones[zn] += share[zn] * eff(x, zn);
   }
   // Strefa = średnia ważona udziałami ról całej formacji (11 slotów), z łagodnym wpływem kształtu
@@ -247,11 +270,11 @@ export function updateCondition(T, M) {
     const role = FATIGUE_ROLE[x.slot.pos] ?? 1;
     const mid = ['DP', 'ŚP', 'OP', 'BP'].includes(x.slot.pos) ? P.fatMidMul : 1;
     const dK = 0.22 * P.fatMul * mid * role * (1.4 - 0.04 * a(x.p, 'WYT')) * (M.ctx.weather?.fat ?? 1) * ((x.p.age ?? 25) >= 31 ? 1.1 : 1)
-      * (x.knock && !x.knock.aggravated ? KNOCK.fatigue : 1);
+      * (x.knock && !x.knock.aggravated ? KNOCK.fatigue : 1) * (x.pi?.fat ?? 1);
     x.cond = Math.max(20, x.cond - dK);
     x.Z *= 0.97;
   }
-  T.S = Math.min(100, T.S + 1 + 0.05 * ((T.avg?.('LID') ?? 10) - 10));
+  T.S = Math.min(T.sCap ?? 100, T.S + 1 + 0.05 * ((T.avg?.('LID') ?? 10) - 10));
 }
 
 // ------------------------------------------------------------ Ustawienie zawodników na slotach
@@ -471,6 +494,10 @@ export function planShape(T, formationId = T.formation.id, { assign = null, empt
 /** Walidacja zmiany taktyki: komunikat błędu albo null (formacja, puste miejsca, przypisanie zawodników). */
 export function validateTacticPatch(T, patch = {}) {
   if (patch.formation != null && !FORMATIONS.some((f) => f.id === patch.formation)) return 'Nieznane ustawienie.';
+  if (patch.playerInstr != null) {
+    const e = validatePlayerInstr(T, patch.playerInstr);
+    if (e) return e;
+  }
   if (patch.assign == null && patch.empty == null) return null;
   const r = planShape(T, patch.formation ?? T.formation.id, { assign: patch.assign ?? null, empty: patch.empty ?? null });
   return r.ok ? null : r.error;
@@ -489,6 +516,9 @@ export function applyTacticChange(T, M, patch) {
   const plan = manual ? planShape(T, patch.formation ?? T.formation.id, { assign: patch.assign ?? null, empty: patch.empty ?? null }) : null;
   const newTactics = { ...T.tactics, ...patch, instructions: { ...T.tactics.instructions, ...(patch.instructions || {}) } };
   delete newTactics.drop; delete newTactics.assign; delete newTactics.empty;
+  // Instrukcje indywidualne: scalenie z dotychczasowymi (zawodnik null albo klucz 0/null: jak drużyna)
+  const pim = patch.playerInstr != null ? mergePlayerInstr(T.tactics.playerInstr, patch.playerInstr) : null;
+  newTactics.playerInstr = pim ? pim.map : (T.tactics.playerInstr ?? {});
   const formation = formationById(newTactics.formation);
   const atBreak = M.phase === 'break' || M.minute === 0;
   let cost = 0;
@@ -497,13 +527,19 @@ export function applyTacticChange(T, M, patch) {
   if (newTactics.formation !== T.tactics.formation) cost += formation.family && formation.family === T.formation.family ? 5 : 10; // w rodzinie 4-4-2 te same role
   else if (dropChanged || moved) cost += 5; // przesunięcie zawodników w tej samej formacji
   for (const k of Object.keys(patch.instructions || {})) if (patch.instructions[k] !== T.tactics.instructions?.[k]) cost += 5;
+  if (pim?.changed) cost += Math.min(PI.changeCostMax, PI.changeCost * pim.changed); // ok. 2 za zawodnika, najwyżej 6
   if (M.minute - T.lastTacChange < 10) cost *= 2;
   const adapt = clamp(6 - 0.2 * ((T.avg?.('DEC') ?? 10) - 10), 3, 8);
-  const from = T.P === T.tac.buf ? { ...T.P, act: { ...T.P.act }, oppAct: { ...T.P.oppAct } } : T.P; // kopia, bo bufor się zmienia
+  const cur = T.Pbase ?? T.P; // parametry drużyny bez przesunięcia od instrukcji indywidualnych
+  const from = cur === T.tac.buf ? { ...cur, act: { ...cur.act }, oppAct: { ...cur.oppAct } } : cur; // kopia, bo bufor się zmienia
   T.tac = { from, to: tacticParams(formation, newTactics.instructions), t0: M.minute, adapt: atBreak ? 0 : adapt, buf: {} };
   if (!atBreak && cost) { T.S = Math.max(30, T.S - cost); T.lastTacChange = M.minute; }
   T.formation = formation;
   T.tactics = newTactics;
+  // Przeliczenie efektów instrukcji indywidualnych (z zapisanych jakości, bez nowych losowań) od następnej minuty
+  T.piVer = (T.piVer ?? 0) + 1;
+  T.piOn = Object.keys(newTactics.playerInstr).length > 0;
+  if (!T.piOn) clearPI(T);
   if (plan) {
     // Ręczne ustawienie: dokładnie te sloty puste, zawodnicy tam, gdzie wskazano
     T.emptyIdx = plan.empty.slice(); T.emptyFor = formation.id;

@@ -54,6 +54,16 @@ export const K = {
   minPlayers: 7,
 };
 
+// Liczby silnika dla opcji instrukcji drużyny, które wcześniej były porównaniami tekstu w core.js
+// (styl podań, celność, pressing przeciw krótkim podaniom, twardy i łagodny odbiór, faul taktyczny).
+// Liczby zamiast tekstu pozwalają zawodnikom z instrukcjami indywidualnymi przesuwać je o 1/10 (playerInstr.js).
+// Bez interpolacji przy zmianie taktyki (NOLERP w teams.js), jak dawne teksty.
+export const INSTR_NUM = {
+  passing: { short: { passVolMul: 1.25, passAcc: 0.03, shortPass: 1 }, long: { passVolMul: 0.8, passAcc: -0.06 } },
+  pressing: { high: { pressHigh: 1 } },
+  tackling: { hard: { tackleHard: 1, tacFoulMul: 1.3 }, soft: { tackleSoft: 1, tacFoulMul: 0.5 } },
+};
+
 // Bezpośrednia czerwona kartka: kod -> [kod dla studia (długość kary), opis]
 export const RED_REASONS = {
   second: ['druga żółta', 'druga żółta kartka'],

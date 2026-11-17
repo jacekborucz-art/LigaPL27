@@ -39,7 +39,7 @@ import {
 } from './press.js';
 import './pressSystem.js'; // decyzje komisji dyscyplinarnych po słowach o sędziach
 import { addMessages, createMessage } from '../core/inbox.js';
-import { applyMorale } from '../career/morale.js';
+import { applyMorale, teamMorale } from '../career/morale.js';
 import { isAvailable } from '../career/squad.js';
 import { compClubIds } from '../season/leagueComps.js';
 import { matchReferee } from '../career/referees.js';
@@ -58,7 +58,8 @@ export function weatherFor(date, rng) {
 
 /** Wpływ pogody i murawy na silnik (ekspert 6.1 b). */
 export function engineWeather(w, pitch) {
-  const out = { conv: 1, foul: 1, inj: 1, fat: 1, act: 1, dys: 1, tempC: w.tempC }; // tempC: przerwa na schłodzenie w silniku (>= 32 st.)
+  // tempC: przerwa na schłodzenie w silniku (>= 32 st.); type: rodzaj pogody dla jakości instrukcji indywidualnych
+  const out = { conv: 1, foul: 1, inj: 1, fat: 1, act: 1, dys: 1, tempC: w.tempC, type: w.type };
   if (w.type === 'deszcz') Object.assign(out, { conv: 1.06, foul: 1.08, inj: 1.05, dys: 1.15 });
   if (w.type === 'snieg') Object.assign(out, { act: 0.92, fat: 1.1, inj: 1.1 });
   if (w.type === 'wiatr') out.dys = 0.85;
@@ -240,7 +241,7 @@ function teamCtx(game, clubId, comp, table, tactics) {
  */
 export function matchTactics(game, squad, benchSize, benchGk = 1) {
   const prev = game.tactics;
-  if (prev.assistant) return { ...createTactics(squad, { formation: prev.formation, instructions: prev.instructions, benchSize, benchGk }), assistant: true };
+  if (prev.assistant) return { ...createTactics(squad, { formation: prev.formation, instructions: prev.instructions, benchSize, benchGk, playerInstr: prev.playerInstr }), assistant: true };
   const subs = { ...(game.tacticsSubs ?? {}) }; // miejsce w jedenastce -> { orig: zastąpiony, sub: zastępca }
   const byId = new Map(squad.map((p) => [p.id, p]));
   const out = (id) => { const p = byId.get(id); return !p || !isAvailable(p); };
@@ -436,8 +437,9 @@ export function kickOff(game, S) {
   // Wielki mecz: odporny trener uspokaja drużynę, nerwowy ją usztywnia (zaangażowanie na start, PRE)
   const nerves = oppQ ? oppQ.imp * COACH.nerves * oppQ.pre : 0;
   const zOpp = Object.fromEntries(oppSquad.map((p) => [p.id, (ai.zByPersona[p.persona] ?? ai.teamZ) + nerves]));
-  const mine = { club: anyClub(game.clubId), squad: mySquad, tactics: matchTacticsFor(game, S), ai: false, coach: 'P', zStart: S.briefings.pre?.engine?.zStart ?? {}, assistantQ: S.myQ ?? null };
-  const theirs = { club: oppClub, squad: oppSquad, tactics: S.oppTactics, ai: true, coach: coachStyle(game, S.oppId), zStart: zOpp, coachQ: oppQ };
+  // teamMorale: średnie morale drużyny dla instrukcji indywidualnych (silnik nie importuje career/)
+  const mine = { club: anyClub(game.clubId), squad: mySquad, tactics: matchTacticsFor(game, S), ai: false, coach: 'P', zStart: S.briefings.pre?.engine?.zStart ?? {}, assistantQ: S.myQ ?? null, teamMorale: teamMorale(mySquad) };
+  const theirs = { club: oppClub, squad: oppSquad, tactics: S.oppTactics, ai: true, coach: coachStyle(game, S.oppId), zStart: zOpp, coachQ: oppQ, teamMorale: teamMorale(oppSquad) };
   // Trening: spójność zespołu na start meczu i stałe fragmenty (src/training)
   Object.assign(mine, trainingMatchInput(game, game.clubId, mine));
   Object.assign(theirs, trainingMatchInput(game, S.oppId, theirs));
@@ -447,7 +449,7 @@ export function kickOff(game, S) {
     home: S.userSide === 0 ? mine : theirs,
     away: S.userSide === 0 ? theirs : mine,
     ctx: {
-      neutral: !!S.f.neutral, var: S.hasVar, rank: S.pre.preview.rank.level, refStrict: S.referee.strictness,
+      neutral: !!S.f.neutral, var: S.hasVar, rank: S.pre.preview.rank.level, refStrict: S.referee.strictness, date: S.f.date,
       concussionSubs: false, // zmiany po wstrząśnieniu mózgu: flaga rozgrywek (UEFA ich nie stosuje, brak potwierdzenia dla Ekstraklasy)
       attendance: S.pre.conditions.attendance.fill, weather: engineWeather(S.weather, S.pitch),
       knockout: knockoutCtx(S.f),

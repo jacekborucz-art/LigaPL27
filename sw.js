@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-c42e06554c';
+const VERSION = 'v0.3-dd2d39cc80';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -78,7 +78,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', '474afdc13b'],
+  ['./src/app.js', 'd648b18363'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '5cc24e938e'],
@@ -142,16 +142,18 @@ const FILES = [
   ['./src/data/kibice.js', '9c3baf12b0'],
   ['./src/data/kluby_uefa.json', 'e579c6760e'],
   ['./src/data/names.js', '7195dbc1a8'],
+  ['./src/data/playerInstructions.js', '7f8727dcae'],
   ['./src/data/reprezentacje.json', '551a9d5bdd'],
   ['./src/data/reprezentacje_swiat.json', '29c3c96adf'],
-  ['./src/engine/lineup.js', '3e5e76a9b6'],
-  ['./src/engine/match/coach.js', '2cc9ca6593'],
-  ['./src/engine/match/constants.js', 'e513a78280'],
-  ['./src/engine/match/control.js', 'b17907f777'],
-  ['./src/engine/match/core.js', 'c3ab1fed44'],
+  ['./src/engine/lineup.js', '2783f8d715'],
+  ['./src/engine/match/coach.js', 'b25f14ff0a'],
+  ['./src/engine/match/constants.js', '4c7f75d944'],
+  ['./src/engine/match/control.js', '79aaff64bd'],
+  ['./src/engine/match/core.js', '6ca41fe2c9'],
   ['./src/engine/match/match.js', 'd1ed756f73'],
+  ['./src/engine/match/playerInstr.js', '5de7c75bd3'],
   ['./src/engine/match/rules.js', 'd5cc299ded'],
-  ['./src/engine/match/teams.js', 'fc879835d3'],
+  ['./src/engine/match/teams.js', 'b7090ab4e5'],
   ['./src/engine/matchStats.js', '71542c9b3b'],
   ['./src/engine/modifiers.js', 'cf8f446d97'],
   ['./src/engine/positions.js', 'ee736ff7cc'],
@@ -159,7 +161,7 @@ const FILES = [
   ['./src/engine/teamStrength.js', '29de64f3e1'],
   ['./src/match/aiPlan.js', '2f958da775'],
   ['./src/match/briefings.js', '259a9a1c24'],
-  ['./src/match/matchday.js', '417dd2e734'],
+  ['./src/match/matchday.js', 'f713d0f228'],
   ['./src/match/press.js', 'a0c01d2832'],
   ['./src/match/pressSystem.js', 'f08d4d2743'],
   ['./src/match/studio.js', '13cae950dc'],
@@ -178,7 +180,7 @@ const FILES = [
   ['./src/season/matchReport.js', 'be9864d533'],
   ['./src/season/national.js', '1b51378924'],
   ['./src/season/nationalSystem.js', '56b1056ddd'],
-  ['./src/season/rollover.js', 'dc0750f768'],
+  ['./src/season/rollover.js', '23f50cb370'],
   ['./src/season/schedule.js', 'a608f6730f'],
   ['./src/season/season.js', '368bc32d62'],
   ['./src/season/standings.js', 'b3bdff91e2'],

@@ -8,6 +8,7 @@ import { proficiency, posEff, assessLineup, validateLineup } from './positions.j
 import { conditionTerms, lineupRating } from './teamStrength.js';
 import { GROUP, isAvailable } from '../career/squad.js';
 import { knockEligible } from './match/teams.js';
+import { cleanPlayerInstrMap } from '../data/playerInstructions.js';
 
 /** Wartość zawodnika na danym slocie (OVR z karą pozycji + stan zawodnika). */
 export function slotValue(player, slot) {
@@ -178,8 +179,11 @@ export function autoRoles(squad, xi) {
   };
 }
 
-/** benchGk: liczba rezerwowych bramkarzy (COMPETITIONS[comp].benchGk, 2 w pucharach UEFA). */
-export function createTactics(squad, { formation = DEFAULT_FORMATION, benchSize = 12, instructions, benchGk = 1, mode = 'best' } = {}) {
+/**
+ * benchGk: liczba rezerwowych bramkarzy (COMPETITIONS[comp].benchGk, 2 w pucharach UEFA).
+ * playerInstr: instrukcje indywidualne do przeniesienia (docs/instrukcje-indywidualne.md), tylko zawodnicy z kadry.
+ */
+export function createTactics(squad, { formation = DEFAULT_FORMATION, benchSize = 12, instructions, benchGk = 1, mode = 'best', playerInstr } = {}) {
   const f = formationById(formation);
   const xi = autoPickXI(squad, f, { bonus: modeBonus(mode, squad, f) });
   return {
@@ -188,6 +192,7 @@ export function createTactics(squad, { formation = DEFAULT_FORMATION, benchSize 
     bench: autoPickBench(squad, xi, benchSize, [], { gks: benchGk }),
     instructions: { ...defaultInstructions(), ...(instructions || {}) },
     ...autoRoles(squad, xi),
+    playerInstr: cleanPlayerInstrMap(playerInstr, new Set(squad.map((p) => p.id))),
   };
 }
 
@@ -291,5 +296,7 @@ export function refreshTactics(tactics, squad, { benchSize = 12, benchGk = 1 } =
   }
   const roles = autoRoles(squad, t.xi);
   for (const r of ['captain', 'penalty', 'freeKick', 'corner']) if (!t[r] || !t.xi.includes(t[r])) t[r] = roles[r];
+  // Instrukcje indywidualne: zostają zawodnicy z kadry (także chwilowo niedostępni), odchodzą ci spoza klubu; stare zapisy: {}
+  t.playerInstr = cleanPlayerInstrMap(tactics.playerInstr, byId);
   return { tactics: t, changes };
 }

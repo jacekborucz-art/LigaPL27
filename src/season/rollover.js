@@ -340,7 +340,7 @@ export function rolloverSeason(game) {
   game.season = createSeason(`${game.seed}:${year}`, { playerClub: game.clubId, superCup: [champion, cupWinner], holder: res.uefa.LM ?? undefined, uefaHolders: res.uefa });
   game.season.polishEurope = polishEurope;
   game.fixtures = game.season.fixtures;
-  game.tactics = createTactics(squadOf(game.world, game.clubId), { benchSize: 12, formation: game.tactics?.formation, instructions: game.tactics?.instructions });
+  game.tactics = createTactics(squadOf(game.world, game.clubId), { benchSize: 12, formation: game.tactics?.formation, instructions: game.tactics?.instructions, playerInstr: game.tactics?.playerInstr });
   if (game.summary) game.summary.season = SEASON;
 
   // Wiadomości

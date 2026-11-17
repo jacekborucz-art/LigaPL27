@@ -1003,7 +1003,7 @@ async function playMyMatch() {
   const oppSquad = squadFor(g, oppId, f.comp);
   const tierComp = LEAGUE_COMPS.includes(f.comp) ? f.comp : 'pucharPolski';
   const bench = COMPETITIONS[tierComp]?.benchSize ?? 12;
-  const cfgFor = (id, squad, tactics, ai) => ({ club: anyClub(id), squad, tactics, ai, coach: coachStyle(g, id) });
+  const cfgFor = (id, squad, tactics, ai) => ({ club: anyClub(id), squad, tactics, ai, coach: coachStyle(g, id), teamMorale: teamMorale(squad) }); // teamMorale: instrukcje indywidualne
   const mine = cfgFor(g.clubId, mySquad(g), g.tactics, false);
   const theirs = cfgFor(oppId, oppSquad, createTactics(oppSquad, { benchSize: bench, benchGk: COMPETITIONS[f.comp]?.benchGk ?? 1 }), true);
   // Trener rywala z atrybutami i asystent gracza (docs/trener-ai-atrybuty.md)
@@ -1016,7 +1016,7 @@ async function playMyMatch() {
     seed: `${g.seed}:${f.id}`,
     home: mySide === 0 ? mine : theirs,
     away: mySide === 0 ? theirs : mine,
-    ctx: { neutral: !!f.neutral, var: f.comp === 'ekstraklasa' || f.comp === 'super' || f.round === 'SF' || f.round === 'F', rank: f.comp === 'pp' ? (f.round === 'F' ? 3 : 1) : f.comp === 'super' ? 2 : 0, refStrict: refStrictFor(g, f),
+    ctx: { neutral: !!f.neutral, var: f.comp === 'ekstraklasa' || f.comp === 'super' || f.round === 'SF' || f.round === 'F', rank: f.comp === 'pp' ? (f.round === 'F' ? 3 : 1) : f.comp === 'super' ? 2 : 0, refStrict: refStrictFor(g, f), date: f.date,
       // Superpuchar od razu na karne, dwumecz z wynikiem 1. meczu, sparing wg zasad z terminarza (docs/sparingi-i-karne.md)
       knockout: ['single', 'penaltiesOnly'].includes(f.knockout) ? f.knockout : f.knockout?.firstLeg ? { firstLeg: [...f.knockout.firstLeg] } : false,
       friendlyRules: f.comp === 'friendly' ? { ...(f.friendlyRules ?? {}) } : undefined },
@@ -1533,7 +1533,7 @@ async function dispatchAct(el, { root = app } = {}) {
     if (act === 'tauto' && !hasAssistant(g)) { state.tMsg = 'W sztabie nie ma asystenta trenera. Zatrudnisz go w Trening, Sztab.'; renderTacticsAfter(); }
     else if (act === 'tauto') {
       const mode = AUTO_MODES[el.dataset.mode] ? el.dataset.mode : 'best';
-      g.tactics = createTactics(mySquad(g), { formation: g.tactics.formation, benchSize: benchSizeFor(g), instructions: g.tactics.instructions, mode });
+      g.tactics = createTactics(mySquad(g), { formation: g.tactics.formation, benchSize: benchSizeFor(g), instructions: g.tactics.instructions, mode, playerInstr: g.tactics.playerInstr });
       state.tSel = null; state.tMsg = `Asystent ustawił skład: ${AUTO_MODES[mode].label.toLowerCase()}.`; await save(); renderTacticsAfter();
     }
     if (act === 'tinstr') { g.tactics = setInstruction(g.tactics, el.dataset.i, el.dataset.v); await save(); renderTacticsAfter(); }
