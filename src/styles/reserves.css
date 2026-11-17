@@ -31,6 +31,8 @@
 .rz-tabs button:focus-visible { outline: 2px solid var(--focus); outline-offset: -3px; }
 .rz-card { position: relative; min-width: 0; padding: var(--space-4); border: 1px solid var(--line); border-radius: 0 var(--radius-s) var(--radius-s) var(--radius-s); background: var(--bg); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); align-content: start; }
 .rz-card > .sqx__bar { margin-bottom: 0; }
+/* Widok „Mecz”: siatka .rz ma odstęp między wierszami, karta podjeżdża pod zakładki (aktywna zakładka łączy się z kartą) */
+.rz > .rz-top + .rz-card { margin-top: calc(-1 * var(--space-4)); }
 @media (max-width: 600px) {
   .rz-tabs { width: 100%; padding: 0; gap: 2px; }
   .rz-tabs button { flex: 1; padding: 0 8px; }
