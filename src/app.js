@@ -44,6 +44,7 @@ import { ensureNational, ensureIntl } from './season/nationalSystem.js';
 import { applySeasonState } from './season/rollover.js';
 import { ensureThirdLeague } from './season/thirdLeague.js';
 import { ensureTraining, trainingMatchInput, teamCohesion } from './training/index.js';
+import { cancelShortFriendlies } from './training/friendlies.js';
 import { renderTraining, handleTrainingAction, isTrainingAction } from './ui/trainingView.js';
 import { handleStaffAction, handleStaffField, isStaffAction, offerPreview } from './ui/staffView.js'; // Trening > Sztab
 import { shirtNumbers, kitColors } from './career/shirts.js';
@@ -1428,6 +1429,12 @@ async function dispatchAct(el, { root = app } = {}) {
       app.querySelector(`[data-act="${act}"][data-${key[1]}="${CSS.escape(el.dataset[key[1]])}"]`)?.focus({ preventScroll: true });
     }
     if (act === 'go') {
+      // Sparing w dniu meczu bez 11 zawodników z bramkarzem (powołania, kontuzje): odwołany, gra toczy się dalej
+      const fr = primaryAction(g).match;
+      if (fr?.comp === 'friendly') {
+        const msgs = cancelShortFriendlies(g, g.date);
+        if (msgs.length) { g.inbox = addMessages(g.inbox || [], msgs).inbox; await save(); render(); return; }
+      }
       const a = primaryAction(g);
       if (a.kind === 'play') {
         const { tactics, changes } = refreshTactics(g.tactics, mySquad(g), { benchSize: benchSizeFor(g) });

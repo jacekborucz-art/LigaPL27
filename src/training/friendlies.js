@@ -4,10 +4,11 @@
 // (na obozie: z kraju obozu, mecz na neutralnym boisku). Sparing to zwykły wpis w game.fixtures (comp 'friendly');
 // mecz rozgrywa aplikacja, a trening liczy go jak dzień meczowy (zgranie, obciążenie).
 
-import { addDays } from '../core/gameLoop.js';
+import { addDays, registerDailySystem } from '../core/gameLoop.js';
+import { createMessage } from '../core/inbox.js';
 import { SEASON_START, FIFA_WINDOWS } from '../config/calendar2026.js';
 import { CLUBS_PL, clubById, LEAGUE_NAMES } from '../data/clubs_pl.js';
-import { restOk } from '../season/season.js';
+import { restOk, squadFor } from '../season/season.js';
 import { UEFA_CLUBS, COUNTRY_NAMES } from '../season/uefa.js';
 import { FRIENDLY, CAMP } from './config.js';
 import { campWindow, campOn, officialDates } from './camps.js';
@@ -166,12 +167,53 @@ export function setFriendlyRules(game, id, opts = {}) {
   return { ok: true, fixture: f };
 }
 
-/** Odwołanie zaplanowanego sparingu (przed dniem meczu). */
+/** Minimalny skład na sparing: 11 zawodników do gry, w tym bramkarz. */
+export const FRIENDLY_MIN = 11;
+
+/**
+ * Za mało zawodników na sparing (powołania do reprezentacji, kontuzje, zawodnicy wstrzymani przez transfer albo
+ * drugą drużynę). Zwraca null albo { n, gk } (liczba dostępnych, czy jest bramkarz).
+ */
+export function friendlyShortage(game, f) {
+  if (!f || f.comp !== 'friendly' || f.played) return null;
+  const squad = squadFor(game, game.clubId, 'friendly', f);
+  const ok = squad.filter((p) => !(p.injuryDays > 0) && !p.callUp && !p.loanBlock && !p.transfer?.hold && !p.teamBlock);
+  const gk = ok.some((p) => p.pos === 'BR');
+  return ok.length >= FRIENDLY_MIN && gk ? null : { n: ok.length, gk };
+}
+
+/**
+ * Dzień sparingu: gdy po powołaniach i kontuzjach nie ma 11 zawodników z bramkarzem, kluby odwołują mecz
+ * (bez kar i bez wpływu na limit sparingów). Zwraca wiadomości dla gracza.
+ */
+export function cancelShortFriendlies(game, date) {
+  const out = [];
+  for (const f of (game.fixtures || []).filter((x) => x.comp === 'friendly' && x.date === date && !x.played && (x.home === game.clubId || x.away === game.clubId))) {
+    const short = friendlyShortage(game, f);
+    if (!short) continue;
+    game.fixtures.splice(game.fixtures.indexOf(f), 1);
+    const oppId = f.home === game.clubId ? f.away : f.home;
+    const opp = clubById(oppId)?.name ?? f.label?.replace(/^Sparing: /, '') ?? 'rywalem';
+    out.push(createMessage({
+      date, key: `sparing-odwolany:${f.id}`, category: 'club', from: 'Kierownik drużyny', priority: 'important',
+      subject: `Sparing odwołany: ${opp}`,
+      body: `Sparing z ${opp} został odwołany. Do dyspozycji jest tylko ${short.n} zawodników${short.gk ? '' : ', bez bramkarza'} (powołania do reprezentacji i kontuzje), a do gry potrzeba 11 z bramkarzem. Kluby odwołały mecz bez kar, termin nie liczy się do limitu sparingów.`,
+    }));
+  }
+  return out;
+}
+
+registerDailySystem({
+  id: 'friendlyShortage', order: 6, // po powołaniach (national, order 3) i rezerwach (order 4)
+  run(game, date) { return { messages: cancelShortFriendlies(game, date) }; },
+});
+
+/** Odwołanie zaplanowanego sparingu (do rozpoczęcia meczu, także w dniu meczu). */
 export function cancelFriendly(game, id) {
   const i = (game.fixtures || []).findIndex((f) => f.id === id && f.comp === 'friendly');
   if (i < 0) return { ok: false, error: 'Nie ma takiego sparingu.' };
   const f = game.fixtures[i];
-  if (f.played || f.date <= game.date) return { ok: false, error: 'Tego sparingu nie da się już odwołać.' };
+  if (f.played || f.date < game.date) return { ok: false, error: 'Tego sparingu nie da się już odwołać.' };
   game.fixtures.splice(i, 1);
   return { ok: true };
 }

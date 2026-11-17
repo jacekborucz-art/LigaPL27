@@ -775,7 +775,7 @@ function friendliesTab(game, ui) {
     const open = future && ui.trFrEdit === f.id;
     const btns = res ? `<b>${esc(res)}</b>` : future
       ? `<span class="tr-frbtns"><button class="btn btn--quiet tr-mini" data-act="tr-fr-edit" data-id="${esc(f.id)}" data-open="${open}" aria-expanded="${open}">${open ? 'Gotowe' : 'Zasady'}</button><button class="btn btn--quiet tr-mini" data-act="tr-fr-cancel" data-id="${esc(f.id)}">Odwołaj</button></span>`
-      : '<span class="muted">dziś</span>';
+      : `<span class="tr-frbtns"><span class="muted">dziś</span><button class="btn btn--quiet tr-mini" data-act="tr-fr-cancel" data-id="${esc(f.id)}">Odwołaj</button></span>`; // odwołanie możliwe do rozpoczęcia meczu
     return `<li class="tr-fr${open ? ' is-open' : ''}"><span><b>${esc(nameOf(opp))}</b><small>${esc(weekday(f.date))}, ${esc(fmtDate(f.date))}, ${f.neutral ? 'na obozie' : f.home === game.clubId ? 'u siebie' : 'na wyjeździe'}</small>${ruleTagsHtml(f)}</span>
       ${btns}${open ? `<div class="tr-fredit">${rulesEditor(friendlyRulesOf(f), 'tr-fr-set', f.id)}</div>` : ''}</li>`;
   }).join('');
