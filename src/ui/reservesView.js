@@ -19,6 +19,10 @@ import { coachOf } from '../career/coaches.js';
 import { leagueLabel } from '../data/clubs_pl.js';
 import { esc, fmtDate, fmtDay } from './dom.js';
 
+/** Listy w panelu rezerw ułożone pozycjami: od bramkarza do napastnika, w obrębie pozycji lepsi wyżej. */
+const POS_ORDER = ['BR', 'ŚO', 'BO', 'WB', 'DP', 'ŚP', 'OP', 'BP', 'SN', 'NAP'];
+const posRank = (p) => { const i = POS_ORDER.indexOf(p.pos); return i < 0 ? POS_ORDER.length : i; };
+
 export const isReservesAction = (act) => typeof act === 'string' && act.startsWith('rz-');
 
 const WD = ['nd', 'pn', 'wt', 'śr', 'czw', 'pt', 'sob'];
@@ -265,7 +269,7 @@ function downList(game, ctx, dl, ui, chips) {
   const f = FILTERS.some(([k]) => k === ui.rzFilter) ? ui.rzFilter : 'all';
   const rows = squadOf(game.world, ctx.club).filter((p) => p && !pickedIds.has(p.id)).map((p) => ({ p, chk: canDelegate(game, p.id, ctx.rf.id) }))
     .filter(({ p }) => filterOk(p, f, game))
-    .sort((a, b) => Number(b.chk.ok) - Number(a.chk.ok) || sendScore(b.p) - sendScore(a.p) || a.p.ovr - b.p.ovr);
+    .sort((a, b) => posRank(a.p) - posRank(b.p) || Number(b.chk.ok) - Number(a.chk.ok) || sendScore(b.p) - sendScore(a.p) || a.p.ovr - b.p.ovr);
   const full = picked.length >= RSV.maxDown;
   const row = (p, act) => `<li class="rz-row${act.off ? ' rz-row--off' : ''}${act.picked ? ' rz-row--picked' : ''}" data-pid="${esc(p.id)}">
       ${posTag(p)}<span class="rz-row__who"><b>${esc(p.name)}</b> <small>${p.age} l., ocena ${Math.round(p.ovr)}</small>${chips ? chips(p, { short: true }) : ''}${act.why ? `<small class="rz-row__why">${esc(act.why)}</small>` : ''}</span>
@@ -298,7 +302,7 @@ function upList(game, ctx, dl, avail, chips) {
   const pickedIds = new Set(picked.map((d) => d.pid));
   const short = ['GK', 'DEF', 'MID', 'ATT'].filter((g) => avail[g] < RSV.firstMin[g]);
   const rows = squadOf(game.world, ctx.R.id).filter((p) => p && !pickedIds.has(p.id)).map((p) => ({ p, chk: canCallUp(game, p.id, ctx.ff.id), need: short.includes(GROUP[p.pos]) }))
-    .sort((a, b) => Number(b.chk.ok) - Number(a.chk.ok) || Number(b.need) - Number(a.need) || b.p.ovr - a.p.ovr);
+    .sort((a, b) => posRank(a.p) - posRank(b.p) || Number(b.chk.ok) - Number(a.chk.ok) || b.p.ovr - a.p.ovr);
   const form = (p) => { const s = p.season ?? {}; return s.apps ? `${s.g ?? 0} ${plural(s.g ?? 0, 'gol', 'gole', 'goli')} w ${s.apps} ${plural(s.apps, 'meczu', 'meczach', 'meczach')}` : 'bez meczów w sezonie'; };
   const row = (p, act) => `<li class="rz-row${act.off ? ' rz-row--off' : ''}${act.picked ? ' rz-row--picked' : ''}" data-pid="${esc(p.id)}">
       ${posTag(p)}<span class="rz-row__who"><b>${esc(p.name)}</b> <small>${p.age} l., ocena ${Math.round(p.ovr)}, ${esc(form(p))}</small>${act.chips ?? ''}${act.why ? `<small class="rz-row__why">${esc(act.why)}</small>` : ''}</span>
