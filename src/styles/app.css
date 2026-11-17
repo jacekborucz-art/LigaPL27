@@ -375,7 +375,7 @@
 [data-b="low"] { color: var(--kartka-czerwona); } .abar i[data-b="low"] { background: var(--kartka-czerwona); }
 
 @media (min-width: 760px) {
-  .sq__row { grid-template-columns: 56px minmax(0, 1fr) 50px 150px 110px 120px 80px; }
+  .sq__row { grid-template-columns: 56px minmax(0, 1fr) 50px 52px 110px 120px 80px; }
   .sq__row .w { display: block; }
   .sq__name small { display: none; }
   .pp__cols { display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--space-6); }
@@ -1223,7 +1223,7 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 /* PC: cała szerokość, w Przeglądzie lista + panel podsumowania po prawej */
 @media (min-width: 1280px) {
   .hub__main:has(.sqx) { max-width: 1840px; }
-  .sq__row { grid-template-columns: 52px minmax(140px, 1fr) 40px 88px 104px 92px 100px 106px 58px; gap: 7px; }
+  .sq__row { grid-template-columns: 52px minmax(140px, 1fr) 40px 44px 104px 92px 100px 106px 58px; gap: 7px; }
   .sq__row .wx { display: block; }
   .sq__row .sq__form.wx, .sq__row .sq__fresh.wx { display: inline-flex; }
   .xl-wrap { max-height: calc(100dvh - 210px); }
@@ -1251,7 +1251,7 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 }
 @media (min-width: 1600px) {
   .sqx__main { grid-template-columns: minmax(0, 1fr) 340px; }
-  .sq__row { grid-template-columns: 56px minmax(160px, 1fr) 44px 100px 108px 100px 108px 114px 62px; gap: 9px; }
+  .sq__row { grid-template-columns: 56px minmax(160px, 1fr) 44px 48px 108px 100px 108px 114px 62px; gap: 9px; }
 }
 
 /* ================= Puchary europejskie: wiersze meczów (src/ui/europeView.js, ufxRow) =================

@@ -208,7 +208,7 @@ export function renderSquadList(players, { filter = 'all', leagueOvrs = [], acad
     <div class="sq" role="table" aria-label="Zawodnicy">
       <div class="sq__row sq__head" role="row">
         <span role="columnheader">Poz.</span><span role="columnheader">Zawodnik</span><span role="columnheader" class="w">Wiek</span>
-        <span role="columnheader" class="w">Narodowość</span><span role="columnheader" class="w wx">Forma</span><span role="columnheader" class="w wx">Kondycja</span><span role="columnheader" class="w">Kontrakt do</span>
+        <span role="columnheader" class="w" title="Narodowość">Kraj</span><span role="columnheader" class="w wx">Forma</span><span role="columnheader" class="w wx">Kondycja</span><span role="columnheader" class="w">Kontrakt do</span>
         <span role="columnheader" class="w">Wartość</span><span role="columnheader">OVR</span>
       </div>
       ${sorted.map((p) => {
@@ -217,7 +217,7 @@ export function renderSquadList(players, { filter = 'all', leagueOvrs = [], acad
       <button class="sq__row" role="row" data-act="player" data-id="${esc(p.id)}" data-pid="${esc(p.id)}">
         <span class="pos" data-g="${GROUP[p.pos]}">${esc(p.pos)}${sideLabel(p)}</span>
         <span class="sq__name">${moraleDot(p.morale)}<span><span class="sq__nl"><b>${esc(p.name)}</b>${tags(p)}</span><small>${esc(p.nat)}, ${p.age} lat${p.persona === 'Lider' ? ', lider' : ''}</small>${rzChips ? rzChips(p, { short: true }) : ''}</span></span>
-        <span class="w">${p.age}</span><span class="w">${esc(NAT_NAMES[p.nat] ?? p.nat)}</span>
+        <span class="w">${p.age}</span><span class="w" title="${esc(NAT_NAMES[p.nat] ?? p.nat)}">${esc(p.nat)}</span>
         <span class="w wx sq__form">${sparkline(p)}<b data-b="${fa == null ? 'none' : formBand(fa)}">${fa == null ? '–' : fa.toFixed(2)}</b></span>
         <span class="w wx sq__fresh" data-b="${fr >= 85 ? 'good' : fr >= 70 ? 'mid' : 'low'}"><i style="--v:${fr}%"></i>${fr}%</span>
         <span class="w">${esc(fmtDate(p.contract.until))}</span><span class="w">${esc(formatZl(p.value))}</span>
