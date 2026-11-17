@@ -27,3 +27,18 @@ Wykorzystanie, logika gry (zmienia balans, każdy punkt do decyzji właściciela
 11. Zarząd i autorytet trenera: długi spadek morale drużyny lekko obniża zaufanie zarządu.
 
 Propozycja kolejności: zapis podstawowy i punkty 1-4, 6 (sama informacja), potem burza mózgów nad punktami 7-11.
+
+## 2. Rozbudowa psychiki zawodnika (dodane Nov 18, 2026)
+
+Cel: sprawdzić, co dziś zawiera osobowość i charakter zawodnika, i zaplanować rozbudowę podpiętą pod logikę gry i meczu.
+
+Krok 1, zebranie danych (agent: analityk kodu, Sonnet medium, bez edycji):
+- osobowość (`p.persona`: Lider, Wrażliwy, Ambitny, Narwaniec, Spokojny), ukryte atrybuty (TMP, PRF, ADP, ambicja, ego), 11 cech, mindset (`src/career/mindset.js`), morale (`src/career/morale.js`), uwaga trenera (`src/career/attention.js`), aklimatyzacja (`src/career/acclimatization.js`);
+- przy każdym: gdzie jest używane (mecz, odprawy, rozmowy, transfery, kartki, rozwój, kontrakty).
+
+Krok 2, burza mózgów (3 agentów równolegle, Sonnet medium, z raportem z kroku 1):
+- ekspert piłkarski: presja dużych meczów, derby, gra przy niekorzystnym wyniku, szatnia i liderzy, zawodnik po błędzie;
+- psycholog drużyny: pewność siebie, odporność, motywacja, konflikty w szatni, wypalenie, tęsknota za domem;
+- trener: co trener widzi i czym steruje (rozmowy, rola, kapitan, odprawa, zmiany w meczu, trening mentalny).
+
+Wynik: jedna lista pomysłów z miejscem podpięcia w logice gry i meczu, oceną pracy i wpływem na balans, do decyzji właściciela. Powiązane: punkt 1 (historia morale).
