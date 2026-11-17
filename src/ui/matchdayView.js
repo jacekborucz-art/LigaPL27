@@ -312,10 +312,13 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
         ${done?.team?.backfireText ? `<p class="notice notice--err">${esc(done.team.backfireText)}</p>` : ''}
         ${done?.team?.summary ? `<p class="notice">${esc(done.team.summary)}</p>` : ''}
         <h2>Przemowa do drużyny</h2>
-        <fieldset class="tones" ${done ? 'disabled' : ''}>
+        ${done
+    // Po wygłoszeniu odprawy wybór tonu znika, zostaje tylko wygłoszona przemowa
+    ? `<div class="tones tones--done"><p class="hint">Wygłoszona przemowa</p><div class="tone is-done"><div><strong>${esc(tones[done.tone]?.label ?? '')}</strong><span>${esc(done.quote ?? quotes?.[done.tone]?.quote ?? tones[done.tone]?.quote ?? '')}</span></div></div></div>`
+    : `<fieldset class="tones">
           <legend class="hint">Wybierz ton. Ta sama przemowa powtarzana mecz po meczu działa słabiej.</legend>
-          ${Object.entries(tones).map(([id, t]) => `<label class="tone"><input type="radio" name="tone" value="${id}" ${id === chosen ? 'checked' : ''} data-md-tone="${id}"><div><strong>${esc(t.label)}${ui.adv?.tone === id && !done ? ' (zalecana)' : ''}</strong><span>${esc(done?.tone === id && done.quote ? done.quote : quotes?.[id]?.quote ?? t.quote)}</span></div></label>`).join('')}
-        </fieldset>
+          ${Object.entries(tones).map(([id, t]) => `<label class="tone"><input type="radio" name="tone" value="${id}" ${id === chosen ? 'checked' : ''} data-md-tone="${id}"><div><strong>${esc(t.label)}${ui.adv?.tone === id ? ' (zalecana)' : ''}</strong><span>${esc(quotes?.[id]?.quote ?? t.quote)}</span></div></label>`).join('')}
+        </fieldset>`}
       </section>
       <section class="tpanel tpanel--talks">
         <h2>Rozmowy indywidualne</h2>
