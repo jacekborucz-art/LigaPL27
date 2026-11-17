@@ -157,13 +157,14 @@ function onFocusOut(ev) {
 /**
  * Otwiera menu. x, y: punkt w oknie (kursor albo palec); anchor: element, do którego wraca fokus;
  * keyboard: otwarte z klawiatury (fokus na pierwszej pozycji). onSelect(item) po wyborze pozycji bez podmenu;
- * onClose({ restored }) po zamknięciu.
+ * onClose({ restored }) po zamknięciu. container: rodzic menu (domyślnie body; w otwartym oknie modalnym
+ * to okno, bo reszta strony jest wtedy nieaktywna).
  */
-export function openMenu({ x, y, model, anchor = null, keyboard = false, onSelect, onClose }) {
+export function openMenu({ x, y, model, anchor = null, keyboard = false, onSelect, onClose, container = null }) {
   closeMenu({ restoreFocus: false });
   const root = document.createElement('div');
   root.className = `cmenu${reduced() ? '' : ' cmenu--anim'}`;
-  document.body.appendChild(root);
+  (container ?? document.body).appendChild(root);
   cur = { root, model, stack: [{ items: model.items, label: model.title, from: 0 }], x, y, onSelect, onClose, anchor, opened: performance.now(), sx: window.scrollX, sy: window.scrollY };
   render();
   place();

@@ -3,17 +3,14 @@
 // korzystają z reguł w src/ui/tacticsMoves.js. Panel atrybutów: dwuklik albo przycisk „i”.
 import { FORMATIONS, formationById } from '../data/formations.js';
 import { INSTRUCTIONS } from '../data/instructions.js';
-import { POS_NAMES } from '../data/attributes.js';
-import { NAT_NAMES } from '../data/names.js';
 import { proficiency, byPosition } from '../engine/positions.js';
 import { checkTactics } from '../engine/lineup.js';
 import { GROUP, isAvailable } from '../career/squad.js';
 import { moraleLabel } from '../career/morale.js';
-import { attrGroupsHtml } from './squadView.js';
 import { locKey, playerAt } from './tacticsMoves.js';
 import { esc } from './dom.js';
-import { formChartHtml } from './formChart.js';
-import { positionMapHtml, profBand } from './positionMap.js';
+import { profBand } from './positionMap.js';
+import { renderPlayerCard, cardFact, barFactHtml } from './playerCard.js'; // karta wspólna z oknem zmian w meczu
 
 const band = (prof) => (prof >= 85 ? 'ok' : prof >= 60 ? 'mid' : 'bad');
 const few = (n) => n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14);
@@ -251,7 +248,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
 /**
  * Panel atrybutów. Renderowany jako otwarty <dialog>: na szerokim ekranie (wide) pływające okno niemodalne
  * z paskiem (przeciąganie, przypięcie, zamknięcie); na węższych ekranach app.js przełącza go w okno modalne
- * (arkusz od dołu na telefonie).
+ * (arkusz od dołu na telefonie). Wygląd karty: src/ui/playerCard.js (ten sam w oknie zmian w meczu).
  */
 function renderPlayerInfo(p, tactics, f, extra = '', { wide = false, pinned = false, slot: cardSlot = 0 } = {}) {
   const slotIdx = tactics.xi.indexOf(p.id);
@@ -262,40 +259,16 @@ function renderPlayerInfo(p, tactics, f, extra = '', { wide = false, pinned = fa
   const health = p.injuryDays > 0 ? `Kontuzja, ok. ${p.injuryDays} dni`
     : p.suspended > 0 ? `Zawieszony, ${p.suspended} ${matchesWord(p.suspended)}`
       : p.callUp ? 'Na zgrupowaniu reprezentacji' : p.loanBlock ? 'Nie zagra z klubem macierzystym (umowa wypożyczenia)' : p.teamBlock ? 'Gra w drugiej drużynie klubu (rezerwy)' : 'Do dyspozycji';
-  const fact = (k, v, attr = '') => `<div${attr}><dt>${k}</dt><dd>${v}</dd></div>`;
-  const fresh = Math.round(p.fresh ?? 95);
-  const hid = wide ? `tcard-h-${cardSlot}` : 'tdet-h';
-  const bar = wide ? `<div class="tcard__bar">
-      <button class="tcard__grip" type="button" data-tcard-grip aria-label="Przesuń okno zawodnika. Strzałki przesuwają, Shift przesuwa szybciej, Home przywraca położenie"></button>
-      <h3 class="tcard__name" id="${hid}" tabindex="-1" title="${esc(p.name)}">${esc(p.name)}</h3>
-      <button class="tcard__pin" type="button" data-act="tcardpin" data-id="${esc(p.id)}" aria-pressed="${pinned}" aria-label="Przypnij kartę (zostaje przy otwieraniu drugiej, do porównania)" title="Przypnij kartę"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M15 3l6 6-2 1-3 3 1 5-2 2-4-4-5 5-1-1 5-5-4-4 2-2 5 1 3-3z"/></svg></button>
-      <button class="tdet__x" data-act="tinfoclose" data-id="${esc(p.id)}" aria-label="Zamknij kartę zawodnika">×</button>
-      <p class="sr-only" role="status" data-tcard-live></p>
-    </div>` : '';
-  return `<dialog class="tdet${wide ? ' tcard' : ''}" open data-card="${cardSlot}" data-id="${esc(p.id)}" aria-labelledby="${hid}">
-    ${bar}
-    <div class="tdet__in">
-      <header class="tdet__head">
-        <span class="tdet__ovr" aria-label="Ocena ogólna ${Math.round(p.ovr)} w skali 1-20" title="Ocena ogólna w skali 1-20">${Math.round(p.ovr)}</span>
-        <span class="pos" data-g="${GROUP[p.pos]}">${esc(posText(p))}</span>
-        <button class="tdet__x" data-act="tinfoclose" data-id="${esc(p.id)}" aria-label="Zamknij atrybuty">×</button>
-        <div class="tdet__title">
-          <h3${wide ? '' : ' id="tdet-h"'}>${esc(p.name)}</h3>
-          <p>${esc(POS_NAMES[p.pos])}, ${p.age} lat, ${esc(NAT_NAMES[p.nat] ?? p.nat)}</p>
-        </div>
-      </header>
-      <dl class="tdet__facts">
-        ${fact('Gdzie', esc(where))}
-        ${fact('Stan', esc(health), p.injuryDays > 0 || p.suspended > 0 || p.callUp || p.loanBlock ? ' class="is-bad"' : '')}
-        ${fact('Świeżość', `<span class="abar" aria-hidden="true"><i data-b="${freshBand(fresh)}" style="width:${fresh}%"></i></span>${fresh}%`)}
-        ${fact('Ostrość', `${Math.round(p.sharp ?? 70)}%`)}
-        ${fact('Morale', esc(moraleLabel(p.morale ?? 12)))}
-      </dl>
-      <div class="tdet__vis">${formChartHtml(p)}${positionMapHtml(p)}</div>
-      ${wide && p.pos === 'BR' // bramkarz na PC: Mentalne nad Fizycznymi, Bramkarskie pod Technicznymi (2 kolumny)
-        ? `<div class="tdet__groups tdet__groups--gk">${attrGroupsHtml(p, { heading: 'h4', order: ['mental', 'phys', 'tech', 'gk'] })}</div>`
-        : `<div class="tdet__groups">${attrGroupsHtml(p, { heading: 'h4' })}</div>`}
-      ${extra ? `<div class="tdet__stats">${extra}</div>` : ''}
-    </div>
-  </dialog>`;
+  const id = esc(p.id);
+  return renderPlayerCard(p, {
+    wide, slot: cardSlot, pinned: !!pinned, extra,
+    closeAttrs: `data-act="tinfoclose" data-id="${id}"`, pinAttrs: `data-act="tcardpin" data-id="${id}"`,
+    facts: [
+      cardFact('Gdzie', esc(where)),
+      cardFact('Stan', esc(health), !!(p.injuryDays > 0 || p.suspended > 0 || p.callUp || p.loanBlock)),
+      cardFact('Świeżość', barFactHtml(p.fresh ?? 95)),
+      cardFact('Ostrość', `${Math.round(p.sharp ?? 70)}%`),
+      cardFact('Morale', esc(moraleLabel(p.morale ?? 12))),
+    ],
+  });
 }

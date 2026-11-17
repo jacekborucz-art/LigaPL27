@@ -33,6 +33,7 @@ import { renderTactics } from './ui/tacticsView.js';
 import { renderReserves, rzHead, rzCard, handleReservesAction, isReservesAction, reservesStrip, rzChipFn, hasReserves } from './ui/reservesView.js'; // Kadra > Rezerwy
 import { resolveMove, resolveTap, parseLoc, locKey, playerAt, sameLoc } from './ui/tacticsMoves.js';
 import { mountTacticsDrag } from './ui/tacticsDrag.js';
+import { WIDE_CARD, cardPos, placeCard, bindCardDrag } from './ui/playerCard.js';
 import { createTactics, changeFormation, setInstruction, refreshTactics, removeFromBench, checkTactics } from './engine/lineup.js';
 import { COMPETITIONS } from './config/competitions.js';
 import { mountMatchday } from './ui/matchdayView.js';
@@ -1023,18 +1024,12 @@ async function runDays() {
 
 
 // ---------- Skład: przeciąganie, wybór dwoma dotknięciami, panel atrybutów ----------
-const WIDE_INFO = '(min-width: 1100px)'; // od tej szerokości karta zawodnika to pływające okno, a siła składu się zwija
+const WIDE_INFO = WIDE_CARD; // od tej szerokości karta zawodnika to pływające okno, a siła składu się zwija
 const STR_KEY = 'lp27.tac.strength';
-const CARD_KEY = 'lp27.tac.card.';
 function readStrOpen() { try { return localStorage.getItem(STR_KEY) !== '0'; } catch { return true; } }
 function writeStrOpen(open) { try { localStorage.setItem(STR_KEY, open ? '1' : '0'); } catch { /* tryb prywatny: tylko na tę wizytę */ } }
-function readCardPos(slot) {
-  try { const [x, y] = (localStorage.getItem(CARD_KEY + slot) ?? '').split(',').map(Number); return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null; } catch { return null; }
-}
-function writeCardPos(slot, pos) {
-  try { if (pos) localStorage.setItem(CARD_KEY + slot, `${Math.round(pos.x)},${Math.round(pos.y)}`); else localStorage.removeItem(CARD_KEY + slot); } catch { /* bez pamięci: położenie tylko na tę wizytę */ }
-}
-const tUi = { focus: null, infoReturn: null, infoOpened: null, lastTap: null, ctx: null, strOpen: readStrOpen(), cardPos: [readCardPos(0), readCardPos(1)], move: null, liveT: 0 };
+// Położenie pływających kart i ich przeciąganie: src/ui/playerCard.js (wspólne z kartą w meczu)
+const tUi = { focus: null, infoReturn: null, infoOpened: null, lastTap: null, ctx: null, strOpen: readStrOpen() };
 
 /** Otwarte karty zawodników (PC: do dwóch, telefon: jedna) z ich statystykami. state.tInfo: id aktywnej karty. */
 function tCardsFor(g, wide) {
@@ -1075,7 +1070,7 @@ function mountTacticsScreen() {
     dlgs[0].showModal(); // telefon i tablet: arkusz/okno modalne, fokus trafia do przycisku Zamknij
   } else {
     // PC: pływające okna niemodalne, położenie zapamiętane dla każdego z dwóch miejsc
-    for (const d of dlgs) placeCard(d, tUi.cardPos[Number(d.dataset.card)] ?? null);
+    for (const d of dlgs) placeCard(d, cardPos(Number(d.dataset.card)) ?? null);
     const d = opened && dlgs.find((x) => x.dataset.id === opened);
     if (d) {
       d.classList.add('is-new');
@@ -1083,22 +1078,6 @@ function mountTacticsScreen() {
     } else if (tUi.focus) app.querySelector(tUi.focus)?.focus({ preventScroll: true });
   }
   tUi.focus = null;
-}
-
-/** Położenie pływającej karty (--cx, --cy), zawsze w oknie; null: położenie domyślne nad ławką. */
-function placeCard(d, pos) {
-  if (!pos) { d.style.removeProperty('--cx'); d.style.removeProperty('--cy'); return null; }
-  const x = Math.max(8, Math.min(window.innerWidth - 120, pos.x));
-  const y = Math.max(8, Math.min(window.innerHeight - 56, pos.y));
-  d.style.setProperty('--cx', `${Math.round(x)}px`);
-  d.style.setProperty('--cy', `${Math.round(y)}px`);
-  return { x, y };
-}
-
-function moveCard(d, pos) {
-  const slot = Number(d.dataset.card);
-  tUi.cardPos[slot] = placeCard(d, pos);
-  writeCardPos(slot, tUi.cardPos[slot]);
 }
 
 function openInfo(pid, el) {
@@ -1127,51 +1106,8 @@ function closeInfo(pid = state.tInfo) {
   renderTacticsAfter(back);
 }
 
-/** Karta na PC: przeciąganie za pasek (mysz, pióro, dotyk) i przesuwanie strzałkami z uchwytu. */
-app.addEventListener('pointerdown', (ev) => {
-  const bar = ev.target.closest?.('.tcard__bar');
-  if (!bar || (ev.pointerType === 'mouse' && ev.button !== 0)) return;
-  if (ev.target.closest('button') && !ev.target.closest('[data-tcard-grip]')) return;
-  const d = bar.closest('dialog.tcard');
-  const r = d.getBoundingClientRect();
-  tUi.move = { d, bar, id: ev.pointerId, dx: ev.clientX - r.left, dy: ev.clientY - r.top, moved: false };
-  bar.setPointerCapture?.(ev.pointerId);
-});
-app.addEventListener('pointermove', (ev) => {
-  const m = tUi.move;
-  if (!m || ev.pointerId !== m.id) return;
-  m.moved = true;
-  m.d.classList.add('is-moving');
-  placeCard(m.d, { x: ev.clientX - m.dx, y: ev.clientY - m.dy });
-});
-const endCardMove = (ev) => {
-  const m = tUi.move;
-  if (!m || ev.pointerId !== m.id) return;
-  tUi.move = null;
-  m.d.classList.remove('is-moving');
-  if (!m.moved) return;
-  const r = m.d.getBoundingClientRect();
-  moveCard(m.d, { x: r.left, y: r.top });
-};
-app.addEventListener('pointerup', endCardMove);
-app.addEventListener('pointercancel', endCardMove);
-app.addEventListener('keydown', (ev) => {
-  const grip = ev.target.closest?.('[data-tcard-grip]');
-  if (!grip) return;
-  const d = grip.closest('dialog.tcard');
-  const step = ev.shiftKey ? 64 : 16;
-  const dir = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[ev.key];
-  if (!dir && ev.key !== 'Home') return;
-  ev.preventDefault();
-  if (ev.key === 'Home') moveCard(d, null);
-  else { const r = d.getBoundingClientRect(); moveCard(d, { x: r.left + dir[0] * step, y: r.top + dir[1] * step }); }
-  clearTimeout(tUi.liveT);
-  tUi.liveT = setTimeout(() => {
-    const live = d.querySelector('[data-tcard-live]');
-    const r = d.getBoundingClientRect();
-    if (live) live.textContent = ev.key === 'Home' ? 'Okno zawodnika wróciło na miejsce.' : `Okno zawodnika: ${Math.round(r.left)} px od lewej, ${Math.round(r.top)} px od góry.`;
-  }, 400);
-});
+/** Karta na PC: przeciąganie za pasek (mysz, pióro, dotyk) i przesuwanie strzałkami z uchwytu (src/ui/playerCard.js). */
+bindCardDrag(app);
 
 async function tacticsClick(g, el) {
   const loc = parseLoc(el.dataset.loc);
@@ -1252,13 +1188,14 @@ app.addEventListener('keydown', (ev) => {
   else if (state.tSel) { ev.preventDefault(); ev.stopPropagation(); state.tSel = null; state.tMsg = ''; renderTacticsAfter(); }
 });
 // Zamknięcie okna modalnego przez przeglądarkę (Escape) i dotknięcie tła za arkuszem.
+// Tylko ekran składu: karta w meczu (src/ui/matchdayView.js) zamyka się sama.
 app.addEventListener('cancel', (ev) => {
-  if (!ev.target.matches?.('dialog.tdet')) return;
+  if (!tacticsOpen() || !ev.target.matches?.('dialog.tdet')) return;
   ev.preventDefault();
   closeInfo();
 }, true);
 app.addEventListener('click', (ev) => {
-  if (ev.target.matches?.('dialog.tdet') && ev.target.matches(':modal')) closeInfo();
+  if (tacticsOpen() && ev.target.matches?.('dialog.tdet') && ev.target.matches(':modal')) closeInfo();
 });
 matchMedia(WIDE_INFO).addEventListener?.('change', () => { if (tacticsOpen()) render(); });
 

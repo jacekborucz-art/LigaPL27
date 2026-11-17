@@ -23,11 +23,8 @@ import { TONES, TALKS, POST_TONES, MAX_TALKS } from '../match/briefings.js';
 import * as MD from '../match/matchday.js';
 import { CLIMATES, currentQuestion, progress, effectWords } from '../match/press.js';
 import { friendlyRuleTags, friendlyRulesOf } from '../training/friendlies.js';
-import { attrGroupsHtml } from './squadView.js';
-import { formChartHtml } from './formChart.js';
-import { positionMapHtml } from './positionMap.js';
-import { NAT_NAMES } from '../data/names.js';
-import { POS_NAMES } from '../data/attributes.js';
+import { renderPlayerCard, cardFact, barFactHtml, WIDE_CARD, cardPos, placeCard, bindCardDrag } from './playerCard.js'; // karta jak w Kadra > Skład i taktyka
+import { playerStatsHtml } from './playerStatsView.js';
 import { moraleLabel } from '../career/morale.js';
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
@@ -152,6 +149,31 @@ function teamColors(f) {
 /**
  * Uruchamia dzień meczowy w kontenerze app. ctx: { game, fixture, save, onExit }.
  */
+/**
+ * Opcje menu zawodnika w meczu (prawy przycisk, przytrzymanie). manage: okno „Zmiany i taktyka” (wybór w tym oknie,
+ * bez „Statystyk meczu”, które zastąpiłyby okno). mine/on/onBench: zawodnik gracza, na boisku, na ławce.
+ * subWhy: powód braku zmian, planned: już w zaplanowanej zmianie, hurt: uraz bez gry, played: grał w meczu,
+ * takers: [[klucz, etykieta, zaznaczony]] dla stałych fragmentów albo null.
+ */
+export function matchMenuItems({ manage = false, mine = false, on = false, onBench = false, subWhy = null, planned = false, hurt = false, played = true, takers = null } = {}) {
+  const items = [];
+  if (manage) {
+    const busy = planned ? 'Już w zaplanowanej zmianie' : null;
+    if (mine && on) items.push({ label: 'Zmień zawodnika', hint: 'Potem wybierz rezerwowego', primary: true, disabled: busy ?? subWhy, act: 'mmSel' });
+    if (mine && onBench) items.push({ label: 'Wprowadź na boisko', hint: 'Potem wybierz, kto zejdzie', primary: true, disabled: busy ?? subWhy ?? (hurt ? 'Uraz' : null), act: 'mmSel' });
+  } else {
+    if (mine && on) items.push({ label: 'Zmień zawodnika', hint: 'Okno zmian z nim wybranym', primary: true, disabled: subWhy, act: 'sub' });
+    if (mine && onBench) items.push({ label: 'Wprowadź na boisko', hint: 'Okno zmian z nim wybranym', primary: true, disabled: subWhy, act: 'subIn' });
+  }
+  items.push({ label: 'Karta zawodnika', hint: 'Atrybuty, forma, stan w meczu', act: 'card' });
+  if (!manage) items.push({ label: 'Statystyki meczu', hint: played ? null : 'Jeszcze nie grał', act: 'stats' });
+  if (takers) {
+    items.push({ sep: true });
+    items.push({ label: 'Stałe fragmenty', items: takers.map(([k, l, checked]) => ({ label: l, checked, act: `taker:${k}` })) });
+  }
+  return items;
+}
+
 export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
   const S = MD.startMatchday(game, fixture);
   const ui = { speed: 1, running: false, timer: null, sel: {}, tab: 'feed', overlay: null, adv: null, dialog: null, raf: null, dots: [] };
@@ -171,6 +193,8 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       <div class="actionbar">${action ?? ''}</div>
     </div>`;
     app.querySelector('.rail [aria-current]')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+    // Karta zawodnika zostaje na kolejnych etapach meczu (połowa, przerwa), po meczu się zamyka
+    if (ui.pcard) { if (!(S.step.startsWith('live') || S.step === 'break' || S.step === 'etbreak')) ui.pcard = null; seatCard(); }
   }
   // Tablica wyniku: pełne nazwy na szerszym ekranie (krótkie na telefonie), pod nazwami strzelcy i czerwone kartki
   const teamName = (sd) => `<span class="nm"><span class="nm__full">${esc(sideName(sd))}</span><span class="nm__short" aria-hidden="true">${esc(shortName(sd))}</span></span>`;
@@ -612,6 +636,9 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
   }
   const onMq = () => { if (S.step.startsWith('live')) { normTab(); updateLive(); } };
   mqWide.addEventListener('change', onMq); mqHuge.addEventListener('change', onMq); mqLaptop.addEventListener('change', onMq);
+  const mqCard = matchMedia(WIDE_CARD); // karta zawodnika: pływające okno (PC) albo arkusz (telefon)
+  const onMqCard = () => { if (ui.pcard) seatCard(); };
+  mqCard.addEventListener('change', onMqCard);
   let headRo = null;
   function setupLiveLayout() {
     normTab();
@@ -1003,11 +1030,13 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       if (!dlg.open) dlg.showModal();
       const l = dlg.querySelector('.mm__lists'); if (l) l.scrollTop = scroll;
       mountSubsDrag(dlg);
+      seatCard(); // otwarta karta zawodnika nad oknem (treść okna właśnie przebudowana)
       return;
     }
     dlg.className = 'panel md-dlg sh-dlg';
     dlg.innerHTML = shoutPanel(M);
     if (!dlg.open) dlg.showModal();
+    seatCard();
     dlg.querySelector('.sh-card:not([disabled])')?.focus();
   }
 
@@ -1173,7 +1202,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       const back = kind === 'bench' && x.rolledOff > 0 ? `może wrócić, grał ${x.prevMins ?? 0} min` : '';
       const note = [kind === 'on' && pos !== x.p.pos ? `nominalnie ${x.p.pos}${band !== 'ok' ? `, ${prof}% na tej pozycji` : ''}` : '', x.injury && !x.injury.playable ? 'uraz' : k ? `gra z bólem (${x.knock.name})` : '', x.yc ? 'żółta kartka' : '', back, kind === 'bench' ? `OVR ${Math.round(x.p.ovr)}` : ''].filter(Boolean).join(', ');
       const sg = sugg.get(`${kind}:${x.id}`);
-      return `<li class="sub-row ${planned ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${sg ? `is-sugg is-sugg--${sg.rank}` : ''} ${back ? 'is-back' : ''} ${x.injury && !x.injury.playable ? 'is-hurt' : ''} ${band !== 'ok' ? `is-off is-off--${band}` : ''}" data-sdrop="${kind}:${esc(x.id)}">
+      return `<li class="sub-row ${planned ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${sg ? `is-sugg is-sugg--${sg.rank}` : ''} ${back ? 'is-back' : ''} ${x.injury && !x.injury.playable ? 'is-hurt' : ''} ${band !== 'ok' ? `is-off is-off--${band}` : ''}" data-sdrop="${kind}:${esc(x.id)}" data-mmp="${esc(x.id)}">
         <button class="sub-row__main" data-md="subPick:${kind}|${esc(x.id)}" data-sdrag="${kind}:${esc(x.id)}" data-name="${esc(x.p.name)}" aria-pressed="${isSel}" ${planned ? 'disabled' : ''}>
           <span class="sub-handle" data-shandle aria-hidden="true"></span>
           <span class="pos" data-g="${GROUP[pos] ?? 'MID'}">${esc(pos)}</span>
@@ -1198,7 +1227,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       const k = who.knock && !who.knock.aggravated;
       const sgT = sugg.get(`on:${x.id}`);
       return `<button class="mm-tok ${sl.pos === 'BR' ? 'is-gk' : ''} ${pl ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${sgT ? `is-sugg is-sugg--${sgT.rank}` : ''} ${x.injury && !x.injury.playable ? 'is-hurt' : ''}" style="--x:${sl.x};--y:${sl.y};--cond:${cond}" data-c="${condCls(cond)}" data-fit="${band}"
-        data-sdrop="on:${esc(x.id)}" data-sdrag="on:${esc(x.id)}" data-shandle data-name="${esc(x.p.name)}" data-md="tokPick:${esc(x.id)}" ${pl ? 'disabled' : ''} title="${esc(`${who.p.name}, ${sl.pos}${band !== 'ok' ? ` (nominalnie ${who.p.pos}, ${prof}%)` : ''}, kondycja ${cond}%`)}">
+        data-sdrop="on:${esc(x.id)}" data-sdrag="on:${esc(x.id)}" data-shandle data-mmp="${esc(x.id)}" data-name="${esc(x.p.name)}" data-md="tokPick:${esc(x.id)}" ${pl ? 'disabled' : ''} title="${esc(`${who.p.name}, ${sl.pos}${band !== 'ok' ? ` (nominalnie ${who.p.pos}, ${prof}%)` : ''}, kondycja ${cond}%`)}">
         <span class="mm-tok__dot"><span>${esc(sl.pos)}</span></span>${who.yc ? '<i class="mm-tok__yc" aria-label="żółta kartka"></i>' : ''}${x.injury && !x.injury.playable ? '<i class="mm-tok__inj" aria-label="uraz">+</i>' : k ? `<i class="mm-tok__knock" aria-label="gra z bólem">${ICON.knock}</i>` : ''}
         <span class="mm-tok__name">${inc ? `↑ ${esc(last(inc.p.name))}` : esc(last(x.p.name))}</span></button>`;
     }).join('');
@@ -1237,7 +1266,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
         ${short}
         <div class="pitch2 mm-field">${tokens}</div>
         <p class="mm-legend"><span><i class="fit fit--mid"></i>poza nominalną pozycją</span><span><i class="fit fit--bad"></i>daleko od swojej pozycji</span></p>
-        <p class="mm__tip">Przeciągnij rezerwowego na zawodnika na boisku albo dotknij kolejno obu. Dwóch zawodników na boisku: zamiana pozycji.</p>
+        <p class="mm__tip">Przeciągnij rezerwowego na zawodnika na boisku albo dotknij kolejno obu. Dwóch zawodników na boisku: zamiana pozycji. Prawy przycisk albo przytrzymanie zawodnika: karta zawodnika.</p>
       </section>
       <nav class="mm__tabs" role="tablist" aria-label="Widok">
         ${[['bench', 'Ławka rezerwowych'], ['xi', 'Pierwszy skład'], ['tac', 'Taktyka']].map(([k, l]) => `<button role="tab" data-md="mmTab:${k}" aria-selected="${tab === k}">${l}${k === 'tac' && Object.keys(diff.ins).length ? ` <i class="dot"></i>` : ''}</button>`).join('')}
@@ -1411,7 +1440,8 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     const T = S.M?.teams[side];
     return T ? T.players.find((x) => x.id === id) ?? T.bench.find((x) => x.id === id) ?? null : null;
   }
-  function playerMenuModel(side, id) {
+  /** manage: menu w oknie „Zmiany i taktyka” (wybór zawodnika w tym oknie, bez otwierania go od nowa). */
+  function playerMenuModel(side, id, { manage = false } = {}) {
     const M = S.M; const T = M.teams[side]; const x = findX(side, id);
     if (!x) return null;
     const mine = side === S.userSide;
@@ -1420,15 +1450,11 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     const pos = on ? x.slot?.pos ?? x.p.pos : x.p.pos;
     const st = subsState(T, M);
     const subWhy = st.windowBlocked ? 'Okna zmian wykorzystane' : st.left <= 0 ? 'Wykorzystano wszystkie zmiany' : null;
-    const items = [];
-    if (mine && on) items.push({ label: 'Zmień zawodnika', hint: 'Okno zmian z nim wybranym', primary: true, disabled: subWhy, act: 'sub' });
-    if (mine && onBench) items.push({ label: 'Wprowadź na boisko', hint: 'Okno zmian z nim wybranym', primary: true, disabled: subWhy, act: 'subIn' });
-    items.push({ label: 'Karta zawodnika', hint: 'Atrybuty, forma, stan', act: 'card' });
-    items.push({ label: 'Statystyki meczu', hint: x.minOn === null ? 'Jeszcze nie grał' : null, act: 'stats' });
-    if (mine && on && M.phase !== 'ended') {
-      items.push({ sep: true });
-      items.push({ label: 'Stałe fragmenty', items: TAKERS.map(([k, l]) => ({ label: l, checked: T.takers?.[k] === x.id, act: `taker:${k}` })) });
-    }
+    const items = matchMenuItems({
+      manage, mine, on, onBench, subWhy, played: x.minOn !== null, hurt: !!(x.injury && !x.injury.playable),
+      planned: manage && (ui.pend ?? []).some((q) => q.out === id || q.in === id),
+      takers: mine && on && M.phase !== 'ended' ? TAKERS.map(([k, l]) => [k, l, T.takers?.[k] === x.id]) : null,
+    });
     const no = kitNo(side, id);
     return { title: x.p.name, pos, group: GROUP[pos] ?? 'MID', meta: `${no != null ? `nr ${no}, ` : ''}${sideName(side)}`, note: x.knock && !x.knock.aggravated && on ? `Gra z bólem: ${x.knock.name}` : null, items };
   }
@@ -1436,12 +1462,15 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     const T = S.M.teams[side]; const x = findX(side, id);
     if (!x || !it?.act) return;
     if (it.act === 'sub' || it.act === 'subIn') { if (ui.running) stop(); ui.preSel = { kind: it.act === 'sub' ? 'on' : 'bench', id }; openDialog('manage', true); return; }
+    if (it.act === 'mmSel') { ui.preSel = { kind: T.bench.includes(x) ? 'bench' : 'on', id }; openDialog('manage'); return; }
     if (it.act === 'stats') { if (ui.running) stop(); openPlayerStats(side, id); return; }
     if (it.act === 'card') { if (ui.running) stop(); openPlayerCard(side, id); return; }
     if (it.act.startsWith('taker:')) {
       const k = it.act.slice(6);
       T.takers = { ...(T.takers ?? {}), [k]: id };
-      menuToast(`${TAKERS.find(([q]) => q === k)?.[1]}: ${x.p.name}.`);
+      const msg = `${TAKERS.find(([q]) => q === k)?.[1]}: ${x.p.name}.`;
+      // W oknie zmian komunikat pod listą (komunikat strony byłby pod oknem modalnym)
+      if (app.querySelector('#mdDlg.mm-dlg')?.open) { ui.subMsg = msg; openDialog('manage'); } else menuToast(msg);
     }
   }
   /** Treść statystyk meczu zawodnika: nagłówek, stan, tabela (okno „Statystyki meczu” i podgląd po najechaniu na ocenę). */
@@ -1468,6 +1497,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       <p class="hint">Ocena na żywo: zdarzenia meczu, bez losowej korekty oceny końcowej.</p>
       <p>${btn('closeDlg', 'Zamknij', false)}</p>`;
     if (!dlg.open) dlg.showModal();
+    seatCard();
   }
 
   // Podgląd statystyk po najechaniu kursorem na ocenę zawodnika (listy składów, tylko urządzenia ze wskaźnikiem).
@@ -1514,39 +1544,97 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     app.addEventListener('mouseleave', hideHover);
   }
 
-  // Karta zawodnika w meczu (menu pod prawym przyciskiem): atrybuty, forma z ostatnich meczów, stan.
-  // Rywal: bez morale (zna je tylko jego klub).
-  function openPlayerCard(side, id) {
-    const dlg = app.querySelector('#mdDlg'); const x = findX(side, id);
-    if (!x || !dlg) return;
-    hideHover();
+  // Karta zawodnika w meczu (menu pod prawym przyciskiem): to samo okno co w Kadra > Skład i taktyka
+  // (src/ui/playerCard.js). PC: pływające okno niemodalne nad oknem „Zmiany i taktyka” (w nim, bo reszta strony
+  // jest wtedy nieaktywna), przeciągane za pasek, Esc i × zamykają. Telefon: arkusz od dołu (okno modalne).
+  // Dane z meczu: miejsce na boisku, kartki, uraz, kondycja, ocena i statystyki meczu. Rywal: bez morale.
+  function cardHtml(side, id, wide) {
+    const x = findX(side, id);
+    if (!x) return '';
     const p = game.world?.players?.[id] ?? x.p;
     const mine = side === S.userSide;
     const r = playerStates(S.M, side).find((q) => q.id === id);
     const pos = r?.on ? r.pos : p.pos;
     const prof = r?.on && x.slot ? proficiency(p, x.slot.pos, x.slot.side) : 100;
-    const facts = [
-      ['W meczu', r?.on ? `${pos}${prof < 100 ? `, ${prof}% na tej pozycji` : ''}` : r?.bench ? 'Ławka rezerwowych' : x.subbedOff ? `Zszedł w ${x.minOff}. min` : 'Poza grą'],
-      ['Kondycja', `${Math.round(x.cond)}%`],
-      ...(mine ? [['Morale', moraleLabel(p.morale ?? 12)]] : []),
-      ['Ocena meczu', r?.rating != null ? r.rating.toFixed(1) : 'brak'],
-    ];
-    dlg.className = 'panel md-dlg mcard-dlg';
-    dlg.innerHTML = `<header class="pstat__head mcard__head" data-side="${side}"><span class="pstat__no">${esc(String(kitNo(side, id) ?? ''))}</span>
-        <div><h2>${esc(p.name)}</h2><p>${esc(POS_NAMES[p.pos] ?? p.pos)}, ${esc(String(p.age ?? ''))} lat, ${esc(NAT_NAMES[p.nat] ?? p.nat ?? '')}, ${esc(sideName(side))}</p></div>
-        <span class="mcard__ovr" title="Ocena ogólna w skali 1-20">${Math.round(p.ovr ?? 0)}</span>
-        <button class="mcard__x" data-md="closeDlg" aria-label="Zamknij kartę zawodnika">×</button></header>
-      <dl class="mcard__facts">${facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(String(v))}</dd></div>`).join('')}</dl>
-      <div class="mcard__body">
-        <section class="mcard__attrs">${attrGroupsHtml(p, { heading: 'h4' })}</section>
-        <section class="mcard__side">${formChartHtml(p)}${positionMapHtml(p)}</section>
-      </div>
-      <p>${btn('closeDlg', 'Zamknij', false)}</p>`;
-    if (!dlg.open) dlg.showModal();
+    const where = r?.on ? `Na boisku: ${pos}${prof < 100 ? `, ${prof}% na tej pozycji` : ''}` : r?.bench ? 'Ławka rezerwowych'
+      : x.sentOff ? 'Usunięty z boiska' : x.subbedOff ? `Zszedł w ${x.minOff}. min` : 'Poza grą';
+    const card = r?.card === 'yellow' ? 'żółta kartka' : r?.card === 'secondYellow' ? 'druga żółta, czerwona kartka' : r?.card === 'red' ? 'czerwona kartka' : '';
+    const hurt = r?.injured || (x.injury && !x.injury.playable) ? `uraz${x.injury?.name ? `: ${x.injury.name}` : ''}` : '';
+    const knock = x.knock && !x.knock.aggravated && !hurt ? `gra z bólem (${x.knock.name})` : '';
+    const state = [card, hurt, knock].filter(Boolean).join(', ');
+    const parts = playerStatsParts(side, id);
+    let season = '';
+    try { season = game.world?.players?.[id] ? playerStatsHtml(p, game) : ''; } catch { season = ''; }
+    return renderPlayerCard(p, {
+      wide, slot: 0, cls: 'md-pcard', closeAttrs: 'data-md="pcardClose"',
+      facts: [
+        cardFact('W meczu', esc(where)),
+        cardFact('Stan', esc(state ? state[0].toUpperCase() + state.slice(1) : 'Do gry'), !!(hurt || r?.card === 'red' || r?.card === 'secondYellow' || x.sentOff)),
+        cardFact('Kondycja', barFactHtml(x.cond ?? 100)),
+        cardFact('Ocena meczu', r?.rating != null ? `<b class="rt rt--${rBand(r.rating)}">${r.rating.toFixed(1)}</b>` : 'brak'),
+        mine ? cardFact('Morale', esc(moraleLabel(p.morale ?? 12))) : cardFact('Drużyna', esc(sideName(side))),
+      ],
+      extra: `<section class="md-pcard__match" aria-label="W tym meczu"><h3>W tym meczu</h3>${parts?.body ?? ''}</section>${season}`,
+    });
+  }
+  const openCard = () => app.querySelector('dialog.md-pcard');
+  /**
+   * Wstawia kartę (ui.pcard) do właściwego miejsca: otwarte okno meczu (#mdDlg) albo ekran meczu.
+   * Bez zmiany, gdy karta już tam jest; po przebudowie treści okna rysuje ją od nowa (to samo położenie i przewinięcie).
+   */
+  function seatCard({ focus = false } = {}) {
+    const old = openCard();
+    if (!ui.pcard || !S.M) { if (old) { if (old.open) old.close(); old.remove(); } ui.pcard = null; return; }
+    const dlg = app.querySelector('#mdDlg');
+    const host = dlg?.open ? dlg : app;
+    const wide = matchMedia(WIDE_CARD).matches;
+    if (!focus && old && old.parentNode === host && old.classList.contains('tcard') === wide) return;
+    const html = cardHtml(ui.pcard.side, ui.pcard.id, wide);
+    if (old) { if (old.open) old.close(); old.remove(); }
+    if (!html) { ui.pcard = null; return; }
+    host.insertAdjacentHTML('beforeend', html);
+    const d = host.lastElementChild;
+    const body = d.querySelector('.tdet__in');
+    if (body) { body.scrollTop = ui.pcard.scroll ?? 0; body.addEventListener('scroll', () => { if (ui.pcard) ui.pcard.scroll = body.scrollTop; }, { passive: true }); }
+    // Zamknięcie przez przeglądarkę (Esc, gest wstecz na telefonie)
+    d.addEventListener('cancel', (ev) => { ev.preventDefault(); closePlayerCard(); });
+    if (wide) placeCard(d, cardPos(0));
+    else { d.close(); d.showModal(); }
+    if (focus) {
+      if (wide) d.classList.add('is-new');
+      (d.querySelector('.tcard__name') ?? d.querySelector('.tdet__x'))?.focus({ preventScroll: true });
+    }
+  }
+  function openPlayerCard(side, id) {
+    if (!findX(side, id)) return;
+    hideHover();
+    const same = ui.pcard && ui.pcard.side === side && ui.pcard.id === id;
+    ui.pcard = { side, id, scroll: same ? ui.pcard.scroll : 0 };
+    seatCard({ focus: true });
+  }
+  function closePlayerCard() {
+    if (!ui.pcard) return;
+    const { side, id } = ui.pcard;
+    ui.pcard = null;
+    seatCard();
+    // Fokus wraca na zawodnika w oknie zmian albo na liście składów
+    const back = app.querySelector(`#mdDlg[open] [data-mmp="${CSS.escape(id)}"]`) ?? app.querySelector(`[data-mdp="${side}|${CSS.escape(id)}"]`);
+    const btnEl = back && (back.matches('button') ? back : back.querySelector('button'));
+    (btnEl ?? (app.querySelector('#mdDlg')?.open ? app.querySelector('#mdDlg') : null))?.focus?.({ preventScroll: true });
   }
   /** Otwiera menu dla elementu listy składu albo zawodnika na boisku (trafienie w kropkę na canvasie). */
   function openPlayerMenuAt(el, at) {
-    if (!S.M || !S.step.startsWith('live')) return false;
+    if (!S.M) return false;
+    if (el.dataset.mmp != null) {
+      const dlg = el.closest('#mdDlg');
+      if (!dlg?.open || dlg.classList.contains('is-dragging')) return false;
+      const pid = el.dataset.mmp;
+      const model = playerMenuModel(S.userSide, pid, { manage: true });
+      if (!model) return false;
+      openMenu({ ...at, model, anchor: el, container: dlg, onSelect: (it) => runPlayerMenu(S.userSide, pid, it) });
+      return true;
+    }
+    if (!S.step.startsWith('live')) return false;
     let side; let id;
     if (el.id === 'mdPitch') {
       const rc = el.getBoundingClientRect();
@@ -1566,8 +1654,13 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
   app.mdMenuOpen = openPlayerMenuAt;
   if (!app.dataset.mdMenu) {
     app.dataset.mdMenu = '1';
-    bindContextTrigger(app, { selector: '[data-mdp], #mdPitch', open: (el, at) => app.mdMenuOpen?.(el, at) ?? false });
+    // [data-mmp]: zawodnicy w oknie „Zmiany i taktyka” (listy i boisko)
+    bindContextTrigger(app, { selector: '[data-mdp], #mdPitch, [data-mmp]', open: (el, at) => app.mdMenuOpen?.(el, at) ?? false });
   }
+  bindCardDrag(app); // przeciąganie karty zawodnika (wspólne z ekranem składu, podpinane raz)
+  // Okno meczu zamknięte: karta wraca na ekran meczu (w zamkniętym oknie byłaby niewidoczna)
+  function onDlgClose(ev) { if (ev.target.id === 'mdDlg' && ui.pcard) seatCard(); }
+  app.addEventListener('close', onDlgClose, true);
 
   // ------------------------------------------------------------ Przerwa, dogrywka, studio pomeczowe
   /** Skład na boisku w przerwie: numer, pozycja, nazwisko, ocena na żywo (od bramkarza). */
@@ -1620,6 +1713,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       <p class="hint" role="status" id="mdDlgMsg">${esc(ui.secondMsg ?? '')}</p>
       <div class="sxi__btns">${btn('closeDlg', 'Zamknij', false)}<button class="btn btn--primary" data-md="secondGo" ${n ? '' : 'disabled'}>Wprowadź zmiany (${n})</button></div>`;
     if (!dlg.open) dlg.showModal();
+    seatCard();
     if (!dlg.dataset.sxi) {
       dlg.dataset.sxi = '1';
       dlg.addEventListener('change', (ev) => {
@@ -1862,6 +1956,8 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
   }
 
   async function onClick(ev) {
+    // Karta zawodnika na telefonie: dotknięcie tła za arkuszem zamyka kartę
+    if (ev.target.matches?.('dialog.md-pcard') && ev.target.matches(':modal')) { closePlayerCard(); return; }
     const row = ev.target.closest('[data-mdp]');
     if (row && !ev.target.closest('[data-md]')) {
       const r = row.getBoundingClientRect();
@@ -1872,6 +1968,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     if (!el) return;
     const [act, arg] = el.dataset.md.split(':');
     const M = S.M;
+    if (act === 'pcardClose') { closePlayerCard(); return; }
     if (act === 'toLineup' && onLineup) {
       // Rozpoczęta konferencja przedmeczowa zostaje rozliczona (nie powtórzy się); nierozpoczęta czeka na powrót
       if (MD.pressSlot(S, 'pre').conf?.answers?.length) MD.leaveStudio(game, S);
@@ -1955,11 +2052,17 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     if (act === 'exit') { stop(); MD.closeMatchday(game, S); app.querySelector('#mdPress')?.remove(); cleanup(); await save(); onExit(); }
   }
 
-  function onKey(ev) { if (ev.key === ' ' && S.step.startsWith('live') && !ev.target.closest('input,select,button,dialog')) { ev.preventDefault(); ui.running ? stop() : start(); } }
+  function onKey(ev) {
+    // Esc najpierw zamyka kartę zawodnika (okno „Zmiany i taktyka” pod nią zostaje otwarte)
+    if (ev.key === 'Escape' && ui.pcard && !ev.defaultPrevented && !ev.target.closest?.('select')) { ev.preventDefault(); ev.stopPropagation(); closePlayerCard(); return; }
+    if (ev.key === ' ' && S.step.startsWith('live') && !ev.target.closest('input,select,button,dialog')) { ev.preventDefault(); ui.running ? stop() : start(); }
+  }
   function cleanup() {
     app.removeEventListener('click', onClick); document.removeEventListener('keydown', onKey);
     ro?.disconnect(); headRo?.disconnect(); cancelAnimationFrame(ui.raf); clearTimeout(ui.soTimer);
     mqWide.removeEventListener('change', onMq); mqHuge.removeEventListener('change', onMq); mqLaptop.removeEventListener('change', onMq);
+    mqCard.removeEventListener('change', onMqCard); app.removeEventListener('close', onDlgClose, true);
+    ui.pcard = null; seatCard();
     closeMenu({ restoreFocus: false });
     app.mdMenuOpen = null; delete app.mdSession;
     for (const k of ['--home', '--home-ink', '--away', '--away-ink']) app.style.removeProperty(k);
