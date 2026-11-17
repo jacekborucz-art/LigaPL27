@@ -493,6 +493,11 @@
 .tp-row__main b { font-family: var(--font-display); font-variant-numeric: tabular-nums; }
 .tp-row__main b { min-width: 2.2em; text-align: right; }
 .tp-cond { display: flex; align-items: center; gap: 5px; }
+/* Kondycja w % obok paska (PC; telefon bez zmian) */
+.tp-pct { display: none; min-width: 34px; text-align: right; font: 600 12px/1 var(--font-body); font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.tp-pct[data-b="mid"] { color: var(--warn-text); }
+.tp-pct[data-b="low"] { color: var(--bad-text); }
+@media (min-width: 1100px) { .tp-pct { display: inline; } }
 .tp-fresh { position: relative; width: 5px; height: 22px; border-radius: 2px; background: color-mix(in srgb, var(--text-muted) 30%, transparent); overflow: hidden; }
 .tp-fresh::after { content: ""; position: absolute; inset: auto 0 0 0; height: var(--f); background: #4CA36B; }
 .tp-fresh[data-b="mid"]::after { background: var(--kartka-zolta); }

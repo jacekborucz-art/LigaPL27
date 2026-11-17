@@ -23,7 +23,7 @@ function condHtml(p) {
   const f = Math.round(p.fresh ?? 95);
   const m = p.morale ?? 12;
   return `<span class="tp-cond" role="img" aria-label="Świeżość ${f}%, morale: ${esc(moraleLabel(m).toLowerCase())}" title="Świeżość ${f}%, morale: ${esc(moraleLabel(m).toLowerCase())}">
-    <i class="tp-fresh" data-b="${freshBand(f)}" style="--f:${f}%"></i><span class="mdot" data-m="${m >= 14 ? 'hi' : m >= 10 ? 'mid' : 'lo'}"></span></span>`;
+    <span class="tp-pct" data-b="${freshBand(f)}">${f}%</span><i class="tp-fresh" data-b="${freshBand(f)}" style="--f:${f}%"></i><span class="mdot" data-m="${m >= 14 ? 'hi' : m >= 10 ? 'mid' : 'lo'}"></span></span>`;
 }
 const posText = (p) => `${p.pos}${p.side ? ` ${p.side}` : ''}`;
 
@@ -210,7 +210,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
       ${wide ? strengthHtml : ''}
     </div>
     <div class="tac__lists">
-      <p class="tp-legend"><span><i class="tp-fresh" data-b="good" style="--f:80%"></i> świeżość</span><span><span class="mdot" data-m="hi"></span> morale</span><span><b>12</b> ocena ogólna (1-20)</span>${wide ? '<span>Dwuklik albo przycisk „i” otwiera kartę zawodnika</span>' : ''}</p>
+      <p class="tp-legend"><span><i class="tp-fresh" data-b="good" style="--f:80%"></i> świeżość${wide ? ' (kondycja w %)' : ''}</span><span><span class="mdot" data-m="hi"></span> morale</span><span><b>12</b> ocena ogólna (1-20)</span>${wide ? '<span>Dwuklik albo przycisk „i” otwiera kartę zawodnika</span>' : ''}</p>
       <section class="tp-sec tp-sec--xi" aria-labelledby="tp-h-xi">
         <h3 id="tp-h-xi">Pierwszy skład <span class="muted">${inXI.size} z ${f.slots.length}</span>${hitsHtml('xi')}</h3>
         <ul class="tp-list">${xiRows}</ul>
