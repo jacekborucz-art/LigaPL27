@@ -1124,10 +1124,10 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 .sq__fresh[data-b="good"] { color: #2E8A4E; } .sq__fresh[data-b="mid"] { color: var(--warn-text); } .sq__fresh[data-b="low"] { color: var(--bad-text); }
 /* Znaczniki stanu za nazwiskiem (src/ui/playerTags.js, docs/tagi-zawodnika.md): pełny kwadrat = sprawa pilna,
    obrys = drugorzędna. Telefon: 2 znaczniki i „+N”, od 760 px: 4 i „+N” (dwa warianty „+N” w HTML). */
-.tg-row { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; flex: none; vertical-align: middle; }
-.tg { --tg: var(--text-muted); --tg-ink: #fff; display: inline-grid; place-items: center; flex: none; min-width: 16px; height: 16px; padding: 0 3px;
-  border-radius: 3px; font: 700 11px/1 var(--font-display); font-variant-numeric: tabular-nums; white-space: nowrap; background: var(--tg); color: var(--tg-ink); cursor: help; }
-.tg--o { background: none; color: var(--tg); box-shadow: inset 0 0 0 1.5px var(--tg); }
+.tg-row { display: inline-flex; align-items: center; gap: 2px; margin-left: 5px; flex: none; vertical-align: middle; }
+.tg { --tg: var(--text-muted); --tg-ink: #fff; display: inline-grid; place-items: center; flex: none; min-width: 11px; height: 11px; padding: 0 2px;
+  border-radius: 2px; font: 700 8px/1 var(--font-display); font-variant-numeric: tabular-nums; white-space: nowrap; background: var(--tg); color: var(--tg-ink); cursor: help; }
+.tg--o { background: none; color: var(--tg); box-shadow: inset 0 0 0 1px var(--tg); }
 .tg[data-k="sy"] { --tg: var(--kartka-zolta); --tg-ink: #14211A; }
 .tg[data-k="sr"], .tg[data-k="inj"] { --tg: var(--kartka-czerwona); }
 .tg[data-k="nt"] { --tg: var(--murawa); }
@@ -1159,7 +1159,7 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 /* Tabele: znaczniki w komórce nazwiska, szerokość kolumny jak dotąd (nazwisko oddaje miejsce znacznikom) */
 .xl__nmw { display: inline-flex; align-items: center; max-width: 200px; vertical-align: middle; }
 .xl__nmw button { min-width: 0; }
-.xl__nmw .tg-row { margin-left: 4px; }
+.xl__nmw .tg-row { margin-left: 3px; }
 /* Panel podsumowania po prawej (PC) */
 .sqa { display: none; }
 .sqa__p { --t: var(--murawa); padding: 12px 14px 14px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--t) 7%, var(--surface)); border: 1px solid color-mix(in srgb, var(--t) 24%, var(--line)); border-top: 4px solid var(--t); }
