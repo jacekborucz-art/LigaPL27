@@ -107,6 +107,7 @@ test('Klub gracza spada do III ligi: zostaje (III liga jest grywalna), kadra i f
   // Wymuszamy ostatnie miejsce: wszystkie mecze ligowe klubu gracza przegrane
   for (const f of g.fixtures.filter((x) => x.comp === 'liga2' && (x.home === g.clubId || x.away === g.clubId))) f.result.score = f.home === g.clubId ? [0, 5] : [5, 0];
   g.date = '2027-07-01';
+  g.board.trust = 100; // zaufanie z przebiegu sezonu zależy od balansu (np. kartek); test sprawdza tylko sam spadek
   const r = rolloverSeason(g);
   assert.equal(anyClub('chojniczanka').tier, 4);
   assert.ok(anyClub('chojniczanka').group >= 1 && anyClub('chojniczanka').group <= 4);
