@@ -23,7 +23,14 @@ function condHtml(p) {
   const f = Math.round(p.fresh ?? 95);
   const m = p.morale ?? 12;
   return `<span class="tp-cond" role="img" aria-label="Świeżość ${f}%, morale: ${esc(moraleLabel(m).toLowerCase())}" title="Świeżość ${f}%, morale: ${esc(moraleLabel(m).toLowerCase())}">
-    <span class="tp-pct" data-b="${freshBand(f)}">${f}%</span><i class="tp-fresh" data-b="${freshBand(f)}" style="--f:${f}%"></i><span class="mdot" data-m="${m >= 14 ? 'hi' : m >= 10 ? 'mid' : 'lo'}"></span></span>`;
+    <span class="tp-pct" data-b="${freshBand(f)}">${f}%</span><i class="tp-fresh" data-b="${freshBand(f)}" style="--f:${f}%"></i><span class="mdot" data-m="${m >= 14 ? 'hi' : m >= 10 ? 'mid' : 'lo'}"></span>${moraleArrow(m)}</span>`;
+}
+/** Morale jako strzałka (PC): 5 poziomów od zielonej w górę do czerwonej w dół (skala 1-20). */
+export const moraleLevel = (m) => (m >= 16 ? 5 : m >= 13 ? 4 : m >= 10 ? 3 : m >= 7 ? 2 : 1);
+const ARROW_ROT = { 5: -90, 4: -45, 3: 0, 2: 45, 1: 90 };
+function moraleArrow(m) {
+  const l = moraleLevel(m);
+  return `<svg class="tp-marr" data-l="${l}" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" transform="rotate(${ARROW_ROT[l]} 8 8)"/></svg>`;
 }
 const posText = (p) => `${p.pos}${p.side ? ` ${p.side}` : ''}`;
 
@@ -210,7 +217,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
       ${wide ? strengthHtml : ''}
     </div>
     <div class="tac__lists">
-      <p class="tp-legend"><span><i class="tp-fresh" data-b="good" style="--f:80%"></i> świeżość${wide ? ' (kondycja w %)' : ''}</span><span><span class="mdot" data-m="hi"></span> morale</span><span><b>12</b> ocena ogólna (1-20)</span>${wide ? '<span>Dwuklik albo przycisk „i” otwiera kartę zawodnika</span>' : ''}</p>
+      <p class="tp-legend"><span><i class="tp-fresh" data-b="good" style="--f:80%"></i> świeżość${wide ? ' (kondycja w %)' : ''}</span>${wide ? `<span class="tp-cond" title="Morale: od wysokiego (zielona w górę) do niskiego (czerwona w dół)">${[5, 4, 3, 2, 1].map((l) => moraleArrow([16, 13, 10, 7, 1][5 - l])).join('')} morale</span>` : '<span><span class="mdot" data-m="hi"></span> morale</span>'}<span><b>12</b> ocena ogólna (1-20)</span>${wide ? '<span>Dwuklik albo przycisk „i” otwiera kartę zawodnika</span>' : ''}</p>
       <section class="tp-sec tp-sec--xi" aria-labelledby="tp-h-xi">
         <h3 id="tp-h-xi">Pierwszy skład <span class="muted">${inXI.size} z ${f.slots.length}</span>${hitsHtml('xi')}</h3>
         <ul class="tp-list">${xiRows}</ul>
