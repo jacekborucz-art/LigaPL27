@@ -16,6 +16,18 @@
 
 .rz { display: grid; gap: var(--space-4); min-width: 0; text-transform: none; }
 .rz-head { margin-bottom: 0; }
+/* Nagłówek z zakładkami drugiego poziomu: tytuł po lewej, „Mecz” i „Kadra rezerw” po prawej (na telefonie pod spodem) */
+.rz-top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-2) var(--space-4); margin-bottom: var(--space-3); }
+.rz-top__ttl { display: grid; gap: 2px; min-width: 0; flex: 1 1 260px; }
+.rz-top__ttl h2 { margin: 0; }
+.rz-top .muted { overflow-wrap: anywhere; }
+.rz-tabs { display: flex; gap: 2px; flex: 0 0 auto; max-width: 100%; border-bottom: 1px solid var(--line); }
+.rz-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 16px; border: 0; background: none; font: 700 var(--step-0)/1 var(--font-display); color: var(--text-muted); border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap; }
+.rz-tabs button small { min-width: 22px; padding: 2px 6px; border-radius: 999px; background: var(--surface); font: 700 var(--step--1)/1.2 var(--font-body); font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.rz-tabs [aria-selected="true"] { color: var(--text); border-bottom-color: var(--rz); background: color-mix(in srgb, var(--rz) 10%, transparent); }
+.rz-tabs [aria-selected="true"] small { background: var(--rz); color: var(--rz-ink); }
+.rz-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (max-width: 600px) { .rz-tabs { width: 100%; } .rz-tabs button { flex: 1; padding: 0 8px; } }
 .rz-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .rz-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
 .rz-main, .rz-side { display: grid; gap: var(--space-4); align-content: start; min-width: 0; }

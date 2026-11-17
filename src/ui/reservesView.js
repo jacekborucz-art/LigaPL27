@@ -429,6 +429,13 @@ function askDialog(game, ctx, ask, avail) {
 }
 
 // ------------------------------------------------------------ Ekran
+/** Nagłówek Rezerw: tytuł i linia drużyny po lewej, zakładki „Mecz” i „Kadra rezerw” (z liczbą) po prawej. */
+export function rzHead(view, count, line) {
+  const tabs = [['match', 'Mecz', ''], ['squad', 'Kadra rezerw', count != null ? `<small>${esc(String(count))}</small>` : '']];
+  return `<div class="rz-top"><div class="rz-top__ttl"><h2>Rezerwy</h2><span class="muted">${esc(line)}</span></div>
+    <div class="rz-tabs" role="tablist" aria-label="Widok rezerw">${tabs.map(([k, v, b]) => `<button role="tab" data-act="rzview" data-v="${k}" aria-selected="${view === k}" tabindex="${view === k ? 0 : -1}">${esc(v)}${b}</button>`).join('')}</div></div>`;
+}
+
 /** Podzakładka Kadra > Rezerwy (HTML). Klub bez rezerw: wyjaśnienie (R.reason). */
 export function renderReserves(game, ui = {}) {
   let ctx;
@@ -457,7 +464,7 @@ export function renderReserves(game, ui = {}) {
     const ask = ui.rzAsk ? askDialog(game, ctx, ui.rzAsk, avail) : '';
     const msg = ui.rzMsg ? `<p class="rz-msg" role="status">${esc(ui.rzMsg)}</p>` : '';
     return `<div class="rz">
-      <div class="mail-head rz-head"><h2>Rezerwy</h2><span class="muted">${esc(`${ctx.R.name}, ${leagueLabel(anyClub(ctx.R.id)) || ''}${pos}${coach}`)}</span></div>
+      ${rzHead('match', squadOf(game.world, ctx.R.id).length, `${ctx.R.name}, ${leagueLabel(anyClub(ctx.R.id)) || ''}${pos}${coach}`)}
       ${alarm}${msg}
       <div class="rz-grid">
         <div class="rz-main">

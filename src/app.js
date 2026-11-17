@@ -30,7 +30,7 @@ import { addDays } from './core/gameLoop.js';
 import { generateWorld, squadOf, academyOf } from './world/worldGen.js';
 import { renderSquadList, renderPlayerProfile } from './ui/squadView.js';
 import { renderTactics } from './ui/tacticsView.js';
-import { renderReserves, handleReservesAction, isReservesAction, reservesStrip, rzChipFn, hasReserves } from './ui/reservesView.js'; // Kadra > Rezerwy
+import { renderReserves, rzHead, handleReservesAction, isReservesAction, reservesStrip, rzChipFn, hasReserves } from './ui/reservesView.js'; // Kadra > Rezerwy
 import { resolveMove, resolveTap, parseLoc, locKey, playerAt, sameLoc } from './ui/tacticsMoves.js';
 import { mountTacticsDrag } from './ui/tacticsDrag.js';
 import { createTactics, changeFormation, setInstruction, refreshTactics, removeFromBench, checkTactics } from './engine/lineup.js';
@@ -256,10 +256,10 @@ app.addEventListener('keydown', (ev) => {
     dispatchAct({ dataset: { act: 'st-fire-no', id: state.trStaffAsk } });
     return;
   }
-  const tab = ev.target.closest?.('.st-subs [role="tab"]');
+  const tab = ev.target.closest?.('.st-subs [role="tab"], .rz-tabs [role="tab"]');
   if (!tab || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(ev.key)) return;
   ev.preventDefault();
-  const tabs = [...app.querySelectorAll('.st-subs [role="tab"]')];
+  const tabs = [...tab.parentElement.querySelectorAll('[role="tab"]')];
   const i = tabs.indexOf(tab);
   const j = ev.key === 'Home' ? 0 : ev.key === 'End' ? tabs.length - 1 : (i + (ev.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
   tabs[j].click();
@@ -465,13 +465,14 @@ function renderTab(tab, g, club) {
       // Rezerwy: „Mecz” (delegowania i powołania) albo „Kadra rezerw” (pełna kadra z atrybutami, jak w Kadrze)
       const R = reservesOf(g, g.clubId);
       const rv = state.rzView === 'squad' ? 'squad' : 'match';
-      const tog = `<div class="seg sqv rz-view" role="tablist" aria-label="Widok rezerw">${[['match', 'Mecz'], ['squad', `Kadra rezerw${R.name ? `: ${R.name}` : ''}`]].map(([k, v]) => `<button role="tab" data-act="rzview" data-v="${k}" aria-selected="${rv === k}">${esc(v)}</button>`).join('')}</div>`;
       if (rv === 'squad' && R.ok) {
         const rp = state.playerOpen && g.world.players[state.playerOpen];
         if (rp && rp.clubId === R.id) return renderPlayerProfile(rp, { leagueOvrs: leagueOvrs(g, anyClub(R.id)?.tier ?? club.tier), clubName: R.name, date: g.date, game: g });
-        return sub + tog + renderSquadList(squadOf(g.world, R.id), { filter: state.sqFilter === 'academy' ? 'all' : state.sqFilter, leagueOvrs: leagueOvrs(g, anyClub(R.id)?.tier ?? club.tier), academy: [], view: state.sqView ?? 'overview', sort: state.sqSort, game: g, clubId: R.id, title: `Kadra rezerw: ${R.name}` });
+        const rsq = squadOf(g.world, R.id);
+        const rAvg = rsq.length ? (rsq.reduce((s, p) => s + p.age, 0) / rsq.length).toFixed(1) : '0';
+        return sub + renderSquadList(rsq, { filter: state.sqFilter === 'academy' ? 'all' : state.sqFilter, leagueOvrs: leagueOvrs(g, anyClub(R.id)?.tier ?? club.tier), academy: [], view: state.sqView ?? 'overview', sort: state.sqSort, game: g, clubId: R.id, title: `Kadra rezerw: ${R.name}`, head: rzHead('squad', rsq.length, `${R.name}, ${rsq.length} zawodników, średni wiek ${rAvg}`) });
       }
-      return sub + tog + renderReserves(g, state);
+      return sub + renderReserves(g, state);
     }
     if (state.sqSub === 'talks') return sub + renderTalks(g, state);
     if (state.sqSub === 'report') return sub + renderTeamReport(g, { msg: state.trepMsg ?? '', sel: state.trepSel ?? 0 });
