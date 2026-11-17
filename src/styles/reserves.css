@@ -1,0 +1,192 @@
+/* Kadra > Rezerwy (src/ui/reservesView.js): pas weekendu, mierniki, listy delegowania i powołań, kadra rezerw,
+   dialog prośby (arkusz u dołu na telefonie, panel w prawej kolumnie na PC), plakietki rezerw w wierszach Kadry i Składu.
+   Jeden akcent: bursztyn (--led) znaczy „druga szatnia”. Bez wielkich liter. */
+:root {
+  --rz: var(--led);
+  --rz-ink: #3A2600;
+  --rz-text: #8A5A00;
+  --rz-line: color-mix(in srgb, var(--led) 55%, var(--line));
+  --rz-wash: color-mix(in srgb, var(--led) 12%, var(--surface));
+  --rz-bad: var(--kartka-czerwona);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --rz-text: #FFB21A; --rz-wash: color-mix(in srgb, var(--led) 14%, var(--surface)); --rz-bad: #E05A5A; }
+}
+:root[data-theme="dark"] { --rz-text: #FFB21A; --rz-wash: color-mix(in srgb, var(--led) 14%, var(--surface)); --rz-bad: #E05A5A; }
+
+.rz { display: grid; gap: var(--space-4); min-width: 0; text-transform: none; }
+.rz-head { margin-bottom: 0; }
+.rz-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.rz-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
+.rz-main, .rz-side { display: grid; gap: var(--space-4); align-content: start; min-width: 0; }
+.rz-cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
+.rz-msg { margin: 0; padding: 10px 12px; border-radius: var(--radius-s); background: var(--surface); border-left: 4px solid var(--rz); }
+.rz-empty { margin: 0; padding: var(--space-3); color: var(--text-muted); list-style: none; }
+.rz-warn { margin: 0; color: var(--warn-text); font-size: var(--step--1); font-weight: 600; }
+
+/* Awaria */
+.rz-alarm { display: grid; gap: var(--space-2); justify-items: start; padding: var(--space-3) var(--space-4); border-radius: var(--radius-s); background: color-mix(in srgb, var(--rz-bad) 8%, var(--surface)); border-left: 4px solid var(--rz-bad); }
+.rz-alarm h3 { margin: 0; font: 700 var(--step-1)/1.15 var(--font-display); }
+.rz-alarm p { margin: 0; }
+.rz-alarm .btn { min-height: var(--tap, 44px); }
+
+/* Pas weekendu */
+.rz-week { display: grid; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-m); background: var(--surface); min-width: 0; }
+.rz-week__table { display: none; width: 100%; border-collapse: separate; border-spacing: 4px; table-layout: fixed; }
+.rz-week__table th { font: 700 var(--step--1)/1.2 var(--font-display); text-align: left; color: var(--text-muted); }
+.rz-week__table thead th small { font-weight: 400; }
+.rz-week__table tbody th { width: 120px; color: var(--text); overflow-wrap: anywhere; }
+.rz-week__table td { vertical-align: top; }
+.rz-week__match { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; padding: 6px 8px; border-radius: var(--radius-s); font-size: var(--step--1); min-width: 0; }
+.rz-week__match b { font: 700 var(--step-0)/1.1 var(--font-display); }
+.rz-week__match small { color: var(--text-muted); }
+.rz-week__match[data-team="reserve"] { background: var(--rz-wash); border-left: 4px solid var(--rz); }
+.rz-week__match[data-team="first"] { background: var(--surface-stripe); border-left: 4px solid var(--accent); }
+.rz-week__dots { display: flex; flex-wrap: wrap; gap: 3px; flex-basis: 100%; }
+.rz-week__dot { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 3px; border-radius: 11px; background: var(--rz); color: var(--rz-ink); font: 700 10px/1 var(--font-display); }
+.rz-week__match[data-team="first"] .rz-week__dot { background: var(--accent); color: var(--accent-text, #fff); }
+.rz-week__mini { display: flex; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.rz-week__mini li { display: flex; align-items: center; gap: 3px; font-size: var(--step--1); color: var(--text-muted); }
+.rz-week__mini li span { min-width: 2.2em; }
+.rz-week__mini i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--line); }
+.rz-week__mini i[data-team="first"] { background: var(--accent); border-color: var(--accent); }
+.rz-week__mini i[data-team="reserve"] { background: var(--rz); border-color: var(--rz); }
+.rz-week__list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.rz-week__note { margin: 0; font-size: var(--step--1); color: var(--text-muted); }
+
+/* Mierniki */
+.rz-meters { display: grid; gap: var(--space-3); padding: var(--space-3); border-radius: var(--radius-m); background: var(--surface); }
+.rz-meter { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px var(--space-2); }
+.rz-meter__t { grid-column: 1 / -1; font-size: var(--step--1); font-weight: 600; }
+.rz-meter__n { font: 700 var(--step-0)/1 var(--font-display); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rz-meter__n small { font: 400 var(--step--1)/1 var(--font-body); color: var(--text-muted); }
+.rz-meter__sub { grid-column: 1 / -1; font-size: var(--step--1); color: var(--text-muted); }
+.rz-segs { display: flex; gap: 4px; }
+.rz-seg { width: 22px; height: 10px; border: 2px solid var(--text-muted); border-radius: 2px; }
+.rz-seg[data-on="1"] { background: var(--rz); border-color: var(--rz); }
+.rz-meter.is-full .rz-seg { border-width: 3px; border-color: var(--rz-text); }
+.rz-gauge { position: relative; height: 10px; border-radius: 5px; background: var(--surface-stripe); overflow: visible; }
+.rz-gauge__bar { display: block; height: 100%; border-radius: 5px; background: var(--accent); }
+.rz-gauge__bar[data-low="1"] { background: var(--rz-bad); }
+.rz-gauge__min { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text); }
+
+/* Listy */
+.rz-sec { display: grid; gap: var(--space-2); min-width: 0; align-content: start; }
+.rz-sec__h { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px var(--space-2); }
+.rz-sec__h h3 { margin: 0; font: 700 var(--step-1)/1.15 var(--font-display); }
+.rz-sec__sub { margin: 0; font-size: var(--step--1); }
+.rz-sec__g { margin: var(--space-2) 0 0; font: 700 var(--step--1)/1.2 var(--font-display); color: var(--rz-text); }
+.rz-tip { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; padding: 8px 10px; border-radius: var(--radius-s); background: var(--rz-wash); font-size: var(--step--1); }
+.rz-tip span { flex: 1 1 200px; }
+.rz-filters { margin: 0; padding: 0; }
+.rz-list { list-style: none; margin: 0; padding: 0; background: var(--surface); border-radius: var(--radius-m); overflow: hidden; }
+.rz-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); padding: 8px 10px; }
+.rz-row:nth-child(even) { background: var(--surface-stripe); }
+.rz-row__who { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; min-width: 0; }
+.rz-row__who b { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.rz-row__who small { font-size: var(--step--1); color: var(--text-muted); }
+.rz-row__why { flex-basis: 100%; color: var(--text-muted); }
+.rz-row--off .rz-row__who b, .rz-row--off .pos { opacity: .6; }
+.rz-row--picked { box-shadow: inset 4px 0 0 var(--rz); }
+.rz-row__act .btn { min-height: var(--tap, 44px); }
+.rz-row__act .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Plakietki rezerw (Kadra, Skład i taktyka, profil, Rezerwy) */
+.rz-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 2px; vertical-align: middle; }
+.rz-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: var(--radius-s); font: 600 var(--step--1)/1.4 var(--font-body); text-transform: none; border: 1px solid var(--line); color: var(--text-muted); white-space: nowrap; }
+.rz-chip[data-k="down"], .rz-chip[data-k="up"] { background: var(--rz); color: var(--rz-ink); border-color: transparent; }
+.rz-chip[data-k="wait"] { border-style: dashed; border-color: var(--rz-line); color: var(--rz-text); }
+.rz-chip[data-k="age"] { color: var(--warn-text); border-color: color-mix(in srgb, var(--warn-text) 45%, var(--line)); }
+.rz-chip[data-k="susp"], .rz-chip[data-k="no"] { color: var(--bad-text); }
+.tp-row__name .rz-chips { display: flex; margin: 2px 0 0; }
+.sq__name .rz-chips { margin: 2px 0 0; }
+
+/* Pasek rezerw nad ławką (Skład i taktyka) */
+.rz-strip { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); margin: 0 0 var(--space-3); padding: 8px 10px; border-radius: var(--radius-s); background: var(--rz-wash); border-left: 4px solid var(--rz); font-size: var(--step--1); }
+.rz-strip p { margin: 0; flex: 1 1 200px; }
+.rz-strip--alarm { border-left-color: var(--rz-bad); }
+.rz-strip--alarm b { color: var(--bad-text); }
+.rz-strip__btns { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* Kadra rezerw */
+.rz-squad { min-width: 0; }
+.rz-squad > summary { min-height: var(--tap, 44px); display: flex; align-items: center; padding: 0 var(--space-3); border-radius: var(--radius-m); background: var(--surface); border: 1px solid var(--line); font: 700 var(--step-0)/1.2 var(--font-display); cursor: pointer; }
+.rz-squad[open] > summary { margin-bottom: var(--space-2); }
+.rz-squad__min { margin: 0 0 var(--space-2); font-size: var(--step--1); color: var(--text-muted); }
+.rz-squad__list { list-style: none; margin: 0; padding: 0; background: var(--surface); border-radius: var(--radius-m); overflow: hidden; }
+.rz-squad__row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 2px var(--space-2); padding: 6px 10px; font-size: var(--step--1); }
+.rz-squad__row:nth-child(even) { background: var(--surface-stripe); }
+.rz-squad__row > .muted, .rz-squad__st { grid-column: 2 / -1; }
+.rz-squad__nm { min-height: 32px; padding: 0; border: 0; background: none; color: var(--text); font: 600 var(--step-0)/1.2 var(--font-body); text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.rz-squad__nm:hover { text-decoration: underline; }
+.rz-squad__st[data-k="bad"] { color: var(--bad-text); }
+.rz-squad__st[data-k="up"] { color: var(--rz-text); font-weight: 600; }
+.rz-squad__st[data-k="ok"] { color: var(--text-muted); }
+
+/* Dialog prośby: arkusz u dołu na telefonie */
+.rz-scrim { position: fixed; inset: 0; z-index: 40; background: rgb(0 0 0 / .45); }
+.rz-ask {
+  position: fixed; left: 0; right: 0; bottom: calc(var(--nav-h, 64px) + env(safe-area-inset-bottom)); z-index: 41;
+  max-height: 80dvh; overflow: auto; display: grid; gap: var(--space-2);
+  padding: var(--space-4); border-radius: var(--radius-m) var(--radius-m) 0 0; background: var(--surface);
+  border-top: 4px solid var(--rz); box-shadow: 0 -8px 24px rgb(0 0 0 / .25);
+}
+.rz-ask h4 { margin: 0; font: 700 var(--step-1)/1.15 var(--font-display); }
+.rz-ask p { margin: 0; }
+.rz-ask__live { display: grid; gap: var(--space-2); }
+.rz-ask__facts { margin: 0; padding-left: 1.2em; display: grid; gap: 2px; font-size: var(--step--1); }
+.rz-ask__answer { padding: 8px 10px; border-radius: var(--radius-s); font-weight: 600; }
+.rz-ask__answer[data-k="yes"] { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); border-left: 4px solid var(--accent); }
+.rz-ask__answer[data-k="no"] { background: color-mix(in srgb, var(--rz-bad) 8%, var(--surface)); border-left: 4px solid var(--rz-bad); }
+.rz-ask__btns { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.rz-ask__btns .btn { min-height: var(--tap, 44px); }
+.rz-ask__btns .btn:disabled { opacity: .5; cursor: not-allowed; }
+.rz-force { display: grid; gap: var(--space-2); padding: 8px 10px; border-left: 4px solid var(--warn-text); background: color-mix(in srgb, var(--warn-text) 8%, var(--surface)); font-size: var(--step--1); }
+.rz-force__cost { font-weight: 600; }
+.rz-btn-bad { background: var(--rz-bad); border-color: var(--rz-bad); color: #fff; }
+.rz-btn-bad:hover { filter: brightness(1.08); }
+
+@media (max-width: 640px) {
+  .rz-row__act .btn { min-width: 88px; }
+}
+
+@media (min-width: 760px) {
+  .rz-week__table { display: table; }
+  .rz-week__mini, .rz-week__list { display: none; }
+  .rz-scrim { display: none; }
+  .rz-ask { position: static; max-height: none; box-shadow: none; border-radius: var(--radius-m); border: 1px solid var(--rz-line); border-top: 4px solid var(--rz); }
+  .rz-squad__row { grid-template-columns: auto minmax(0, 1fr) 32px 32px 64px minmax(0, 1fr); }
+  .rz-squad__row > .muted, .rz-squad__st { grid-column: auto; }
+}
+
+@media (min-width: 900px) {
+  .rz-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1100px) {
+  .hub__main:has(.rz) { max-width: 1440px; }
+  .rz-grid { grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr); }
+  .rz-side { position: sticky; top: calc(var(--hub-top, 0px) + var(--space-3)); }
+  .rz-squad__row { grid-template-columns: auto minmax(0, 1fr) 28px 28px 60px; }
+  .rz-squad__row > .muted { grid-column: auto; }
+  .rz-squad__st { grid-column: 2 / -1; }
+  .rz-squad__list { max-height: 40dvh; overflow: auto; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rz-ask { animation: rz-rise 150ms ease-out; }
+  @keyframes rz-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+}
+
+/* Kadra: pauza tylko w innej klasie (np. 2 Liga po meczu w rezerwach), w meczach drużyny może grać */
+.xl__st[data-k="sus2"] { background: transparent; color: var(--warn-text); box-shadow: inset 0 0 0 1.5px var(--warn-text); }
+
+/* Telefon i tablet: jedna kolumna w kolejności pas weekendu, mierniki, listy, kadra rezerw */
+@media (max-width: 1099px) {
+  .rz-main, .rz-side { display: contents; }
+  .rz-week { order: 1; }
+  .rz-meters { order: 2; }
+  .rz-ask, .rz-scrim { order: 3; }
+  .rz-cols { order: 4; }
+  .rz-squad { order: 5; }
+}

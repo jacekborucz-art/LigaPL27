@@ -2,12 +2,12 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-b57e2c7a95';
+const VERSION = 'v0.3-677ddcd39d';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
   // AUTO-FILES-START
-  ['./index.html', '803bbd95c6'],
+  ['./index.html', '196f138ffe'],
   ['./manifest.webmanifest', 'f15cbe83ae'],
   ['./assets/crests/arka-48.webp', '466a65579c'],
   ['./assets/crests/arka.webp', '58f2c8f4ad'],
@@ -78,7 +78,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', 'bfcbb44edd'],
+  ['./src/app.js', '014211bb11'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '5cc24e938e'],
@@ -198,6 +198,7 @@ const FILES = [
   ['./src/styles/matchday.css', '87959cd153'],
   ['./src/styles/menu.css', 'cdd4f24b98'],
   ['./src/styles/negotiation.css', '949f233adc'],
+  ['./src/styles/reserves.css', 'e1e3d1407f'],
   ['./src/styles/staff.css', 'a779ca23ad'],
   ['./src/styles/todo.css', 'd7bb59a735'],
   ['./src/styles/tokens.css', 'a7865d38be'],
@@ -237,16 +238,17 @@ const FILES = [
   ['./src/ui/menuView.js', 'f7dc955d9f'],
   ['./src/ui/nationalView.js', '92d610d773'],
   ['./src/ui/negotiationView.js', '82b6da6b0d'],
-  ['./src/ui/playerMenus.js', '416420ba16'],
+  ['./src/ui/playerMenus.js', '90e9634c30'],
   ['./src/ui/playerStatsView.js', '00e99b6845'],
   ['./src/ui/positionMap.js', 'ef2c032d52'],
+  ['./src/ui/reservesView.js', '2d8620363e'],
   ['./src/ui/sponsorsView.js', '93ea7f72b4'],
-  ['./src/ui/squadView.js', '3167c8897d'],
+  ['./src/ui/squadView.js', '5abe770e87'],
   ['./src/ui/staffView.js', '7682a3584c'],
   ['./src/ui/sysMenu.js', 'fc1677717f'],
   ['./src/ui/tacticsDrag.js', '1d6819c303'],
   ['./src/ui/tacticsMoves.js', '36742ffefc'],
-  ['./src/ui/tacticsView.js', '6e6be45595'],
+  ['./src/ui/tacticsView.js', '0c0aac59eb'],
   ['./src/ui/talksView.js', 'e2780aa122'],
   ['./src/ui/teamReportView.js', 'c01abc57b6'],
   ['./src/ui/todoView.js', 'bd4d7aa1c4'],

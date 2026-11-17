@@ -12,6 +12,8 @@ import { formChartHtml, formHistory, formBand } from './formChart.js';
 import { positionMapHtml } from './positionMap.js';
 import { playerStatsHtml } from './playerStatsView.js';
 import { scoutLine } from '../career/assistantReport.js'; // raport skauta: potencjał zawodników spoza klubu (docs/sztab.md)
+import { anyClub } from '../season/season.js';
+import { classKeyOfTier, LEAGUE_CLASS_KEYS } from '../season/leagueComps.js';
 
 /** Potencjał w profilu: zawodnik spoza klubu gracza oceniany przez skauta (precyzja z jakości skauta). */
 function potentialText(p, game) {
@@ -122,10 +124,30 @@ function th(k, label, sort, { title = '', cls = '' } = {}) {
 }
 const nameCell = (p) => `<th scope="row" class="xl__nm"><button data-act="player" data-id="${esc(p.id)}">${moraleDot(p.morale ?? 12)}<span>${esc(p.name)}</span></button></th>`;
 const posCell = (p) => `<td class="xl__pos"><span class="pos" data-g="${GROUP[p.pos]}">${esc(p.pos)}${sideLabel(p)}</span></td>`;
-const statusMark = (p) => (p.injuryDays > 0 ? `<span class="xl__st" data-k="inj" title="${esc(`Kontuzja, ok. ${p.injuryDays} dni`)}">+</span>`
-  : (p.suspended > 0 || Object.values(p.susp ?? {}).some((v) => v > 0)) ? '<span class="xl__st" data-k="sus" title="Pauza za kartki">P</span>' : '');
+const SUSP_IN = { ekstraklasa: 'Ekstraklasie', liga1: '1 Lidze', liga2: '2 Lidze', liga3: 'III lidze', cup: 'Pucharze Polski', uefa: 'pucharach europejskich' };
+/**
+ * Pauzy zawodnika z podziałem (kartki per klasa, docs/rezerwy.md): rel = w rozgrywkach jego drużyny (klasa ligi klubu,
+ * Puchar Polski, UEFA), other = tylko w innej klasie ligowej (np. 2 Liga po meczu w rezerwach: w meczach swojej drużyny
+ * może grać). Bez znanego poziomu klubu wszystkie pauzy są w rel. Zwraca { rel: [[klucz, mecze]], other: [...] }.
+ */
+export function suspSplit(p, tier = null) {
+  const own = classKeyOfTier(tier);
+  const rel = []; const other = [];
+  for (const [k, v] of Object.entries(p?.susp ?? {})) if (v > 0) (own && LEAGUE_CLASS_KEYS.includes(k) && k !== own ? other : rel).push([k, v]);
+  if (p?.suspended > 0 && !rel.length && !other.length) rel.push(['', p.suspended]);
+  return { rel, other };
+}
+export const suspText = (list) => list.map(([k, v]) => `${v} ${plural(v, 'mecz', 'mecze', 'meczów')}${SUSP_IN[k] ? ` w ${SUSP_IN[k]}` : ''}`).join(', ');
+const tierOf = (id) => (id ? anyClub(id)?.tier ?? null : null);
+function statusMark(p, tier = null) {
+  if (p.injuryDays > 0) return `<span class="xl__st" data-k="inj" title="${esc(`Kontuzja, ok. ${p.injuryDays} dni`)}">+</span>`;
+  const s = suspSplit(p, tier);
+  if (s.rel.length) return `<span class="xl__st" data-k="sus" title="${esc(`Pauza za kartki: ${suspText(s.rel)}`)}">P</span>`;
+  if (s.other.length) return `<span class="xl__st" data-k="sus2" title="${esc(`Pauza tylko w innej klasie (${suspText(s.other)}), w meczach drużyny może grać`)}" aria-label="${esc(`Pauza tylko w innej klasie: ${suspText(s.other)}`)}">P</span>`;
+  return '';
+}
 
-function attrsTable(list, sort) {
+function attrsTable(list, sort, tier = null) {
   const groups = [['tech', OUTFIELD_ATTRS.filter((k) => ATTRS[k].group === 'tech')], ['mental', OUTFIELD_ATTRS.filter((k) => ATTRS[k].group === 'mental')], ['phys', OUTFIELD_ATTRS.filter((k) => ATTRS[k].group === 'phys')], ['gk', GK_ATTRS]];
   const head1 = `<tr class="xl__grp"><th colspan="2"></th><th colspan="5" data-g="info">Stan i forma</th>${groups.map(([g, ks]) => `<th colspan="${ks.length}" data-g="${g}">${esc(ATTR_GROUPS[g])}</th>`).join('')}</tr>`;
   const head2 = `<tr>${th('pos', 'Poz.', sort, { cls: 'xl__pos' })}${th('name', 'Zawodnik', sort, { cls: 'xl__nm' })}${th('age', 'Wiek', sort)}${th('ovr', 'OVR', sort, { title: 'Ocena ogólna 1-20' })}${th('form', 'Forma', sort, { title: 'Średnia ocen z 5 ostatnich meczów, wykres: 10 ostatnich' })}${th('fresh', 'Kond.', sort, { title: 'Świeżość (kondycja przed meczem)' })}${th('morale', 'Mor.', sort, { title: 'Morale' })}
@@ -139,7 +161,7 @@ function attrsTable(list, sort) {
     }).join('')).join('');
     return `<tr data-pid="${esc(p.id)}">${posCell(p)}${nameCell(p)}<td>${p.age}</td><td class="xl__ovr">${Math.round(p.ovr)}</td>
       <td class="xl__form">${sparkline(p)}<b data-b="${fa == null ? 'none' : formBand(fa)}">${fa == null ? '–' : fa.toFixed(2)}</b></td>
-      <td class="xl__fresh" data-b="${fr >= 85 ? 'good' : fr >= 70 ? 'mid' : 'low'}">${fr}%${statusMark(p)}</td><td>${esc(moraleLabel(p.morale ?? 12))}</td>${cells}</tr>`;
+      <td class="xl__fresh" data-b="${fr >= 85 ? 'good' : fr >= 70 ? 'mid' : 'low'}">${fr}%${statusMark(p, tier)}</td><td>${esc(moraleLabel(p.morale ?? 12))}</td>${cells}</tr>`;
   }).join('');
   return `<div class="xl-wrap" tabindex="0" aria-label="Atrybuty i forma zawodników, tabela przewijana w poziomie"><table class="xl xl--attrs"><thead>${head1}${head2}</thead><tbody>${rows}</tbody></table></div>`;
 }
@@ -163,10 +185,11 @@ function statsTable(list, sort, seasonLabel) {
 }
 
 /** Panel po prawej (PC): podsumowanie kadry. */
-function squadAside(players) {
+function squadAside(players, tier = null) {
   const cnt = (g) => players.filter((p) => GROUP[p.pos] === g).length;
   const inj = players.filter((p) => p.injuryDays > 0).sort((a, b) => b.injuryDays - a.injuryDays);
-  const sus = players.filter((p) => p.suspended > 0 || Object.values(p.susp ?? {}).some((v) => v > 0));
+  const sus = players.filter((p) => !(p.injuryDays > 0) && suspSplit(p, tier).rel.length);
+  const susOther = players.filter((p) => !(p.injuryDays > 0) && !suspSplit(p, tier).rel.length && suspSplit(p, tier).other.length);
   const formed = players.map((p) => ({ p, f: formAvg(p) })).filter((x) => x.f != null && formHistory(x.p).length >= 3).sort((a, b) => b.f - a.f);
   const li = (p, txt, k = '') => `<li><button data-act="player" data-id="${esc(p.id)}"><span class="pos" data-g="${GROUP[p.pos]}">${esc(p.pos)}</span><span class="sqa__nm">${esc(p.name)}</span><small${k ? ` data-k="${k}"` : ''}>${esc(txt)}</small></button></li>`;
   const tired = players.filter((p) => (p.fresh ?? 95) < 75).sort((a, b) => (a.fresh ?? 95) - (b.fresh ?? 95));
@@ -176,13 +199,15 @@ function squadAside(players) {
       <li><span class="pos" data-g="MID">POM</span><b>${cnt('MID')}</b></li><li><span class="pos" data-g="ATT">NAP</span><b>${cnt('ATT')}</b></li></ul></section>
     <section class="sqa__p" data-t="${inj.length + sus.length ? 'bad' : 'good'}"><h3>Niedostępni <span>${inj.length + sus.length}</span></h3>
       ${inj.length + sus.length ? `<ul class="sqa__list">${inj.map((p) => li(p, `uraz, ${p.injuryDays} ${plural(p.injuryDays, 'dzień', 'dni', 'dni')}`, 'inj')).join('')}${sus.map((p) => li(p, 'pauza za kartki', 'sus')).join('')}</ul>` : '<p class="sqa__ok">Wszyscy do dyspozycji.</p>'}</section>
+    ${susOther.length ? `<section class="sqa__p" data-t="calm"><h3>Pauza w innej klasie <span>${susOther.length}</span></h3><ul class="sqa__list">${susOther.map((p) => li(p, `tylko ${suspText(suspSplit(p, tier).other)}`, 'warn')).join('')}</ul></section>` : ''}
     <section class="sqa__p" data-t="good"><h3>Najlepsza forma</h3>
       ${formed.length ? `<ul class="sqa__list">${formed.slice(0, 4).map((x) => li(x.p, `śr. ${x.f.toFixed(2)}`, 'good')).join('')}</ul>` : '<p class="sqa__ok">Forma pojawi się po kilku meczach.</p>'}</section>
     ${tired.length ? `<section class="sqa__p" data-t="warn"><h3>Zmęczeni <span>${tired.length}</span></h3><ul class="sqa__list">${tired.slice(0, 5).map((p) => li(p, `kondycja ${Math.round(p.fresh ?? 95)}%`, 'warn')).join('')}</ul></section>` : ''}
   </aside>`;
 }
 
-export function renderSquadList(players, { filter = 'all', leagueOvrs = [], academy = [], view = 'overview', sort = null, game = null } = {}) {
+export function renderSquadList(players, { filter = 'all', leagueOvrs = [], academy = [], view = 'overview', sort = null, game = null, rzChips = null } = {}) {
+  const tier = tierOf(game?.clubId);
   const list = filter === 'academy' ? academy : players.filter((p) => filter === 'all' || GROUP[p.pos] === filter);
   const sorted = view === 'overview' ? [...list].sort(defaultOrder) : sortList(list, sort);
   const avgAge = players.length ? (players.reduce((s, p) => s + p.age, 0) / players.length).toFixed(1) : '0';
@@ -191,7 +216,7 @@ export function renderSquadList(players, { filter = 'all', leagueOvrs = [], acad
   const top = `<div class="mail-head sqx__head"><h2>Kadra</h2><span class="muted">${players.length} zawodników, średni wiek ${avgAge}</span></div>
     <div class="sqx__bar">${views}<div class="chips">${chips}</div></div>`;
   if (view === 'attrs' || view === 'stats') {
-    const body = !sorted.length ? '<p class="mail-empty">Brak zawodników.</p>' : view === 'attrs' ? attrsTable(sorted, sort) : statsTable(sorted, sort, game?.season?.seasonId ?? game?.season ?? '');
+    const body = !sorted.length ? '<p class="mail-empty">Brak zawodników.</p>' : view === 'attrs' ? attrsTable(sorted, sort, tier) : statsTable(sorted, sort, game?.season?.seasonId ?? game?.season ?? '');
     return `<div class="sqx sqx--table">${top}${body}</div>`;
   }
   return `<div class="sqx sqx--overview">${top}
@@ -207,16 +232,16 @@ export function renderSquadList(players, { filter = 'all', leagueOvrs = [], acad
         return `
       <button class="sq__row" role="row" data-act="player" data-id="${esc(p.id)}" data-pid="${esc(p.id)}">
         <span class="pos" data-g="${GROUP[p.pos]}">${esc(p.pos)}${sideLabel(p)}</span>
-        <span class="sq__name">${moraleDot(p.morale)}<span><b>${esc(p.name)}</b><small>${esc(p.nat)}, ${p.age} lat${p.persona === 'Lider' ? ', lider' : ''}</small></span></span>
+        <span class="sq__name">${moraleDot(p.morale)}<span><b>${esc(p.name)}</b><small>${esc(p.nat)}, ${p.age} lat${p.persona === 'Lider' ? ', lider' : ''}</small>${rzChips ? rzChips(p, { short: true }) : ''}</span></span>
         <span class="w">${p.age}</span><span class="w">${esc(NAT_NAMES[p.nat] ?? p.nat)}</span>
         <span class="w wx sq__form">${sparkline(p)}<b data-b="${fa == null ? 'none' : formBand(fa)}">${fa == null ? '–' : fa.toFixed(2)}</b></span>
-        <span class="w wx sq__fresh" data-b="${fr >= 85 ? 'good' : fr >= 70 ? 'mid' : 'low'}"><i style="--v:${fr}%"></i>${fr}%${statusMark(p)}</span>
+        <span class="w wx sq__fresh" data-b="${fr >= 85 ? 'good' : fr >= 70 ? 'mid' : 'low'}"><i style="--v:${fr}%"></i>${fr}%${statusMark(p, tier)}</span>
         <span class="w">${esc(fmtDate(p.contract.until))}</span><span class="w">${esc(formatZl(p.value))}</span>
         <span class="sq__ovr"><b title="Ocena ogólna w skali 1-20">${Math.round(p.ovr)}</b>${stars(starsFor(p.ovr, leagueOvrs))}</span>
       </button>`;
       }).join('') || '<p class="mail-empty">Brak zawodników.</p>'}
     </div>
-    ${filter === 'academy' ? '' : squadAside(players)}
+    ${filter === 'academy' ? '' : squadAside(players, tier)}
     </div></div>`;
 }
 
@@ -267,6 +292,8 @@ export function renderPlayerProfile(p, opts = {}) {
           ${foreign ? '' : `<li><span class="k">Świeżość</span><span>${Math.round(p.fresh ?? 95)}%</span></li>
           <li><span class="k">Ostrość</span><span>${Math.round(p.sharp ?? 70)}%</span></li>`}
           <li><span class="k">Zdrowie</span><span>${p.injuryDays > 0 ? `Kontuzja, ok. ${p.injuryDays} dni` : 'Zdrowy'}</span></li>
+          ${(() => { const s = suspSplit(p, tierOf(p.clubId)); return s.rel.length || s.other.length ? `<li><span class="k">Kartki</span><span>${esc([s.rel.length ? `Pauza: ${suspText(s.rel)}` : '', s.other.length ? `Pauza tylko w innej klasie: ${suspText(s.other)}, w meczach swojej drużyny może grać` : ''].filter(Boolean).join('. '))}</span></li>` : ''; })()}
+          ${opts.rzChips ? `<li><span class="k">Rezerwy</span><span>${opts.rzChips}</span></li>` : ''}
           ${p.acclim ? `<li><span class="k">Aklimatyzacja</span><span>${Math.round(p.acclim.level)} %, pełna ok. ${esc(fmtDate(acclimEta(p, opts.date ?? p.acclim.since)))}. ${esc(p.acclim.reasons.join(', '))}</span></li>` : ''}
           ${p.callUp ? `<li><span class="k">Kadra</span><span>Na zgrupowaniu do ${esc(fmtDate(p.callUp.to))}</span></li>` : ''}
           ${p.intl?.caps || p.intlU21 ? `<li><span class="k">Reprezentacja</span><span>${p.intl?.caps ? `występy: ${p.intl.caps}, gole: ${p.intl.goals}` : ''}${p.intl?.caps && p.intlU21 ? '; ' : ''}${p.intlU21 ? `zgrupowania U21: ${p.intlU21}` : ''}</span></li>` : ''}

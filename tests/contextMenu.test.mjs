@@ -78,7 +78,8 @@ test('Kadra: własny zawodnik ma profil, skład meczowy, rozmowę, trening i kon
   const p = g.world.players[g.tactics.xi[4]];
   p.contract.until = '2029-06-30';
   const m = menu(g, p.id, 'squad');
-  assert.deepEqual(top(m), ['Profil zawodnika', 'Raport asystenta', 'Statystyki i historia', 'Skład meczowy', 'Rozmowa indywidualna', 'Trening indywidualny', 'Przedłuż kontrakt', 'Wystaw na listę transferową', 'Rozwiąż kontrakt…']);
+  // Widzew ma rezerwy (Widzew II): wpis delegowania po składzie meczowym, przed rozmową (docs/rezerwy.md)
+  assert.deepEqual(top(m), ['Profil zawodnika', 'Raport asystenta', 'Statystyki i historia', 'Skład meczowy', 'Deleguj do rezerw na mecz…', 'Rozmowa indywidualna', 'Trening indywidualny', 'Przedłuż kontrakt', 'Wystaw na listę transferową', 'Rozwiąż kontrakt…']);
   assert.ok(m.items[0].primary, 'profil jak zwykłe kliknięcie wiersza');
   assert.deepEqual(m.items[0].run.steps.map((s) => s.act), ['tab', 'tsub', 'player']);
   assert.match(find(m, 'Przedłuż kontrakt').disabled, /^Rozmowy możliwe od 1 gru 2027$/);

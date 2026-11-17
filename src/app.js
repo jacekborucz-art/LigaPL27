@@ -27,6 +27,7 @@ import { addDays } from './core/gameLoop.js';
 import { generateWorld, squadOf, academyOf } from './world/worldGen.js';
 import { renderSquadList, renderPlayerProfile } from './ui/squadView.js';
 import { renderTactics } from './ui/tacticsView.js';
+import { renderReserves, handleReservesAction, isReservesAction, reservesStrip, rzChipFn, hasReserves } from './ui/reservesView.js'; // Kadra > Rezerwy
 import { resolveMove, resolveTap, parseLoc, locKey, playerAt, sameLoc } from './ui/tacticsMoves.js';
 import { mountTacticsDrag } from './ui/tacticsDrag.js';
 import { createTactics, changeFormation, setInstruction, refreshTactics, removeFromBench, checkTactics } from './engine/lineup.js';
@@ -452,20 +453,25 @@ function renderTab(tab, g, club) {
   if (tab === 'klub') return renderClubHub(g, state);
   if (tab === 'rozgrywki') return renderCompetitions(g, { comp: state.cComp ?? compOfClub(club) ?? 'ekstraklasa', view: state.cView, round: state.cRound, filter: state.uFilter, draw: state.uDraw });
   if (tab === 'kadra') {
-    const sub = `<div class="subtabs" role="tablist"><button role="tab" data-act="tsub" data-s="players" aria-selected="${state.sqSub === 'players'}">Zawodnicy</button><button role="tab" data-act="tsub" data-s="tactics" aria-selected="${state.sqSub === 'tactics'}">Skład i taktyka</button><button role="tab" data-act="tsub" data-s="talks" aria-selected="${state.sqSub === 'talks'}">Rozmowy</button><button role="tab" data-act="tsub" data-s="report" aria-selected="${state.sqSub === 'report'}">Raport ogólny</button></div>`;
+    // Rezerwy: podzakładka tylko w klubie z grywalnymi rezerwami (po zmianie klubu powrót do „Zawodnicy”)
+    const rzOn = hasReserves(g);
+    if (state.sqSub === 'reserves' && !rzOn) state.sqSub = 'players';
+    const rzChips = rzOn ? rzChipFn(g) : null;
+    const sub = `<div class="subtabs${rzOn ? ' subtabs--5 subtabs--scroll' : ''}" role="tablist"><button role="tab" data-act="tsub" data-s="players" aria-selected="${state.sqSub === 'players'}">Zawodnicy</button><button role="tab" data-act="tsub" data-s="tactics" aria-selected="${state.sqSub === 'tactics'}">Skład i taktyka</button>${rzOn ? `<button role="tab" data-act="tsub" data-s="reserves" aria-selected="${state.sqSub === 'reserves'}">Rezerwy</button>` : ''}<button role="tab" data-act="tsub" data-s="talks" aria-selected="${state.sqSub === 'talks'}">Rozmowy</button><button role="tab" data-act="tsub" data-s="report" aria-selected="${state.sqSub === 'report'}">Raport ogólny</button></div>`;
+    if (state.sqSub === 'reserves') return sub + renderReserves(g, state);
     if (state.sqSub === 'talks') return sub + renderTalks(g, state);
     if (state.sqSub === 'report') return sub + renderTeamReport(g, { msg: state.trepMsg ?? '', sel: state.trepSel ?? 0 });
     if (state.sqSub === 'tactics') {
       queueMicrotask(mountTacticsScreen); // po wstawieniu HTML: okno atrybutów i fokus
-      return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), info: state.tInfo, msg: state.tMsg, numbers: shirtNumbers(g, g.clubId, squadOf(g.world, g.clubId)), kit: kitColors(clubById(g.clubId)), infoExtra: state.tInfo && g.world.players[state.tInfo] ? playerStatsHtml(g.world.players[state.tInfo], g) : '' });
+      return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), info: state.tInfo, msg: state.tMsg, numbers: shirtNumbers(g, g.clubId, squadOf(g.world, g.clubId)), kit: kitColors(clubById(g.clubId)), infoExtra: state.tInfo && g.world.players[state.tInfo] ? playerStatsHtml(g.world.players[state.tInfo], g) : '', rzChips, rzStrip: rzOn ? reservesStrip(g) : '' });
     }
     const ovrs = leagueOvrs(g, club.tier);
     const p = state.playerOpen && g.world.players[state.playerOpen];
     if (p) {
       const inAcademy = !!g.world.clubs[g.clubId]?.academy?.includes(p.id);
-      return renderPlayerProfile(p, { leagueOvrs: ovrs, clubName: club.name, date: g.date, game: g, promote: inAcademy ? canPromote(g, p.id) : null, promoteMsg: state.acMsg?.id === p.id ? state.acMsg.text : null });
+      return renderPlayerProfile(p, { leagueOvrs: ovrs, clubName: club.name, date: g.date, game: g, promote: inAcademy ? canPromote(g, p.id) : null, promoteMsg: state.acMsg?.id === p.id ? state.acMsg.text : null, rzChips: rzChips ? rzChips(p) : '' });
     }
-    return sub + renderSquadList(squadOf(g.world, g.clubId), { filter: state.sqFilter, leagueOvrs: ovrs, academy: academyOf(g.world, g.clubId), view: state.sqView ?? 'overview', sort: state.sqSort, game: g });
+    return sub + renderSquadList(squadOf(g.world, g.clubId), { filter: state.sqFilter, leagueOvrs: ovrs, academy: academyOf(g.world, g.clubId), view: state.sqView ?? 'overview', sort: state.sqSort, game: g, rzChips });
   }
   const soon = {
     transfery: ['Lista transferowa, wypożyczenia, wolni zawodnicy', 'Negocjacje kontraktów', 'Okna transferowe'],
@@ -1115,6 +1121,12 @@ mountTacticsDrag(app, {
   onReject: (reason) => { state.tMsg = reason; renderTacticsAfter(); },
 });
 
+// Escape w Rezerwach: zamyka dialog prośby i oddaje fokus na przycisk źródłowy.
+app.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'Escape' || !state.rzAsk || state.tab !== 'kadra' || state.sqSub !== 'reserves') return;
+  ev.preventDefault(); ev.stopPropagation();
+  dispatchAct({ dataset: { act: 'rz-ask-no' } });
+});
 // Escape na ekranie składu: najpierw zamyka panel atrybutów albo anuluje wybór (nie wychodzi do menu).
 app.addEventListener('keydown', (ev) => {
   if (ev.key !== 'Escape' || !tacticsOpen() || ev.target.closest('select')) return;
@@ -1237,6 +1249,16 @@ async function dispatchAct(el, { root = app } = {}) {
     render();
     if (r.top) window.scrollTo({ top: 0 });
     if (r.focus) app.querySelector(r.focus)?.focus({ preventScroll: !r.top && act !== 'st-fire-ask' });
+    return;
+  }
+  if (isReservesAction(act) && state.game) {
+    const r = handleReservesAction(state.game, act, el.dataset, state);
+    Object.assign(state, r.ui ?? {});
+    if (r.squadChanged) afterSquadChange(state.game);
+    if (r.save) await save();
+    render();
+    if (r.top) window.scrollTo({ top: 0 });
+    if (r.focus) app.querySelector(r.focus)?.focus({ preventScroll: true });
     return;
   }
   if (isTrainingAction(act) && state.game) {
@@ -1391,7 +1413,7 @@ async function dispatchAct(el, { root = app } = {}) {
       render(); window.scrollTo({ top: 0 });
     }
     if (act === 'clubback') { state.extClub = null; state.extPlayer = null; render(); }
-    if (act === 'tsub') { state.sqSub = el.dataset.s; state.trepMsg = ''; state.tSel = null; state.tInfo = null; state.tMsg = ''; state.playerOpen = null; state.ttResult = null; state.ttMeeting = null; render(); }
+    if (act === 'tsub') { state.sqSub = el.dataset.s; state.rzAsk = null; state.rzMsg = null; state.trepMsg = ''; state.tSel = null; state.tInfo = null; state.tMsg = ''; state.playerOpen = null; state.ttResult = null; state.ttMeeting = null; render(); }
     if (act === 'tcancel') { state.tSel = null; state.tMsg = ''; renderTacticsAfter('[data-act="tauto"]'); }
     if (act === 'tform') { g.tactics = changeFormation(g.tactics, mySquad(g), el.dataset.f); state.tSel = null; state.tMsg = ''; await save(); renderTacticsAfter(); }
     if (act === 'tauto') { g.tactics = createTactics(mySquad(g), { formation: g.tactics.formation, benchSize: benchSizeFor(g), instructions: g.tactics.instructions }); state.tSel = null; state.tMsg = 'Asystent ustawił skład.'; await save(); renderTacticsAfter(); }
@@ -1469,7 +1491,7 @@ function menuView() {
   return null;
 }
 
-const MSG_KEYS = ['tfMsg', 'trNotice', 'ttResult', 'tMsg'];
+const MSG_KEYS = ['tfMsg', 'trNotice', 'ttResult', 'tMsg', 'rzMsg'];
 
 /** Fokus po akcji z menu: wskazany element, a gdy fokus wypadł z ekranu, ten sam zawodnik albo główna część. */
 function focusAfterMenu(run, pid) {

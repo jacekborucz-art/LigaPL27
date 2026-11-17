@@ -36,8 +36,9 @@ const dragAttrs = (loc, p) => `data-drag="${esc(locKey(loc))}" data-gname="${esc
 /**
  * sel: null | loc ({ zone: 'xi'|'bench'|'out', idx?, id? }), zob. tacticsMoves.js.
  * info: id zawodnika z otwartym panelem atrybutów. msg: komunikat po ostatnim ruchu.
+ * rzChips: plakietki rezerw (src/ui/reservesView.js, rzChipFn), rzStrip: pasek rezerw nad ławką (klub bez rezerw: brak).
  */
-export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg = '', numbers = null, kit = null, infoExtra = '' }) {
+export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg = '', numbers = null, kit = null, infoExtra = '', rzChips = null, rzStrip = '' }) {
   const byId = new Map(squad.map((p) => [p.id, p]));
   const f = formationById(tactics.formation);
   const check = checkTactics(tactics, squad, { benchSize });
@@ -88,7 +89,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
     return `<li class="tp-row ${isSel ? 'is-sel' : ''} ${reason ? 'is-off' : ''}" data-drop="${key}" data-pid="${esc(p.id)}">
       <button class="tp-row__main" data-act="tpick" data-loc="${key}" ${dragAttrs(loc, p)} aria-pressed="${isSel}">
         ${handle(s.pos, GROUP[s.pos])}
-        <span class="tp-row__name">${esc(p.name)}${tactics.captain === p.id ? ' <abbr class="tp-c" title="Kapitan">C</abbr>' : ''}${reason ? `<small class="tp-off">${esc(reason)}</small>` : fit}</span>
+        <span class="tp-row__name">${esc(p.name)}${tactics.captain === p.id ? ' <abbr class="tp-c" title="Kapitan">C</abbr>' : ''}${reason ? `<small class="tp-off">${esc(reason)}</small>` : fit}${rzChips ? rzChips(p, { short: true }) : ''}</span>
         ${condHtml(p)}<b class="tp-ovr" title="Ocena ogólna w skali 1-20">${Math.round(p.ovr)}</b>
       </button>
       ${infoBtn(p)}
@@ -103,7 +104,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
     return `<li class="tp-row ${isSel ? 'is-sel' : ''} ${reason ? 'is-off' : ''}" data-drop="${esc(key)}" data-pid="${esc(p.id)}">
       <button class="tp-row__main" data-act="tpick" data-loc="${esc(key)}" ${dragAttrs(loc, p)} aria-pressed="${isSel}">
         ${handle(posText(p), GROUP[p.pos])}
-        <span class="tp-row__name">${esc(p.name)}${reason ? `<small class="tp-off">${esc(reason)}</small>` : ''}</span>
+        <span class="tp-row__name">${esc(p.name)}${reason ? `<small class="tp-off">${esc(reason)}</small>` : ''}${rzChips ? rzChips(p, { short: true }) : ''}</span>
         ${condHtml(p)}<b class="tp-ovr" title="Ocena ogólna w skali 1-20">${Math.round(p.ovr)}</b>
       </button>
       ${infoBtn(p)}
@@ -155,6 +156,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
         <h3 id="tp-h-xi">Pierwszy skład <span class="muted">${inXI.size} z ${f.slots.length}</span></h3>
         <ul class="tp-list">${xiRows}</ul>
       </section>
+      ${rzStrip}
       <section class="tp-sec tp-sec--bench" aria-labelledby="tp-h-bench">
         <h3 id="tp-h-bench">Ławka rezerwowych <span class="muted">${tactics.bench.length} z ${benchSize}</span></h3>
         <ul class="tp-list">${bench || (free ? '' : '<li class="mail-empty">Ławka jest pusta.</li>')}${benchAdd}</ul>

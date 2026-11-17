@@ -23,6 +23,7 @@ import { PROGRAMS, MODES } from '../training/config.js';
 import { locKey, playerAt, resolveMove, resolveTap, sameLoc } from './tacticsMoves.js';
 import { monthsLeft, compareText } from './transfersView.js';
 import { fmtDate } from './dom.js';
+import { rzMenuItems, rzCtx } from './reservesView.js'; // rezerwy: delegowanie i powołania (docs/rezerwy.md)
 
 export const MENU_VIEWS = ['squad', 'profile', 'tactics', 'talks', 'transfers', 'training', 'dashboard'];
 const ROLES = [['captain', 'Kapitan'], ['penalty', 'Rzuty karne'], ['freeKick', 'Rzuty wolne'], ['corner', 'Rzuty rożne']];
@@ -320,6 +321,13 @@ export function playerMenu(game, pid, { view, ui = {}, why = null, lineup = null
   const own = p.clubId === game.clubId;
   const L = lineup?.tactics && lineup?.byId ? lineup : null;
   const head = header(game, p, own, L);
+  // Zawodnik rezerw klubu gracza: powołanie, przeniesienie na stałe, profil (bez rynku: to nie obcy klub)
+  const rz = rzCtx(game);
+  if (!own && rz.ok && p.clubId === rz.R.id) {
+    const ext = item('Profil i statystyki', { steps: [{ act: 'extplayer', id: p.id }], focus: '[data-act="extback"]' }, { hint: 'Atrybuty, mecze, gole, oceny' });
+    const lp = view === 'tactics' && L?.byId?.get(p.id) ? lineupItems(p, L, { inTactics: true, ui }) : [];
+    return { ...head, note: rz.R.name, items: tidy([...lp, lp.length ? SEP : null, ...rzMenuItems(game, p, item), SEP, ext]) };
+  }
   if (!own) return { ...head, items: tidy(otherItems(game, p, { view, ui })) };
 
   const academy = !!game.world.clubs?.[game.clubId]?.academy?.includes(p.id);
@@ -337,6 +345,7 @@ export function playerMenu(game, pid, { view, ui = {}, why = null, lineup = null
   const contractSub = sub('Kontrakt i transfer', contract);
   const training = sub('Trening indywidualny', trainingItems(p));
   const talk = talkMenu(game, p);
+  const rzItems = ['squad', 'tactics', 'profile'].includes(view) ? rzMenuItems(game, p, item) : [];
 
   let items;
   switch (view) {
@@ -344,6 +353,7 @@ export function playerMenu(game, pid, { view, ui = {}, why = null, lineup = null
       items = [
         ...lineupItems(p, L ?? { tactics: null, byId: new Map() }, { inTactics: true, ui }),
         ui.tInfo === p.id ? null : item('Atrybuty', { steps: [{ act: 'tinfo', id: p.id }] }, { hint: 'Panel atrybutów i stanu' }),
+        ...rzItems,
         SEP, profile, report, talk, training, contractSub,
       ];
       break;
@@ -376,10 +386,10 @@ export function playerMenu(game, pid, { view, ui = {}, why = null, lineup = null
       break;
     }
     case 'profile':
-      items = [stats, report, lineupNav, inLineup ? sub('Skład meczowy', lineupItems(p, L)) : null, talk, training, SEP, ...contract];
+      items = [stats, report, lineupNav, inLineup ? sub('Skład meczowy', lineupItems(p, L)) : null, ...rzItems, talk, training, SEP, ...contract];
       break;
     default: // squad
-      items = [profile, report, stats, inLineup ? sub('Skład meczowy', [...lineupItems(p, L), SEP, lineupNav]) : null, talk, training, SEP, ...contract];
+      items = [profile, report, stats, inLineup ? sub('Skład meczowy', [...lineupItems(p, L), SEP, lineupNav]) : null, ...rzItems, talk, training, SEP, ...contract];
   }
   return { ...head, items: tidy(items) };
 }
