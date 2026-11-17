@@ -1191,6 +1191,22 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
   .sq__row .wx { display: block; }
   .sq__row .sq__form.wx, .sq__row .sq__fresh.wx { display: inline-flex; }
   .xl-wrap { max-height: calc(100dvh - 210px); }
+  /* Tabela atrybutów i statystyk w Kadrze: widok zwarty, żeby zmieścić całość bez przewijania w okienku */
+  .sqx--table .xl-wrap { max-height: none; overflow: visible; }
+  .sqx--table .xl { font-size: 12px; }
+  .sqx--table .xl th, .sqx--table .xl td { padding: 2px 3px; line-height: 1.25; }
+  .sqx--table .xl thead tr.xl__grp th { padding: 3px 4px; font-size: 12px; }
+  .sqx--table .xl thead tr.xl__grp + tr th { top: 20px; }
+  .sqx--table .xl thead th button { font-size: 11px; }
+  .sqx--table .xl__a { min-width: 0; width: 25px; }
+  .sqx--table .xl__ovr { font-size: 14px; }
+  .sqx--table .xl .xl__pos { width: 44px; }
+  .sqx--table .xl .xl__pos .pos { min-width: 30px; height: 18px; min-height: 0; padding: 0 4px; font-size: 10px; line-height: 18px; }
+  .sqx--table .xl td, .sqx--table .xl tbody th { height: 22px; }
+  .sqx--table .xl__card { width: 13px; height: 17px; font-size: 10px; }
+  .sqx--table .xl .xl__nm { left: 44px; }
+  .sqx--table .xl__nm button { max-width: 150px; min-height: 0; padding: 0; font-size: 12px; line-height: 1.2; }
+  .sqx--table .xl td, .sqx--table .xl tbody th { height: 20px; padding-top: 1px; padding-bottom: 1px; }
 }
 @media (min-width: 1440px) {
   .sqx__main { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: var(--space-4); align-items: start; }
