@@ -168,7 +168,7 @@ export function talkSuggestions(game) {
  * Rozmowa z zawodnikiem. opts.approach: podejście trenera z okna rozmowy (career/talkDialog.js); bez podejścia
  * (szybka rozmowa z menu) efekt jak dotąd.
  */
-export function talkToPlayer(game, playerId, kind, { approach = null } = {}) {
+export function talkToPlayer(game, playerId, kind, { approach = null, assistant = null } = {}) {
   const T = state(game);
   const p = game.world.players[playerId];
   if (!p || p.clubId !== game.clubId) return { ok: false, text: 'To nie jest zawodnik twojej drużyny.' };
@@ -220,14 +220,17 @@ export function talkToPlayer(game, playerId, kind, { approach = null } = {}) {
     default: break;
   }
   z += (trust - 50) / 60 - same * 0.9 + rng.gauss(0, 0.4) + approachMod(persona, kind, approach);
-  const trustD = z >= 1.4 ? 1 : z <= -0.8 ? -1.5 : 0;
+  // Rozmowa prowadzona przez asystenta (assistant: jego motywowanie MOT 1-20): siła przekazu 33-100 % rozmowy trenera,
+  // słabszy asystent bardziej losowy; bez zmiany zaufania do trenera i bez wpływu na jego autorytet [SZAC]
+  if (assistant != null) z = z * (0.3 + 0.035 * clamp(assistant, 1, 20)) + rng.gauss(0, 0.7 - 0.025 * clamp(assistant, 1, 20));
+  const trustD = assistant != null ? 0 : z >= 1.4 ? 1 : z <= -0.8 ? -1.5 : 0;
   if (trustD) p.relations = { ...(p.relations ?? {}), [game.clubId]: applyTrust(p, trustD, `rozmowa:${kind}`, { clubId: game.clubId, date: game.date }) };
   const moraleBefore = p.morale ?? 12;
   p.morale = applyMorale(p.morale ?? 12, clamp(z, -2.5, 2.5));
   noteAttention(p, game.date);
-  logEngage(game, z >= 0.8 ? 'talkGood' : z <= -0.5 ? 'talkBad' : 'talkMeh'); // trafność rozmowy (career/authority.js)
+  if (assistant == null) logEngage(game, z >= 0.8 ? 'talkGood' : z <= -0.5 ? 'talkBad' : 'talkMeh'); // trafność rozmowy (career/authority.js)
   const reaction = classifyReaction(z * 1.8, trustD);
   T.perPlayer[playerId] = [...hist, { date: game.date, kind }];
-  T.log = [{ date: game.date, kind: 'talk', playerId, talk: kind, reaction, reply, approach }, ...T.log].slice(0, 20);
+  T.log = [{ date: game.date, kind: 'talk', playerId, talk: kind, reaction, reply, approach, ...(assistant != null ? { by: 'assistant' } : {}) }, ...T.log].slice(0, 20);
   return { ok: true, reaction, label: REACTIONS[reaction].label, reply: same ? `${reply} Słyszał to już niedawno.` : reply, moraleBefore, moraleAfter: p.morale, same: !!same };
 }

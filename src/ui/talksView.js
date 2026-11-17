@@ -4,7 +4,12 @@ import { squadOf } from '../world/worldGen.js';
 import { moraleLabel } from '../career/morale.js';
 import {
   MEETING_TONES, PLAYER_TALKS, teamSituation, canHoldMeeting, holdMeeting, talkSuggestions, talkToPlayer, talksThisWeek, talkThisWeek,
+  talkBlockedText,
 } from '../career/teamTalks.js';
+import { rosterOf } from '../career/staffMarket.js';
+import { staffQ } from '../training/staff.js';
+import { assistantProfile } from '../career/coaches.js';
+import { clubById } from '../data/clubs_pl.js';
 import { acclimLabel } from '../career/acclimatization.js';
 import { GROUP } from '../career/squad.js';
 import { attentionNeed, daysSinceAttention, ATTN } from '../career/attention.js';
@@ -93,6 +98,29 @@ const TOPIC_HINT = {
   future: 'Kontrakt i plany', warn: 'Kartki i dyscyplina',
 };
 
+// ------------------------------------------------------------ Rozmowy przez asystenta
+/** Motywowanie asystenta trenera (MOT 1-20) albo null, gdy w sztabie nie ma asystenta. */
+function assistantMot(game) {
+  if (game.staff && !rosterOf(game, game.clubId).some((p) => p.role === 'asystent')) return null;
+  return assistantProfile(staffQ(game, game.clubId, 'asystent'), clubById(game.clubId)?.tier).a.MOT;
+}
+/** Polecani bez rozmowy w tym tygodniu, z tematem najważniejszego powodu. */
+function assistantQueue(game, rec) {
+  const sugg = new Map(talkSuggestions(game).map((x) => [x.p.id, x.reasons]));
+  return rec.filter((p) => !talkThisWeek(game, p.id) && !talkBlockedText(game, p.id)).map((p) => {
+    const rs = (sugg.get(p.id) ?? []).slice().sort((a, b) => PRIO[reasonKind(b[1])] - PRIO[reasonKind(a[1])]);
+    return { id: p.id, kind: rs[0]?.[0] ?? 'encourage' };
+  });
+}
+function assistantBar(game, rec) {
+  const q = assistantQueue(game, rec);
+  if (!q.length) return '';
+  const mot = assistantMot(game);
+  if (mot == null) return '<p class="hint tt-asst">Rozmowy w twoim imieniu może przeprowadzić asystent trenera (zatrudnisz go w Trening, Sztab).</p>';
+  return `<div class="tt-asst"><button class="btn btn--sm" data-act="tt-assist">Asystent porozmawia z czekającymi (${q.length})</button>
+    <small>Asystent wybiera temat sam. Efekt zależy od jego umiejętności motywowania i bywa słabszy niż twoja rozmowa; zaufanie do ciebie się nie zmienia.</small></div>`;
+}
+
 export function renderTalks(game, ui = {}) {
   const sit = teamSituation(game);
   const m = moraleSummary(game);
@@ -122,7 +150,7 @@ export function renderTalks(game, ui = {}) {
     <section class="tt-panel tt-players" aria-labelledby="tt-h-players">
       <h3 id="tt-h-players">Rozmowy indywidualne</h3>
       <p class="hint">Z każdym zawodnikiem możesz porozmawiać raz w tygodniu. Asystent podpowiada, z kim porozmawiać, i ustawia temat. Wrażliwi, nowi w klubie i ambitni rezerwowi źle znoszą kilka tygodni bez rozmowy.</p>
-      ${rec.length ? `<h4 class="tt-group tt-group--rec">Asystent poleca <span>${rec.length}</span></h4><ul class="tt-list">${rec.map((p) => talkRow(p, reasonsOf.get(p.id) ?? [], talkThisWeek(game, p.id), true)).join('')}</ul>` : '<p class="tt-ok">Nikt teraz pilnie nie potrzebuje rozmowy.</p>'}
+      ${rec.length ? `<h4 class="tt-group tt-group--rec">Asystent poleca <span>${rec.length}</span></h4>${assistantBar(game, rec)}<ul class="tt-list">${rec.map((p) => talkRow(p, reasonsOf.get(p.id) ?? [], talkThisWeek(game, p.id), true)).join('')}</ul>` : '<p class="tt-ok">Nikt teraz pilnie nie potrzebuje rozmowy.</p>'}
       ${rest.length ? `<h4 class="tt-group">Pozostali zawodnicy <span>${rest.length}</span></h4><ul class="tt-list tt-list--rest">${rest.map((p) => talkRow(p, reasonsOf.get(p.id) ?? [], talkThisWeek(game, p.id), false)).join('')}</ul>` : ''}
     </section>
     <aside class="tt-side">
@@ -132,7 +160,7 @@ export function renderTalks(game, ui = {}) {
         <div class="tt-tones">${Object.entries(MEETING_TONES).map(([k, t]) => `<button class="tt-tone" data-hue="${TONE_HUE[k] ?? 'calm'}" data-act="tt-meet" data-t="${k}" ${meetingOk ? '' : 'disabled'}><strong>${esc(t.label)}</strong><span class="tt-quote">${esc(t.quote)}</span><small>${esc(t.hint)}</small></button>`).join('')}</div>
         ${ui.ttMeeting ? `<ul class="tt-react">${ui.ttMeeting.map((r) => `<li><span>${esc(r.name)}</span><span class="react" data-r="${esc(r.reaction === 'obojetny' ? 'obojętny' : r.reaction === 'urazony' ? 'urażony' : r.reaction)}">${esc(r.label.toLowerCase())}</span></li>`).join('')}</ul>` : ''}
       </section>
-      ${T.log.length ? `<section class="tt-panel tt-log" aria-labelledby="tt-h-log"><h3 id="tt-h-log">Ostatnie rozmowy</h3><ol>${T.log.slice(0, 8).map((x) => `<li data-k="${x.kind === 'meeting' ? 'meet' : 'talk'}"><time>${esc(fmtDay(x.date))}</time><span>${x.kind === 'meeting' ? `<b>Zebranie, ${esc(MEETING_TONES[x.tone].label.toLowerCase())}.</b> ${esc(x.summary)}` : `<b>${esc(game.world.players[x.playerId]?.name ?? '')}, ${esc(PLAYER_TALKS[x.talk].label.toLowerCase())}.</b> ${esc(x.reply)}`}</span></li>`).join('')}</ol></section>` : ''}
+      ${T.log.length ? `<section class="tt-panel tt-log" aria-labelledby="tt-h-log"><h3 id="tt-h-log">Ostatnie rozmowy</h3><ol>${T.log.slice(0, 8).map((x) => `<li data-k="${x.kind === 'meeting' ? 'meet' : 'talk'}"><time>${esc(fmtDay(x.date))}</time><span>${x.kind === 'meeting' ? `<b>Zebranie, ${esc(MEETING_TONES[x.tone].label.toLowerCase())}.</b> ${esc(x.summary)}` : `<b>${x.by === 'assistant' ? 'Asystent: ' : ''}${esc(game.world.players[x.playerId]?.name ?? '')}, ${esc(PLAYER_TALKS[x.talk].label.toLowerCase())}.</b> ${esc(x.reply)}`}</span></li>`).join('')}</ol></section>` : ''}
     </aside>
     ${talkDialog(game, ui, reasonsOf)}
   </div>`;
@@ -154,6 +182,16 @@ export function handleTalkAction(game, act, ds = {}, root = null) {
     return { ui: { ttDlg: { id: ds.id, step: 'done', kind: ds.k, result }, ttResult: null }, save: true };
   }
 
+  if (act === 'tt-assist') {
+    const mot = assistantMot(game);
+    if (mot == null) return { ui: { ttResult: 'W sztabie nie ma asystenta trenera.' } };
+    const sugg = new Map(talkSuggestions(game).map((x) => [x.p.id, x.reasons]));
+    const rec = squadOf(game.world, game.clubId).filter((p) => (sugg.get(p.id) ?? []).some((r) => PRIO[reasonKind(r[1])] >= 2));
+    const out = assistantQueue(game, rec).map(({ id, kind }) => talkToPlayer(game, id, kind, { assistant: mot })).filter((r) => r.ok);
+    const good = out.filter((r) => r.reaction === 'zmotywowany' || r.reaction === 'spokojny').length;
+    const bad = out.filter((r) => r.reaction === 'urazony' || r.reaction === 'zdenerwowany').length;
+    return { ui: { ttResult: `Asystent porozmawiał z ${out.length} ${out.length === 1 ? 'zawodnikiem' : 'zawodnikami'}: ${good} dobrze przyjęło rozmowę, ${bad} źle, pozostali obojętnie.`, ttMeeting: null }, save: true };
+  }
   if (act === 'tt-meet') {
     const r = holdMeeting(game, ds.t);
     if (!r.ok) return { ui: { ttResult: r.text } };
