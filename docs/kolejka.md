@@ -42,3 +42,16 @@ Krok 2, burza mózgów (3 agentów równolegle, Sonnet medium, z raportem z krok
 - trener: co trener widzi i czym steruje (rozmowy, rola, kapitan, odprawa, zmiany w meczu, trening mentalny).
 
 Wynik: jedna lista pomysłów z miejscem podpięcia w logice gry i meczu, oceną pracy i wpływem na balans, do decyzji właściciela. Powiązane: punkt 1 (historia morale).
+
+## 3. Strzałki ruchu zawodników na boisku taktyki (dodane Nov 18, 2026)
+
+Jak w Football Managerze: gracz rysuje strzałkę od zawodnika (kierunki zależne od pozycji, np. lewy obrońca w górę i do środka, środkowy pomocnik w każdą stronę). Strzałka to indywidualny ruch w fazie ataku: zmienia strefy gry zawodnika, wsparcie akcji i luki w obronie.
+
+Burza mózgów (agenci równolegle, bez edycji):
+- trener i taktyk (Sonnet medium): sensowne ruchy dla każdej pozycji (dozwolone kierunki), korzyść i ryzyko każdego ruchu;
+- znawca futbolu (Sonnet medium): jak to działa w FM i innych grach, co gracze lubią, realizm (rola, zmęczenie, atrybuty);
+- analityk (Sonnet medium): pomiar skutków w meczu (strzały, kontry rywala, zmęczenie, kartki), balans bez darmowej przewagi;
+- grafik (Sonnet medium): rysowanie na boisku PC i telefon (przeciągnięcie albo wybór kierunku), czytelność;
+- programista silnika (Opus high): podpięcie do silnika (strefy `zoneRatings`, aktywność, obrona przed kontrą, zmęczenie), zapis w taktyce, kluby AI, praca i ryzyka.
+
+Wynik: jeden projekt z decyzjami dla właściciela. Powiązane: punkt 4 (instrukcje indywidualne).
