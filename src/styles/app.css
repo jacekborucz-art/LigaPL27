@@ -959,6 +959,48 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
   .tcard__pin:hover { background: var(--surface-stripe); }
   .tcard__pin[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 }
+/* Szeroka karta: nagłówek, pasek statusu, atrybuty w 2 kolumnach z formą pod nimi, boisko pozycji po prawej */
+@media (min-width: 1100px) {
+  .tdet.tcard { width: min(1040px, calc(100vw - 48px)); max-height: calc(100dvh - var(--hub-top, 84px) - 24px); }
+  .tcard .tdet__in {
+    display: grid; align-content: start; gap: var(--space-3) var(--space-4);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) clamp(280px, 30%, 340px);
+    grid-template-areas: "head head head" "facts facts facts" "attrs attrs map" "form form map" "stats stats stats";
+  }
+  .tcard .tdet__head { grid-area: head; display: flex; align-items: center; gap: var(--space-3); }
+  .tcard .tdet__ovr { font-size: var(--step-3); padding: 6px 12px; }
+  .tcard .tdet__title { flex: 1; min-width: 0; }
+  .tcard .tdet__title p { margin: 0; font-size: var(--step-0); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tcard .tdet__facts { grid-area: facts; grid-template-columns: 1.6fr 1.2fr 1fr .7fr .9fr; gap: var(--space-3); margin: 0; padding: var(--space-2) 0; }
+  .tcard .tdet__facts > div { min-width: 0; }
+  .tcard .tdet__facts > div:nth-child(-n + 2) { grid-column: auto; display: block; }
+  .tcard .tdet__facts dt { display: block; font-size: 12px; margin-bottom: 2px; }
+  .tcard .tdet__facts dd { font-size: var(--step-0); }
+  .tcard .tdet__facts > div:nth-child(-n + 2) dd { white-space: normal; line-height: 1.2; }
+  .tcard .tdet__vis { display: contents; }
+  .tcard .tdet__groups { grid-area: attrs; columns: 2; column-gap: var(--space-5); column-fill: balance; }
+  .tcard .tdet__groups h4 { margin: 0 0 var(--space-1); padding-top: var(--space-2); }
+  .tcard .tdet__groups h4:first-child { padding-top: 0; }
+  .tcard .tdet__groups .attrs { margin-bottom: var(--space-1); }
+  .tcard .tdet__groups .attrs li { grid-template-columns: minmax(0, 1fr) 56px 22px; gap: var(--space-2); padding: 2px 0; font-size: 13px; line-height: 1.25; }
+  .tcard .tdet__groups .attrs li > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tcard .tdet__groups .attrs b { font-size: 15px; }
+  .tdet.tcard .fch { grid-area: form; max-width: none; margin: 0; padding: var(--space-2) var(--space-3); }
+  /* wykres ma stałe proporcje (nie rozciąga się w poziomie), więc nagłówek i opis stoją obok niego */
+  .tdet.tcard .fch:not(.fch--empty) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 340px); grid-template-areas: "head svg" "foot svg"; gap: var(--space-1) var(--space-4); align-content: start; }
+  .tdet.tcard .fch__head { grid-area: head; flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+  .tdet.tcard .fch__head h3 { margin: 0; }
+  .tdet.tcard .fch__svg { grid-area: svg; margin: 0; max-height: 150px; }
+  .tdet.tcard .fch__foot { grid-area: foot; align-self: end; margin: 0; }
+  .tcard .tdet__vis .pmap { grid-area: map; max-width: none; margin: 0; align-self: start; }
+  .tcard .tdet__stats { grid-area: stats; }
+}
+@media (min-width: 1100px) and (max-width: 1279px) {
+  .tdet.tcard { width: min(900px, calc(100vw - 32px)); }
+  .tcard .tdet__in { grid-template-columns: minmax(0, 1fr) clamp(250px, 32%, 300px); grid-template-areas: "head head" "facts facts" "attrs map" "form map" "stats stats"; }
+  .tcard .tdet__groups { columns: 1; }
+  .tcard .tdet__facts { grid-template-columns: repeat(3, 1fr); }
+}
 @media (min-width: 1100px) and (prefers-reduced-motion: no-preference) { .tdet.tcard.is-new { animation: tcard-in 140ms ease-out; } }
 @keyframes tcard-in { from { opacity: 0; transform: translateY(6px); } }
 @supports not (backdrop-filter: blur(1px)) { @media (min-width: 1100px) { .tdet.tcard { background: var(--surface); } } }

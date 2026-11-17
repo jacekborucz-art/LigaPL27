@@ -261,7 +261,7 @@ function renderPlayerInfo(p, tactics, f, extra = '', { wide = false, pinned = fa
   const hid = wide ? `tcard-h-${cardSlot}` : 'tdet-h';
   const bar = wide ? `<div class="tcard__bar">
       <button class="tcard__grip" type="button" data-tcard-grip aria-label="Przesuń okno zawodnika. Strzałki przesuwają, Shift przesuwa szybciej, Home przywraca położenie"></button>
-      <h3 class="tcard__name" id="${hid}" tabindex="-1">${esc(p.name)}</h3>
+      <h3 class="tcard__name" id="${hid}" tabindex="-1" title="${esc(p.name)}">${esc(p.name)}</h3>
       <button class="tcard__pin" type="button" data-act="tcardpin" data-id="${esc(p.id)}" aria-pressed="${pinned}" aria-label="Przypnij kartę (zostaje przy otwieraniu drugiej, do porównania)" title="Przypnij kartę"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M15 3l6 6-2 1-3 3 1 5-2 2-4-4-5 5-1-1 5-5-4-4 2-2 5 1 3-3z"/></svg></button>
       <button class="tdet__x" data-act="tinfoclose" data-id="${esc(p.id)}" aria-label="Zamknij kartę zawodnika">×</button>
       <p class="sr-only" role="status" data-tcard-live></p>
