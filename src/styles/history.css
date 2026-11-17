@@ -307,7 +307,16 @@ button.ufx__mid { font: inherit; color: var(--text-muted); }
 .mr-sc { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
 .mr-sc ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: var(--step--1); }
 .mr-sc ul + ul { text-align: right; }
-.mrdlg__x { justify-self: start; }
+/* X w prawym górnym rogu, przyklejony przy przewijaniu; okno lekko przezroczyste (jak karta zawodnika) */
+.mrdlg { background: color-mix(in srgb, var(--surface) 90%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+@supports not (backdrop-filter: blur(1px)) { .mrdlg { background: color-mix(in srgb, var(--surface) 96%, transparent); } }
+@media (prefers-reduced-transparency: reduce) { .mrdlg { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+.mrdlg__x {
+  position: sticky; top: 0; z-index: 2; justify-self: end; margin-bottom: -48px;
+  display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--line); border-radius: 50%;
+  background: var(--surface); color: var(--text); font: 600 20px/1 var(--font-body, inherit); cursor: pointer;
+}
+.mrdlg__x:hover { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
 .mr-ev__crest { display: none; flex: none; }
 /* Telefon: jedna kolumna (minuta, herb drużyny, opis), zamiast stron gospodarzy i gości */
 @media (max-width: 600px) {

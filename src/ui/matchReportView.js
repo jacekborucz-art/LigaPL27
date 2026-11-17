@@ -147,7 +147,7 @@ export function reportModel(game, ref) {
   const rep = unpackReport(f);
   if (!rep) {
     const sc = [0, 1].map((s) => (res.scorers?.[s] ?? []).map((id) => playerName(game, id, [f.home, f.away][s])));
-    return { ...head, kind: 'scorers', scorers: sc, note: res.forfeit ? 'Mecz nie został rozegrany (walkower).' : 'Mecz rozegrany przed zapisem relacji: tylko wynik i strzelcy.' };
+    return { ...head, kind: 'scorers', scorers: sc, note: res.forfeit ? 'Mecz nie został rozegrany (walkower).' : '' };
   }
   const score = [0, 0];
   const evs = rep.ev.map((e) => describe(game, f, e, score)).filter(Boolean);
@@ -160,7 +160,7 @@ export function reportModel(game, ref) {
     pk: rep.pk.map((k) => ({ side: k.side, name: playerName(game, k.id, [f.home, f.away][k.side]), scored: k.scored })),
     ratings, best,
     note: rep.abandoned ? 'Mecz przerwany: drużyna miała za mało zawodników, wynik z decyzji organizatora.'
-      : rep.full ? '' : 'Mecz rozegrany w tle: relacja bez zmian i analiz VAR.',
+      : '',
   };
 }
 
@@ -215,8 +215,8 @@ function pkHtml(M) {
 /** Treść okna raportu (dialog #mrDlg). ref: { fx, s }. */
 export function matchReportHtml(game, ref) {
   const M = reportModel(game, ref);
-  const close = '<button class="btn btn--quiet mrdlg__x" data-act="mreport-close">Zamknij</button>';
-  if (!M) return `<h2 id="mrTitle" tabindex="-1">Raport meczu</h2><p class="mr-empty">Brak danych o tym meczu.</p>${close}`;
+  const close = '<button class="mrdlg__x" data-act="mreport-close" aria-label="Zamknij" title="Zamknij"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>';
+  if (!M) return `<div class="mr">${close}<h2 id="mrTitle" tabindex="-1">Raport meczu</h2><p class="mr-empty">Brak danych o tym meczu.</p></div>`;
   const tags = [M.extraTime && !M.shootout ? 'po dogrywce' : '', M.shootout ? `${M.extraTime ? 'po dogrywce, ' : ''}karne ${M.shootout[0]}:${M.shootout[1]}` : ''].filter(Boolean).join('');
   const info = [
     ['Data', `${weekday(M.dateIso)}, ${fmtDate(M.dateIso)}${M.time ? `, ${M.time}` : ''}`],
@@ -236,6 +236,7 @@ export function matchReportHtml(game, ref) {
     body = `<section class="mr-sec"><h3>Strzelcy</h3><div class="mr-sc"><ul>${list(0)}</ul><ul>${list(1)}</ul></div></section>${pkHtml(M)}${statsHtml(M.stats)}`;
   } else body = pkHtml(M);
   return `<div class="mr">
+    ${close}
     <header class="mr-head">
       <h2 id="mrTitle" tabindex="-1">Raport meczu</h2>
       <p class="mr-head__comp">${esc(M.title)}</p>
@@ -249,6 +250,5 @@ export function matchReportHtml(game, ref) {
     <dl class="mr-info">${info.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
     ${body}
     ${M.note ? `<p class="mr-note">${esc(M.note)}</p>` : ''}
-    ${close}
   </div>`;
 }
