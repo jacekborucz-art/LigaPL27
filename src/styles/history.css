@@ -302,6 +302,8 @@ button.ufx__mid { font: inherit; color: var(--text-muted); }
 .mr-rt__list { list-style: none; margin: 0; padding: 0; }
 .mr-rt__list li { display: flex; justify-content: space-between; gap: var(--space-2); padding: 4px 0; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); font-size: var(--step--1); }
 .mr-rt__list li small { color: var(--text-muted); }
+.mr-rt__yc { display: inline-flex; vertical-align: -2px; margin-left: 4px; }
+.mr-rt__yc .mr-card { width: 8px; height: 11px; }
 .mr-rt__list b { font-variant-numeric: tabular-nums; }
 .mr-rt__list li.is-best b { padding: 0 6px; border-radius: var(--radius-s); background: color-mix(in srgb, var(--led) 30%, transparent); }
 .mr-sc { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }

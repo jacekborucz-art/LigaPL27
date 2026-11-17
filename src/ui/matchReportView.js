@@ -150,9 +150,11 @@ export function reportModel(game, ref) {
     return { ...head, kind: 'scorers', scorers: sc, note: res.forfeit ? 'Mecz nie został rozegrany (walkower).' : '' };
   }
   const score = [0, 0];
-  const evs = rep.ev.map((e) => describe(game, f, e, score)).filter(Boolean);
+  // Przebieg bez żółtych kartek (tylko druga żółta i czerwona); żółte przy nazwiskach w ocenach zawodników
+  const evs = rep.ev.map((e) => describe(game, f, e, score)).filter((e) => e && e.k !== 'y');
   const subsIn = new Set(rep.ev.filter((e) => e[1] === 's').map((e) => e[3]));
-  const ratings = [0, 1].map((s) => rep.players[s].map((x) => ({ name: playerName(game, x.id, [f.home, f.away][s]), rating: x.rating, sub: subsIn.has(x.id) })));
+  const yellow = new Set(rep.ev.filter((e) => e[1] === 'y' && !e[4]).map((e) => e[3]));
+  const ratings = [0, 1].map((s) => rep.players[s].map((x) => ({ name: playerName(game, x.id, [f.home, f.away][s]), rating: x.rating, sub: subsIn.has(x.id), yc: yellow.has(x.id) })));
   const best = Math.max(0, ...ratings.flat().map((x) => x.rating));
   return {
     ...head, kind: 'full', full: rep.full, abandoned: rep.abandoned,
@@ -201,7 +203,7 @@ function statsHtml(st) {
 
 function ratingsHtml(M) {
   if (!M.ratings?.some((l) => l.length)) return '';
-  const col = (s) => `<div class="mr-rt__col"><h4>${crest([M.home, M.away][s], 20)}${esc(clubName([M.home, M.away][s]))}</h4><ol class="mr-rt__list">${M.ratings[s].map((x) => `<li${x.rating === M.best ? ' class="is-best"' : ''}><span>${esc(x.name)}${x.sub ? ' <small>z ławki</small>' : ''}</span><b>${num(x.rating, 1)}</b></li>`).join('')}</ol></div>`;
+  const col = (s) => `<div class="mr-rt__col"><h4>${crest([M.home, M.away][s], 20)}${esc(clubName([M.home, M.away][s]))}</h4><ol class="mr-rt__list">${M.ratings[s].map((x) => `<li${x.rating === M.best ? ' class="is-best"' : ''}><span>${esc(x.name)}${x.yc ? ` <span class="mr-rt__yc" title="Żółta kartka">${ICON.y}</span>` : ''}${x.sub ? ' <small>z ławki</small>' : ''}</span><b>${num(x.rating, 1)}</b></li>`).join('')}</ol></div>`;
   return `<details class="mr-sec mr-rt"><summary>Oceny zawodników</summary><div class="mr-rt__grid">${col(0)}${col(1)}</div></details>`;
 }
 
