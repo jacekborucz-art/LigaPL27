@@ -79,14 +79,14 @@ export function quickEvents({ goals, players, extraTime = false, regScore = null
   [0, 1].forEach((s) => {
     for (const x of players[s] ?? []) {
       const lo = inv[s].get(x.id) ?? 0; // zejście najwcześniej w minucie ostatniego gola lub asysty
-      const yc = (x.yc ?? 0) > 0; // druga żółta bez czerwonej z modelu w tle liczy się w grze jako jedna (applyResult)
+      const yc = (x.yc ?? 0) > 0;
       const inj = x.injury ?? null;
       const injCode = inj ? (PLAYABLE.get(inj.name) ? 'k' : 'i') : null;
       const injEv = (i, code) => [i, code, s, x.id, inj.cat ?? 'light', inj.days ?? 0, inj.name ?? ''];
       if (x.rc) {
-        // Czerwona po żółtej: kartka bezpośrednia w późniejszej minucie (model w tle nie ma drugich żółtych)
+        // Czerwona po żółtej w późniejszej minucie: druga żółta (redReason 'second') albo kartka bezpośrednia
         const ri = rng.int(Math.min(last, Math.max(lo, yc ? 1 : 0)), last);
-        raw.push([ri, 'r', s, x.id]);
+        raw.push([ri, x.redReason === 'second' ? 'r2' : 'r', s, x.id]);
         if (yc) raw.push([rng.int(0, Math.max(0, ri - 1)), 'y', s, x.id]);
         if (inj) raw.push(injEv(rng.int(0, ri), 'k')); // uraz przed wykluczeniem: zawodnik dograł do czerwonej
         continue;

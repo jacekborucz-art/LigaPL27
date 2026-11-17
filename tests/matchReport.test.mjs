@@ -68,7 +68,7 @@ function checkReport(f, rep, { squad = null, players = null, quick = false } = {
     if (m !== base && ![45, 90, 105, 120].includes(base)) err.push(`doliczony ${tag}`);
     if (base > 90 && m >= 91 && !res.extraTime) err.push(`dogrywka bez dogrywki ${tag}`);
     if (quick && rep.full) err.push('mecz w tle z pełnym silnikiem');
-    if (quick && ['s', 'vg', 'vc', 'vp', 'mp', 'r2'].includes(code)) err.push(`zdarzenie spoza modelu w tle ${tag}`);
+    if (quick && ['s', 'vg', 'vc', 'vp', 'mp'].includes(code)) err.push(`zdarzenie spoza modelu w tle ${tag}`);
     const ps = code === 'o' ? 1 - s : s; // samobój: zawodnik drużyny rywala
     const bench = CARD.has(code) && x === 1;
     if (pid == null && code !== 'o') err.push(`brak zawodnika ${tag}`);
@@ -142,6 +142,12 @@ test('Mecz w tle: zdarzenia zgodne ze statystykami zawodników (gole, asysty, ka
     const res = playQuick(G, f, rng);
     f.result = { score: res.score, scorers: res.scorers, extraTime: res.extraTime, ...packReport(res, f) };
     errs.push(...checkReport(f, unpackReport(f), { players: res.players, quick: true }));
+    // Druga żółta = czerwona (r2), minuty gry kończą się przy zejściu (czerwona, kontuzja bez gry dalej)
+    for (const [m, code, s, id] of res.ev) {
+      const x = res.players[s].find((y) => y.id === id);
+      if (code === 'r2' && !(x?.yc && x.rc && x.redReason === 'second')) errs.push(`r2 bez dwóch żółtych ${f.id} ${id}`);
+      if (['r', 'r2', 'i'].includes(code) && x && x.minutes !== Math.max(1, Math.min(90, Math.floor(m)))) errs.push(`minuty po zejściu ${f.id} ${id}: ${x.minutes} / ${m}`);
+    }
     n++;
   }
   // Pucharowe w tle z dogrywką: gole dogrywki w minutach 91-120

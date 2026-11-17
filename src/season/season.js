@@ -32,7 +32,7 @@ import { statGroup, addPlayerMatch, syncSpell, recordTeamMatch, CLUB_GROUPS } fr
 import { matchRepEvents } from '../career/reputation.js';
 import { refStrictFor, refereeAfterMatch } from '../career/referees.js';
 import { noteSuspWhy, clearSuspWhy } from './suspension.js'; // powód pauzy: żółte albo czerwona (znaczniki w Kadrze)
-import { quickEvents, engineEvents, packReport } from './matchReport.js'; // raport meczu (docs/raport-meczu.md)
+import { quickEvents, engineEvents, packReport, LEAVE } from './matchReport.js'; // raport meczu (docs/raport-meczu.md)
 
 export { LEAGUE_COMPS, L3_COMPS, isL3Comp, compOfClub, compClubIds };
 const ALL_CLUBS = [...CLUBS_PL, ...CLUBS_L3, ...CLUBS_L4, ...UEFA_CLUBS];
@@ -249,8 +249,17 @@ export function playQuick(game, f, rng, cache = new Map()) {
       }
       goals[s].push([id, aid]);
     }
-    for (let i = 0; i < r.yellow[s]; i++) rng.weighted(out, (x) => (byId.get(x.id).attr?.AGR ?? 10) * (x.yc ? 0.4 : 1)).yc++;
-    for (let i = 0; i < r.red[s]; i++) rng.weighted(out, (x) => byId.get(x.id).attr?.AGR ?? 10).rc = 1;
+    // Druga żółta tego samego zawodnika = czerwona kartka (Law 12), kara 1 mecz (RED_BAN.second); wykluczony nie dostaje kolejnych kartek
+    for (let i = 0; i < r.yellow[s]; i++) {
+      const left = out.filter((x) => !x.rc);
+      if (!left.length) break;
+      const x = rng.weighted(left, (y) => (byId.get(y.id).attr?.AGR ?? 10) * (y.yc ? 0.15 : 1)); // ukarany gra ostrożniej (jak bookedFoulMul x bookedYellowMul w pełnym silniku)
+      if (x.yc) { x.rc = 1; x.redReason = 'second'; } else x.yc = 1;
+    }
+    for (let i = 0; i < r.red[s]; i++) {
+      const left = out.filter((x) => !x.rc);
+      if (left.length) rng.weighted(left, (x) => byId.get(x.id).attr?.AGR ?? 10).rc = 1;
+    }
     const win = r.score[s] > r.score[1 - s] ? 0.2 : r.score[s] < r.score[1 - s] ? -0.2 : 0;
     const Q = QUICK_RATING;
     for (const x of out) x.rating = Math.round(clamp(Q.base + Q.goal * x.g + Q.assist * x.a + Q.yellow * x.yc + Q.red * x.rc + win + rng.gauss(0, 0.45), 4, 9.5) * 10) / 10;
@@ -261,12 +270,18 @@ export function playQuick(game, f, rng, cache = new Map()) {
     }
     return out;
   });
+  // Raport meczu: minuty goli, kartek i kontuzji z osobnego ziarna (wynik meczu bez zmian)
+  const ev = quickEvents({ goals, players, extraTime: !!r.extraTime, regScore: r.regScore ?? null }, `${game.seed}:${f.id}`);
+  // Minuty gry kończą się w chwili zejścia z boiska (czerwona kartka, kontuzja bez gry dalej)
+  for (const e of ev) {
+    if (!LEAVE.has(e[1])) continue;
+    const x = players[e[2]].find((y) => y.id === e[3]);
+    if (x) x.minutes = Math.max(1, Math.min(90, Math.floor(e[0])));
+  }
   return {
     score: r.score, scorers: r.scorers, shootout: r.shootout ?? null, extraTime: !!r.extraTime,
     stats: { shots: r.shots, onTarget: r.onTarget, possession: r.possession, xg: r.xg },
-    players, strengthDiff: r.model.dH - r.model.dA, quick: true,
-    // Raport meczu: minuty goli, kartek i kontuzji z osobnego ziarna (wynik i skutki meczu bez zmian)
-    ev: quickEvents({ goals, players, extraTime: !!r.extraTime, regScore: r.regScore ?? null }, `${game.seed}:${f.id}`),
+    players, strengthDiff: r.model.dH - r.model.dA, quick: true, ev,
   };
 }
 

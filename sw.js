@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-1e041eb5e5';
+const VERSION = 'v0.3-dad963f159';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -155,7 +155,7 @@ const FILES = [
   ['./src/engine/matchStats.js', '71542c9b3b'],
   ['./src/engine/modifiers.js', 'cf8f446d97'],
   ['./src/engine/positions.js', 'ee736ff7cc'],
-  ['./src/engine/quickSim.js', '038ce54d7a'],
+  ['./src/engine/quickSim.js', 'a979ffa923'],
   ['./src/engine/teamStrength.js', '29de64f3e1'],
   ['./src/match/aiPlan.js', '2f958da775'],
   ['./src/match/briefings.js', '259a9a1c24'],
@@ -175,12 +175,12 @@ const FILES = [
   ['./src/season/intl/windows.js', '5a2ab9590f'],
   ['./src/season/leagueComps.js', 'caddb5c253'],
   ['./src/season/leagues.js', '0844dc0aba'],
-  ['./src/season/matchReport.js', 'ad71724694'],
+  ['./src/season/matchReport.js', 'be9864d533'],
   ['./src/season/national.js', '1b51378924'],
   ['./src/season/nationalSystem.js', '56b1056ddd'],
   ['./src/season/rollover.js', 'dc0750f768'],
   ['./src/season/schedule.js', 'a608f6730f'],
-  ['./src/season/season.js', '41bba1cbc4'],
+  ['./src/season/season.js', '368bc32d62'],
   ['./src/season/standings.js', 'b3bdff91e2'],
   ['./src/season/superCupEU.js', 'f728d6d300'],
   ['./src/season/suspension.js', '7671748aa6'],
