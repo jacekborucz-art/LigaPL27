@@ -13,6 +13,7 @@ import { applyLeagueState, balanceGroups } from './leagues.js';
 import { isL3Comp } from './leagueComps.js';
 import { thirdLeagueFixtures, playQuick, applyResult } from './season.js';
 import { initClub } from '../career/finance.js';
+import { pruneSuspWhy } from './suspension.js';
 
 /** Uzupełnia zapis o grywalną III ligę. Zwraca { squads, fixtures, simulated } (liczby) albo null, gdy nic nie trzeba. */
 export function ensureThirdLeague(game) {
@@ -53,7 +54,7 @@ export function ensureThirdLeague(game) {
       for (const pid of game.world.clubs[id]?.squad ?? []) {
         const p = game.world.players[pid];
         if (!p) continue;
-        p.injuryDays = 0; p.injury = null; p.susp = {}; p.fresh = 95; delete p.matchDebt;
+        p.injuryDays = 0; p.injury = null; p.susp = {}; pruneSuspWhy(p); p.fresh = 95; delete p.matchDebt;
       }
     }
   }

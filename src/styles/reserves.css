@@ -205,9 +205,6 @@
   @keyframes rz-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 }
 
-/* Kadra: pauza tylko w innej klasie (np. 2 Liga po meczu w rezerwach), w meczach drużyny może grać */
-.xl__st[data-k="sus2"] { background: transparent; color: var(--warn-text); box-shadow: inset 0 0 0 1.5px var(--warn-text); }
-
 /* Telefon i tablet: jedna kolumna w kolejności pas weekendu, mierniki, listy, kadra rezerw */
 @media (max-width: 1099px) {
   .rz-main, .rz-side { display: contents; }

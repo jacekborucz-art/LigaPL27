@@ -35,6 +35,7 @@ import { coachMarketNewSeason } from '../career/coachMarket.js';
 import { fmtDate } from '../ui/dom.js';
 import { archivePlayerSeason, archiveSeasonMatches, syncSpell } from './history.js';
 import { reputationSeasonEnd, applyClubRep } from '../career/reputationSystem.js'; // docs/reputacja.md
+import { pruneSuspWhy } from './suspension.js';
 
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
 const groupOf = (p) => GROUP[p.pos] ?? 'MID';
@@ -114,6 +115,7 @@ function processPlayers(game, oldEnd, newStart, rng, report) {
   for (const p of Object.values(W.players)) {
     p.season = { apps: 0, subs: 0, min: 0, g: 0, a: 0, yc: 0, rc: 0, rating: 0, motm: 0, cs: 0 };
     p.yc = {};
+    pruneSuspWhy(p); // powody pauz tylko przy trwających pauzach (pauzy przechodzą na nowy sezon)
     p.age = ageOn(p, newStart);
     p.renewRefused = false; p.transferRequest = false;
   }

@@ -27,6 +27,7 @@ import { winnerOf } from '../season/cup.js';
 import { marketWage } from './negotiation.js';
 import { payLevel } from '../data/finanse_klubow.js';
 import { fmtDate } from '../ui/dom.js';
+import { clearSuspWhy, moveSuspWhy } from '../season/suspension.js';
 
 /** Liczby zasad (docs/rezerwy.md). [SZAC] przy wartościach bez przepisu. */
 export const RSV = {
@@ -787,7 +788,7 @@ export function serveFamilySuspensions(game, f, clubId, key, played) {
   if (!fam || f.comp === 'friendly') return;
   if (!LEAGUE_CLASS_KEYS.includes(key) && clubId !== fam.parent) return;
   const other = clubId === fam.parent ? fam.reserve : fam.parent;
-  for (const p of squadOf(game.world, other)) if (p && p.susp?.[key] > 0 && !played.has(p.id)) p.susp[key]--;
+  for (const p of squadOf(game.world, other)) if (p && p.susp?.[key] > 0 && !played.has(p.id)) { p.susp[key]--; if (p.susp[key] === 0) clearSuspWhy(p, key); }
 }
 
 /** Po meczu: przydziały na ten mecz wykorzystane albo przepadłe (zawodnik niedostępny w dniu meczu). */
@@ -863,6 +864,7 @@ export function reservesNewSeason(game) {
       if (k === own || k === other || !(p.susp[k] > 0)) continue;
       p.susp[own] = (p.susp[own] ?? 0) + p.susp[k];
       delete p.susp[k];
+      moveSuspWhy(p, k, own);
     }
   }
 }

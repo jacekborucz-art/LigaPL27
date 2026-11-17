@@ -31,6 +31,7 @@ import { staffQ, healDays } from '../training/staff.js';
 import { statGroup, addPlayerMatch, syncSpell, recordTeamMatch, CLUB_GROUPS } from './history.js';
 import { matchRepEvents } from '../career/reputation.js';
 import { refStrictFor, refereeAfterMatch } from '../career/referees.js';
+import { noteSuspWhy, clearSuspWhy } from './suspension.js'; // powód pauzy: żółte albo czerwona (znaczniki w Kadrze)
 
 export { LEAGUE_COMPS, L3_COMPS, isL3Comp, compOfClub, compClubIds };
 const ALL_CLUBS = [...CLUBS_PL, ...CLUBS_L3, ...CLUBS_L4, ...UEFA_CLUBS];
@@ -370,7 +371,7 @@ function lossStreakOf(game, clubId, f) {
   return n;
 }
 
-function yellowSuspension(comp, count) {
+export function yellowSuspension(comp, count) {
   const rules = COMPETITIONS[comp]?.yellowSuspension ?? (comp === 'pp' ? COMPETITIONS.pucharPolski.yellowSuspension : []);
   if (!Array.isArray(rules)) {
     // UEFA: pauza po 3. żółtej (uproszczenie: jeden próg na cały sezon), potem co 2 kartki
@@ -415,6 +416,7 @@ export function applyResult(game, f, res, rng) {
       // Odbycie pauzy: klub zagrał mecz w tych rozgrywkach
       if (p.susp?.[key] > 0 && !played.has(p.id)) {
         p.susp[key]--;
+        if (p.susp[key] === 0) clearSuspWhy(p, key);
         if (mine && p.susp[key] === 0) msgs.push(['info', `${p.name} odbył pauzę`, `${p.name} może już zagrać w kolejnym meczu.`]);
       }
       const x = played.get(p.id);
@@ -461,12 +463,14 @@ export function applyResult(game, f, res, rng) {
           const games = yellowSuspension(compRules, p.yc[key]);
           if (games) {
             p.susp[key] = (p.susp[key] ?? 0) + games;
+            noteSuspWhy(p, key, 'y');
             if (tell) msgs.push(['important', `Pauza: ${p.name}`, `${p.name} otrzymał ${p.yc[key]}. żółtą kartkę i nie zagra w ${games === 1 ? 'kolejnym meczu' : `${games} kolejnych meczach`} (${LEAGUE_CLASS_KEYS.includes(key) ? (guest ? `liga, ${COMPETITIONS[f.comp]?.name ?? 'druga drużyna klubu'}` : 'liga') : key === 'uefa' ? 'puchary europejskie' : 'Puchar Polski'}).`]);
           }
         }
         if (x.rc) {
           const games = RED_BAN[x.redReason] ?? rng.weighted([1, 2, 3], (g) => ({ 1: 0.6, 2: 0.3, 3: 0.1 })[g]);
           p.susp[key] = (p.susp[key] ?? 0) + games;
+          noteSuspWhy(p, key, 'r');
           if (tell) msgs.push(['important', `Czerwona kartka: ${p.name}`, `${p.name} został ukarany ${games === 1 ? '1 meczem' : `${games} meczami`} zawieszenia${guest ? ' (tylko w rozgrywkach tego meczu, PZPN)' : ''}.`]);
         }
       }

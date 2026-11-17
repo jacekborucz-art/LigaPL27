@@ -1122,8 +1122,44 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 .sq__fresh { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
 .sq__fresh i { width: 44px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, currentColor var(--v), var(--line) var(--v)); }
 .sq__fresh[data-b="good"] { color: #2E8A4E; } .sq__fresh[data-b="mid"] { color: var(--warn-text); } .sq__fresh[data-b="low"] { color: var(--bad-text); }
-.xl__st { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-left: 4px; border-radius: 3px; font: 700 11px/1 var(--font-display); color: #fff; background: var(--kartka-czerwona); }
-.xl__st[data-k="sus"] { background: var(--warn-text); }
+/* Znaczniki stanu za nazwiskiem (src/ui/playerTags.js, docs/tagi-zawodnika.md): pełny kwadrat = sprawa pilna,
+   obrys = drugorzędna. Telefon: 2 znaczniki i „+N”, od 760 px: 4 i „+N” (dwa warianty „+N” w HTML). */
+.tg-row { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; flex: none; vertical-align: middle; }
+.tg { --tg: var(--text-muted); --tg-ink: #fff; display: inline-grid; place-items: center; flex: none; min-width: 16px; height: 16px; padding: 0 3px;
+  border-radius: 3px; font: 700 11px/1 var(--font-display); font-variant-numeric: tabular-nums; white-space: nowrap; background: var(--tg); color: var(--tg-ink); cursor: help; }
+.tg--o { background: none; color: var(--tg); box-shadow: inset 0 0 0 1.5px var(--tg); }
+.tg[data-k="sy"] { --tg: var(--kartka-zolta); --tg-ink: #14211A; }
+.tg[data-k="sr"], .tg[data-k="inj"] { --tg: var(--kartka-czerwona); }
+.tg[data-k="nt"] { --tg: var(--murawa); }
+.tg[data-k="tr"], .tg[data-k="pk"] { --tg: #6B4FB0; }
+.tg[data-k="of"] { --tg: #2D6A8F; }
+.tg[data-k="mw"] { --tg: var(--bad-text); }
+.tg[data-k="y1"], .tg[data-k="s2"], .tg[data-k="kw"], .tg[data-k="z"] { --tg: var(--warn-text); }
+.tg[data-k="tl"] { --tg: var(--led); --tg-ink: #14211A; }
+.tg[data-k="ll"], .tg[data-k="li"], .tg[data-k="lo"] { --tg: var(--pa-fix); }
+.tg-more { --tg: color-mix(in srgb, var(--text-muted) 22%, transparent); --tg-ink: var(--text); font-weight: 600; }
+.tg--pc, .tg-more--pc { display: none; }
+@media (min-width: 760px) {
+  .tg--pc, .tg-more--pc { display: inline-grid; }
+  .tg-more--ph { display: none; }
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .tg[data-k="nt"] { --tg: #2E8A4E; }
+  :root:not([data-theme="light"]) .tg[data-k="tr"], :root:not([data-theme="light"]) .tg[data-k="pk"] { --tg: #8F74D6; --tg-ink: #14211A; }
+  :root:not([data-theme="light"]) .tg[data-k="of"] { --tg: #4A8FC4; --tg-ink: #0E1A14; }
+  :root:not([data-theme="light"]) .tg[data-k="ll"] { --tg-ink: #14211A; }
+}
+:root[data-theme="dark"] .tg[data-k="nt"] { --tg: #2E8A4E; }
+:root[data-theme="dark"] .tg[data-k="tr"], :root[data-theme="dark"] .tg[data-k="pk"] { --tg: #8F74D6; --tg-ink: #14211A; }
+:root[data-theme="dark"] .tg[data-k="of"] { --tg: #4A8FC4; --tg-ink: #0E1A14; }
+:root[data-theme="dark"] .tg[data-k="ll"] { --tg-ink: #14211A; }
+/* Przegląd: nazwisko i znaczniki w jednej linii, nazwisko skraca się wielokropkiem */
+.sq__nl { display: flex; align-items: center; min-width: 0; }
+.sq__nl b { min-width: 0; }
+/* Tabele: znaczniki w komórce nazwiska, szerokość kolumny jak dotąd (nazwisko oddaje miejsce znacznikom) */
+.xl__nmw { display: inline-flex; align-items: center; max-width: 200px; vertical-align: middle; }
+.xl__nmw button { min-width: 0; }
+.xl__nmw .tg-row { margin-left: 4px; }
 /* Panel podsumowania po prawej (PC) */
 .sqa { display: none; }
 .sqa__p { --t: var(--murawa); padding: 12px 14px 14px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--t) 7%, var(--surface)); border: 1px solid color-mix(in srgb, var(--t) 24%, var(--line)); border-top: 4px solid var(--t); }
@@ -1206,6 +1242,7 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
   .sqx--table .xl__card { width: 13px; height: 17px; font-size: 10px; }
   .sqx--table .xl .xl__nm { left: 44px; }
   .sqx--table .xl__nm button { max-width: 150px; min-height: 0; padding: 0; font-size: 12px; line-height: 1.2; }
+  .sqx--table .xl__nmw { max-width: 150px; }
   .sqx--table .xl td, .sqx--table .xl tbody th { height: 20px; padding-top: 1px; padding-bottom: 1px; }
 }
 @media (min-width: 1440px) {

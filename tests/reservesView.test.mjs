@@ -240,8 +240,8 @@ test('Pauzy per klasa w Kadrze: „P” tylko za pauzę w rozgrywkach drużyny, 
   assert.deepEqual(suspSplit(b, null).rel, [['liga2', 1]], 'bez znanej klasy: jak dawniej');
   const html = renderSquadList(squadOf(g.world, 'legia'), { game: g, view: 'attrs', rzChips: rzChipFn(g) });
   const rowA = html.slice(html.indexOf(`data-pid="${a.id}"`)); const rowB = html.slice(html.indexOf(`data-pid="${b.id}"`));
-  assert.match(rowA.slice(0, rowA.indexOf('</tr>')), /data-k="sus" title="Pauza za kartki: 2 mecze w Ekstraklasie"/);
-  assert.match(rowB.slice(0, rowB.indexOf('</tr>')), /data-k="sus2"/);
+  assert.match(rowA.slice(0, rowA.indexOf('</tr>')), /data-k="sy" role="img" title="Pauza za kartki: 2 mecze w Ekstraklasie"/);
+  assert.match(rowB.slice(0, rowB.indexOf('</tr>')), /class="tg tg--o[^"]*" data-k="s2"/);
   const ov = renderSquadList(squadOf(g.world, 'legia'), { game: g, rzChips: rzChipFn(g) });
   clean(ov.slice(ov.indexOf('sqa')), 'aside');
   assert.match(ov, /Pauza w innej klasie/);

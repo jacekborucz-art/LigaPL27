@@ -13,7 +13,7 @@ import { positionMapHtml } from './positionMap.js';
 import { playerStatsHtml } from './playerStatsView.js';
 import { scoutLine } from '../career/assistantReport.js'; // raport skauta: potencjał zawodników spoza klubu (docs/sztab.md)
 import { anyClub } from '../season/season.js';
-import { classKeyOfTier, LEAGUE_CLASS_KEYS } from '../season/leagueComps.js';
+import { playerTags, suspSplit, suspText } from './playerTags.js'; // znaczniki stanu za nazwiskiem (docs/tagi-zawodnika.md)
 
 /** Potencjał w profilu: zawodnik spoza klubu gracza oceniany przez skauta (precyzja z jakości skauta). */
 function potentialText(p, game) {
@@ -122,32 +122,15 @@ function th(k, label, sort, { title = '', cls = '' } = {}) {
   const aria = on ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none';
   return `<th scope="col" class="${cls}" aria-sort="${aria}"><button data-act="sqsort" data-k="${k}" ${title ? `title="${esc(title)}"` : ''}>${esc(label)}${on ? `<i aria-hidden="true">${sort.dir === 'asc' ? '▲' : '▼'}</i>` : ''}</button></th>`;
 }
-const nameCell = (p) => `<th scope="row" class="xl__nm"><button data-act="player" data-id="${esc(p.id)}">${moraleDot(p.morale ?? 12)}<span>${esc(p.name)}</span></button></th>`;
+const nameCell = (p, tags = '') => `<th scope="row" class="xl__nm"><span class="xl__nmw"><button data-act="player" data-id="${esc(p.id)}">${moraleDot(p.morale ?? 12)}<span>${esc(p.name)}</span></button>${tags}</span></th>`;
 const posCell = (p) => `<td class="xl__pos"><span class="pos" data-g="${GROUP[p.pos]}">${esc(p.pos)}${sideLabel(p)}</span></td>`;
-const SUSP_IN = { ekstraklasa: 'Ekstraklasie', liga1: '1 Lidze', liga2: '2 Lidze', liga3: 'III lidze', cup: 'Pucharze Polski', uefa: 'pucharach europejskich' };
-/**
- * Pauzy zawodnika z podziałem (kartki per klasa, docs/rezerwy.md): rel = w rozgrywkach jego drużyny (klasa ligi klubu,
- * Puchar Polski, UEFA), other = tylko w innej klasie ligowej (np. 2 Liga po meczu w rezerwach: w meczach swojej drużyny
- * może grać). Bez znanego poziomu klubu wszystkie pauzy są w rel. Zwraca { rel: [[klucz, mecze]], other: [...] }.
- */
-export function suspSplit(p, tier = null) {
-  const own = classKeyOfTier(tier);
-  const rel = []; const other = [];
-  for (const [k, v] of Object.entries(p?.susp ?? {})) if (v > 0) (own && LEAGUE_CLASS_KEYS.includes(k) && k !== own ? other : rel).push([k, v]);
-  if (p?.suspended > 0 && !rel.length && !other.length) rel.push(['', p.suspended]);
-  return { rel, other };
-}
-export const suspText = (list) => list.map(([k, v]) => `${v} ${plural(v, 'mecz', 'mecze', 'meczów')}${SUSP_IN[k] ? ` w ${SUSP_IN[k]}` : ''}`).join(', ');
+/** Pauzy zawodnika z podziałem na rozgrywki drużyny i inną klasę: src/ui/playerTags.js (tam też znaczniki stanu). */
+export { suspSplit, suspText };
 const tierOf = (id) => (id ? anyClub(id)?.tier ?? null : null);
-function statusMark(p, tier = null) {
-  if (p.injuryDays > 0) return `<span class="xl__st" data-k="inj" title="${esc(`Kontuzja, ok. ${p.injuryDays} dni`)}">+</span>`;
-  const s = suspSplit(p, tier);
-  if (s.rel.length) return `<span class="xl__st" data-k="sus" title="${esc(`Pauza za kartki: ${suspText(s.rel)}`)}">P</span>`;
-  if (s.other.length) return `<span class="xl__st" data-k="sus2" title="${esc(`Pauza tylko w innej klasie (${suspText(s.other)}), w meczach drużyny może grać`)}" aria-label="${esc(`Pauza tylko w innej klasie: ${suspText(s.other)}`)}">P</span>`;
-  return '';
-}
+/** Znaczniki w Kadrze: zawodnicy gracza (także druga drużyna klubu), oglądany klub i jego poziom ligi. */
+const tagsOf = (game, p, clubId, tier) => playerTags(game, p, { own: true, clubId: clubId ?? game?.clubId ?? p.clubId ?? null, tier });
 
-function attrsTable(list, sort, tier = null) {
+function attrsTable(list, sort, tier = null, tags = () => '') {
   const groups = [['tech', OUTFIELD_ATTRS.filter((k) => ATTRS[k].group === 'tech')], ['mental', OUTFIELD_ATTRS.filter((k) => ATTRS[k].group === 'mental')], ['phys', OUTFIELD_ATTRS.filter((k) => ATTRS[k].group === 'phys')], ['gk', GK_ATTRS]];
   const head1 = `<tr class="xl__grp"><th colspan="2"></th><th colspan="5" data-g="info">Stan i forma</th>${groups.map(([g, ks]) => `<th colspan="${ks.length}" data-g="${g}">${esc(ATTR_GROUPS[g])}</th>`).join('')}</tr>`;
   const head2 = `<tr>${th('pos', 'Poz.', sort, { cls: 'xl__pos' })}${th('name', 'Zawodnik', sort, { cls: 'xl__nm' })}${th('age', 'Wiek', sort)}${th('ovr', 'OVR', sort, { title: 'Ocena ogólna 1-20' })}${th('form', 'Forma', sort, { title: 'Średnia ocen z 5 ostatnich meczów, wykres: 10 ostatnich' })}${th('fresh', 'Kond.', sort, { title: 'Świeżość (kondycja przed meczem)' })}${th('morale', 'Mor.', sort, { title: 'Morale' })}
@@ -159,14 +142,14 @@ function attrsTable(list, sort, tier = null) {
       if (g === 'gk' && p.pos !== 'BR') return `<td class="xl__a xl__na${i === 0 ? ' xl__g0' : ''}">·</td>`;
       return `<td class="xl__a${i === 0 ? ' xl__g0' : ''}" data-b="${attrBand(v)}">${v ?? '–'}</td>`;
     }).join('')).join('');
-    return `<tr data-pid="${esc(p.id)}">${posCell(p)}${nameCell(p)}<td>${p.age}</td><td class="xl__ovr">${Math.round(p.ovr)}</td>
+    return `<tr data-pid="${esc(p.id)}">${posCell(p)}${nameCell(p, tags(p))}<td>${p.age}</td><td class="xl__ovr">${Math.round(p.ovr)}</td>
       <td class="xl__form">${sparkline(p)}<b data-b="${fa == null ? 'none' : formBand(fa)}">${fa == null ? '–' : fa.toFixed(2)}</b></td>
-      <td class="xl__fresh" data-b="${fr >= 85 ? 'good' : fr >= 70 ? 'mid' : 'low'}">${fr}%${statusMark(p, tier)}</td><td>${esc(moraleLabel(p.morale ?? 12))}</td>${cells}</tr>`;
+      <td class="xl__fresh" data-b="${fr >= 85 ? 'good' : fr >= 70 ? 'mid' : 'low'}">${fr}%</td><td>${esc(moraleLabel(p.morale ?? 12))}</td>${cells}</tr>`;
   }).join('');
   return `<div class="xl-wrap" tabindex="0" aria-label="Atrybuty i forma zawodników, tabela przewijana w poziomie"><table class="xl xl--attrs"><thead>${head1}${head2}</thead><tbody>${rows}</tbody></table></div>`;
 }
 
-function statsTable(list, sort, seasonLabel) {
+function statsTable(list, sort, seasonLabel, tags = () => '') {
   const head = `<tr>${th('pos', 'Poz.', sort, { cls: 'xl__pos' })}${th('name', 'Zawodnik', sort, { cls: 'xl__nm' })}${th('age', 'Wiek', sort)}${th('apps', 'Mecze', sort, { title: 'Występy (w tym z ławki)' })}${th('min', 'Minuty', sort)}${th('g', 'Gole', sort)}${th('a', 'Asysty', sort)}${th('ga', 'G+A', sort, { title: 'Gole i asysty' })}
     ${th('rating', 'Śr. ocena', sort, { title: 'Średnia ocena w sezonie' })}${th('form', 'Forma', sort, { title: 'Średnia ocen z 5 ostatnich meczów' })}${th('motm', 'Gracz meczu', sort)}${th('yc', 'Żółte', sort)}${th('rc', 'Czerwone', sort)}${th('cs', 'Czyste konta', sort, { title: 'Tylko bramkarze' })}</tr>`;
   const tot = { apps: 0, min: 0, g: 0, a: 0, yc: 0, rc: 0, motm: 0 };
@@ -174,7 +157,7 @@ function statsTable(list, sort, seasonLabel) {
     const ss = p.season ?? {}; const fa = formAvg(p);
     for (const k of Object.keys(tot)) tot[k] += ss[k] ?? 0;
     const n = (v) => (v ? v : '<span class="xl__z">0</span>');
-    return `<tr data-pid="${esc(p.id)}">${posCell(p)}${nameCell(p)}<td>${p.age}</td><td>${n(ss.apps ?? 0)}</td><td>${n(ss.min ?? 0)}</td><td>${n(ss.g ?? 0)}</td><td>${n(ss.a ?? 0)}</td><td>${n((ss.g ?? 0) + (ss.a ?? 0))}</td>
+    return `<tr data-pid="${esc(p.id)}">${posCell(p)}${nameCell(p, tags(p))}<td>${p.age}</td><td>${n(ss.apps ?? 0)}</td><td>${n(ss.min ?? 0)}</td><td>${n(ss.g ?? 0)}</td><td>${n(ss.a ?? 0)}</td><td>${n((ss.g ?? 0) + (ss.a ?? 0))}</td>
       <td class="xl__rt">${ss.apps ? `<b data-b="${formBand(ss.rating)}">${ss.rating.toFixed(2)}</b>` : '–'}</td>
       <td class="xl__form">${sparkline(p)}<b data-b="${fa == null ? 'none' : formBand(fa)}">${fa == null ? '–' : fa.toFixed(2)}</b></td>
       <td>${n(ss.motm ?? 0)}</td><td>${ss.yc ? `<span class="xl__card" data-c="y">${ss.yc}</span>` : n(0)}</td><td>${ss.rc ? `<span class="xl__card" data-c="r">${ss.rc}</span>` : n(0)}</td><td>${p.pos === 'BR' ? n(ss.cs ?? 0) : '<span class="xl__z">·</span>'}</td></tr>`;
@@ -208,6 +191,7 @@ function squadAside(players, tier = null) {
 
 export function renderSquadList(players, { filter = 'all', leagueOvrs = [], academy = [], view = 'overview', sort = null, game = null, rzChips = null, clubId = null, title = 'Kadra', head = null, card = null } = {}) {
   const tier = tierOf(clubId ?? game?.clubId);
+  const tags = (p) => tagsOf(game, p, clubId, tier);
   const list = filter === 'academy' ? academy : players.filter((p) => filter === 'all' || GROUP[p.pos] === filter);
   const sorted = view === 'overview' ? [...list].sort(defaultOrder) : sortList(list, sort);
   const avgAge = players.length ? (players.reduce((s, p) => s + p.age, 0) / players.length).toFixed(1) : '0';
@@ -216,7 +200,7 @@ export function renderSquadList(players, { filter = 'all', leagueOvrs = [], acad
   const bar = `<div class="sqx__bar">${views}<div class="chips">${chips}</div></div>`;
   const wrap = (inner) => card ? `${head}${card(inner)}` : `${head ?? `<div class="mail-head sqx__head"><h2>${esc(title)}</h2><span class="muted">${players.length} zawodników, średni wiek ${avgAge}</span></div>`}${inner}`; // card: karta z zakładki (Rezerwy)
   if (view === 'attrs' || view === 'stats') {
-    const body = !sorted.length ? '<p class="mail-empty">Brak zawodników.</p>' : view === 'attrs' ? attrsTable(sorted, sort, tier) : statsTable(sorted, sort, game?.season?.seasonId ?? game?.season ?? '');
+    const body = !sorted.length ? '<p class="mail-empty">Brak zawodników.</p>' : view === 'attrs' ? attrsTable(sorted, sort, tier, tags) : statsTable(sorted, sort, game?.season?.seasonId ?? game?.season ?? '', tags);
     return `<div class="sqx sqx--table">${wrap(bar + body)}</div>`;
   }
   return `<div class="sqx sqx--overview">${wrap(`${bar}
@@ -232,10 +216,10 @@ export function renderSquadList(players, { filter = 'all', leagueOvrs = [], acad
         return `
       <button class="sq__row" role="row" data-act="player" data-id="${esc(p.id)}" data-pid="${esc(p.id)}">
         <span class="pos" data-g="${GROUP[p.pos]}">${esc(p.pos)}${sideLabel(p)}</span>
-        <span class="sq__name">${moraleDot(p.morale)}<span><b>${esc(p.name)}</b><small>${esc(p.nat)}, ${p.age} lat${p.persona === 'Lider' ? ', lider' : ''}</small>${rzChips ? rzChips(p, { short: true }) : ''}</span></span>
+        <span class="sq__name">${moraleDot(p.morale)}<span><span class="sq__nl"><b>${esc(p.name)}</b>${tags(p)}</span><small>${esc(p.nat)}, ${p.age} lat${p.persona === 'Lider' ? ', lider' : ''}</small>${rzChips ? rzChips(p, { short: true }) : ''}</span></span>
         <span class="w">${p.age}</span><span class="w">${esc(NAT_NAMES[p.nat] ?? p.nat)}</span>
         <span class="w wx sq__form">${sparkline(p)}<b data-b="${fa == null ? 'none' : formBand(fa)}">${fa == null ? '–' : fa.toFixed(2)}</b></span>
-        <span class="w wx sq__fresh" data-b="${fr >= 85 ? 'good' : fr >= 70 ? 'mid' : 'low'}"><i style="--v:${fr}%"></i>${fr}%${statusMark(p, tier)}</span>
+        <span class="w wx sq__fresh" data-b="${fr >= 85 ? 'good' : fr >= 70 ? 'mid' : 'low'}"><i style="--v:${fr}%"></i>${fr}%</span>
         <span class="w">${esc(fmtDate(p.contract.until))}</span><span class="w">${esc(formatZl(p.value))}</span>
         <span class="sq__ovr"><b title="Ocena ogólna w skali 1-20">${Math.round(p.ovr)}</b>${stars(starsFor(p.ovr, leagueOvrs))}</span>
       </button>`;
