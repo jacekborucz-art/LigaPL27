@@ -223,8 +223,8 @@ export function collectTodo(game, date = game.date) {
       title: `Przedłuż kontrakt: ${p.name}`, act: STEPS.card(p.id), data: { until, top: top.has(p.id) } });
   }
 
-  // 7. Licencja: braki w infrastrukturze (kierownik drużyny, bez terminu w grze)
-  const lic = game.infra ? licenceNeeds(game, clubId) : [];
+  // 7. Licencja: braki w infrastrukturze (kierownik drużyny, bez terminu w grze); bez braków z wnioskiem w toku
+  const lic = game.infra ? licenceNeeds(game, clubId).filter((x) => !game.infra.clubs[clubId]?.req?.[x.track]) : [];
   if (lic.length) {
     obs({ key: `licencja:${lic.map((x) => x.track).join('-')}`, type: 'licence', role: 'kierownik', qe: sk.kierownik, sev: false, area: 'club', due: null, prio: 'rozw', since: sinceOf(`licencja:${lic.map((x) => x.track).join('-')}`),
       title: 'Uzupełnij wymogi licencyjne', act: STEPS.klub('infrastruktura'), data: { lines: lic.map((x) => x.text) } });

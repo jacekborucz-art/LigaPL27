@@ -10,7 +10,7 @@ import { createFinance, financeDay, FIN_LABELS } from '../src/career/finance.js'
 import { CLUBS_PL } from '../src/data/clubs_pl.js';
 import {
   LEVELS, TRACKS, AI_MAX, INFRA, infraOf, ensureInfra, startLevels, trainingMods, academyMods, developmentMods,
-  quote, startProject, infraMonth, infraSeason, licenceNeeds, ownerShare, capacityOf, applyPlan, upkeepAt,
+  quote, startProject, infraMonth, infraSeason, infraRequestsDay, licenceNeeds, ownerShare, capacityOf, applyPlan, upkeepAt,
 } from '../src/career/infrastructure.js';
 import { renderClubHub, handleClubAction } from '../src/ui/klubView.js';
 import '../src/season/dailySystems.js';
@@ -186,11 +186,14 @@ test('Kluby AI: inwestują z nadwyżki w kolejności licencja, baza, akademia, s
       m.out.invest = Math.round(c.plan.domestic * 0.2);
       infraOf(g, id).fill = 0.95; // pełne stadiony: zachęta do budowy
     }
-    infraSeason(g, date);
-    for (let mo = 0; mo < 12; mo++) {
-      const d = new Date(`${y}-07-01T12:00:00Z`); d.setUTCMonth(d.getUTCMonth() + mo + 1);
-      infraMonth(g, d.toISOString().slice(0, 10));
+    // Dzień po dniu jak system 'infra': raty 1. dnia miesiąca, 1 lipca decyzje AI, potem wnioski (zarząd, miasto)
+    for (let d = new Date(`${y}-07-01T12:00:00Z`); d < new Date(`${y + 1}-07-01T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 1)) {
+      const iso = d.toISOString().slice(0, 10);
+      if (iso.endsWith('-01') && iso !== date) infraMonth(g, iso);
+      if (iso === date) infraSeason(g, iso);
+      infraRequestsDay(g, iso);
     }
+    infraMonth(g, `${y + 1}-07-01`);
   }
   let upgrades = 0;
   for (const [id, I] of Object.entries(g.infra.clubs)) {
@@ -220,7 +223,7 @@ test('Stary zapis: brak game.infra i znacznika w planie, ensureCareer tworzy sta
   assert.ok(FIN_LABELS.infra && FIN_LABELS.upkeep);
 });
 
-test('Widok: kafelki, trzy karty z drabiną poziomów, potwierdzenie, start inwestycji i oś czasu', () => {
+test('Widok: kafelki, trzy karty z drabiną poziomów, potwierdzenie, wniosek do zarządu, start inwestycji i oś czasu', () => {
   const g = fresh(); ensureInfra(g);
   g.finance.clubs[g.clubId].balance = 300e6;
   const html = renderClubHub(g, { kTab: 'infrastruktura' });
@@ -239,15 +242,26 @@ test('Widok: kafelki, trzy karty z drabiną poziomów, potwierdzenie, start inwe
   const h2 = renderClubHub(g, { kTab: 'infrastruktura', ...ui });
   assert.match(h2, /data-act="inf-confirm" data-track="training"/);
   assert.match(h2, /data-act="inf-cancel"/);
+  assert.match(h2, /Złożyć wniosek\?/);
   const r = handleClubAction(g, 'inf-confirm', { track: 'training' });
-  assert.equal(r.save, true); assert.equal(r.ui.infAsk, null); assert.match(r.ui.kMsg, /Ruszyła inwestycja/);
+  assert.equal(r.save, true); assert.equal(r.ui.infAsk, null); assert.match(r.ui.kMsg, /Wniosek złożony/);
   ui = r.ui;
   const h3 = renderClubHub(g, { kTab: 'infrastruktura', ...ui });
-  assert.match(h3, /class="inf-time"/);
-  assert.match(h3, /class="inf-run"/);
+  assert.match(h3, /class="inf-req"/);
+  assert.match(h3, /Wnioski w toku/);
+  assert.match(h3, /data-act="inf-withdraw" data-track="training"/);
   assert.ok(!/undefined|NaN/.test(h3));
   assert.equal(handleClubAction(g, 'inf-cancel', {}).ui.infAsk, null);
-  assert.equal(handleClubAction(g, 'inf-confirm', { track: 'training' }).save, false, 'drugi projekt na tym samym torze');
+  assert.equal(handleClubAction(g, 'inf-confirm', { track: 'training' }).save, false, 'drugi wniosek na tym samym torze');
+  // Zgoda zarządu (bogaty klub): budowa rusza, karta pokazuje postęp
+  for (let i = 1; i <= 60 && !infraOf(g, g.clubId).proj.training; i++) {
+    const d = new Date(Date.UTC(2026, 6, 1 + i)).toISOString().slice(0, 10);
+    infraRequestsDay(g, d);
+  }
+  const h4 = renderClubHub(g, { kTab: 'infrastruktura' });
+  assert.match(h4, /class="inf-time"/);
+  assert.match(h4, /class="inf-run"/);
+  assert.ok(!/undefined|NaN/.test(h4));
 });
 
 test('Akademia: miejsca według poziomu, od 3 (brak akademii) do 24 (akademia światowa), rosnąco', async () => {

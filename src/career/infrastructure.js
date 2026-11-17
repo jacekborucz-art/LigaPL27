@@ -5,15 +5,22 @@
 // (przychód z widza = naKibica x M(L) / M(L_start), rozwój x f(L) / f(L_start) itd.). Utrzymanie obiektów zastępuje
 // część dotychczasowych kosztów klubu (ops): w dniu startu ops - kredyt + utrzymanie = ops.
 //
+// Inwestycja nie rusza od razu: wniosek (submitRequest) przechodzi etapy z rejestru STAGES (zarząd, potem pozwolenie
+// miasta dla stadionu i bazy współfinansowanej przez miasto), a po ostatniej zgodzie startProject rusza z budową.
+// Te same zasady dla klubu gracza i klubów AI (AI bez poczty).
+//
 // Stan gry: game.infra = { v, clubs: { [id]: { stadium, training, academy, start: {...}, seats, fans, fund,
-//   proj: { stadium, training, academy }, fillSum, fillN, fill, licence } }, july }.
+//   proj: { stadium, training, academy }, req: { [tor]: wniosek }, reqLast: { [tor]: { result, stage, date, why, until } },
+//   fillSum, fillN, fill, licence } }, july }.
 
-import { clamp } from '../core/rng.js';
-import { registerDailySystem } from '../core/gameLoop.js';
+import { Rng, clamp } from '../core/rng.js';
+import { registerDailySystem, addDays } from '../core/gameLoop.js';
 import { createMessage } from '../core/inbox.js';
 import { clubById } from '../data/clubs_pl.js';
 import { clubFinanceData } from '../data/finanse_klubow.js';
 import { FIN, book } from './finance.js';
+import { ownerOf } from './owners.js';
+import { fmtDate } from '../ui/dom.js';
 
 const M = 1e6;
 export const TRACKS = ['stadium', 'training', 'academy'];
@@ -122,7 +129,7 @@ export function startLevels(club) {
 
 function newEntry(club) {
   const s = startLevels(club);
-  return { ...s, start: { ...s }, seats: 0, fans: 0, fund: 0, proj: {}, fillSum: 0, fillN: 0, fill: null, licence: null };
+  return { ...s, start: { ...s }, seats: 0, fans: 0, fund: 0, proj: {}, req: {}, reqLast: {}, fillSum: 0, fillN: 0, fill: null, licence: null };
 }
 
 /** Stan infrastruktury klubu (tworzony przy pierwszym użyciu; null, gdy klub nieznany albo brak game.infra). */
@@ -220,7 +227,12 @@ export function applyPlan(game, id) {
 /** Leniwe tworzenie stanu (stare zapisy) i nałożenie infrastruktury na nowe plany sezonu. Wywoływane codziennie. */
 export function ensureInfra(game) {
   if (!game?.finance) return;
-  if (!game.infra) game.infra = { v: 1, clubs: {}, july: null };
+  if (!game.infra) game.infra = { v: 2, clubs: {}, july: null };
+  if ((game.infra.v ?? 1) < 2) {
+    // Zapisy sprzed wniosków (v1): puste wnioski i historia decyzji
+    for (const I of Object.values(game.infra.clubs)) { I.req ??= {}; I.reqLast ??= {}; }
+    game.infra.v = 2;
+  }
   for (const [id, c] of Object.entries(game.finance.clubs)) {
     if (!c.plan || c.plan.infra) continue;
     if (infraOf(game, id)) applyPlan(game, id);
@@ -284,7 +296,9 @@ export function seatRoom(game, id) {
 
 /**
  * Wycena projektu. track: 'stadium' | 'training' | 'academy'; opts.seats: rozbudowa trybun (tor stadionu).
- * Zwraca { ok, why, track, kind, to, seats, cost, share, owner, club, upfront, monthly, months, upkeep, upkeepDelta, disrupt }.
+ * Wniosek w toku albo odmowa w tym sezonie blokuje wycenę (poza wnioskiem usuwającym brak licencyjny);
+ * opts.skipReq: bez tych blokad (etapy wniosku i start po zgodzie), opts.date: dzień (domyślnie game.date).
+ * Zwraca { ok, why, blocked?, track, kind, to, seats, cost, share, owner, club, upfront, monthly, months, upkeep, upkeepDelta, disrupt }.
  */
 export function quote(game, id, track, opts = {}) {
   const I = infraOf(game, id);
@@ -310,6 +324,13 @@ export function quote(game, id, track, opts = {}) {
     q.upkeepDelta = 0; q.disrupt = INFRA.DISRUPT.seats;
   }
   if (I.proj?.[track]) return { ...q, ok: false, why: 'Na tym obiekcie trwa już inwestycja.' };
+  if (!opts.skipReq) {
+    if (I.req?.[track]) return { ...q, ok: false, why: 'Wniosek w sprawie tego obiektu czeka na decyzję.' };
+    const last = I.reqLast?.[track]; const date = opts.date ?? game.date;
+    if (last?.until && date && last.until > date && !fixesLicence(game, id, q)) {
+      return { ...q, ok: false, blocked: true, why: `${last.stage === 'city' ? 'Miasto odrzuciło' : 'Zarząd odrzucił'} wniosek, kolejny można złożyć od ${fmtDate(last.until)}.` };
+    }
+  }
   q.share = ownerShare(game, id, track, kind, q.to);
   q.owner = r1000(q.cost * q.share);
   q.club = q.cost - q.owner;
@@ -323,13 +344,14 @@ const msgOf = (date, key, subject, body, priority = 'info') => createMessage({ d
 /**
  * Start projektu. Klub gracza płaci 20 % udziału od razu (wpis 'infra'), resztę w ratach 1. dnia miesiąca.
  * opts.ai: klub AI płaci cały udział z funduszu inwestycyjnego (pieniądze zeszły już jako 'invest').
+ * Start niskopoziomowy: gracz i kluby AI zaczynają przez wniosek (submitRequest), który woła tę funkcję po ostatniej zgodzie.
  * Zwraca { ok, text, quote }.
  */
 export function startProject(game, id, track, opts = {}) {
   const q = quote(game, id, track, opts);
   if (!q.ok) return { ok: false, text: q.why, quote: q };
   const I = infraOf(game, id); const F = game.finance; const c = F.clubs[id];
-  const date = game.date;
+  const date = opts.date ?? game.date;
   let fromFund = 0; let fromBalance = 0;
   if (opts.ai) {
     fromFund = Math.min(I.fund, q.club);
@@ -344,7 +366,7 @@ export function startProject(game, id, track, opts = {}) {
   } else if (!c || c.balance < q.upfront) {
     return { ok: false, text: `Za mało pieniędzy na pierwszą wpłatę (${fmtZl(q.upfront)}).`, quote: q };
   }
-  const label = q.kind === 'seats' ? `rozbudowa trybun (+${fmtN(q.seats)} miejsc)` : `${TRACK_NAMES[track].toLowerCase()}, poziom ${q.to}`;
+  const label = projectLabel(q);
   if (opts.ai) {
     I.fund -= fromFund;
     if (fromBalance > 0) book(F, id, date, 'out', 'infra', fromBalance, `Inwestycja: ${label}`);
@@ -360,6 +382,268 @@ function fmtZl(n) {
   if (n >= 1e6) return `${(n / 1e6).toFixed(n >= 1e7 ? 1 : 2).replace('.', ',')} mln zł`;
   if (n >= 1e3) return `${Math.round(n / 1e3)} tys. zł`;
   return `${Math.round(n)} zł`;
+}
+
+/** Nazwa projektu z wyceny, np. „akademia, poziom 6” albo „rozbudowa trybun (+2 000 miejsc)”. */
+export function projectLabel(q) {
+  return q.kind === 'seats' ? `rozbudowa trybun (+${fmtN(q.seats)} miejsc)` : `${TRACK_NAMES[q.track].toLowerCase()}, poziom ${q.to}`;
+}
+
+// ------------------------------------------------------------ Wnioski: zarząd, pozwolenie miasta, start
+// Wniosek: game.infra.clubs[id].req[tor] = { id, track, opts: { seats }, created, ai, q (wycena), licence, pipeline,
+// at, stage, decideOn, cond: null | { minBalance, by }, steps: [{ stage, from, decideOn, result, S, p, why, date, met? }] }.
+// Etapy z rejestru STAGES w kolejności STAGE_ORDER; nowy etap (protesty kibiców, dotacja, przetarg) = nowy wpis.
+// Pieniądze nie schodzą przy złożeniu wniosku: pierwsza wpłata dopiero w dniu startu budowy. Odmowa blokuje tor
+// do końca sezonu (do 1 lipca), poza wnioskiem usuwającym brak licencyjny. Wszystkie liczby [SZAC].
+export const IREQ = {
+  BOARD_DAYS: [3, 7], // zarząd odpowiada po 3-7 dniach
+  CITY_DAYS: { level: [30, 45], seats: [21, 35], training: [14, 28] }, // pozwolenie miasta: stadion, trybuny, baza
+  COND_MIN: -12, // warunkowa zgoda od S >= -12, gdy największy minus to saldo
+  COND_DAYS: 30, // termin na spełnienie warunku
+  COND_STEP: 100000, // próg salda w warunku zaokrąglony w górę do 100 tys. zł
+  LICENCE: 40, // wniosek usuwający brak licencyjny
+  CITY_P: 0.95, CITY_P_MIN: 0.25, CITY_P_K: 0.03, CITY_P_LICENCE: 0.9, // szansa na zgodę miasta
+};
+const seasonEnd = (iso) => { const [y, m] = iso.split('-').map(Number); return `${m >= 7 ? y + 1 : y}-07-01`; };
+const ownerTypeOf = (id) => clubFinanceData(clubById(id) ?? id).wlasciciel?.typ ?? 'miasto';
+const cityMoney = (id, q) => q.owner > 0 && ownerTypeOf(id) === 'miasto';
+
+/** Czy projekt usuwa brak licencyjny klubu (tor i rodzaj: poziom albo trybuny). */
+export function fixesLicence(game, id, q) {
+  return licenceNeeds(game, id).some((n) => n.track === q.track && (q.track !== 'stadium' || !!n.seats === (q.kind === 'seats')));
+}
+
+/** Rejestr etapów wniosku: needed(game, id, q), days(q) -> [od, do], decide(game, id, r, date, rng) -> decyzja. */
+export const STAGES = {
+  board: { label: 'Zarząd', from: 'Zarząd klubu', needed: () => true, days: () => IREQ.BOARD_DAYS, decide: boardDecide },
+  city: {
+    label: 'Miasto', from: 'Urząd miasta',
+    needed: (game, id, q) => q.track === 'stadium' || (q.track === 'training' && cityMoney(id, q)),
+    days: (q) => (q.track === 'training' ? IREQ.CITY_DAYS.training : IREQ.CITY_DAYS[q.kind]),
+    decide: cityDecide,
+  },
+};
+export const STAGE_ORDER = ['board', 'city'];
+/** Etapy wniosku dla wyceny, np. ['board'] (akademia) albo ['board', 'city'] (stadion). */
+export const pipelineFor = (game, id, q) => STAGE_ORDER.filter((s) => STAGES[s].needed(game, id, q));
+
+const stageRng = (game, id, r) => new Rng(`infra-wniosek:${game.seed}:${id}:${r.track}:${r.created}:${r.stage}`);
+
+/**
+ * Punktacja zarządu dla projektu [SZAC]. opts: { ai, licence, rng (bez niego los 0), trust }.
+ * Zwraca { S, parts: { cash, load, result, owner, trust, licence, luck }, free, reserve, R, loadM, bal, hard }.
+ */
+export function boardScore(game, id, q, opts = {}) {
+  const c = game.finance?.clubs?.[id]; const I = infraOf(game, id); const p = c?.plan;
+  if (!c || !p || !I) return { S: -99, parts: {}, hard: 'Brak danych o finansach klubu.' };
+  const ai = !!opts.ai;
+  const R = Math.max(1, (p.domestic + p.owner) / 12); // miesięczne przychody (z dopłatą właściciela)
+  const reserve = Math.max(1, (p.wages + p.ops) / 12); // miesięczne koszty
+  const bal = c.balance + (ai ? I.fund : 0);
+  const free = bal - q.upfront - reserve;
+  // Raty liczone co najmniej na 12 miesięcy: krótka, tania budowa (np. 2 mies.) nie wygląda na duże obciążenie [SZAC]
+  const loadM = (q.club - q.upfront) / Math.max(q.months || 1, 12) + (q.upkeepDelta ?? 0) / 12;
+  const typ = ownerTypeOf(id);
+  const o = ownerOf(game, id);
+  const trust = opts.trust ?? (!ai && id === game.clubId ? game.board?.trust ?? 50 : 50);
+  const parts = {
+    cash: clamp(20 * free / reserve, -20, 15),
+    load: clamp(10 - 100 * loadM / R, -30, 10),
+    result: (p.net < 0 ? -5 : 0) + (c.balance < 0 ? -20 : 0),
+    owner: (typ === 'miliarder' ? 10 : typ === 'miasto' ? -5 : typ === 'spolka' || typ === 'klub' ? 0 : p.skarbiec > 0 ? 5 : 0) + (o ? 0.5 * (o.zasobnosc - 10) : 0),
+    trust: 0.3 * (trust - 50),
+    licence: opts.licence ? IREQ.LICENCE : 0,
+    luck: opts.rng ? -5 + 10 * opts.rng.next() : 0,
+  };
+  const S = Math.round(Object.values(parts).reduce((a, b) => a + b, 0) * 10) / 10;
+  let hard = null;
+  if (!ai && c.balance < q.upfront) hard = `Saldo klubu (${fmtZl(c.balance)}) nie wystarcza na pierwszą wpłatę (${fmtZl(q.upfront)}).`;
+  else if (ai && !opts.licence && I.fund < q.club) hard = 'Fundusz inwestycyjny klubu nie pokrywa kosztu.';
+  return { S, parts, free, reserve, R, loadM, bal, hard };
+}
+
+/** Powód odmowy zarządu z najbardziej ujemnego składnika (prostymi słowami). */
+function boardWhy(game, id, sc, key) {
+  const c = game.finance.clubs[id];
+  if (key === 'cash') {
+    return sc.free < 0 ? `Saldo klubu (${fmtZl(c.balance)}) nie pokrywa pierwszej wpłaty i miesięcznych kosztów klubu (${fmtZl(sc.reserve)}).`
+      : `Po pierwszej wpłacie zostałoby tylko ${fmtZl(sc.free)} ponad miesięczne koszty klubu.`;
+  }
+  if (key === 'load') return `Raty i utrzymanie to ${Math.round(100 * sc.loadM / sc.R)} % miesięcznych przychodów.`;
+  if (key === 'result') return c.balance < 0 ? `Klub ma ujemne saldo (${fmtZl(c.balance)}).` : 'Plan sezonu zakłada stratę.';
+  if (key === 'owner') return ownerTypeOf(id) === 'miasto' ? 'Miasto jako właściciel nie dokłada do bieżących wydatków klubu.' : 'Właściciel nie chce dokładać pieniędzy.';
+  if (key === 'trust') return `Zaufanie zarządu jest niskie (${game.board?.trust ?? 50} na 100).`;
+  return 'Zarząd uznał, że to nie jest dobry moment na taki wydatek.';
+}
+
+function boardDecide(game, id, r, date, rng) {
+  const sc = boardScore(game, id, r.q, { ai: r.ai, licence: r.licence, rng });
+  if (sc.hard) return { result: 'no', S: sc.S, why: sc.hard, block: !r.licence };
+  if (sc.S >= 0) return { result: 'yes', S: sc.S, why: '' };
+  const [worst] = Object.entries(sc.parts).sort((a, b) => a[1] - b[1])[0];
+  // Warunek: niewiele brakuje, a głównym minusem jest saldo (nie obciążenie ratami): zgoda po wzroście salda
+  const target = sc.parts.cash - sc.S; // składnik salda, przy którym S = 0
+  if (sc.S >= IREQ.COND_MIN && worst === 'cash' && target <= 15) {
+    const need = target * sc.reserve / 20 + r.q.upfront + sc.reserve - (r.ai ? infraOf(game, id).fund : 0);
+    const minBalance = Math.ceil(need / IREQ.COND_STEP) * IREQ.COND_STEP;
+    const by = addDays(date, IREQ.COND_DAYS);
+    return { result: 'cond', S: sc.S, why: `Zgoda, jeśli saldo klubu wyniesie co najmniej ${fmtZl(minBalance)} do ${fmtDate(by)}.`, cond: { minBalance, by } };
+  }
+  return { result: 'no', S: sc.S, why: boardWhy(game, id, sc, worst), block: !r.licence };
+}
+
+/** Szansa na zgodę miasta: samo pozwolenie 95 %, z pieniędzmi miasta mniej przy dużej kwocie; licencja co najmniej 90 %. */
+export function cityChance(game, id, q, licence = false) {
+  const plan = game.finance?.clubs?.[id]?.plan;
+  let p = cityMoney(id, q) ? clamp(IREQ.CITY_P - IREQ.CITY_P_K * q.owner / Math.max(plan?.owner ?? 0, M), IREQ.CITY_P_MIN, IREQ.CITY_P) : IREQ.CITY_P;
+  if (licence) p = Math.max(p, IREQ.CITY_P_LICENCE);
+  return p;
+}
+
+function cityDecide(game, id, r, date, rng) {
+  const p = cityChance(game, id, r.q, r.licence);
+  if (rng.next() < p) return { result: 'yes', p, why: '' };
+  const why = cityMoney(id, r.q) ? `Miasto nie znalazło w budżecie ${fmtZl(r.q.owner)} na swoją część inwestycji.` : 'Urząd miasta nie wydał pozwolenia na budowę (zastrzeżenia do projektu).';
+  return { result: 'no', p, why, block: !r.licence };
+}
+
+/**
+ * Wniosek o inwestycję (gracz i kluby AI). opts: { seats, ai, date }. Bez pieniędzy na starcie; decyzje etapami
+ * w infraRequestsDay. Zwraca { ok, text, req, quote }.
+ */
+export function submitRequest(game, id, track, opts = {}) {
+  const date = opts.date ?? game.date;
+  const q = quote(game, id, track, { seats: opts.seats, date });
+  if (!q.ok) return { ok: false, text: q.why, quote: q };
+  const I = infraOf(game, id);
+  const r = {
+    id: `${id}:${track}:${date}`, track, opts: { seats: q.seats }, created: date, ai: !!opts.ai, q,
+    licence: fixesLicence(game, id, q), pipeline: pipelineFor(game, id, q), at: 0, stage: null, decideOn: null, cond: null, steps: [],
+  };
+  (I.req ??= {})[track] = r;
+  enterStage(game, id, r, 0, date);
+  const city = r.pipeline.includes('city') ? ', potem pozwolenie miasta' : '';
+  return { ok: true, req: r, quote: q, text: `Wniosek złożony: ${projectLabel(q)}. Zarząd odpowie ok. ${fmtDate(r.decideOn)}${city}.` };
+}
+
+function enterStage(game, id, r, at, date) {
+  r.at = at; r.stage = r.pipeline[at]; r.cond = null;
+  const days = stageRng(game, id, r).int(...STAGES[r.stage].days(r.q));
+  r.decideOn = addDays(date, days);
+  r.steps.push({ stage: r.stage, from: date, decideOn: r.decideOn, result: null, S: null, p: null, why: '', date: null });
+}
+
+/** Wycofanie wniosku: bez kosztów i bez blokady. Zwraca { ok, text }. */
+export function withdrawRequest(game, id, track) {
+  const I = infraOf(game, id);
+  const r = I?.req?.[track];
+  if (!r) return { ok: false, text: 'Nie ma wniosku do wycofania.' };
+  delete I.req[track];
+  return { ok: true, text: `Wniosek wycofany: ${projectLabel(r.q)}.` };
+}
+
+const boardLetter = (date, key, subject, body, priority = 'important') => createMessage({ date, key, category: 'board', from: 'Zarząd klubu', priority, subject, body: `Panie Trenerze, ${body}\n\nZarząd klubu.` });
+const cityLetter = (date, key, subject, body, priority = 'important') => createMessage({ date, key, category: 'club', from: 'Urząd miasta', priority, subject, body });
+const blockText = (until) => (until ? `Kolejny wniosek w sprawie tego obiektu można złożyć od ${fmtDate(until)}.` : 'Nowy wniosek można złożyć od razu.');
+
+/** Odmowa (albo wycena nieaktualna): koniec wniosku, blokada do 1 lipca przy odmowie bez licencji. */
+function closeRequest(game, id, I, r, date, why, block, out, mine) {
+  delete I.req[r.track];
+  const until = block ? seasonEnd(date) : null;
+  (I.reqLast ??= {})[r.track] = { result: 'no', stage: r.stage, date, why, until };
+  if (!mine) return;
+  const label = projectLabel(r.q);
+  const key = `infra-wniosek:${id}:${r.track}:${r.stage}:${date}`;
+  if (r.stage === 'city') out.push(cityLetter(date, key, `Urząd miasta odmawia: ${label}`, `${why} ${blockText(until)}`));
+  else out.push(boardLetter(date, key, `Odmowa zarządu: ${label}`, `zarząd nie zgadza się na inwestycję (${label}). Powód: ${why.replace(/\.$/, '')}. ${blockText(until)}`));
+}
+
+/** Zgoda na etapie: następny etap albo start budowy (ponowna wycena, pierwsza wpłata w dniu startu). */
+function advanceRequest(game, id, I, r, date, out, mine) {
+  if (r.at + 1 < r.pipeline.length) { enterStage(game, id, r, r.at + 1, date); return null; }
+  delete I.req[r.track];
+  const res = startProject(game, id, r.track, { seats: r.opts.seats, ai: r.ai, allowBalance: r.ai && r.licence, date, skipReq: true });
+  (I.reqLast ??= {})[r.track] = { result: res.ok ? 'yes' : 'no', stage: r.stage, date, why: res.ok ? '' : res.text, until: null };
+  if (mine) out.push(msgOf(date, `infra-start:${id}:${r.track}:${date}`, res.ok ? `Ruszyła inwestycja: ${projectLabel(res.quote)}` : `Inwestycja nie ruszyła: ${projectLabel(r.q)}`, res.text, res.ok ? 'info' : 'important'));
+  return res;
+}
+
+/** Tekst o następnym kroku po zgodzie (do listu). */
+function nextStepText(id, I, r, res) {
+  if (I.req?.[r.track] === r) return r.stage === 'city' ? `Teraz wniosek trafia do urzędu miasta (pozwolenie na budowę${cityMoney(id, r.q) ? ' i pieniądze miasta' : ''}), decyzja ok. ${fmtDate(r.decideOn)}.` : `Następny etap: ${STAGES[r.stage].label.toLowerCase()}, decyzja ok. ${fmtDate(r.decideOn)}.`;
+  return res?.ok ? 'Budowa rusza od razu.' : `Budowa jednak nie ruszyła: ${res?.text ?? ''}`;
+}
+
+function stepRequest(game, id, I, r, date, out) {
+  const mine = id === game.clubId && !r.ai;
+  const step = r.steps[r.steps.length - 1];
+  const key = `infra-wniosek:${id}:${r.track}:${r.stage}:${date}`;
+  const label = projectLabel(r.q);
+  if (r.cond) {
+    const c = game.finance.clubs[id];
+    const bal = (c?.balance ?? 0) + (r.ai ? I.fund : 0);
+    if (bal >= r.cond.minBalance) {
+      step.met = date;
+      const at = out.length; // list zarządu przed wiadomością o starcie budowy
+      const res = advanceRequest(game, id, I, r, date, out, mine);
+      if (mine) out.splice(at, 0, boardLetter(date, key, `Warunek spełniony: ${label}`, `saldo klubu wynosi ${fmtZl(c.balance)}, więc zarząd zgadza się na inwestycję (${label}). ${nextStepText(id, I, r, res)}`));
+    } else if (date > r.cond.by) {
+      closeRequest(game, id, I, r, date, `Saldo klubu nie osiągnęło ${fmtZl(r.cond.minBalance)} do ${fmtDate(r.cond.by)}.`, !r.licence, out, mine);
+    }
+    return;
+  }
+  if (date < r.decideOn) return;
+  const q = quote(game, id, r.track, { seats: r.opts.seats, skipReq: true, date });
+  if (!q.ok) {
+    Object.assign(step, { result: 'no', why: q.why, date });
+    closeRequest(game, id, I, r, date, q.why, false, out, mine);
+    return;
+  }
+  r.q = q; r.licence = fixesLicence(game, id, q);
+  const st = STAGES[r.stage];
+  const rng = stageRng(game, id, r); rng.int(...st.days(q)); // ten sam strumień co termin decyzji
+  const d = st.decide(game, id, r, date, rng);
+  Object.assign(step, { result: d.result, S: d.S ?? null, p: d.p ?? null, why: d.why, date });
+  if (d.result === 'no') { closeRequest(game, id, I, r, date, d.why, d.block, out, mine); return; }
+  if (d.result === 'cond') {
+    r.cond = d.cond;
+    if (mine) out.push(boardLetter(date, key, `Warunek zarządu: ${label}`, `zarząd zgodzi się na inwestycję (${label}), jeśli saldo klubu wyniesie co najmniej ${fmtZl(d.cond.minBalance)} do ${fmtDate(d.cond.by)}. Teraz saldo to ${fmtZl(game.finance.clubs[id].balance)}.`));
+    return;
+  }
+  const stage = r.stage; const at = out.length; // list przed wiadomością o starcie budowy
+  const res = advanceRequest(game, id, I, r, date, out, mine);
+  if (!mine) return;
+  if (stage === 'city') {
+    const money = cityMoney(id, q) ? ` Miasto przekaże ${fmtZl(q.owner)} na swoją część.` : '';
+    out.splice(at, 0, cityLetter(date, key, `Pozwolenie na budowę: ${label}`, `Urząd miasta wydał pozwolenie na budowę (${label}).${money} ${nextStepText(id, I, r, res)}`));
+  } else out.splice(at, 0, boardLetter(date, key, `Zgoda zarządu: ${label}`, `zarząd zgadza się na inwestycję (${label}${q.club ? `, klub płaci ${fmtZl(q.club)}` : ''}). ${nextStepText(id, I, r, res)}`));
+}
+
+/** Klub AI: wniosek usuwający brak licencyjny (trybuny od stadionu poziomu 4, inaczej standard). */
+function aiLicenceRequest(game, id, n, date) {
+  const I = infraOf(game, id);
+  const seats = n.seats && I.stadium >= LICENCE[1].stadium ? Math.min(seatRoom(game, id), Math.max(500, n.need - capacityOf(game, id).full)) : 0;
+  return submitRequest(game, id, n.track, { ai: true, seats, date });
+}
+
+/**
+ * Codziennie (po ratach 1. dnia miesiąca): decyzje etapów, warunki zarządu, start budowy. 1. dnia miesiąca klub AI
+ * z brakiem licencyjnym bez projektu i wniosku składa wniosek ponownie. Zwraca wiadomości dla klubu gracza.
+ */
+export function infraRequestsDay(game, date) {
+  const out = [];
+  for (const [id, I] of Object.entries(game.infra.clubs)) {
+    if (!I.req) continue;
+    for (const track of TRACKS) { const r = I.req[track]; if (r) stepRequest(game, id, I, r, date, out); }
+  }
+  if (date.endsWith('-01')) {
+    for (const [id, I] of Object.entries(game.infra.clubs)) {
+      const club = clubById(id);
+      if (id === game.clubId || !club || club.parent || !game.finance.clubs[id]) continue;
+      for (const n of licenceNeeds(game, id)) if (!I.proj?.[n.track] && !I.req?.[n.track]) aiLicenceRequest(game, id, n, date);
+    }
+  }
+  return out;
 }
 
 /** Zakończenie projektu: poziom +1 albo nowe miejsca, nowe efekty od razu. */
@@ -439,27 +723,30 @@ export function infraSeason(game, date) {
     else if (!I.licence || (I.licence.tier != null && I.licence.tier !== club.tier)) {
       // Nowa liga (awans, także dwa awanse z rzędu z III ligi): znowu sezon na rozpoczęcie inwestycji
       I.licence = { since: date, tier: club.tier };
-      if (mine) out.push(msgOf(date, `licencja:${id}:${date}`, 'Licencja: obiekty poniżej wymogów ligi', `${needs.map((n) => n.text).join('. ')}.\n\nMamy sezon na rozpoczęcie inwestycji (zakładka Klub, Infrastruktura). Bez niej PZPN nałoży karę ${fmtZl(INFRA.LICENCE_FINE)}.`, 'important'));
-    } else if (needs.some((n) => !I.proj?.[n.track])) {
+      if (mine) out.push(msgOf(date, `licencja:${id}:${date}`, 'Licencja: obiekty poniżej wymogów ligi', `${needs.map((n) => n.text).join('. ')}.\n\nMamy sezon na rozpoczęcie inwestycji (zakładka Klub, Infrastruktura: wniosek do zarządu). Bez niej PZPN nałoży karę ${fmtZl(INFRA.LICENCE_FINE)}.`, 'important'));
+    } else if (needs.some((n) => !I.proj?.[n.track] && !I.req?.[n.track])) { // wniosek w toku chroni przed karą
       book(F, id, date, 'out', 'fines', INFRA.LICENCE_FINE, 'Kara licencyjna PZPN: obiekty poniżej wymogów');
       I.licence = { since: date, fined: (I.licence.fined ?? 0) + 1, tier: club.tier };
-      if (mine) out.push(msgOf(date, `licencja-kara:${id}:${date}`, `Kara licencyjna: ${fmtZl(INFRA.LICENCE_FINE)}`, `Nie rozpoczęliśmy inwestycji wymaganych przez licencję. ${needs.map((n) => n.text).join('. ')}.\n\nKolejna kara za rok, jeśli inwestycja nie ruszy.`, 'urgent'));
+      if (mine) out.push(msgOf(date, `licencja-kara:${id}:${date}`, `Kara licencyjna: ${fmtZl(INFRA.LICENCE_FINE)}`, `Nie rozpoczęliśmy inwestycji wymaganych przez licencję i nie ma wniosku w toku. ${needs.map((n) => n.text).join('. ')}.\n\nKolejna kara za rok, jeśli do tego czasu inwestycja nie ruszy albo nie będzie wniosku w toku.`, 'urgent'));
     }
-    if (!mine && !club.parent) aiInvest(game, id, needs);
+    if (!mine && !club.parent) aiInvest(game, id, needs, date);
   }
   return out;
 }
 
-/** Klub AI: najpierw wymogi licencji, potem baza, akademia, stadion (tylko przy zapełnieniu od 92 %). */
-function aiInvest(game, id, needs) {
+/**
+ * Klub AI: wnioski (te same etapy co gracz), najpierw wymogi licencji, potem baza, akademia, stadion (tylko przy
+ * zapełnieniu od 92 %). Fundusz pomniejszony o koszt wniosków w toku.
+ */
+function aiInvest(game, id, needs, date) {
   const I = infraOf(game, id);
   for (const n of needs) {
-    if (I.proj[n.track]) continue;
-    const seats = n.seats && I.stadium >= LICENCE[1].stadium ? Math.min(seatRoom(game, id), Math.max(500, n.need - capacityOf(game, id).full)) : 0;
-    startProject(game, id, n.track, { ai: true, allowBalance: true, seats });
+    if (I.proj[n.track] || I.req?.[n.track]) continue;
+    aiLicenceRequest(game, id, n, date);
   }
+  const pending = TRACKS.reduce((s, t) => s + (I.req?.[t]?.q?.club ?? 0), 0);
   for (const track of ['training', 'academy', 'stadium']) {
-    if (I.proj[track]) continue;
+    if (I.proj[track] || I.req?.[track]) continue;
     let opts = { ai: true };
     if (track === 'stadium') {
       if (I.fill == null || I.fill < INFRA.AI_STADIUM_FILL) continue; // decyzja dopiero po pełnym sezonie
@@ -467,9 +754,9 @@ function aiInvest(game, id, needs) {
       if (room >= 1000) opts = { ai: true, seats: Math.floor(room / 500) * 500 };
     }
     if (!opts.seats && I[track] >= AI_MAX) continue;
-    const q = quote(game, id, track, opts);
-    if (!q.ok || q.club > I.fund) continue;
-    if (startProject(game, id, track, opts).ok) break; // jeden nowy projekt na sezon (poza licencją)
+    const q = quote(game, id, track, { ...opts, date });
+    if (!q.ok || q.club > I.fund - pending) continue;
+    if (submitRequest(game, id, track, { ...opts, date }).ok) break; // jeden nowy wniosek na sezon (poza licencją)
   }
 }
 
@@ -482,6 +769,8 @@ registerDailySystem({
     const messages = [];
     if (date.endsWith('-01')) messages.push(...infraMonth(game, date));
     if (date.endsWith('-07-01') && game.infra.july !== date) { game.infra.july = date; messages.push(...infraSeason(game, date)); }
+    // Wnioski po ratach: projekt startujący 1. dnia miesiąca nie płaci raty tego samego dnia
+    messages.push(...infraRequestsDay(game, date));
     return { messages };
   },
 });

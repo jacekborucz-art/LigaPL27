@@ -119,6 +119,19 @@
 .inf-run__head { display: flex; justify-content: space-between; gap: var(--space-2); margin: 0; font-size: var(--step--1); }
 .inf-run__head span { font-variant-numeric: tabular-nums; font-weight: 700; }
 
+/* Wniosek w toku: etapy zarząd, miasto */
+.inf-req { display: grid; gap: 6px; padding: 10px 12px; border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--tf-warn) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--tf-warn) 35%, var(--line)); }
+.inf-req > .btn { justify-self: start; }
+.inf-req__steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: var(--step--1); }
+.inf-req__steps li { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.inf-req__steps li b { display: flex; align-items: center; gap: 6px; }
+.inf-req__steps li b::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.inf-req__steps li[data-st="yes"] b::before { background: var(--tf-good); }
+.inf-req__steps li[data-st="wait"] b::before, .inf-req__steps li[data-st="cond"] b::before { background: var(--tf-warn); }
+.inf-req__steps li[data-st="todo"] { color: var(--text-muted); }
+.inf-note--no { color: var(--bad-text, var(--tf-bad)); }
+
 /* Prawa kolumna: oś czasu inwestycji i licencja */
 .inf-time { margin: 0; padding: 0 0 0 14px; list-style: none; display: grid; gap: var(--space-3); border-left: 2px solid color-mix(in srgb, var(--line) 85%, transparent); }
 .inf-time li { position: relative; display: grid; gap: 2px; font-size: var(--step--1); }

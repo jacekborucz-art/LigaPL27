@@ -1,6 +1,6 @@
 # Infrastruktura: stadion, baza treningowa, akademia
 
-Stan: Nov 13, 2026. Dotyczy `src/career/infrastructure.js` (model), `src/ui/infraView.js` (zakładka Klub, Infrastruktura), `src/styles/klub.css` (reguły `.inf-`) oraz krótkich zaczepów w `src/career/finance.js`, `src/career/careerSystem.js`, `src/season/rollover.js`, `src/training/development.js`, `src/training/sessions.js`, `src/training/aiClubs.js` i `src/match/matchday.js`. Model finansów, do którego dopięta jest infrastruktura: docs/finanse.md.
+Stan: Nov 13, 2026, wnioski (rozdz. 5.1): Nov 17, 2026. Dotyczy `src/career/infrastructure.js` (model), `src/ui/infraView.js` (zakładka Klub, Infrastruktura), `src/styles/klub.css` (reguły `.inf-`) oraz krótkich zaczepów w `src/career/finance.js`, `src/career/careerSystem.js`, `src/season/rollover.js`, `src/training/development.js`, `src/training/sessions.js`, `src/training/aiClubs.js` i `src/match/matchday.js`. Model finansów, do którego dopięta jest infrastruktura: docs/finanse.md.
 
 Oznaczenia: **[SZAC]** to szacunek albo założenie balansowe. Wszystkie poziomy, koszty, czasy budowy, utrzymanie i mnożniki w tym dokumencie są [SZAC]; realne obiekty służą tylko do ustawienia skali.
 
@@ -124,7 +124,7 @@ rozwój do 21 lat       x (0,92 + 0,016 x L) / (0,92 + 0,016 x L0)              
 
 ## 5. Projekty i finansowanie
 
-- Jeden projekt na tor naraz (rozbudowa trybun zajmuje tor stadionu). Klub gracza płaci 20 % swojej części na start, resztę w równych ratach 1. dnia każdego miesiąca budowy (wpis `infra`, „Inwestycje w obiekty”). Utrzymanie co miesiąc jako `upkeep` („Utrzymanie obiektów”).
+- Jeden projekt na tor naraz (rozbudowa trybun zajmuje tor stadionu). Projekt rusza dopiero po zgodzie zarządu i (gdy trzeba) pozwoleniu miasta, rozdz. 5.1. Klub gracza płaci 20 % swojej części w dniu startu budowy, resztę w równych ratach 1. dnia każdego miesiąca budowy (wpis `infra`, „Inwestycje w obiekty”). Utrzymanie co miesiąc jako `upkeep` („Utrzymanie obiektów”).
 - Po ostatnim miesiącu: poziom +1 albo nowe miejsca, wiadomość w poczcie (kategoria Klub), nowe efekty od razu (plan sezonu przeliczony).
 - Udział właściciela (deterministyczny, bez nazwisk w interfejsie) [SZAC]:
 
@@ -135,7 +135,50 @@ rozwój do 21 lat       x (0,92 + 0,016 x L) / (0,92 + 0,016 x L0)              
 | Właściciel albo spółka ze skarbcem | 25 % | 25 % | 25 % |
 | Pozostali, rezerwy | 0 | 0 | 0 |
 
-Realnie miasto decyduje o pieniądzach raz w roku (budżet w grudniu); w grze udział jest znany od razu przy wycenie.
+Realnie miasto decyduje o pieniądzach raz w roku (budżet w grudniu); w grze udział jest znany od razu przy wycenie, a miasto potwierdza go (albo nie) na etapie pozwolenia (rozdz. 5.1).
+
+### 5.1 Wnioski: zarząd, pozwolenie miasta, start (Nov 17, 2026)
+
+Inwestycja nie rusza od razu. Łańcuch: wniosek gracza (albo klubu AI), decyzja zarządu, pozwolenie miasta (gdy potrzebne), start budowy. Przy złożeniu wniosku nic nie schodzi z salda; przed każdą decyzją wycena jest liczona od nowa, a pierwsza wpłata schodzi w dniu startu. Etapy są w rejestrze `STAGES` (`board`, `city`) w kolejności `STAGE_ORDER`; `pipelineFor(game, id, q)` wybiera potrzebne. Kolejny etap (np. protesty kibiców, dotacja, przetarg) to nowy wpis w rejestrze. Wszystkie liczby [SZAC].
+
+| Etap | Kiedy | Czas | Decyzja |
+|---|---|---|---|
+| Zarząd | zawsze | 3-7 dni | punktacja S (niżej): S >= 0 zgoda; warunek albo odmowa |
+| Miasto | stadion (standard i trybuny) zawsze; baza, gdy dokłada miasto; akademia nigdy | standard stadionu 30-45 dni, trybuny 21-35, baza 14-28 | samo pozwolenie: 95 %; z pieniędzmi miasta: clamp(0,95 - 0,03 x udział miasta / max(dopłata miasta na sezon, 1 mln zł), 0,25, 0,95); wymóg licencji: co najmniej 90 % |
+
+Punktacja zarządu (`boardScore`), kwoty miesięczne:
+
+```text
+R          = (przychody krajowe + dopłata właściciela) / 12
+rezerwa    = (płace + koszty klubu) / 12
+wolne      = saldo (klub AI: saldo + fundusz) - pierwsza wpłata - rezerwa
+obciążenie = (część klubu - pierwsza wpłata) / max(miesiące budowy, 12) + przyrost utrzymania / 12
+saldo        clamp(20 x wolne / rezerwa, -20, 15)
+obciążenie   clamp(10 - 100 x obciążenie / R, -30, 10)
+wynik        plan sezonu na minusie -5, saldo ujemne -20
+właściciel   miliarder +10, prywatny ze skarbcem +5, spółka 0, miasto -5; plus 0,5 x (zasobność - 10)
+zaufanie     0,3 x (zaufanie zarządu - 50)   (kluby AI: 50)
+licencja     +40, gdy wniosek usuwa brak licencyjny
+los          -5..+5 (Rng infra-wniosek:ziarno:klub:tor:dzień złożenia:etap)
+```
+
+Raty w obciążeniu liczone są co najmniej na 12 miesięcy (decyzja wdrożeniowa Nov 17, 2026, do potwierdzenia przez właściciela): bez tego krótka i tania budowa (np. baza poziom 2 w III lidze, 2 miesiące) wyglądała na 36 % miesięcznych przychodów i zarząd zawsze odmawiał. Projekty od 12 miesięcy liczą się dokładnie według projektu.
+
+- Saldo poniżej pierwszej wpłaty: odmowa (klub AI bez licencji: fundusz poniżej kosztu).
+- Zgoda warunkowa: gdy -12 <= S < 0 i największym minusem jest saldo: „Zgoda, jeśli saldo klubu wyniesie co najmniej X do <data>”, X to saldo dające S = 0 (w górę do 100 tys. zł), termin 30 dni, sprawdzane codziennie. Spełniony: następny etap; niespełniony: odmowa.
+- Odmowa (zarządu albo miasta) blokuje nowy wniosek na ten obiekt do końca sezonu (do 1 lipca). Wniosek usuwający brak licencyjny nigdy nie jest blokowany. Wycofanie wniosku nic nie kosztuje i nie blokuje.
+- Powód odmowy prostymi słowami z najbardziej ujemnego składnika, np. „Raty i utrzymanie to 29 % miesięcznych przychodów”.
+- Poczta tylko dla klubu gracza: zarząd (kategoria Zarząd, „Zarząd klubu”), miasto („Urząd miasta”), start budowy jak dotąd („Ruszyła inwestycja”).
+
+Przykłady z symulacji (ziarno 21, dzień startu gry, zaufanie 60; szansa zgody zarządu z losu -5..+5):
+
+| Klub (właściciel, saldo) | Stadion | Baza treningowa | Akademia |
+|---|---|---|---|
+| Jagiellonia (miasto, 14,9 mln zł) | poziom 7: 0 % (obciążenie), miasto 25 % | poziom 7: 0 % (obciążenie) | poziom 6: 100 % (przy zaufaniu 50: ok. 93 %) |
+| Korona (miasto, 9,8 mln zł) | poziom 6: 99 %, miasto 54 % | poziom 6: 36 %, miasto 92 % | poziom 5: 100 % |
+| Legia (prywatny, 39,9 mln zł) | poziom 8: odmowa (saldo poniżej pierwszej wpłaty) | poziom 9: 0 % | poziom 8: 100 % |
+| Widzew (miliarder, 48,2 mln zł) | poziom 7: 100 %, pozwolenie 95 % | poziom 7: 100 % | poziom 6: 100 % |
+| Arka (miasto, 4,4 mln zł) | poziom 5: 100 %, miasto 69 % | poziom 5: 100 %, miasto 93 % | poziom 5: 100 % |
 
 ## 6. Licencja (PZPN, uproszczona [SZAC])
 
@@ -145,22 +188,23 @@ Realnie miasto decyduje o pieniądzach raz w roku (budżet w grudniu); w grze ud
 | 1 Liga | od 3 | | | od 2 |
 | 2 Liga | od 2 | | | |
 
-1 lipca klub poniżej wymogów (zwykle beniaminek) dostaje sezon na rozpoczęcie inwestycji (ostrzeżenie w poczcie). Jeśli rok później dalej brakuje obiektu i nie trwa jego budowa, PZPN nakłada karę 1 mln zł (wpis `fines`) i ostrzega ponownie; kara powtarza się co roku. Rozbudowa trybun wymagana przez licencję omija warunek 85 % zapełnienia i limit +50 %.
+1 lipca klub poniżej wymogów (zwykle beniaminek) dostaje sezon na rozpoczęcie inwestycji (ostrzeżenie w poczcie). Jeśli rok później dalej brakuje obiektu, nie trwa jego budowa i nie ma wniosku w toku, PZPN nakłada karę 1 mln zł (wpis `fines`) i ostrzega ponownie; kara powtarza się co roku. Rozbudowa trybun wymagana przez licencję omija warunek 85 % zapełnienia i limit +50 %.
 
 ## 7. Kluby AI
 
 - Klub AI z dużą nadwyżką co sezon wydaje połowę nadwyżki na „Spłatę długów i inwestycje” (`invest`, docs/finanse.md rozdz. 3.4). Połowa tej kwoty trafia do funduszu inwestycyjnego klubu (`fund`); pieniądze zeszły już z salda, więc projekty AI nie zmieniają salda drugi raz.
+- Kluby AI składają wnioski i przechodzą te same etapy (bez poczty). Wymogi licencji: wniosek 1 lipca, a gdy brakuje projektu i wniosku, ponownie 1. dnia każdego miesiąca.
 - 1 lipca: najpierw wymogi licencji (z funduszu, potem z salda ponad miesięczne koszty, a resztę dokłada właściciel albo miasto, jak przy długach klubów AI w docs/finanse.md rozdz. 3.4), potem jeden nowy projekt w kolejności baza, akademia, stadion. Stadion tylko przy zapełnieniu poprzedniego sezonu od 92 % (najpierw trybuny do maksimum poziomu, potem standard).
 - Kluby AI nie budują ponad poziom 8 (`AI_MAX`). Koszty i efekty są te same co dla gracza.
 - Test 10 sezonów z hojnym funduszem (20 % przychodów krajowych rocznie, stadiony pełne): żaden klub AI nie przekracza poziomu 8.
 
 ## 8. Stan gry i API
 
-`game.infra = { v: 1, clubs: { [id]: { stadium, training, academy, start: { stadium, training, academy }, seats, fans, fund, proj: { [tor]: { kind, to, seats, cost, owner, club, paid, months, m, start, ai, label } }, fillSum, fillN, fill, licence } }, july }`. Stare zapisy: stan powstaje przy wczytaniu (`ensureCareer` woła `ensureInfra`). Plan sezonu klubu (`F.clubs[id].plan`) dostaje pola `upkeep`, `upkeepBase`, `infraBase`, `infraOps` i znacznik `infra`; pozostałe pola planu zmieniają się tylko o różnicę (`cap`, `att`, `perFan`, `tickets`, `domestic`, `ops`, `net`), więc zmiany planu z innych modułów zostają.
+`game.infra = { v: 2, clubs: { [id]: { stadium, training, academy, start: { stadium, training, academy }, seats, fans, fund, proj: { [tor]: { kind, to, seats, cost, owner, club, paid, months, m, start, ai, label } }, req: { [tor]: wniosek }, reqLast: { [tor]: { result, stage, date, why, until } }, fillSum, fillN, fill, licence } }, july }`. Wniosek: `{ id, track, opts: { seats }, created, ai, q (wycena), licence, pipeline, at, stage, decideOn, cond: null | { minBalance, by }, steps: [{ stage, from, decideOn, result, S, p, why, date, met? }] }`. Stare zapisy: stan powstaje przy wczytaniu (`ensureCareer` woła `ensureInfra`); zapisy v1 dostają puste `req` i `reqLast`. Plan sezonu klubu (`F.clubs[id].plan`) dostaje pola `upkeep`, `upkeepBase`, `infraBase`, `infraOps` i znacznik `infra`; pozostałe pola planu zmieniają się tylko o różnicę (`cap`, `att`, `perFan`, `tickets`, `domestic`, `ops`, `net`), więc zmiany planu z innych modułów zostają.
 
-Eksporty `infrastructure.js`: `LEVELS`, `TRACKS`, `TRACK_NAMES`, `PL_CEILING`, `AI_MAX`, `INFRA`, `LICENCE`, `startLevels`, `infraOf`, `ensureInfra`, `applyPlan`, `trainingMods`, `academyMods`, `developmentMods`, `upkeepAt`, `capacityOf`, `seatRoom`, `seasonFill`, `licenceNeeds`, `ownerShare`, `ownerLabel`, `quote`, `startProject`, `infraMonth`, `infraSeason`, `stadiumMul`. System dnia `infra` (kolejność 55): zapełnienie stadionów po meczach ligowych, raty i zakończenia 1. dnia miesiąca, 1 lipca licencje i decyzje AI.
+Eksporty `infrastructure.js`: `LEVELS`, `TRACKS`, `TRACK_NAMES`, `PL_CEILING`, `AI_MAX`, `INFRA`, `LICENCE`, `startLevels`, `infraOf`, `ensureInfra`, `applyPlan`, `trainingMods`, `academyMods`, `developmentMods`, `upkeepAt`, `capacityOf`, `seatRoom`, `seasonFill`, `licenceNeeds`, `ownerShare`, `ownerLabel`, `quote`, `startProject` (start niskopoziomowy), `infraMonth`, `infraSeason`, `stadiumMul`, `IREQ`, `STAGES`, `STAGE_ORDER`, `pipelineFor`, `fixesLicence`, `boardScore`, `cityChance`, `submitRequest`, `withdrawRequest`, `infraRequestsDay`, `projectLabel`. System dnia `infra` (kolejność 55): zapełnienie stadionów po meczach ligowych, raty i zakończenia 1. dnia miesiąca, 1 lipca licencje i wnioski AI, na końcu `infraRequestsDay` (decyzje etapów, warunki, start; po ratach, więc projekt startujący 1. dnia miesiąca nie płaci raty tego dnia).
 
-Interfejs (`infraView.js`, akcje `inf-start`, `inf-confirm`, `inf-cancel`): kafelki poziomów i utrzymania, trzy karty torów (drabina 10 poziomów z obecnym poziomem i polskim szczytem, lista nazw z odniesieniami, efekty prostymi słowami, wycena następnego kroku z podziałem finansowania, przycisk z krokiem potwierdzenia, pasek postępu budowy i wpływ na pojemność), na PC prawa kolumna z osią „Trwające inwestycje”, wymogami licencji i opisem finansowania; na telefonie jedna kolumna.
+Interfejs (`infraView.js`, akcje `inf-start`, `inf-confirm` (wniosek), `inf-cancel`, `inf-withdraw` (wycofanie wniosku)): przycisk „Złóż wniosek do zarządu” z potwierdzeniem (czas decyzji zarządu i miasta), w karcie toru etapy wniosku (Zarząd, Miasto) z terminem albo warunkiem, po odmowie powód i data, od której można złożyć nowy wniosek, panel „Wnioski w toku” w prawej kolumnie; zadanie tygodnia o licencji znika, gdy wniosek jest w toku; kafelki poziomów i utrzymania, trzy karty torów (drabina 10 poziomów z obecnym poziomem i polskim szczytem, lista nazw z odniesieniami, efekty prostymi słowami, wycena następnego kroku z podziałem finansowania, przycisk z krokiem potwierdzenia, pasek postępu budowy i wpływ na pojemność), na PC prawa kolumna z osią „Trwające inwestycje”, wymogami licencji i opisem finansowania; na telefonie jedna kolumna.
 
 ## 9. Ograniczenia
 

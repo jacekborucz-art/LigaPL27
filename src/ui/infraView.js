@@ -1,14 +1,17 @@
 // Infrastruktura klubu (zakładka Klub > Infrastruktura): stadion, baza treningowa, akademia.
 // Model: src/career/infrastructure.js, opis i źródła: docs/infrastruktura.md.
-// Akcje (prefiks inf-): inf-start (pokazuje potwierdzenie), inf-confirm (start inwestycji), inf-cancel.
-// Układ: telefon jedna kolumna; PC karty torów po lewej, po prawej trwające inwestycje i wymogi licencyjne.
+// Akcje (prefiks inf-): inf-start (pokazuje potwierdzenie), inf-confirm (wniosek do zarządu), inf-cancel,
+// inf-withdraw (wycofanie wniosku). Inwestycja rusza po zgodzie zarządu i (stadion, baza z pieniędzmi miasta)
+// pozwoleniu miasta; etapy wniosku w karcie toru i w panelu „Wnioski w toku”.
+// Układ: telefon jedna kolumna; PC karty torów po lewej, po prawej wnioski, trwające inwestycje i wymogi licencyjne.
 import { esc, fmtDate } from './dom.js';
 import { kpi, panel, meter } from './transfersView.js';
 import { fmtZl } from '../career/transfers.js';
 import { clubById, LEAGUE_NAMES } from '../data/clubs_pl.js';
 import {
   TRACKS, TRACK_NAMES, LEVELS, MAX_LEVEL, PL_CEILING, LICENCE, INFRA,
-  infraOf, ensureInfra, quote, startProject, capacityOf, seatRoom, seasonFill, licenceNeeds,
+  infraOf, ensureInfra, quote, submitRequest, withdrawRequest, pipelineFor, projectLabel, STAGES, IREQ,
+  capacityOf, seatRoom, seasonFill, licenceNeeds,
   trainingMods, academyMods, academyCapacity, stadiumMul, ownerLabel, upkeepAt,
 } from '../career/infrastructure.js';
 
@@ -17,6 +20,18 @@ const x2 = (x) => (Math.round(x * 100) / 100).toFixed(2).replace('.', ',');
 const pct = (x) => `${Math.round(x * 100)}\u00a0%`;
 const mln = (x) => (x >= 1 ? `${String(x).replace('.', ',')} mln zł` : `${Math.round(x * 1000)} tys. zł`);
 const TONE = { stadium: 'good', training: 'info', academy: 'misc' };
+
+function plusDays(iso, n) {
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Czas decyzji miasta prostymi słowami: 30-45 dni = „1-1,5 mies.”, 21-35 dni = „3-5 tyg.”. */
+function spanText([a, b]) {
+  if (a >= 28) return `${String(Math.round(a / 30 * 2) / 2).replace('.', ',')}-${String(Math.round(b / 30 * 2) / 2).replace('.', ',')} mies.`;
+  return `${Math.round(a / 7)}-${Math.round(b / 7)} tyg.`;
+}
 
 function addMonths(iso, n) {
   const d = new Date(`${iso.slice(0, 7)}-01T12:00:00Z`);
@@ -87,6 +102,7 @@ function progress(game, id, track) {
 
 /** Wycena kolejnego kroku: koszt, czas, utrzymanie, podział finansowania, przycisk z potwierdzeniem. */
 function offer(game, id, q, ask, label) {
+  const city = pipelineFor(game, id, q).includes('city') ? `, potem pozwolenie miasta ok. ${spanText(STAGES.city.days(q))}` : '';
   const key = q.kind === 'seats' ? `seats:${q.seats}` : q.track;
   const data = `data-track="${q.kind === 'seats' ? 'seats' : q.track}"${q.kind === 'seats' ? ` data-seats="${q.seats}"` : ''}`;
   const who = ownerLabel(id);
@@ -98,9 +114,9 @@ function offer(game, id, q, ask, label) {
     ['Płatność', q.club ? `${fmtZl(q.upfront)} na start, potem ${fmtZl(q.monthly)} miesięcznie` : 'bez kosztów dla klubu'],
   ];
   const confirm = ask === key
-    ? `<div class="inf-ask" role="group" aria-label="Potwierdzenie"><p>${esc(label)}: ${q.club ? `pierwsza wpłata ${fmtZl(q.upfront)}` : 'bez kosztów dla klubu'}${q.disrupt ? `, w czasie budowy pojemność -${Math.round(q.disrupt * 100)} %` : ''}. Rozpocząć?</p>
-        <div class="inf-ask__btns"><button class="btn btn--primary btn--sm" data-act="inf-confirm" ${data}>Rozpocznij</button><button class="btn btn--quiet btn--sm" data-act="inf-cancel">Anuluj</button></div></div>`
-    : `<button class="btn btn--quiet btn--sm" data-act="inf-start" ${data}>${esc(label)}</button>`;
+    ? `<div class="inf-ask" role="group" aria-label="Potwierdzenie"><p>${esc(label)}. Zarząd odpowie w ${IREQ.BOARD_DAYS[0]}-${IREQ.BOARD_DAYS[1]} dni${esc(city.replace(/\.$/, ''))}.${q.club ? `Pierwsza wpłata (${fmtZl(q.upfront)}) dopiero w dniu startu budowy` : 'Bez kosztów dla klubu'}${q.disrupt ? `, w czasie budowy pojemność -${Math.round(q.disrupt * 100)} %` : ''}. Złożyć wniosek?</p>
+        <div class="inf-ask__btns"><button class="btn btn--primary btn--sm" data-act="inf-confirm" ${data}>Złóż wniosek</button><button class="btn btn--quiet btn--sm" data-act="inf-cancel">Anuluj</button></div></div>`
+    : `<button class="btn btn--quiet btn--sm" data-act="inf-start" ${data} aria-label="${esc(`Złóż wniosek do zarządu: ${label}`)}">Złóż wniosek do zarządu</button>`;
   return `<dl class="tf-dl inf-dl">${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>${confirm}`;
 }
 
@@ -109,14 +125,49 @@ function trackCard(game, id, track, ask) {
   const fx = `<ul class="inf-fx">${effects(game, id, track).map((t) => `<li>${esc(t)}</li>`).join('')}</ul>`;
   let next;
   if (I.proj[track]) next = progress(game, id, track);
+  else if (I.req?.[track]) next = requestBlock(game, id, track);
   else {
     const q = quote(game, id, track);
-    next = q.ok ? `<h4 class="inf-h">Następny poziom: ${q.to}. ${esc(LEVELS[track][q.to - 1].name)}</h4>${offer(game, id, q, ask, `Rozbuduj do poziomu ${q.to}`)}`
-      : `<p class="inf-note">${esc(q.why)}</p>`;
+    next = `${refusalNote(game, id, track)}${q.ok ? `<h4 class="inf-h">Następny poziom: ${q.to}. ${esc(LEVELS[track][q.to - 1].name)}</h4>${offer(game, id, q, ask, `Rozbudowa do poziomu ${q.to}`)}`
+      : `<p class="inf-note">${esc(q.why)}</p>`}`;
   }
-  const seats = track === 'stadium' && !I.proj.stadium ? seatsBlock(game, id, ask) : '';
+  const seats = track === 'stadium' && !I.proj.stadium && !I.req?.stadium ? seatsBlock(game, id, ask) : '';
   const body = `<p class="inf-now">${esc(LEVELS[track][L - 1].name)}</p>${ladder(track, L)}${fx}${next}${seats}`;
   return panel(TRACK_NAMES[track], TONE[track], body, { count: `poziom ${L}`, cls: 'inf-card', attrs: `data-track="${track}"` });
+}
+
+/** Etap wniosku prostymi słowami, np. „decyzja ok. 12 lip 2026”. */
+function stageText(r, i) {
+  const step = r.steps[i];
+  if (i < r.at) return { st: 'yes', txt: step?.met ? `zgoda po spełnieniu warunku ${fmtDate(step.met)}` : `zgoda ${fmtDate(step?.date ?? r.created)}` };
+  if (i > r.at) return { st: 'todo', txt: 'czeka' };
+  if (r.cond) return { st: 'cond', txt: `warunek: saldo co najmniej ${fmtZl(r.cond.minBalance)} do ${fmtDate(r.cond.by)}` };
+  return { st: 'wait', txt: `decyzja ok. ${fmtDate(r.decideOn)}` };
+}
+
+/** Wniosek w toku: etapy (zarząd, miasto), pierwsza wpłata w dniu startu, wycofanie bez kosztów. */
+function requestBlock(game, id, track) {
+  const r = infraOf(game, id).req[track];
+  const steps = r.pipeline.map((s, i) => {
+    const { st, txt } = stageText(r, i);
+    return `<li data-st="${st}"><b>${esc(STAGES[s].label)}</b><span>${esc(txt)}</span></li>`;
+  }).join('');
+  const pay = r.q.club ? `Pierwsza wpłata (${fmtZl(r.q.upfront)}) dopiero w dniu startu budowy.` : 'Bez kosztów dla klubu.';
+  return `<div class="inf-req">
+      <p class="inf-run__head"><b>${esc(`Wniosek: ${projectLabel(r.q)}`)}</b><span>${esc(fmtDate(r.created))}</span></p>
+      <ol class="inf-req__steps">${steps}</ol>
+      <p class="inf-note">${esc(pay)} Wycofanie wniosku nic nie kosztuje.</p>
+      <button class="btn btn--quiet btn--sm" data-act="inf-withdraw" data-track="${track}">Wycofaj wniosek</button>
+    </div>`;
+}
+
+/** Ostatnia odmowa: powód (do końca blokady albo przez 30 dni, gdy blokady nie ma). */
+function refusalNote(game, id, track) {
+  const last = infraOf(game, id).reqLast?.[track];
+  if (!last || last.result !== 'no' || !game.date) return '';
+  if (last.until ? last.until <= game.date : plusDays(last.date, 30) <= game.date) return '';
+  const who = last.stage === 'city' ? 'Odmowa miasta' : 'Odmowa zarządu';
+  return `<p class="inf-note inf-note--no">${esc(`${who} (${fmtDate(last.date)}): ${last.why}`)}</p>`;
 }
 
 /** Rozbudowa trybun: +25 % albo +50 % (do maksimum poziomu), tylko przy zapełnieniu od 85 % albo dla licencji. */
@@ -130,15 +181,27 @@ function seatsBlock(game, id, ask) {
   else {
     const qs = opts.map((s) => quote(game, id, 'stadium', { seats: s }));
     const okQ = qs.filter((q) => q.ok);
+    if (!okQ.length && qs[0]?.blocked) return ''; // odmowa w tym sezonie: powód już w karcie stadionu
     if (!okQ.length) body = `<p class="inf-note">${esc(qs[0]?.why ?? '')} Teraz: ${pct(fill)}.</p>`;
     else {
       const chosen = okQ.find((q) => ask === `seats:${q.seats}`) ?? okQ[okQ.length - 1];
       const others = okQ.filter((q) => q !== chosen).map((q) => `<button class="btn btn--quiet btn--sm" data-act="inf-start" data-track="seats" data-seats="${q.seats}">+${n0(q.seats)} miejsc</button>`).join('');
       body = `<p class="inf-note">Średnie zapełnienie ${pct(fill)}. Koszt miejsca ${fmtZl(INFRA.SEAT_COST * stadiumMul(infraOf(game, id).stadium))} na tym poziomie, najwyżej +50 % w jednym projekcie.</p>
-        ${offer(game, id, chosen, ask, `Dobuduj ${n0(chosen.seats)} miejsc`)}${others ? `<div class="inf-alt">${others}</div>` : ''}`;
+        ${offer(game, id, chosen, ask, `Dobudowa ${n0(chosen.seats)} miejsc`)}${others ? `<div class="inf-alt">${others}</div>` : ''}`;
     }
   }
   return `<h4 class="inf-h">Rozbudowa trybun</h4>${body}`;
+}
+
+/** Prawa kolumna: wnioski w toku (tylko gdy są). */
+function requestsPanel(game, id) {
+  const I = infraOf(game, id);
+  const list = TRACKS.filter((t) => I.req?.[t]).map((t) => ({ t, r: I.req[t] }));
+  if (!list.length) return '';
+  return panel('Wnioski w toku', 'warn', `<ol class="inf-time">${list.map(({ t, r }) => {
+    const { txt } = stageText(r, r.at);
+    return `<li data-track="${t}"><time>${esc(fmtDate(r.created))}</time><b>${esc(TRACK_NAMES[t])}: ${esc(r.q.kind === 'seats' ? `+${n0(r.q.seats)} miejsc` : `poziom ${r.q.to}`)}</b><small>${esc(`${STAGES[r.stage].label}: ${txt}`)}</small></li>`;
+  }).join('')}</ol>`, { count: list.length });
 }
 
 /** Prawa kolumna: trwające inwestycje (oś czasu). */
@@ -186,7 +249,7 @@ export function infraView(game, ui = {}) {
     </div>`;
   const ask = ui.infAsk ?? null;
   const cards = TRACKS.map((t) => trackCard(game, id, t, ask)).join('');
-  const side = `${timeline(game, id)}${licencePanel(game, id)}${panel('Kto płaci', 'misc', `<p class="tf-p__txt">${esc(fundingText(id))}</p>`)}`;
+  const side = `${requestsPanel(game, id)}${timeline(game, id)}${licencePanel(game, id)}${panel('Kto płaci', 'misc', `<p class="tf-p__txt">${esc(fundingText(id))}</p>`)}`;
   return `${kpis}<div class="inf-grid"><div class="inf-main">${cards}</div><aside class="inf-side" aria-label="Inwestycje i licencja">${side}</aside></div>`;
 }
 
@@ -196,10 +259,10 @@ function fundingText(id) {
     Właściciel: 'Bogaty właściciel dokłada do każdej inwestycji (do 50 %). Właściciel bez osobnych pieniędzy na klub nie dokłada.',
     'Spółka właściciela': 'Spółka właściciela dokłada 25 %, gdy przekazuje klubowi pieniądze na sezon.',
     'Pierwsza drużyna': 'Rezerwy korzystają z obiektów pierwszej drużyny.' }[who];
-  return `${t ?? ''} Klub płaci 20 % swojej części na start, resztę w miesięcznych ratach.`;
+  return `${t ?? ''} Każdą inwestycję najpierw zatwierdza zarząd (${IREQ.BOARD_DAYS[0]}-${IREQ.BOARD_DAYS[1]} dni), a stadion i bazę z pieniędzmi miasta także urząd miasta (pozwolenie na budowę, od 2 tygodni do 1,5 miesiąca). Po odmowie kolejny wniosek w sprawie tego obiektu można złożyć w nowym sezonie (od 1 lipca), chyba że chodzi o wymogi licencji. Klub płaci 20 % swojej części w dniu startu budowy, resztę w miesięcznych ratach.`;
 }
 
-/** Akcje inf-: inf-start (potwierdzenie), inf-confirm (start), inf-cancel. Zwraca { ui, save }. */
+/** Akcje inf-: inf-start (potwierdzenie), inf-confirm (wniosek), inf-cancel, inf-withdraw. Zwraca { ui, save }. */
 export function handleInfraAction(game, act, ds = {}) {
   const track = ds.track === 'seats' ? 'stadium' : ds.track;
   const seats = ds.track === 'seats' ? Number(ds.seats) || 0 : 0;
@@ -211,7 +274,13 @@ export function handleInfraAction(game, act, ds = {}) {
   if (act === 'inf-confirm') {
     if (!TRACKS.includes(track)) return { ui: {} };
     ensureInfra(game);
-    const r = startProject(game, game.clubId, track, { seats });
+    const r = submitRequest(game, game.clubId, track, { seats });
+    return { ui: { infAsk: null, kMsg: r.text }, save: r.ok };
+  }
+  if (act === 'inf-withdraw') {
+    if (!TRACKS.includes(track)) return { ui: {} };
+    ensureInfra(game);
+    const r = withdrawRequest(game, game.clubId, track);
     return { ui: { infAsk: null, kMsg: r.text }, save: r.ok };
   }
   return { ui: {} };

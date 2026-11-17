@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-03c32f66c5';
+const VERSION = 'v0.3-bd59e2870f';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -95,7 +95,7 @@ const FILES = [
   ['./src/career/finance.js', 'f6fb7c16a5'],
   ['./src/career/foreignMarket.js', '69f8495b89'],
   ['./src/career/foreignPool.js', '48d9c4bd5d'],
-  ['./src/career/infrastructure.js', '43b0f3fcec'],
+  ['./src/career/infrastructure.js', '687f630eb1'],
   ['./src/career/loans.js', '6b12fbe674'],
   ['./src/career/mindset.js', 'b8a1c39ce7'],
   ['./src/career/morale.js', '941048776c'],
@@ -123,7 +123,7 @@ const FILES = [
   ['./src/career/transferDeals.js', '116a88df52'],
   ['./src/career/transferSystem.js', '91a3d49d4c'],
   ['./src/career/transfers.js', 'cfee366370'],
-  ['./src/career/weeklyTodo.js', '4fe47926fe'],
+  ['./src/career/weeklyTodo.js', '3ff6bf1fca'],
   ['./src/config/calendar2026.js', '7af3df5b12'],
   ['./src/config/competitions.js', '1ba35856b2'],
   ['./src/config/version.js', 'cf12e050dc'],
@@ -195,7 +195,7 @@ const FILES = [
   ['./src/styles/editor.css', '3037084983'],
   ['./src/styles/fonts.css', '372f3ee1fc'],
   ['./src/styles/history.css', 'baa48b28de'],
-  ['./src/styles/klub.css', '932d181b46'],
+  ['./src/styles/klub.css', '62ff25555a'],
   ['./src/styles/matchday.css', '4093b1727a'],
   ['./src/styles/menu.css', 'cdd4f24b98'],
   ['./src/styles/negotiation.css', '949f233adc'],
@@ -231,7 +231,7 @@ const FILES = [
   ['./src/ui/europeView.js', '15e2d036f2'],
   ['./src/ui/fixturesView.js', 'c12490e48a'],
   ['./src/ui/formChart.js', '9d81bc96d3'],
-  ['./src/ui/infraView.js', '1cb8fd20bf'],
+  ['./src/ui/infraView.js', '8c179c1db1'],
   ['./src/ui/klubView.js', 'd55225df54'],
   ['./src/ui/loansView.js', '21eb434f9f'],
   ['./src/ui/masonry.js', 'abee5a105a'],
