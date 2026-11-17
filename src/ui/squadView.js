@@ -250,8 +250,8 @@ export function attrBand(v) {
 }
 
 /** Grupy atrybutów z paskami (profil zawodnika i panel atrybutów na ekranie składu). */
-export function attrGroupsHtml(p, { heading = 'h3' } = {}) {
-  const groups = p.pos === 'BR' ? ['gk', 'mental', 'phys', 'tech'] : ['tech', 'mental', 'phys'];
+export function attrGroupsHtml(p, { heading = 'h3', order = null } = {}) {
+  const groups = order ?? (p.pos === 'BR' ? ['gk', 'mental', 'phys', 'tech'] : ['tech', 'mental', 'phys']);
   return groups.map((g) => `
           <${heading}>${esc(ATTR_GROUPS[g])}</${heading}>
           <ul class="attrs">${Object.keys(ATTRS).filter((a) => ATTRS[a].group === g).map((a) => `

@@ -984,6 +984,9 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
   .tcard .tdet__groups h4:first-child { break-before: auto; }
   /* Bramkarz ma 4 grupy: bez wymuszonych podziałów, przeglądarka wyrówna 3 kolumny (inaczej 4. grupa wchodzi na boisko pozycji) */
   .tcard .tdet__groups:has(> h4:nth-of-type(4)) h4 { break-before: auto; }
+  /* Bramkarz: 2 kolumny, Mentalne nad Fizycznymi, Techniczne nad Bramkarskimi */
+  .tcard .tdet__groups--gk { columns: 2; }
+  .tcard .tdet__groups--gk h4:nth-of-type(3) { break-before: column; }
   .tcard .tdet__groups .attrs { break-inside: avoid; }
   .tcard .tdet__groups h4 { margin: 0 0 var(--space-1); padding-top: var(--space-2); }
   .tcard .tdet__groups h4:first-child { padding-top: 0; }

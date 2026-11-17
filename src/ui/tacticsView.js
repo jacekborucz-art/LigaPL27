@@ -292,7 +292,9 @@ function renderPlayerInfo(p, tactics, f, extra = '', { wide = false, pinned = fa
         ${fact('Morale', esc(moraleLabel(p.morale ?? 12)))}
       </dl>
       <div class="tdet__vis">${formChartHtml(p)}${positionMapHtml(p)}</div>
-      <div class="tdet__groups">${attrGroupsHtml(p, { heading: 'h4' })}</div>
+      ${wide && p.pos === 'BR' // bramkarz na PC: Mentalne nad Fizycznymi, Bramkarskie pod Technicznymi (2 kolumny)
+        ? `<div class="tdet__groups tdet__groups--gk">${attrGroupsHtml(p, { heading: 'h4', order: ['mental', 'phys', 'tech', 'gk'] })}</div>`
+        : `<div class="tdet__groups">${attrGroupsHtml(p, { heading: 'h4' })}</div>`}
       ${extra ? `<div class="tdet__stats">${extra}</div>` : ''}
     </div>
   </dialog>`;
