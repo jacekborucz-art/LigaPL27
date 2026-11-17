@@ -242,7 +242,7 @@ button.ufx__mid { font: inherit; color: var(--text-muted); }
 .mr-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--space-2) var(--space-3); margin: 0; padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--surface-stripe); }
 .mr-info div { min-width: 0; }
 .mr-info dt { font-size: 11px; color: var(--text-muted); }
-.mr-info dd { margin: 2px 0 0; font-weight: 600; overflow-wrap: anywhere; }
+.mr-info dd { margin: 2px 0 0; font-size: 13px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
 .mr-sec { display: grid; gap: var(--space-2); }
 .mr-sec h3 { margin: 0; font: 700 var(--step-0)/1.2 var(--font-display); }
 .mr-empty { margin: 0; color: var(--text-muted); font-size: var(--step--1); }
@@ -257,8 +257,8 @@ button.ufx__mid { font: inherit; color: var(--text-muted); }
 .mr-ev--h .mr-ev__body { grid-column: 1; flex-direction: row-reverse; text-align: right; }
 .mr-ev--a .mr-ev__body { grid-column: 3; }
 .mr-ev__txt { display: grid; min-width: 0; line-height: 1.2; }
-.mr-ev__txt b { font-weight: 600; overflow-wrap: anywhere; }
-.mr-ev__txt small { font-size: 12px; color: var(--text-muted); overflow-wrap: anywhere; }
+.mr-ev__txt b { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.mr-ev__txt small { font-size: 11px; color: var(--text-muted); overflow-wrap: anywhere; }
 .mr-ev__sc { flex: none; padding: 1px 6px; border-radius: var(--radius-s); font: 700 var(--step--1)/1.4 var(--font-display); background: color-mix(in srgb, var(--led) 26%, transparent); font-variant-numeric: tabular-nums; }
 .mr-ev__ico { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; position: relative; color: var(--text); }
 .mr-ev__ico svg { width: 18px; height: 18px; }
