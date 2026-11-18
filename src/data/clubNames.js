@@ -42,6 +42,25 @@ export const FICTIONAL = {
   'unia-skierniewice': { real: 'Unia Skierniewice', name: 'Zjednoczeni Skierniewice', short: 'ZJE' },
   warta: { real: 'Warta Poznań', name: 'Strażnica Poznań', short: 'STR' },
   podbeskidzie: { real: 'Podbeskidzie Bielsko-Biała', name: 'Górale Bielsko-Biała', short: 'GRL' },
+  // 2 Liga (Nov 18, 2026); rezerwy z własnymi nazwami i herbami: Legat II, Silesia II
+  avia: { real: 'Avia Świdnik', name: 'Lotnik Świdnik', short: 'LOT' },
+  chojniczanka: { real: 'Chojniczanka Chojnice', name: 'Gryf Chojnice', short: 'GRY' },
+  'gks-tychy': { real: 'GKS Tychy', name: 'Tyski Sport Tychy', short: 'TYS' },
+  'gornik-leczna': { real: 'Górnik Łęczna', name: 'Karbon Łęczna', short: 'KŁĘ' },
+  hutnik: { real: 'Hutnik Kraków', name: 'Kuźnia Kraków', short: 'KKR' },
+  'lechia-zg': { real: 'Lechia Zielona Góra', name: 'Zielonogórski Zielona Góra', short: 'ZGÓ' },
+  'legia-ii': { real: 'Legia II Warszawa', name: 'Legat II Warszawa', short: 'LG2' },
+  'olimpia-grudziadz': { real: 'Olimpia Grudziądz', name: 'Olimp Grudziądz', short: 'OLI' },
+  podhale: { real: 'NKP Podhale Nowy Targ', name: 'Tatrzański Nowy Targ', short: 'TAT' },
+  rekord: { real: 'Rekord Bielsko-Biała', name: 'Champion Bielsko-Biała', short: 'CHA' },
+  resovia: { real: 'Resovia Rzeszów', name: 'Biało-Czerwoni Rzeszów', short: 'BCZ' },
+  sandecja: { real: 'Sandecja Nowy Sącz', name: 'Dunajec Nowy Sącz', short: 'DUN' },
+  'sokol-kleczew': { real: 'Sokół Kleczew', name: 'Jastrząb Kleczew', short: 'JAS' },
+  'stal-stalowa-wola': { real: 'Stal Stalowa Wola', name: 'Metal Stalowa Wola', short: 'MTL' },
+  'slask-ii': { real: 'Śląsk Wrocław II', name: 'Silesia II Wrocław', short: 'SI2' },
+  swit: { real: 'Świt Szczecin', name: 'Jutrzenka Szczecin', short: 'JUT' },
+  zawisza: { real: 'Zawisza Bydgoszcz', name: 'Rycerz Bydgoszcz', short: 'RYC' },
+  znicz: { real: 'Znicz Pruszków', name: 'Płomień Pruszków', short: 'PŁO' },
 };
 
 export const NAMES_KEY = 'ligapl27-names';
@@ -59,6 +78,9 @@ export function reserveName(name, parentId) {
   if (name.startsWith(f.real)) return f.name + name.slice(f.real.length);
   const rf = first(f.real);
   if (name.startsWith(`${rf} `) || name === rf) return first(f.name) + name.slice(rf.length);
+  // Rezerwy nazwane innym członem prawdziwej nazwy, np. „Termalica II Nieciecza” (Bruk-Bet Termalica Nieciecza)
+  const w = String(f.real).split(' ').find((x) => x.length >= 4 && name.startsWith(`${x} `));
+  if (w) return first(f.name) + name.slice(w.length);
   return name;
 }
 

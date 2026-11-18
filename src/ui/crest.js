@@ -18,6 +18,8 @@ export const FICTIONAL_CRESTS = new Set([
   // 1 Liga
   'arka', 'lechia-gdansk', 'puszcza', 'polonia-bytom', 'ruch', 'pogon-grodzisk', 'podbeskidzie', 'stal-rzeszow', 'miedz',
   'stal-mielec', 'chrobry', 'pogon-siedlce', 'odra-opole', 'polonia-warszawa', 'warta', 'termalica', 'lks', 'unia-skierniewice',
+  // 2 Liga (Legat II i Silesia II mają własne herby)
+  'resovia', 'rekord', 'sandecja', 'chojniczanka', 'sokol-kleczew', 'swit', 'gornik-leczna', 'hutnik', 'legia-ii', 'avia', 'stal-stalowa-wola', 'olimpia-grudziadz', 'znicz', 'zawisza', 'slask-ii', 'podhale', 'gks-tychy', 'lechia-zg',
 ]);
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => (
@@ -59,9 +61,11 @@ export function fallbackCrestSvg(club) {
  * base: ścieżka do katalogu assets (względna względem strony).
  */
 export function crestHtml(club, { size = 32, base = 'assets/crests', clubsById = null } = {}) {
-  const parent = club.parent && clubsById ? clubsById.get(club.parent) : null;
+  // Rezerwy z własnym nowym herbem (np. Legat II) używają go, pozostałe herbu pierwszej drużyny z plakietką „II”
+  const own = fictionalCrest(club.id) && FICTIONAL_CRESTS.has(club.id);
+  const parent = !own && club.parent && clubsById ? clubsById.get(club.parent) : null;
   const source = parent || club;
-  const badge = club.parent ? '<span class="crest__badge">II</span>' : '';
+  const badge = club.parent && !own ? '<span class="crest__badge">II</span>' : '';
   let inner;
   const fict = fictionalCrest(source.id);
   if (fict && !FICTIONAL_CRESTS.has(source.id)) {

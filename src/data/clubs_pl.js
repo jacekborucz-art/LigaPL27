@@ -8,6 +8,7 @@
 // (applyLeagueState): kluby spadające do IV ligi wypadają z listy, beniaminkowie z IV ligi do niej trafiają.
 
 import { CLUBS_L3 } from './clubs_l3.js';
+import { CLUBS_L4 } from './clubs_l4.js';
 import { applyClubNames } from './clubNames.js';
 
 export const TIERS = { EK: 1, L1: 2, L2: 3, L3: 4 };
@@ -91,6 +92,7 @@ export const CLUBS_PL = [
 // Nazwy do publikacji (fikcyjne; prawdziwe w clubNames.js), także rezerwy w 2 Lidze i III lidze: tylko w przeglądarce
 applyClubNames(CLUBS_PL);
 applyClubNames(CLUBS_L3);
+applyClubNames(CLUBS_L4); // rezerwy w IV lidze (np. Cracovia II, Piast II Gliwice)
 
 for (const c of CLUBS_L3) CLUBS_PL.push(c);
 
