@@ -23,6 +23,25 @@ export const FICTIONAL = {
   'wisla-krakow': { real: 'Wisła Kraków', name: 'Błękit Kraków', short: 'BŁĘ' },
   slask: { real: 'Śląsk Wrocław', name: 'Silesia Wrocław', short: 'SIL' },
   wieczysta: { real: 'Wieczysta Kraków', name: 'Wieczność Kraków', short: 'WIE' },
+  // 1 Liga (Nov 18, 2026)
+  arka: { real: 'Arka Gdynia', name: 'Armada Gdynia', short: 'ARM' },
+  termalica: { real: 'Bruk-Bet Termalica Nieciecza', name: 'Słonie Nieciecza', short: 'SŁO' },
+  'lechia-gdansk': { real: 'Lechia Gdańsk', name: 'Bursztyn Gdańsk', short: 'BUR' },
+  chrobry: { real: 'Chrobry Głogów', name: 'Monarcha Głogów', short: 'MON' },
+  lks: { real: 'ŁKS Łódź', name: 'Włókniarze Łódź', short: 'WŁÓ' },
+  miedz: { real: 'Miedź Legnica', name: 'Kuźnia Legnica', short: 'KUŹ' },
+  'odra-opole': { real: 'Odra Opole', name: 'Rzeczni Opole', short: 'RZE' },
+  'pogon-grodzisk': { real: 'Pogoń Grodzisk Mazowiecki', name: 'Grodzianie Grodzisk', short: 'GRO' },
+  'pogon-siedlce': { real: 'Pogoń Siedlce', name: 'Pościg Siedlce', short: 'POŚ' },
+  'polonia-bytom': { real: 'Polonia Bytom', name: 'Czarni Bytom', short: 'CZA' },
+  'polonia-warszawa': { real: 'Polonia Warszawa', name: 'Stołeczni Warszawa', short: 'STO' },
+  puszcza: { real: 'Puszcza Niepołomice', name: 'Bór Niepołomice', short: 'BÓR' },
+  ruch: { real: 'Ruch Chorzów', name: 'Dynamika Chorzów', short: 'DNM' },
+  'stal-mielec': { real: 'Stal Mielec', name: 'Metalurg Mielec', short: 'MET' },
+  'stal-rzeszow': { real: 'Stal Rzeszów', name: 'Hutniczy Rzeszów', short: 'HUT' },
+  'unia-skierniewice': { real: 'Unia Skierniewice', name: 'Zjednoczeni Skierniewice', short: 'ZJE' },
+  warta: { real: 'Warta Poznań', name: 'Strażnica Poznań', short: 'STR' },
+  podbeskidzie: { real: 'Podbeskidzie Bielsko-Biała', name: 'Górale Bielsko-Biała', short: 'GRL' },
 };
 
 export const NAMES_KEY = 'ligapl27-names';
@@ -57,7 +76,7 @@ export function applyClubNames(list) {
   return list;
 }
 
-const SHORT_ALIASES = [['Raków', 'Stalowy'], ['Legia', 'Legat'], ['Lech', 'Żelazny'], ['Jagiellonia', 'Dynastia'], ['Widzew', 'Robotniczy'], ['Radomiak', 'Zieloni'], ['Wieczysta', 'Wieczność'], ['Cracovia', 'Szachownica']];
+const SHORT_ALIASES = [['Bruk-Bet Termalica', 'Słonie'], ['Termalica', 'Słonie'], ['Raków', 'Stalowy'], ['Legia', 'Legat'], ['Lech', 'Żelazny'], ['Jagiellonia', 'Dynastia'], ['Widzew', 'Robotniczy'], ['Radomiak', 'Zieloni'], ['Wieczysta', 'Wieczność'], ['Cracovia', 'Szachownica']];
 /** Zamienia prawdziwe nazwy klubów w tekście (pełna nazwa, a dla rezerw i skrótów pierwszy człon: „Raków” -> „Stalowy”). */
 export function fictionalText(s) {
   if (typeof s !== 'string') return s;

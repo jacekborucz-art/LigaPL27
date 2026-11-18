@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-550728b855';
+const VERSION = 'v0.3-4cf68497c7';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -170,7 +170,7 @@ const FILES = [
   ['./src/core/rng.js', '3712174b88'],
   ['./src/core/store.js', 'adb3d58f02'],
   ['./src/data/attributes.js', '892bf10066'],
-  ['./src/data/clubNames.js', '0ff1494ace'],
+  ['./src/data/clubNames.js', '8c5a46ada0'],
   ['./src/data/clubs_l3.js', 'd3a2685877'],
   ['./src/data/clubs_l4.js', '90bd3180ad'],
   ['./src/data/clubs_pl.js', '266d3c9c54'],
@@ -266,7 +266,7 @@ const FILES = [
   ['./src/ui/clubView.js', 'c762a8d93c'],
   ['./src/ui/competitionsView.js', '6df6a9a5c1'],
   ['./src/ui/contextMenu.js', '5590f7bc7f'],
-  ['./src/ui/crest.js', '13c50820f9'],
+  ['./src/ui/crest.js', '5b0d793b8f'],
   ['./src/ui/daySpeed.js', '73d29c5b52'],
   ['./src/ui/dom.js', '0ce16300f6'],
   ['./src/ui/editorView.js', '3d17acf1f6'],

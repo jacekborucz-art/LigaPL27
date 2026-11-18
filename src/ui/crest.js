@@ -11,6 +11,11 @@ export const CRESTS_AVAILABLE = new Set([
 import { FICTIONAL, realNamesOn } from '../data/clubNames.js';
 /** Nowy herb (fikcyjna nazwa klubu, przeglądarka bez prawdziwych nazw). */
 const fictionalCrest = (id) => !!FICTIONAL[id] && typeof document !== 'undefined' && !realNamesOn();
+/** Nowe herby w assets/crests/f (kluby z nazwą do publikacji, które mają już plik). Bez pliku: tarcza w barwach klubu. */
+export const FICTIONAL_CRESTS = new Set([
+  'cracovia', 'gks-katowice', 'gornik-zabrze', 'jagiellonia', 'korona', 'lech', 'legia', 'motor', 'piast', 'pogon-szczecin',
+  'radomiak', 'rakow', 'slask', 'widzew', 'wieczysta', 'wisla-krakow', 'wisla-plock', 'zaglebie-lubin',
+]);
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
@@ -55,10 +60,13 @@ export function crestHtml(club, { size = 32, base = 'assets/crests', clubsById =
   const source = parent || club;
   const badge = club.parent ? '<span class="crest__badge">II</span>' : '';
   let inner;
-  if (CRESTS_AVAILABLE.has(source.id)) {
+  const fict = fictionalCrest(source.id);
+  if (fict && !FICTIONAL_CRESTS.has(source.id)) {
+    inner = fallbackCrestSvg(source); // nowa nazwa bez nowego herbu: nie pokazujemy prawdziwego
+  } else if (CRESTS_AVAILABLE.has(source.id) || fict) {
     const file = size <= 24 ? `${source.id}-48.webp` : `${source.id}.webp`;
     // Kluby z nazwą do publikacji (src/data/clubNames.js): nowe herby w assets/crests/f, prawdziwe po Ctrl+Alt+P
-    const dir = fictionalCrest(source.id) ? `${base}/f` : base;
+    const dir = fict ? `${base}/f` : base;
     inner = `<img src="${dir}/${file}" alt="" width="${size}" height="${size}" loading="lazy" decoding="async">`;
   } else {
     inner = fallbackCrestSvg(source);
