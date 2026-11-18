@@ -71,7 +71,7 @@ Zapisywane są tylko zmienione pola. Klucze atrybutów jak w `src/data/attribute
 
 ### Pełny datapack
 
-Przycisk „Eksportuj wszystkie kluby i zawodników” zapisuje plik `LigaPL27-datapack-pelny-<data>.json` z bieżącymi
+Przycisk „Eksportuj datapack” (jedyny eksport w edytorze od Nov 19, 2026) zapisuje plik `LigaPL27-datapack-pelny-<data>.json` z bieżącymi
 danymi wszystkich klubów z kadrą (wszystkie pola klubu) i wszystkich zawodników świata gry (kluby polskie, zagranica,
 wolni zawodnicy), razem z edytowanymi. Format jak wyżej, z `"full": true`; zawodnik ma dodatkowo `club` (nazwa klubu)
 i `ovr`, tylko do czytania (import je pomija). Pole, które nie przeszłoby walidacji importu, jest pomijane, więc plik

@@ -432,7 +432,8 @@ test('Widok edytora: zakładki, formularz klubu i zawodnika, zapis przez akcje, 
   handleEditorAction(g, ed, 'ed-player', { id: found.rows[0].id });
   assert.match(renderEditor(g, ed), /id="ed-a-POD"/);
   ed.tab = 'pack';
-  assert.match(renderEditor(g, ed), /data-act="ed-export"/);
+  assert.match(renderEditor(g, ed), /data-act="ed-export" data-full="1"/);
+  assert.doesNotMatch(renderEditor(g, ed), /Eksportuj zmiany/); // tylko pełny eksport
   restoreOriginals();
 });
 

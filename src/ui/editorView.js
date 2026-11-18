@@ -358,12 +358,11 @@ function packPanel(game, ed) {
   const n = packCounts(game);
   return `<div class="ed-form ed-pack">
     <h2 id="ed-title" tabindex="-1">Datapack</h2>
-    <p class="ed-note">Datapack to plik z danymi klubów (nazwy, stadion, pojemność, finanse) i zawodników. Możesz zapisać same swoje zmiany albo wszystkie kluby i wszystkich zawodników, razem ze zmienionymi. Plik wczytasz w innej grze. Dane klubów działają zawsze, dane zawodników tylko w tym samym świecie gry (ta sama kariera albo jej kopia).</p>
+    <p class="ed-note">Datapack to plik z danymi klubów (nazwy, stadion, pojemność, finanse) i zawodników. Eksport zapisuje wszystkie kluby i wszystkich zawodników, razem ze zmienionymi. Plik wczytasz w innej grze. Dane klubów działają zawsze, dane zawodników tylko w tym samym świecie gry (ta sama kariera albo jej kopia).</p>
     <dl class="ed-sum"><div><dt>Zmienione kluby</dt><dd>${n.clubs}</dd></div><div><dt>Zmienieni zawodnicy</dt><dd>${n.players}</dd></div></dl>
     ${msgHtml(ed)}
     <div class="ed-actions">
-      <button class="btn btn--primary" data-act="ed-export">Eksportuj zmiany</button>
-      <button class="btn btn--primary" data-act="ed-export" data-full="1">Eksportuj wszystkie kluby i zawodników</button>
+      <button class="btn btn--primary" data-act="ed-export" data-full="1">Eksportuj datapack</button>
       <label class="btn btn--quiet ed-import">Wczytaj datapack<input type="file" data-act="ed-import" hidden></label>
     </div>
     <section class="ed-danger"><h3>Wyczyść datapack</h3>
