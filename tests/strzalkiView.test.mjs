@@ -124,7 +124,7 @@ test('Ruch w oknie zawodnika i w tabeli: kierunek zamiast osobnej kolumny lat (t
   assert.equal((table.match(/<th scope="col"/g) ?? []).length, PI_IDS.length + 1);
   assert.equal(PI_IDS.length, 7);
   assert.match(table, /<th scope="col"><span>Ruch<\/span>/);
-  assert.match(table, /data-k="run"[^>]*>[\s\S]*?<option value="fi" selected>Skos do środka<\/option>/);
+  assert.match(table, /<td class="pit-pitch is-set"><span[^>]*>Skos do środka<\/span><\/td>/, 'pierwszy skład: ruch z boiska, bez listy');
   assert.match(table, /Instrukcje: ruch skos do środka/);
   // Telefon: Ruch jako lista wyboru
   const one = piTableHtml({ rows, map, instructions: base.instructions, pick: 'run', attr });

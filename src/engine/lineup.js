@@ -8,7 +8,7 @@ import { proficiency, posEff, assessLineup, validateLineup } from './positions.j
 import { conditionTerms, lineupRating } from './teamStrength.js';
 import { GROUP, isAvailable } from '../career/squad.js';
 import { knockEligible } from './match/teams.js';
-import { cleanPlayerInstrMap } from '../data/playerInstructions.js';
+import { cleanPlayerInstrMap, arrowOf, arrowAllowed } from '../data/playerInstructions.js';
 
 /** Wartość zawodnika na danym slocie (OVR z karą pozycji + stan zawodnika). */
 export function slotValue(player, slot) {
@@ -297,6 +297,27 @@ export function refreshTactics(tactics, squad, { benchSize = 12, benchGk = 1 } =
   const roles = autoRoles(squad, t.xi);
   for (const r of ['captain', 'penalty', 'freeKick', 'corner']) if (!t[r] || !t.xi.includes(t[r])) t[r] = roles[r];
   // Instrukcje indywidualne: zostają zawodnicy z kadry (także chwilowo niedostępni), odchodzą ci spoza klubu; stare zapisy: {}
-  t.playerInstr = cleanPlayerInstrMap(tactics.playerInstr, byId);
+  t.playerInstr = pruneArrows(cleanPlayerInstrMap(tactics.playerInstr, byId), t, byId);
   return { tactics: t, changes };
+}
+
+/**
+ * Strzałki ruchu niedozwolone na obecnym miejscu w składzie (np. ruch na zewnątrz przy linii bocznej po zmianie zasad
+ * albo formacji) znikają z zapisu: silnik i tak je pomija (playerInstr.js), więc nie mogą wisieć jako „ustawione”.
+ */
+export function pruneArrows(map, tactics, byId) {
+  if (!map) return map;
+  const f = formationById(tactics.formation);
+  let out = map;
+  tactics.xi.forEach((id, i) => {
+    const e = out[id]; const slot = f.slots[i];
+    const dir = e && slot ? arrowOf(e) : null;
+    if (!dir) return;
+    const pos = byId.get(id)?.pos;
+    if (arrowAllowed(slot.pos, dir, slot.x) || (pos && arrowAllowed(pos, dir, slot.x))) return;
+    const { run, lat, ...rest } = e;
+    out = { ...out };
+    if (Object.keys(rest).length) out[id] = rest; else delete out[id];
+  });
+  return out;
 }

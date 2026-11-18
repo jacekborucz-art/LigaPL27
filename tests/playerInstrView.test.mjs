@@ -72,8 +72,9 @@ test('Tabela: N zawodników x 7 instrukcji, pola „nie dotyczy”, nadpisania p
   for (const [i, tr] of trs.entries()) {
     const sel = (tr.match(/<select class="pit-sel"/g) ?? []).length;
     const na = (tr.match(/class="pit-na"/g) ?? []).length;
-    assert.equal(sel + na, PI_IDS.length, `wiersz ${i}: 7 kolumn`);
-    assert.equal(sel, PLAYER_INSTRUCTIONS.filter((d) => piFor(d.id, rows[i])).length);
+    const pitch = (tr.match(/class="pit-pitch/g) ?? []).length; // pierwszy skład: Ruch jako strzałka na boisku
+    assert.equal(sel + na + pitch, PI_IDS.length, `wiersz ${i}: 7 kolumn`);
+    assert.equal(sel + pitch, PLAYER_INSTRUCTIONS.filter((d) => piFor(d.id, rows[i])).length);
     if (rows[i].p.pos === 'BR' && !rows[i].slotPos) assert.equal(na, 6, 'bramkarz: tylko podania');
   }
   assert.equal((table.match(/<th scope="col"/g) ?? []).length, 8, 'nazwisko i 7 instrukcji');

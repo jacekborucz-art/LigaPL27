@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-f244d44ef3';
+const VERSION = 'v0.3-f7d42b66b3';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -78,7 +78,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', '469ac44b76'],
+  ['./src/app.js', '4f8b3848fa'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '5cc24e938e'],
@@ -146,7 +146,7 @@ const FILES = [
   ['./src/data/playerInstructions.js', 'c83822cb91'],
   ['./src/data/reprezentacje.json', '551a9d5bdd'],
   ['./src/data/reprezentacje_swiat.json', '29c3c96adf'],
-  ['./src/engine/lineup.js', '2783f8d715'],
+  ['./src/engine/lineup.js', 'fd8c7c295e'],
   ['./src/engine/match/coach.js', 'b25f14ff0a'],
   ['./src/engine/match/constants.js', '4c7f75d944'],
   ['./src/engine/match/control.js', 'cfc35b73b8'],
@@ -190,7 +190,7 @@ const FILES = [
   ['./src/season/thirdLeague.js', 'b37f1d8a44'],
   ['./src/season/uefa.js', '4a0c9dc052'],
   ['./src/season/worldNations.js', '6003d36e12'],
-  ['./src/styles/app.css', 'a32523ac90'],
+  ['./src/styles/app.css', '3b2df322fe'],
   ['./src/styles/assistant.css', 'a1dd04f875'],
   ['./src/styles/base.css', 'f2fee58203'],
   ['./src/styles/club.css', '6615e08e49'],
@@ -246,7 +246,7 @@ const FILES = [
   ['./src/ui/nationalView.js', '92d610d773'],
   ['./src/ui/negotiationView.js', '82b6da6b0d'],
   ['./src/ui/playerCard.js', '9f75750223'],
-  ['./src/ui/playerInstrView.js', '6b72abebba'],
+  ['./src/ui/playerInstrView.js', '9e2555a798'],
   ['./src/ui/playerMenus.js', 'c3d2bde3f2'],
   ['./src/ui/playerStatsView.js', '00e99b6845'],
   ['./src/ui/playerTags.js', '11c84f25c9'],

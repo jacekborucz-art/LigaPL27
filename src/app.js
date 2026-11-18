@@ -37,7 +37,7 @@ import { mountArrowDraw } from './ui/tacticsArrows.js'; // strzałki ruchu: ryso
 import { formationById } from './data/formations.js';
 import { arrowsFor, arrowLabel } from './data/playerInstructions.js';
 import { WIDE_CARD, cardPos, placeCard, bindCardDrag } from './ui/playerCard.js';
-import { createTactics, changeFormation, setInstruction, refreshTactics, removeFromBench, checkTactics, AUTO_MODES } from './engine/lineup.js';
+import { createTactics, changeFormation, setInstruction, refreshTactics, removeFromBench, checkTactics, AUTO_MODES, pruneArrows } from './engine/lineup.js';
 import { COMPETITIONS } from './config/competitions.js';
 import { mountMatchday } from './ui/matchdayView.js';
 import { mountDrawAnimation } from './ui/europeView.js';
@@ -529,6 +529,7 @@ function renderTab(tab, g, club) {
     if (state.sqSub === 'tactics') {
       queueMicrotask(mountTacticsScreen); // po wstawieniu HTML: okno atrybutów i fokus
       const wide = matchMedia(WIDE_INFO).matches;
+      if (g.tactics.playerInstr) { const sqm = new Map(mySquad(g).map((p) => [p.id, p])); g.tactics.playerInstr = pruneArrows(g.tactics.playerInstr, g.tactics, sqm); } // nieważne strzałki znikają
       return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), info: state.tInfo, msg: state.tMsg, numbers: shirtNumbers(g, g.clubId, squadOf(g.world, g.clubId)), kit: kitColors(clubById(g.clubId)), cards: tCardsFor(g, wide), wide, strengthOpen: tUi.strOpen, assistant: hasAssistant(g), rzChips, rzStrip: rzOn ? reservesStrip(g) : '', analyses: analysesBadge(g), arrows: state.tArrows });
     }
     const ovrs = leagueOvrs(g, club.tier);

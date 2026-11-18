@@ -221,7 +221,12 @@ export function piTableHtml({ rows, map = {}, instructions = {}, filter = 'all',
   const head = `<tr><th scope="col" class="pit-c0">Zawodnik</th>${PLAYER_INSTRUCTIONS.map((d) => `<th scope="col"><span>${esc(d.label)}</span>${d.team ? `<small>drużyna: ${esc(teamValueLabel(d.id, instructions).toLowerCase())}</small>` : ''}</th>`).join('')}</tr>`;
   const cell = (r, d) => {
     if (!piFor(d.id, r)) return '<td class="pit-na"><span>nie dotyczy</span></td>';
-    if (d.id === 'run') return `<td class="${arrowOf(map[r.id]) ? 'is-set' : ''}">${dirSelectHtml(r, map[r.id], `${r.p.name}: ${d.label}`)}</td>`;
+    if (d.id === 'run') {
+      const dir = arrowOf(map[r.id]); const ok = !!dir && piDirsFor(r).includes(dir);
+      // Pierwszy skład: ruch ustawia strzałka na boisku (prawy przycisk), tu tylko podgląd; ławka i reszta: lista wyboru
+      if (r.zone === 'xi') return `<td class="pit-pitch${ok ? ' is-set' : ''}"><span title="Strzałkę ruchu rysuje się na boisku: prawy przycisk przytrzymany i przeciągnięty od zawodnika">${esc(ok ? arrowLabel(dir) : 'strzałka na boisku')}</span></td>`;
+      return `<td class="${ok ? 'is-set' : ''}">${dirSelectHtml(r, map[r.id], `${r.p.name}: ${d.label}`)}</td>`;
+    }
     const v = valOf(r, d.id);
     const tl = teamLevel(d.id, instructions);
     const opts = [[0, PI_TEAM_LABEL], ...d.options.map((o) => [o.v, o.label])]
