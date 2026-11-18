@@ -450,29 +450,61 @@
 .pick2__top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-3) var(--space-5); margin-bottom: var(--space-2); }
 .pick2__top .nc__h { margin: 0; }
 .pick2__other { margin: var(--space-4) 0 0; color: var(--text-muted); }
-.ltabs { display: inline-flex; max-width: 100%; border: 2px solid var(--text); border-radius: var(--radius-s); overflow: hidden; }
+/* Ligi: cztery równe zakładki, nazwa i licznik klubów wyśrodkowane */
+.ltabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  flex: 0 1 440px;
+  max-width: 100%;
+  border: 2px solid var(--text);
+  border-radius: var(--radius-s);
+  overflow: hidden;
+}
 .ltab {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  min-height: var(--tap);
-  padding: 0 var(--space-4);
+  position: relative;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 4px;
+  min-height: 52px;
+  padding: var(--space-2);
   border: 0;
   background: none;
-  font: 700 var(--step-1)/1 var(--font-display);
+  color: var(--text);
+  font: 700 var(--step-1)/1.05 var(--font-display);
+  text-align: center;
   white-space: nowrap;
   cursor: pointer;
 }
 .ltab + .ltab { border-left: 2px solid var(--text); }
 .ltab:hover { background: var(--surface-stripe); }
 .ltab[aria-selected="true"] { background: var(--accent); color: var(--accent-text); }
-.ltab__n { font: 600 var(--step--1)/1 var(--font-body); opacity: 0.75; }
-.ltab:focus-visible { outline-offset: -5px; }
-/* Cztery ligi (z III ligą) na telefonie: zakładki dzielą szerokość, bez liczników */
+/* Linia boiska wewnątrz aktywnej zakładki */
+.ltab[aria-selected="true"]::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid color-mix(in srgb, var(--accent-text) 50%, transparent);
+  border-radius: 2px;
+  pointer-events: none;
+}
+/* Licznik klubów jako plakietka */
+.ltab__n {
+  min-width: 2.2em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  font: 600 var(--step--1)/1.2 var(--font-body);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+.ltab[aria-selected="true"] .ltab__n { background: var(--accent-text); color: var(--accent); }
+.ltab:focus-visible { outline: 2px solid var(--focus); outline-offset: -5px; }
+/* Telefon: cztery zakładki w jednym rzędzie na całą szerokość */
 @media (max-width: 520px) {
-  .ltabs { display: flex; width: 100%; }
-  .ltab { flex: 1 1 0; justify-content: center; padding: 0 var(--space-2); white-space: nowrap; }
-  .ltab__n { display: none; }
+  .ltabs { flex: 1 1 100%; width: 100%; }
+  .ltab { padding: var(--space-2) 2px; gap: 3px; }
+  .ltab__n { min-width: 2em; padding: 1px 6px; font-size: 0.74rem; }
 }
 
 .cc-grid { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
