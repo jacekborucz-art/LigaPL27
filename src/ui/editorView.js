@@ -95,6 +95,10 @@ function clubForm(game, ed, id) {
       ${field('ed-name', 'Nazwa', textIn('ed-name', v.name, { max: LIMITS.name, err: e.name }), { err: e.name, help: orig('name') })}
       ${field('ed-short', 'Nazwa skrócona', textIn('ed-short', v.short, { max: LIMITS.short, err: e.short }), { err: e.short, help: orig('short') || 'Od 2 do 5 liter lub cyfr, np. na herbie.' })}
       ${field('ed-stadium', 'Nazwa stadionu', textIn('ed-stadium', v.stadium, { max: LIMITS.stadium, err: e.stadium }), { err: e.stadium, help: 'Puste pole: „Stadion gospodarzy” w informacjach o meczu.' })}
+      <div class="fld ed-fld ed-wide"><label class="ed-fld__l" for="ed-crest">Herb</label>
+        <div class="ed-crest">${c.crest ? crest(c, 44) : ''}<input id="ed-crest" type="file" data-act="ed-crest" data-id="${esc(id)}">
+        ${c.crest ? `<button class="btn btn--quiet btn--sm" data-act="ed-crest-clear" data-id="${esc(id)}">Usuń własny herb</button>` : ''}</div>
+        <p class="fld__help">Obrazek PNG, JPG albo WEBP, najlepiej kwadratowy z przezroczystym tłem. Trafia do datapacku, więc po wczytaniu pliku każdy ma ten sam herb.</p></div>
       ${field('ed-capacity', 'Pojemność stadionu', textIn('ed-capacity', v.capacity, { num: true, err: e.capacity }), { err: e.capacity, help: `Od ${LIMITS.capMin.toLocaleString('pl-PL')} do ${LIMITS.capMax.toLocaleString('pl-PL')} miejsc.` })}
       ${hasFin ? `${field('ed-balance', 'Saldo (zł)', textIn('ed-balance', v.balance, { num: true, err: e.balance }), { err: e.balance, help: `Teraz ${esc(fmtZl(cur.balance))}. Może być ujemne.` })}
       ${field('ed-tb', 'Budżet transferowy (zł)', textIn('ed-tb', v.transferBudget, { num: true, err: e.transferBudget }), { err: e.transferBudget, help: `Teraz ${esc(fmtZl(cur.transferBudget))}.` })}
@@ -104,7 +108,7 @@ function clubForm(game, ed, id) {
       <button class="btn btn--primary" data-act="ed-save-club" data-id="${esc(id)}">Zapisz zmiany</button>
       ${inPack ? `<button class="btn btn--quiet" data-act="ed-reset-club" data-id="${esc(id)}">Przywróć oryginał</button>` : ''}
     </div>
-    ${inPack ? '<p class="ed-note">Przywróć oryginał: wracają nazwa, skrót i stadion z danych gry, a klub znika z datapacku. Finanse i pojemność zostają takie, jak teraz.</p>' : ''}
+    ${inPack ? '<p class="ed-note">Przywróć oryginał: wracają nazwa, skrót, stadion i herb z danych gry, a klub znika z datapacku. Finanse i pojemność zostają takie, jak teraz.</p>' : ''}
     <section class="ed-squad" aria-labelledby="ed-squad-h"><h3 id="ed-squad-h">Kadra (${squad.length})</h3>
       ${squad.length ? playerRows(game, squad, 'ed-cplayer', null) : '<p class="ed-empty">Brak zawodników.</p>'}</section>
   </div>`;
@@ -263,6 +267,7 @@ export function handleEditorAction(game, ed, act, data, root) {
     ed.errors = null; ed.draft = null; ed.msg = changed(n);
     return { save: n > 0, squadChanged: n > 0 && game.world.players[pid]?.clubId === game.clubId };
   }
+  if (act === 'ed-crest-clear') { const n = editClub(game, data.id, { crest: '' }); clearMsg(); ed.msg = 'Usunięto własny herb klubu.'; return { save: n > 0 }; }
   if (act === 'ed-reset-club') { resetClub(game, data.id); clearMsg(); ed.msg = 'Przywrócono oryginalne nazwy klubu.'; return { save: true }; }
   if (act === 'ed-reset-player') { resetPlayer(game, data.id); clearMsg(); ed.msg = 'Zawodnik usunięty z datapacku.'; return { save: true }; }
   if (act === 'ed-clear') { ed.confirmClear = true; clearMsg(); return { focus: '[data-act="ed-clear-no"]' }; }

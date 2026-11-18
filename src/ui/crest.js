@@ -64,13 +64,16 @@ export function crestHtml(club, { size = 32, base = 'assets/crests', clubsById =
   // real: herby prawdziwe albo nowe (lista zapisów w menu: każda kariera z nazwami, z którymi ją rozpoczęto)
   // Rezerwy z własnym nowym herbem (np. Legat II) używają go, pozostałe herbu pierwszej drużyny z plakietką „II”
   const hidden = crestsAreHidden(); // gra z datapackiem: tylko tarcze w barwach klubów
-  const own = !hidden && fictionalCrest(club.id, real) && FICTIONAL_CRESTS.has(club.id);
+  const custom = (c) => typeof c?.crest === 'string' && c.crest.startsWith('data:image/'); // własny herb z datapacku (edytor)
+  const own = custom(club) || (!hidden && fictionalCrest(club.id, real) && FICTIONAL_CRESTS.has(club.id));
   const parent = !own && club.parent && clubsById ? clubsById.get(club.parent) : null;
   const source = parent || club;
   const badge = club.parent && !own ? '<span class="crest__badge">II</span>' : '';
   let inner;
   const fict = fictionalCrest(source.id, real);
-  if (hidden) {
+  if (custom(source)) {
+    inner = `<img src="${esc(source.crest)}" alt="" width="${size}" height="${size}" decoding="async">`;
+  } else if (hidden) {
     inner = fallbackCrestSvg(source);
   } else if (fict && !FICTIONAL_CRESTS.has(source.id)) {
     inner = fallbackCrestSvg(source); // nowa nazwa bez nowego herbu: nie pokazujemy prawdziwego

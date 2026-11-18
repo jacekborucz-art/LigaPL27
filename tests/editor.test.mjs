@@ -160,6 +160,30 @@ test('Nazwy klubów kariery: zapisane w grze przy pierwszym wczytaniu, potem nak
   restoreOriginals();
 });
 
+test('Własny herb klubu: zapis w datapacku, eksport, wczytanie u kolegi, pierwszeństwo przed tarczą', () => {
+  restoreOriginals();
+  const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  assert.ok(checkClub({ crest: 'data:text/html;base64,AAAA' }).errors.crest);
+  assert.ok(checkClub({ crest: 'javascript:alert(1)' }).errors.crest);
+  const g = structuredClone(G);
+  const r = checkClub({ crest: PNG });
+  assert.deepEqual(r.errors, {});
+  assert.equal(editClub(g, 'legia', r.value), 1);
+  assert.equal(g.editor.clubs.legia.crest, PNG);
+  assert.ok(crestHtml(clubById('legia')).includes(PNG));
+  const file = JSON.stringify(exportPack(g));
+  restoreOriginals();
+  assert.ok(!crestHtml(clubById('legia')).includes('data:image'), 'inna gra bez herbu z pliku');
+  const friend = structuredClone(G);
+  importPack(friend, parsePack(file));
+  assert.ok(crestHtml(clubById('legia')).includes(PNG), 'herb z pliku mimo ukrytych herbów datapacku');
+  const full = exportPack(g, new Date(), { full: true });
+  assert.equal(full.clubs.legia.crest, PNG, 'pełny datapack też niesie herb');
+  editClub(friend, 'legia', { crest: '' });
+  assert.ok(!crestHtml(clubById('legia')).includes('data:image'));
+  restoreOriginals();
+});
+
 test('Datapack: po wczytaniu pliku tarcze w barwach zamiast herbów, gra bez pliku z herbami', () => {
   const legia = clubById('legia');
   restoreOriginals();

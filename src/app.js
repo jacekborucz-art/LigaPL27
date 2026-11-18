@@ -58,6 +58,7 @@ import { renderClubHub, handleClubAction, isClubAction } from './ui/klubView.js'
 import { sysNavHtml, sysHeaderBtn, sysDialogHtml } from './ui/sysMenu.js';
 import { renderEditor, handleEditorAction, isEditorAction, newEditorState, clubListHtml, playerListHtml } from './ui/editorView.js'; // edytor i datapack (docs/edytor.md)
 import { canPromote, promoteYouth } from './career/academy.js'; // wychowankowie do pierwszego składu
+import { checkClub, editClub } from './career/editor.js';
 import { applyPack, restoreOriginals, clubNamesSnapshot, exportPack, packFileName, parsePack, importPack, importSummary } from './career/editor.js';
 import { realNamesOn, NAMES_KEY, NAMES_GAME_KEY, gameUsesRealNames } from './data/clubNames.js';
 const NC_RESTORE_KEY = 'ligapl27-nc-restore';
@@ -259,6 +260,34 @@ app.addEventListener('change', async (ev) => {
     applyPack({ editor: { clubs: pack.clubs, packLoaded: true } }); // nazwy klubów z pliku widać już przy wyborze klubu
   } catch (err) {
     nc.packMsg = `Nie wczytano pliku: ${err.message}`;
+  }
+  input.value = '';
+  render();
+});
+
+// Edytor: własny herb klubu z pliku obrazka, zmniejszony do 128 px (kwadrat, przezroczyste tło) i zapisany w datapacku
+app.addEventListener('change', async (ev) => {
+  const input = ev.target.closest?.('input[data-act="ed-crest"]');
+  if (!input || !input.files?.[0] || !state.game || !state.ed) return;
+  const ed = state.ed; const id = input.dataset.id;
+  try {
+    const file = input.files[0];
+    if (file.size > 10e6) throw new Error('Obrazek jest za duży.');
+    let img;
+    try { img = await createImageBitmap(file); } catch { throw new Error('To nie jest obrazek PNG, JPG ani WEBP.'); }
+    const S = 128; const cv = document.createElement('canvas'); cv.width = S; cv.height = S;
+    const k = Math.min(S / img.width, S / img.height); const w = img.width * k; const h = img.height * k;
+    const cx = cv.getContext('2d'); cx.imageSmoothingQuality = 'high';
+    cx.drawImage(img, (S - w) / 2, (S - h) / 2, w, h);
+    let url = cv.toDataURL('image/webp', 0.9);
+    if (!url.startsWith('data:image/webp')) url = cv.toDataURL('image/png'); // przeglądarka bez WEBP
+    const r = checkClub({ crest: url });
+    if (r.errors.crest) throw new Error(r.errors.crest);
+    editClub(state.game, id, r.value);
+    await save();
+    ed.msg = 'Zapisano własny herb klubu. Trafi do pliku datapacku przy eksporcie.'; ed.errors = null;
+  } catch (err) {
+    ed.msg = `Nie wczytano herbu: ${err.message}`; ed.errors = {};
   }
   input.value = '';
   render();

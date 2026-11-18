@@ -33,9 +33,12 @@ export const LIMITS = {
   attrMin: 1, attrMax: 20,
   ageMin: 15, ageMax: 45,
 };
-export const CLUB_FIELDS = ['name', 'short', 'stadium', 'capacity', 'balance', 'transferBudget', 'wageBudget'];
+export const CLUB_FIELDS = ['name', 'short', 'stadium', 'crest', 'capacity', 'balance', 'transferBudget', 'wageBudget'];
 export const PLAYER_FIELDS = ['first', 'last', 'nat', 'pos', 'birthDate', 'attrs', 'pot'];
-const STATIC = ['name', 'short', 'stadium'];
+const STATIC = ['name', 'short', 'stadium', 'crest'];
+// Własny herb klubu w datapacku: obrazek wpisany w plik (data URL), więc działa u każdego, kto wczyta plik
+export const CREST_MAX = 120000; // znaków; herb z edytora (128 px) ma kilka do kilkunastu tysięcy
+const CREST_RE = /^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$/;
 const ATTR_KEYS = Object.keys(ATTRS);
 
 // Oryginalne wartości statycznych danych klubów: zdjęte raz, przy wczytaniu modułu (przed jakąkolwiek grą).
@@ -53,6 +56,7 @@ export function restoreOriginals() {
     if (!o) continue;
     c.name = o.name; c.short = o.short;
     if (o.stadium == null) delete c.stadium; else c.stadium = o.stadium;
+    delete c.crest; // własny herb tylko z datapacku gry
   }
 }
 
@@ -91,6 +95,7 @@ export function applyPack(game) {
     if (typeof o.name === 'string' && o.name) c.name = o.name;
     if (typeof o.short === 'string' && o.short) c.short = o.short;
     if (typeof o.stadium === 'string') { if (o.stadium) c.stadium = o.stadium; else delete c.stadium; }
+    if (typeof o.crest === 'string' && CREST_RE.test(o.crest)) c.crest = o.crest;
   }
 }
 
@@ -142,6 +147,12 @@ export function checkClub(src, { form = false } = {}) {
     put('short', r.v && !/^[\p{L}\p{N}]+$/u.test(r.v) ? { err: 'Nazwa skrócona: tylko litery i cyfry.' } : r);
   }
   if (src.stadium !== undefined) put('stadium', text(src.stadium, { label: 'Nazwa stadionu', max: LIMITS.stadium, allowEmpty: true }));
+  if (src.crest !== undefined) {
+    const s = src.crest;
+    put('crest', s === '' ? { v: '' }
+      : typeof s !== 'string' || !CREST_RE.test(s) ? { err: 'Herb: obrazek WEBP, PNG albo JPG.' }
+        : s.length > CREST_MAX ? { err: 'Herb: obrazek jest za duży.' } : { v: s });
+  }
   if (src.capacity !== undefined) put('capacity', num(src.capacity, { label: 'Pojemność stadionu', min: LIMITS.capMin, max: LIMITS.capMax, form }));
   if (src.balance !== undefined) put('balance', num(src.balance, { label: 'Saldo', min: LIMITS.balanceMin, max: LIMITS.moneyMax, form }));
   if (src.transferBudget !== undefined) put('transferBudget', num(src.transferBudget, { label: 'Budżet transferowy', min: 0, max: LIMITS.moneyMax, form }));
@@ -198,7 +209,7 @@ export function clubCapacity(game, id) {
 export function clubValues(game, id) {
   const c = clubObj(id); const F = game.finance?.clubs?.[id];
   return {
-    name: c?.name ?? id, short: c?.short ?? '', stadium: c?.stadium ?? '', capacity: clubCapacity(game, id),
+    name: c?.name ?? id, short: c?.short ?? '', stadium: c?.stadium ?? '', crest: c?.crest ?? '', capacity: clubCapacity(game, id),
     balance: F?.balance ?? null, transferBudget: F?.transferBudget ?? null, wageBudget: F?.wageBudget ?? null,
   };
 }
@@ -235,7 +246,7 @@ export function editClub(game, id, values) {
     const v = values[k];
     if (STATIC.includes(k)) {
       if (v !== cur[k]) n++;
-      if (k === 'stadium') { if (v) c.stadium = v; else delete c.stadium; } else c[k] = v;
+      if (k === 'stadium' || k === 'crest') { if (v) c[k] = v; else delete c[k]; } else c[k] = v;
       if (v === (ORIGINAL.get(id)?.[k] ?? '')) delete rec[k]; else rec[k] = v;
       continue;
     }
@@ -299,7 +310,7 @@ export function editPlayer(game, pid, values) {
 /** Usuwa klub z datapacku i przywraca oryginalną nazwę, skrót i stadion (liczby w grze zostają). */
 export function resetClub(game, id) {
   const c = clubObj(id); const o = ORIGINAL.get(id);
-  if (c && o) { c.name = o.name; c.short = o.short; if (o.stadium == null) delete c.stadium; else c.stadium = o.stadium; }
+  if (c && o) { c.name = o.name; c.short = o.short; if (o.stadium == null) delete c.stadium; else c.stadium = o.stadium; delete c.crest; }
   if (game.editor?.clubs) delete game.editor.clubs[id];
 }
 
