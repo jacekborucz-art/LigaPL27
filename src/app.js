@@ -56,7 +56,7 @@ import { renderClubView, hasClubView } from './ui/clubView.js';
 import { renderTransfers, handleTransferAction, isTransferAction } from './ui/transfersView.js';
 import { renderClubHub, handleClubAction, isClubAction } from './ui/klubView.js';
 import { sysNavHtml, sysHeaderBtn, sysDialogHtml } from './ui/sysMenu.js';
-import { renderEditor, handleEditorAction, isEditorAction, newEditorState, clubListHtml, playerListHtml, altState } from './ui/editorView.js'; // edytor i datapack (docs/edytor.md)
+import { renderEditor, handleEditorAction, isEditorAction, newEditorState, clubListHtml, playerListHtml, altState, freeListHtml, refListHtml } from './ui/editorView.js'; // edytor i datapack (docs/edytor.md)
 import { canPromote, promoteYouth } from './career/academy.js'; // wychowankowie do pierwszego składu
 import { checkClub, editClub } from './career/editor.js';
 import { applyPack, restoreOriginals, clubNamesSnapshot, exportPack, packFileName, parsePack, importPack, importSummary } from './career/editor.js';
@@ -324,6 +324,12 @@ app.addEventListener('input', (ev) => {
     return;
   }
   const id = ev.target.id;
+  if (id === 'ed-fq' || id === 'ed-rq') { // wolni zawodnicy do kadry klubu, sędziowie
+    state.ed[id === 'ed-fq' ? 'fq' : 'rq'] = ev.target.value;
+    const out = app.querySelector(id === 'ed-fq' ? '#ed-free' : '#ed-results');
+    if (out) out.innerHTML = id === 'ed-fq' ? freeListHtml(state.game, state.ed) : refListHtml(state.game, state.ed);
+    return;
+  }
   if (id !== 'ed-q' && id !== 'ed-pq') return;
   if (id === 'ed-q') state.ed.q = ev.target.value; else state.ed.pq = ev.target.value;
   const box = app.querySelector('#ed-results');

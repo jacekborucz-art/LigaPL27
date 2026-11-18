@@ -30,7 +30,7 @@ import { rosterOf, syncStaff, STAFF_ROLE_IDS } from './staffMarket.js';
 import { completeTransfer, editorRelease } from './transfers.js';
 import { computeNorm, REF_ATTRS } from './referees.js';
 import { genPlayer } from '../world/playerGen.js';
-import { Rng } from '../core/rng.js';
+import { Rng, clamp } from '../core/rng.js';
 
 export const PACK_TYPE = 'ligapl27-datapack';
 // Wersje pliku datapacku (eksport zawsze w najnowszej, import każdej od PACK_V_MIN, starsze pliki bez błędu):
@@ -51,7 +51,7 @@ export const LIMITS = {
   ageMin: 15, ageMax: 45,
 };
 export const CLUB_FIELDS = ['name', 'short', 'stadium', 'crest', 'capacity', 'balance', 'transferBudget', 'wageBudget'];
-export const PLAYER_FIELDS = ['first', 'last', 'nat', 'pos', 'birthDate', 'attrs', 'pot', 'alt'];
+export const PLAYER_FIELDS = ['first', 'last', 'nat', 'pos', 'birthDate', 'attrs', 'pot', 'alt', 'team'];
 // Pozycje dodatkowe (p.alt: biegłość 0-90 %, jak nauka pozycji na treningu, src/engine/positions.js): bez bramki
 export const ALT_POSITIONS = POSITIONS.filter((x) => x !== 'BR');
 export const ALT_MAX = 90; // pozycja dodatkowa nigdy nie daje pełnej biegłości naturalnej (LEARNED_CAP)
@@ -217,6 +217,9 @@ export function checkPlayer(src, { form = false, date = null } = {}) {
     }
   }
   if (src.pot !== undefined) put('pot', num(src.pot, { label: 'Potencjał', min: LIMITS.attrMin, max: LIMITS.attrMax, int: false, form }));
+  if (src.team !== undefined) { // klub z edytora (przeniesienie), null = wolny zawodnik
+    put('team', src.team === null ? { v: null } : typeof src.team === 'string' && /^[A-Za-z0-9_.:-]{1,80}$/.test(src.team) ? { v: src.team } : { err: 'Klub: zły identyfikator.' });
+  }
   if (src.alt !== undefined) {
     if (!isObj(src.alt)) errors.alt = 'Pozycje dodatkowe: oczekiwano listy pozycji.';
     else {
@@ -641,7 +644,9 @@ export function clearPack(game) {
 export function exportPack(game, now = new Date(), { full = false } = {}) {
   const E = ensureEditor(game);
   const head = { type: PACK_TYPE, v: PACK_V, game: GAME_VERSION, seed: game.seed, created: now.toISOString(), full };
-  if (!full) return { ...head, clubs: structuredClone(E.clubs), players: structuredClone(E.players) };
+  const extra = { created: exportCreated(game), refs: structuredClone(E.refs ?? {}) }; // nowi zawodnicy i sędziowie
+  if (!full) return { ...head, clubs: structuredClone(E.clubs), players: structuredClone(E.players), ...extra };
+  for (const r of game.refs?.list ?? []) extra.refs[r.id] = refValues(game, r); // pełny: wszyscy sędziowie
   const clubs = {}; const players = {};
   for (const id of Object.keys(game.world?.clubs ?? {})) {
     if (!clubObj(id)) continue;
@@ -663,7 +668,7 @@ export function exportPack(game, now = new Date(), { full = false } = {}) {
     if (!Object.keys(value).length) continue;
     players[id] = { ...value, club: p.clubId ? (clubObj(p.clubId)?.name ?? p.clubId) : null, ovr: p.ovr };
   }
-  return { ...head, clubs, players };
+  return { ...head, clubs, players, ...extra };
 }
 
 /** Nazwa pliku tylko ze znaków ASCII (polskie litery psują nazwę pobieranego pliku w Chromium). */
@@ -713,7 +718,29 @@ export function parsePack(text) {
     if (r.value.attrs && !Object.keys(r.value.attrs).length) delete r.value.attrs;
     if (Object.keys(r.value).length) players[id] = r.value;
   }
-  return { seed: Number.isFinite(d.seed) ? d.seed : null, clubs, players };
+  // Nowi zawodnicy z edytora: pełne dane (działają w każdym świecie gry)
+  if (d.created !== undefined && !isObj(d.created)) throw new Error('Datapack: sekcja nowych zawodników ma zły format.');
+  const created = {};
+  for (const [id, o] of Object.entries(d.created ?? {})) {
+    if (!ID_RE.test(id) || !isObj(o)) throw new Error('Datapack: zły wpis nowego zawodnika.');
+    const src = Object.fromEntries(PLAYER_FIELDS.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
+    const r = checkPlayer(src);
+    const bad = Object.values(r.errors)[0];
+    if (bad) throw new Error(`Nowy zawodnik ${id}: ${bad}`);
+    for (const k of ['first', 'last', 'nat', 'pos', 'birthDate']) if (r.value[k] === undefined) throw new Error(`Nowy zawodnik ${id}: brak pola ${k}.`);
+    created[id] = r.value;
+  }
+  // Sędziowie (identyfikatory r1, r2... są w każdej grze)
+  if (d.refs !== undefined && !isObj(d.refs)) throw new Error('Datapack: sekcja sędziów ma zły format.');
+  const refs = {};
+  for (const [id, o] of Object.entries(d.refs ?? {})) {
+    if (!/^r\d{1,4}$/.test(id)) throw new Error('Datapack: zły wpis sędziego.');
+    const r = checkReferee(o);
+    const bad = Object.values(r.errors)[0];
+    if (bad) throw new Error(`Sędzia ${id}: ${bad}`);
+    refs[id] = r.value;
+  }
+  return { seed: Number.isFinite(d.seed) ? d.seed : null, clubs, players, created, refs };
 }
 const esc0 = (v) => String(v ?? 'brak').slice(0, 12);
 
@@ -732,6 +759,22 @@ export function importPack(game, pack) {
     if (v.owner) editOwner(game, id, v.owner);
     if (v.staff) editStaff(game, id, v.staff);
   }
+  // Sędziowie: w każdym świecie gry
+  out.refs = 0;
+  for (const [id, v] of Object.entries(pack.refs ?? {})) if (game.refs?.list?.some((r) => r.id === id)) { editReferee(game, id, v); out.refs++; }
+  // Nowi zawodnicy z edytora: w każdym świecie gry (już obecni w grze: bez zmian)
+  out.created = 0; out.squadSkipped = 0;
+  for (const [id, v] of Object.entries(pack.created ?? {})) {
+    if (game.world?.players?.[id] || !game.market) continue;
+    const age = clamp(ageAt({ birthDate: v.birthDate }, game.date), LIMITS.ageMin, LIMITS.ageMax);
+    createFreePlayer(game, { first: v.first, last: v.last, nat: v.nat, pos: v.pos, age, level: 10 }, id);
+    const vals = { ...v };
+    if (ageAt({ birthDate: v.birthDate }, game.date) !== age) delete vals.birthDate;
+    editPlayer(game, id, vals);
+    delete game.editor.players[id]; // dane nowego zawodnika żyją w sekcji created
+    out.created++;
+    if (v.team && joinFromFree(game, id, v.team)) out.squadSkipped++;
+  }
   const ids = Object.keys(pack.players);
   if (ids.length && pack.seed !== game.seed) { out.otherWorld = true; out.playersSkipped = ids.length; return out; }
   for (const id of ids) {
@@ -743,6 +786,13 @@ export function importPack(game, pack) {
       if (age < LIMITS.ageMin || age > LIMITS.ageMax) delete v.birthDate;
     }
     editPlayer(game, id, v); out.players++;
+    // Przeniesienie z edytora (team: klub albo null = wolny), z limitami kadry
+    if (v.team !== undefined && (p.clubId ?? null) !== v.team) {
+      let why = '';
+      if (p.clubId) why = releaseToFree(game, id);
+      if (!why && v.team) why = joinFromFree(game, id, v.team);
+      if (why) out.squadSkipped++;
+    }
   }
   return out;
 }
@@ -752,6 +802,9 @@ export function importSummary(r) {
   const parts = [`Kluby: zastosowano ${r.clubs}${r.clubsSkipped ? `, pominięto ${r.clubsSkipped} (nieznane)` : ''}.`];
   if (r.otherWorld) parts.push(`Zawodnicy pominięci: inny świat gry (${r.playersSkipped}).`);
   else parts.push(`Zawodnicy: zastosowano ${r.players}${r.playersSkipped ? `, pominięto ${r.playersSkipped} (brak w tej grze)` : ''}.`);
+  if (r.created) parts.push(`Nowi zawodnicy: ${r.created}.`);
+  if (r.refs) parts.push(`Sędziowie: ${r.refs}.`);
+  if (r.squadSkipped) parts.push(`Zmiany kadry pominięte przez limit ${EDIT_SQUAD.min}-${EDIT_SQUAD.max} zawodników: ${r.squadSkipped}.`);
   return parts.join(' ');
 }
 

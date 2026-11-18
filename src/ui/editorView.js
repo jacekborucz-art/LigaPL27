@@ -15,7 +15,10 @@ import {
   LIMITS, checkClub, checkPlayer, editClub, editPlayer, clubValues, playerValues, resetClub, resetPlayer, clearPack,
   packCounts, originalOf, peopleValues, checkCoach, checkOwner, checkStaff, editCoach, editOwner, editStaff,
   OWNER_LABELS, PERSON_AGE, ALT_MAX, ALT_POSITIONS,
+  EDIT_SQUAD, squadSize, releaseBlock, releaseToFree, joinFromFree, freeAgents, checkNewPlayer, createFreePlayer, NEW_LEVEL,
+  REF_LIMITS, refValues, checkReferee, editReferee,
 } from '../career/editor.js';
+import { REF_ATTRS } from '../career/referees.js';
 import { proficiency } from '../engine/positions.js';
 import { COACH_KEYS, COACH_ATTRS, COACH_STYLES } from '../career/coaches.js';
 import { OWNER_KEYS } from '../career/owners.js';
@@ -31,7 +34,7 @@ const crest = (c, size = 24) => (c ? crestHtml(c, { size }) : '');
 const fold = (s) => String(s ?? '').toLowerCase().replace(/ł/g, 'l').normalize('NFD').replace(/[̀-ͯ]/g, '');
 const leagueOf = (c) => (c?.tier <= 4 ? leagueLabel(c) : 'IV liga');
 
-export const newEditorState = () => ({ tab: 'clubs', tier: 1, q: '', club: null, cplayer: null, player: null, pq: '', pclub: 'all', ppos: 'all', msg: null, errors: null, draft: null, confirmClear: false });
+export const newEditorState = () => ({ tab: 'clubs', tier: 1, q: '', club: null, cplayer: null, player: null, pq: '', pclub: 'all', ppos: 'all', msg: null, errors: null, draft: null, confirmClear: false, addTo: null, fq: '', newp: false, ref: null, rl: 1, rq: '' });
 export const isEditorAction = (act) => typeof act === 'string' && act.startsWith('ed-');
 
 /** Kluby z kadrą w świecie gry, w kolejności lig i z danych. */
@@ -76,6 +79,85 @@ export function playerListHtml(game, ed) {
   return `<p class="ed-count">${total > rows.length ? `Pokazano ${rows.length} z ${total}. Zawęź wyszukiwanie.` : `Znaleziono: ${total}.`}</p>${playerRows(game, rows, 'ed-player', ed.player)}`;
 }
 
+/** Karta zawodnika: przeniesienie z kadry do wolnych albo wolnego do kadry wybranego klubu. */
+function squadMoveHtml(game, p) {
+  if (p.clubId && game.world.clubs[p.clubId]) {
+    const why = releaseBlock(game, p.id);
+    return `<section class="ed-move" aria-label="Kadra"><h3>Kadra</h3>
+      <div class="ed-actions"><button class="btn btn--quiet" data-act="ed-release" data-id="${esc(p.id)}"${why ? ' disabled' : ''}>Przenieś do wolnych zawodników</button></div>
+      <p class="fld__help">${esc(why || `Zawodnik odchodzi bez kosztów i trafia na listę wolnych. Kadra: od ${EDIT_SQUAD.min} do ${EDIT_SQUAD.max} zawodników.`)}</p></section>`;
+  }
+  if (!p.clubId && game.market?.free?.includes(p.id)) {
+    const clubs = editorClubs(game).filter((c) => squadSize(game, c.id) < EDIT_SQUAD.max);
+    return `<section class="ed-move" aria-label="Kadra"><h3>Kadra</h3>
+      <div class="ed-move__row"><select id="ed-joinclub" aria-label="Klub">${clubs.map((c) => `<option value="${esc(c.id)}"${c.id === game.clubId ? ' selected' : ''}>${esc(c.name)} (${squadSize(game, c.id)})</option>`).join('')}</select>
+      <button class="btn btn--quiet" data-act="ed-join-sel" data-id="${esc(p.id)}"${clubs.length ? '' : ' disabled'}>Dodaj do kadry</button></div>
+      <p class="fld__help">Wolny zawodnik dostaje kontrakt do końca następnego sezonu z pensją, jakiej oczekuje. Na liście kluby z miejscem w kadrze (do ${EDIT_SQUAD.max}).</p></section>`;
+  }
+  return '';
+}
+
+/** Wolni zawodnicy do dodania do kadry klubu (ed.addTo). */
+export function freeListHtml(game, ed) {
+  const { total, rows } = freeAgents(game, ed.fq);
+  if (!rows.length) return '<p class="ed-empty">Brak wolnych zawodników dla tego wyszukiwania.</p>';
+  return `<p class="ed-count">${total > rows.length ? `Pokazano ${rows.length} z ${total}. Zawęź wyszukiwanie.` : `Wolni zawodnicy: ${total}.`}</p>
+    <ul class="ed-list">${rows.map((p) => `<li><button class="ed-row" data-act="ed-join" data-id="${esc(p.id)}" data-club="${esc(ed.addTo)}" title="Dodaj do kadry">
+    ${posBadge(p)}<span class="ed-row__main"><b>${esc(p.name)}</b><small>${ageAt(p, game.date)} lat, ${esc(NAT_NAMES[p.nat] ?? p.nat)}, dodaj do kadry</small></span><span class="ed-row__ovr" title="Ocena ogólna">${ovrTxt(p.ovr)}</span></button></li>`).join('')}</ul>`;
+}
+
+/** Sędziowie: lista (liga, wyszukiwanie). */
+const REF_LISTS = { 1: 'Ekstraklasa', 2: '1 Liga', 3: '2 Liga', 4: 'III liga' };
+const refAvg = (r) => Math.round((r.a.reduce((s, x) => s + x, 0) / r.a.length) * 10) / 10;
+export function refListHtml(game, ed) {
+  const q = fold(ed.rq);
+  const rows = (game.refs?.list ?? []).filter((r) => (ed.rl === 'all' || r.l === ed.rl) && (!q || fold(r.n).includes(q)))
+    .sort((a, b) => a.l - b.l || refAvg(b) - refAvg(a));
+  if (!rows.length) return '<p class="ed-empty">Brak sędziów dla tego filtra.</p>';
+  return `<ul class="ed-list">${rows.map((r) => `<li><button class="ed-row" data-act="ed-ref" data-id="${esc(r.id)}" aria-current="${ed.ref === r.id ? 'true' : 'false'}">
+    <span class="ed-row__main"><b>${esc(r.n)}</b><small>${esc(REF_LISTS[r.l] ?? '')}, ${Number(game.date.slice(0, 4)) - r.b} lat${game.editor?.refs?.[r.id] ? ', zmieniony' : ''}</small></span><span class="ed-row__ovr" title="Średnia atrybutów">${ovrTxt(refAvg(r))}</span></button></li>`).join('')}</ul>`;
+}
+
+function refForm(game, ed, rid) {
+  const r = game.refs?.list?.find((x) => x.id === rid);
+  if (!r) return '<p class="ed-empty">Nie ma takiego sędziego.</p>';
+  const d = draftFor(ed, `ref:${rid}`); const v = d ?? refValues(game, r); const e = d ? ed.errors ?? {} : {};
+  return `<div class="ed-form" data-ed-form="ref">
+    <div class="ed-form__top"><button class="btn btn--quiet btn--sm ed-close" data-act="ed-close">Wróć do listy</button></div>
+    <header class="ed-form__head"><div><h2 id="ed-title" tabindex="-1">${esc(r.n)}</h2><p class="muted">Sędzia, lista: ${esc(REF_LISTS[r.l] ?? '')}</p></div></header>
+    ${msgHtml(ed)}${firstErr(e)}
+    <div class="ed-grid">
+      ${field('ed-r-name', 'Imię i nazwisko', textIn('ed-r-name', v.name, { max: LIMITS.name, err: e.name }))}
+      ${field('ed-r-age', 'Wiek', numIn('ed-r-age', v.age, e.age, { min: REF_LIMITS.ageMin, max: REF_LIMITS.ageMax }), { help: `Od ${REF_LIMITS.ageMin} do ${REF_LIMITS.ageMax} lat.` })}
+    </div>
+    <fieldset class="ed-attrs"><legend>Atrybuty (1-20)</legend><div class="ed-attrs__grid">
+      ${REF_ATTRS.map((n, i) => attrBox(`ed-r-a-${i}`, n, v.a?.[i], e[`a.${i}`])).join('')}
+      ${attrBox('ed-r-e', 'Doświadczenie', v.e, e.e)}
+    </div></fieldset>
+    <div class="ed-grid">${field('ed-r-s', 'Surowość', `<input id="ed-r-s" type="number" min="${REF_LIMITS.strictMin}" max="${REF_LIMITS.strictMax}" step="0.01" inputmode="decimal" value="${esc(v.s)}"${e.s ? ' aria-invalid="true"' : ''}>`, { err: e.s, help: `Od ${REF_LIMITS.strictMin} (pobłażliwy) do ${REF_LIMITS.strictMax} (surowy), 1,0 to przeciętny: więcej kartek i fauli odgwizdanych.` })}</div>
+    <div class="ed-actions"><button class="btn btn--primary" data-act="ed-save-ref" data-id="${esc(rid)}">Zapisz zmiany</button></div>
+  </div>`;
+}
+
+/** Nowy wolny zawodnik (narodowość z całego świata). */
+function newPlayerForm(game, ed) {
+  const d = draftFor(ed, 'newp'); const v = d ?? { first: '', last: '', nat: 'POL', pos: 'ŚP', age: '24', level: '10' }; const e = d ? ed.errors ?? {} : {};
+  return `<div class="ed-form" data-ed-form="newp">
+    <div class="ed-form__top"><button class="btn btn--quiet btn--sm ed-close" data-act="ed-close">Wróć do listy</button></div>
+    <header class="ed-form__head"><div><h2 id="ed-title" tabindex="-1">Nowy wolny zawodnik</h2><p class="muted">Trafi na listę wolnych zawodników (Transfery). Do kadry klubu dodasz go w edytorze klubu albo w jego karcie.</p></div></header>
+    ${msgHtml(ed)}
+    <div class="ed-grid">
+      ${field('ed-n-first', 'Imię', textIn('ed-n-first', v.first, { max: LIMITS.name, err: e.first }), { err: e.first })}
+      ${field('ed-n-last', 'Nazwisko', textIn('ed-n-last', v.last, { max: LIMITS.name, err: e.last }), { err: e.last })}
+      ${field('ed-n-nat', 'Narodowość', `<select id="ed-n-nat">${natOptions(v.nat)}</select>`, { err: e.nat })}
+      ${field('ed-n-pos', 'Pozycja', `<select id="ed-n-pos">${posOptions(v.pos)}</select>`, { err: e.pos })}
+      ${field('ed-n-age', 'Wiek', numIn('ed-n-age', v.age, e.age, { min: LIMITS.ageMin, max: LIMITS.ageMax }), { err: e.age, help: `Od ${LIMITS.ageMin} do ${LIMITS.ageMax} lat.` })}
+      ${field('ed-n-level', 'Poziom (1-20)', `<input id="ed-n-level" type="number" min="${NEW_LEVEL.min}" max="${NEW_LEVEL.max}" step="0.5" inputmode="decimal" value="${esc(v.level)}"${e.level ? ' aria-invalid="true"' : ''}>`, { err: e.level, help: 'Mniej więcej ocena ogólna. Atrybuty losuje gra z poziomu i pozycji, potem możesz je zmienić.' })}
+    </div>
+    <div class="ed-actions"><button class="btn btn--primary" data-act="ed-create">Utwórz zawodnika</button></div>
+  </div>`;
+}
+
 // ------------------------------------------------------------ Formularze
 const field = (id, label, input, { err = '', help = '' } = {}) => `<div class="fld ed-fld${err ? ' is-invalid' : ''}"><label class="ed-fld__l" for="${id}">${esc(label)}</label>${input}
   ${err ? `<p class="fld__err" id="${id}-err">${esc(err)}</p>` : help ? `<p class="fld__help">${help}</p>` : ''}</div>`;
@@ -117,6 +199,10 @@ function clubForm(game, ed, id) {
     ${peopleForms(game, ed, id)}
     ${inPack ? '<p class="ed-note">Przywróć oryginał: wracają nazwa, skrót, stadion i herb z danych gry, a klub znika z datapacku. Finanse, pojemność, trener, sztab i właściciel zostają tacy, jak teraz.</p>' : ''}
     <section class="ed-squad" aria-labelledby="ed-squad-h"><h3 id="ed-squad-h">Kadra (${squad.length})</h3>
+      <p class="fld__help">Kadra pierwszej drużyny: od ${EDIT_SQUAD.min} do ${EDIT_SQUAD.max} zawodników. Zawodnika przeniesiesz do wolnych w jego karcie.</p>
+      <div class="ed-actions"><button class="btn btn--quiet btn--sm" data-act="ed-addfree" data-id="${esc(id)}" aria-expanded="${ed.addTo === id}"${squad.length >= EDIT_SQUAD.max ? ' disabled' : ''}>${ed.addTo === id ? 'Zamknij listę wolnych' : 'Dodaj wolnego zawodnika'}</button></div>
+      ${ed.addTo === id ? `<div class="ed-free"><input class="ed-search" id="ed-fq" type="search" placeholder="Szukaj wolnego zawodnika" aria-label="Szukaj wolnego zawodnika" value="${esc(ed.fq)}" autocomplete="off">
+        <div id="ed-free">${freeListHtml(game, ed)}</div></div>` : ''}
       ${squad.length ? playerRows(game, squad, 'ed-cplayer', null) : '<p class="ed-empty">Brak zawodników.</p>'}</section>
   </div>`;
 }
@@ -251,6 +337,7 @@ function playerForm(game, ed, pid, { back }) {
       ${inPack ? `<button class="btn btn--quiet" data-act="ed-reset-player" data-id="${esc(pid)}">Usuń z datapacku</button>` : ''}
     </div>
     <p class="ed-note">OVR liczy się po zapisie z atrybutów i pozycji, tak jak w grze.${inPack ? ' Usunięcie z datapacku zostawia obecne dane zawodnika w tej grze.' : ''}</p>
+    ${squadMoveHtml(game, p)}
   </div>`;
 }
 
@@ -275,7 +362,7 @@ function packPanel(game, ed) {
 }
 
 // ------------------------------------------------------------ Ekran
-const TABS = [['clubs', 'Kluby'], ['players', 'Zawodnicy'], ['pack', 'Datapack']];
+const TABS = [['clubs', 'Kluby'], ['players', 'Zawodnicy'], ['refs', 'Sędziowie'], ['pack', 'Datapack']];
 
 export function renderEditor(game, ed) {
   const tabs = `<div class="ed-tabs" role="tablist" aria-label="Edytor">${TABS.map(([k, l]) => `<button class="ed-tab" role="tab" data-act="ed-tab" data-tab="${k}" aria-selected="${ed.tab === k}">${esc(l)}</button>`).join('')}</div>`;
@@ -289,17 +376,26 @@ export function renderEditor(game, ed) {
     sel = !!ed.club;
     form = ed.cplayer ? playerForm(game, ed, ed.cplayer, { back: { act: 'ed-close', label: `Wróć do klubu ${clubObj(ed.club)?.name ?? ''}`.trim(), cls: '' } })
       : ed.club ? clubForm(game, ed, ed.club) : '<p class="ed-empty ed-hint">Wybierz klub z listy.</p>';
+  } else if (ed.tab === 'refs') {
+    const lists = [[1, REF_LISTS[1]], [2, REF_LISTS[2]], [3, REF_LISTS[3]], [4, REF_LISTS[4]], ['all', 'Wszyscy']];
+    list = `<div class="ed-filters">
+      <div class="chips chips--sm chips--wrap" role="group" aria-label="Lista sędziów">${lists.map(([t, l]) => `<button class="chip" data-act="ed-rlist" data-t="${t}" aria-pressed="${ed.rl === t}">${esc(l)}</button>`).join('')}</div>
+      <input class="ed-search" id="ed-rq" type="search" placeholder="Szukaj sędziego" aria-label="Szukaj sędziego" value="${esc(ed.rq)}" autocomplete="off"></div>
+      <div id="ed-results">${refListHtml(game, ed)}</div>`;
+    sel = !!ed.ref;
+    form = ed.ref ? refForm(game, ed, ed.ref) : '<p class="ed-empty ed-hint">Wybierz sędziego z listy.</p>';
   } else if (ed.tab === 'players') {
     const clubs = editorClubs(game);
     list = `<div class="ed-filters">
+      <div class="ed-actions"><button class="btn btn--quiet btn--sm" data-act="ed-newp">Nowy wolny zawodnik</button></div>
       <input class="ed-search" id="ed-pq" type="search" placeholder="Szukaj po imieniu lub nazwisku" aria-label="Szukaj zawodnika" value="${esc(ed.pq)}" autocomplete="off">
       <div class="ed-selects">
         <select id="ed-pclub" aria-label="Klub"><option value="all">Wszystkie kluby</option><option value="none"${ed.pclub === 'none' ? ' selected' : ''}>Bez polskiego klubu</option>${clubs.map((c) => `<option value="${esc(c.id)}"${ed.pclub === c.id ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
         <select id="ed-ppos" aria-label="Pozycja"><option value="all">Wszystkie pozycje</option>${POS_ORDER.map((k) => `<option value="${esc(k)}"${ed.ppos === k ? ' selected' : ''}>${esc(POS_NAMES[k])}</option>`).join('')}</select>
       </div></div>
       <div id="ed-results">${playerListHtml(game, ed)}</div>`;
-    sel = !!ed.player;
-    form = ed.player ? playerForm(game, ed, ed.player, { back: { act: 'ed-close', label: 'Wróć do listy', cls: 'ed-close' } }) : '<p class="ed-empty ed-hint">Wyszukaj zawodnika i wybierz go z listy.</p>';
+    sel = !!ed.player || ed.newp;
+    form = ed.newp ? newPlayerForm(game, ed) : ed.player ? playerForm(game, ed, ed.player, { back: { act: 'ed-close', label: 'Wróć do listy', cls: 'ed-close' } }) : '<p class="ed-empty ed-hint">Wyszukaj zawodnika i wybierz go z listy.</p>';
   }
   const body = ed.tab === 'pack' ? `<div class="ed-body ed-body--one">${packPanel(game, ed)}</div>`
     : `<div class="ed-body${sel ? ' ed-body--sel' : ''}"><section class="ed-pane ed-pane--list" aria-label="Lista">${list}</section><section class="ed-pane ed-pane--form" aria-label="Edycja">${form}</section></div>`;
@@ -344,7 +440,7 @@ export function handleEditorAction(game, ed, act, data, root) {
   if (act === 'ed-player') { ed.player = data.id; clearMsg(); return { focus: '#ed-title', top: true }; }
   if (act === 'ed-close') {
     clearMsg();
-    if (ed.tab === 'clubs') { if (ed.cplayer) ed.cplayer = null; else ed.club = null; } else ed.player = null;
+    if (ed.tab === 'clubs') { if (ed.cplayer) ed.cplayer = null; else ed.club = null; } else if (ed.tab === 'refs') ed.ref = null; else { ed.player = null; ed.newp = false; }
     return { focus: '#ed-title', top: true };
   }
   if (act === 'ed-save-club') {
@@ -364,6 +460,45 @@ export function handleEditorAction(game, ed, act, data, root) {
     const n = editPlayer(game, pid, r.value);
     ed.errors = null; ed.draft = null; ed.msg = changed(n);
     return { save: n > 0, squadChanged: n > 0 && game.world.players[pid]?.clubId === game.clubId };
+  }
+  // Kadra: wolni zawodnicy do klubu i z klubu (limit kadry w src/career/editor.js)
+  if (act === 'ed-addfree') { ed.addTo = ed.addTo === data.id ? null : data.id; ed.fq = ''; clearMsg(); return { focus: ed.addTo ? '#ed-fq' : '[data-act="ed-addfree"]' }; }
+  if (act === 'ed-join' || act === 'ed-join-sel') {
+    const club = act === 'ed-join' ? data.club : val(root, 'ed-joinclub');
+    const name = game.world.players[data.id]?.name ?? '';
+    const why = joinFromFree(game, data.id, club);
+    clearMsg();
+    ed.msg = why ? `Nie dodano: ${why}` : `${name} w kadrze klubu ${clubObj(club)?.name ?? ''}.`; ed.errors = why ? {} : null;
+    return { save: !why, squadChanged: !why && club === game.clubId };
+  }
+  if (act === 'ed-release') {
+    const p = game.world.players[data.id]; const from = p?.clubId;
+    const why = releaseToFree(game, data.id);
+    clearMsg();
+    ed.msg = why ? `Nie przeniesiono: ${why}` : `${p.name} jest teraz wolnym zawodnikiem.`; ed.errors = why ? {} : null;
+    return { save: !why, squadChanged: !why && from === game.clubId };
+  }
+  if (act === 'ed-newp') { ed.newp = true; ed.player = null; clearMsg(); return { focus: '#ed-title', top: true }; }
+  if (act === 'ed-create') {
+    const raw = { first: val(root, 'ed-n-first'), last: val(root, 'ed-n-last'), nat: val(root, 'ed-n-nat'), pos: val(root, 'ed-n-pos'), age: val(root, 'ed-n-age'), level: val(root, 'ed-n-level') };
+    const r = checkNewPlayer(raw, { form: true });
+    if (Object.keys(r.errors).length) { ed.errors = r.errors; ed.draft = { key: 'newp', v: raw }; ed.msg = 'Popraw zaznaczone pola.'; return { focus: '[aria-invalid="true"]' }; }
+    const p = createFreePlayer(game, r.value);
+    clearMsg(); ed.newp = false; ed.player = p.id;
+    ed.msg = `Utworzono wolnego zawodnika ${p.name}. Możesz zmienić jego atrybuty i dodać go do kadry klubu.`;
+    return { save: true, focus: '#ed-title', top: true };
+  }
+  // Sędziowie
+  if (act === 'ed-rlist') { ed.rl = data.t === 'all' ? 'all' : Number(data.t); return {}; }
+  if (act === 'ed-ref') { ed.ref = data.id; clearMsg(); return { focus: '#ed-title', top: true }; }
+  if (act === 'ed-save-ref') {
+    const rid = data.id;
+    const raw = { name: val(root, 'ed-r-name'), age: val(root, 'ed-r-age'), a: REF_ATTRS.map((_, i) => val(root, `ed-r-a-${i}`)), e: val(root, 'ed-r-e'), s: val(root, 'ed-r-s') };
+    const r = checkReferee(raw, { form: true });
+    if (Object.keys(r.errors).length) { ed.errors = r.errors; ed.draft = { key: `ref:${rid}`, v: raw }; ed.msg = 'Popraw zaznaczone pola.'; return { focus: '[aria-invalid="true"]' }; }
+    const n = editReferee(game, rid, r.value);
+    ed.errors = null; ed.draft = null; ed.msg = changed(n);
+    return { save: n > 0 };
   }
   if (act === 'ed-altpos') {
     // Kliknięcie pozycji na boisku: pole dopasowania tej pozycji (szkic formularza, wpisane pola zostają)

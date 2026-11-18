@@ -14,8 +14,10 @@ import {
   applyPack, restoreOriginals, checkClub, checkPlayer, editClub, editPlayer, exportPack, parsePack, importPack,
   packFileName, resetClub, clearPack, PACK_TYPE, PACK_V,
   peopleValues, checkCoach, checkOwner, checkStaff, editCoach, editOwner, editStaff,
+  EDIT_SQUAD, squadSize, releaseToFree, joinFromFree, checkNewPlayer, createFreePlayer, checkReferee, editReferee, refValues,
 } from '../src/career/editor.js';
 import { coachOf } from '../src/career/coaches.js';
+import { ensureReferees } from '../src/career/referees.js';
 import { proficiency } from '../src/engine/positions.js';
 import { GAME_VERSION } from '../src/config/version.js';
 import { ownerOf } from '../src/career/owners.js';
@@ -248,6 +250,88 @@ test('Pozycje dodatkowe zawodnika: edycja, biegłość w silniku, datapack i wal
   assert.equal(proficiency(g2.world.players[p.id], 'NAP'), 90);
   editPlayer(g, p.id, checkPlayer({ alt: {} }).value);
   assert.equal(proficiency(p, 'NAP'), before, 'usunięcie pozycji dodatkowej');
+  restoreOriginals();
+});
+
+test('Kadra w edytorze: do wolnych i z wolnych, limit 21-32, przeniesienia w datapacku', () => {
+  restoreOriginals();
+  const g = structuredClone(G);
+  const id = 'legia';
+  const n0 = squadSize(g, id);
+  const squad = [...g.world.clubs[id].squad];
+  const p = g.world.players[squad.find((x) => !g.world.players[x].loan)];
+  assert.equal(releaseToFree(g, p.id), '');
+  assert.equal(p.clubId, null);
+  assert.ok(g.market.free.includes(p.id));
+  assert.equal(squadSize(g, id), n0 - 1);
+  assert.equal(g.editor.players[p.id].team, null);
+  assert.equal(joinFromFree(g, p.id, 'lech'), '');
+  assert.equal(p.clubId, 'lech');
+  assert.ok(!g.market.free.includes(p.id));
+  assert.ok(p.contract?.until > g.date);
+  assert.equal(g.editor.players[p.id].team, 'lech');
+  // Minimum: do 21 zawodników, potem odmowa
+  for (const x of [...g.world.clubs[id].squad]) { if (squadSize(g, id) <= EDIT_SQUAD.min) break; if (!g.world.players[x].loan) releaseToFree(g, x); }
+  assert.equal(squadSize(g, id), EDIT_SQUAD.min);
+  const last = g.world.clubs[id].squad.find((x) => !g.world.players[x].loan);
+  assert.match(releaseToFree(g, last), /minimum/);
+  // Maksimum: do 32
+  const free = [...g.market.free];
+  for (const x of free) { if (squadSize(g, 'rakow') >= EDIT_SQUAD.max) break; joinFromFree(g, x, 'rakow'); }
+  assert.equal(squadSize(g, 'rakow'), EDIT_SQUAD.max);
+  const left = g.market.free.find((x) => !g.world.players[x].clubId);
+  assert.match(joinFromFree(g, left, 'rakow'), /maksimum/);
+  // Datapack w tym samym świecie: przeniesienie zawodnika
+  const g2 = structuredClone(G);
+  const r = importPack(g2, parsePack(JSON.stringify(exportPack(g))));
+  assert.equal(g2.world.players[p.id].clubId, 'lech');
+  assert.ok(squadSize(g2, 'rakow') <= EDIT_SQUAD.max && squadSize(g2, id) >= EDIT_SQUAD.min);
+  assert.ok(r.players > 0);
+  restoreOriginals();
+});
+
+test('Nowy wolny zawodnik: narodowość z całego świata, datapack w innym świecie gry z klubem', () => {
+  restoreOriginals();
+  const g = structuredClone(G);
+  assert.ok(checkNewPlayer({ first: 'A', last: 'B', nat: 'XXX', pos: 'ŚP', age: '20', level: '10' }, { form: true }).errors.nat);
+  const r = checkNewPlayer({ first: 'Kofi', last: 'Mensah', nat: 'EGY', pos: 'NAP', age: '22', level: '12' }, { form: true });
+  assert.deepEqual(r.errors, {});
+  const p = createFreePlayer(g, r.value);
+  assert.equal(p.nat, 'EGY');
+  assert.equal(p.name, 'Kofi Mensah');
+  assert.ok(g.market.free.includes(p.id) && !p.clubId);
+  assert.ok(p.ovr > 8 && p.ovr < 16, `OVR ${p.ovr} blisko poziomu 12`);
+  assert.equal(joinFromFree(g, p.id, 'legia'), '');
+  const pk = parsePack(JSON.stringify(exportPack(g)));
+  assert.equal(pk.created[p.id].team, 'legia');
+  const friend = structuredClone(G2); // inny świat gry
+  const res = importPack(friend, pk);
+  assert.equal(res.created, 1);
+  const q = friend.world.players[p.id];
+  assert.equal(q.name, 'Kofi Mensah');
+  assert.equal(q.clubId, 'legia');
+  assert.deepEqual(q.attr, p.attr);
+  restoreOriginals();
+});
+
+test('Sędziowie w edytorze: atrybuty, surowość, datapack w innym świecie gry', () => {
+  const g = structuredClone(G); ensureReferees(g);
+  const r = g.refs.list[0];
+  assert.ok(checkReferee({ a: [1, 2, 3] }).errors.a);
+  assert.ok(checkReferee({ s: 2 }).errors.s);
+  assert.ok(checkReferee({ a: [20, 20, 20, 20, 20, 20, 21] }).errors['a.6']);
+  const normBefore = g.refs.norm[r.l];
+  const v = checkReferee({ name: 'Jan Gwizdek', age: '40', a: ['20', '20', '20', '20', '20', '20', '20'], e: '18', s: '1.4' }, { form: true });
+  assert.deepEqual(v.errors, {});
+  assert.ok(editReferee(g, r.id, v.value) > 0);
+  assert.equal(r.n, 'Jan Gwizdek');
+  assert.equal(refValues(g, r).age, 40);
+  assert.ok(g.refs.norm[r.l] > normBefore, 'surowość zmienia średnią listy');
+  const friend = structuredClone(G2); ensureReferees(friend);
+  importPack(friend, parsePack(JSON.stringify(exportPack(g))));
+  const f = friend.refs.list.find((x) => x.id === r.id);
+  assert.equal(f.n, 'Jan Gwizdek');
+  assert.deepEqual(f.a, [20, 20, 20, 20, 20, 20, 20]);
   restoreOriginals();
 });
 

@@ -11,6 +11,11 @@
 .ed-tab:hover { background: var(--surface-stripe); }
 .ed-tab[aria-selected="true"] { background: var(--accent); color: var(--accent-text); }
 .ed-tab:focus-visible { outline: 3px solid var(--focus); outline-offset: -5px; }
+/* Telefon: cztery zakładki w jednym rzędzie, bez przewijania */
+@media (max-width: 479px) {
+  .ed-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; overflow: visible; }
+  .ed-tab { padding: 0 4px; font-size: var(--step-0); }
+}
 
 .ed-body { display: grid; gap: var(--space-4); min-width: 0; }
 .ed-pane { min-width: 0; }
@@ -71,6 +76,12 @@
 .ed-ppl { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-2); font-size: var(--step--1); }
 .ed-ppl i { flex: none; width: 20px; height: 20px; border-color: var(--text-muted); background: color-mix(in srgb, var(--murawa) 60%, transparent); }
 .ed-people { margin-top: var(--space-4); }
+.ed-move { margin-top: var(--space-4); }
+.ed-move h3 { margin: 0 0 var(--space-2); font: 700 var(--step-1)/1.2 var(--font-display); }
+.ed-move__row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.ed-move__row select { flex: 1 1 220px; min-width: 0; min-height: 44px; }
+.ed-free { margin: var(--space-2) 0 var(--space-3); padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-s); }
+.ed-free .ed-list { max-height: 320px; overflow: auto; }
 .ed-people .ed-actions { margin-top: var(--space-3); }
 .ed-staff { display: grid; grid-template-columns: minmax(0, 1fr) 72px 72px; gap: var(--space-1) var(--space-2); align-items: end; padding: var(--space-2) 0; border-bottom: 1px solid var(--line); }
 .ed-staff__role { grid-column: 1 / -1; font: 700 var(--step--1)/1.2 var(--font-display); }
