@@ -42,3 +42,16 @@ Krok 2, burza mózgów (3 agentów równolegle, Sonnet medium, z raportem z krok
 - trener: co trener widzi i czym steruje (rozmowy, rola, kapitan, odprawa, zmiany w meczu, trening mentalny).
 
 Wynik: jedna lista pomysłów z miejscem podpięcia w logice gry i meczu, oceną pracy i wpływem na balans, do decyzji właściciela. Powiązane: punkt 1 (historia morale).
+
+## 3. Limit zawodników spoza UE w 1, 2 i 3 lidze (dodane Nov 18, 2026)
+
+Stan dziś: limit wyłączony we wszystkich ligach (`src/config/competitions.js`), pole `p.eu` (27 państw UE, `EU` w `src/data/names.js`) jest liczone, ale nieużywane.
+
+Przepisy (regulamin PZPN 1., 2. i 3. Ligi 2025/26): na boisku jednocześnie najwyżej 2 zawodników-cudzoziemców spoza UE, zgłaszać można dowolnie wielu. Ekstraklasa i Puchar Polski na szczeblu centralnym: bez limitu (zniesiony przed 2019/20). Do sprawdzenia przed wdrożeniem: wyjątek dla obywateli Ukrainy (starsza uchwała PZPN) i ewentualne zmiany w 2026.
+
+Do zrobienia:
+- ta sama zasada dla gracza i klubów AI: wybór składu, ławka i zmiany w meczu (trzeci zawodnik spoza UE nie wejdzie, gdy dwóch jest na boisku);
+- informacja w taktyce i przy zmianie (licznik „spoza UE na boisku: 2/2”), ostrzeżenie przy ustawianiu składu;
+- obywatelstwo UE z drugim paszportem: później (na razie tylko narodowość `p.nat`).
+
+Źródło: https://pzpn.pl/public/system/files/site_content/635/6576-Regulamin%201.%20Ligi%202.%20Ligi%20i%203.%20Ligi%20na%20sezon%202025-2026.pdf
