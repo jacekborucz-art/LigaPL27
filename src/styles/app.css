@@ -441,8 +441,8 @@
 .slot-btn__c { position: absolute; top: -4px; right: 10px; width: 16px; height: 16px; border-radius: 50%; background: var(--led); color: #14211A; font: 800 10px/16px var(--font-display); }
 .tac__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: center; }
 /* Opis formacji i przycisk „Instrukcje indywidualne” nad boiskiem */
-.tac__hintrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
-.tac__hintrow .hint { flex: 1 1 200px; margin: 0; }
+.tac__hintrow { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; } /* przycisk pod opisem, nad boiskiem */
+.tac__hintrow .hint { margin: 0; }
 /* Menu „Poproś asystenta”: sposób ustawienia składu (AUTO_MODES w src/engine/lineup.js) */
 .tac__auto { position: relative; }
 .tac__auto > summary { list-style: none; cursor: pointer; }
