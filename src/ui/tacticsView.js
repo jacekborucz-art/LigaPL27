@@ -63,8 +63,9 @@ const hitsWord = (n) => (n !== 1 && few(n) ? 'pasują' : 'pasuje');
  * wide: szeroki ekran (PC od 1100 px): zwijana siła składu w kolumnie boiska, karta jako pływające okno.
  * strengthOpen: rozwinięta siła składu (tylko wide).
  * rzChips: plakietki rezerw (src/ui/reservesView.js, rzChipFn), rzStrip: pasek rezerw nad ławką (klub bez rezerw: brak).
+ * analyses: { n, alert } przycisk „Analizy meczów” (src/ui/postMatchView.js analysesBadge); brak: bez przycisku.
  */
-export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg = '', numbers = null, kit = null, infoExtra = '', rzChips = null, rzStrip = '', cards = null, wide = false, strengthOpen = true, assistant = true }) {
+export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg = '', numbers = null, kit = null, infoExtra = '', rzChips = null, rzStrip = '', cards = null, wide = false, strengthOpen = true, assistant = true, analyses = null }) {
   const byId = new Map(squad.map((p) => [p.id, p]));
   const f = formationById(tactics.formation);
   const check = checkTactics(tactics, squad, { benchSize });
@@ -216,6 +217,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
         ${assistant ? `<details class="tac__auto"><summary class="btn btn--quiet">Poproś asystenta</summary>
           <div class="tac__auto-menu" role="menu">${Object.entries(AUTO_MODES).map(([k, m]) => `<button role="menuitem" data-act="tauto" data-mode="${k}"><b>${esc(m.label)}</b><small>${esc(m.note)}</small></button>`).join('')}</div></details>`
           : '<button class="btn btn--quiet" data-act="tauto" disabled title="W sztabie nie ma asystenta trenera">Poproś asystenta</button><p class="hint">Brak asystenta trenera w sztabie (zatrudnisz go w Trening, Sztab).</p>'}
+        ${analyses ? `<button class="btn btn--quiet tac__ma" data-act="ma-list"${analyses.alert ? ' data-alert="1"' : ''}>Analizy meczów${analyses.n ? ` <span class="tac__ma-n">${analyses.n}</span>` : ''}${analyses.alert ? '<span class="tac__ma-dot" aria-label="problem wraca"></span>' : ''}</button>` : ''}
         ${sel ? '<button class="btn btn--quiet" data-act="tcancel">Anuluj wybór</button>' : ''}
       </div>
       ${wide ? strengthHtml : ''}

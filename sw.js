@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-7bce3eade3';
+const VERSION = 'v0.3-e4433ba8b7';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -78,7 +78,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', 'd94d7b0f93'],
+  ['./src/app.js', 'a6e3080168'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '5cc24e938e'],
@@ -104,6 +104,7 @@ const FILES = [
   ['./src/career/negotiationLines.js', '37c64fb89e'],
   ['./src/career/owners.js', '881a7a1333'],
   ['./src/career/personality.js', 'f490724de6'],
+  ['./src/career/postMatchReport.js', 'd8bb4cab6b'],
   ['./src/career/preContracts.js', '8c71401605'],
   ['./src/career/prizes.js', 'eed7f4e394'],
   ['./src/career/referees.js', '4a2d4c8ccb'],
@@ -161,7 +162,7 @@ const FILES = [
   ['./src/engine/teamStrength.js', '29de64f3e1'],
   ['./src/match/aiPlan.js', '2f958da775'],
   ['./src/match/briefings.js', '259a9a1c24'],
-  ['./src/match/matchday.js', 'f713d0f228'],
+  ['./src/match/matchday.js', '2af7bc822b'],
   ['./src/match/press.js', 'a0c01d2832'],
   ['./src/match/pressSystem.js', 'f08d4d2743'],
   ['./src/match/studio.js', '13cae950dc'],
@@ -189,8 +190,8 @@ const FILES = [
   ['./src/season/thirdLeague.js', 'b37f1d8a44'],
   ['./src/season/uefa.js', '4a0c9dc052'],
   ['./src/season/worldNations.js', '6003d36e12'],
-  ['./src/styles/app.css', 'b5dff3f4f6'],
-  ['./src/styles/assistant.css', '87577f8aa4'],
+  ['./src/styles/app.css', '6f55e226f2'],
+  ['./src/styles/assistant.css', 'a1dd04f875'],
   ['./src/styles/base.css', 'f2fee58203'],
   ['./src/styles/club.css', '6615e08e49'],
   ['./src/styles/contextmenu.css', '55d14f38c2'],
@@ -249,6 +250,7 @@ const FILES = [
   ['./src/ui/playerStatsView.js', '00e99b6845'],
   ['./src/ui/playerTags.js', '11c84f25c9'],
   ['./src/ui/positionMap.js', 'ef2c032d52'],
+  ['./src/ui/postMatchView.js', 'acdba6d632'],
   ['./src/ui/reservesView.js', '0768b9e72d'],
   ['./src/ui/sponsorsView.js', '93ea7f72b4'],
   ['./src/ui/squadView.js', '26402bd3f1'],
@@ -256,7 +258,7 @@ const FILES = [
   ['./src/ui/sysMenu.js', 'fc1677717f'],
   ['./src/ui/tacticsDrag.js', '1d6819c303'],
   ['./src/ui/tacticsMoves.js', '36742ffefc'],
-  ['./src/ui/tacticsView.js', 'eb20daf158'],
+  ['./src/ui/tacticsView.js', '0ffed73672'],
   ['./src/ui/talksView.js', '0721af17ae'],
   ['./src/ui/teamReportView.js', 'c01abc57b6'],
   ['./src/ui/todoView.js', 'bd4d7aa1c4'],

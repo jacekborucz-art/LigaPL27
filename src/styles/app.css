@@ -455,6 +455,10 @@
 .tac__auto-menu button:hover, .tac__auto-menu button:focus-visible { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .tac__auto-menu b { font-size: 14px; }
 .tac__auto-menu small { font-size: 12px; color: var(--text-muted); }
+/* „Analizy meczów” (src/ui/postMatchView.js): liczba analiz i kropka, gdy problem wraca w 3 z 5 ostatnich meczów */
+.tac__ma { display: inline-flex; align-items: center; gap: 6px; }
+.tac__ma-n { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--surface-stripe); font: 700 12px/1 var(--font-display); }
+.tac__ma-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--kartka-czerwona); }
 .tac h3 .muted { font: 400 var(--step--1) var(--font-body); }
 .notice--err { border-left-color: var(--kartka-czerwona); }
 .zones { list-style: none; margin: 0; padding: 0; }

@@ -43,6 +43,7 @@ import { applyMorale, teamMorale } from '../career/morale.js';
 import { isAvailable } from '../career/squad.js';
 import { compClubIds } from '../season/leagueComps.js';
 import { matchReferee } from '../career/referees.js';
+import { recordMatchReport } from '../career/postMatchReport.js'; // analiza pomeczowa sztabu (docs/analiza-pomeczowa.md)
 
 
 /** Pogoda zależna od miesiąca (prosto, deterministycznie z meczu). */
@@ -679,6 +680,9 @@ export function finishMatchday(game, S) {
     const warn = scoutingWarning(game);
     if (warn) inbox.push(createMessage({ date: S.f.date, category: 'staff', from: 'Analityk wideo', key: `schemat:${S.f.id}`, subject: warn.subject, body: warn.body }));
   }
+  // Analiza pomeczowa sztabu: mecz o stawkę (sparing bez analizy), tylko dane widoczne w meczu
+  const analysis = recordMatchReport(game, S.f, r);
+  if (analysis) inbox.push(analysis);
   game.inbox = addMessages(game.inbox, inbox).inbox;
   void msgs;
   S.result = r;

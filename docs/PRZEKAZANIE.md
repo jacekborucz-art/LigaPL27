@@ -244,6 +244,10 @@ Instrukcje indywidualne zawodników, etap 1 (silnik, dane, zmiana w meczu, regu�
 `tests/playerInstr.test.mjs` pilnuje, że mecz bez instrukcji indywidualnych jest identyczny jak przed nimi: zmiana
 silnika, która celowo zmienia przebieg meczu, wymaga nowych skrótów (zebranych kodem z `tests/piHelpers.mjs`).
 
+Analiza pomeczowa sztabu, Nov 18, 2026: poczta po każdym meczu o stawkę (bez sparingów), pełny raport, archiwum
+„Analizy meczów” w panelu taktyki, błędy zależne od jakości analityka i asystenta, tylko dane widoczne w meczu.
+Opis wdrożenia: `docs/analiza-pomeczowa.md` rozdział 8, testy `tests/postMatchReport.test.mjs`.
+
 ### W toku
 Nic nie jest w toku. Wszystko jest na `main` (`9b4403e`).
 

@@ -77,6 +77,8 @@ import { renderAssistantReport } from './ui/assistantReportView.js';
 import { ensureAssistantReport } from './career/assistantReport.js';
 import { ensureTeamReport, requestTeamReport } from './career/teamReport.js'; // raport ogólny o drużynie (docs/raport-druzyny.md)
 import { renderTeamReport } from './ui/teamReportView.js';
+import { ensureMatchReports, recordMatchReport } from './career/postMatchReport.js'; // analiza pomeczowa sztabu (docs/analiza-pomeczowa.md)
+import { renderMatchAnalysis, matchReportMailFoot, analysesBadge } from './ui/postMatchView.js';
 import { ensureWeeklyTodo, buildWeeklyTodo, noteTodoSeen, todoBadge, snoozeTodo, unhideTodo } from './career/weeklyTodo.js'; // lista „Do zrobienia w tym tygodniu” (docs/do-zrobienia.md)
 import { todoPanelBody, renderTodo } from './ui/todoView.js';
 import { ensureReferees, refStrictFor } from './career/referees.js'; // pula sędziów i obsada meczów (docs/sedziowie.md)
@@ -348,6 +350,7 @@ function ensureGameShape(g) {
   ensureHistory(g); // historia meczów drużyny gracza (stare zapisy: bieżący sezon z terminarza)
   ensureAssistantReport(g); // raport asystenta: częstotliwość i dziennik urazów (stare zapisy: co 2 tygodnie)
   ensureTeamReport(g); // raport ogólny o drużynie (stare zapisy: pusty stan, pierwszy raport od 3. dnia miesiąca)
+  ensureMatchReports(g); // analizy pomeczowe (stare zapisy: puste archiwum, pierwsza analiza po najbliższym meczu)
   ensureWeeklyTodo(g); // lista „Do zrobienia” (stare zapisy: pusty stan odłożonych spraw)
   ensureReferees(g); // pula sędziów (stare zapisy: pula z ziarna gry, obsada od najbliższej kolejki)
   if (!g.inbox.length) {
@@ -499,6 +502,7 @@ function renderTab(tab, g, club) {
   if (tab === 'klub') return renderClubHub(g, state);
   if (tab === 'rozgrywki') return renderCompetitions(g, { comp: state.cComp ?? compOfClub(club) ?? 'ekstraklasa', view: state.cView, round: state.cRound, filter: state.uFilter, draw: state.uDraw });
   if (tab === 'kadra') {
+    if (state.ma) return renderMatchAnalysis(g, state.ma); // analiza meczu albo archiwum (Skład i taktyka, Analizy meczów)
     // Rezerwy: podzakładka tylko w klubie z grywalnymi rezerwami (po zmianie klubu powrót do „Zawodnicy”)
     const rzOn = hasReserves(g);
     if (state.sqSub === 'reserves' && !rzOn) state.sqSub = 'players';
@@ -522,7 +526,7 @@ function renderTab(tab, g, club) {
     if (state.sqSub === 'tactics') {
       queueMicrotask(mountTacticsScreen); // po wstawieniu HTML: okno atrybutów i fokus
       const wide = matchMedia(WIDE_INFO).matches;
-      return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), info: state.tInfo, msg: state.tMsg, numbers: shirtNumbers(g, g.clubId, squadOf(g.world, g.clubId)), kit: kitColors(clubById(g.clubId)), cards: tCardsFor(g, wide), wide, strengthOpen: tUi.strOpen, assistant: hasAssistant(g), rzChips, rzStrip: rzOn ? reservesStrip(g) : '' });
+      return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), info: state.tInfo, msg: state.tMsg, numbers: shirtNumbers(g, g.clubId, squadOf(g.world, g.clubId)), kit: kitColors(clubById(g.clubId)), cards: tCardsFor(g, wide), wide, strengthOpen: tUi.strOpen, assistant: hasAssistant(g), rzChips, rzStrip: rzOn ? reservesStrip(g) : '', analyses: analysesBadge(g) });
     }
     const ovrs = leagueOvrs(g, club.tier);
     const p = state.playerOpen && g.world.players[state.playerOpen];
@@ -899,6 +903,7 @@ function mailReader(g, m, nextId) {
     <div class="mail-view__body">${mailBodyHtml(m.body)}</div>
     ${needsAnswer(m) ? `<section class="mail-decide"><h3>Twoja decyzja</h3><div class="mail-actions">${m.actions.map((a, i) => `<button class="btn ${i === 0 ? 'btn--primary' : 'btn--quiet'}" data-act="mailaction" data-id="${esc(m.id)}" data-a="${esc(a.id)}">${esc(a.label)}</button>`).join('')}</div></section>` : ''}
     ${m.refs?.kind === 'teamReport' ? '<p class="mail-view__foot"><button class="btn btn--sm" data-act="trep-open">Otwórz pełny raport</button></p>' : ''}
+    ${m.refs?.kind === 'matchReport' ? matchReportMailFoot(g, m) : ''}
     ${m.chosen ? `<p class="mail-chosen">Twoja odpowiedź: <b>${esc(m.actions.find((a) => a.id === m.chosen)?.label ?? '')}</b></p>` : ''}
     ${canDelete(m) ? `<p class="mail-view__foot"><button class="btn btn--quiet btn--sm" data-act="maildel" data-id="${esc(m.id)}">Usuń wiadomość</button></p>` : ''}
   </article>`;
@@ -995,6 +1000,22 @@ function renderMatchResult() {
   window.scrollTo({ top: 0 });
 }
 
+/**
+ * Przejście z analizy meczu albo z wiadomości (dataset: to, id, mail). Tylko nawigacja: taktyka, trening (Tydzień),
+ * rozmowa z zawodnikiem, rozmowy, karta zawodnika, pełny raport. Niczego nie zmienia w grze.
+ */
+function maGo(ds) {
+  const g = state.game;
+  const base = { mailOpen: null, playerOpen: null, repOpen: null, extPlayer: null, extClub: null, ma: null, ttDlg: null };
+  const mine = ds.id && g.world.players[ds.id]?.clubId === g.clubId;
+  if (ds.to === 'report') Object.assign(state, base, { tab: 'kadra', sqSub: 'tactics', ma: { id: ds.id, from: ds.mail ? 'mail' : 'tactics', mail: ds.mail ?? null } });
+  else if (ds.to === 'training') Object.assign(state, base, { tab: 'trening', trTab: 'tydzien', trDay: null, trPlayer: null, trNotice: null });
+  else if (ds.to === 'talk' && mine) Object.assign(state, base, { tab: 'kadra', sqSub: 'talks', ttDlg: { id: ds.id, step: 'topic' }, ttResult: null, ttMeeting: null });
+  else if (ds.to === 'talks' || ds.to === 'talk') Object.assign(state, base, { tab: 'kadra', sqSub: 'talks', ttResult: null, ttMeeting: null });
+  else if (ds.to === 'player' && mine) Object.assign(state, base, { tab: 'kadra', sqSub: 'players', playerOpen: ds.id });
+  else Object.assign(state, base, { tab: 'kadra', sqSub: 'tactics', tSel: null, tMsg: '' });
+}
+
 async function playMyMatch() {
   const g = state.game;
   const f = primaryAction(g).match;
@@ -1029,6 +1050,8 @@ async function playMyMatch() {
   }
   const rng = new Rng(`wynik:${g.seed}:${f.id}`);
   const msgs = applyResult(g, f, fromEngineResult(r), rng);
+  const analysis = recordMatchReport(g, f, r); // analiza pomeczowa sztabu (sparing bez analizy)
+  if (analysis) g.inbox = addMessages(g.inbox, [analysis]).inbox;
   for (const [priority, subject, body] of msgs) g.inbox.unshift({ id: `m:${f.id}:${subject}`, key: `m:${f.id}:${subject}`, date: g.date, category: 'staff', from: 'Sztab', subject, body, priority, actions: [], read: false, resolved: true });
   await save();
   state.lastResult = { f, r };
@@ -1521,7 +1544,7 @@ async function dispatchAct(el, { root = app } = {}) {
       await new Promise((r) => setTimeout(r, matchMedia('(prefers-reduced-motion: reduce)').matches ? 150 : 450)); // podpis widoczny przed generowaniem świata
       await newGame(nc.slot, nc.clubId, profileOf(nc));
     }
-    if (act === 'tab') { state.tab = el.dataset.tab; state.mailOpen = null; state.playerOpen = null; state.repOpen = null; state.fx = null; state.todo = null; state.extPlayer = null; state.extClub = null; if (el.dataset.sub) { if (state.tab === 'klub') state.kTab = el.dataset.sub; else state.tfTab = el.dataset.sub; } render(); }
+    if (act === 'tab') { state.tab = el.dataset.tab; state.ma = null; state.mailOpen = null; state.playerOpen = null; state.repOpen = null; state.fx = null; state.todo = null; state.extPlayer = null; state.extClub = null; if (el.dataset.sub) { if (state.tab === 'klub') state.kTab = el.dataset.sub; else state.tfTab = el.dataset.sub; } render(); }
     // Terminarz i wyniki (Pulpit > Pokaż wszystko): sezon, rozgrywki, miejsce meczu
     if (act === 'fixtures') { state.tab = 'pulpit'; state.fx = { season: null, comp: 'all', venue: 'all' }; render(); window.scrollTo({ top: 0 }); app.querySelector('.fxs h2')?.setAttribute('tabindex', '-1'); app.querySelector('.fxs h2')?.focus({ preventScroll: true }); }
     if (act === 'fxback') { state.fx = null; render(); app.querySelector('[data-act="fixtures"]')?.focus(); }
@@ -1595,6 +1618,16 @@ async function dispatchAct(el, { root = app } = {}) {
     // Raport ogólny o drużynie: na prośbę trenera (co 14 dni) i otwarcie z poczty
     if (act === 'trep-req') { const r = requestTeamReport(g); state.trepMsg = r.ok ? 'Sztab przygotował nowy raport.' : r.msg; if (r.ok) state.trepSel = 0; if (r.ok) await save(); render(); }
     if (act === 'trep-sel') { state.trepSel = Number(el.dataset.i) || 0; state.trepMsg = ''; render(); }
+    // Analizy meczów: archiwum, pełny raport i przejścia z raportu albo z poczty (tylko nawigacja)
+    if (act === 'ma-list') { Object.assign(state, { tab: 'kadra', sqSub: 'tactics', ma: { list: true }, mailOpen: null, playerOpen: null, repOpen: null, extPlayer: null, extClub: null }); render(); window.scrollTo({ top: 0 }); }
+    if (act === 'ma-open') { state.ma = { id: el.dataset.id, from: state.ma?.list ? 'list' : 'tactics' }; render(); window.scrollTo({ top: 0 }); }
+    if (act === 'ma-back') {
+      const b = state.ma;
+      if (b?.from === 'mail' && b.mail && g.inbox.some((x) => x.id === b.mail)) { state.ma = null; state.tab = 'poczta'; state.mailOpen = b.mail; }
+      else state.ma = b?.id && b.from === 'list' ? { list: true } : null;
+      render(); window.scrollTo({ top: 0 });
+    }
+    if (act === 'ma-go') { maGo(el.dataset); render(); window.scrollTo({ top: 0 }); }
     if (act === 'trep-open') { state.tab = 'kadra'; state.sqSub = 'report'; state.trepSel = 0; state.mailOpen = null; state.playerOpen = null; state.repOpen = null; state.trepMsg = ''; render(); window.scrollTo({ top: 0 }); }
     if (act === 'extplayer') {
       const id = el.dataset.id; const pl = state.game?.world.players[id];
@@ -1616,7 +1649,7 @@ async function dispatchAct(el, { root = app } = {}) {
       render(); window.scrollTo({ top: 0 });
     }
     if (act === 'clubback') { state.extClub = null; state.extPlayer = null; render(); }
-    if (act === 'tsub') { state.sqSub = el.dataset.s; state.rzAsk = null; state.rzMsg = null; state.trepMsg = ''; state.tSel = null; state.tInfo = null; state.tCards = []; state.tMsg = ''; state.playerOpen = null; state.ttResult = null; state.ttMeeting = null; render(); }
+    if (act === 'tsub') { state.ma = null; state.sqSub = el.dataset.s; state.rzAsk = null; state.rzMsg = null; state.trepMsg = ''; state.tSel = null; state.tInfo = null; state.tCards = []; state.tMsg = ''; state.playerOpen = null; state.ttResult = null; state.ttMeeting = null; render(); }
     if (act === 'tcancel') { state.tSel = null; state.tMsg = ''; renderTacticsAfter('[data-act="tauto"]'); }
     if (act === 'tform') { g.tactics = changeFormation(g.tactics, mySquad(g), el.dataset.f); state.tSel = null; state.tMsg = ''; await save(); renderTacticsAfter(); }
     if (act === 'tauto' && !hasAssistant(g)) { state.tMsg = 'W sztabie nie ma asystenta trenera. Zatrudnisz go w Trening, Sztab.'; renderTacticsAfter(); }
