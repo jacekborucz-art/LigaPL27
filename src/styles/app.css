@@ -894,8 +894,9 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
   .tac__pitch .pitch2 { flex: none; max-width: min(460px, max(260px, calc((100dvh - var(--hub-top, 0px) - 330px) * .68))); }
   .tac__lists > * { min-width: 0; }
 }
-/* Duży PC: boisko | pierwszy skład | ławka; pod składem pas rezerw, pod ławką zawodnicy spoza kadry */
-@media (min-width: 1280px) {
+/* Duży PC: boisko | pierwszy skład | ławka; pod składem pas rezerw, pod ławką zawodnicy spoza kadry.
+   Tablet dotykowy (wysokie wiersze pod palec) dopiero od 1500 px, inaczej listy są za wąskie i ucinają nazwiska. */
+@media (min-width: 1280px) and (pointer: fine), (min-width: 1500px) {
   .hub__main:has(.tac) { max-width: 1440px; }
   .tac {
     grid-template-columns: minmax(300px, 360px) minmax(0, 1fr) minmax(0, 1fr);
