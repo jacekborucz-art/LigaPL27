@@ -904,8 +904,8 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
   /* Opis formacji w jednej linii z legendą, pierwszy skład wyrównany do góry z boiskiem; ławka pod składem, poza kadrą obok składu */
   .tac__form { display: contents; }
   .tac__form .chips { grid-area: form; }
-  .tac__form .tac__hintrow { grid-area: hint; align-self: center; }
-  .tac .tp-legend { align-self: center; }
+  .tac__form .tac__hintrow { grid-area: hint; align-self: start; }
+  .tac .tp-legend { align-self: start; } /* legenda w jednej linii z opisem formacji (przycisk pod opisem) */
   .tac__lists { display: contents; }
   .tac .tp-legend { grid-area: legend; margin: 0; }
   .tac .tp-sec--xi { grid-area: xi; }
