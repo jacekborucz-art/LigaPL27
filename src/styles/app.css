@@ -767,8 +767,15 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 .tt-group span { padding: 2px 7px; border-radius: 999px; font-size: var(--step--1); background: color-mix(in srgb, var(--text) 10%, transparent); }
 .tt-group--rec { color: var(--text); }
 .tt-group--rec span { background: var(--tt-push); color: #1C1404; }
-.tt-asst { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0 0 var(--space-2); }
-.tt-asst small { flex: 1 1 260px; color: var(--text-muted); font-size: var(--step--1); }
+/* „Poproś asystenta”: zielony przycisk w wyróżnionym pasku (inny niż żółte „Porozmawiaj” w wierszach) */
+.tt-asst { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 var(--space-3); padding: 10px 12px; border-radius: var(--radius-m); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.tt-asst small { flex: 1 1 220px; color: var(--text-muted); font-size: var(--step--1); }
+.tt-asst--off { background: none; border-style: dashed; border-color: var(--line); }
+.tt-asst__btn { gap: 8px; padding: 0 var(--space-4); border-radius: 999px; font-size: var(--step-0); box-shadow: 0 2px 0 color-mix(in srgb, var(--accent) 55%, #000); }
+.tt-asst__btn:hover { filter: brightness(1.1); }
+.tt-asst__btn:focus-visible { outline: 3px solid var(--text); outline-offset: 2px; }
+.tt-asst__btn:active { transform: translateY(1px); box-shadow: none; }
+@media (max-width: 600px) { .tt-asst__btn { width: 100%; } .tt-asst small { flex-basis: 100%; } }
 .tt-ok { padding: 10px 12px; border-radius: var(--radius-s); background: color-mix(in srgb, var(--tt-good) 12%, transparent); }
 .tt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .tt-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 10px; align-items: center; padding: 8px 10px; border-radius: var(--radius-s); background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--line); }

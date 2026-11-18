@@ -116,9 +116,9 @@ function assistantBar(game, rec) {
   const q = assistantQueue(game, rec);
   if (!q.length) return '';
   const mot = assistantMot(game);
-  if (mot == null) return '<p class="hint tt-asst">Rozmowy w twoim imieniu może przeprowadzić asystent trenera (zatrudnisz go w Trening, Sztab).</p>';
-  return `<div class="tt-asst"><button class="btn btn--sm" data-act="tt-assist">Asystent porozmawia z czekającymi (${q.length})</button>
-    <small>Asystent wybiera temat sam. Efekt zależy od jego umiejętności motywowania i bywa słabszy niż twoja rozmowa; zaufanie do ciebie się nie zmienia.</small></div>`;
+  if (mot == null) return '<p class="hint tt-asst tt-asst--off">Rozmowy w twoim imieniu może przeprowadzić asystent trenera (zatrudnisz go w Trening, Sztab).</p>';
+  return `<div class="tt-asst"><button class="btn btn--primary tt-asst__btn" data-act="tt-assist"><svg class="tt-asst__ico" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 4.5h5.5v4.5H19l-2 2v-2h-1z"/></svg><span>Poproś asystenta (${q.length})</span></button>
+    <small>Asystent porozmawia ze wszystkimi czekającymi i sam dobierze tematy. Efekt zależy od jego umiejętności i bywa słabszy niż twoja rozmowa, a zaufanie do ciebie się nie zmienia.</small></div>`;
 }
 
 export function renderTalks(game, ui = {}) {
