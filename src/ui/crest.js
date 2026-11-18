@@ -10,7 +10,7 @@ export const CRESTS_AVAILABLE = new Set([
 
 import { FICTIONAL, realNamesOn, crestsAreHidden } from '../data/clubNames.js';
 /** Nowy herb (fikcyjna nazwa klubu, przeglądarka bez prawdziwych nazw). */
-const fictionalCrest = (id) => !!FICTIONAL[id] && typeof document !== 'undefined' && !realNamesOn();
+const fictionalCrest = (id, real = realNamesOn()) => !!FICTIONAL[id] && typeof document !== 'undefined' && !real;
 /** Nowe herby w assets/crests/f (kluby z nazwą do publikacji, które mają już plik). Bez pliku: tarcza w barwach klubu. */
 export const FICTIONAL_CRESTS = new Set([
   'cracovia', 'gks-katowice', 'gornik-zabrze', 'jagiellonia', 'korona', 'lech', 'legia', 'motor', 'piast', 'pogon-szczecin',
@@ -60,15 +60,16 @@ export function fallbackCrestSvg(club) {
  * HTML herbu. size w px CSS; dla <= 24 px używamy miniatury 48, wyżej 128.
  * base: ścieżka do katalogu assets (względna względem strony).
  */
-export function crestHtml(club, { size = 32, base = 'assets/crests', clubsById = null } = {}) {
+export function crestHtml(club, { size = 32, base = 'assets/crests', clubsById = null, real = realNamesOn() } = {}) {
+  // real: herby prawdziwe albo nowe (lista zapisów w menu: każda kariera z nazwami, z którymi ją rozpoczęto)
   // Rezerwy z własnym nowym herbem (np. Legat II) używają go, pozostałe herbu pierwszej drużyny z plakietką „II”
   const hidden = crestsAreHidden(); // gra z datapackiem: tylko tarcze w barwach klubów
-  const own = !hidden && fictionalCrest(club.id) && FICTIONAL_CRESTS.has(club.id);
+  const own = !hidden && fictionalCrest(club.id, real) && FICTIONAL_CRESTS.has(club.id);
   const parent = !own && club.parent && clubsById ? clubsById.get(club.parent) : null;
   const source = parent || club;
   const badge = club.parent && !own ? '<span class="crest__badge">II</span>' : '';
   let inner;
-  const fict = fictionalCrest(source.id);
+  const fict = fictionalCrest(source.id, real);
   if (hidden) {
     inner = fallbackCrestSvg(source);
   } else if (fict && !FICTIONAL_CRESTS.has(source.id)) {

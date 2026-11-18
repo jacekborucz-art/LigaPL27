@@ -64,9 +64,22 @@ export const FICTIONAL = {
 };
 
 export const NAMES_KEY = 'ligapl27-names';
-/** Prawdziwe nazwy włączone (tylko przeglądarka, ustawienie zapamiętane po skrócie na ekranie wyboru klubu). */
+// Nazwy wczytanej kariery (na czas karty przeglądarki): kariera zachowuje nazwy, z którymi została rozpoczęta
+export const NAMES_GAME_KEY = 'ligapl27-names-game';
+/** Prawdziwe nazwy włączone (tylko przeglądarka): nazwy wczytanej kariery, a poza nią ustawienie po skrócie na ekranie wyboru klubu. */
 export function realNamesOn() {
-  try { return globalThis.localStorage?.getItem(NAMES_KEY) === 'real'; } catch { return false; }
+  try {
+    const s = globalThis.sessionStorage?.getItem(NAMES_GAME_KEY);
+    if (s) return s === 'real';
+    return globalThis.localStorage?.getItem(NAMES_KEY) === 'real';
+  } catch { return false; }
+}
+// Wdrożenie fikcyjnych nazw (pierwszy commit, Nov 18, 2026): kariery rozpoczęte wcześniej zostają przy prawdziwych nazwach
+const RENAME_DEPLOYED = '2026-11-18T17:31:01.000Z';
+/** Kariera z prawdziwymi nazwami: znacznik clubNames w zapisie, a w zapisie bez znacznika data rozpoczęcia kariery. */
+export function gameUsesRealNames(game) {
+  if (game?.clubNames === 'real' || game?.clubNames === 'fictional') return game.clubNames === 'real';
+  return !(typeof game?.createdAt === 'string' && game.createdAt >= RENAME_DEPLOYED);
 }
 const inBrowser = () => typeof window !== 'undefined' && typeof document !== 'undefined';
 
@@ -94,7 +107,7 @@ export function applyClubNames(list) {
   if (!inBrowser() || realNamesOn()) return list;
   for (const c of list) {
     const f = FICTIONAL[c.id];
-    if (f) { c.name = f.name; c.short = f.short; continue; }
+    if (f) { f.realShort ??= c.short; c.name = f.name; c.short = f.short; continue; }
     if (c.parent && FICTIONAL[c.parent]) {
       c.name = reserveName(c.name, c.parent);
       c.short = `${FICTIONAL[c.parent].short.slice(0, 2)}2`;

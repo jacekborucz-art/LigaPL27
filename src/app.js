@@ -58,9 +58,24 @@ import { renderClubHub, handleClubAction, isClubAction } from './ui/klubView.js'
 import { sysNavHtml, sysHeaderBtn, sysDialogHtml } from './ui/sysMenu.js';
 import { renderEditor, handleEditorAction, isEditorAction, newEditorState, clubListHtml, playerListHtml } from './ui/editorView.js'; // edytor i datapack (docs/edytor.md)
 import { canPromote, promoteYouth } from './career/academy.js'; // wychowankowie do pierwszego składu
-import { applyPack, restoreOriginals, exportPack, packFileName, parsePack, importPack, importSummary } from './career/editor.js';
-import { realNamesOn, NAMES_KEY } from './data/clubNames.js';
+import { applyPack, restoreOriginals, clubNamesSnapshot, exportPack, packFileName, parsePack, importPack, importSummary } from './career/editor.js';
+import { realNamesOn, NAMES_KEY, NAMES_GAME_KEY, gameUsesRealNames } from './data/clubNames.js';
 const NC_RESTORE_KEY = 'ligapl27-nc-restore';
+const LOAD_RESTORE_KEY = 'ligapl27-load-restore';
+/**
+ * Kariera ma nazwy klubów, z którymi ją rozpoczęto (stare kariery: prawdziwe). Gdy strona ma inne nazwy,
+ * zapamiętuje nazwy kariery na czas karty i przeładowuje stronę, po czym wczytuje slot. Zwraca true przy przeładowaniu.
+ */
+function switchNamesFor(g, slot) {
+  const real = gameUsesRealNames(g);
+  if (real === realNamesOn()) return false;
+  try {
+    sessionStorage.setItem(NAMES_GAME_KEY, real ? 'real' : 'fictional');
+    sessionStorage.setItem(LOAD_RESTORE_KEY, String(slot));
+  } catch { return false; } // bez pamięci przeglądarki: kariera z nazwami strony
+  location.reload();
+  return true;
+}
 import { renderTalks, handleTalkAction, isTalkAction } from './ui/talksView.js';
 import { ensureCareer } from './career/careerSystem.js';
 import { ensureReputation } from './career/reputationSystem.js'; // dynamiczna reputacja (docs/reputacja.md)
@@ -319,12 +334,13 @@ app.addEventListener('keydown', (ev) => {
 async function save() {
   const g = state.game;
   const p = g.manager?.profile;
-  g.summary = { clubId: g.clubId, season: typeof g.season === 'string' ? g.season : (g.season?.seasonId ?? SEASON), date: g.date, ...(p ? { managerName: managerName(g) } : {}) };
+  g.summary = { clubId: g.clubId, season: typeof g.season === 'string' ? g.season : (g.season?.seasonId ?? SEASON), date: g.date, ...(p ? { managerName: managerName(g) } : {}), names: g.clubNames };
   await store.saveSlot(state.slot, g);
 }
 
 /** Uzupełnia zapisy sprzed poczty i pętli dni (migracja w miejscu). */
 function ensureGameShape(g) {
+  g.clubNames = gameUsesRealNames(g) ? 'real' : 'fictional'; // nazwy klubów, z którymi kariera została rozpoczęta
   migratePosCodes(g); // kody pozycji: SP (boczny pomocnik) -> BP, przed wszystkim, co czyta pozycje
   applySeasonState(g); // kalendarz i ligi sezonu zapisanego w grze
   applyPack(g); // edytor: nazwy klubów i stadiony z datapacku gry (docs/edytor.md)
@@ -390,6 +406,15 @@ function renderCareerScreen() {
 
 /** Wejście do kreatora: pierwszy wolny slot albo wskazany. */
 function startCareer(slot) {
+  // Po wczytanej karierze z innymi nazwami klubów: nowa kariera z ustawieniem domyślnym (przeładowanie strony)
+  try {
+    if (sessionStorage.getItem(NAMES_GAME_KEY)) {
+      sessionStorage.removeItem(NAMES_GAME_KEY);
+      sessionStorage.setItem(NC_RESTORE_KEY, JSON.stringify(newCareerState(slot)));
+      location.reload();
+      return;
+    }
+  } catch { /* bez pamięci przeglądarki */ }
   applySeasonState({}); // kalendarz i puchary 2026/27, także po wczytaniu późniejszego sezonu
   state.slot = slot;
   state.nc = newCareerState(slot);
@@ -1447,6 +1472,7 @@ async function newGame(slot, clubId, profile = null) {
   const seed = Number.isFinite(pack?.seed) ? pack.seed : hashString(`${clubId}:${Date.now()}:${Math.random()}`);
   const game = {
     seed, clubId, date: GAME_START, season: SEASON, createdAt: new Date().toISOString(),
+    clubNames: realNamesOn() ? 'real' : 'fictional', // kariera zawsze z nazwami, z którymi ją rozpoczęto
     inbox: [],
   };
   // Profil trenera: tylko w zapisie gry na tym urządzeniu (gra nie wysyła danych do sieci)
@@ -1454,6 +1480,7 @@ async function newGame(slot, clubId, profile = null) {
   game.season = createSeason(seed, { playerClub: clubId });
   game.fixtures = game.season.fixtures;
   game.world = generateWorld(seed);
+  game.names = clubNamesSnapshot(); // nazwy klubów kariery (zapis i plik JSON), niezależne od przyszłych zmian nazw w grze
   game.tactics = createTactics(squadOf(game.world, clubId), { benchSize: benchSizeFor(game) });
   ensureTraining(game);
   ensureCareer(game);
@@ -1779,6 +1806,7 @@ async function dispatchAct(el, { root = app } = {}) {
     if (act === 'load' || act === 'continue') {
       const rec = await store.loadSlot(slot);
       if (!rec) throw new Error('Ten slot jest pusty.');
+      if (switchNamesFor(rec.game, slot)) return; // kariera z innymi nazwami klubów: przeładowanie i wczytanie
       state.game = ensureGameShape(rec.game); state.slot = slot; state.screen = 'hub'; state.tab = 'pulpit'; state.confirmDel = null; state.repOpen = null; render();
     }
     // Usunięcie zapisu: potwierdzenie w wierszu slotu (bez okna przeglądarki)
@@ -1948,6 +1976,15 @@ document.addEventListener('keydown', (ev) => {
     location.reload();
     return;
   }
+  // Pulpit kariery: ukryty przełącznik nazw klubów tej kariery (prawdziwe albo nowe), zapamiętany w zapisie; przeładowanie strony
+  if (state.screen === 'hub' && state.game && !state.running && ev.ctrlKey && ev.altKey && !ev.shiftKey && ev.code === 'KeyP') {
+    ev.preventDefault();
+    const g = state.game;
+    g.clubNames = gameUsesRealNames(g) ? 'fictional' : 'real';
+    delete g.names; // nazwy klubów zapisane w karierze: nowe po przeładowaniu (applySavedNames)
+    save().then(() => { if (!switchNamesFor(g, state.slot)) render(); }).catch(() => {});
+    return;
+  }
   if (ev.key === 'Escape' && state.screen === 'start' && state.confirmDel) { app.querySelector('[data-act="deleteNo"]')?.click(); return; }
   if (ev.key === 'Escape' && state.screen === 'editor') { app.querySelector('[data-act="ed-back"]')?.click(); return; } // edytor: powrót do gry
   if (ev.key === 'Escape' && state.screen !== 'start') { state.running = false; state.screen = 'start'; render(); }
@@ -2002,9 +2039,16 @@ try {
   const nc = sessionStorage.getItem(NC_RESTORE_KEY);
   if (nc) { sessionStorage.removeItem(NC_RESTORE_KEY); state.nc = JSON.parse(nc); state.slot = state.nc.slot ?? state.slot; state.screen = 'career'; }
 } catch { /* bez pamięci przeglądarki */ }
+// Po przełączeniu nazw klubów dla wczytywanej kariery (switchNamesFor): wczytanie tego slotu
+let loadAfterReload = null;
+try {
+  const s = sessionStorage.getItem(LOAD_RESTORE_KEY);
+  if (s) { sessionStorage.removeItem(LOAD_RESTORE_KEY); loadAfterReload = s; }
+} catch { /* bez pamięci przeglądarki */ }
 
 applyTheme(state.theme);
 Promise.resolve(render()).then(() => {
   document.body.dataset.ready = '1';
+  if (loadAfterReload) { dispatchAct({ dataset: { act: 'load', slot: loadAfterReload } }); return; }
   maybePlayIntro(app, { onDone: () => { if (state.screen === 'start') app.querySelector('.mi')?.focus({ preventScroll: true }); } });
 });

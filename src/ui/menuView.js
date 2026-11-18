@@ -11,12 +11,22 @@ import { clubPlan, initClub, stadiumCapacity } from '../career/finance.js';
 import { rivalry, fmtZl } from '../career/fans.js';
 import { Rng } from '../core/rng.js';
 import { crestHtml } from './crest.js';
+import { FICTIONAL, realNamesOn } from '../data/clubNames.js';
 import { esc, fmtDate } from './dom.js';
 import { GAME_VERSION } from '../config/version.js';
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const HEX = /^#[0-9a-fA-F]{6}$/;
-const crest = (club, size) => crestHtml(club, { size, clubsById });
+const crest = (club, size) => crestHtml(club, { size, clubsById, ...(club?.realNames != null ? { real: club.realNames } : {}) });
+/** Klub zapisu z nazwą i herbem, z którymi kariera została rozpoczęta (zapis bez znacznika: prawdziwe nazwy). */
+function slotClub(s) {
+  const c = clubsById.get(s.summary?.clubId);
+  const f = c && FICTIONAL[c.id];
+  if (!f) return c;
+  const real = s.summary?.names ? s.summary.names === 'real' : true;
+  if (real === realNamesOn()) return c;
+  return real ? { ...c, name: f.real, short: f.realShort ?? c.short, realNames: true } : { ...c, name: f.name, short: f.short, realNames: false };
+}
 const num = (n) => Math.round(n).toLocaleString('pl-PL');
 
 // ------------------------------------------------------------ Motyw (preferencja tej przeglądarki)
@@ -145,7 +155,7 @@ function saveRow(s, confirmDel) {
       <div class="save__actions"><button class="btn btn--primary" data-act="new" data-slot="${s.slot}">Nowa kariera</button></div>
     </li>`;
   }
-  const club = clubsById.get(s.summary?.clubId);
+  const club = slotClub(s);
   const name = club?.name ?? 'Nieznany klub';
   const manager = s.summary?.managerName || 'Trener';
   const actions = confirmDel === s.slot
@@ -177,7 +187,7 @@ export function renderMenu(ctx) {
   const last = latestSlot(slots);
   const free = slots.find((s) => s.empty);
   const used = slots.filter((s) => !s.empty).length;
-  const lastClub = last && clubsById.get(last.summary?.clubId);
+  const lastClub = last && slotClub(last);
   const items = [];
   if (last) {
     items.push(`<li><button class="mi mi--lead" data-act="continue" data-slot="${last.slot}">

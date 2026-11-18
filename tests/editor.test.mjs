@@ -142,6 +142,24 @@ test('Import: nieznane klucze pominięte, zły typ i złe wartości odrzucone', 
   restoreOriginals();
 });
 
+test('Nazwy klubów kariery: zapisane w grze przy pierwszym wczytaniu, potem nakładane z zapisu (zmiana nazw w aktualizacji nie rusza kariery)', () => {
+  restoreOriginals();
+  const orig = clubById('legia').name;
+  const g = structuredClone(G);
+  delete g.names;
+  applyPack(g);
+  assert.equal(g.names.legia[0], orig, 'zapis dostaje nazwy z chwili wczytania');
+  assert.ok(Object.keys(g.names).length > 54, 'także kluby III i IV ligi');
+  g.names.legia = ['Legia Stara Nazwa', 'LSN']; // jak gdyby aktualizacja gry zmieniła nazwę po zapisie
+  const saved = JSON.parse(JSON.stringify(g)); // plik JSON zapisu
+  applyPack(saved);
+  assert.equal(clubById('legia').name, 'Legia Stara Nazwa');
+  assert.equal(clubById('legia').short, 'LSN');
+  applyPack(structuredClone(G)); // inna gra: jej własne nazwy
+  assert.equal(clubById('legia').name, orig);
+  restoreOriginals();
+});
+
 test('Datapack: po wczytaniu pliku tarcze w barwach zamiast herbów, gra bez pliku z herbami', () => {
   const legia = clubById('legia');
   restoreOriginals();

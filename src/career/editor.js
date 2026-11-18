@@ -12,6 +12,7 @@
 
 import { CLUBS_PL } from '../data/clubs_pl.js';
 import { CLUBS_L3 } from '../data/clubs_l3.js';
+import { CLUBS_L4 } from '../data/clubs_l4.js';
 import { setCrestsHidden } from '../data/clubNames.js';
 import { NAT_NAMES, EU } from '../data/names.js';
 import { ATTRS, POS_NAMES, VARIANTS, ovrAt } from '../data/attributes.js';
@@ -39,17 +40,38 @@ const ATTR_KEYS = Object.keys(ATTRS);
 
 // Oryginalne wartości statycznych danych klubów: zdjęte raz, przy wczytaniu modułu (przed jakąkolwiek grą).
 const known = () => [...CLUBS_PL, ...CLUBS_L3];
-const ORIGINAL = new Map(known().map((c) => [c.id, { name: c.name, short: c.short, stadium: c.stadium ?? null }]));
+// Wszystkie polskie kluby (także IV liga z rezerwami): nazwy kariery zapisane w grze (game.names)
+const allClubs = () => [...CLUBS_PL, ...CLUBS_L3, ...CLUBS_L4];
+const ORIGINAL = new Map(allClubs().map((c) => [c.id, { name: c.name, short: c.short, stadium: c.stadium ?? null }]));
 const clubObj = (id) => known().find((c) => c.id === id) ?? null;
 
 /** Przywraca oryginalne nazwy, skróty i stadiony wszystkich klubów. */
 export function restoreOriginals() {
   setCrestsHidden(false);
-  for (const c of known()) {
+  for (const c of allClubs()) {
     const o = ORIGINAL.get(c.id);
     if (!o) continue;
     c.name = o.name; c.short = o.short;
     if (o.stadium == null) delete c.stadium; else c.stadium = o.stadium;
+  }
+}
+
+/** Nazwy i skróty wszystkich klubów w tej chwili, { id: [nazwa, skrót] } (zapis kariery i plik JSON zapisu). */
+export const clubNamesSnapshot = () => Object.fromEntries(allClubs().map((c) => [c.id, [c.name, c.short]]));
+
+/**
+ * Kariera zachowuje nazwy klubów, z którymi grała: przy pierwszym wczytaniu (albo starcie) zapisujemy je w grze,
+ * a później nakładamy z zapisu, więc kolejna zmiana nazw w aktualizacji gry nie zmienia kariery ani jej pliku JSON.
+ * Kluby spoza zapisu (nowe w aktualizacji) mają nazwy z danych gry.
+ */
+export function applySavedNames(game) {
+  if (!game || typeof game !== 'object' || !game.world) return;
+  if (!game.names || typeof game.names !== 'object') { game.names = clubNamesSnapshot(); return; }
+  for (const c of allClubs()) {
+    const n = game.names[c.id];
+    if (!Array.isArray(n)) continue;
+    if (typeof n[0] === 'string' && n[0]) c.name = n[0];
+    if (typeof n[1] === 'string' && n[1]) c.short = n[1];
   }
 }
 
@@ -59,6 +81,7 @@ export const originalOf = (id, field) => ORIGINAL.get(id)?.[field] ?? null;
 /** Nakłada zmiany z game.editor na wspólne obiekty klubów (po przywróceniu oryginałów). Wołać przy wczytaniu gry. */
 export function applyPack(game) {
   restoreOriginals();
+  applySavedNames(game);
   const E = game?.editor;
   setCrestsHidden(!!E?.packLoaded); // gra z wczytanym datapackiem: tarcze w barwach zamiast herbów
   if (!E?.clubs) return;
