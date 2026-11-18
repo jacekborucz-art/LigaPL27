@@ -445,7 +445,8 @@
 .tac__hintrow .hint { margin: 0; }
 @media (min-width: 1100px) {
   /* PC: opis formacji w jednej linii (pełny tekst w podpowiedzi), przycisk w drugiej, boisko trochę niżej */
-  .tac__hintrow { min-width: 0; margin-bottom: 6px; }
+  .tac__hintrow { min-width: 0; margin-bottom: 10px; gap: 14px; }
+  .tac__hintrow > .btn { align-self: center; } /* przycisk na środku nad boiskiem */
   .tac__hintrow .hint { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 /* Menu „Poproś asystenta”: sposób ustawienia składu (AUTO_MODES w src/engine/lineup.js) */
