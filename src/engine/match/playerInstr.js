@@ -293,7 +293,7 @@ export function playerPI(T, x) {
   const mu = PI.micro; const ar = PI.arrow;
   // Strzałka (run i lat razem): para niedozwolona na obecnej pozycji jest ignorowana w całości
   const dir = o.run || o.lat ? arrowOf(o) : null;
-  const moveOk = arrowAllowed(pos, dir);
+  const moveOk = arrowAllowed(pos, dir, x.slot.x); // przy linii bocznej bez ruchu na zewnątrz
   if (moveOk) pi.dir = dir;
   const move = (from, to, f) => (pi.moves ?? (pi.moves = [])).push([from, to, f]);
   let conflictAny = false;
@@ -488,7 +488,7 @@ export function validatePlayerInstr(T, patch) {
       const m = { run: 'run' in o ? o.run : cur.run, lat: 'lat' in o ? o.lat : cur.lat };
       if (m.run || m.lat) {
         const dir = arrowOf(m);
-        if (!dir || !(arrowAllowed(x.p.pos, dir) || (x.slot && arrowAllowed(x.slot.pos, dir)))) return 'Ruch: ten kierunek nie dotyczy pozycji zawodnika.';
+        if (!dir || !(x.slot ? arrowAllowed(x.slot.pos, dir, x.slot.x) || arrowAllowed(x.p.pos, dir, x.slot.x) : arrowAllowed(x.p.pos, dir))) return 'Ruch: ten kierunek nie dotyczy pozycji zawodnika.';
       }
     }
   }

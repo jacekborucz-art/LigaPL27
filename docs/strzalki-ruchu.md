@@ -23,6 +23,8 @@ Projekt Nov 18, 2026 po burzy mózgów (taktyk, znawca futbolu, analityk, grafik
 
 `run` rozszerzone na OP, SN i NAP. Niedozwolona para na nowej pozycji jest ignorowana.
 
+Zasada linii bocznej (Nov 18, 2026, uwaga właściciela): zawodnik ustawiony przy linii bocznej (miejsce w formacji x <= 22 albo >= 78, `onFlank`) nie ma ruchu na zewnątrz („szeroko”, „skos na zewnątrz”), bo strzałka wskazywałaby poza boisko. Dotyczy bocznych obrońców, wahadłowych i skrzydłowych we wszystkich formacjach; na zewnątrz wybiegają tylko gracze ze środka i półprzestrzeni (ŚP, OP, NAP w środku). Silnik ignoruje taki kierunek także w starych zapisach.
+
 ## 3. Skutki w silniku (waga 1/10 jak instrukcje, każdy zysk ma koszt) [SZAC]
 
 - Strefy: dzisiejsze `run` DEF<->ATT; OP, SN, NAP MID<->ATT (cofnięcie NAP: ATT -> MID ok. 25 %); „do środka” u BO: DEF -> MID ok. 20 %.

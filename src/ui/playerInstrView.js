@@ -37,7 +37,7 @@ export function piSummary(o) {
 
 /** Kierunki Ruchu dla wiersza: pozycja zawodnika albo miejsce w składzie (jak walidacja w silniku). */
 export function piDirsFor(row) {
-  const s = new Set([...arrowsFor(row.p.pos), ...(row.slotPos ? arrowsFor(row.slotPos) : [])]);
+  const s = new Set([...arrowsFor(row.p.pos, row.slotX), ...(row.slotPos ? arrowsFor(row.slotPos, row.slotX) : [])]); // przy linii bocznej bez ruchu na zewnątrz
   return ARROW_DIRS.map((d) => d.id).filter((d) => s.has(d));
 }
 /** Nowa mapa po ustawieniu kierunku Ruchu (run i lat razem; '' albo null: jak drużyna). */
@@ -112,7 +112,7 @@ export function piRowsFromTactics(squad, tactics) {
   const f = formationById(tactics.formation);
   const rows = [];
   const seen = new Set();
-  tactics.xi.forEach((id, i) => { const p = byId.get(id); if (p && !seen.has(id)) { seen.add(id); rows.push({ id, p, slotPos: f.slots[i]?.pos ?? null, zone: 'xi' }); } });
+  tactics.xi.forEach((id, i) => { const p = byId.get(id); if (p && !seen.has(id)) { seen.add(id); rows.push({ id, p, slotPos: f.slots[i]?.pos ?? null, slotX: f.slots[i]?.x ?? null, zone: 'xi' }); } });
   tactics.bench.map((id) => byId.get(id)).filter((p) => p && !seen.has(p.id)).sort(byPosition)
     .forEach((p) => { seen.add(p.id); rows.push({ id: p.id, p, slotPos: null, zone: 'bench' }); });
   squad.filter((p) => !seen.has(p.id)).sort(byPosition).forEach((p) => rows.push({ id: p.id, p, slotPos: null, zone: 'out' }));

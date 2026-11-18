@@ -1335,9 +1335,9 @@ const arrowTok = (pid) => `[data-act="tarrow-pick"][data-pid="${CSS.escape(pid)}
 function arrowPick(g, el) {
   const idx = Number(el.dataset.idx);
   const pid = g.tactics.xi[idx];
-  const pos = formationById(g.tactics.formation).slots[idx]?.pos;
+  const slotAt = formationById(g.tactics.formation).slots[idx]; const pos = slotAt?.pos;
   if (!pid) { state.tMsg = 'Puste miejsce: najpierw wstaw zawodnika (wyłącz strzałki, żeby zmieniać skład).'; renderTacticsAfter(); return; }
-  if (!arrowsFor(pos).length) { state.tMsg = `${pos}: bez strzałek. Bramkarz i środkowi obrońcy trzymają swoją pozycję.`; renderTacticsAfter(); return; }
+  if (!arrowsFor(pos, slotAt?.x).length) { state.tMsg = `${pos}: bez strzałek. Bramkarz i środkowi obrońcy trzymają swoją pozycję.`; renderTacticsAfter(); return; }
   const open = state.tArrows?.pick === idx;
   state.tArrows = { on: true, pick: open ? null : idx };
   state.tMsg = '';

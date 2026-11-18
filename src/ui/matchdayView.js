@@ -1305,10 +1305,10 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       if (!x) continue;
       const pl0 = pend.find((q) => q.out === x.id);
       const who = (pl0 ? T.bench.find((b) => b.id === pl0.in) : null) ?? x;
-      const dir = drawnDir(d.pi?.[who.id], (dd) => arrowAllowed(sl.pos, dd));
+      const dir = drawnDir(d.pi?.[who.id], (dd) => arrowAllowed(sl.pos, dd, sl.x));
       if (dir) arrItems.push({ x: sl.x, y: sl.y, dir, pos: sl.pos });
-      if (arrOn && ui.mmArrowPick === x.id && !pl0 && arrowsFor(sl.pos).length) {
-        pickHtml = compassHtml({ name: who.p.name, pos: sl.pos, x: sl.x, dirs: arrowsFor(sl.pos), cur: dir, attr: (dd) => `data-md="arrSet:${esc(who.id)}|${dd}"`, closeAttr: 'data-md="arrClose"', style: `--x:${sl.x};--y:${sl.y}` });
+      if (arrOn && ui.mmArrowPick === x.id && !pl0 && arrowsFor(sl.pos, sl.x).length) {
+        pickHtml = compassHtml({ name: who.p.name, pos: sl.pos, x: sl.x, dirs: arrowsFor(sl.pos, sl.x), cur: dir, attr: (dd) => `data-md="arrSet:${esc(who.id)}|${dd}"`, closeAttr: 'data-md="arrClose"', style: `--x:${sl.x};--y:${sl.y}` });
       }
     }
     const arrSvg = arrowsSvg(arrItems, { map: (x, y) => [x, 94 - y * 0.98], vw: 68, vh: 100, id: 'mpv', cls: 'pa--v' })
@@ -1330,7 +1330,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       const sgT = sugg.get(`on:${x.id}`);
       // Tryb strzałek: dotknięcie otwiera kompas (bez przeciągania i zmian zawodników)
       const acts = arrOn
-        ? `data-mmp="${esc(x.id)}" data-md="arrPick:${esc(x.id)}" aria-haspopup="dialog" aria-expanded="${ui.mmArrowPick === x.id}"${arrowsFor(sl.pos).length && !pl ? '' : ' aria-disabled="true"'}`
+        ? `data-mmp="${esc(x.id)}" data-md="arrPick:${esc(x.id)}" aria-haspopup="dialog" aria-expanded="${ui.mmArrowPick === x.id}"${arrowsFor(sl.pos, sl.x).length && !pl ? '' : ' aria-disabled="true"'}`
         : `data-sdrop="on:${esc(x.id)}" data-sdrag="on:${esc(x.id)}" data-shandle data-mmp="${esc(x.id)}" data-name="${esc(x.p.name)}" data-md="tokPick:${esc(x.id)}"`;
       return `<button class="mm-tok ${sl.pos === 'BR' ? 'is-gk' : ''} ${pl ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${sgT ? `is-sugg is-sugg--${sgT.rank}` : ''} ${x.injury && !x.injury.playable ? 'is-hurt' : ''}${arrOn && ui.mmArrowPick === x.id ? ' is-arrow' : ''}" style="--x:${sl.x};--y:${sl.y};--cond:${cond}" data-c="${condCls(cond)}" data-fit="${band}"
         ${acts} ${pl ? 'disabled' : ''} title="${esc(`${who.p.name}, ${sl.pos}${band !== 'ok' ? ` (nominalnie ${who.p.pos}, ${prof}%)` : ''}, kondycja ${cond}%${d.pi?.[who.id] ? `, instrukcje: ${piSummary(d.pi[who.id])}` : ''}`)}">
@@ -2187,7 +2187,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     if (act === 'arrPick') {
       const T = M.teams[S.userSide]; const x = T.players.find((y) => y.id === arg);
       const sl = x ? (draftPreview(T).slots ?? []).find((s) => s.playerId === x.id) ?? x.slot : null;
-      if (!x || !sl || !arrowsFor(sl.pos).length) { ui.subMsg = `${sl?.pos ?? 'Ta pozycja'}: bez strzałek. Bramkarz i środkowi obrońcy trzymają swoją pozycję.`; openDialog('manage'); return; }
+      if (!x || !sl || !arrowsFor(sl.pos, sl.x).length) { ui.subMsg = `${sl?.pos ?? 'Ta pozycja'}: bez strzałek. Bramkarz i środkowi obrońcy trzymają swoją pozycję.`; openDialog('manage'); return; }
       ui.mmArrowPick = ui.mmArrowPick === arg ? null : arg; ui.subMsg = '';
       openDialog('manage');
       app.querySelector(ui.mmArrowPick ? '#mdDlg .acomp__b.is-on' : `#mdDlg [data-md="arrPick:${CSS.escape(arg)}"]`)?.focus();

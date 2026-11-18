@@ -38,8 +38,9 @@ function item(label, run, { hint = null, disabled = null, danger = false, primar
 /** Ruch w ataku (strzałka) zawodnika z pierwszego składu: kierunki dozwolone na jego miejscu i „Bez ruchu”. */
 function arrowMenu(p, L) {
   const i = L?.tactics?.xi?.indexOf(p.id) ?? -1;
-  const pos = i >= 0 ? formationById(L.tactics.formation).slots[i]?.pos : null;
-  const dirs = pos ? arrowsFor(pos) : [];
+  const slot = i >= 0 ? formationById(L.tactics.formation).slots[i] : null;
+  const pos = slot?.pos ?? null;
+  const dirs = pos ? arrowsFor(pos, slot.x) : []; // przy linii bocznej bez ruchu na zewnątrz
   if (!dirs.length) return null;
   const cur = arrowOf(L.tactics.playerInstr?.[p.id]);
   const last = p.name.split(' ').slice(-1)[0];

@@ -97,15 +97,15 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
 
   // ---------- Strzałki ruchu: kierunek dozwolony na miejscu zawodnika (niedozwolony silnik pomija, więc go nie rysujemy)
   const arrOn = !!arrows?.on;
-  const dirAt = f.slots.map((s, i) => { const p = byId.get(tactics.xi[i]); return p ? drawnDir(pim[p.id], (d) => arrowAllowed(s.pos, d)) : null; });
+  const dirAt = f.slots.map((s, i) => { const p = byId.get(tactics.xi[i]); return p ? drawnDir(pim[p.id], (d) => arrowAllowed(s.pos, d, s.x)) : null; });
   const arrowItems = f.slots.map((s, i) => ({ x: s.x, y: s.y, dir: dirAt[i], pos: s.pos })).filter((it) => it.dir);
   const arrowSvgHtml = arrowsSvg(arrowItems, { map: (x, y) => [x, 100 - y], vw: 68, vh: 100, id: 'tpa' });
   const fbWarn = fbWarning(arrowItems);
   const pickIdx = arrOn && arrows.pick != null ? arrows.pick : null;
   const pickP = pickIdx != null ? byId.get(tactics.xi[pickIdx]) : null;
   const pickS = pickP ? f.slots[pickIdx] : null;
-  const compass = pickP && arrowsFor(pickS.pos).length ? compassHtml({
-    name: pickP.name, pos: pickS.pos, x: pickS.x, dirs: arrowsFor(pickS.pos), cur: dirAt[pickIdx],
+  const compass = pickP && arrowsFor(pickS.pos, pickS.x).length ? compassHtml({
+    name: pickP.name, pos: pickS.pos, x: pickS.x, dirs: arrowsFor(pickS.pos, pickS.x), cur: dirAt[pickIdx],
     attr: (d) => `data-act="tarrow-set" data-id="${esc(pickP.id)}" data-d="${d}"`, closeAttr: 'data-act="tarrow-close"',
     style: `--px:${pickS.x};--py:${100 - pickS.y}`,
   }) : '';
@@ -119,11 +119,11 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
     const isSel = selKey === key;
     const r = repAt(p, i);
     const cls = ['slot-btn', p ? `slot-btn--${band(prof)}` : 'slot-btn--empty', s.pos === 'BR' ? 'slot-btn--gk' : '', isSel ? 'is-sel' : '', pickIdx === i ? 'is-arrow' : ''].filter(Boolean).join(' ');
-    const mv = dirAt[i] ? `, ruch: ${arrowLabel(dirAt[i]).toLowerCase()}` : arrOn && p && arrowsFor(s.pos).length ? ', bez ruchu' : '';
+    const mv = dirAt[i] ? `, ruch: ${arrowLabel(dirAt[i]).toLowerCase()}` : arrOn && p && arrowsFor(s.pos, s.x).length ? ', bez ruchu' : '';
     // Tryb strzałek: klik otwiera kompas (bez przeciągania i bez wyboru dwoma dotknięciami)
     const acts = arrOn
-      ? `data-act="tarrow-pick" data-idx="${i}"${p ? ` data-pid="${esc(p.id)}"` : ''} data-sx="${s.x}" data-sy="${s.y}" data-dirs="${arrowsFor(s.pos).join(' ')}" aria-haspopup="dialog" aria-expanded="${pickIdx === i}"${p && arrowsFor(s.pos).length ? '' : ' aria-disabled="true"'}`
-      : `data-act="tslot" data-loc="${key}" data-drop="${key}" data-handle ${p ? `${dragAttrs(loc, p)} data-pid="${esc(p.id)}"${arrowsFor(s.pos).length ? ` data-sx="${s.x}" data-sy="${s.y}" data-dirs="${arrowsFor(s.pos).join(' ')}"${dirAt[i] ? ` data-adir="${dirAt[i]}"` : ''}` : ''}` : ''}${repAttr(r)} aria-pressed="${isSel}"`;
+      ? `data-act="tarrow-pick" data-idx="${i}"${p ? ` data-pid="${esc(p.id)}"` : ''} data-sx="${s.x}" data-sy="${s.y}" data-dirs="${arrowsFor(s.pos, s.x).join(' ')}" aria-haspopup="dialog" aria-expanded="${pickIdx === i}"${p && arrowsFor(s.pos, s.x).length ? '' : ' aria-disabled="true"'}`
+      : `data-act="tslot" data-loc="${key}" data-drop="${key}" data-handle ${p ? `${dragAttrs(loc, p)} data-pid="${esc(p.id)}"${arrowsFor(s.pos, s.x).length ? ` data-sx="${s.x}" data-sy="${s.y}" data-dirs="${arrowsFor(s.pos, s.x).join(' ')}"${dirAt[i] ? ` data-adir="${dirAt[i]}"` : ''}` : ''}` : ''}${repAttr(r)} aria-pressed="${isSel}"`;
     return `<button class="${cls}" style="left:${s.x}%;top:${100 - s.y}%" ${acts}
       aria-label="${esc(s.pos)}: ${p ? esc(p.name) : 'puste miejsce'}${p && prof < 85 ? `, poza pozycją (${prof}%)` : ''}${esc(repAria(r))}${p && pim[p.id] ? esc(`, instrukcje: ${piSummary(pim[p.id])}`) : ''}${esc(arrOn || !pim[p?.id] ? mv : '')}">
       ${r && r.b !== 'no' ? `<span class="slot-btn__rep" aria-hidden="true">${r.v}%</span>` : ''}

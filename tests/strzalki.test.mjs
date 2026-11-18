@@ -129,7 +129,8 @@ test('A/B każdego kierunku na każdej pozycji (300 meczów): jest zysk i mierza
   const res = {};
   for (const [g, G] of Object.entries(ARROW_GROUPS)) {
     const base = abRunArrow(N, g, null);
-    for (const dir of arrowsFor(G.pos[0])) {
+    const gx = formationById(G.formation).slots.find((sl) => G.pos.includes(sl.pos)).x; // miejsce grupy (linia boczna: bez ruchu na zewnątrz)
+    for (const dir of arrowsFor(G.pos[0], gx)) {
       const d = abArrowDiff(base, abRunArrow(N, g, dir));
       res[`${g}:${dir}`] = d;
       const txt = JSON.stringify(Object.fromEntries(Object.entries(d).map(([k, v]) => [k, Math.round(v * 100) / 100])));
@@ -140,10 +141,19 @@ test('A/B każdego kierunku na każdej pozycji (300 meczów): jest zysk i mierza
   // Kierunki zgodne z piłką (najważniejsze skutki)
   const r = res;
   assert.ok(r['BO:i'].poss > 0.8 && r['BO:i'].skrA > 0.15, 'odwrócony boczny obrońca: posiadanie, ale dośrodkowania rywala');
-  assert.ok(r['WB:fo'].skr > 0.2 && r['WB:fo'].konA > 0.1 && r['WB:fo'].condI < -1.5, 'wahadłowy na zewnątrz (trójka obrońców): dośrodkowania, kontry rywala, zmęczenie');
+  assert.ok(!('WB:fo' in r) && !('BP:o' in r) && !('SN:o' in r), 'zawodnik przy linii bocznej bez ruchu na zewnątrz (poza boisko)');
+  assert.ok(r['ŚP:o'] && r['ŚP:fo'], 'środek pola może wybiegać na zewnątrz');
   assert.ok(r['ŚP:o'].skr > 0.2 && r['ŚP:o'].poss < -0.4, 'szeroko: dośrodkowania kosztem posiadania');
   assert.ok(r['SN:i'].shI > 0.4 && r['SN:i'].kpI < -0.1, 'skrzydłowy do środka: strzela, mniej wrzutek');
   assert.ok(r['NAP:b'].shI < -0.5 && r['NAP:b'].poss > 0.8 && r['NAP:b'].kpI > 0.1, 'fałszywa dziewiątka');
   assert.ok(r['DP:b'].sh < -0.3 && r['DP:b'].condI > 0.7, 'DP opada: mniej ludzi w ataku');
   assert.ok(r['BO:f'].konA > 0.1 && r['BO:f'].sh > 0.2, 'do przodu jak Pozycja');
+});
+
+test('Linia boczna: zawodnik przy linii (x <= 22 albo >= 78) nie ma ruchu na zewnątrz, środek pola ma', () => {
+  assert.deepEqual(arrowsFor('BP', 15), ['f', 'fi', 'i', 'b']);
+  assert.deepEqual(arrowsFor('WB', 90), ['f', 'fi', 'i', 'b']);
+  assert.ok(arrowsFor('ŚP', 32).includes('o') && arrowsFor('ŚP', 32).includes('fo'));
+  assert.ok(!arrowAllowed('SN', 'o', 82) && arrowAllowed('SN', 'o', 50));
+  assert.ok(arrowAllowed('NAP', 'o', 40), 'napastnik w środku: gra w kanale');
 });

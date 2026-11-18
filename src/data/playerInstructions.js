@@ -132,9 +132,17 @@ export function arrowToInstr(dir) {
   const d = arrowDir(dir);
   return { run: d?.run ?? 0, lat: d?.lat ?? 0 };
 }
-/** Dozwolone kierunki na pozycji (id w kolejności ARROW_DIRS). */
-export const arrowsFor = (pos) => ARROW_DIRS.filter((d) => (ARROW_POS[pos] ?? []).includes(d.id)).map((d) => d.id);
-export const arrowAllowed = (pos, dir) => !!dir && (ARROW_POS[pos] ?? []).includes(dir);
+/**
+ * Zawodnik ustawiony przy linii bocznej (x miejsca w formacji 0-100 od lewej) nie ma ruchu na zewnątrz
+ * („szeroko”, „skos na zewnątrz”): strzałka wskazywałaby poza boisko. Szerzej mogą wybiegać tylko gracze ze środka
+ * i z półprzestrzeni. x nieznane (null): sama pozycja.
+ */
+export const FLANK_X = 22;
+export const onFlank = (x) => Number.isFinite(x) && (x <= FLANK_X || x >= 100 - FLANK_X);
+const OUTWARD = new Set(['o', 'fo']);
+/** Dozwolone kierunki na pozycji (id w kolejności ARROW_DIRS); x: miejsce w formacji (linia boczna bez ruchu na zewnątrz). */
+export const arrowsFor = (pos, x = null) => ARROW_DIRS.filter((d) => (ARROW_POS[pos] ?? []).includes(d.id) && !(onFlank(x) && OUTWARD.has(d.id))).map((d) => d.id);
+export const arrowAllowed = (pos, dir, x = null) => !!dir && (ARROW_POS[pos] ?? []).includes(dir) && !(onFlank(x) && OUTWARD.has(dir));
 export const arrowLabel = (dir) => arrowDir(dir)?.label ?? PI_TEAM_LABEL;
 export const arrowHint = (dir, pos) => ARROW_HINT[dir]?.[pos] ?? ARROW_HINT[dir]?._ ?? '';
 
