@@ -23,6 +23,9 @@ import { marketValue } from '../world/playerGen.js';
 import { infraOf, applyPlan, capacityOf } from './infrastructure.js';
 import { stadiumCapacity } from './finance.js';
 import { normPos } from '../engine/positions.js';
+import { coachOf, COACH_KEYS, COACH_ATTRS, COACH_STYLES } from './coaches.js';
+import { ownerOf, OWNER_KEYS } from './owners.js';
+import { rosterOf, syncStaff, STAFF_ROLE_IDS } from './staffMarket.js';
 
 export const PACK_TYPE = 'ligapl27-datapack';
 export const PACK_V = 1;
@@ -260,6 +263,132 @@ export function editClub(game, id, values) {
   return n;
 }
 
+// ------------------------------------------------------------ Trener, sztab i właściciel klubu
+// W datapacku przy klubie: coach { name, age, style, a: { TAK, ... } }, owner { name, cierpliwosc, ... },
+// staff { rola: [{ name, age, q }, ...] } (osoby w kolejności sztabu klubu, więc plik działa też w innym świecie gry).
+// Trener i właściciel to obecni ludzie klubu w chwili wczytania pliku. Trener klubu gracza to gracz (bez edycji).
+export const OWNER_LABELS = { cierpliwosc: 'Cierpliwość', ambicja: 'Ambicja', temperament: 'Temperament', media: 'Wrażliwość na media', zasobnosc: 'Zasobność' };
+export const PERSON_AGE = { min: 18, max: 85 };
+const COACH_LABELS = Object.fromEntries(COACH_KEYS.map((k) => [k, COACH_ATTRS[k].name]));
+
+function attrs1to20(src, keys, labels, form, errors, prefix) {
+  const a = {};
+  for (const k of keys) {
+    if (src[k] === undefined) continue;
+    const r = num(src[k], { label: labels[k], min: 1, max: 20, form });
+    if (r.err) errors[`${prefix}${k}`] = r.err; else a[k] = r.v;
+  }
+  return a;
+}
+const personName = (v) => text(v, { label: 'Imię i nazwisko', max: LIMITS.name, min: 2 });
+const personAge = (v, form) => num(v, { label: 'Wiek', min: PERSON_AGE.min, max: PERSON_AGE.max, form });
+
+/** Sprawdza trenera { name, age, style, a }. Zwraca { value, errors } (errors: a.TAK itd. dla atrybutów). */
+export function checkCoach(src, { form = false } = {}) {
+  const value = {}; const errors = {};
+  if (!isObj(src)) return { value, errors: { coach: 'Trener: zły format.' } };
+  const put = (k, r) => { if (r.err) errors[k] = r.err; else value[k] = r.v; };
+  if (src.name !== undefined) put('name', personName(src.name));
+  if (src.age !== undefined) put('age', personAge(src.age, form));
+  if (src.style !== undefined) put('style', typeof src.style === 'string' && COACH_STYLES[src.style] ? { v: src.style } : { err: 'Styl: wybierz z listy.' });
+  if (src.a !== undefined) {
+    if (!isObj(src.a)) errors.a = 'Atrybuty trenera: oczekiwano listy wartości.';
+    else value.a = attrs1to20(src.a, COACH_KEYS, COACH_LABELS, form, errors, 'a.');
+  }
+  return { value, errors };
+}
+
+/** Sprawdza właściciela { name, cierpliwosc, ambicja, temperament, media, zasobnosc }. */
+export function checkOwner(src, { form = false } = {}) {
+  const value = {}; const errors = {};
+  if (!isObj(src)) return { value, errors: { owner: 'Właściciel: zły format.' } };
+  if (src.name !== undefined) { const r = text(src.name, { label: 'Właściciel', max: LIMITS.name, min: 2 }); if (r.err) errors.name = r.err; else value.name = r.v; }
+  Object.assign(value, attrs1to20(src, OWNER_KEYS, OWNER_LABELS, form, errors, ''));
+  return { value, errors };
+}
+
+/** Sprawdza sztab { rola: [{ name, age, q }] }. Błędy: rola.numer.pole. */
+export function checkStaff(src, { form = false } = {}) {
+  const value = {}; const errors = {};
+  if (!isObj(src)) return { value, errors: { staff: 'Sztab: zły format.' } };
+  for (const [role, list] of Object.entries(src)) {
+    if (!STAFF_ROLE_IDS.includes(role) || !Array.isArray(list) || list.length > 12) { errors.staff = 'Sztab: zły wpis roli.'; continue; }
+    value[role] = list.map((o, i) => {
+      const v = {};
+      if (!isObj(o)) { errors[`${role}.${i}`] = 'Sztab: zły wpis osoby.'; return v; }
+      const put = (k, r) => { if (r.err) errors[`${role}.${i}.${k}`] = r.err; else v[k] = r.v; };
+      if (o.name !== undefined) put('name', personName(o.name));
+      if (o.age !== undefined) put('age', personAge(o.age, form));
+      if (o.q !== undefined) put('q', num(o.q, { label: 'Jakość', min: 1, max: 20, form }));
+      return v;
+    });
+  }
+  return { value, errors };
+}
+
+/** Obecni ludzie klubu (do formularza i pełnego datapacku): { coach, owner, staff }. Kluby bez kadry: null. */
+export function peopleValues(game, id) {
+  if (!game.world?.clubs?.[id]) return { coach: null, owner: null, staff: null };
+  const co = id === game.clubId ? null : coachOf(game, id);
+  const ow = ownerOf(game, id);
+  let staff = null;
+  for (const p of rosterOf(game, id)) ((staff ??= {})[p.role] ??= []).push({ name: p.name, age: p.age, q: p.q });
+  return {
+    coach: co ? { name: co.name, age: co.age, style: co.style, a: { ...co.a } } : null,
+    owner: ow ? { name: ow.name, ...Object.fromEntries(OWNER_KEYS.map((k) => [k, ow[k]])) } : null,
+    staff,
+  };
+}
+
+/** Zapis sekcji ludzi klubu w datapacku (pełne bieżące wartości sekcji). */
+function recordPeople(game, id, key) {
+  const E = ensureEditor(game);
+  const val = peopleValues(game, id)[key];
+  const rec = { ...(E.clubs[id] ?? {}) };
+  if (val) rec[key] = val; else delete rec[key];
+  if (Object.keys(rec).length) E.clubs[id] = rec; else delete E.clubs[id];
+}
+
+/** Zmiana trenera klubu AI (values po checkCoach). Zwraca liczbę zmienionych pól. */
+export function editCoach(game, id, v) {
+  if (id === game.clubId || !game.world?.clubs?.[id]) return 0;
+  const co = coachOf(game, id);
+  if (!co) return 0;
+  let n = 0;
+  for (const k of ['name', 'age', 'style']) if (v[k] !== undefined && v[k] !== co[k]) { co[k] = v[k]; n++; }
+  for (const [k, x] of Object.entries(v.a ?? {})) if (co.a?.[k] !== x) { co.a[k] = x; n++; }
+  if (n) recordPeople(game, id, 'coach');
+  return n;
+}
+
+/** Zmiana właściciela klubu (values po checkOwner). Typ właściciela zostaje (zależą od niego finanse). */
+export function editOwner(game, id, v) {
+  if (!game.world?.clubs?.[id]) return 0;
+  const ow = ownerOf(game, id);
+  if (!ow) return 0;
+  let n = 0;
+  for (const k of ['name', ...OWNER_KEYS]) if (v[k] !== undefined && v[k] !== ow[k]) { ow[k] = v[k]; n++; }
+  if (n) recordPeople(game, id, 'owner');
+  return n;
+}
+
+/** Zmiana osób sztabu (values po checkStaff): i-ta osoba roli w kolejności sztabu klubu. Nadmiarowe wpisy pomijane. */
+export function editStaff(game, id, v) {
+  if (!game.world?.clubs?.[id]) return 0;
+  const roster = rosterOf(game, id);
+  let n = 0;
+  for (const [role, list] of Object.entries(v)) {
+    const ppl = roster.filter((p) => p.role === role);
+    list.forEach((o, i) => {
+      const p = ppl[i];
+      if (!p) return;
+      for (const k of ['name', 'age', 'q']) if (o[k] !== undefined && o[k] !== p[k]) { p[k] = o[k]; n++; }
+    });
+  }
+  if (n) { syncStaff(game, id); recordPeople(game, id, 'staff'); }
+  return n;
+}
+
 /** Bieżące wartości zawodnika (do formularza). */
 export function playerValues(p) {
   return {
@@ -340,6 +469,10 @@ export function exportPack(game, now = new Date(), { full = false } = {}) {
     if (!clubObj(id)) continue;
     const cur = Object.fromEntries(Object.entries(clubValues(game, id)).filter(([, v]) => v != null && v !== ''));
     const { value } = checkClub(cur);
+    const ppl = peopleValues(game, id); // trener, właściciel i sztab z bieżącymi wartościami
+    if (ppl.coach) { const r = checkCoach(ppl.coach); if (!Object.keys(r.errors).length) value.coach = r.value; }
+    if (ppl.owner) { const r = checkOwner(ppl.owner); if (!Object.keys(r.errors).length) value.owner = r.value; }
+    if (ppl.staff) { const r = checkStaff(ppl.staff); if (!Object.keys(r.errors).length) value.staff = r.value; }
     if (Object.keys(value).length) clubs[id] = value;
   }
   for (const [id, p] of Object.entries(game.world?.players ?? {})) {
@@ -379,6 +512,14 @@ export function parsePack(text) {
     const r = checkClub(src);
     const bad = Object.values(r.errors)[0];
     if (bad) throw new Error(`Klub ${id}: ${bad}`);
+    // Trener, właściciel i sztab klubu
+    for (const [k, check] of [['coach', checkCoach], ['owner', checkOwner], ['staff', checkStaff]]) {
+      if (o[k] === undefined) continue;
+      const p = check(o[k]);
+      const e = Object.values(p.errors)[0];
+      if (e) throw new Error(`Klub ${id}: ${e}`);
+      r.value[k] = p.value;
+    }
     if (Object.keys(r.value).length) clubs[id] = r.value;
   }
   for (const [id, o] of Object.entries(d.players ?? {})) {
@@ -406,6 +547,9 @@ export function importPack(game, pack) {
   for (const [id, v] of Object.entries(pack.clubs)) {
     if (!clubObj(id)) { out.clubsSkipped++; continue; }
     editClub(game, id, v); out.clubs++;
+    if (v.coach) editCoach(game, id, v.coach);
+    if (v.owner) editOwner(game, id, v.owner);
+    if (v.staff) editStaff(game, id, v.staff);
   }
   const ids = Object.keys(pack.players);
   if (ids.length && pack.seed !== game.seed) { out.otherWorld = true; out.playersSkipped = ids.length; return out; }

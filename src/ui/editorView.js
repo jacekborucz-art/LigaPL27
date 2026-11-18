@@ -13,8 +13,13 @@ import { ageAt } from '../training/state.js';
 import { squadOf } from '../world/worldGen.js';
 import {
   LIMITS, checkClub, checkPlayer, editClub, editPlayer, clubValues, playerValues, resetClub, resetPlayer, clearPack,
-  packCounts, originalOf,
+  packCounts, originalOf, peopleValues, checkCoach, checkOwner, checkStaff, editCoach, editOwner, editStaff,
+  OWNER_LABELS, PERSON_AGE,
 } from '../career/editor.js';
+import { COACH_KEYS, COACH_ATTRS, COACH_STYLES } from '../career/coaches.js';
+import { OWNER_KEYS } from '../career/owners.js';
+import { STAFF_ROLE_ORDER } from '../career/staffMarket.js';
+import { STAFF_ROLES } from '../training/config.js';
 import { crestHtml } from './crest.js';
 import { esc } from './dom.js';
 
@@ -108,10 +113,66 @@ function clubForm(game, ed, id) {
       <button class="btn btn--primary" data-act="ed-save-club" data-id="${esc(id)}">Zapisz zmiany</button>
       ${inPack ? `<button class="btn btn--quiet" data-act="ed-reset-club" data-id="${esc(id)}">Przywróć oryginał</button>` : ''}
     </div>
-    ${inPack ? '<p class="ed-note">Przywróć oryginał: wracają nazwa, skrót, stadion i herb z danych gry, a klub znika z datapacku. Finanse i pojemność zostają takie, jak teraz.</p>' : ''}
+    ${peopleForms(game, ed, id)}
+    ${inPack ? '<p class="ed-note">Przywróć oryginał: wracają nazwa, skrót, stadion i herb z danych gry, a klub znika z datapacku. Finanse, pojemność, trener, sztab i właściciel zostają tacy, jak teraz.</p>' : ''}
     <section class="ed-squad" aria-labelledby="ed-squad-h"><h3 id="ed-squad-h">Kadra (${squad.length})</h3>
       ${squad.length ? playerRows(game, squad, 'ed-cplayer', null) : '<p class="ed-empty">Brak zawodników.</p>'}</section>
   </div>`;
+}
+
+// Trener, sztab i właściciel klubu: osobne sekcje z własnym przyciskiem zapisu
+const numIn = (id, v, err, { min = 1, max = 20 } = {}) => `<input id="${id}" type="number" min="${min}" max="${max}" step="1" inputmode="numeric" value="${esc(v ?? '')}"${err ? ' aria-invalid="true"' : ''}>`;
+const attrBox = (id, label, v, err) => `<label class="ed-attr${err ? ' is-invalid' : ''}"><span>${esc(label)}</span>${numIn(id, v, err)}</label>`;
+const firstErr = (e) => { const m = Object.values(e); return m.length ? `<p class="ed-msg is-bad">${esc(m[0])}${m.length > 1 ? ` (i ${m.length - 1} więcej)` : ''}</p>` : ''; };
+
+function peopleForms(game, ed, id) {
+  const cur = peopleValues(game, id);
+  const sec = (key) => { const d = draftFor(ed, `${key}:${id}`); return { v: d ?? cur[key], e: d ? ed.errors ?? {} : {} }; };
+  const out = [];
+  if (cur.coach) {
+    const { v, e } = sec('coach');
+    out.push(`<fieldset class="ed-attrs ed-people"><legend>Trener</legend>${firstErr(e)}
+      <div class="ed-grid">
+        ${field('ed-co-name', 'Imię i nazwisko', textIn('ed-co-name', v.name, { max: LIMITS.name, err: e.name }))}
+        ${field('ed-co-age', 'Wiek', numIn('ed-co-age', v.age, e.age, PERSON_AGE))}
+        ${field('ed-co-style', 'Styl', `<select id="ed-co-style">${Object.entries(COACH_STYLES).map(([k, l]) => `<option value="${k}"${k === v.style ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`)}
+      </div>
+      <div class="ed-attrs__grid">${COACH_KEYS.map((k) => attrBox(`ed-co-a-${k}`, COACH_ATTRS[k].name, v.a?.[k], e[`a.${k}`])).join('')}</div>
+      <div class="ed-actions"><button class="btn btn--primary btn--sm" data-act="ed-save-coach" data-id="${esc(id)}">Zapisz trenera</button></div></fieldset>`);
+  }
+  if (cur.staff) {
+    const { v, e } = sec('staff');
+    const rows = STAFF_ROLE_ORDER.filter((r) => v[r]?.length).map((role) => v[role].map((p, i) => {
+      const k = `ed-st-${role}-${i}`; const er = (f) => e[`${role}.${i}.${f}`];
+      return `<div class="ed-staff"><span class="ed-staff__role">${esc(STAFF_ROLES[role]?.name ?? role)}</span>
+        <label class="ed-staff__f ed-staff__name"><span>Imię i nazwisko</span>${textIn(`${k}-name`, p.name, { max: LIMITS.name, err: er('name') })}</label>
+        <label class="ed-staff__f"><span>Wiek</span>${numIn(`${k}-age`, p.age, er('age'), PERSON_AGE)}</label>
+        <label class="ed-staff__f"><span>Jakość</span>${numIn(`${k}-q`, p.q, er('q'))}</label></div>`;
+    }).join('')).join('');
+    out.push(`<fieldset class="ed-attrs ed-people"><legend>Sztab</legend>${firstErr(e)}${rows}
+      <p class="fld__help">Jakość od 1 do 20: jak dobrze osoba wykonuje swoją pracę w sztabie.</p>
+      <div class="ed-actions"><button class="btn btn--primary btn--sm" data-act="ed-save-staff" data-id="${esc(id)}">Zapisz sztab</button></div></fieldset>`);
+  }
+  if (cur.owner) {
+    const { v, e } = sec('owner');
+    out.push(`<fieldset class="ed-attrs ed-people"><legend>Właściciel</legend>${firstErr(e)}
+      <div class="ed-grid">${field('ed-ow-name', 'Właściciel', textIn('ed-ow-name', v.name, { max: LIMITS.name, err: e.name }))}</div>
+      <div class="ed-attrs__grid">${OWNER_KEYS.map((k) => attrBox(`ed-ow-${k}`, OWNER_LABELS[k], v[k], e[k])).join('')}</div>
+      <div class="ed-actions"><button class="btn btn--primary btn--sm" data-act="ed-save-owner" data-id="${esc(id)}">Zapisz właściciela</button></div></fieldset>`);
+  }
+  return out.join('');
+}
+
+function readPeople(root, key, game, id) {
+  if (key === 'coach') {
+    return { name: val(root, 'ed-co-name'), age: val(root, 'ed-co-age'), style: val(root, 'ed-co-style'), a: Object.fromEntries(COACH_KEYS.map((k) => [k, val(root, `ed-co-a-${k}`)])) };
+  }
+  if (key === 'owner') return { name: val(root, 'ed-ow-name'), ...Object.fromEntries(OWNER_KEYS.map((k) => [k, val(root, `ed-ow-${k}`)])) };
+  const staff = {};
+  for (const [role, list] of Object.entries(peopleValues(game, id).staff ?? {})) {
+    staff[role] = list.map((_, i) => ({ name: val(root, `ed-st-${role}-${i}-name`), age: val(root, `ed-st-${role}-${i}-age`), q: val(root, `ed-st-${role}-${i}-q`) }));
+  }
+  return staff;
 }
 
 const natOptions = (cur) => Object.entries(NAT_NAMES).sort((a, b) => a[1].localeCompare(b[1], 'pl'))
@@ -266,6 +327,16 @@ export function handleEditorAction(game, ed, act, data, root) {
     const n = editPlayer(game, pid, r.value);
     ed.errors = null; ed.draft = null; ed.msg = changed(n);
     return { save: n > 0, squadChanged: n > 0 && game.world.players[pid]?.clubId === game.clubId };
+  }
+  const people = { 'ed-save-coach': ['coach', checkCoach, editCoach], 'ed-save-staff': ['staff', checkStaff, editStaff], 'ed-save-owner': ['owner', checkOwner, editOwner] }[act];
+  if (people) {
+    const [key, check, edit] = people; const id = data.id;
+    const raw = readPeople(root, key, game, id);
+    const r = check(raw, { form: true });
+    if (Object.keys(r.errors).length) { ed.errors = r.errors; ed.draft = { key: `${key}:${id}`, v: raw }; ed.msg = 'Popraw zaznaczone pola.'; return { focus: '[aria-invalid="true"]' }; }
+    const n = edit(game, id, r.value);
+    ed.errors = null; ed.draft = null; ed.msg = changed(n);
+    return { save: n > 0 };
   }
   if (act === 'ed-crest-clear') { const n = editClub(game, data.id, { crest: '' }); clearMsg(); ed.msg = 'Usunięto własny herb klubu.'; return { save: n > 0 }; }
   if (act === 'ed-reset-club') { resetClub(game, data.id); clearMsg(); ed.msg = 'Przywrócono oryginalne nazwy klubu.'; return { save: true }; }

@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-11d5b98514';
+const VERSION = 'v0.3-45ef502763';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -197,7 +197,7 @@ const FILES = [
   ['./src/career/careerSystem.js', 'cd7a0226ec'],
   ['./src/career/coachMarket.js', '127756aa97'],
   ['./src/career/coaches.js', 'c381987592'],
-  ['./src/career/editor.js', 'cac2d9d03e'],
+  ['./src/career/editor.js', '48d8fcda2f'],
   ['./src/career/fans.js', '737d9449e9'],
   ['./src/career/fansSystem.js', 'ced36b7dd1'],
   ['./src/career/finance.js', 'f6fb7c16a5'],
@@ -305,7 +305,7 @@ const FILES = [
   ['./src/styles/club.css', '6615e08e49'],
   ['./src/styles/contextmenu.css', '55d14f38c2'],
   ['./src/styles/dashboard.css', 'e950cf99bc'],
-  ['./src/styles/editor.css', 'b4c9ab5d86'],
+  ['./src/styles/editor.css', 'd06d017eb8'],
   ['./src/styles/fonts.css', '372f3ee1fc'],
   ['./src/styles/history.css', '6e342b15ec'],
   ['./src/styles/klub.css', '62ff25555a'],
@@ -341,7 +341,7 @@ const FILES = [
   ['./src/ui/crest.js', '61a5e64fb5'],
   ['./src/ui/daySpeed.js', '73d29c5b52'],
   ['./src/ui/dom.js', '0ce16300f6'],
-  ['./src/ui/editorView.js', '447bb72d53'],
+  ['./src/ui/editorView.js', 'ceefcf34e3'],
   ['./src/ui/europeView.js', '3ee900afcf'],
   ['./src/ui/fixturesView.js', '8ad243c712'],
   ['./src/ui/formChart.js', '9d81bc96d3'],

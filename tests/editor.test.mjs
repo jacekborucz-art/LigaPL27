@@ -13,7 +13,10 @@ import { offsetsFor } from '../src/training/development.js';
 import {
   applyPack, restoreOriginals, checkClub, checkPlayer, editClub, editPlayer, exportPack, parsePack, importPack,
   packFileName, resetClub, clearPack, PACK_TYPE,
+  peopleValues, checkCoach, checkOwner, checkStaff, editCoach, editOwner, editStaff,
 } from '../src/career/editor.js';
+import { coachOf } from '../src/career/coaches.js';
+import { ownerOf } from '../src/career/owners.js';
 import { renderEditor, newEditorState, handleEditorAction, findPlayers, LIST_CAP } from '../src/ui/editorView.js';
 import { sysDialogHtml } from '../src/ui/sysMenu.js';
 import { crestHtml } from '../src/ui/crest.js';
@@ -181,6 +184,43 @@ test('Własny herb klubu: zapis w datapacku, eksport, wczytanie u kolegi, pierws
   assert.equal(full.clubs.legia.crest, PNG, 'pełny datapack też niesie herb');
   editClub(friend, 'legia', { crest: '' });
   assert.ok(!crestHtml(clubById('legia')).includes('data:image'));
+  restoreOriginals();
+});
+
+test('Trener, sztab i właściciel klubu: edycja, walidacja, datapack i wczytanie w innej grze', () => {
+  restoreOriginals();
+  const g = structuredClone(G);
+  const id = 'legia';
+  const cur = peopleValues(g, id);
+  assert.ok(cur.coach && cur.owner && cur.staff, 'klub AI ma trenera, właściciela i sztab');
+  assert.equal(peopleValues(g, 'widzew').coach, null, 'trener klubu gracza to gracz');
+  assert.ok(checkCoach({ a: { TAK: 25 } }).errors['a.TAK']);
+  assert.ok(checkOwner({ ambicja: 0 }).errors.ambicja);
+  assert.ok(checkStaff({ nieznana: [] }).errors.staff);
+  assert.ok(checkStaff({ asystent: [{ q: '30' }] }, { form: true }).errors['asystent.0.q']);
+  assert.equal(editCoach(g, id, checkCoach({ name: 'Jan Trener', age: 50, style: 'O', a: { TAK: 20, PRE: 1 } }).value), 5 - (cur.coach.style === 'O' ? 1 : 0) - (cur.coach.a.TAK === 20 ? 1 : 0) - (cur.coach.a.PRE === 1 ? 1 : 0) - (cur.coach.age === 50 ? 1 : 0));
+  assert.equal(g.coaches[id].name, 'Jan Trener');
+  assert.equal(g.coaches[id].a.TAK, 20);
+  assert.ok(editOwner(g, id, checkOwner({ name: 'Pan Prezes', cierpliwosc: 20 }).value) >= 1);
+  assert.equal(g.owners[id].name, 'Pan Prezes');
+  const role = Object.keys(cur.staff)[0];
+  assert.ok(editStaff(g, id, checkStaff({ [role]: [{ name: 'Adam Sztabowy', q: 20 }] }).value) >= 1);
+  const person = Object.values(g.staff.people).find((p) => p.club === id && p.role === role && p.name === 'Adam Sztabowy');
+  assert.ok(person && person.q === 20);
+  assert.equal(g.training.staff[id][role].name !== undefined, true, 'widok sztabu przeliczony');
+  const file = JSON.stringify(exportPack(g));
+  const pk = parsePack(file);
+  assert.equal(pk.clubs[id].coach.name, 'Jan Trener');
+  // Kolega w innym świecie gry: trener, właściciel i sztab z pliku
+  const friend = structuredClone(G2);
+  importPack(friend, pk);
+  assert.equal(coachOf(friend, id).name, 'Jan Trener');
+  assert.equal(ownerOf(friend, id).cierpliwosc, 20);
+  assert.ok(Object.values(friend.staff.people).some((p) => p.club === id && p.name === 'Adam Sztabowy' && p.q === 20));
+  // Pełny datapack niesie ludzi wszystkich klubów i wczytuje się bez błędów
+  const full = parsePack(JSON.stringify(exportPack(g, new Date(), { full: true })));
+  assert.equal(full.clubs[id].owner.name, 'Pan Prezes');
+  assert.throws(() => parsePack(JSON.stringify({ type: PACK_TYPE, v: 1, clubs: { legia: { coach: { a: { MOT: 99 } } } } })), /Motywacja/);
   restoreOriginals();
 });
 
