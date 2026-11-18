@@ -217,7 +217,7 @@ export function renderMenu(ctx) {
         ${memoryOnly ? '<p class="notice" role="status">Ta przeglądarka nie pozwala zapisać gry na stałe. Postęp zniknie po zamknięciu karty; użyj eksportu.</p>' : ''}
         <ol class="saves__list">${slots.map((s) => saveRow(s, confirmDel)).join('')}</ol>
         <label class="btn btn--quiet saves__import">Wczytaj zapis z pliku JSON
-          <input type="file" accept="application/json,.json" data-act="import" class="sr-only">
+          <input type="file" data-act="import" class="sr-only">
         </label>
         <p class="saves__note">Zapisy zostają w tej przeglądarce. Gra działa bez internetu.</p>
         <p class="menu__ver">Wersja gry <b>${esc(GAME_VERSION)}</b></p>
@@ -525,7 +525,7 @@ function packBox(nc) {
        <button class="btn btn--quiet btn--sm" data-act="ncPackClear">Usuń datapack</button>`
     : '<p class="hint">Opcjonalnie: wczytaj datapack z Edytora (Opcje, Edytor, Eksportuj), żeby zacząć z jego kadrami. Bez pliku kadry zostaną wylosowane.</p>';
   return `<div class="nc-pack">${info}
-    <label class="btn btn--quiet btn--sm nc-pack__load">${P ? 'Wczytaj inny datapack' : 'Wczytaj datapack'}<input type="file" accept=".json,application/json" data-act="nc-pack" hidden></label>
+    <label class="btn btn--quiet btn--sm nc-pack__load">${P ? 'Wczytaj inny datapack' : 'Wczytaj datapack'}<input type="file" data-act="nc-pack" hidden></label>
     ${nc.packMsg ? `<p class="nc-pack__err" role="alert">${esc(nc.packMsg)}</p>` : ''}</div>`;
 }
 

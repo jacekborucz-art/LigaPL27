@@ -164,7 +164,7 @@ function packPanel(game, ed) {
     <div class="ed-actions">
       <button class="btn btn--primary" data-act="ed-export">Eksportuj zmiany</button>
       <button class="btn btn--primary" data-act="ed-export" data-full="1">Eksportuj wszystkie kluby i zawodników</button>
-      <label class="btn btn--quiet ed-import">Wczytaj datapack<input type="file" accept=".json,application/json" data-act="ed-import" hidden></label>
+      <label class="btn btn--quiet ed-import">Wczytaj datapack<input type="file" data-act="ed-import" hidden></label>
     </div>
     <section class="ed-danger"><h3>Wyczyść datapack</h3>
       <p class="ed-note">Nazwy klubów wrócą do oryginału. Liczby i dane zawodników w tej grze zostaną takie, jak teraz.</p>
