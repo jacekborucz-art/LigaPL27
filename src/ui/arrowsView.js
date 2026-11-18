@@ -44,7 +44,7 @@ export function arrowsSvg(items, { map, vw = 68, vh = 100, id = 'pa', cls = '' }
 /** Legenda pod boiskiem. */
 export function arrowLegendHtml() {
   const s = (k, t) => `<span><svg viewBox="0 0 28 8" aria-hidden="true"><path class="pa__l pa__l--${k}" d="M1 4H26"/></svg>${esc(t)}</span>`;
-  return `<p class="pa-legend">${s('run', 'wbieganie do przodu')}${s('back', 'cofnięcie')}${s('lat', 'do środka albo szeroko')}</p>`;
+  return `<p class="pa-legend">${s('run', 'kierunek ruchu zawodnika w ataku')}</p>`;
 }
 
 /**

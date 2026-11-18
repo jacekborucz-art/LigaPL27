@@ -13,7 +13,8 @@ Projekt Nov 18, 2026 po burzy mózgów (taktyk, znawca futbolu, analityk, grafik
 | Pozycja | Kierunki |
 |---|---|
 | BR, ŚO | brak |
-| BO, WB | do przodu, skos na zewnątrz (overlap), skos do środka (underlap), do środka (odwrócony boczny obrońca), cofnięcie |
+| BO | do przodu (wybieg wzdłuż linii), skos do środka (underlap), do środka (odwrócony boczny obrońca), cofnięcie; bez ruchu na zewnątrz (strzałka poza boisko) |
+| WB (trójka środkowych obrońców) | jak BO plus skos na zewnątrz (overlap) |
 | DP | do przodu, cofnięcie (opada między stoperów) |
 | ŚP | wszystkie 6 (box-to-box, półprzestrzeń, rotacja) |
 | OP | do przodu (cień napastnika), cofnięcie, szeroko, skos na zewnątrz |

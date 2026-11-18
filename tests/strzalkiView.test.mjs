@@ -32,7 +32,7 @@ test('Ekran składu: bez przełącznika trybu, żetony gotowe do rysowania prawy
   const off = renderTactics({ squad, tactics: t, sel: null, benchSize: 9 });
   clean(off.replace(/null/g, ''));
   assert.doesNotMatch(off, /data-act="tarrows"/, 'bez przycisku trybu strzałek');
-  assert.match(off, /data-pid="[^"]+" data-sx="15" data-sy="26" data-dirs="f fi fo i b"/, 'żeton z kierunkami do rysowania prawym przyciskiem');
+  assert.match(off, /data-pid="[^"]+" data-sx="15" data-sy="26" data-dirs="f fi i b"/, 'żeton z kierunkami do rysowania prawym przyciskiem');
   assert.doesNotMatch(off, /data-gpos="BR"[^>]*data-dirs/, 'bramkarz bez strzałek');
   // Strzałki widać także poza trybem: SVG przed żetonami (pod nimi), znaczniki w defs, linie bez skalowania grubości
   const pitch = off.slice(off.indexOf('<div class="pitch2'), off.indexOf('</div>', off.indexOf('<div class="pitch2')));
@@ -98,10 +98,10 @@ test('Kierunek względem strony: do środka u lewego w prawo, u prawego w lewo; 
 });
 
 test('Ostrzeżenie o obu bocznych obrońcach do przodu (bez blokady), asekuracja je wyłącza', () => {
-  assert.match(fbWarning([{ pos: 'BO', dir: 'f' }, { pos: 'BO', dir: 'fo' }]), /ryzyko kontry/);
+  assert.match(fbWarning([{ pos: 'BO', dir: 'f' }, { pos: 'BO', dir: 'fi' }]), /ryzyko kontry/);
   assert.equal(fbWarning([{ pos: 'BO', dir: 'f' }, { pos: 'BO', dir: 'i' }]), '');
   assert.equal(fbWarning([{ pos: 'BO', dir: 'f' }]), '');
-  const t = { ...base, playerInstr: { [lb]: { run: 1 }, [rb]: { run: 1, lat: 1 } } };
+  const t = { ...base, playerInstr: { [lb]: { run: 1 }, [rb]: { run: 1, lat: -1 } } };
   const html = renderTactics({ squad, tactics: t, sel: null, benchSize: 9 });
   assert.match(html, /<p class="tac__msg is-msg is-warn" role="status">Obaj boczni obrońcy idą do przodu/);
 });

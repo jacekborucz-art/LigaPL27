@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-83fbae26d6';
+const VERSION = 'v0.3-a544cf5a55';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -143,7 +143,7 @@ const FILES = [
   ['./src/data/kibice.js', '9c3baf12b0'],
   ['./src/data/kluby_uefa.json', 'e579c6760e'],
   ['./src/data/names.js', '7195dbc1a8'],
-  ['./src/data/playerInstructions.js', 'ca54ca3b77'],
+  ['./src/data/playerInstructions.js', '5b9dd115ef'],
   ['./src/data/reprezentacje.json', '551a9d5bdd'],
   ['./src/data/reprezentacje_swiat.json', '29c3c96adf'],
   ['./src/engine/lineup.js', '2783f8d715'],
@@ -190,7 +190,7 @@ const FILES = [
   ['./src/season/thirdLeague.js', 'b37f1d8a44'],
   ['./src/season/uefa.js', '4a0c9dc052'],
   ['./src/season/worldNations.js', '6003d36e12'],
-  ['./src/styles/app.css', 'a6c3707bbc'],
+  ['./src/styles/app.css', 'a32523ac90'],
   ['./src/styles/assistant.css', 'a1dd04f875'],
   ['./src/styles/base.css', 'f2fee58203'],
   ['./src/styles/club.css', '6615e08e49'],
@@ -223,7 +223,7 @@ const FILES = [
   ['./src/training/staff.js', 'afce57997d'],
   ['./src/training/state.js', '8577a26767'],
   ['./src/training/variety.js', '31ec815b77'],
-  ['./src/ui/arrowsView.js', '24ffd54430'],
+  ['./src/ui/arrowsView.js', 'de09da93ff'],
   ['./src/ui/assistantReportView.js', 'ad1ef0c14d'],
   ['./src/ui/boardRequestsView.js', '14afde7d17'],
   ['./src/ui/clubView.js', 'c762a8d93c'],
@@ -257,7 +257,7 @@ const FILES = [
   ['./src/ui/squadView.js', '26402bd3f1'],
   ['./src/ui/staffView.js', '7682a3584c'],
   ['./src/ui/sysMenu.js', 'fc1677717f'],
-  ['./src/ui/tacticsArrows.js', 'c23ecac10b'],
+  ['./src/ui/tacticsArrows.js', '1465820237'],
   ['./src/ui/tacticsDrag.js', 'e4a2009a87'],
   ['./src/ui/tacticsMoves.js', '36742ffefc'],
   ['./src/ui/tacticsView.js', 'ec59a6e711'],

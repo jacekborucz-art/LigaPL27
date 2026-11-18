@@ -44,7 +44,9 @@ export function mountArrowDraw(root, { onSet, onReject }) {
     const ok = !!dir && el.dataset.dirs.split(' ').includes(dir);
     draw.dir = ok ? dir : null;
     // Podgląd: strzałka przyciągnięta do kierunku (dozwolony) albo linia do kursora (niedozwolony)
-    const vb = (px, py) => `${((px - r.left) / r.width * 68).toFixed(2)} ${((py - r.top) / r.height * 100).toFixed(2)}`;
+    // Warstwa strzałek jest przesunięta w górę o różnicę między środkiem kółka a środkiem przycisku (CSS .tac .pitch2 > .pa)
+    const sh = (el.getBoundingClientRect().top + el.getBoundingClientRect().height / 2) - cy;
+    const vb = (px, py) => `${((px - r.left) / r.width * 68).toFixed(2)} ${((py + sh - r.top) / r.height * 100).toFixed(2)}`;
     let end;
     if (ok) { const v = arrowVec(dir, sx); end = `${((sx + v.dx) * 0.68).toFixed(2)} ${(100 - sy - v.dy).toFixed(2)}`; }
     else end = vb(ev.clientX, ev.clientY);

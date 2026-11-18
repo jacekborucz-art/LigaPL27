@@ -106,7 +106,7 @@ export function abRun(n, variant) {
 export const ARROW_GROUPS = {
   BO: { formation: '4231', pos: ['BO'] }, DP: { formation: '4231', pos: ['DP'] }, ŚP: { formation: '433', pos: ['ŚP'] },
   OP: { formation: '4231', pos: ['OP'] }, BP: { formation: '442', pos: ['BP'] }, SN: { formation: '433', pos: ['SN'] },
-  NAP: { formation: '442', pos: ['NAP'] },
+  NAP: { formation: '442', pos: ['NAP'] }, WB: { formation: '352', pos: ['WB'] },
 };
 const groupTac = {};
 const tacIn = (club, formation) => groupTac[`${club}:${formation}`] ?? (groupTac[`${club}:${formation}`] = createTactics(sq[club], { formation }));

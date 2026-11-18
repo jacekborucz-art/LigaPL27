@@ -94,9 +94,10 @@ export const ARROW_DIRS = [
   { id: 'o', run: 0, lat: 1, label: 'Szeroko' },
   { id: 'b', run: -1, lat: 0, label: 'Cofnięcie' },
 ];
-/** Dozwolone kierunki na pozycji (BR i ŚO: brak). */
+/** Dozwolone kierunki na pozycji (BR i ŚO: brak). Boczny obrońca w czwórce bez ruchu na zewnątrz (strzałka poza boisko);
+ * wybieg wzdłuż linii to „do przodu”. Na zewnątrz tylko wahadłowy (WB), czyli przy trójce środkowych obrońców. */
 export const ARROW_POS = {
-  BO: ['f', 'fo', 'fi', 'i', 'b'], WB: ['f', 'fo', 'fi', 'i', 'b'], DP: ['f', 'b'], ŚP: ['f', 'fi', 'fo', 'i', 'o', 'b'],
+  BO: ['f', 'fi', 'i', 'b'], WB: ['f', 'fo', 'fi', 'i', 'b'], DP: ['f', 'b'], ŚP: ['f', 'fi', 'fo', 'i', 'o', 'b'],
   OP: ['f', 'b', 'o', 'fo'], BP: ['f', 'i', 'fi', 'o', 'b'], SN: ['f', 'i', 'fi', 'o', 'b'], NAP: ['f', 'o', 'b'],
 };
 /** Opis zysku i ryzyka kierunku (ogólny, bez prognozy dla zawodnika); rola zależy od pozycji (_: domyślny). */

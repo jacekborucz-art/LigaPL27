@@ -20,7 +20,7 @@ const xOf = (M, id) => M.teams[0].players.find((x) => x.id === id);
 
 test('Dozwolone kierunki na pozycjach jak w projekcie; kierunek z run i lat i z powrotem', () => {
   const exp = {
-    BR: [], ŚO: [], BO: ['f', 'fi', 'fo', 'i', 'b'], WB: ['f', 'fi', 'fo', 'i', 'b'], DP: ['f', 'b'], ŚP: ['f', 'fi', 'fo', 'i', 'o', 'b'],
+    BR: [], ŚO: [], BO: ['f', 'fi', 'i', 'b'], WB: ['f', 'fi', 'fo', 'i', 'b'], DP: ['f', 'b'], ŚP: ['f', 'fi', 'fo', 'i', 'o', 'b'],
     OP: ['f', 'fo', 'o', 'b'], BP: ['f', 'fi', 'i', 'o', 'b'], SN: ['f', 'fi', 'i', 'o', 'b'], NAP: ['f', 'o', 'b'],
   };
   for (const [pos, dirs] of Object.entries(exp)) assert.deepEqual(arrowsFor(pos), dirs, pos);
@@ -46,11 +46,11 @@ test('Walidacja zmiany w meczu: para dozwolona na pozycji albo miejscu, scalenie
   assert.equal(checkTacticPatch(M, 0, { playerInstr: { [nap.id]: { run: -1 } } }), null, 'fałszywa dziewiątka');
   assert.equal(checkTacticPatch(M, 0, { playerInstr: { [bo.id]: { run: 1, lat: -1 } } }), null, 'underlap');
   assert.ok(changeTactics(M, 0, { playerInstr: { [bo.id]: { run: -1 } } }).ok);
-  assert.match(checkTacticPatch(M, 0, { playerInstr: { [bo.id]: { lat: 1 } } }), /Ruch/, 'cofnięcie + szeroko po scaleniu: nie ma takiego kierunku');
-  const r = changeTactics(M, 0, { playerInstr: { [bo.id]: { run: 1, lat: 1 } } });
+  assert.match(checkTacticPatch(M, 0, { playerInstr: { [bo.id]: { lat: 1 } } }), /Ruch/, 'boczny obrońca: bez ruchu na zewnątrz');
+  const r = changeTactics(M, 0, { playerInstr: { [bo.id]: { run: 1, lat: -1 } } });
   assert.ok(r.ok);
-  assert.match(M.events.at(-1).text, /ruch: skos na zewnątrz/);
-  assert.deepEqual(T.tactics.playerInstr[bo.id], { run: 1, lat: 1 });
+  assert.match(M.events.at(-1).text, /ruch: skos do środka/);
+  assert.deepEqual(T.tactics.playerInstr[bo.id], { run: 1, lat: -1 });
 });
 
 test('Para niedozwolona na nowej pozycji jest ignorowana w całości; znaczenie względem strony zawodnika', () => {
@@ -101,7 +101,7 @@ test('Łączenie: dwóch bocznych obrońców do przodu bez asekuracji zwiększa 
   const t = tacF('legia', '442');
   const [lb, rb] = idsAt(t, 'BO');
   const shiftOf = (pim) => { const M = match(t, pim); step(M); const T = M.teams[0]; return { T, plain: teamShift(T.players.flatMap((x) => x.pi?.devs ?? [])) }; };
-  const both = shiftOf({ [lb]: { run: 1 }, [rb]: { run: 1, lat: 1 } });
+  const both = shiftOf({ [lb]: { run: 1 }, [rb]: { run: 1, lat: -1 } });
   assert.ok(Math.abs(both.T.piShift.mul.counterVulnMul - both.plain.mul.counterVulnMul * (1 + PI.arrow.pairPen)) < 1e-12, 'kara x(1 + 0,06)');
   const covered = shiftOf({ [lb]: { run: 1 }, [rb]: { lat: -1 } });
   assert.equal(covered.T.piShift.mul.counterVulnMul, covered.plain.mul.counterVulnMul, 'drugi do środka: bez kary');
@@ -140,7 +140,7 @@ test('A/B każdego kierunku na każdej pozycji (300 meczów): jest zysk i mierza
   // Kierunki zgodne z piłką (najważniejsze skutki)
   const r = res;
   assert.ok(r['BO:i'].poss > 0.8 && r['BO:i'].skrA > 0.15, 'odwrócony boczny obrońca: posiadanie, ale dośrodkowania rywala');
-  assert.ok(r['BO:fo'].skr > 0.2 && r['BO:fo'].konA > 0.1 && r['BO:fo'].condI < -1.5, 'overlap: dośrodkowania, kontry rywala, zmęczenie');
+  assert.ok(r['WB:fo'].skr > 0.2 && r['WB:fo'].konA > 0.1 && r['WB:fo'].condI < -1.5, 'wahadłowy na zewnątrz (trójka obrońców): dośrodkowania, kontry rywala, zmęczenie');
   assert.ok(r['ŚP:o'].skr > 0.2 && r['ŚP:o'].poss < -0.4, 'szeroko: dośrodkowania kosztem posiadania');
   assert.ok(r['SN:i'].shI > 0.4 && r['SN:i'].kpI < -0.1, 'skrzydłowy do środka: strzela, mniej wrzutek');
   assert.ok(r['NAP:b'].shI < -0.5 && r['NAP:b'].poss > 0.8 && r['NAP:b'].kpI > 0.1, 'fałszywa dziewiątka');
