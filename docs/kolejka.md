@@ -55,3 +55,23 @@ Do zrobienia:
 - obywatelstwo UE z drugim paszportem: później (na razie tylko narodowość `p.nat`).
 
 Źródło: https://pzpn.pl/public/system/files/site_content/635/6576-Regulamin%201.%20Ligi%202.%20Ligi%20i%203.%20Ligi%20na%20sezon%202025-2026.pdf
+
+## 4. Atrybuty członków sztabu (dodane Nov 18, 2026)
+
+Stan dziś: osoba sztabu (`game.staff.people`, `src/career/staffMarket.js`) ma jeden atrybut, jakość `q` 1-20; od niego zależy jej wpływ (`STAFF_ROLES` w `src/training/config.js`). Trener prowadzący ma 5 atrybutów (`src/career/coaches.js`).
+
+Cel: każdy członek sztabu ma kilka atrybutów 1-20 dopasowanych do roli, np. [SZAC, do burzy mózgów]:
+- asystent trenera: taktyka, czytanie gry, praca z zawodnikami, przygotowanie odpraw;
+- trener przygotowania fizycznego: periodyzacja, prewencja urazów, regeneracja, nowoczesne metody;
+- trener bramkarzy: technika bramkarska, gra nogami, przygotowanie mentalne bramkarza;
+- trener młodzieży: rozwój młodych, ocena talentu, praca z akademią;
+- główny analityk: analiza rywala, dane i statystyki, analiza własnej gry;
+- fizjoterapeuta: leczenie urazów, prewencja, rehabilitacja po ciężkich urazach;
+- skaut: ocena umiejętności, ocena potencjału, znajomość rynków (kraje);
+- kierownik drużyny: organizacja, dokumenty i terminy, logistyka obozów i wyjazdów.
+
+Do zrobienia:
+- burza mózgów (ekspert piłkarski, trener, analityk kodu): lista atrybutów na rolę i gdzie każdy działa w logice gry, zamiast jednego `q`;
+- jakość `q` liczona z atrybutów roli (wagi), żeby ponad 30 miejsc czytających `staffQ` działało bez zmian, a potem stopniowe podpięcie pojedynczych atrybutów tam, gdzie mają sens;
+- migracja zapisów: atrybuty losowane deterministycznie wokół obecnego `q`;
+- rynek sztabu, pensje, widok Sztab, karta osoby, edytor i datapack (sekcja `staff`, nowa wersja pliku z migracją).
