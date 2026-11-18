@@ -9,7 +9,7 @@ import { ensureCareer } from '../src/career/careerSystem.js';
 import { createFinance, financeDay, FIN_LABELS } from '../src/career/finance.js';
 import { CLUBS_PL } from '../src/data/clubs_pl.js';
 import {
-  LEVELS, TRACKS, AI_MAX, INFRA, infraOf, ensureInfra, startLevels, trainingMods, academyMods, developmentMods,
+  LEVELS, TRACKS, AI_MAX, aiMaxLevel, polishPeak, AI_STAGE_MAX, INFRA, infraOf, ensureInfra, startLevels, trainingMods, academyMods, developmentMods,
   quote, startProject, infraMonth, infraSeason, infraRequestsDay, licenceNeeds, ownerShare, capacityOf, applyPlan, upkeepAt,
 } from '../src/career/infrastructure.js';
 import { renderClubHub, handleClubAction } from '../src/ui/klubView.js';
@@ -51,15 +51,17 @@ test('Dzień startu: plan sezonu i efekty bez zmian względem modelu finansów s
 
 test('Poziomy startowe: czołówka, Ekstraklasa, niższe ligi; wszyscy spełniają licencję na starcie', () => {
   const L = (id) => { const x = infraOf(G, id); return [x.stadium, x.training, x.academy]; };
-  assert.deepEqual(L('legia'), [7, 8, 7]);
-  assert.deepEqual(L('lech'), [7, 7, 7]);
-  assert.equal(L('rakow')[0], 4); assert.equal(L('rakow')[1], 6);
+  // Skala światowa (Nov 18, 2026): w Polsce baza najwyżej 5 (Legia Training Center), akademia najwyżej 6 (Wronki)
+  assert.deepEqual(L('legia'), [7, 5, 6]);
+  assert.deepEqual(L('lech'), [7, 5, 6]);
+  assert.equal(L('rakow')[0], 4); assert.equal(L('rakow')[1], 4);
   assert.equal(L('gornik-zabrze')[0], 6); assert.equal(L('korona')[0], 5);
-  assert.equal(L('zaglebie-lubin')[2], 6); assert.equal(L('pogon-szczecin')[2], 6);
+  assert.equal(L('zaglebie-lubin')[2], 5); assert.equal(L('pogon-szczecin')[2], 5);
+  assert.ok(CLUBS_PL.every((c) => startLevels(c).training <= 5 && startLevels(c).academy <= 6), 'polskie realia w skali światowej');
   for (const c of CLUBS_PL.filter((x) => x.tier <= 3)) {
     const s = startLevels(c);
     for (const k of TRACKS) assert.ok(s[k] >= 2 && s[k] <= 8, `${c.id} ${k} ${s[k]}`);
-    if (c.tier === 2) { assert.ok(s.stadium >= 3 && s.stadium <= 6, c.id); assert.ok(s.academy >= 3 && s.academy <= 4, c.id); }
+    if (c.tier === 2) { assert.ok(s.stadium >= 3 && s.stadium <= 6, c.id); assert.ok(s.academy === 3, c.id); }
     if (c.tier === 3) { assert.ok(s.stadium >= 2 && s.stadium <= 3, c.id); assert.ok(s.academy <= 3, c.id); }
     assert.deepEqual(licenceNeeds(G, c.id), [], `${c.id}: licencja na starcie`);
   }
@@ -71,7 +73,8 @@ test('Skala poziomów: 10 poziomów na tor, koszty i utrzymanie rosną, stadion 
     for (let i = 2; i < 10; i++) { assert.ok(LEVELS[k][i].cost > LEVELS[k][i - 1].cost, `${k} ${i}`); assert.ok(LEVELS[k][i].upkeep >= LEVELS[k][i - 1].upkeep); }
   }
   assert.equal(LEVELS.stadium[9].max, 100000); assert.equal(LEVELS.stadium[9].M, 2); assert.equal(LEVELS.stadium[5].M, 1);
-  assert.equal(LEVELS.academy[5].name, 'Akademia z certyfikatem złotym');
+  assert.equal(LEVELS.academy[4].name, 'Akademia z certyfikatem złotym');
+  assert.equal(LEVELS.academy[5].name, 'Akademia czołowa w Polsce');
   assert.ok(!JSON.stringify(LEVELS).toLowerCase().includes('platyn'), 'PZPN nie ma certyfikatu platynowego');
 });
 
@@ -199,7 +202,7 @@ test('Kluby AI: inwestują z nadwyżki w kolejności licencja, baza, akademia, s
   for (const [id, I] of Object.entries(g.infra.clubs)) {
     if (id === g.clubId) continue;
     for (const k of TRACKS) {
-      assert.ok(I[k] <= AI_MAX, `${id} ${k}: ${I[k]}`);
+      assert.ok(I[k] <= Math.max(I.start[k], aiMaxLevel(g, id)), `${id} ${k}: ${I[k]}`);
       if (I[k] > I.start[k]) upgrades++;
     }
   }
@@ -232,7 +235,7 @@ test('Widok: kafelki, trzy karty z drabiną poziomów, potwierdzenie, wniosek do
   for (const t of TRACKS) assert.match(html, new RegExp(`data-act="inf-start" data-track="${t}"`));
   assert.equal((html.match(/<ol class="inf-steps"/g) ?? []).length, 3);
   assert.match(html, /data-s="cur"/);
-  assert.match(html, /szczyt w Polsce/);
+  assert.match(html, /najwyżej w Polsce teraz/);
   assert.match(html, /Camp Nou/);
   assert.match(html, /Trwające inwestycje/);
   assert.match(html, /Licencja: Ekstraklasa/);
@@ -270,4 +273,27 @@ test('Akademia: miejsca według poziomu, od 3 (brak akademii) do 24 (akademia ś
   assert.equal(academyCapacity(2), 5);
   assert.equal(academyCapacity(10), 24);
   assert.ok(ACADEMY_CAP.every((v, i) => i === 0 || v > ACADEMY_CAP[i - 1]));
+});
+
+test('Sufit klubu AI rośnie z pozycją w Europie (lata w Lidze Mistrzów), polski szczyt na drabinie z gry', () => {
+  const g = { seed: 1, clubId: 'widzew', date: '2026-07-01', countryCoef: { POL: 35 } };
+  assert.equal(aiMaxLevel(g, 'legia'), AI_MAX, 'bez pucharów: zwykły sufit');
+  g.repState = { clubPts: { legia: [10, 10, 10, 10, 10] } }; // kilka sezonów fazy ligowej LM
+  assert.ok(aiMaxLevel(g, 'legia') >= 9, `scena ${aiMaxLevel(g, 'legia')}`);
+  g.repState.clubPts.legia = [40, 40, 40, 40, 40]; // europejska czołówka
+  assert.equal(aiMaxLevel(g, 'legia'), 10);
+  assert.equal(polishPeak({ infra: { clubs: { a: { academy: 6 }, b: { academy: 9 } } } }, 'academy'), 9);
+});
+
+test('Stare zapisy: baza treningowa i akademia przeliczone na skalę światową raz, projekty w toku do kolejnego poziomu', () => {
+  const g = fresh();
+  const I = infraOf(g, 'legia');
+  Object.assign(I, { training: 8, academy: 7 }); I.start = { ...I.start, training: 8, academy: 7 };
+  I.proj.academy = { kind: 'level', to: 8, m: 0, months: 18 };
+  g.infra.v = 2;
+  ensureInfra(g);
+  assert.deepEqual([I.training, I.academy, I.start.training, I.start.academy, I.proj.academy.to], [5, 6, 5, 6, 7]);
+  ensureInfra(g);
+  assert.deepEqual([I.training, I.academy], [5, 6], 'tylko raz');
+  assert.equal(aiMaxLevel(g, 'legia', 'training'), 5); assert.equal(aiMaxLevel(g, 'legia', 'academy'), 6);
 });

@@ -236,7 +236,8 @@ test('Kluby AI: te same etapy bez poczty, projekty ruszają zwykle w ciągu 60 d
   }
   infraSeason(g, '2027-07-01');
   const sub = Object.entries(g.infra.clubs).filter(([, I]) => Object.keys(I.req ?? {}).length);
-  assert.ok(sub.length >= 10, `wnioski AI: ${sub.length}`);
+  // Skala światowa (Nov 18, 2026): większe i droższe kroki bazy i akademii, więc mniej wniosków w jednym sezonie
+  assert.ok(sub.length >= 8, `wnioski AI: ${sub.length}`);
   assert.ok(sub.every(([, I]) => Object.values(I.req).every((r) => r.ai)));
   const msgs = [...infraRequestsDay(g, '2027-07-01'), ...runDays(g, 60)];
   assert.equal(msgs.length, 0, 'bez poczty dla klubów AI');
@@ -268,7 +269,7 @@ test('Stary zapis bez wniosków: ensureInfra uzupełnia req i reqLast', () => {
   g.infra.v = 1;
   for (const I of Object.values(g.infra.clubs)) { delete I.req; delete I.reqLast; }
   ensureInfra(g);
-  assert.equal(g.infra.v, 2);
+  assert.equal(g.infra.v, 3); // v1 -> v2 (wnioski) -> v3 (skala światowa)
   assert.deepEqual(infraOf(g, 'legia').req, {});
   assert.deepEqual(infraOf(g, 'legia').reqLast, {});
   g.finance.clubs[g.clubId].balance = 300e6;

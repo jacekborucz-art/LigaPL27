@@ -20,6 +20,7 @@ import { clubById } from '../data/clubs_pl.js';
 import { clubFinanceData } from '../data/finanse_klubow.js';
 import { FIN, book } from './finance.js';
 import { ownerOf } from './owners.js';
+import { clubStage } from './reputation.js';
 import { fmtDate } from '../ui/dom.js';
 
 const M = 1e6;
@@ -37,41 +38,68 @@ export const LEVELS = {
     lv('Stadion licencyjny (podgrzewana murawa, oświetlenie TV)', 12, 10, 1.2, { M: 0.8, max: 12000 }),
     lv('Nowoczesny stadion miejski', 35, 18, 3, { M: 0.9, max: 20000, ref: 'np. stadion w Opolu (11 600 miejsc, 208,7 mln zł)' }),
     lv('Arena z lożami (UEFA kat. 4)', 80, 24, 6, { M: 1.0, max: 35000, ref: 'np. Arena Zabrze (31 871), stadion w Szczecinie (261 mln zł)' }),
-    lv('Arena premium (szczyt w Polsce)', 150, 30, 10, { M: 1.15, max: 45000, ref: 'np. stadion Legii (31 103), stadion w Poznaniu (42 837)' }),
+    lv('Arena premium', 150, 30, 10, { M: 1.15, max: 45000, ref: 'np. stadion Legii (31 103), stadion w Poznaniu (42 837)' }),
     lv('Stadion europejski', 400, 36, 20, { M: 1.35, max: 60000, ref: 'np. PGE Narodowy (58 580), Stadion Śląski (55 211)' }),
     lv('Stadion światowy', 1200, 42, 40, { M: 1.65, max: 75000, ref: 'np. Signal Iduna Park (81 tys.), Santiago Bernabéu (ok. 83 tys.)' }),
     lv('Ikona (klasa Wembley, Camp Nou)', 3000, 48, 80, { M: 2.0, max: 100000, ref: 'np. Wembley (90 tys.), Camp Nou (ok. 99 tys., docelowo 105 tys.)' }),
   ],
+  // Baza treningowa i akademia w skali światowej (decyzja właściciela Nov 18, 2026): w Polsce najwyżej baza 5
+  // (Legia Training Center) i akademia 6 (Wronki); wyżej obiekty klubów z Europy. Efekty liczone od poziomu startowego.
   training: [
     lv('Boisko gminne', 0, 0, 0.05),
-    lv('Boisko klubowe z szatnią', 0.2, 2, 0.15),
-    lv('Dwa boiska i siłownia', 0.6, 3, 0.4),
-    lv('Ośrodek treningowy', 2, 6, 1),
-    lv('Ośrodek z odnową biologiczną', 6, 9, 2),
-    lv('Nowoczesny ośrodek', 15, 12, 4, { ref: 'np. planowany ośrodek Widzewa (ok. 30 mln zł)' }),
-    lv('Centrum treningowe (poziom Wronek)', 35, 15, 6, { ref: 'rozbudowa akademii we Wronkach: 55 mln zł' }),
+    lv('Boisko klubowe z szatnią i siłownią', 0.4, 2, 0.2),
+    lv('Ośrodek treningowy', 2.5, 6, 1),
+    lv('Nowoczesny ośrodek z odnową biologiczną', 15, 12, 4, { ref: 'np. planowany ośrodek Widzewa (ok. 30 mln zł)' }),
     lv('Centrum premium (poziom Legia Training Center)', 70, 18, 10, { ref: 'Legia Training Center: ok. 80 mln zł' }),
-    lv('Ośrodek europejski', 140, 24, 18, { ref: 'ośrodki czołowych klubów Europy' }),
-    lv('Kampus światowy', 500, 30, 30, { ref: 'kampusy największych klubów świata' }),
+    lv('Ośrodek klasy europejskiej', 120, 20, 14, { ref: 'np. czołowe kluby Czech, Austrii, Szwajcarii' }),
+    lv('Ośrodek czołowy w Europie', 200, 24, 20, { ref: 'np. Ajax, Benfica (Seixal), Red Bull Salzburg' }),
+    lv('Ośrodek elity', 350, 26, 28, { ref: 'np. Borussia Dortmund, Juventus' }),
+    lv('Kampus elity', 600, 30, 40, { ref: 'np. Bayern Monachium, FC Barcelona' }),
+    lv('Kampus światowy', 1000, 36, 55, { ref: 'np. City Football Academy (Manchester City)' }),
   ],
   academy: [
     lv('Brak akademii', 0, 0, 0.1),
-    lv('Szkółka miejska', 0.1, 2, 0.3),
-    lv('Grupy młodzieżowe', 0.3, 3, 0.7),
+    lv('Szkółka i grupy młodzieżowe', 0.3, 2, 0.5),
     lv('Akademia z certyfikatem brązowym', 1, 6, 1.2, { ref: 'certyfikat PZPN: brązowy' }),
     lv('Akademia z certyfikatem srebrnym', 3, 9, 2, { ref: 'certyfikat PZPN: srebrny' }),
     lv('Akademia z certyfikatem złotym', 6, 12, 4, { ref: 'certyfikat PZPN: złoty (najwyższy)' }),
-    lv('Akademia czołowa w Polsce', 12, 15, 7),
-    lv('Akademia międzynarodowa', 25, 18, 14),
-    lv('Akademia europejska', 60, 24, 25, { ref: 'akademie czołowych klubów Europy' }),
-    lv('Akademia światowa', 150, 30, 50, { ref: 'akademie największych klubów świata' }),
+    lv('Akademia czołowa w Polsce', 12, 15, 7, { ref: 'np. akademia Lecha we Wronkach' }),
+    lv('Akademia międzynarodowa', 30, 18, 14, { ref: 'np. czołowe akademie Czech, Austrii, Chorwacji' }),
+    lv('Akademia europejska', 70, 24, 25, { ref: 'np. Ajax, Benfica, Dinamo Zagrzeb' }),
+    lv('Akademia elity', 150, 30, 40, { ref: 'np. La Masia (Barcelona), Real Madryt' }),
+    lv('Akademia światowa', 300, 36, 55, { ref: 'akademie największych klubów świata' }),
   ],
 };
 export const MAX_LEVEL = 10;
 /** Najwyższy poziom spotykany w Polsce (oznaczenie na drabinie poziomów). [SZAC] */
-export const PL_CEILING = { stadium: 7, training: 8, academy: 8 };
-/** Kluby AI nie budują ponad ten poziom (polskie realia). [SZAC] */
+export const PL_CEILING = { stadium: 7, training: 5, academy: 6 };
+/** Kluby AI nie budują ponad ten poziom (polskie realia), chyba że klub urośnie w Europie (aiMaxLevel). [SZAC] */
 export const AI_MAX = 8;
+/**
+ * Sufit klubu AI: zwykle polskie realia (stadion 8, baza 5, akademia 6), ale klub, który latami gra w pucharach
+ * (np. kilka sezonów Ligi Mistrzów) i ma scenę europejską jak Ajax czy Benfica, buduje dalej: od sceny 60 wyżej,
+ * od 68 do poziomu 10 (scena: clubStage, ta sama skala co reputacja zawodników; Ekstraklasa na starcie najwyżej
+ * ok. 57). Pieniądze i tak sprawdza zarząd. [SZAC]
+ */
+export const AI_STAGE_MAX = [[68, 2], [60, 1]];
+/** Sufit klubu AI na obiekt: [zwykły, scena od 60, scena od 68]. Baza i akademia w skali światowej. [SZAC] */
+export const AI_LIMITS = { stadium: [AI_MAX, 9, 10], training: [5, 7, 10], academy: [6, 8, 10] };
+export function aiMaxLevel(game, id, track = 'stadium') {
+  const club = clubById(id);
+  const row = AI_LIMITS[track] ?? AI_LIMITS.stadium;
+  if (!club) return row[0];
+  const S = clubStage(club, game);
+  return row[AI_STAGE_MAX.find(([s]) => S >= s)?.[1] ?? 0];
+}
+/** Przeliczenie dawnych poziomów (skala polska, do Nov 18, 2026) na skalę światową: indeks = dawny poziom - 1. */
+export const OLD_TO_WORLD = { training: [1, 2, 2, 3, 3, 4, 5, 5, 7, 10], academy: [1, 2, 3, 3, 4, 5, 6, 7, 8, 10] };
+const toWorld = (track, L) => (OLD_TO_WORLD[track] ? OLD_TO_WORLD[track][clamp(Math.round(L), 1, MAX_LEVEL) - 1] : L);
+/** Najwyższy poziom obiektu, jaki ma teraz polski klub w tej grze (oznaczenie na drabinie poziomów). */
+export function polishPeak(game, track) {
+  let top = 0;
+  for (const I of Object.values(game?.infra?.clubs ?? {})) if ((I?.[track] ?? 0) > top) top = I[track];
+  return top || PL_CEILING[track];
+}
 
 export const INFRA = {
   SEAT_COST: 10000, // zł za miejsce x M(L); realnie ok. 12-18 tys. zł (Opole 208,7 mln / 11 600) [SZAC]
@@ -124,7 +152,7 @@ export function startLevels(club) {
   let academy = START.academy[id];
   if (academy == null) academy = tier === 1 ? (pr >= 7 ? 5 : 4) : tier === 2 ? (pr >= 6 ? 4 : 3) : tier >= 4 ? (pr >= 4 ? 2 : 1) : (pr >= 5 ? 3 : 2);
   if (club?.parent) { training = Math.min(training, 3); academy = 2; }
-  return { stadium, training, academy };
+  return { stadium, training: toWorld('training', training), academy: toWorld('academy', academy) }; // skala światowa
 }
 
 function newEntry(club) {
@@ -146,7 +174,7 @@ const injF = (L) => 1.1 - 0.02 * L;
 const youthF = (L) => 0.92 + 0.016 * L;
 const juniors = (L) => 2 + Math.round(L / 3);
 /** Miejsca w akademii według poziomu (decyzja właściciela Nov 16, 2026: amatorska 3-5, światowa 24). [SZAC] */
-export const ACADEMY_CAP = [3, 5, 7, 9, 11, 13, 15, 18, 21, 24];
+export const ACADEMY_CAP = [3, 5, 8, 11, 13, 15, 18, 20, 22, 24]; // skala światowa (Nov 18, 2026): Wronki 6 = 15 miejsc jak dawniej
 export const academyCapacity = (L) => ACADEMY_CAP[clamp(Math.round(L ?? 3), 1, MAX_LEVEL) - 1];
 /** Miejsca w akademii klubu. Bez danych infrastruktury (np. beniaminek z IV ligi w dniu przełomu sezonu): poziom startowy. */
 export const academyCapOf = (game, id) => academyCapacity(game?.infra?.clubs?.[id]?.academy ?? startLevels(clubById(id)).academy);
@@ -227,11 +255,24 @@ export function applyPlan(game, id) {
 /** Leniwe tworzenie stanu (stare zapisy) i nałożenie infrastruktury na nowe plany sezonu. Wywoływane codziennie. */
 export function ensureInfra(game) {
   if (!game?.finance) return;
-  if (!game.infra) game.infra = { v: 2, clubs: {}, july: null };
+  if (!game.infra) game.infra = { v: 3, clubs: {}, july: null };
   if ((game.infra.v ?? 1) < 2) {
     // Zapisy sprzed wniosków (v1): puste wnioski i historia decyzji
     for (const I of Object.values(game.infra.clubs)) { I.req ??= {}; I.reqLast ??= {}; }
     game.infra.v = 2;
+  }
+  if (game.infra.v < 3) {
+    // Zapisy ze skalą polską (v2): baza treningowa i akademia przeliczone na skalę światową, projekty i wnioski w toku
+    // prowadzą do kolejnego poziomu nowej skali
+    for (const I of Object.values(game.infra.clubs)) {
+      for (const t of ['training', 'academy']) {
+        I[t] = toWorld(t, I[t]);
+        if (I.start) I.start[t] = toWorld(t, I.start[t]);
+        if (I.proj?.[t] && I.proj[t].kind !== 'seats') I.proj[t].to = Math.min(MAX_LEVEL, I[t] + 1);
+        if (I.req?.[t]?.q && I.req[t].q.kind !== 'seats') I.req[t].q.to = Math.min(MAX_LEVEL, I[t] + 1);
+      }
+    }
+    game.infra.v = 3;
   }
   for (const [id, c] of Object.entries(game.finance.clubs)) {
     if (!c.plan || c.plan.infra) continue;
@@ -753,7 +794,7 @@ function aiInvest(game, id, needs, date) {
       const room = seatRoom(game, id);
       if (room >= 1000) opts = { ai: true, seats: Math.floor(room / 500) * 500 };
     }
-    if (!opts.seats && I[track] >= AI_MAX) continue;
+    if (!opts.seats && I[track] >= aiMaxLevel(game, id, track)) continue;
     const q = quote(game, id, track, { ...opts, date });
     if (!q.ok || q.club > I.fund - pending) continue;
     if (submitRequest(game, id, track, { ...opts, date }).ok) break; // jeden nowy wniosek na sezon (poza licencją)

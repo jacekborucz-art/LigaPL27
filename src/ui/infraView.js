@@ -9,7 +9,7 @@ import { kpi, panel, meter } from './transfersView.js';
 import { fmtZl } from '../career/transfers.js';
 import { clubById, LEAGUE_NAMES } from '../data/clubs_pl.js';
 import {
-  TRACKS, TRACK_NAMES, LEVELS, MAX_LEVEL, PL_CEILING, LICENCE, INFRA,
+  TRACKS, TRACK_NAMES, LEVELS, MAX_LEVEL, PL_CEILING, LICENCE, INFRA, polishPeak,
   infraOf, ensureInfra, quote, submitRequest, withdrawRequest, pipelineFor, projectLabel, STAGES, IREQ,
   capacityOf, seatRoom, seasonFill, licenceNeeds,
   trainingMods, academyMods, academyCapacity, stadiumMul, ownerLabel, upkeepAt,
@@ -68,9 +68,9 @@ function effects(game, id, track) {
   ];
 }
 
-/** Drabina 10 poziomów: obecny wyróżniony, polski szczyt zaznaczony, lista nazw w rozwijanym bloku. */
-function ladder(track, L) {
-  const ceil = PL_CEILING[track];
+/** Drabina 10 poziomów: obecny wyróżniony, najwyższy poziom w Polsce teraz zaznaczony, lista nazw w rozwijanym bloku. */
+function ladder(game, track, L) {
+  const ceil = polishPeak(game, track); // najwyższy poziom, jaki ma teraz polski klub (przesuwa się, gdy ktoś go przebije)
   const cells = LEVELS[track].map((_, i) => {
     const n = i + 1;
     const s = n < L ? 'done' : n === L ? 'cur' : 'far';
@@ -78,10 +78,10 @@ function ladder(track, L) {
   }).join('');
   const rows = LEVELS[track].map((lv, i) => {
     const n = i + 1;
-    return `<li${n === L ? ' aria-current="true"' : ''}><b>${n}</b><span>${esc(lv.name)}${lv.ref ? `<small>${esc(lv.ref)}</small>` : ''}${n === ceil ? '<small class="inf-tag">szczyt w Polsce</small>' : ''}</span><em>${n === 1 ? '' : `${mln(lv.cost)}`}</em></li>`;
+    return `<li${n === L ? ' aria-current="true"' : ''}><b>${n}</b><span>${esc(lv.name)}${lv.ref ? `<small>${esc(lv.ref)}</small>` : ''}${n === ceil ? '<small class="inf-tag">najwyżej w Polsce teraz</small>' : ''}</span><em>${n === 1 ? '' : `${mln(lv.cost)}`}</em></li>`;
   }).join('');
   return `<ol class="inf-steps" aria-label="Poziomy 1-${MAX_LEVEL}">${cells}</ol>
-    <p class="inf-steps__key"><span>Poziom ${L} z ${MAX_LEVEL}</span><span>szczyt w Polsce: ${ceil}</span></p>
+    <p class="inf-steps__key"><span>Poziom ${L} z ${MAX_LEVEL}</span><span>najwyżej w Polsce teraz: ${ceil}</span></p>
     <details class="inf-levels"><summary>Wszystkie poziomy</summary><ol>${rows}</ol></details>`;
 }
 
@@ -132,7 +132,7 @@ function trackCard(game, id, track, ask) {
       : `<p class="inf-note">${esc(q.why)}</p>`}`;
   }
   const seats = track === 'stadium' && !I.proj.stadium && !I.req?.stadium ? seatsBlock(game, id, ask) : '';
-  const body = `<p class="inf-now">${esc(LEVELS[track][L - 1].name)}</p>${ladder(track, L)}${fx}${next}${seats}`;
+  const body = `<p class="inf-now">${esc(LEVELS[track][L - 1].name)}</p>${ladder(game, track, L)}${fx}${next}${seats}`;
   return panel(TRACK_NAMES[track], TONE[track], body, { count: `poziom ${L}`, cls: 'inf-card', attrs: `data-track="${track}"` });
 }
 
