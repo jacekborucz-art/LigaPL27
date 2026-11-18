@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-1ed01768ab';
+const VERSION = 'v0.3-4c9671b357';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -78,7 +78,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', '4f8b3848fa'],
+  ['./src/app.js', '04f1e68989'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '5cc24e938e'],
@@ -93,8 +93,8 @@ const FILES = [
   ['./src/career/fans.js', '737d9449e9'],
   ['./src/career/fansSystem.js', 'ced36b7dd1'],
   ['./src/career/finance.js', 'f6fb7c16a5'],
-  ['./src/career/foreignMarket.js', '69f8495b89'],
-  ['./src/career/foreignPool.js', '48d9c4bd5d'],
+  ['./src/career/foreignMarket.js', 'de8611d4a2'],
+  ['./src/career/foreignPool.js', 'df311e562f'],
   ['./src/career/infrastructure.js', '687f630eb1'],
   ['./src/career/loans.js', '6b12fbe674'],
   ['./src/career/mindset.js', 'b8a1c39ce7'],
@@ -108,7 +108,7 @@ const FILES = [
   ['./src/career/preContracts.js', '8c71401605'],
   ['./src/career/prizes.js', 'eed7f4e394'],
   ['./src/career/referees.js', '4a2d4c8ccb'],
-  ['./src/career/reputation.js', '76035a1c80'],
+  ['./src/career/reputation.js', 'c89eb66b85'],
   ['./src/career/reputationSystem.js', '68df5d28ba'],
   ['./src/career/reserves.js', '07b46b62ea'],
   ['./src/career/shirts.js', '848f4d409c'],
@@ -134,9 +134,10 @@ const FILES = [
   ['./src/core/rng.js', '3712174b88'],
   ['./src/core/store.js', 'adb3d58f02'],
   ['./src/data/attributes.js', '892bf10066'],
+  ['./src/data/clubNames.js', '0ff1494ace'],
   ['./src/data/clubs_l3.js', 'd3a2685877'],
   ['./src/data/clubs_l4.js', '90bd3180ad'],
-  ['./src/data/clubs_pl.js', '203a873b34'],
+  ['./src/data/clubs_pl.js', '266d3c9c54'],
   ['./src/data/finanse_klubow.js', '6d44dc85bb'],
   ['./src/data/formations.js', 'fdc9ab1756'],
   ['./src/data/instructions.js', 'b422ada136'],
@@ -188,7 +189,7 @@ const FILES = [
   ['./src/season/superCupEU.js', 'f728d6d300'],
   ['./src/season/suspension.js', '7671748aa6'],
   ['./src/season/thirdLeague.js', 'b37f1d8a44'],
-  ['./src/season/uefa.js', '4a0c9dc052'],
+  ['./src/season/uefa.js', '4880cc084f'],
   ['./src/season/worldNations.js', '6003d36e12'],
   ['./src/styles/app.css', 'fb6e04f6e4'],
   ['./src/styles/assistant.css', 'a1dd04f875'],

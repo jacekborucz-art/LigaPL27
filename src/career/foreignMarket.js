@@ -15,6 +15,8 @@ import { startDeal, hasOpenDeal, stat } from './transferDeals.js';
 import { onOfferRejected } from './moveWish.js';
 import { fmtDate } from '../ui/dom.js';
 import DATA from '../data/kluby_uefa.json' with { type: 'json' };
+import { applyNamesDeep } from '../data/clubNames.js';
+applyNamesDeep(DATA); // nazwy do publikacji (prawdziwe w clubNames.js)
 
 const round = (x, step = 5000) => Math.round(x / step) * step;
 

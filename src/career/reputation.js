@@ -4,6 +4,8 @@
 
 import { clamp } from '../core/rng.js';
 import UEFA_DATA from '../data/kluby_uefa.json' with { type: 'json' };
+import { applyNamesDeep } from '../data/clubNames.js';
+applyNamesDeep(UEFA_DATA); // nazwy do publikacji (prawdziwe w clubNames.js)
 
 export const REP_LEVELS = [
   { min: 85, label: 'Światowa gwiazda' },

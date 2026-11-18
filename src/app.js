@@ -59,6 +59,8 @@ import { sysNavHtml, sysHeaderBtn, sysDialogHtml } from './ui/sysMenu.js';
 import { renderEditor, handleEditorAction, isEditorAction, newEditorState, clubListHtml, playerListHtml } from './ui/editorView.js'; // edytor i datapack (docs/edytor.md)
 import { canPromote, promoteYouth } from './career/academy.js'; // wychowankowie do pierwszego składu
 import { applyPack, restoreOriginals, exportPack, packFileName, parsePack, importPack, importSummary } from './career/editor.js';
+import { realNamesOn, NAMES_KEY } from './data/clubNames.js';
+const NC_RESTORE_KEY = 'ligapl27-nc-restore';
 import { renderTalks, handleTalkAction, isTalkAction } from './ui/talksView.js';
 import { ensureCareer } from './career/careerSystem.js';
 import { ensureReputation } from './career/reputationSystem.js'; // dynamiczna reputacja (docs/reputacja.md)
@@ -1936,6 +1938,16 @@ document.addEventListener('keydown', (ev) => {
   if (ev.target.closest('#mrDlg')) return; // raport meczu: Escape zamyka tylko okno (przeglądarka), Enter nie gra meczu
   if (ev.target.closest('#piDlg')) return; // instrukcje indywidualne: jak wyżej
   if (ev.key === 'Escape' && state.screen === 'career') { ev.preventDefault(); app.querySelector('[data-act="ncBack"]')?.click(); return; }
+  // Wybór klubu w Nowej karierze: ukryty przełącznik prawdziwych nazw klubów (testy, src/data/clubNames.js); przeładowanie strony
+  if (state.screen === 'career' && ev.ctrlKey && ev.altKey && !ev.shiftKey && ev.code === 'KeyP') {
+    ev.preventDefault();
+    try {
+      if (realNamesOn()) localStorage.removeItem(NAMES_KEY); else localStorage.setItem(NAMES_KEY, 'real');
+      if (state.nc) sessionStorage.setItem(NC_RESTORE_KEY, JSON.stringify({ ...state.nc, pack: null }));
+    } catch { /* bez pamięci przeglądarki: tylko przeładowanie */ }
+    location.reload();
+    return;
+  }
   if (ev.key === 'Escape' && state.screen === 'start' && state.confirmDel) { app.querySelector('[data-act="deleteNo"]')?.click(); return; }
   if (ev.key === 'Escape' && state.screen === 'editor') { app.querySelector('[data-act="ed-back"]')?.click(); return; } // edytor: powrót do gry
   if (ev.key === 'Escape' && state.screen !== 'start') { state.running = false; state.screen = 'start'; render(); }
@@ -1984,6 +1996,12 @@ window.addEventListener('scroll', () => {
 }, true);
 window.addEventListener('resize', () => closeAutoMenu());
 document.addEventListener('pointerdown', (e) => closeAutoMenu(e), true);
+
+// Po przełączeniu nazw klubów (Ctrl+Alt+P) wracamy do wyboru klubu w Nowej karierze
+try {
+  const nc = sessionStorage.getItem(NC_RESTORE_KEY);
+  if (nc) { sessionStorage.removeItem(NC_RESTORE_KEY); state.nc = JSON.parse(nc); state.slot = state.nc.slot ?? state.slot; state.screen = 'career'; }
+} catch { /* bez pamięci przeglądarki */ }
 
 applyTheme(state.theme);
 Promise.resolve(render()).then(() => {

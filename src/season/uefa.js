@@ -12,6 +12,8 @@ import { UEFA } from '../config/calendar2026.js';
 import { POLISH_EUROPE_2026 } from '../config/calendar2026.js';
 import { QS, sampleScore } from '../engine/quickSim.js';
 import DATA from '../data/kluby_uefa.json' with { type: 'json' };
+import { applyNamesDeep } from '../data/clubNames.js';
+applyNamesDeep(DATA); // nazwy do publikacji (prawdziwe w clubNames.js)
 
 export const UCOMPS = ['LM', 'LE', 'LK'];
 export const UCOMP_NAMES = { LM: 'Liga Mistrzów', LE: 'Liga Europy', LK: 'Liga Konferencji' };

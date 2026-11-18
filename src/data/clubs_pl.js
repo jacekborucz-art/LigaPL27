@@ -8,6 +8,7 @@
 // (applyLeagueState): kluby spadające do IV ligi wypadają z listy, beniaminkowie z IV ligi do niej trafiają.
 
 import { CLUBS_L3 } from './clubs_l3.js';
+import { applyClubNames } from './clubNames.js';
 
 export const TIERS = { EK: 1, L1: 2, L2: 3, L3: 4 };
 
@@ -87,6 +88,9 @@ export const CLUBS_PL = [
   c('rekord', 'Rekord Bielsko-Biała', 'REK', 3, 8.1, 2, 'P', ['#00843D', '#FFFFFF'], 'bielsko'),
   c('sokol-kleczew', 'Sokół Kleczew', 'SOK', 3, 8.0, 2, 'S', ['#0057B8', '#FFFFFF'], 'wielkopolska'),
 ];
+// Nazwy do publikacji (fikcyjne; prawdziwe w clubNames.js), także rezerwy w 2 Lidze i III lidze: tylko w przeglądarce
+applyClubNames(CLUBS_PL);
+applyClubNames(CLUBS_L3);
 
 for (const c of CLUBS_L3) CLUBS_PL.push(c);
 
