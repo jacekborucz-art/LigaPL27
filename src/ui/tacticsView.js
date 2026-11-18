@@ -208,7 +208,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
   <div class="tac${sel ? ' has-sel' : ''}">
     <div class="tac__form">
       <div class="chips chips--wrap" role="group" aria-label="Formacja">${FORMATIONS.map((x) => `<button class="chip" data-act="tform" data-f="${x.id}" aria-pressed="${x.id === f.id}">${esc(x.name)}</button>`).join('')}</div>
-      <p class="hint">${esc(f.nick)}: ${esc(f.note)}</p>
+      <div class="tac__hintrow"><p class="hint">${esc(f.nick)}: ${esc(f.note)}</p><button class="btn btn--quiet btn--sm" data-act="pi-table">Instrukcje indywidualne (${playerInstrCount(pim)})</button></div>
     </div>
     <div class="tac__pitch">
       <div class="pitch2" ${kit ? `style="--kit:${kit.shirt};--kit-ink:${kit.ink};--kit-trim:${kit.trim}"` : ''} role="group" aria-label="Boisko, formacja ${esc(f.name)}">${slotsHtml}</div>
