@@ -82,7 +82,16 @@ Wczytanie pełnego pliku działa jak zwykłego: do datapacku gry trafiają tylko
 
 ## Wczytanie datapacku
 
-- Plik musi mieć `type: "ligapl27-datapack"` i `v: 1`, inaczej jest odrzucony z komunikatem (np. zapis gry: „To nie jest datapack LigaPL 27”).
+- Plik musi mieć `type: "ligapl27-datapack"` i wersję `v` od `PACK_V_MIN` do `PACK_V` (src/career/editor.js), inaczej jest odrzucony z komunikatem (np. zapis gry: „To nie jest datapack LigaPL 27”, plik z nowszej gry: „Zaktualizuj grę”).
+
+### Wersje pliku (Nov 18, 2026)
+
+Eksport zawsze zapisuje najnowszą wersję i numer wersji gry (pole `game`, np. „v1.19 Beta”). Import przyjmuje każdą wersję od 1: starszy plik przechodzi przez migracje `MIGRATE[v]` (z wersji v na v + 1) i wczytuje się bez błędu. Nowa wersja pliku = nowa pozycja w `MIGRATE` i wpis w tabeli.
+
+| v | Gra | Zmiany |
+|---|---|---|
+| 1 | v1.18 Beta | kluby (nazwa, skrót, stadion, pojemność, finanse), zawodnicy (dane, atrybuty, potencjał) |
+| 2 | v1.19 Beta | herb klubu (`crest`, obrazek data URL), trener (`coach`), sztab (`staff`), właściciel (`owner`), pozycje dodatkowe zawodnika (`alt`, biegłość 0-90 %); tylko nowe pola, migracja z wersji 1 bez zmian |
 - Nieznane klucze są pomijane. Zła wartość znanego pola (typ albo zakres jak w tabeli walidacji; liczby muszą być liczbami JSON) odrzuca cały plik z nazwą klubu lub zawodnika i pola.
 - Kluby: stosowane zawsze (identyfikatory klubów są wspólne dla wszystkich gier), nieznane identyfikatory pomijane.
 - Zawodnicy: tylko gdy `seed` pliku = ziarno gry, bo zawodnicy są losowani z ziarna świata. W innym świecie: „Zawodnicy pominięci: inny świat gry”. Zawodników, których już nie ma w grze, edytor pomija; datę urodzenia poza zakresem wieku też.

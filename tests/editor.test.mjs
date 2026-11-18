@@ -12,10 +12,12 @@ import { ovrAt } from '../src/data/attributes.js';
 import { offsetsFor } from '../src/training/development.js';
 import {
   applyPack, restoreOriginals, checkClub, checkPlayer, editClub, editPlayer, exportPack, parsePack, importPack,
-  packFileName, resetClub, clearPack, PACK_TYPE,
+  packFileName, resetClub, clearPack, PACK_TYPE, PACK_V,
   peopleValues, checkCoach, checkOwner, checkStaff, editCoach, editOwner, editStaff,
 } from '../src/career/editor.js';
 import { coachOf } from '../src/career/coaches.js';
+import { proficiency } from '../src/engine/positions.js';
+import { GAME_VERSION } from '../src/config/version.js';
 import { ownerOf } from '../src/career/owners.js';
 import { renderEditor, newEditorState, handleEditorAction, findPlayers, LIST_CAP } from '../src/ui/editorView.js';
 import { sysDialogHtml } from '../src/ui/sysMenu.js';
@@ -112,7 +114,7 @@ test('Datapack: eksport i import (round trip), nazwa pliku ASCII', () => {
   editPlayer(g, p.id, checkPlayer({ last: 'Kowalski', attrs: { POD: '18' } }, { form: true }).value);
   const pack = exportPack(g, new Date('2026-11-14T10:00:00Z'));
   assert.equal(pack.type, PACK_TYPE);
-  assert.equal(pack.v, 1);
+  assert.equal(pack.v, PACK_V); assert.equal(pack.game, GAME_VERSION);
   assert.equal(pack.seed, g.seed);
   restoreOriginals();
   const g2 = structuredClone(G); // ten sam świat
@@ -135,7 +137,10 @@ test('Import: nieznane klucze pominięte, zły typ i złe wartości odrzucone', 
   assert.deepEqual(ok.clubs.legia, { name: 'Legia X' });
   assert.throws(() => parsePack('nie json'), /JSON/);
   assert.throws(() => parsePack(JSON.stringify({ version: 1, game: { seed: 1 } })), /To nie jest datapack/);
-  assert.throws(() => parsePack(JSON.stringify({ type: PACK_TYPE, v: 2 })), /wersję/);
+  assert.throws(() => parsePack(JSON.stringify({ type: PACK_TYPE, v: 99 })), /nowszej gry/);
+  assert.throws(() => parsePack(JSON.stringify({ type: PACK_TYPE, v: 0 })), /nieznaną wersję/);
+  // Wersja 1 (starsze pliki) wczytuje się bez błędu
+  assert.equal(parsePack(JSON.stringify({ type: PACK_TYPE, v: 1, seed: 7, clubs: { legia: { name: 'Legia Stara' } } })).clubs.legia.name, 'Legia Stara');
   assert.throws(() => parsePack(JSON.stringify({ type: PACK_TYPE, v: 1, clubs: { legia: { capacity: 5 } } })), /Pojemność/);
   assert.throws(() => parsePack(JSON.stringify({ type: PACK_TYPE, v: 1, players: { x: { attrs: { POD: 30 } } } })), /Podania/);
   assert.throws(() => parsePack(JSON.stringify({ type: PACK_TYPE, v: 1, clubs: [] })), /format/);
@@ -221,6 +226,28 @@ test('Trener, sztab i właściciel klubu: edycja, walidacja, datapack i wczytani
   const full = parsePack(JSON.stringify(exportPack(g, new Date(), { full: true })));
   assert.equal(full.clubs[id].owner.name, 'Pan Prezes');
   assert.throws(() => parsePack(JSON.stringify({ type: PACK_TYPE, v: 1, clubs: { legia: { coach: { a: { MOT: 99 } } } } })), /Motywacja/);
+  restoreOriginals();
+});
+
+test('Pozycje dodatkowe zawodnika: edycja, biegłość w silniku, datapack i walidacja', () => {
+  const g = structuredClone(G);
+  const p = Object.values(g.world.players).find((x) => x.clubId === 'legia' && x.pos === 'ŚP');
+  assert.ok(p);
+  assert.ok(checkPlayer({ alt: { BR: 90 } }).errors.alt, 'bez bramki jako pozycji dodatkowej');
+  assert.ok(checkPlayer({ alt: { NAP: 95 } }).errors.alt, 'najwyżej 90 %');
+  assert.ok(checkPlayer({ alt: { XX: 90 } }).errors.alt);
+  const before = proficiency(p, 'NAP');
+  assert.ok(editPlayer(g, p.id, checkPlayer({ alt: { NAP: 90, OP: 90 } }).value) >= 1);
+  assert.equal(proficiency(p, 'NAP'), 90);
+  assert.ok(proficiency(p, 'NAP') > before);
+  assert.deepEqual(g.editor.players[p.id].alt, { NAP: 90, OP: 90 });
+  const pk = parsePack(JSON.stringify(exportPack(g)));
+  assert.deepEqual(pk.players[p.id].alt, { NAP: 90, OP: 90 });
+  const g2 = structuredClone(G);
+  importPack(g2, pk);
+  assert.equal(proficiency(g2.world.players[p.id], 'NAP'), 90);
+  editPlayer(g, p.id, checkPlayer({ alt: {} }).value);
+  assert.equal(proficiency(p, 'NAP'), before, 'usunięcie pozycji dodatkowej');
   restoreOriginals();
 });
 

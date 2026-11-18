@@ -22,13 +22,23 @@ import { ageAt } from '../training/state.js';
 import { marketValue } from '../world/playerGen.js';
 import { infraOf, applyPlan, capacityOf } from './infrastructure.js';
 import { stadiumCapacity } from './finance.js';
-import { normPos } from '../engine/positions.js';
+import { normPos, POSITIONS } from '../engine/positions.js';
+import { GAME_VERSION } from '../config/version.js';
 import { coachOf, COACH_KEYS, COACH_ATTRS, COACH_STYLES } from './coaches.js';
 import { ownerOf, OWNER_KEYS } from './owners.js';
 import { rosterOf, syncStaff, STAFF_ROLE_IDS } from './staffMarket.js';
 
 export const PACK_TYPE = 'ligapl27-datapack';
-export const PACK_V = 1;
+// Wersje pliku datapacku (eksport zawsze w najnowszej, import każdej od PACK_V_MIN, starsze pliki bez błędu):
+//   1  v1.18 Beta: kluby (nazwa, skrót, stadion, pojemność, finanse) i zawodnicy (dane, atrybuty, potencjał)
+//   2  v1.19 Beta: herb klubu, trener, sztab i właściciel klubu, pozycje dodatkowe zawodnika (alt);
+//      tylko nowe pola, plik w wersji 1 wczytuje się bez zmian
+export const PACK_V = 2;
+export const PACK_V_MIN = 1;
+/** Migracje starszych plików do bieżącej wersji: MIGRATE[v] zamienia plik z wersji v na v + 1. */
+const MIGRATE = {
+  1: (d) => d, // wersja 2 tylko dodaje pola
+};
 export const LIMITS = {
   name: 40, short: 5, stadium: 60,
   capMin: 500, capMax: 100000,
@@ -37,7 +47,11 @@ export const LIMITS = {
   ageMin: 15, ageMax: 45,
 };
 export const CLUB_FIELDS = ['name', 'short', 'stadium', 'crest', 'capacity', 'balance', 'transferBudget', 'wageBudget'];
-export const PLAYER_FIELDS = ['first', 'last', 'nat', 'pos', 'birthDate', 'attrs', 'pot'];
+export const PLAYER_FIELDS = ['first', 'last', 'nat', 'pos', 'birthDate', 'attrs', 'pot', 'alt'];
+// Pozycje dodatkowe (p.alt: biegłość 0-90 %, jak nauka pozycji na treningu, src/engine/positions.js): bez bramki
+export const ALT_POSITIONS = POSITIONS.filter((x) => x !== 'BR');
+export const ALT_MAX = 90; // pozycja dodatkowa nigdy nie daje pełnej biegłości naturalnej (LEARNED_CAP)
+const sameAlt = (a, b) => JSON.stringify(Object.entries(a ?? {}).sort()) === JSON.stringify(Object.entries(b ?? {}).sort());
 const STATIC = ['name', 'short', 'stadium', 'crest'];
 // Własny herb klubu w datapacku: obrazek wpisany w plik (data URL), więc działa u każdego, kto wczyta plik
 export const CREST_MAX = 120000; // znaków; herb z edytora (128 px) ma kilka do kilkunastu tysięcy
@@ -105,6 +119,7 @@ export function applyPack(game) {
 export function ensureEditor(game) {
   if (!game.editor || typeof game.editor !== 'object') game.editor = { v: PACK_V, seed: game.seed, clubs: {}, players: {} };
   game.editor.clubs ??= {}; game.editor.players ??= {};
+  game.editor.v = PACK_V; // datapack w zapisie gry: nowe pola są dodatkami, więc zapis ze starszej wersji pasuje bez zmian
   game.editor.seed = game.seed;
   return game.editor;
 }
@@ -198,6 +213,19 @@ export function checkPlayer(src, { form = false, date = null } = {}) {
     }
   }
   if (src.pot !== undefined) put('pot', num(src.pot, { label: 'Potencjał', min: LIMITS.attrMin, max: LIMITS.attrMax, int: false, form }));
+  if (src.alt !== undefined) {
+    if (!isObj(src.alt)) errors.alt = 'Pozycje dodatkowe: oczekiwano listy pozycji.';
+    else {
+      const a = {};
+      for (const [k0, v] of Object.entries(src.alt)) {
+        const k = normPos(k0);
+        if (!ALT_POSITIONS.includes(k)) { errors.alt = `Pozycje dodatkowe: nieznana pozycja ${String(k0).slice(0, 6)}.`; continue; }
+        const r = num(v, { label: `Biegłość na pozycji ${k}`, min: 0, max: ALT_MAX, int: false });
+        if (r.err) errors.alt = r.err; else if (r.v > 0) a[k] = r.v;
+      }
+      value.alt = a;
+    }
+  }
   return { value, errors };
 }
 
@@ -394,6 +422,7 @@ export function playerValues(p) {
   return {
     first: p.first ?? String(p.name ?? '').split(' ')[0] ?? '', last: p.last ?? String(p.name ?? '').split(' ').slice(1).join(' '),
     nat: p.nat, pos: p.pos, birthDate: p.birthDate ?? '', attrs: { ...p.attr }, pot: p.hidden?.POT ?? p.ovr,
+    alt: Object.fromEntries(Object.entries(p.alt ?? {}).filter(([k, v]) => k !== p.pos && ALT_POSITIONS.includes(k) && v > 0).map(([k, v]) => [k, Math.min(ALT_MAX, Math.round(v * 10) / 10)])),
   };
 }
 
@@ -416,6 +445,11 @@ export function editPlayer(game, pid, values) {
     const a = { ...(rec.attrs ?? {}) };
     for (const [k, v] of Object.entries(values.attrs)) if (v !== p.attr[k]) { n++; a[k] = v; p.attr[k] = v; }
     if (Object.keys(a).length) rec.attrs = a;
+  }
+  if (values.alt !== undefined) {
+    const pos = values.pos ?? p.pos;
+    const alt = Object.fromEntries(Object.entries(values.alt).filter(([k]) => k !== pos)); // pozycja główna to 100 %
+    if (!sameAlt(alt, cur.alt)) { n++; p.alt = alt; rec.alt = alt; }
   }
   if (!n) return 0; // nic się nie zmieniło (np. pełny datapack wczytany do tej samej gry)
   if (values.first !== undefined || values.last !== undefined) {
@@ -462,7 +496,7 @@ export function clearPack(game) {
  */
 export function exportPack(game, now = new Date(), { full = false } = {}) {
   const E = ensureEditor(game);
-  const head = { type: PACK_TYPE, v: PACK_V, seed: game.seed, created: now.toISOString(), full };
+  const head = { type: PACK_TYPE, v: PACK_V, game: GAME_VERSION, seed: game.seed, created: now.toISOString(), full };
   if (!full) return { ...head, clubs: structuredClone(E.clubs), players: structuredClone(E.players) };
   const clubs = {}; const players = {};
   for (const id of Object.keys(game.world?.clubs ?? {})) {
@@ -480,6 +514,7 @@ export function exportPack(game, now = new Date(), { full = false } = {}) {
     const cur = playerValues(p);
     if (!cur.birthDate) delete cur.birthDate;
     if (typeof cur.pot === 'number') cur.pot = Math.round(cur.pot * 10) / 10;
+    if (!Object.keys(cur.alt).length) delete cur.alt; // bez pozycji dodatkowych: pole pominięte
     const { value } = checkPlayer(cur);
     if (!Object.keys(value).length) continue;
     players[id] = { ...value, club: p.clubId ? (clubObj(p.clubId)?.name ?? p.clubId) : null, ovr: p.ovr };
@@ -501,7 +536,9 @@ export function parsePack(text) {
   let d;
   try { d = JSON.parse(text); } catch { throw new Error('Plik nie jest poprawnym JSON-em.'); }
   if (!isObj(d) || d.type !== PACK_TYPE) throw new Error('To nie jest datapack LigaPL 27 (zapis gry wczytasz z ekranu startowego).');
-  if (d.v !== PACK_V) throw new Error(`Datapack ma wersję ${esc0(d.v)}, a gra obsługuje wersję ${PACK_V}.`);
+  if (!Number.isInteger(d.v) || d.v < PACK_V_MIN) throw new Error(`Datapack ma nieznaną wersję ${esc0(d.v)}, a gra obsługuje wersje od ${PACK_V_MIN} do ${PACK_V}.`);
+  if (d.v > PACK_V) throw new Error(`Datapack ma wersję ${d.v} z nowszej gry, a ta gra obsługuje wersje od ${PACK_V_MIN} do ${PACK_V}. Zaktualizuj grę.`);
+  for (let v = d.v; v < PACK_V; v++) d = MIGRATE[v](d); // starszy plik: migracja do bieżącej wersji
   if (d.seed !== undefined && d.seed !== null && !Number.isFinite(d.seed)) throw new Error('Datapack: nieprawidłowe ziarno świata.');
   if (d.clubs !== undefined && !isObj(d.clubs)) throw new Error('Datapack: sekcja klubów ma zły format.');
   if (d.players !== undefined && !isObj(d.players)) throw new Error('Datapack: sekcja zawodników ma zły format.');

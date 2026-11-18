@@ -14,8 +14,9 @@ import { squadOf } from '../world/worldGen.js';
 import {
   LIMITS, checkClub, checkPlayer, editClub, editPlayer, clubValues, playerValues, resetClub, resetPlayer, clearPack,
   packCounts, originalOf, peopleValues, checkCoach, checkOwner, checkStaff, editCoach, editOwner, editStaff,
-  OWNER_LABELS, PERSON_AGE,
+  OWNER_LABELS, PERSON_AGE, ALT_MAX,
 } from '../career/editor.js';
+import { proficiency } from '../engine/positions.js';
 import { COACH_KEYS, COACH_ATTRS, COACH_STYLES } from '../career/coaches.js';
 import { OWNER_KEYS } from '../career/owners.js';
 import { STAFF_ROLE_ORDER } from '../career/staffMarket.js';
@@ -175,6 +176,31 @@ function readPeople(root, key, game, id) {
   return staff;
 }
 
+// Boisko pozycji zawodnika (kopia boiska z taktyki): główna z listy „Pozycja”, kliknięcie dodaje albo usuwa dodatkową.
+// Procent przy pozycji: biegłość, tak jak liczy ją silnik meczu (naturalna z pozycji głównej albo dodatkowa).
+const PITCH_SPOTS = [['NAP', 50, 11], ['SN', 17, 18], ['SN', 83, 18], ['OP', 50, 30], ['BP', 14, 41], ['BP', 86, 41], ['ŚP', 50, 46],
+  ['DP', 50, 60], ['WB', 13, 61], ['WB', 87, 61], ['BO', 15, 76], ['BO', 85, 76], ['ŚO', 50, 79], ['BR', 50, 92]];
+function posPitch(v, pid) {
+  const main = v.pos; const alt = v.alt ?? {};
+  const spots = PITCH_SPOTS.map(([k, x, y]) => {
+    const lvl = alt[k] ?? 0;
+    const prof = Math.round(proficiency({ pos: main, alt }, k));
+    const state = k === main ? 'main' : lvl >= 70 ? 'alt' : lvl > 0 ? 'learn' : 'none';
+    const dis = k === main || k === 'BR' || main === 'BR';
+    const what = state === 'main' ? 'pozycja główna' : state === 'alt' ? 'pozycja dodatkowa' : state === 'learn' ? 'w nauce' : 'bez pozycji dodatkowej';
+    return `<button type="button" class="ed-pp" style="left:${x}%;top:${y}%" data-act="ed-altpos" data-id="${esc(pid)}" data-pos="${esc(k)}" data-s="${state}"${dis ? ' disabled' : ''} aria-pressed="${state === 'main' || state === 'alt'}" aria-label="${esc(POS_NAMES[k] ?? k)}: ${what}, biegłość ${prof} %"><b>${esc(k)}</b><small>${prof} %</small></button>`;
+  }).join('');
+  return `<fieldset class="ed-attrs"><legend>Pozycje</legend><div class="ed-pitchbox">
+    <div class="pitch2 ed-pitch" role="group" aria-label="Boisko: pozycje zawodnika">${spots}</div>
+    <div class="ed-pitchinfo">
+      <p class="ed-ppl"><i data-s="main"></i>Pozycja główna (wybierasz ją w polu „Pozycja”)</p>
+      <p class="ed-ppl"><i data-s="alt"></i>Pozycja dodatkowa (dodana tutaj: ${ALT_MAX} % biegłości)</p>
+      <p class="ed-ppl"><i data-s="learn"></i>Pozycja w nauce na treningu</p>
+      <p class="fld__help">${main === 'BR' ? 'Bramkarz nie ma pozycji dodatkowych w polu.' : 'Kliknij pozycję, żeby dodać ją jako dodatkową albo usunąć. Procent to biegłość w meczu: naturalna z pozycji głównej albo dodatkowa, wyższa z nich. Zmiany zapisuje przycisk „Zapisz zmiany”.'}</p>
+    </div>
+    <input type="hidden" id="ed-alt" value="${esc(JSON.stringify(alt))}"></div></fieldset>`;
+}
+
 const natOptions = (cur) => Object.entries(NAT_NAMES).sort((a, b) => a[1].localeCompare(b[1], 'pl'))
   .map(([k, l]) => `<option value="${k}"${k === cur ? ' selected' : ''}>${esc(l)}</option>`).join('');
 const posOptions = (cur) => POS_ORDER.map((k) => `<option value="${esc(k)}"${k === cur ? ' selected' : ''}>${esc(k)}, ${esc(POS_NAMES[k])}</option>`).join('');
@@ -209,6 +235,8 @@ function playerForm(game, ed, pid, { back }) {
       ${field('ed-birth', 'Data urodzenia', `<input id="ed-birth" type="date" value="${esc(v.birthDate)}"${e.birthDate ? ' aria-invalid="true" aria-describedby="ed-birth-err"' : ''}>`, { err: e.birthDate, help: `Wiek liczony z daty. Od ${LIMITS.ageMin} do ${LIMITS.ageMax} lat.` })}
       ${field('ed-pot', 'Potencjał (1-20)', `<input id="ed-pot" type="number" min="1" max="20" step="0.1" inputmode="decimal" value="${esc(v.pot)}"${e.pot ? ' aria-invalid="true" aria-describedby="ed-pot-err"' : ''}>`, { err: e.pot, help: 'Ukryty sufit rozwoju zawodnika.' })}
     </div>
+    ${e.alt ? `<p class="ed-msg is-bad">${esc(e.alt)}</p>` : ''}
+    ${posPitch(v, pid)}
     ${attrErr.length ? `<p class="ed-msg is-bad">${esc(attrErr[0])}${attrErr.length > 1 ? ` (i ${attrErr.length - 1} więcej)` : ''}</p>` : ''}
     ${groups}
     <div class="ed-actions">
@@ -287,7 +315,9 @@ function readClubForm(root, hasFin) {
 function readPlayerForm(root) {
   const attrs = {};
   for (const k of Object.keys(ATTRS)) attrs[k] = val(root, `ed-a-${k}`);
-  return { first: val(root, 'ed-first'), last: val(root, 'ed-last'), nat: val(root, 'ed-nat'), pos: val(root, 'ed-pos'), birthDate: val(root, 'ed-birth'), attrs, pot: val(root, 'ed-pot') };
+  let alt = {};
+  try { alt = JSON.parse(val(root, 'ed-alt') || '{}'); } catch { /* puste */ }
+  return { first: val(root, 'ed-first'), last: val(root, 'ed-last'), nat: val(root, 'ed-nat'), pos: val(root, 'ed-pos'), birthDate: val(root, 'ed-birth'), attrs, pot: val(root, 'ed-pot'), alt };
 }
 
 const changed = (n) => (n ? `Zapisano zmiany (${n} ${n === 1 ? 'pole' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'pola' : 'pól'}).` : 'Bez zmian do zapisania.');
@@ -327,6 +357,16 @@ export function handleEditorAction(game, ed, act, data, root) {
     const n = editPlayer(game, pid, r.value);
     ed.errors = null; ed.draft = null; ed.msg = changed(n);
     return { save: n > 0, squadChanged: n > 0 && game.world.players[pid]?.clubId === game.clubId };
+  }
+  if (act === 'ed-altpos') {
+    // Przełączenie pozycji dodatkowej: szkic formularza (wpisane pola zostają), zapis dopiero przyciskiem
+    const pid = data.id; const k = data.pos;
+    const raw = readPlayerForm(root);
+    const alt = { ...raw.alt };
+    if ((alt[k] ?? 0) >= 70) delete alt[k]; else alt[k] = ALT_MAX;
+    raw.alt = alt;
+    ed.draft = { key: `player:${pid}`, v: raw }; ed.errors = null; ed.msg = null;
+    return { focus: `[data-act="ed-altpos"][data-pos="${k}"]` };
   }
   const people = { 'ed-save-coach': ['coach', checkCoach, editCoach], 'ed-save-staff': ['staff', checkStaff, editStaff], 'ed-save-owner': ['owner', checkOwner, editOwner] }[act];
   if (people) {

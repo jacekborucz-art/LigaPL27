@@ -52,6 +52,22 @@
 
 .ed-grid { display: grid; gap: 0 var(--space-4); }
 .ed-wide { grid-column: 1 / -1; }
+.ed-pitchbox { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-3) var(--space-4); }
+.pitch2.ed-pitch { flex: none; width: 260px; max-width: 100%; margin: 0; }
+.ed-pitchinfo { flex: 1 1 220px; min-width: 0; }
+.ed-pp { position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 1px; padding: 0; border: 0; background: none; color: var(--kreda); cursor: pointer; }
+.ed-pp b, .ed-ppl i { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; border: 2px dashed rgba(243, 246, 241, .75); background: rgba(14, 21, 17, .25); color: var(--kreda); font: 700 12px/1 var(--font-display); }
+.ed-pp small { padding: 0 3px; border-radius: 3px; background: rgba(14, 21, 17, .6); font: 600 10px/1.3 var(--font-body); }
+.ed-pp[data-s="main"] b, .ed-ppl i[data-s="main"] { border: 3px solid #fff; background: var(--led); color: #14211A; }
+.ed-pp[data-s="alt"] b, .ed-ppl i[data-s="alt"] { border: 3px solid var(--led); background: #F3F6F1; color: #14211A; }
+.ed-pp[data-s="learn"] b, .ed-ppl i[data-s="learn"] { border-style: solid; background: rgba(243, 246, 241, .35); }
+.ed-pp:disabled { cursor: default; }
+.ed-pp:disabled:not([data-s="main"]) { opacity: .5; }
+.ed-pp:not(:disabled):hover b { transform: scale(1.08); }
+.ed-pp:focus-visible { outline: 0; }
+.ed-pp:focus-visible b { outline: 3px solid var(--focus); outline-offset: 2px; }
+.ed-ppl { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-2); font-size: var(--step--1); }
+.ed-ppl i { flex: none; width: 20px; height: 20px; border-color: var(--text-muted); background: color-mix(in srgb, var(--murawa) 60%, transparent); }
 .ed-people { margin-top: var(--space-4); }
 .ed-people .ed-actions { margin-top: var(--space-3); }
 .ed-staff { display: grid; grid-template-columns: minmax(0, 1fr) 72px 72px; gap: var(--space-1) var(--space-2); align-items: end; padding: var(--space-2) 0; border-bottom: 1px solid var(--line); }
