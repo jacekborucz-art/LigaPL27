@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-f27c87b51e';
+const VERSION = 'v0.3-efca9e5b2c';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -186,7 +186,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', '2fa50a12d0'],
+  ['./src/app.js', '07e497698d'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '5cc24e938e'],
@@ -251,7 +251,7 @@ const FILES = [
   ['./src/data/instructions.js', 'b422ada136'],
   ['./src/data/kibice.js', '9c3baf12b0'],
   ['./src/data/kluby_uefa.json', 'e579c6760e'],
-  ['./src/data/names.js', '84b53f7d1a'],
+  ['./src/data/names.js', '160544f719'],
   ['./src/data/playerInstructions.js', 'c83822cb91'],
   ['./src/data/reprezentacje.json', '551a9d5bdd'],
   ['./src/data/reprezentacje_swiat.json', '29c3c96adf'],

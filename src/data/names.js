@@ -179,4 +179,4 @@ export const UEFA = new Set(['ALB', 'AND', 'ARM', 'AUT', 'AZE', 'BLR', 'BEL', 'B
   'FIN', 'FRA', 'GEO', 'GER', 'GIB', 'GRE', 'HUN', 'ISL', 'ISR', 'IRL', 'ITA', 'KAZ', 'KOS', 'LVA', 'LIE', 'LTU', 'LUX', 'MLT', 'MDA',
   'MNE', 'NED', 'MKD', 'NIR', 'NOR', 'POL', 'POR', 'ROU', 'RUS', 'SMR', 'SCO', 'SRB', 'SVK', 'SVN', 'ESP', 'SWE', 'SUI', 'TUR', 'UKR', 'WAL']);
 
-export const EU = new Set(['POL', 'ESP', 'POR', 'CRO', 'SVN', 'SVK', 'CZE', 'LTU', 'LVA', 'NED', 'BEL', 'GER', 'AUT', 'FRA', 'SWE', 'DEN', 'FIN']);
+export const EU = new Set(['AUT', 'BEL', 'BUL', 'CRO', 'CYP', 'CZE', 'DEN', 'EST', 'FIN', 'FRA', 'GER', 'GRE', 'HUN', 'IRL', 'ITA', 'LVA', 'LTU', 'LUX', 'MLT', 'NED', 'POL', 'POR', 'ROU', 'SVK', 'SVN', 'ESP', 'SWE']); // 27 państw Unii Europejskiej

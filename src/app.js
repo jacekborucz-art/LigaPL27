@@ -61,6 +61,7 @@ import { canPromote, promoteYouth } from './career/academy.js'; // wychowankowie
 import { checkClub, editClub } from './career/editor.js';
 import { applyPack, restoreOriginals, clubNamesSnapshot, exportPack, packFileName, parsePack, importPack, importSummary } from './career/editor.js';
 import { realNamesOn, NAMES_KEY, NAMES_GAME_KEY, gameUsesRealNames } from './data/clubNames.js';
+import { EU } from './data/names.js';
 const NC_RESTORE_KEY = 'ligapl27-nc-restore';
 const LOAD_RESTORE_KEY = 'ligapl27-load-restore';
 /**
@@ -390,6 +391,7 @@ function ensureGameShape(g) {
   applySeasonState(g); // kalendarz i ligi sezonu zapisanego w grze
   applyPack(g); // edytor: nazwy klubów i stadiony z datapacku gry (docs/edytor.md)
   if (!g.world) g.world = generateWorld(g.seed);
+  for (const p of Object.values(g.world.players ?? {})) if (p?.nat) p.eu = EU.has(p.nat); // stare zapisy: 27 państw UE (Nov 18, 2026)
   ensureReserves(g); // rezerwy (src/career/reserves.js); stare zapisy: kartki 'league' do klasy ligi klubu zawodnika
   if (!g.tactics) g.tactics = createTactics(mySquad(g), { benchSize: benchSizeFor(g) });
   else g.tactics = refreshTactics(g.tactics, mySquad(g), { benchSize: benchSizeFor(g) }).tactics;
