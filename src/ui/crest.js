@@ -8,6 +8,10 @@ export const CRESTS_AVAILABLE = new Set([
   'wisla-krakow', 'wisla-plock', 'zaglebie-lubin',
 ]);
 
+import { FICTIONAL, realNamesOn } from '../data/clubNames.js';
+/** Nowy herb (fikcyjna nazwa klubu, przeglądarka bez prawdziwych nazw). */
+const fictionalCrest = (id) => !!FICTIONAL[id] && typeof document !== 'undefined' && !realNamesOn();
+
 const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
 ));
@@ -53,7 +57,9 @@ export function crestHtml(club, { size = 32, base = 'assets/crests', clubsById =
   let inner;
   if (CRESTS_AVAILABLE.has(source.id)) {
     const file = size <= 24 ? `${source.id}-48.webp` : `${source.id}.webp`;
-    inner = `<img src="${base}/${file}" alt="" width="${size}" height="${size}" loading="lazy" decoding="async">`;
+    // Kluby z nazwą do publikacji (src/data/clubNames.js): nowe herby w assets/crests/f, prawdziwe po Ctrl+Alt+P
+    const dir = fictionalCrest(source.id) ? `${base}/f` : base;
+    inner = `<img src="${dir}/${file}" alt="" width="${size}" height="${size}" loading="lazy" decoding="async">`;
   } else {
     inner = fallbackCrestSvg(source);
   }
