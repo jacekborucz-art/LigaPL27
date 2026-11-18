@@ -12,6 +12,7 @@
 
 import { CLUBS_PL } from '../data/clubs_pl.js';
 import { CLUBS_L3 } from '../data/clubs_l3.js';
+import { setCrestsHidden } from '../data/clubNames.js';
 import { NAT_NAMES, EU } from '../data/names.js';
 import { ATTRS, POS_NAMES, VARIANTS, ovrAt } from '../data/attributes.js';
 import { clubFinanceData } from '../data/finanse_klubow.js';
@@ -43,6 +44,7 @@ const clubObj = (id) => known().find((c) => c.id === id) ?? null;
 
 /** Przywraca oryginalne nazwy, skróty i stadiony wszystkich klubów. */
 export function restoreOriginals() {
+  setCrestsHidden(false);
   for (const c of known()) {
     const o = ORIGINAL.get(c.id);
     if (!o) continue;
@@ -58,6 +60,7 @@ export const originalOf = (id, field) => ORIGINAL.get(id)?.[field] ?? null;
 export function applyPack(game) {
   restoreOriginals();
   const E = game?.editor;
+  setCrestsHidden(!!E?.packLoaded); // gra z wczytanym datapackiem: tarcze w barwach zamiast herbów
   if (!E?.clubs) return;
   for (const [id, o] of Object.entries(E.clubs)) {
     const c = clubObj(id);
@@ -365,6 +368,7 @@ const esc0 = (v) => String(v ?? 'brak').slice(0, 12);
  */
 export function importPack(game, pack) {
   const out = { clubs: 0, clubsSkipped: 0, players: 0, playersSkipped: 0, otherWorld: false };
+  ensureEditor(game).packLoaded = true; setCrestsHidden(true); // od wczytania pliku: tarcze w barwach zamiast herbów
   for (const [id, v] of Object.entries(pack.clubs)) {
     if (!clubObj(id)) { out.clubsSkipped++; continue; }
     editClub(game, id, v); out.clubs++;

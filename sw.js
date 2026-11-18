@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-982b85e0d9';
+const VERSION = 'v0.3-e1fcfc80f7';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -186,7 +186,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', '04f1e68989'],
+  ['./src/app.js', '8f096e6bbd'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '5cc24e938e'],
@@ -197,7 +197,7 @@ const FILES = [
   ['./src/career/careerSystem.js', 'cd7a0226ec'],
   ['./src/career/coachMarket.js', '127756aa97'],
   ['./src/career/coaches.js', 'c381987592'],
-  ['./src/career/editor.js', '50e837787b'],
+  ['./src/career/editor.js', '176e8de27a'],
   ['./src/career/fans.js', '737d9449e9'],
   ['./src/career/fansSystem.js', 'ced36b7dd1'],
   ['./src/career/finance.js', 'f6fb7c16a5'],
@@ -242,7 +242,7 @@ const FILES = [
   ['./src/core/rng.js', '3712174b88'],
   ['./src/core/store.js', 'adb3d58f02'],
   ['./src/data/attributes.js', '892bf10066'],
-  ['./src/data/clubNames.js', '0e50d2fc32'],
+  ['./src/data/clubNames.js', '700e58240a'],
   ['./src/data/clubs_l3.js', 'd3a2685877'],
   ['./src/data/clubs_l4.js', '90bd3180ad'],
   ['./src/data/clubs_pl.js', 'e661f60c7f'],
@@ -338,7 +338,7 @@ const FILES = [
   ['./src/ui/clubView.js', 'c762a8d93c'],
   ['./src/ui/competitionsView.js', '6df6a9a5c1'],
   ['./src/ui/contextMenu.js', '5590f7bc7f'],
-  ['./src/ui/crest.js', '38ce9d200e'],
+  ['./src/ui/crest.js', '483316b07c'],
   ['./src/ui/daySpeed.js', '73d29c5b52'],
   ['./src/ui/dom.js', '0ce16300f6'],
   ['./src/ui/editorView.js', '3d17acf1f6'],

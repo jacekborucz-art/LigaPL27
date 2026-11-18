@@ -70,6 +70,11 @@ export function realNamesOn() {
 }
 const inBrowser = () => typeof window !== 'undefined' && typeof document !== 'undefined';
 
+// Gra z wczytanym datapackiem (plik gracza, często z prawdziwymi nazwami): bez herbów, tylko tarcze w barwach klubów
+let crestsHidden = false;
+export const setCrestsHidden = (on) => { crestsHidden = !!on; };
+export const crestsAreHidden = () => crestsHidden;
+
 const first = (s) => String(s).split(' ')[0];
 /** Nazwa rezerw od nazwy pierwszej drużyny: „Legia II Warszawa” -> „Legat II Warszawa”, „Śląsk Wrocław II” -> „Silesia Wrocław II”. */
 export function reserveName(name, parentId) {

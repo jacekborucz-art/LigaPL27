@@ -241,7 +241,7 @@ app.addEventListener('change', async (ev) => {
     const pack = parsePack(await file.text());
     nc.pack = { data: pack, fileName: file.name, clubs: Object.keys(pack.clubs).length, players: Object.keys(pack.players).length, seed: pack.seed };
     nc.packMsg = '';
-    applyPack({ editor: { clubs: pack.clubs } }); // nazwy klubów z pliku widać już przy wyborze klubu
+    applyPack({ editor: { clubs: pack.clubs, packLoaded: true } }); // nazwy klubów z pliku widać już przy wyborze klubu
   } catch (err) {
     nc.packMsg = `Nie wczytano pliku: ${err.message}`;
   }

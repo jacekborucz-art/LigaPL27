@@ -8,7 +8,7 @@ export const CRESTS_AVAILABLE = new Set([
   'wisla-krakow', 'wisla-plock', 'zaglebie-lubin',
 ]);
 
-import { FICTIONAL, realNamesOn } from '../data/clubNames.js';
+import { FICTIONAL, realNamesOn, crestsAreHidden } from '../data/clubNames.js';
 /** Nowy herb (fikcyjna nazwa klubu, przeglądarka bez prawdziwych nazw). */
 const fictionalCrest = (id) => !!FICTIONAL[id] && typeof document !== 'undefined' && !realNamesOn();
 /** Nowe herby w assets/crests/f (kluby z nazwą do publikacji, które mają już plik). Bez pliku: tarcza w barwach klubu. */
@@ -62,13 +62,16 @@ export function fallbackCrestSvg(club) {
  */
 export function crestHtml(club, { size = 32, base = 'assets/crests', clubsById = null } = {}) {
   // Rezerwy z własnym nowym herbem (np. Legat II) używają go, pozostałe herbu pierwszej drużyny z plakietką „II”
-  const own = fictionalCrest(club.id) && FICTIONAL_CRESTS.has(club.id);
+  const hidden = crestsAreHidden(); // gra z datapackiem: tylko tarcze w barwach klubów
+  const own = !hidden && fictionalCrest(club.id) && FICTIONAL_CRESTS.has(club.id);
   const parent = !own && club.parent && clubsById ? clubsById.get(club.parent) : null;
   const source = parent || club;
   const badge = club.parent && !own ? '<span class="crest__badge">II</span>' : '';
   let inner;
   const fict = fictionalCrest(source.id);
-  if (fict && !FICTIONAL_CRESTS.has(source.id)) {
+  if (hidden) {
+    inner = fallbackCrestSvg(source);
+  } else if (fict && !FICTIONAL_CRESTS.has(source.id)) {
     inner = fallbackCrestSvg(source); // nowa nazwa bez nowego herbu: nie pokazujemy prawdziwego
   } else if (CRESTS_AVAILABLE.has(source.id) || fict) {
     const file = size <= 24 ? `${source.id}-48.webp` : `${source.id}.webp`;

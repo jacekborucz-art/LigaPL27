@@ -16,6 +16,7 @@ import {
 } from '../src/career/editor.js';
 import { renderEditor, newEditorState, handleEditorAction, findPlayers, LIST_CAP } from '../src/ui/editorView.js';
 import { sysDialogHtml } from '../src/ui/sysMenu.js';
+import { crestHtml } from '../src/ui/crest.js';
 
 function game(seed = 7) {
   const g = { seed, clubId: 'widzew', date: '2026-07-01', season: '2026/27', inbox: [] };
@@ -141,6 +142,23 @@ test('Import: nieznane klucze pominięte, zły typ i złe wartości odrzucone', 
   restoreOriginals();
 });
 
+test('Datapack: po wczytaniu pliku tarcze w barwach zamiast herbów, gra bez pliku z herbami', () => {
+  const legia = clubById('legia');
+  restoreOriginals();
+  assert.match(crestHtml(legia), /<img /);
+  const g = structuredClone(G);
+  importPack(g, parsePack(JSON.stringify({ type: PACK_TYPE, v: 1, seed: 7, clubs: { legia: { name: 'Legia' } } })));
+  assert.equal(g.editor.packLoaded, true);
+  assert.match(crestHtml(legia), /<svg /);
+  restoreOriginals();
+  assert.match(crestHtml(legia), /<img /);
+  applyPack(g); // wczytanie zapisu z datapackiem
+  assert.match(crestHtml(legia), /<svg /);
+  applyPack(structuredClone(G)); // inna gra bez pliku
+  assert.match(crestHtml(legia), /<img /);
+  restoreOriginals();
+});
+
 test('Import: zawodnicy pominięci w innym świecie gry, kluby zastosowane', () => {
   const g = structuredClone(G);
   const p = squadOf(g.world, 'legia')[0];
@@ -212,7 +230,10 @@ test('Pełny datapack: wszystkie kluby i zawodnicy, wczytuje się bez błędów,
   const g2 = structuredClone(g);
   const packBefore = JSON.stringify(g2.editor);
   importPack(g2, parsed);
+  assert.equal(g2.editor.packLoaded, true, 'znacznik wczytanego pliku (tarcze zamiast herbów)');
+  delete g2.editor.packLoaded;
   assert.equal(JSON.stringify(g2.editor), packBefore);
+  restoreOriginals();
   // Kopia gry sprzed edycji dostaje wartość z pełnego pliku
   const g3 = structuredClone(G);
   importPack(g3, parsed);
