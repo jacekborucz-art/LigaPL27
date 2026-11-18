@@ -1268,3 +1268,14 @@
 .mm-tok.is-sugg--1 .mm-tok__dot { animation: mm-sugg 1.4s ease-in-out infinite; }
 @keyframes mm-sugg { 50% { box-shadow: 0 0 0 11px rgb(123 214 154 / .12); } }
 @media (prefers-reduced-motion: reduce) { .mm-tok.is-sugg--1 .mm-tok__dot { animation: none; } }
+/* Instrukcje indywidualne w oknie „Zmiany i taktyka” (src/ui/playerInstrView.js, wygląd w app.css) */
+.mm-pi { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 12px; }
+.mm-pi .hint { flex: 1 1 260px; margin: 0; }
+.mm-pi .dot { display: inline-block; width: 7px; height: 7px; margin-left: 4px; border-radius: 50%; background: var(--led); vertical-align: middle; }
+.md-dlg.mm-dlg.pi-host--player { width: min(600px, calc(100vw - 32px)); }
+.pi-host--table .pi { height: min(860px, calc(100dvh - 34px)); }
+@media (max-width: 699px) {
+  .pi-host--table .pi { height: 100dvh; max-height: 100dvh; }
+  .md-dlg.mm-dlg.pi-host--player { width: 100vw; height: auto; max-height: 92dvh; margin: auto 0 0; border-top: 1px solid var(--line); border-radius: 14px 14px 0 0; }
+  .pi-host--player .pi { max-height: 92dvh; }
+}

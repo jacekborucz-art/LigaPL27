@@ -72,6 +72,7 @@ import { runDecision } from './core/decisions.js';
 import { startNegotiation, renderNegotiation, handleNegotiationAction, isNegotiationAction, readNegotiationForm, refreshNegotiationHints } from './ui/negotiationView.js';
 import { bindContextTrigger, openMenu, showToast } from './ui/contextMenu.js';
 import { playerMenu } from './ui/playerMenus.js';
+import { piPlayerHtml, piTableHtml, piRowsFromTactics, piWith, piWithout } from './ui/playerInstrView.js'; // instrukcje indywidualne (docs/instrukcje-indywidualne.md)
 import { renderAssistantReport } from './ui/assistantReportView.js';
 import { ensureAssistantReport } from './career/assistantReport.js';
 import { ensureTeamReport, requestTeamReport } from './career/teamReport.js'; // raport ogólny o drużynie (docs/raport-druzyny.md)
@@ -1119,6 +1120,91 @@ function mountTacticsScreen() {
     } else if (tUi.focus) app.querySelector(tUi.focus)?.focus({ preventScroll: true });
   }
   tUi.focus = null;
+  if (state.pi) showPi(); // okno instrukcji indywidualnych przetrwało ponowny render ekranu
+}
+
+// ---------- Instrukcje indywidualne (src/ui/playerInstrView.js): okno zawodnika i okno z tabelą ----------
+// state.pi: { view: 'player'|'table', id, from: 'table'|null, f: filtr pozycji, k: instrukcja na telefonie }.
+// Zmiana zapisuje grę od razu; znaczniki na ekranie składu odświeżają się po zamknięciu okna.
+const PI_KEYS = ['act', 'id', 'k', 'v', 'f'];
+const piAttr = (name, data) => `data-act="pi-${name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}"${Object.entries(data).map(([k, v]) => ` data-${k}="${esc(String(v))}"`).join('')}`;
+let piReturn = null; // fokus po zamknięciu okna (element ekranu składu)
+/** Selektor elementu w oknie (ten sam przycisk albo lista wyboru po przebudowie treści). */
+function piFocusKey(el) {
+  const parts = PI_KEYS.filter((k) => el?.dataset?.[k] != null).map((k) => `[data-${k}="${CSS.escape(el.dataset[k])}"]`);
+  return parts.length ? `${el.tagName.toLowerCase()}${parts.join('')}` : null;
+}
+function piHtml(g) {
+  const pi = state.pi;
+  const rows = piRowsFromTactics(mySquad(g), g.tactics);
+  const map = g.tactics.playerInstr ?? {};
+  const note = 'Zmiany zapisują się od razu i obowiązują od najbliższego meczu.';
+  if (pi.view === 'player') {
+    const row = rows.find((r) => r.id === pi.id);
+    return row ? piPlayerHtml({ row, entry: map[row.id] ?? null, instructions: g.tactics.instructions, attr: piAttr, note }) : null;
+  }
+  return piTableHtml({ rows, map, instructions: g.tactics.instructions, filter: pi.f, pick: pi.k, attr: piAttr, note });
+}
+function showPi({ focus = null } = {}) {
+  const g = state.game;
+  if (!state.pi || !g) return;
+  const html = piHtml(g);
+  if (!html) { state.pi = null; return; }
+  let dlg = app.querySelector('#piDlg');
+  if (!dlg) {
+    app.insertAdjacentHTML('beforeend', '<dialog id="piDlg" class="pidlg" aria-labelledby="piTitle"></dialog>');
+    dlg = app.querySelector('#piDlg');
+    dlg.addEventListener('close', () => {
+      state.pi = null;
+      const back = piReturn; piReturn = null;
+      if (tacticsOpen()) renderTacticsAfter(back); else dlg.remove();
+    });
+    dlg.addEventListener('click', (ev) => { // dotknięcie tła poza oknem zamyka okno
+      const r = dlg.getBoundingClientRect();
+      if (ev.target === dlg && (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom)) dlg.close();
+    });
+  }
+  const key = focus ?? (dlg.contains(document.activeElement) ? piFocusKey(document.activeElement) : null);
+  const same = dlg.dataset.view === state.pi.view && dlg.dataset.id === String(state.pi.id ?? '');
+  const scroll = same ? [...dlg.querySelectorAll('.pi__body, .pit-wrap, .pi-chips')].map((e) => [e.scrollTop, e.scrollLeft]) : [];
+  dlg.dataset.view = state.pi.view; dlg.dataset.id = String(state.pi.id ?? '');
+  dlg.className = `pidlg pidlg--${state.pi.view}`;
+  dlg.innerHTML = html;
+  [...dlg.querySelectorAll('.pi__body, .pit-wrap, .pi-chips')].forEach((e, i) => { if (scroll[i]) { e.scrollTop = scroll[i][0]; e.scrollLeft = scroll[i][1]; } });
+  if (!dlg.open) dlg.showModal();
+  const vis = key ? [...dlg.querySelectorAll(key)].find((e) => e.offsetParent !== null) : null;
+  (vis ?? (same && key ? null : dlg.querySelector('#piTitle')))?.focus({ preventScroll: true });
+}
+const closePi = () => app.querySelector('#piDlg')?.close();
+/** Akcje okna instrukcji indywidualnych (data-act pi-...). el: przycisk albo { dataset } (menu, lista wyboru). */
+async function piAction(act, el) {
+  const g = state.game;
+  const d = el.dataset;
+  const own = (id) => !!id && g.world.players[id]?.clubId === g.clubId;
+  if (!state.pi && (act === 'pi-open' || act === 'pi-table')) piReturn = focusKeyOf(document.activeElement);
+  if (act === 'pi-open' && own(d.id)) {
+    state.pi = { f: 'all', k: 'pass', ...(state.pi ?? {}), view: 'player', id: d.id, from: state.pi?.view === 'table' ? 'table' : null };
+    showPi({ focus: '#piTitle' });
+  } else if (act === 'pi-table') {
+    state.pi = { f: 'all', k: 'pass', ...(state.pi ?? {}), view: 'table', from: null };
+    showPi({ focus: '#piTitle' });
+  } else if (act === 'pi-set' && own(d.id)) {
+    g.tactics = { ...g.tactics, playerInstr: piWith(g.tactics.playerInstr, d.id, d.k, Number(d.v)) };
+    await save(); showPi();
+  } else if (act === 'pi-reset' && d.id) {
+    g.tactics = { ...g.tactics, playerInstr: piWithout(g.tactics.playerInstr, d.id) };
+    await save(); showPi({ focus: '#piTitle' });
+  } else if (act === 'pi-reset-all') {
+    g.tactics = { ...g.tactics, playerInstr: {} };
+    await save(); showPi({ focus: '#piTitle' });
+  } else if ((act === 'pi-filter' || act === 'pi-pick') && state.pi) {
+    state.pi = { ...state.pi, [act === 'pi-filter' ? 'f' : 'k']: act === 'pi-filter' ? d.f : d.k };
+    showPi();
+  } else if (act === 'pi-done' && state.pi?.view === 'player' && state.pi.from === 'table') {
+    const id = state.pi.id;
+    state.pi = { ...state.pi, view: 'table', from: null };
+    showPi({ focus: `button[data-act="pi-open"][data-id="${CSS.escape(id)}"]` });
+  } else if (act === 'pi-done' || act === 'pi-close') closePi();
 }
 
 function openInfo(pid, el) {
@@ -1222,7 +1308,7 @@ app.addEventListener('keydown', (ev) => {
 });
 // Escape na ekranie składu: najpierw zamyka panel atrybutów albo anuluje wybór (nie wychodzi do menu).
 app.addEventListener('keydown', (ev) => {
-  if (ev.key !== 'Escape' || !tacticsOpen() || ev.target.closest('select')) return;
+  if (ev.key !== 'Escape' || !tacticsOpen() || ev.target.closest('select, #piDlg')) return; // okno instrukcji zamyka przeglądarka
   const card = ev.target.closest('dialog.tcard'); // Escape z wnętrza karty zamyka właśnie tę kartę
   if (card) { ev.preventDefault(); ev.stopPropagation(); closeInfo(card.dataset.id); }
   else if (state.tInfo) { ev.preventDefault(); ev.stopPropagation(); closeInfo(); }
@@ -1247,6 +1333,8 @@ app.addEventListener('input', (ev) => {
 app.addEventListener('change', async (ev) => {
   if (ev.target.matches?.('input[data-act="sys-theme"]')) { await sysAction('sys-theme', ev.target); return; } // Opcje: motyw
   if (ev.target.matches?.('input[data-act="sys-speed"]')) { await sysAction('sys-speed', ev.target); return; } // Opcje: tempo dni
+  const ps = ev.target.closest('#piDlg select.pit-sel'); // tabela instrukcji indywidualnych
+  if (ps) { await piAction('pi-set', { dataset: { id: ps.dataset.id, k: ps.dataset.k, v: ps.value } }); return; }
   const sel = ev.target.closest('select[data-act="trole"]');
   if (!sel) return;
   await setRole(sel.dataset.role, sel.value);
@@ -1304,6 +1392,7 @@ async function dispatchAct(el, { root = app } = {}) {
   if (act?.startsWith('sys-') && state.game) { await sysAction(act, el); return; } // Opcje, Zapis, Wyjście
   if (act === 'mreport' && state.game) { openReport(el); return; } // raport meczu (wynik w terminarzu)
   if (act === 'mreport-close') { app.querySelector('#mrDlg')?.close(); return; }
+  if (act?.startsWith('pi-') && state.game && state.screen === 'hub') { await piAction(act, el); return; } // instrukcje indywidualne
   if (isEditorAction(act) && state.game && state.screen === 'editor') { await editorAction(act, el); return; }
   if (isTalkAction(act) && state.game) {
     const r = handleTalkAction(state.game, act, el.dataset, root);
@@ -1735,6 +1824,7 @@ document.addEventListener('keydown', (ev) => {
   if (ev.target.closest('input, select, textarea')) return;
   if (state.screen === 'matchday') return;
   if (ev.target.closest('#mrDlg')) return; // raport meczu: Escape zamyka tylko okno (przeglądarka), Enter nie gra meczu
+  if (ev.target.closest('#piDlg')) return; // instrukcje indywidualne: jak wyżej
   if (ev.key === 'Escape' && state.screen === 'career') { ev.preventDefault(); app.querySelector('[data-act="ncBack"]')?.click(); return; }
   if (ev.key === 'Escape' && state.screen === 'start' && state.confirmDel) { app.querySelector('[data-act="deleteNo"]')?.click(); return; }
   if (ev.key === 'Escape' && state.screen === 'editor') { app.querySelector('[data-act="ed-back"]')?.click(); return; } // edytor: powrót do gry

@@ -26,6 +26,8 @@ import { friendlyRuleTags, friendlyRulesOf } from '../training/friendlies.js';
 import { renderPlayerCard, cardFact, barFactHtml, WIDE_CARD, cardPos, placeCard, bindCardDrag } from './playerCard.js'; // karta jak w Kadra > Skład i taktyka
 import { playerStatsHtml } from './playerStatsView.js';
 import { moraleLabel } from '../career/morale.js';
+import { PI_IDS, playerInstruction, cleanPlayerInstrMap, playerInstrCount } from '../data/playerInstructions.js';
+import { piPlayerHtml, piTableHtml, piMarker, piSummary, piOptionLabel, piWith, piWithout, piFor, piPatch } from './playerInstrView.js'; // instrukcje indywidualne
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size) => (anyClub(id) ? crestHtml(anyClub(id), { size, clubsById }) : '');
@@ -154,8 +156,9 @@ function teamColors(f) {
  * bez „Statystyk meczu”, które zastąpiłyby okno). mine/on/onBench: zawodnik gracza, na boisku, na ławce.
  * subWhy: powód braku zmian, planned: już w zaplanowanej zmianie, hurt: uraz bez gry, played: grał w meczu,
  * takers: [[klucz, etykieta, zaznaczony]] dla stałych fragmentów albo null.
+ * pi: instrukcje indywidualne (false: bez opcji, true: opcja, tekst: obecne instrukcje zawodnika w podpowiedzi).
  */
-export function matchMenuItems({ manage = false, mine = false, on = false, onBench = false, subWhy = null, planned = false, hurt = false, played = true, takers = null } = {}) {
+export function matchMenuItems({ manage = false, mine = false, on = false, onBench = false, subWhy = null, planned = false, hurt = false, played = true, takers = null, pi = false } = {}) {
   const items = [];
   if (manage) {
     const busy = planned ? 'Już w zaplanowanej zmianie' : null;
@@ -165,6 +168,7 @@ export function matchMenuItems({ manage = false, mine = false, on = false, onBen
     if (mine && on) items.push({ label: 'Zmień zawodnika', hint: 'Okno zmian z nim wybranym', primary: true, disabled: subWhy, act: 'sub' });
     if (mine && onBench) items.push({ label: 'Wprowadź na boisko', hint: 'Okno zmian z nim wybranym', primary: true, disabled: subWhy, act: 'subIn' });
   }
+  if (pi) items.push({ label: 'Instrukcje zawodnika', hint: typeof pi === 'string' ? `Teraz: ${pi}` : 'Podania, odbiór, pressing i inne', act: 'pi' });
   items.push({ label: 'Karta zawodnika', hint: 'Atrybuty, forma, stan w meczu', act: 'card' });
   if (!manage) items.push({ label: 'Statystyki meczu', hint: played ? null : 'Jeszcze nie grał', act: 'stats' });
   if (takers) {
@@ -1024,6 +1028,27 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
         ui.subMsg = ui.preSel.kind === 'on' ? `${nm}: wybierz rezerwowego, który wejdzie za niego.` : `${nm}: wybierz zawodnika, który zejdzie.`;
         ui.preSel = null;
       }
+      if (ui.piView) {
+        const html = piPanel(T, M);
+        if (html) {
+          const keep = ui.piFocus ?? (dlg.contains(document.activeElement) ? piFocusKey(document.activeElement) : null);
+          const same = dlg.dataset.pi === `${ui.piView.kind}:${ui.piView.id ?? ''}`;
+          const sc = same ? [...dlg.querySelectorAll('.pi__body, .pit-wrap, .pi-chips')].map((e) => [e.scrollTop, e.scrollLeft]) : [];
+          ui.piFocus = null;
+          dlg.dataset.pi = `${ui.piView.kind}:${ui.piView.id ?? ''}`;
+          dlg.className = `panel md-dlg md-dlg--wide mm-dlg pi-host pi-host--${ui.piView.kind}`;
+          dlg.innerHTML = html;
+          [...dlg.querySelectorAll('.pi__body, .pit-wrap, .pi-chips')].forEach((e, i) => { if (sc[i]) { e.scrollTop = sc[i][0]; e.scrollLeft = sc[i][1]; } });
+          if (!dlg.open) dlg.showModal();
+          mountSubsDrag(dlg);
+          const vis = keep ? [...dlg.querySelectorAll(keep)].find((e) => e.offsetParent !== null) : null;
+          (vis ?? (same && keep ? null : dlg.querySelector('#piTitle')))?.focus({ preventScroll: true });
+          seatCard();
+          return;
+        }
+        ui.piView = null;
+      }
+      delete dlg.dataset.pi;
       const scroll = dlg.querySelector('.mm__lists')?.scrollTop ?? 0;
       dlg.className = 'panel md-dlg md-dlg--wide mm-dlg';
       dlg.innerHTML = managePanel(T, M);
@@ -1107,7 +1132,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     return pv.ok ? pv.assign : {};
   }
   function tacDraft(T) {
-    ui.tac ??= { formation: T.formation.id, ins: Object.fromEntries(INS_KEYS.map((k) => [k, String(T.tactics.instructions?.[k] ?? '')])), assign: curAssign(), moved: false };
+    ui.tac ??= { formation: T.formation.id, ins: Object.fromEntries(INS_KEYS.map((k) => [k, String(T.tactics.instructions?.[k] ?? '')])), assign: curAssign(), moved: false, pi: cleanPlayerInstrMap(T.tactics.playerInstr) };
     // Skład na boisku zmienił się pod oknem (np. podpowiedź asystenta): ustawienie od nowa
     const ids = fieldIds(T);
     const keys = Object.keys(ui.tac.assign);
@@ -1130,7 +1155,57 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     const formation = d.formation !== T.formation.id ? d.formation : null;
     const cur = curAssign();
     const moved = d.moved && Object.entries(d.assign).some(([id, i]) => cur[id] !== i);
-    return { formation, ins, moved, n: (formation ? 1 : 0) + (moved && !formation ? 1 : 0) + Object.keys(ins).length };
+    const pi = piDiff(T);
+    return { formation, ins, moved, pi, n: (formation ? 1 : 0) + (moved && !formation ? 1 : 0) + Object.keys(ins).length + Object.keys(pi).length };
+  }
+  // ------------------------------------------------------------ Instrukcje indywidualne w meczu (src/ui/playerInstrView.js)
+  // Szkic ui.tac.pi (pełna mapa nadpisań), do silnika idą tylko zmienione instrukcje razem z resztą zmian po „Zatwierdź”
+  // (changeTactics: 0 = jak drużyna, null = wszystkie jak drużyna). ui.piView: null | { kind: 'player'|'table', id, from, f, k }.
+  const piPlayers = (T) => [...T.players, ...T.bench].filter((x) => !x.sentOff);
+  /** Zmiany instrukcji indywidualnych w szkicu wobec meczu: { [id]: { k: -1|0|1 } | null }. */
+  function piDiff(T) {
+    const d = ui.tac;
+    return d?.pi ? piPatch(T.tactics.playerInstr ?? {}, d.pi, piPlayers(T).map((x) => x.id)) : {};
+  }
+  /** Wiersze okna instrukcji: zawodnicy na boisku (miejsce w ustawieniu), potem ławka. */
+  function piRows(T) {
+    const on = onPitchNow(T).filter((x) => !x.sentOff).sort((a, b) => (a.slotIdx ?? 99) - (b.slotIdx ?? 99)).map((x) => ({ id: x.id, p: x.p, slotPos: x.slot?.pos ?? null, zone: 'xi' }));
+    const bench = [...T.bench].filter((x) => !x.sentOff).sort((a, b) => byPosition(a.p, b.p)).map((x) => ({ id: x.id, p: x.p, slotPos: null, zone: 'bench' }));
+    return [...on, ...bench];
+  }
+  function piDraftSet(id, k, v) {
+    const T = S.M.teams[S.userSide]; const d = tacDraft(T);
+    const row = piRows(T).find((r) => String(r.id) === String(id));
+    if (!row || !PI_IDS.includes(k) || (v && !piFor(k, row))) return;
+    d.pi = piWith(d.pi, row.id, k, v);
+    ui.subMsg = '';
+  }
+  const piMdAttr = (name, data) => `data-md="pi${name[0].toUpperCase()}${name.slice(1)}:${esc(Object.values(data).join('|'))}"`;
+  /** Koszt zgrania jak przy innych zmianach taktyki (control.js: ok. 2 za zawodnika, najwyżej 6, w przerwie 0). */
+  function piNote(T, M) {
+    const n = Object.keys(piDiff(T)).length;
+    const live = M.phase !== 'break' && M.minute > 0;
+    const twice = live && M.minute - (T.lastTacChange ?? -99) < 10;
+    const base = live ? 'Zmiana instrukcji zawodników kosztuje trochę zgrania: ok. 2 pkt spójności za zawodnika, najwyżej 6, a w ciągu 10 minut od poprzedniej zmiany taktyki podwójnie.' : M.phase === 'break' ? 'W przerwie zmiana instrukcji nie kosztuje zgrania.' : 'Przed pierwszym gwizdkiem zmiana instrukcji nie kosztuje zgrania.';
+    const now = n ? ` Zmieniasz ${n} ${n === 1 ? 'zawodnika' : 'zawodników'}${live ? `: ok. ${Math.min(6, 2 * n) * (twice ? 2 : 1)} pkt` : ''}.` : '';
+    return `${base}${now} Wejdzie razem z innymi zmianami po „Zatwierdź”. Spójność teraz ${Math.round(T.S)} na 100.`;
+  }
+  function piPanel(T, M) {
+    const d = tacDraft(T); const v = ui.piView;
+    const rows = piRows(T);
+    const instructions = { ...(T.tactics.instructions ?? {}), ...d.ins };
+    const note = piNote(T, M);
+    if (v.kind === 'player') {
+      const row = rows.find((r) => String(r.id) === String(v.id));
+      return row ? piPlayerHtml({ row, entry: d.pi[row.id] ?? null, instructions, attr: piMdAttr, note, done: 'Gotowe' }) : null;
+    }
+    return piTableHtml({ rows, map: d.pi, instructions, filter: v.f, pick: v.k, attr: piMdAttr, note });
+  }
+  /** Selektor elementu z fokusem w oknie (przycisk data-md albo lista wyboru tabeli) do odtworzenia po przebudowie. */
+  function piFocusKey(el) {
+    if (!el) return null;
+    if (el.matches?.('select.pit-sel')) return `select.pit-sel[data-id="${CSS.escape(el.dataset.id)}"][data-k="${CSS.escape(el.dataset.k)}"]`;
+    return el.dataset?.md ? `[data-md="${CSS.escape(el.dataset.md)}"]` : null;
   }
   const draftPreview = (T) => { const d = tacDraft(T); return previewShape(S.M, S.userSide, d.formation, { assign: d.assign }); };
   function swapSlots(a, b) {
@@ -1206,7 +1281,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
         <button class="sub-row__main" data-md="subPick:${kind}|${esc(x.id)}" data-sdrag="${kind}:${esc(x.id)}" data-name="${esc(x.p.name)}" aria-pressed="${isSel}" ${planned ? 'disabled' : ''}>
           <span class="sub-handle" data-shandle aria-hidden="true"></span>
           <span class="pos" data-g="${GROUP[pos] ?? 'MID'}">${esc(pos)}</span>
-          <span class="sub-name"><span class="sub-name__l"><span class="sub-name__t">${esc(x.p.name)}</span>${x.yc ? ICON.yellow : ''}${k ? ICON.knock : ''}</span>${sg ? `<span class="sub-sugg">${esc(sg.text)}</span>` : ''}${note ? `<small>${esc(note)}</small>` : ''}</span>
+          <span class="sub-name"><span class="sub-name__l"><span class="sub-name__t">${esc(x.p.name)}</span>${piMarker(d.pi?.[x.id])}${x.yc ? ICON.yellow : ''}${k ? ICON.knock : ''}</span>${sg ? `<span class="sub-sugg">${esc(sg.text)}</span>` : ''}${note ? `<small>${esc(note)}</small>` : ''}</span>
           <span class="sub-cond" title="Kondycja"><i style="width:${cond}%" class="${condCls(cond)}"></i></span><b>${cond}%</b>
         </button></li>`;
     };
@@ -1227,9 +1302,9 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       const k = who.knock && !who.knock.aggravated;
       const sgT = sugg.get(`on:${x.id}`);
       return `<button class="mm-tok ${sl.pos === 'BR' ? 'is-gk' : ''} ${pl ? 'is-planned' : ''} ${isSel ? 'is-sel' : ''} ${sgT ? `is-sugg is-sugg--${sgT.rank}` : ''} ${x.injury && !x.injury.playable ? 'is-hurt' : ''}" style="--x:${sl.x};--y:${sl.y};--cond:${cond}" data-c="${condCls(cond)}" data-fit="${band}"
-        data-sdrop="on:${esc(x.id)}" data-sdrag="on:${esc(x.id)}" data-shandle data-mmp="${esc(x.id)}" data-name="${esc(x.p.name)}" data-md="tokPick:${esc(x.id)}" ${pl ? 'disabled' : ''} title="${esc(`${who.p.name}, ${sl.pos}${band !== 'ok' ? ` (nominalnie ${who.p.pos}, ${prof}%)` : ''}, kondycja ${cond}%`)}">
+        data-sdrop="on:${esc(x.id)}" data-sdrag="on:${esc(x.id)}" data-shandle data-mmp="${esc(x.id)}" data-name="${esc(x.p.name)}" data-md="tokPick:${esc(x.id)}" ${pl ? 'disabled' : ''} title="${esc(`${who.p.name}, ${sl.pos}${band !== 'ok' ? ` (nominalnie ${who.p.pos}, ${prof}%)` : ''}, kondycja ${cond}%${d.pi?.[who.id] ? `, instrukcje: ${piSummary(d.pi[who.id])}` : ''}`)}">
         <span class="mm-tok__dot"><span>${esc(sl.pos)}</span></span>${who.yc ? '<i class="mm-tok__yc" aria-label="żółta kartka"></i>' : ''}${x.injury && !x.injury.playable ? '<i class="mm-tok__inj" aria-label="uraz">+</i>' : k ? `<i class="mm-tok__knock" aria-label="gra z bólem">${ICON.knock}</i>` : ''}
-        <span class="mm-tok__name">${inc ? `↑ ${esc(last(inc.p.name))}` : esc(last(x.p.name))}</span></button>`;
+        <span class="mm-tok__name">${inc ? `↑ ${esc(last(inc.p.name))}` : esc(last(x.p.name))}</span>${piMarker(d.pi?.[who.id], 'mm-tok__pi')}</button>`;
     }).join('');
     // Ustawienie: przyciski zamiast listy rozwijanej (czytelne w obu motywach, jeden dotyk)
     const chips = `<fieldset class="mm-forms"><legend class="mm-forms__lbl">Ustawienie</legend><div class="mm-forms__opts">${FORMATIONS.map((f) => `<label class="mm-fchip ${f.id === T.formation.id ? 'is-now' : ''}" title="${esc(`${f.name} „${f.nick}”${f.id === T.formation.id ? ', obecne ustawienie' : ''}`)}"><input type="radio" name="mdForm" value="${f.id}" ${f.id === d.formation ? 'checked' : ''}><span>${esc(formShort(f))}</span></label>`).join('')}</div></fieldset>`;
@@ -1245,6 +1320,11 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       diff.formation ? `<li class="mm-pend"><span>Ustawienie: ${esc(T.formation.name)} → ${esc(F.name)}${pv.ok && pv.need ? ` (${esc(pv.shape)})` : ''}</span><button data-md="tacUndo:formation" aria-label="Cofnij zmianę ustawienia">×</button></li>` : '',
       diff.moved && !diff.formation ? `<li class="mm-pend"><span>Nowe pozycje zawodników${pv.ok && pv.need ? ` (${esc(pv.shape)})` : ''}</span><button data-md="tacUndo:assign" aria-label="Cofnij przesunięcia zawodników">×</button></li>` : '',
       ...Object.entries(diff.ins).map(([k, v]) => `<li class="mm-pend"><span>${esc(INSTRUCTIONS.find((i) => i.id === k)?.label ?? k)}: ${esc(insLabel(k, T.tactics.instructions?.[k]))} → ${esc(insLabel(k, v))}</span><button data-md="tacUndo:${k}" aria-label="Cofnij">×</button></li>`),
+      ...Object.entries(diff.pi).map(([id, o]) => {
+        const who = lastName(findX(S.userSide, id)?.p) || 'Zawodnik';
+        const what = o === null ? 'wszystko jak drużyna' : Object.entries(o).map(([k, v]) => `${playerInstruction(k)?.label.toLowerCase() ?? k} ${piOptionLabel(k, v).toLowerCase()}`).join(', ');
+        return `<li class="mm-pend"><span>Instrukcje, ${esc(who)}: ${esc(what)}</span><button data-md="piUndo:${esc(id)}" aria-label="Cofnij instrukcje: ${esc(who)}">×</button></li>`;
+      }),
     ].filter(Boolean);
     const nAll = pend.length + diff.n;
     const live = M.phase !== 'break' && M.minute > 0;
@@ -1266,15 +1346,16 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
         ${short}
         <div class="pitch2 mm-field">${tokens}</div>
         <p class="mm-legend"><span><i class="fit fit--mid"></i>poza nominalną pozycją</span><span><i class="fit fit--bad"></i>daleko od swojej pozycji</span></p>
-        <p class="mm__tip">Przeciągnij rezerwowego na zawodnika na boisku albo dotknij kolejno obu. Dwóch zawodników na boisku: zamiana pozycji. Prawy przycisk albo przytrzymanie zawodnika: karta zawodnika.</p>
+        <p class="mm__tip">Przeciągnij rezerwowego na zawodnika na boisku albo dotknij kolejno obu. Dwóch zawodników na boisku: zamiana pozycji. Prawy przycisk albo przytrzymanie zawodnika: karta i instrukcje zawodnika.</p>
       </section>
       <nav class="mm__tabs" role="tablist" aria-label="Widok">
-        ${[['bench', 'Ławka rezerwowych'], ['xi', 'Pierwszy skład'], ['tac', 'Taktyka']].map(([k, l]) => `<button role="tab" data-md="mmTab:${k}" aria-selected="${tab === k}">${l}${k === 'tac' && Object.keys(diff.ins).length ? ` <i class="dot"></i>` : ''}</button>`).join('')}
+        ${[['bench', 'Ławka rezerwowych'], ['xi', 'Pierwszy skład'], ['tac', 'Taktyka']].map(([k, l]) => `<button role="tab" data-md="mmTab:${k}" aria-selected="${tab === k}">${l}${k === 'tac' && (Object.keys(diff.ins).length || Object.keys(diff.pi).length) ? ` <i class="dot"></i>` : ''}</button>`).join('')}
       </nav>
       <div class="mm__lists">
         <section class="mm__xi"><h3>Pierwszy skład</h3><ul class="sub-list">${onList.map((x) => row(x, 'on')).join('')}</ul></section>
         <section class="mm__bench"><h3>Ławka rezerwowych</h3><ul class="sub-list">${[...T.bench].sort((a, b) => byPosition(a.p, b.p)).map((x) => row(x, 'bench')).join('') || '<li class="hint">Brak rezerwowych.</li>'}</ul></section>
-        <section class="mm__tac"><h3>Instrukcje</h3><div class="mm-segs">${INS_KEYS.map(seg).join('')}</div></section>
+        <section class="mm__tac"><h3>Instrukcje</h3><div class="mm-segs">${INS_KEYS.map(seg).join('')}</div>
+          <div class="mm-pi"><button class="btn btn--quiet" data-md="piTable">Instrukcje indywidualne (${playerInstrCount(d.pi)})${Object.keys(diff.pi).length ? ' <i class="dot" aria-label="niezatwierdzone zmiany"></i>' : ''}</button><span class="hint">Polecenie dla jednego zawodnika zamiast instrukcji drużyny. Także z menu zawodnika (prawy przycisk albo przytrzymanie).</span></div></section>
       </div>
       <footer class="mm__foot">
         <div class="mm__queue">${err}${chipsQ.length ? `<ul>${chipsQ.join('')}</ul>` : '<p class="hint">Nic do zatwierdzenia. Zmiany zawodników i taktyki wejdą razem po zatwierdzeniu.</p>'}
@@ -1332,6 +1413,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       if (Object.keys(diff.ins).length) patch.instructions = diff.ins;
       if (diff.formation) patch.formation = diff.formation;
       if (diff.formation || diff.moved) patch.assign = assign;
+      if (Object.keys(diff.pi).length) patch.playerInstr = diff.pi;
       const r = changeTactics(M, S.userSide, patch);
       if (r?.ok === false) {
         tacMsg = `Taktyka nie weszła: ${r.error}`;
@@ -1340,7 +1422,9 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
         ui.subMsg = [subMsg, tacMsg].filter(Boolean).join(' ');
         return;
       }
-      tacMsg = r?.adapt ? `Taktyka wejdzie w pełni po ok. ${Math.round(r.adapt)} min (koszt spójności ${r.cost}).` : 'Taktyka obowiązuje od razu.';
+      const piOnly = patch.playerInstr && Object.keys(patch).length === 1;
+      tacMsg = piOnly ? `Instrukcje zawodników obowiązują od następnej minuty${r?.cost && r?.adapt ? ` (koszt spójności ${r.cost})` : ''}.`
+        : r?.adapt ? `Taktyka wejdzie w pełni po ok. ${Math.round(r.adapt)} min (koszt spójności ${r.cost}).` : 'Taktyka obowiązuje od razu.';
     }
     ui.tac = null;
     ui.subMsg = [subMsg, tacMsg].filter(Boolean).join(' ');
@@ -1364,12 +1448,14 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     dlg.dataset.sdnd = '1';
     // Escape nie gubi niezatwierdzonych zmian
     dlg.addEventListener('cancel', (ev) => {
+      if (dlg.classList.contains('mm-dlg') && ui.piView) { ev.preventDefault(); ui.piView = null; ui.mmTab = 'tac'; openDialog('manage'); dlg.querySelector('[data-md="piTable"]')?.focus(); return; } // instrukcje: powrót do okna zmian
       if (dlg.classList.contains('mm-dlg') && (ui.pend?.length || tacDiff(S.M.teams[S.userSide]).n)) { ev.preventDefault(); ui.subMsg = 'Masz niezatwierdzone zmiany. Zatwierdź je albo odrzuć.'; openDialog('manage'); }
     });
     dlg.addEventListener('change', (ev) => {
       const t = ev.target;
       if (!dlg.classList.contains('mm-dlg')) return;
       const T = S.M.teams[S.userSide];
+      if (t.matches('select.pit-sel')) { piDraftSet(t.dataset.id, t.dataset.k, Number(t.value)); openDialog('manage'); return; }
       if (t.matches('[data-ins]')) { tacDraft(T).ins[t.dataset.ins] = t.value; ui.subMsg = ''; openDialog('manage'); }
       if (t.name === 'mdForm') { setDraftFormation(T, t.value); ui.subMsg = ''; openDialog('manage'); dlg.querySelector(`input[name="mdForm"][value="${t.value}"]`)?.focus(); }
     });
@@ -1454,6 +1540,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       manage, mine, on, onBench, subWhy, played: x.minOn !== null, hurt: !!(x.injury && !x.injury.playable),
       planned: manage && (ui.pend ?? []).some((q) => q.out === id || q.in === id),
       takers: mine && on && M.phase !== 'ended' ? TAKERS.map(([k, l]) => [k, l, T.takers?.[k] === x.id]) : null,
+      pi: mine && (on || onBench) && !x.sentOff && !M.ended ? (piSummary((manage && ui.tac?.pi ? ui.tac.pi : T.tactics.playerInstr ?? {})[id]) || true) : false,
     });
     const no = kitNo(side, id);
     return { title: x.p.name, pos, group: GROUP[pos] ?? 'MID', meta: `${no != null ? `nr ${no}, ` : ''}${sideName(side)}`, note: x.knock && !x.knock.aggravated && on ? `Gra z bólem: ${x.knock.name}` : null, items };
@@ -1465,6 +1552,15 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     if (it.act === 'mmSel') { ui.preSel = { kind: T.bench.includes(x) ? 'bench' : 'on', id }; openDialog('manage'); return; }
     if (it.act === 'stats') { if (ui.running) stop(); openPlayerStats(side, id); return; }
     if (it.act === 'card') { if (ui.running) stop(); openPlayerCard(side, id); return; }
+    if (it.act === 'pi') {
+      if (ui.running) stop();
+      const dlg = app.querySelector('#mdDlg');
+      const inManage = !!dlg?.open && dlg.classList.contains('mm-dlg');
+      ui.piView = { kind: 'player', id, from: null, f: ui.piView?.f ?? 'all', k: ui.piView?.k ?? 'pass' };
+      ui.piFocus = '#piTitle';
+      openDialog('manage', !inManage);
+      return;
+    }
     if (it.act.startsWith('taker:')) {
       const k = it.act.slice(6);
       T.takers = { ...(T.takers ?? {}), [k]: id };
@@ -2005,10 +2101,31 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     if (act === 'speed') { ui.speed = Number(arg); app.querySelectorAll('.speed').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.md === `speed:${arg}`))); if (ui.running) { stop(); start(); } }
     if (act === 'tab') { ui.tab = arg; normTab(); }
     if (act === 'skip') { stop(); MD.skip(S); route(); }
-    if (act === 'dlg') { if (ui.running) stop(); openDialog(arg, true); }
+    if (act === 'dlg') { if (ui.running) stop(); ui.piView = null; openDialog(arg, true); }
     if (act === 'mmTab') { ui.mmTab = arg; openDialog('manage'); }
     if (act === 'mmConfirm') { confirmAll(); openDialog('manage'); }
-    if (act === 'mmDiscard') { ui.pend = []; ui.tac = null; ui.subSel = null; ui.subMsg = 'Odrzucono niezatwierdzone zmiany.'; openDialog('manage'); }
+    if (act === 'mmDiscard') { ui.pend = []; ui.tac = null; ui.piView = null; ui.subSel = null; ui.subMsg = 'Odrzucono niezatwierdzone zmiany.'; openDialog('manage'); }
+    // Instrukcje indywidualne (widok w oknie „Zmiany i taktyka”, zmiany w szkicu do „Zatwierdź”)
+    if (act.startsWith('pi') && M && !M.ended) {
+      const T = M.teams[S.userSide]; const d = tacDraft(T); const v = ui.piView;
+      const view = { f: v?.f ?? 'all', k: v?.k ?? 'pass' };
+      if (act === 'piTable') { ui.piView = { ...view, kind: 'table' }; ui.piFocus = '#piTitle'; }
+      if (act === 'piOpen') { ui.piView = { ...view, kind: 'player', id: arg, from: v?.kind === 'table' ? 'table' : null }; ui.piFocus = '#piTitle'; }
+      if (act === 'piSet') { const [id, k, val] = arg.split('|'); piDraftSet(id, k, Number(val)); }
+      if (act === 'piReset') { d.pi = piWithout(d.pi, arg); ui.piFocus = '#piTitle'; }
+      if (act === 'piResetAll') { for (const x of piPlayers(T)) d.pi = piWithout(d.pi, x.id); ui.piFocus = '#piTitle'; }
+      if (act === 'piUndo') { const cur = T.tactics.playerInstr?.[arg]; d.pi = cur ? { ...d.pi, [arg]: { ...cur } } : piWithout(d.pi, arg); }
+      if (act === 'piFilter' && v) ui.piView = { ...v, f: arg };
+      if (act === 'piPick' && v) ui.piView = { ...v, k: arg };
+      if (act === 'piDone' && v?.kind === 'player' && v.from === 'table') { ui.piView = { ...v, kind: 'table', from: null }; ui.piFocus = `[data-md="piOpen:${CSS.escape(v.id)}"]`; }
+      else if (act === 'piDone' || act === 'piClose') {
+        ui.piView = null; ui.mmTab = 'tac';
+        const n = Object.keys(piDiff(T)).length;
+        ui.subMsg = n ? `Instrukcje zawodników (${n}) czekają na zatwierdzenie.` : '';
+      }
+      openDialog('manage');
+      if (!ui.piView && (act === 'piDone' || act === 'piClose')) app.querySelector('#mdDlg [data-md="piTable"]')?.focus();
+    }
     if (act === 'tacUndo') { const T = M.teams[S.userSide]; const d = tacDraft(T); if (arg === 'formation' || arg === 'assign') setDraftFormation(T, T.formation.id); else d.ins[arg] = String(T.tactics.instructions?.[arg] ?? ''); openDialog('manage'); }
     if (act === 'tokPick') { if (Date.now() < (ui.suppressClick ?? 0)) return; tokPick(arg); openDialog('manage'); }
     if (act === 'slotPick') { if (Date.now() < (ui.suppressClick ?? 0)) return; slotPick(Number(arg)); openDialog('manage'); }
@@ -2017,7 +2134,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     if (act === 'subDrop') { ui.pend.splice(Number(arg), 1); ui.subMsg = 'Usunięto zaplanowaną zmianę.'; openDialog('manage'); }
     if (act === 'subClose') {
       if (ui.pend?.length || tacDiff(M.teams[S.userSide]).n) { ui.subMsg = 'Masz niezatwierdzone zmiany. Zatwierdź je albo odrzuć.'; openDialog('manage'); return; }
-      ui.subSel = null; ui.subMsg = ''; ui.tac = null; app.querySelector('#mdDlg')?.close();
+      ui.subSel = null; ui.subMsg = ''; ui.tac = null; ui.piView = null; app.querySelector('#mdDlg')?.close();
     }
     if (act === 'doShout') {
       const r = shout(M, S.userSide, arg);

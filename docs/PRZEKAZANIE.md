@@ -240,7 +240,7 @@ akademia do pierwszego składu, BP zamiast SP, polskie daty, oszczędny service 
 Testy: 626, wszystkie przechodziły przy ostatnim pełnym uruchomieniu (Nov 14, 2026).
 
 Instrukcje indywidualne zawodników, etap 1 (silnik, dane, zmiana w meczu, reguła AI, testy), Nov 18, 2026:
-`docs/instrukcje-indywidualne.md` rozdział 10. Etap 2 (interfejs) jeszcze nie zrobiony. Złoty test w
+`docs/instrukcje-indywidualne.md` rozdział 10. Etap 2 (interfejs: okno zawodnika, tabela, znaczniki, zmiana w meczu) Nov 18, 2026: rozdział 11. Złoty test w
 `tests/playerInstr.test.mjs` pilnuje, że mecz bez instrukcji indywidualnych jest identyczny jak przed nimi: zmiana
 silnika, która celowo zmienia przebieg meczu, wymaga nowych skrótów (zebranych kodem z `tests/piHelpers.mjs`).
 

@@ -39,7 +39,7 @@ const top = (m) => m.items.filter((x) => !x.sep).map((x) => x.label);
 const outIds = (g) => squadOf(g.world, g.clubId).map((p) => p.id).filter((id) => !g.tactics.xi.includes(id) && !g.tactics.bench.includes(id));
 
 // Akcje, które obsługuje app.js (kliknięcia data-act); prefiksy tf-, tt-, tr- mają własne handlery widoków.
-const APP_ACTS = new Set(['tab', 'tsub', 'player', 'tpick', 'tmove', 'tbench', 'tunbench', 'tcancel', 'tinfo', 'trole', 'extplayer', 'arep', 'ac-promote']);
+const APP_ACTS = new Set(['tab', 'tsub', 'player', 'tpick', 'tmove', 'tbench', 'tunbench', 'tcancel', 'tinfo', 'trole', 'extplayer', 'arep', 'ac-promote', 'pi-open']);
 const TF_ACTS = new Set(['tf-open', 'tf-offer', 'tf-loan', 'tf-negotiate', 'tf-renew', 'tf-list-own', 'tf-unlist', 'tf-keep', 'tf-release']);
 const TR_ACTS = new Set(['tr-tab', 'tr-player', 'tr-focus', 'tr-mode', 'tr-pos', 'tr-prog']);
 

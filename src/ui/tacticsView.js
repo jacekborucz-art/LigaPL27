@@ -11,6 +11,8 @@ import { locKey, playerAt } from './tacticsMoves.js';
 import { esc } from './dom.js';
 import { profBand } from './positionMap.js';
 import { renderPlayerCard, cardFact, barFactHtml } from './playerCard.js'; // karta wspólna z oknem zmian w meczu
+import { piMarker, piSummary } from './playerInstrView.js'; // instrukcje indywidualne (docs/instrukcje-indywidualne.md)
+import { playerInstrCount } from '../data/playerInstructions.js';
 
 const band = (prof) => (prof >= 85 ? 'ok' : prof >= 60 ? 'mid' : 'bad');
 const few = (n) => n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14);
@@ -73,6 +75,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
   const onBench = new Set(tactics.bench);
   const openCards = (cards ?? (info ? [{ id: info, pinned: false, slot: 0, extra: infoExtra }] : [])).filter((c) => byId.has(c.id));
   const openIds = new Set(openCards.map((c) => c.id));
+  const pim = tactics.playerInstr ?? {};
 
   // ---------- Zmiennicy po wyborze: wybrane miejsce w XI -> kandydaci na to miejsce;
   // wybrany zawodnik z ławki albo spoza kadry -> miejsca w XI, na których zagra.
@@ -97,11 +100,12 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
     const r = repAt(p, i);
     const cls = ['slot-btn', p ? `slot-btn--${band(prof)}` : 'slot-btn--empty', s.pos === 'BR' ? 'slot-btn--gk' : '', isSel ? 'is-sel' : ''].filter(Boolean).join(' ');
     return `<button class="${cls}" style="left:${s.x}%;top:${100 - s.y}%" data-act="tslot" data-loc="${key}" data-drop="${key}" data-handle ${p ? `${dragAttrs(loc, p)} data-pid="${esc(p.id)}"` : ''}${repAttr(r)}
-      aria-pressed="${isSel}" aria-label="${esc(s.pos)}: ${p ? esc(p.name) : 'puste miejsce'}${p && prof < 85 ? `, poza pozycją (${prof}%)` : ''}${esc(repAria(r))}">
+      aria-pressed="${isSel}" aria-label="${esc(s.pos)}: ${p ? esc(p.name) : 'puste miejsce'}${p && prof < 85 ? `, poza pozycją (${prof}%)` : ''}${esc(repAria(r))}${p && pim[p.id] ? esc(`, instrukcje: ${piSummary(pim[p.id])}`) : ''}">
       ${r && r.b !== 'no' ? `<span class="slot-btn__rep" aria-hidden="true">${r.v}%</span>` : ''}
       <span class="slot-btn__dot">${p ? (numbers?.get(p.id) ?? Math.round(p.ovr)) : '+'}</span>
       <span class="slot-btn__name">${p ? esc(p.last) : esc(s.pos)}</span>
       ${p && tactics.captain === p.id ? '<span class="slot-btn__c" aria-hidden="true">C</span>' : ''}
+      ${p ? piMarker(pim[p.id], 'slot-btn__pi') : ''}
     </button>`;
   }).join('');
 
@@ -131,7 +135,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
     return `<li class="tp-row ${isSel ? 'is-sel' : ''} ${reason ? 'is-off' : ''}" data-drop="${key}" data-pid="${esc(p.id)}"${repAttr(r)}>
       <button class="tp-row__main" data-act="tpick" data-loc="${key}" ${dragAttrs(loc, p)} aria-pressed="${isSel}">
         ${handle(s.pos, GROUP[s.pos])}
-        <span class="tp-row__name"><span class="tp-row__nm">${esc(p.name)}</span>${tactics.captain === p.id ? ' <abbr class="tp-c" title="Kapitan">C</abbr>' : ''}${reason ? `<small class="tp-off">${esc(reason)}</small>` : fit}${repBadge(r)}${rzChips ? rzChips(p, { short: true }) : ''}</span>
+        <span class="tp-row__name"><span class="tp-row__nm">${esc(p.name)}</span>${tactics.captain === p.id ? ' <abbr class="tp-c" title="Kapitan">C</abbr>' : ''}${piMarker(pim[p.id])}${reason ? `<small class="tp-off">${esc(reason)}</small>` : fit}${repBadge(r)}${rzChips ? rzChips(p, { short: true }) : ''}</span>
         ${condHtml(p)}<b class="tp-ovr" title="Ocena ogólna w skali 1-20">${Math.round(p.ovr)}</b>
       </button>
       ${infoBtn(p)}
@@ -148,7 +152,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
     return `<li class="tp-row ${isSel ? 'is-sel' : ''} ${reason ? 'is-off' : ''}" data-drop="${esc(key)}" data-pid="${esc(p.id)}"${repAttr(r)}>
       <button class="tp-row__main" data-act="tpick" data-loc="${esc(key)}" ${dragAttrs(loc, p)} aria-pressed="${isSel}">
         ${handle(posText(p), GROUP[p.pos])}
-        <span class="tp-row__name"><span class="tp-row__nm">${esc(p.name)}</span>${reason ? `<small class="tp-off">${esc(reason)}</small>` : ''}${repBadge(r)}${rzChips ? rzChips(p, { short: true }) : ''}</span>
+        <span class="tp-row__name"><span class="tp-row__nm">${esc(p.name)}</span>${piMarker(pim[p.id])}${reason ? `<small class="tp-off">${esc(reason)}</small>` : ''}${repBadge(r)}${rzChips ? rzChips(p, { short: true }) : ''}</span>
         ${condHtml(p)}<b class="tp-ovr" title="Ocena ogólna w skali 1-20">${Math.round(p.ovr)}</b>
       </button>
       ${infoBtn(p)}
@@ -246,6 +250,10 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
         <div class="seg2" role="radiogroup" aria-label="${esc(ins.label)}">${ins.options.map((o) => `<button data-act="tinstr" data-i="${ins.id}" data-v="${o.id}" aria-pressed="${o.id === cur}">${esc(o.label)}</button>`).join('')}</div>
         <p class="hint">${esc(opt?.text ?? '')}</p></div>`;
     }).join('')}
+  </div>
+  <div class="instr__pi">
+    <button class="btn btn--quiet" data-act="pi-table">Instrukcje indywidualne (${playerInstrCount(pim)})</button>
+    <p class="hint">Polecenie dla jednego zawodnika zamiast instrukcji drużyny, np. twardszy odbiór albo więcej dryblingu. Prawy przycisk albo przytrzymanie zawodnika: „Instrukcje zawodnika”.</p>
   </div>
   </section>
   <section class="tpanel3 tpanel3--roles" aria-labelledby="tp-h-roles">

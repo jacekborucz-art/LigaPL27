@@ -24,6 +24,7 @@ import { locKey, playerAt, resolveMove, resolveTap, sameLoc } from './tacticsMov
 import { monthsLeft, compareText } from './transfersView.js';
 import { fmtDate } from './dom.js';
 import { rzMenuItems, rzCtx } from './reservesView.js'; // rezerwy: delegowanie i powołania (docs/rezerwy.md)
+import { piSummary } from './playerInstrView.js'; // instrukcje indywidualne (docs/instrukcje-indywidualne.md)
 
 export const MENU_VIEWS = ['squad', 'profile', 'tactics', 'talks', 'transfers', 'training', 'dashboard'];
 const ROLES = [['captain', 'Kapitan'], ['penalty', 'Rzuty karne'], ['freeKick', 'Rzuty wolne'], ['corner', 'Rzuty rożne']];
@@ -353,6 +354,7 @@ export function playerMenu(game, pid, { view, ui = {}, why = null, lineup = null
       items = [
         ...lineupItems(p, L ?? { tactics: null, byId: new Map() }, { inTactics: true, ui }),
         ui.tInfo === p.id ? null : item('Atrybuty', { steps: [{ act: 'tinfo', id: p.id }] }, { hint: 'Panel atrybutów i stanu' }),
+        item('Instrukcje zawodnika', { steps: [{ act: 'pi-open', id: p.id }] }, { hint: piSummary(L?.tactics?.playerInstr?.[p.id]) ? `Teraz: ${piSummary(L.tactics.playerInstr[p.id])}` : 'Podania, drybling, odbiór, pressing i inne' }),
         ...rzItems,
         SEP, profile, report, talk, training, contractSub,
       ];
