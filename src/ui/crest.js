@@ -15,6 +15,9 @@ const fictionalCrest = (id) => !!FICTIONAL[id] && typeof document !== 'undefined
 export const FICTIONAL_CRESTS = new Set([
   'cracovia', 'gks-katowice', 'gornik-zabrze', 'jagiellonia', 'korona', 'lech', 'legia', 'motor', 'piast', 'pogon-szczecin',
   'radomiak', 'rakow', 'slask', 'widzew', 'wieczysta', 'wisla-krakow', 'wisla-plock', 'zaglebie-lubin',
+  // 1 Liga
+  'arka', 'lechia-gdansk', 'puszcza', 'polonia-bytom', 'ruch', 'pogon-grodzisk', 'podbeskidzie', 'stal-rzeszow', 'miedz',
+  'stal-mielec', 'chrobry', 'pogon-siedlce', 'odra-opole', 'polonia-warszawa', 'warta', 'termalica', 'lks', 'unia-skierniewice',
 ]);
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => (
