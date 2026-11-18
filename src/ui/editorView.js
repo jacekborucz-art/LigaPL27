@@ -16,7 +16,7 @@ import {
   packCounts, originalOf, peopleValues, checkCoach, checkOwner, checkStaff, editCoach, editOwner, editStaff,
   OWNER_LABELS, PERSON_AGE, ALT_MAX, ALT_POSITIONS,
   EDIT_SQUAD, squadSize, releaseBlock, releaseToFree, joinFromFree, freeAgents, checkNewPlayer, createFreePlayer, NEW_LEVEL,
-  REF_LIMITS, refValues, checkReferee, editReferee,
+  REF_LIMITS, refValues, checkReferee, editReferee, INJURY_LIST, INJ_DAYS_MAX,
 } from '../career/editor.js';
 import { REF_ATTRS } from '../career/referees.js';
 import { proficiency } from '../engine/positions.js';
@@ -77,6 +77,18 @@ export function playerListHtml(game, ed) {
   const { total, rows } = findPlayers(game, { q: ed.pq, club: ed.pclub, pos: ed.ppos });
   if (!rows.length) return '<p class="ed-empty">Nikt nie pasuje do wyszukiwania.</p>';
   return `<p class="ed-count">${total > rows.length ? `Pokazano ${rows.length} z ${total}. Zawęź wyszukiwanie.` : `Znaleziono: ${total}.`}</p>${playerRows(game, rows, 'ed-player', ed.player)}`;
+}
+
+/** Karta zawodnika: kontuzja (rodzaj z listy silnika meczu i dni do powrotu). */
+const CAT_LABEL = { light: 'Lekkie', medium: 'Średnie', severe: 'Ciężkie' };
+function healthHtml(v, e) {
+  const inj = v.injury ?? null;
+  const known = INJURY_LIST.some((t) => t.name === inj?.name);
+  const opts = Object.keys(CAT_LABEL).map((cat) => `<optgroup label="${CAT_LABEL[cat]}">${INJURY_LIST.filter((t) => t.cat === cat).map((t) => `<option value="${esc(t.name)}"${inj?.name === t.name ? ' selected' : ''}>${esc(t.name)} (${t.lo}-${t.hi} dni${t.playable ? ', gra z bólem' : ''})</option>`).join('')}</optgroup>`).join('');
+  return `<fieldset class="ed-attrs"><legend>Zdrowie</legend>${e.injury ? `<p class="ed-msg is-bad">${esc(e.injury)}</p>` : ''}<div class="ed-grid">
+    ${field('ed-inj', 'Kontuzja', `<select id="ed-inj"><option value="">Zdrowy</option>${inj && !known ? `<option value="${esc(inj.name)}" selected>${esc(inj.name)}</option>` : ''}${opts}</select>`)}
+    ${field('ed-inj-days', 'Dni do powrotu', `<input id="ed-inj-days" type="number" min="1" max="${INJ_DAYS_MAX}" step="1" inputmode="numeric" value="${esc(inj?.days ?? '')}"${e.injury ? ' aria-invalid="true"' : ''}>`, { help: `Od 1 do ${INJ_DAYS_MAX}. Puste przy wybranej kontuzji: środek zakresu dni. Lekkie urazy pozwalają grać z bólem.` })}
+  </div></fieldset>`;
 }
 
 /** Karta zawodnika: przeniesienie z kadry do wolnych albo wolnego do kadry wybranego klubu. */
@@ -329,6 +341,7 @@ function playerForm(game, ed, pid, { back }) {
       ${field('ed-pot', 'Potencjał (1-20)', `<input id="ed-pot" type="number" min="1" max="20" step="0.1" inputmode="decimal" value="${esc(v.pot)}"${e.pot ? ' aria-invalid="true" aria-describedby="ed-pot-err"' : ''}>`, { err: e.pot, help: 'Ukryty sufit rozwoju zawodnika.' })}
     </div>
     ${e.alt ? `<p class="ed-msg is-bad">${esc(e.alt)}</p>` : ''}
+    ${healthHtml(v, e)}
     ${posPitch(v, pid)}
     ${attrErr.length ? `<p class="ed-msg is-bad">${esc(attrErr[0])}${attrErr.length > 1 ? ` (i ${attrErr.length - 1} więcej)` : ''}</p>` : ''}
     ${groups}
@@ -420,7 +433,12 @@ function readPlayerForm(root) {
   for (const k of Object.keys(ATTRS)) attrs[k] = val(root, `ed-a-${k}`);
   const alt = {}; // pozycje dodatkowe: puste pole = bez wpisu
   for (const el of root?.querySelectorAll?.('input[data-alt]') ?? []) if (String(el.value).trim() !== '') alt[el.dataset.alt] = el.value;
-  return { first: val(root, 'ed-first'), last: val(root, 'ed-last'), nat: val(root, 'ed-nat'), pos: val(root, 'ed-pos'), birthDate: val(root, 'ed-birth'), attrs, pot: val(root, 'ed-pot'), alt };
+  // Kontuzja: „Zdrowy” = null; bez dni: środek zakresu dni rodzaju urazu
+  const injName = val(root, 'ed-inj'); let injDays = String(val(root, 'ed-inj-days')).trim();
+  const t = INJURY_LIST.find((x) => x.name === injName);
+  if (injName && !injDays && t) injDays = String(Math.round((t.lo + t.hi) / 2));
+  const injury = root?.querySelector?.('#ed-inj') ? (injName ? { name: injName, days: injDays } : null) : undefined;
+  return { first: val(root, 'ed-first'), last: val(root, 'ed-last'), nat: val(root, 'ed-nat'), pos: val(root, 'ed-pos'), birthDate: val(root, 'ed-birth'), attrs, pot: val(root, 'ed-pot'), alt, injury };
 }
 
 const changed = (n) => (n ? `Zapisano zmiany (${n} ${n === 1 ? 'pole' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'pola' : 'pól'}).` : 'Bez zmian do zapisania.');

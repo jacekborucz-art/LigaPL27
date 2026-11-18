@@ -23,6 +23,7 @@ import { marketValue } from '../world/playerGen.js';
 import { infraOf, applyPlan, capacityOf } from './infrastructure.js';
 import { stadiumCapacity } from './finance.js';
 import { normPos, POSITIONS } from '../engine/positions.js';
+import { INJURY_TYPES } from '../engine/match/constants.js';
 import { GAME_VERSION } from '../config/version.js';
 import { coachOf, COACH_KEYS, COACH_ATTRS, COACH_STYLES } from './coaches.js';
 import { ownerOf, OWNER_KEYS } from './owners.js';
@@ -51,7 +52,7 @@ export const LIMITS = {
   ageMin: 15, ageMax: 45,
 };
 export const CLUB_FIELDS = ['name', 'short', 'stadium', 'crest', 'capacity', 'balance', 'transferBudget', 'wageBudget'];
-export const PLAYER_FIELDS = ['first', 'last', 'nat', 'pos', 'birthDate', 'attrs', 'pot', 'alt', 'team'];
+export const PLAYER_FIELDS = ['first', 'last', 'nat', 'pos', 'birthDate', 'attrs', 'pot', 'alt', 'injury', 'team'];
 // Pozycje dodatkowe (p.alt: biegłość 0-90 %, jak nauka pozycji na treningu, src/engine/positions.js): bez bramki
 export const ALT_POSITIONS = POSITIONS.filter((x) => x !== 'BR');
 export const ALT_MAX = 90; // pozycja dodatkowa nigdy nie daje pełnej biegłości naturalnej (LEARNED_CAP)
@@ -217,6 +218,15 @@ export function checkPlayer(src, { form = false, date = null } = {}) {
     }
   }
   if (src.pot !== undefined) put('pot', num(src.pot, { label: 'Potencjał', min: LIMITS.attrMin, max: LIMITS.attrMax, int: false, form }));
+  if (src.injury !== undefined) { // kontuzja: null = zdrowy, albo { name, days }
+    if (src.injury === null) value.injury = null;
+    else if (!isObj(src.injury)) errors.injury = 'Kontuzja: zły format.';
+    else {
+      const nm = text(src.injury.name, { label: 'Rodzaj kontuzji', max: INJ_NAME_MAX, min: 2 });
+      const d = num(src.injury.days, { label: 'Dni kontuzji', min: 1, max: INJ_DAYS_MAX, form });
+      if (nm.err) errors.injury = nm.err; else if (d.err) errors.injury = d.err; else value.injury = { name: nm.v, days: d.v };
+    }
+  }
   if (src.team !== undefined) { // klub z edytora (przeniesienie), null = wolny zawodnik
     put('team', src.team === null ? { v: null } : typeof src.team === 'string' && /^[A-Za-z0-9_.:-]{1,80}$/.test(src.team) ? { v: src.team } : { err: 'Klub: zły identyfikator.' });
   }
@@ -570,8 +580,23 @@ export function playerValues(p) {
     first: p.first ?? String(p.name ?? '').split(' ')[0] ?? '', last: p.last ?? String(p.name ?? '').split(' ').slice(1).join(' '),
     nat: p.nat, pos: p.pos, birthDate: p.birthDate ?? '', attrs: { ...p.attr }, pot: p.hidden?.POT ?? p.ovr,
     alt: Object.fromEntries(Object.entries(p.alt ?? {}).filter(([k, v]) => k !== p.pos && ALT_POSITIONS.includes(k) && v > 0).map(([k, v]) => [k, Math.min(ALT_MAX, Math.round(v * 10) / 10)])),
+    injury: p.injuryDays > 0 ? { name: String(p.injury?.name ?? 'uraz').slice(0, INJ_NAME_MAX), days: Math.min(INJ_DAYS_MAX, p.injuryDays) } : null,
   };
 }
+
+// ------------------------------------------------------------ Kontuzja zawodnika
+// p.injuryDays: dni do powrotu (maleją co dzień, src/season/season.js), p.injury: { cat, name, days, playable, since }.
+// Rodzaje z silnika meczu (INJURY_TYPES): lekkie pozwalają grać z bólem, jak kontuzja z meczu albo treningu.
+export const INJ_DAYS_MAX = 365;
+const INJ_NAME_MAX = 60;
+export const INJURY_LIST = Object.entries(INJURY_TYPES).flatMap(([cat, list]) => list.map(([name, lo, hi, playable]) => ({ cat, name, lo, hi, playable })));
+/** Kontuzja z edytora: rodzaj z listy silnika (inna nazwa: kategoria z liczby dni, bez gry z bólem). */
+export function injuryFrom(name, days, date) {
+  const t = INJURY_LIST.find((x) => x.name === name);
+  const cat = t?.cat ?? (days <= 14 ? 'light' : days <= 42 ? 'medium' : 'severe');
+  return { cat, name, days, playable: !!t?.playable, since: date, editor: true };
+}
+const sameInjury = (a, b) => (a?.name ?? null) === (b?.name ?? null) && (a?.days ?? 0) === (b?.days ?? 0);
 
 /** OVR zawodnika liczony tak jak w grze (profil pozycji z wariantem, src/training/development.js). */
 export const ovrOf = (p) => ovrAt(p.attr, p.pos, offsetsFor(p));
@@ -597,6 +622,12 @@ export function editPlayer(game, pid, values) {
     const pos = values.pos ?? p.pos;
     const alt = Object.fromEntries(Object.entries(values.alt).filter(([k]) => k !== pos)); // pozycja główna to 100 %
     if (!sameAlt(alt, cur.alt)) { n++; p.alt = alt; rec.alt = alt; }
+  }
+  if (values.injury !== undefined && !sameInjury(values.injury, cur.injury)) {
+    n++;
+    const v = values.injury;
+    if (v) { p.injuryDays = v.days; p.injury = injuryFrom(v.name, v.days, game.date); } else { p.injuryDays = 0; p.injury = null; }
+    rec.injury = v;
   }
   if (!n) return 0; // nic się nie zmieniło (np. pełny datapack wczytany do tej samej gry)
   if (values.first !== undefined || values.last !== undefined) {
@@ -664,6 +695,7 @@ export function exportPack(game, now = new Date(), { full = false } = {}) {
     if (!cur.birthDate) delete cur.birthDate;
     if (typeof cur.pot === 'number') cur.pot = Math.round(cur.pot * 10) / 10;
     if (!Object.keys(cur.alt).length) delete cur.alt; // bez pozycji dodatkowych: pole pominięte
+    if (!cur.injury) delete cur.injury; // zdrowy: pole pominięte
     const { value } = checkPlayer(cur);
     if (!Object.keys(value).length) continue;
     players[id] = { ...value, club: p.clubId ? (clubObj(p.clubId)?.name ?? p.clubId) : null, ovr: p.ovr };

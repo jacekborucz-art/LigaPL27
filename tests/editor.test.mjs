@@ -335,6 +335,30 @@ test('Sędziowie w edytorze: atrybuty, surowość, datapack w innym świecie gry
   restoreOriginals();
 });
 
+test('Kontuzja w edytorze: rodzaj i dni, gra z bólem przy lekkich, wyleczenie, datapack', () => {
+  const g = structuredClone(G);
+  const p = Object.values(g.world.players).find((x) => x.clubId === 'legia' && !(x.injuryDays > 0));
+  assert.ok(checkPlayer({ injury: { name: 'zerwanie więzadła krzyżowego', days: '400' } }, { form: true }).errors.injury);
+  assert.ok(checkPlayer({ injury: 'x' }).errors.injury);
+  const r = checkPlayer({ injury: { name: 'zerwanie więzadła krzyżowego', days: '200' } }, { form: true });
+  assert.deepEqual(r.errors, {});
+  assert.equal(editPlayer(g, p.id, r.value), 1);
+  assert.equal(p.injuryDays, 200);
+  assert.equal(p.injury.cat, 'severe');
+  assert.equal(p.injury.playable, false);
+  editPlayer(g, p.id, checkPlayer({ injury: { name: 'stłuczenie', days: 3 } }).value);
+  assert.equal(p.injury.playable, true, 'lekki uraz: gra z bólem');
+  const pk = parsePack(JSON.stringify(exportPack(g)));
+  assert.deepEqual(pk.players[p.id].injury, { name: 'stłuczenie', days: 3 });
+  const g2 = structuredClone(G);
+  importPack(g2, pk);
+  assert.equal(g2.world.players[p.id].injuryDays, 3);
+  editPlayer(g, p.id, checkPlayer({ injury: null }).value);
+  assert.equal(p.injuryDays, 0);
+  assert.equal(p.injury, null);
+  restoreOriginals();
+});
+
 test('Datapack: po wczytaniu pliku tarcze w barwach zamiast herbów, gra bez pliku z herbami', () => {
   const legia = clubById('legia');
   restoreOriginals();
