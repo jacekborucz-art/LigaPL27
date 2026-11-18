@@ -3,7 +3,7 @@
 // wspólne dla ekranu Skład i taktyka (src/app.js, data-act) i okna „Zmiany i taktyka” w meczu
 // (src/ui/matchdayView.js, data-md). Host podaje attr(nazwa, dane) z atrybutami przycisków.
 // Jakość wykonania instrukcji jest ukryta: tylko ogólne opisy zysku i ryzyka, bez prognozy dla zawodnika.
-import { PLAYER_INSTRUCTIONS, PI_IDS, PI_TEAM_LABEL, piAllowed, teamLevel, playerInstruction, cleanPlayerInstr, playerInstrCount } from '../data/playerInstructions.js';
+import { PLAYER_INSTRUCTIONS, PI_IDS, PI_KEYS, PI_TEAM_LABEL, piAllowed, teamLevel, playerInstruction, cleanPlayerInstr, playerInstrCount, arrowOf, arrowToInstr, arrowsFor, arrowLabel, arrowHint, ARROW_DIRS } from '../data/playerInstructions.js';
 import { INSTRUCTIONS } from '../data/instructions.js';
 import { formationById } from '../data/formations.js';
 import { byPosition } from '../engine/positions.js';
@@ -27,11 +27,30 @@ export function piOptionLabel(id, v) {
   return d?.options.find((o) => o.v === v)?.label ?? PI_TEAM_LABEL;
 }
 
-/** „odbiór twardy, pressing więcej” (kolejność z katalogu) albo pusty tekst. */
+/** „odbiór twardy, pressing więcej, ruch skos do środka” (kolejność z katalogu) albo pusty tekst. */
 export function piSummary(o) {
   if (!o) return '';
-  return PLAYER_INSTRUCTIONS.filter((d) => o[d.id] === -1 || o[d.id] === 1)
-    .map((d) => `${d.label.toLowerCase()} ${piOptionLabel(d.id, o[d.id]).toLowerCase()}`).join(', ');
+  const dir = arrowOf(o);
+  return PLAYER_INSTRUCTIONS.filter((d) => (d.id === 'run' ? !!dir : o[d.id] === -1 || o[d.id] === 1))
+    .map((d) => (d.id === 'run' ? `ruch ${arrowLabel(dir).toLowerCase()}` : `${d.label.toLowerCase()} ${piOptionLabel(d.id, o[d.id]).toLowerCase()}`)).join(', ');
+}
+
+/** Kierunki Ruchu dla wiersza: pozycja zawodnika albo miejsce w składzie (jak walidacja w silniku). */
+export function piDirsFor(row) {
+  const s = new Set([...arrowsFor(row.p.pos), ...(row.slotPos ? arrowsFor(row.slotPos) : [])]);
+  return ARROW_DIRS.map((d) => d.id).filter((d) => s.has(d));
+}
+/** Nowa mapa po ustawieniu kierunku Ruchu (run i lat razem; '' albo null: jak drużyna). */
+export function piWithDir(map, pid, dir) {
+  const { run, lat } = arrowToInstr(dir || null);
+  return piWith(piWith(map, pid, 'run', run), pid, 'lat', lat);
+}
+/** Opis zmiany w kolejce meczu: zmienione instrukcje, Ruch jako kierunek ze szkicu entry. */
+export function piChangeText(o, entry) {
+  if (o === null) return 'wszystko jak drużyna';
+  const parts = Object.entries(o).filter(([k]) => k !== 'run' && k !== 'lat').map(([k, v]) => `${playerInstruction(k)?.label.toLowerCase() ?? k} ${piOptionLabel(k, v).toLowerCase()}`);
+  if ('run' in o || 'lat' in o) parts.push(`ruch ${arrowLabel(arrowOf(entry)).toLowerCase()}`);
+  return parts.join(', ');
 }
 
 /** Znacznik przy nazwisku: ikona (kształt, nie tylko kolor) z opisem w title i aria-label. Brak instrukcji: pusty tekst. */
@@ -78,7 +97,7 @@ export function piPatch(cur = {}, draft = {}, ids = null) {
     if (ok && !ok.has(String(id))) continue;
     const a = cur?.[id] ?? {}; const b = draft?.[id] ?? {};
     const ch = {};
-    for (const k of PI_IDS) if ((a[k] ?? 0) !== (b[k] ?? 0)) ch[k] = b[k] ?? 0;
+    for (const k of PI_KEYS) if ((a[k] ?? 0) !== (b[k] ?? 0)) ch[k] = b[k] ?? 0;
     if (Object.keys(ch).length) out[id] = Object.keys(b).length ? ch : null;
   }
   return out;
@@ -117,6 +136,19 @@ function segHtml(d, row, val, instructions, attr, { short = false, label = d.lab
   return `<div class="pi-seg" role="group" aria-label="${esc(label)}">${b(minus)}${mid}${b(plus)}</div>`;
 }
 
+/** Przyciski kierunków Ruchu w oknie zawodnika: jak drużyna i kierunki dozwolone na jego pozycji albo miejscu. */
+function dirSegHtml(row, entry, attr) {
+  const cur = arrowOf(entry) ?? '';
+  const b = (d, text) => `<button type="button" ${attr('dir', { id: row.id, d })} aria-pressed="${cur === d}" title="${esc(d ? arrowHint(d, piPos(row)) : 'Bez osobnego ruchu, jak reszta drużyny')}">${esc(text)}</button>`;
+  return `<div class="pi-seg pi-seg--dirs" role="group" aria-label="Ruch">${b('', PI_TEAM_LABEL)}${piDirsFor(row).map((d) => b(d, arrowLabel(d))).join('')}</div>`;
+}
+/** Lista wyboru kierunku Ruchu (tabela na PC i lista na telefonie; listener change jak przy innych instrukcjach). */
+function dirSelectHtml(r, entry, label) {
+  const cur = arrowOf(entry) ?? '';
+  const opts = [['', PI_TEAM_LABEL], ...piDirsFor(r).map((x) => [x, arrowLabel(x)])].map(([ov, l]) => `<option value="${ov}"${ov === cur ? ' selected' : ''}>${esc(l)}</option>`).join('');
+  return `<select class="pit-sel" data-id="${esc(r.id)}" data-k="run" aria-label="${esc(label)}">${opts}</select>`;
+}
+
 /**
  * Okno instrukcji jednego zawodnika. row: { id, p, slotPos }, entry: jego nadpisania albo null,
  * instructions: instrukcje drużyny, attr(nazwa, dane): atrybuty przycisków hosta
@@ -128,6 +160,15 @@ export function piPlayerHtml({ row, entry = null, instructions = {}, attr, note 
   const list = PLAYER_INSTRUCTIONS.filter((d) => piFor(d.id, row));
   const skipped = PLAYER_INSTRUCTIONS.length - list.length;
   const rows = list.map((d) => {
+    if (d.id === 'run') {
+      // Ruch: kierunek strzałki (do przodu, skosy, do środka, szeroko, cofnięcie), ten sam zapis co na boisku
+      const dir = arrowOf(entry);
+      return `<div class="pi-row${dir ? ' is-set' : ''}" data-k="run">
+      <span class="pi-row__lbl" id="pi-l-run">${esc(d.label)}</span>
+      ${dirSegHtml(row, entry, attr)}
+      <p class="pi-row__hint">${esc(dir ? arrowHint(dir, pos) : 'Gra jak reszta drużyny (bez osobnego ruchu). Kierunek możesz też narysować strzałką na boisku.')}</p>
+    </div>`;
+    }
     const val = entry?.[d.id] === -1 || entry?.[d.id] === 1 ? entry[d.id] : 0;
     const opt = d.options.find((o) => o.v === val);
     const hint = opt ? opt.hint : `Gra jak reszta drużyny (${d.team ? `${INSTRUCTIONS.find((i) => i.id === d.team.id)?.label.toLowerCase() ?? d.label.toLowerCase()}: ${teamValueLabel(d.id, instructions).toLowerCase()}` : 'bez osobnego polecenia'}).`;
@@ -180,6 +221,7 @@ export function piTableHtml({ rows, map = {}, instructions = {}, filter = 'all',
   const head = `<tr><th scope="col" class="pit-c0">Zawodnik</th>${PLAYER_INSTRUCTIONS.map((d) => `<th scope="col"><span>${esc(d.label)}</span>${d.team ? `<small>drużyna: ${esc(teamValueLabel(d.id, instructions).toLowerCase())}</small>` : ''}</th>`).join('')}</tr>`;
   const cell = (r, d) => {
     if (!piFor(d.id, r)) return '<td class="pit-na"><span>nie dotyczy</span></td>';
+    if (d.id === 'run') return `<td class="${arrowOf(map[r.id]) ? 'is-set' : ''}">${dirSelectHtml(r, map[r.id], `${r.p.name}: ${d.label}`)}</td>`;
     const v = valOf(r, d.id);
     const tl = teamLevel(d.id, instructions);
     const opts = [[0, PI_TEAM_LABEL], ...d.options.map((o) => [o.v, o.label])]
@@ -202,11 +244,12 @@ export function piTableHtml({ rows, map = {}, instructions = {}, filter = 'all',
   const pickChips = `<div class="chips pi-chips pi-pick" role="group" aria-label="Instrukcja">${PLAYER_INSTRUCTIONS.map((d) => `<button type="button" class="chip" ${attr('pick', { k: d.id })} aria-pressed="${d.id === k1}">${esc(d.label)}</button>`).join('')}</div>`;
   const one = `<div class="pit-one">
       ${pickChips}
-      <p class="hint pit-one__team">${esc(`${d1.label}: ${d1.options.map((o) => o.label.toLowerCase()).join(' albo ')}. Drużyna teraz: ${teamValueLabel(k1, instructions).toLowerCase()}.`)}</p>
+      <p class="hint pit-one__team">${esc(k1 === 'run' ? 'Ruch: kierunek w ataku (do przodu, skosy, do środka, szeroko, cofnięcie), jak strzałka na boisku.' : `${d1.label}: ${d1.options.map((o) => o.label.toLowerCase()).join(' albo ')}. Drużyna teraz: ${teamValueLabel(k1, instructions).toLowerCase()}.`)}</p>
       <ul class="pit-list">${fit.map((r) => {
         const v = valOf(r, k1);
         const pos = piPos(r);
-        return `<li class="pit-item${v ? ' is-set' : ''}"><span class="pit-item__who"><span class="pos" data-g="${GROUP[pos] ?? 'MID'}">${esc(pos)}</span>${nameBtn(r)}${piMarker(map[r.id])}</span>${segHtml(d1, r, v, instructions, attr, { short: true, label: `${r.p.name}: ${d1.label}` })}</li>`;
+        const ctl = k1 === 'run' ? `<span class="pi-seg pi-seg--sel">${dirSelectHtml(r, map[r.id], `${r.p.name}: ${d1.label}`)}</span>` : segHtml(d1, r, v, instructions, attr, { short: true, label: `${r.p.name}: ${d1.label}` });
+        return `<li class="pit-item${v || (k1 === 'run' && arrowOf(map[r.id])) ? ' is-set' : ''}"><span class="pit-item__who"><span class="pos" data-g="${GROUP[pos] ?? 'MID'}">${esc(pos)}</span>${nameBtn(r)}${piMarker(map[r.id])}</span>${ctl}</li>`;
       }).join('') || '<li class="hint">Brak zawodników, których dotyczy ta instrukcja.</li>'}</ul>
       ${other ? `<p class="hint">${esc(`Ta instrukcja nie dotyczy ${other} ${nWord(other)} z tej listy (pozycja).`)}</p>` : ''}
     </div>`;

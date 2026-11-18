@@ -1656,3 +1656,55 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
   .pidlg[open] { animation: pi-up 180ms ease-out; }
 }
 @keyframes pi-up { from { transform: translateY(24px); opacity: .6; } }
+
+/* ---------- Strzałki ruchu (docs/strzalki-ruchu.md): warstwa SVG pod żetonami, kompas, legenda ---------- */
+/* Murawa ma ten sam kolor w obu motywach, więc kolory strzałek są stałe; ciemny obrys (halo) dla czytelności na trawie */
+:root { --pa-run: #FFC233; --pa-lat: #6FE0FF; --pa-back: #F3F6F1; --pa-halo: rgba(6, 18, 10, .62); --pa-bad: #FF6B5E; }
+.pa { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 0; }
+.pitch2 > .slot-btn, .pitch2 > .mm-tok { z-index: 1; }
+.pa__halo { fill: none; stroke: var(--pa-halo); stroke-width: 6.5; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.pa__l { fill: none; stroke-width: 3; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.pa__l--run { stroke: var(--pa-run); stroke-dasharray: 7 5; }
+.pa__l--back { stroke: var(--pa-back); stroke-dasharray: 0.5 6; stroke-width: 3.6; }
+.pa__l--lat { stroke: var(--pa-lat); }
+.pa__l--bad { stroke: var(--pa-bad); stroke-dasharray: 3 4; }
+.pa__l--preview { stroke-width: 3.4; }
+.pa__m path { stroke: var(--pa-halo); stroke-width: 1.2; stroke-linejoin: round; }
+.pa__m--run path { fill: var(--pa-run); }
+.pa__m--back path { fill: var(--pa-back); }
+.pa__m--lat path { fill: var(--pa-lat); }
+.pa-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; margin: 6px 0 0; font-size: 12px; color: var(--text-muted); }
+.pa-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.pa-legend svg { width: 28px; height: 8px; border-radius: 2px; background: var(--murawa); overflow: visible; }
+.pa-legend .pa__l { stroke-width: 2.4; }
+/* Przycisk „Strzałki” obok „Instrukcje indywidualne” */
+.tac__hintbtns { display: flex; flex-wrap: wrap; gap: 8px; }
+.tac__arrows { display: inline-flex; align-items: center; gap: 6px; }
+.tac__arrows-i { width: 15px; height: 15px; }
+.tac__arrows[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+@media (min-width: 1100px) { .tac__hintrow > .tac__hintbtns { align-self: center; justify-content: center; } }
+.tac__msg.is-warn { color: var(--kartka-czerwona); }
+/* Tryb strzałek: zawodnik bez strzałek przygaszony, kursor wskazuje rysowanie */
+.pitch2.is-arrows .slot-btn[aria-disabled="true"] { opacity: .55; cursor: default; }
+.pitch2.is-arrows .slot-btn:not([aria-disabled="true"]) { cursor: crosshair; }
+.pitch2.is-arrows .slot-btn.is-arrow .slot-btn__dot { outline: 3px solid var(--pa-run); outline-offset: 2px; }
+.pitch2.is-drawing::after { content: attr(data-draw-hint); position: absolute; left: 50%; top: 6px; transform: translateX(-50%); padding: 3px 8px; border-radius: 4px; background: var(--pa-halo); color: #fff; font: 600 12px/1.3 var(--font-body); pointer-events: none; z-index: 3; white-space: nowrap; }
+/* Kompas: siatka 3 x 3 wokół zawodnika (środek: brak ruchu), przyciski 44 px, tylko dozwolone kierunki */
+.acomp { position: absolute; z-index: 4; left: clamp(86px, calc(var(--px) * 1%), calc(100% - 86px)); top: clamp(72px, calc(var(--py) * 1%), calc(100% - 96px)); transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 4px; pointer-events: none; }
+.acomp__grid { display: grid; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 44px); gap: 2px; padding: 4px; border-radius: 14px; background: rgba(6, 18, 10, .5); pointer-events: auto; }
+.acomp__b { grid-column: var(--c); grid-row: var(--r); display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 2px solid rgba(243, 246, 241, .75); border-radius: 50%; background: var(--surface); color: var(--text); box-shadow: 0 2px 6px rgba(0, 0, 0, .35); cursor: pointer; }
+.acomp__b svg { width: 22px; height: 22px; transform: rotate(var(--a, 0deg)); }
+.acomp__b--none { font: 700 20px/1 var(--font-display); color: var(--text-muted); }
+.acomp__b:hover { border-color: var(--pa-run); }
+.acomp__b.is-on { background: var(--pa-run); color: #14211A; border-color: #14211A; }
+.acomp__b:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.acomp__cap { display: flex; align-items: center; gap: 6px; max-width: 168px; margin: 0; padding: 3px 4px 3px 8px; border-radius: 6px; background: var(--pa-halo); color: #fff; font-size: 12px; line-height: 1.3; pointer-events: auto; white-space: nowrap; }
+.acomp__cap b { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.acomp__cap > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.acomp__x { min-height: 28px; padding: 0 8px; border: 1px solid rgba(255, 255, 255, .5); border-radius: 4px; background: transparent; color: #fff; font: 600 12px/1 var(--font-body); cursor: pointer; }
+.acomp__x:focus-visible { outline: 2px solid var(--focus); }
+/* Okno instrukcji: kierunki Ruchu zawijają się (do 7 przycisków) */
+.pi-seg--dirs { display: flex; flex-wrap: wrap; }
+.pi-seg--dirs button { flex: 1 1 96px; }
+.pi-seg--sel { display: block; padding: 0; background: none; }
+.pi-seg--sel .pit-sel { min-height: 44px; }

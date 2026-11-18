@@ -244,6 +244,11 @@ Instrukcje indywidualne zawodników, etap 1 (silnik, dane, zmiana w meczu, regu�
 `tests/playerInstr.test.mjs` pilnuje, że mecz bez instrukcji indywidualnych jest identyczny jak przed nimi: zmiana
 silnika, która celowo zmienia przebieg meczu, wymaga nowych skrótów (zebranych kodem z `tests/piHelpers.mjs`).
 
+Strzałki ruchu zawodników (Nov 18, 2026, v1.19 Beta): tryb „Strzałki” nad boiskiem w Skład i taktyka i w oknie
+„Zmiany i taktyka” w meczu, kompas z kierunkami dozwolonymi dla pozycji, rysowanie przeciągnięciem na PC. Zapis jako
+instrukcje indywidualne `run` i `lat`, silnik w `src/engine/match/playerInstr.js` (`PI.arrow`), pomiar A/B wszystkich
+30 kierunków: `node tools/pi-kalibracja.mjs 300 strzalki`. Opis: `docs/strzalki-ruchu.md` rozdział 5.
+
 Analiza pomeczowa sztabu, Nov 18, 2026: poczta po każdym meczu o stawkę (bez sparingów), pełny raport, archiwum
 „Analizy meczów” w panelu taktyki, błędy zależne od jakości analityka i asystenta, tylko dane widoczne w meczu.
 Opis wdrożenia: `docs/analiza-pomeczowa.md` rozdział 8, testy `tests/postMatchReport.test.mjs`.

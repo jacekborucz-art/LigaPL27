@@ -10,7 +10,7 @@
 
 import { Rng, clamp } from '../../core/rng.js';
 import { INSTRUCTIONS } from '../../data/instructions.js';
-import { PLAYER_INSTRUCTIONS, playerInstruction, teamLevel, cleanPlayerInstrMap, cleanPlayerInstr } from '../../data/playerInstructions.js';
+import { PLAYER_INSTRUCTIONS, PI_LAT, playerInstruction, teamLevel, cleanPlayerInstrMap, cleanPlayerInstr, arrowOf, arrowAllowed, arrowLabel } from '../../data/playerInstructions.js';
 import { INSTR_NUM } from './constants.js';
 
 /** Wartości balansowe [SZAC], pomiar A/B w docs/instrukcje-indywidualne.md. */
@@ -24,6 +24,14 @@ export const PI = {
     shoot: { 1: { act: { DYS: 1.5, POZ: 0.93 } }, [-1]: { act: { DYS: 0.6, POZ: 1.04 } } },
     cross: { 1: { act: { SKR: 1.35, POZ: 0.92 }, brkPerAerial: 0.03, passAcc: -0.015 }, [-1]: { act: { SKR: 0.75, POZ: 1.05 } } },
     run: { 1: { counterVulnMul: 1.4, offsideMul: 1.3 }, [-1]: { counterVulnMul: 0.8, offsideMul: 0.85, D: 0.1 } },
+    // Strzałki ruchu (docs/strzalki-ruchu.md): do środka (-1) i szeroko (1) dla każdego; koszty zależne od roli
+    lat: { [-1]: { act: { POZ: 1.08, SKR: 0.85 } }, 1: { act: { SKR: 1.2, POZ: 0.95 } } },
+    'lat:fb': { [-1]: { counterVulnMul: 1.12, oppAct: { SKR: 1.2 } } }, // boczny obrońca do środka odsłania flankę
+    'lat:w': { [-1]: { W: -0.1, oppAct: { SKR: 1.1 } } }, // skrzydłowy do środka zwęża grę
+    'lat:c': { [-1]: { W: -0.15, oppAct: { SKR: 1.2 } } }, // środkowy pomocnik do środka: bok bez wsparcia
+    'lat:o': { 1: { W: 0.15, act: { SKR: 1.08 } } }, // szeroko: rozciąga obronę rywala, więcej dośrodkowań
+    'run:w': { 1: { act: { KON: 1.05 } } }, // skrzydłowy i napastnik za linię obrony: więcej szybkich ataków
+    'run:b': { [-1]: { pActMul: 0.97 } }, // obrońca i pomocnik z tyłu: mniej ludzi w ataku
   },
   // Efekty tylko dla zawodnika (mnożniki wag losowania i zmęczenia), względem poziomu 0
   micro: {
@@ -34,6 +42,16 @@ export const PI = {
     offW: { 1: 1.3, [-1]: 0.75 },
     shift: 0.15, shiftMax: 0.25, // Pozycja: udział strefy DEF -> ATT (do przodu), ATT -> DEF (z tyłu)
   },
+  // Strzałki ruchu (docs/strzalki-ruchu.md) [SZAC]: strefy, środek pola, mnożniki zawodnika, łączenie
+  arrow: {
+    attShift: 0.15, napBack: 0.15, fbIn: 0.08, fbDiagIn: 0.04, shiftMax: 0.35, // OP, SN, NAP: MID <-> ATT; BO i WB do środka: DEF -> MID
+    cen: 0.2, cenDiag: 0.1, cenFull: 0.4, cenTail: 0.5, // T.central: do środka +, szeroko -; od trzeciego zawodnika do środka połowa
+    midEff: 0.2, roleW: 10, // efekty zależne od roli (lat:fb, lat:w, lat:c, lat:o, run:w, run:b) działają w pełni na zawodnika, nie 1/10
+    fwdShot: { ŚP: 1.25, OP: 1.3, BP: 1.15 }, // do przodu: wbiega w pole karne (box-to-box, cień napastnika, skrzydłowy)
+    fat: { diag: 1.06, o: 1.04, i: 1 },
+    wIn: { shotW: 1.25, dysW: 1.3, skrA: 0.6 }, wide: { skrA: 1.4, opSkrA: 2.5, shotW: 0.85 }, napBackFx: { shotW: 0.7, othA: 1.4 },
+    pairPen: 0.06, // co najmniej 2 obrońców do przodu: podatność na kontrę x(1 + 0,06 x (n - 1))
+  },
   // Jakość wykonania q: inteligencja (DEC, WIZ, UST z wagami instrukcji) ok. 50-60 % zmienności
   q: {
     base: 0.96, attr: 0.08, mean: 10.6, sd: 2.3, form: 0.05, morale: 0.01, noise: 0.064, min: 0.6, max: 1.2,
@@ -42,12 +60,12 @@ export const PI = {
   intel: {
     pass: { DEC: 0.4, WIZ: 0.5, UST: 0.1 }, dribble: { DEC: 0.6, WIZ: 0.3, UST: 0.1 }, shoot: { DEC: 0.7, WIZ: 0.2, UST: 0.1 },
     cross: { DEC: 0.4, WIZ: 0.5, UST: 0.1 }, tackle: { DEC: 0.4, UST: 0.6 }, run: { DEC: 0.3, WIZ: 0.2, UST: 0.5 },
-    press: { DEC: 0.4, WIZ: 0.1, UST: 0.5 },
+    press: { DEC: 0.4, WIZ: 0.1, UST: 0.5 }, lat: { DEC: 0.4, WIZ: 0.4, UST: 0.2 },
   },
   // Atrybuty wykonania (zysk); dobre atrybuty też lekko zmniejszają koszt
   skill: {
     pass: ['POD', 'TEC', 'WIZ'], dribble: ['DRY', 'ZWI', 'TEC'], shoot: ['DYS'], cross: ['DOS', 'SZY', 'WYT'],
-    tackle: ['ODB', 'SIL'], run: ['WYT', 'SZY', 'PRA'], press: ['PRA', 'WYT', 'AGR'],
+    tackle: ['ODB', 'SIL'], run: ['WYT', 'SZY', 'PRA'], press: ['PRA', 'WYT', 'AGR'], lat: ['TEC', 'POD', 'WYT'],
   },
   // Konflikt z planem drużyny: w ok. 25-30 % meczów lekki bonus (do +10 %), poza tym lekka kara (do -15 %)
   conflict: { pBonus: 0.28, pStatus: 0.08, bonus: 0.10, pen: 0.10, minScale: 0.6, maxScale: 1.5 },
@@ -59,10 +77,14 @@ const GOOD = {
   pos: 1, oppPos: -1, pActMul: 1, D: 1, counterVulnMul: -1, oppPActMul: -1, foulMul: -1, penMul: -1, brk: 1, brkPerTec: 1,
   brkPerAerial: 1, setPieceD: 1, DvsPOZ: 1, DvsKON: 1, oppOffsideMul: 1, redMul: -1, passAcc: 1, pressHigh: 1,
   tackleHard: 1, tackleSoft: -1, tacFoulMul: 1, offsideMul: -1, penDrawMul: 1, yellowPerFoul: -1, redPerFoul: -1,
-  fatMul: -1, fatMidMul: -1,
+  fatMul: -1, fatMidMul: -1, W: 1,
 };
 const isMulKey = (k) => k.endsWith('Mul') || k === 'yellowPerFoul' || k === 'redPerFoul';
 const MID4 = new Set(['DP', 'ŚP', 'OP', 'BP']);
+// Strzałki: role (boczny obrońca, skrzydłowy, środek) i efekty drużynowe zależne od roli (PI.fx z dwukropkiem)
+const FB = new Set(['BO', 'WB']); const WING = new Set(['BP', 'SN']); const RUN_MID = new Set(['OP', 'SN', 'NAP']);
+const PSEUDO = Object.fromEntries(['lat:fb', 'lat:w', 'lat:c', 'lat:o', 'run:w', 'run:b'].map((id) => [id, { id, team: null }]));
+const defOf = (id) => playerInstruction(id) ?? PSEUDO[id] ?? null;
 
 // ------------------------------------------------------------ Efekty instrukcji
 const fxCache = new Map();
@@ -123,7 +145,7 @@ export function teamShift(entries) {
   const acc = { add: {}, mul: {}, act: {}, oppAct: {} };
   let any = false;
   for (const e of entries) {
-    const def = playerInstruction(e.id);
+    const def = defOf(e.id);
     if (!def || e.lv === e.tl) continue;
     const w = PI.w * (e.pw ?? 1); const b = e.b ?? 1; const c = e.c ?? 1;
     for (const [g, k, d, good] of diffList(def, e.lv, e.tl)) {
@@ -181,6 +203,9 @@ function drawsOf(T, x) {
   const noise = {}; const conf = {};
   for (const d of PLAYER_INSTRUCTIONS) noise[d.id] = r.gauss(0, 1);
   for (const d of PLAYER_INSTRUCTIONS) conf[d.id] = [r.next(), r.next()];
+  // Strzałki (lat): losowania dopisane PO dotychczasowych, więc q i u 7 instrukcji się nie zmieniają
+  noise[PI_LAT.id] = r.gauss(0, 1);
+  conf[PI_LAT.id] = [r.next(), r.next()];
   x.piDraw = { noise, conf };
   return x.piDraw;
 }
@@ -263,26 +288,36 @@ export function playerPI(T, x) {
   const o = T.tactics.playerInstr?.[x.id];
   if (!o || !x.slot) return null;
   const pos = x.slot.pos; const ti = T.tactics.instructions ?? {};
-  const pi = { devs: [], fat: 1, foulW: 1, yc: 1, rc: 1, tackleW: 1, dysW: 1, shotW: 1, skrA: 1, othA: 1, offW: 1, fwd: 0, back: 0, share: null, cohesion: false };
+  const pi = { devs: [], fat: 1, foulW: 1, yc: 1, rc: 1, tackleW: 1, dysW: 1, shotW: 1, skrA: 1, othA: 1, offW: 1, fwd: 0, back: 0, moves: null, cen: 0, dir: null, share: null, cohesion: false };
   const rep = T.piReport;
-  const mu = PI.micro;
+  const mu = PI.micro; const ar = PI.arrow;
+  // Strzałka (run i lat razem): para niedozwolona na obecnej pozycji jest ignorowana w całości
+  const dir = o.run || o.lat ? arrowOf(o) : null;
+  const moveOk = arrowAllowed(pos, dir);
+  if (moveOk) pi.dir = dir;
+  const move = (from, to, f) => (pi.moves ?? (pi.moves = [])).push([from, to, f]);
   let conflictAny = false;
-  for (const def of PLAYER_INSTRUCTIONS) {
-    const lv = o[def.id];
-    if (!lv || !def.pos.includes(pos)) continue;
-    const tl = teamLevel(def.id, ti);
-    if (lv === tl) continue;
+  /** Jakość, konflikt i mnożniki zysku (b) i kosztu (c) instrukcji def na poziomie lv (zapis w T.piReport). */
+  const gainCost = (def, lv) => {
     const q = qualityOf(T, x, def.id, lv);
     const conf = isConflict(def.id, lv, ti);
     const u = conf ? conflictOf(T, x, def.id) : 0;
     const af = clamp(1 + 0.08 * (avgAttr(x.p, PI.skill[def.id]) - 12), 0.5, 1.5);
     let cf = clamp(1 - 0.5 * (af - 1), 0.6, 1.4);
     if (def.id === 'tackle') cf = clamp(cf + 0.05 * (attr(x.p, 'AGR') - 11) - 0.05 * (attr(x.p, 'OPA') - 11), 0.6, 1.5);
-    const b = q * af * (1 + u); const c = (2 - q) * cf * (1 - u);
-    const pw = def.posWeight?.[pos] ?? 1;
-    pi.devs.push({ id: def.id, lv, tl, b, c, pw });
     (rep[x.id] ?? (rep[x.id] = {}))[def.id] = { q, u, conflict: conf };
     if (conf) conflictAny = true;
+    return { b: q * af * (1 + u), c: (2 - q) * cf * (1 - u) };
+  };
+  for (const def of PLAYER_INSTRUCTIONS) {
+    const lv = o[def.id];
+    if (!lv || !def.pos.includes(pos)) continue;
+    if (def.id === 'run' && !moveOk) continue;
+    const tl = teamLevel(def.id, ti);
+    if (lv === tl) continue;
+    const { b, c } = gainCost(def, lv);
+    const pw = def.posWeight?.[pos] ?? 1;
+    pi.devs.push({ id: def.id, lv, tl, b, c, pw });
     // Mnożnik zawodnika: r (surowy) skalowany zyskiem albo kosztem; good: czy wzrost to zysk
     const sc = (r, good) => { const d = (r - 1) * pw; return 1 + d * (good * d > 0 ? b : c); };
     const ratio = (k) => (fxValue(def, lv, k) ?? 1) / (fxValue(def, tl, k) ?? 1);
@@ -302,8 +337,41 @@ export function playerPI(T, x) {
       pi.fat *= sc(mu.fat.dribble[lv], -1);
     } else if (def.id === 'run') {
       pi.offW *= sc(mu.offW[lv], -1); pi.fat *= sc(mu.fat.run[lv], -1);
-      const f = Math.min(mu.shiftMax, mu.shift * b);
-      if (lv === 1) pi.fwd = f; else pi.back = f;
+      if (RUN_MID.has(pos)) {
+        // Ofensywni (OP, SN, NAP): MID <-> ATT; cofnięcie napastnika (fałszywa dziewiątka) mocniej, ok. 25 %
+        const nb = pos === 'NAP' && lv === -1;
+        const f = Math.min(ar.shiftMax, (nb ? ar.napBack : ar.attShift) * b);
+        if (lv === 1) { pi.fwd = f; move('MID', 'ATT', f); } else { pi.back = f; move('ATT', 'MID', f); }
+        if (nb) {
+          pi.cen += ar.cen * b; pi.shotW *= sc(ar.napBackFx.shotW, 1); pi.othA *= sc(ar.napBackFx.othA, 1);
+        }
+      } else {
+        const f = Math.min(mu.shiftMax, mu.shift * b);
+        if (lv === 1) { pi.fwd = f; move('DEF', 'ATT', f); } else { pi.back = f; move('ATT', 'DEF', f); }
+      }
+      if (lv === 1 && (WING.has(pos) || pos === 'NAP')) pi.devs.push({ id: 'run:w', lv, tl: 0, b, c, pw: ar.roleW });
+      if (lv === -1 && (FB.has(pos) || pos === 'DP' || pos === 'ŚP')) pi.devs.push({ id: 'run:b', lv, tl: 0, b, c, pw: ar.roleW });
+      if (lv === 1 && ar.fwdShot[pos]) pi.shotW *= sc(ar.fwdShot[pos], 1);
+    }
+  }
+  // Ruch w poziomie (lat, tylko ze strzałki): po 7 instrukcjach, osobna jakość wykonania
+  const lv = moveOk ? o.lat : 0;
+  if (lv) {
+    const { b, c } = gainCost(PI_LAT, lv);
+    pi.devs.push({ id: 'lat', lv, tl: 0, b, c, pw: 1 });
+    const sc = (r, good) => { const d = r - 1; return 1 + d * (good * d > 0 ? b : c); };
+    const diag = o.run === 1;
+    pi.fat *= sc(diag ? ar.fat.diag : lv === 1 ? ar.fat.o : ar.fat.i, -1);
+    const cen = diag ? ar.cenDiag : ar.cen;
+    pi.cen += lv === -1 ? cen * b : -cen * c;
+    if (lv === -1) {
+      pi.devs.push({ id: FB.has(pos) ? 'lat:fb' : WING.has(pos) ? 'lat:w' : 'lat:c', lv, tl: 0, b, c, pw: ar.roleW });
+      if (FB.has(pos)) move('DEF', 'MID', Math.min(ar.shiftMax, (diag ? ar.fbDiagIn : ar.fbIn) * b)); // odwrócony boczny obrońca
+      else if (WING.has(pos)) { pi.shotW *= sc(ar.wIn.shotW, 1); pi.dysW *= sc(ar.wIn.dysW, 1); pi.skrA *= sc(ar.wIn.skrA, 1); }
+    } else {
+      pi.devs.push({ id: 'lat:o', lv, tl: 0, b, c, pw: ar.roleW });
+      // Ofensywny pomocnik przy linii: z małej wagi przy wrzutkach (0,5 wobec 2 u skrzydłowych) mocniej w górę
+      pi.skrA *= sc(pos === 'OP' ? ar.wide.opSkrA : ar.wide.skrA, 1); pi.shotW *= sc(ar.wide.shotW, 1);
     }
   }
   if (!pi.devs.length) return null;
@@ -314,13 +382,21 @@ export function playerPI(T, x) {
   return pi;
 }
 
-/** Udział zawodnika w strefach z przesunięciem Pozycja (do przodu: DEF -> ATT, z tyłu: ATT -> DEF). */
+/**
+ * Udział zawodnika w strefach z przesunięciami Ruchu (pi.moves: [z, do, ułamek], np. do przodu DEF -> ATT, z tyłu
+ * ATT -> DEF, ofensywni MID <-> ATT, odwrócony boczny obrońca DEF -> MID). Ułamek liczony od udziału bez przesunięć.
+ */
 export function shiftedShare(share, pi) {
   if (pi.share && pi.share.base === share) return pi.share.v;
-  const f = pi.fwd; const g = pi.back;
-  let v = share;
-  if (f) v = { DEF: share.DEF * (1 - f), MID: share.MID, ATT: share.ATT + f * share.DEF };
-  else if (g) v = { DEF: share.DEF + g * share.ATT, MID: share.MID, ATT: share.ATT * (1 - g) };
+  const v = { DEF: share.DEF, MID: share.MID, ATT: share.ATT };
+  // Środek pola liczy się w ataku, obronie i posiadaniu: zawodnik dochodzący do środka albo z niego wybiegający
+  // zmienia go tylko w połowie (PI.arrow.midEff), żeby ruch nie był darmową przewagą
+  const me = PI.arrow.midEff;
+  for (const [from, to, f] of pi.moves ?? []) {
+    const amt = f * share[from];
+    v[from] = from === 'MID' ? v[from] - me * amt : v[from] === share[from] ? share[from] * (1 - f) : v[from] - amt;
+    v[to] += to === 'MID' ? me * amt : amt;
+  }
   pi.share = { base: share, v };
   return v;
 }
@@ -358,19 +434,33 @@ export function refreshPI(T) {
   teamCtx(T);
   const entries = [];
   let coh = 0;
+  let cenIn = 0; let cenOut = 0; let defFwd = 0; let cover = false;
   for (const x of T.players) {
     x.pi = x.on && !x.sentOff && map[x.id] ? playerPI(T, x) : null;
-    if (x.pi) { for (const e of x.pi.devs) entries.push(e); if (x.pi.cohesion) coh++; }
+    if (x.pi) {
+      for (const e of x.pi.devs) entries.push(e);
+      if (x.pi.cohesion) coh++;
+      if (x.pi.cen > 0) cenIn += x.pi.cen; else cenOut += x.pi.cen;
+      if (FB.has(x.slot.pos)) {
+        if (x.pi.dir === 'f' || x.pi.dir === 'fi' || x.pi.dir === 'fo') defFwd++;
+        else if (x.pi.dir === 'i' || x.pi.dir === 'b') cover = true; // asekuracja: drugi boczny obrońca do środka albo z tyłu
+      }
+    }
   }
   for (const x of T.bench) x.pi = null;
   T.piShift = entries.length ? teamShift(entries) : null;
+  // Łączenie: kilku obrońców do przodu naraz bez asekuracji to większa podatność na kontrę
+  if (T.piShift && defFwd >= 2 && !cover) T.piShift.mul.counterVulnMul = (T.piShift.mul.counterVulnMul ?? 1) * (1 + PI.arrow.pairPen * (defFwd - 1));
+  // Środek pola (posiadanie, T.central): malejący zysk od trzeciego zawodnika do środka
+  const A = PI.arrow;
+  T.piCen = (cenIn <= A.cenFull ? cenIn : A.cenFull + A.cenTail * (cenIn - A.cenFull)) + cenOut;
   T.sCap = 100 - PI.cohesion * Math.min(coh, PI.cohesionMax);
 }
 
 /** Wyłączenie instrukcji (brak nadpisań): wszystko jak bez instrukcji. */
 export function clearPI(T) {
   for (const x of [...T.players, ...T.bench]) x.pi = null;
-  T.piShift = null; T.piSig = null; T.piSigArr = null; T.sCap = 100;
+  T.piShift = null; T.piSig = null; T.piSigArr = null; T.sCap = 100; T.piCen = 0;
 }
 
 /**
@@ -392,9 +482,21 @@ export function validatePlayerInstr(T, patch) {
       if (!(v === -1 || v === 0 || v === 1 || v === null)) return `${def.label}: nieprawidłowa wartość.`;
       if (v && !def.pos.includes(x.p.pos) && !(x.slot && def.pos.includes(x.slot.pos))) return `${def.label}: ta instrukcja nie dotyczy pozycji zawodnika.`;
     }
+    // Strzałka (run i lat razem po scaleniu): kierunek musi być dozwolony na pozycji zawodnika albo jego miejscu
+    if ('run' in o || 'lat' in o) {
+      const cur = T.tactics.playerInstr?.[x.id] ?? {};
+      const m = { run: 'run' in o ? o.run : cur.run, lat: 'lat' in o ? o.lat : cur.lat };
+      if (m.run || m.lat) {
+        const dir = arrowOf(m);
+        if (!dir || !(arrowAllowed(x.p.pos, dir) || (x.slot && arrowAllowed(x.slot.pos, dir)))) return 'Ruch: ten kierunek nie dotyczy pozycji zawodnika.';
+      }
+    }
   }
   return null;
 }
+
+/** Opis kierunku Ruchu zawodnika po zmianie (relacja meczu), np. „ruch: skos do środka”. */
+export const moveText = (o) => `ruch: ${arrowLabel(arrowOf(o)).toLowerCase()}`;
 
 /** Nowa mapa nadpisań po zmianie (klucz 0/null: jak drużyna, zawodnik null: wszystkie jak drużyna) i liczba zmienionych. */
 export function mergePlayerInstr(cur = {}, patch = {}) {

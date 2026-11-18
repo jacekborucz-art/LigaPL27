@@ -7,7 +7,7 @@ import { generateWorld, squadOf } from '../src/world/worldGen.js';
 import { createTactics } from '../src/engine/lineup.js';
 import { CLUBS_PL, clubById } from '../src/data/clubs_pl.js';
 import { formationById } from '../src/data/formations.js';
-import { PLAYER_INSTRUCTIONS } from '../src/data/playerInstructions.js';
+import { PLAYER_INSTRUCTIONS, arrowToInstr, arrowAllowed } from '../src/data/playerInstructions.js';
 import { createMatch, step, resume, runToEnd, changeTactics } from '../src/engine/match/match.js';
 import { hashString } from '../src/core/rng.js';
 
@@ -99,6 +99,62 @@ export function abRun(n, variant) {
     out.push({ h, poss: t[0].possession, acc: t[0].passAccuracy, sh: t[0].shots, shA: t[1].shots, fouls: t[0].fouls, yc: t[0].yellow, konA, pl });
   }
   return out;
+}
+
+// ------------------------------------------------------------ Pomiar A/B strzałek ruchu (docs/strzalki-ruchu.md)
+/** Grupy pozycji do pomiaru strzałek: formacja gospodarzy, w której grupa gra (te same ustawienia z wariantem i bez). */
+export const ARROW_GROUPS = {
+  BO: { formation: '4231', pos: ['BO'] }, DP: { formation: '4231', pos: ['DP'] }, ŚP: { formation: '433', pos: ['ŚP'] },
+  OP: { formation: '4231', pos: ['OP'] }, BP: { formation: '442', pos: ['BP'] }, SN: { formation: '433', pos: ['SN'] },
+  NAP: { formation: '442', pos: ['NAP'] },
+};
+const groupTac = {};
+const tacIn = (club, formation) => groupTac[`${club}:${formation}`] ?? (groupTac[`${club}:${formation}`] = createTactics(sq[club], { formation }));
+/** Strzałka dir dla wszystkich zawodników jedenastki na pozycjach grupy: { [id]: { run, lat } } (bez zer). */
+export function arrowEligible(t, pos, dir) {
+  const f = formationById(t.formation);
+  const out = {};
+  const o = Object.fromEntries(Object.entries(arrowToInstr(dir)).filter(([, v]) => v));
+  t.xi.forEach((pid, i) => { if (pid && pos.includes(f.slots[i].pos) && arrowAllowed(f.slots[i].pos, dir)) out[pid] = o; });
+  return out;
+}
+/**
+ * n meczów jak abRun, gospodarze w formacji grupy g; dir: kierunek strzałki dla zawodników grupy albo null (odniesienie).
+ * Wynik na mecz: posiadanie, strzały, xG obu drużyn, kontry i dośrodkowania rywala, gole, zawodnicy ze strzałką.
+ */
+export function abRunArrow(n, g, dir, extra = null) {
+  const G = ARROW_GROUPS[g];
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const [h, a] = pairOf(i);
+    const t = tacIn(h, G.formation);
+    const ids = Object.keys(arrowEligible(t, G.pos, dir ?? 'f'));
+    const pim = dir ? { ...arrowEligible(t, G.pos, dir), ...(extra ? extra(t) : {}) } : {};
+    const M = createMatch({ seed: `piab${i}`, home: { club: clubById(h), squad: sq[h], tactics: { ...t, playerInstr: pim }, ai: false }, away: { club: clubById(a), squad: sq[a], tactics: baseTac[a], ai: false }, ctx: {} });
+    const r = runToEnd(M);
+    const st = r.stats;
+    const m = { poss: st[0].possession, sh: st[0].shots, shA: st[1].shots, xg: st[0].xg, xgA: st[1].xg, gd: r.score[0] - r.score[1], kon: 0, konA: 0, skr: 0, skrA: 0, shI: 0, dysI: 0, kpI: 0, offI: 0, condI: 0 };
+    const I = new Set(ids);
+    for (const e of M.events) {
+      const kind = SHOTS.has(e.type) ? e.kind : e.type === 'goal' && !e.ownGoal && !e.provisional ? e.how : null;
+      if (kind === 'KON') m[e.side === 0 ? 'kon' : 'konA']++;
+      if (kind === 'SKR' || kind === 'HEAD') m[e.side === 0 ? 'skr' : 'skrA']++;
+      if (e.side !== 0 || !I.has(e.pid)) continue;
+      if (kind) { m.shI++; if (kind === 'DYS') m.dysI++; }
+      if (e.type === 'keyPass') m.kpI++;
+      if (e.type === 'offside') m.offI++;
+    }
+    const xs = M.teams[0].players.filter((x) => I.has(x.id) && x.on && !x.sentOff);
+    m.condI = xs.length ? xs.reduce((s, x) => s + x.cond, 0) / xs.length : 0;
+    out.push(m);
+  }
+  return out;
+}
+/** Różnica średnich na mecz (wariant minus odniesienie) z dwóch wyników abRunArrow. */
+export function abArrowDiff(base, run) {
+  const d = {};
+  for (const k of Object.keys(base[0])) d[k] = (run.reduce((s, m) => s + m[k], 0) - base.reduce((s, m) => s + m[k], 0)) / base.length;
+  return d;
 }
 
 /** Średnie na mecz z abRun: drużyna i zawodnicy, którzy w wariancie [instr, lv] mają instrukcję (kpI, shI, ..., condI). */

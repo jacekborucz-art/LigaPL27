@@ -25,6 +25,7 @@ import { monthsLeft, compareText } from './transfersView.js';
 import { fmtDate } from './dom.js';
 import { rzMenuItems, rzCtx } from './reservesView.js'; // rezerwy: delegowanie i powołania (docs/rezerwy.md)
 import { piSummary } from './playerInstrView.js'; // instrukcje indywidualne (docs/instrukcje-indywidualne.md)
+import { arrowsFor, arrowLabel, arrowOf } from '../data/playerInstructions.js'; // strzałki ruchu (docs/strzalki-ruchu.md)
 
 export const MENU_VIEWS = ['squad', 'profile', 'tactics', 'talks', 'transfers', 'training', 'dashboard'];
 const ROLES = [['captain', 'Kapitan'], ['penalty', 'Rzuty karne'], ['freeKick', 'Rzuty wolne'], ['corner', 'Rzuty rożne']];
@@ -33,6 +34,16 @@ const ROLES = [['captain', 'Kapitan'], ['penalty', 'Rzuty karne'], ['freeKick', 
 const SEP = { sep: true };
 function item(label, run, { hint = null, disabled = null, danger = false, primary = false, checked } = {}) {
   return { label, hint, disabled: disabled || null, danger, primary, ...(checked === undefined ? {} : { checked }), run };
+}
+/** Ruch w ataku (strzałka) zawodnika z pierwszego składu: kierunki dozwolone na jego miejscu i „Bez ruchu”. */
+function arrowMenu(p, L) {
+  const i = L?.tactics?.xi?.indexOf(p.id) ?? -1;
+  const pos = i >= 0 ? formationById(L.tactics.formation).slots[i]?.pos : null;
+  const dirs = pos ? arrowsFor(pos) : [];
+  if (!dirs.length) return null;
+  const cur = arrowOf(L.tactics.playerInstr?.[p.id]);
+  const last = p.name.split(' ').slice(-1)[0];
+  return sub('Ruch w ataku (strzałka)', [...dirs, ''].map((d) => item(d ? arrowLabel(d) : 'Bez ruchu', { steps: [{ act: 'tarrow-set', id: p.id, d }], toast: `${last}: ${d ? `ruch ${arrowLabel(d).toLowerCase()}` : 'bez ruchu'}.` }, { checked: (cur ?? '') === d })), { hint: cur ? `Teraz: ${arrowLabel(cur).toLowerCase()}` : `${pos}: kierunek na boisku` });
 }
 function sub(label, list, { hint = null, disabled = null } = {}) {
   const items = tidy(list);
@@ -355,6 +366,7 @@ export function playerMenu(game, pid, { view, ui = {}, why = null, lineup = null
         ...lineupItems(p, L ?? { tactics: null, byId: new Map() }, { inTactics: true, ui }),
         ui.tInfo === p.id ? null : item('Atrybuty', { steps: [{ act: 'tinfo', id: p.id }] }, { hint: 'Panel atrybutów i stanu' }),
         item('Instrukcje zawodnika', { steps: [{ act: 'pi-open', id: p.id }] }, { hint: piSummary(L?.tactics?.playerInstr?.[p.id]) ? `Teraz: ${piSummary(L.tactics.playerInstr[p.id])}` : 'Podania, drybling, odbiór, pressing i inne' }),
+        arrowMenu(p, L),
         ...rzItems,
         SEP, profile, report, talk, training, contractSub,
       ];

@@ -31,7 +31,7 @@ const clean = (html) => {
 const rowsIn = (html) => [...html.matchAll(/<div class="pi-row[^"]*" data-k="(\w+)">/g)].map((m) => m[1]);
 
 test('Okno zawodnika: tylko instrukcje dla jego pozycji, „Jak drużyna” z wartością drużyny, ogólne opisy', () => {
-  const exp = { BR: ['pass'], ŚO: ['pass', 'tackle', 'press'], NAP: ['pass', 'dribble', 'shoot', 'tackle', 'press'], BO: ['pass', 'dribble', 'cross', 'tackle', 'run', 'press'] };
+  const exp = { BR: ['pass'], ŚO: ['pass', 'tackle', 'press'], NAP: ['pass', 'dribble', 'shoot', 'tackle', 'run', 'press'], BO: ['pass', 'dribble', 'cross', 'tackle', 'run', 'press'] };
   for (const [pos, ids] of Object.entries(exp)) {
     const p = squad.find((x) => x.pos === pos);
     assert.ok(p, `zawodnik ${pos}`);

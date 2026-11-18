@@ -152,7 +152,7 @@ export function buildTeam(side, cfg, rng, ctx, seed = 'mecz') {
     // Instrukcje indywidualne (playerInstr.js): piOn tylko przy nadpisaniach; sCap: sufit spójności w meczu
     // Wszystkie pola od początku (stały kształt obiektu drużyny: szybki dostęp w silniku)
     piOn: Object.keys(playerInstr).length > 0, piVer: 0, piSig: null, piSigArr: null, piShift: null, piBuf: {}, piMemo: { base: null, S: null },
-    piReport: {}, sCap: 100, piSeed: String(seed),
+    piReport: {}, sCap: 100, piSeed: String(seed), piCen: 0,
     piCtx: { ctx, teamMorale: cfg.teamMorale ?? null },
     shout: null, shoutReadyAt: 0, shoutUses: {},
     takers: { penalty: cfg.tactics.penalty, freeKick: cfg.tactics.freeKick, corner: cfg.tactics.corner, captain: cfg.tactics.captain },
@@ -234,7 +234,7 @@ export function updateZones(T, M) {
   const zones = { DEF: 0, MID: 0, ATT: 0 };
   for (const x of xs) {
     let share = ROLE_SHARE[x.slot.pos] ?? ROLE_SHARE.ŚP;
-    if (x.pi && (x.pi.fwd || x.pi.back)) share = shiftedShare(share, x.pi); // Pozycja: do przodu albo z tyłu
+    if (x.pi && x.pi.moves) share = shiftedShare(share, x.pi); // Ruch: do przodu, z tyłu, do środka (strzałki)
     for (const zn of ['DEF', 'MID', 'ATT']) if (share[zn]) zones[zn] += share[zn] * eff(x, zn);
   }
   // Strefa = średnia ważona udziałami ról całej formacji (11 slotów), z łagodnym wpływem kształtu
@@ -259,6 +259,7 @@ export function updateZones(T, M) {
   zones.SPD = 0.7 * (defA.reduce((s, v) => s + v, 0) / Math.max(1, defA.length)) + 0.3 * (gk ? a(gk.p, 'WYJ') : 4) + T.P.setPieceD;
   T.zones = zones;
   T.central = xs.filter((x) => ['DP', 'ŚP', 'OP'].includes(x.slot.pos)).length;
+  if (T.piOn) T.central += T.piCen; // strzałki: do środka więcej ludzi w środku pola, szeroko mniej
   updatePace(T, xs);
   T.avg = (k) => xs.reduce((s, x) => s + a(x.p, k), 0) / Math.max(1, xs.length);
 }

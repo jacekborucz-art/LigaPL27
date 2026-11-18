@@ -39,7 +39,7 @@ const top = (m) => m.items.filter((x) => !x.sep).map((x) => x.label);
 const outIds = (g) => squadOf(g.world, g.clubId).map((p) => p.id).filter((id) => !g.tactics.xi.includes(id) && !g.tactics.bench.includes(id));
 
 // Akcje, które obsługuje app.js (kliknięcia data-act); prefiksy tf-, tt-, tr- mają własne handlery widoków.
-const APP_ACTS = new Set(['tab', 'tsub', 'player', 'tpick', 'tmove', 'tbench', 'tunbench', 'tcancel', 'tinfo', 'trole', 'extplayer', 'arep', 'ac-promote', 'pi-open']);
+const APP_ACTS = new Set(['tab', 'tsub', 'player', 'tpick', 'tmove', 'tbench', 'tunbench', 'tcancel', 'tinfo', 'trole', 'extplayer', 'arep', 'ac-promote', 'pi-open', 'tarrow-set']);
 const TF_ACTS = new Set(['tf-open', 'tf-offer', 'tf-loan', 'tf-negotiate', 'tf-renew', 'tf-list-own', 'tf-unlist', 'tf-keep', 'tf-release']);
 const TR_ACTS = new Set(['tr-tab', 'tr-player', 'tr-focus', 'tr-mode', 'tr-pos', 'tr-prog']);
 
@@ -269,4 +269,23 @@ test('Wystawienie na listę z menu: handler bez formularza bierze cenę z menu',
   assert.equal(g.market.userListed[p.id], s.price);
   assert.equal(s.price % 10000, 0);
   assert.ok(r.save && it.run.toast === true);
+});
+
+test('Skład i taktyka: menu zawodnika z podmenu „Ruch w ataku (strzałka)” tylko z kierunkami jego miejsca', async () => {
+  const { formationById } = await import('../src/data/formations.js');
+  const { arrowsFor } = await import('../src/data/playerInstructions.js');
+  const g = newGame();
+  const f = formationById(g.tactics.formation);
+  const i = f.slots.findIndex((s) => s.pos === 'BO');
+  const pid = g.tactics.xi[i];
+  g.tactics = { ...g.tactics, playerInstr: { [pid]: { run: 1, lat: -1 } } };
+  const m = menu(g, pid, 'tactics');
+  const mv = flat(m).find((x) => x.label === 'Ruch w ataku (strzałka)');
+  assert.ok(mv && mv.items, 'podmenu');
+  assert.equal(mv.hint, 'Teraz: skos do środka');
+  assert.deepEqual(mv.items.map((x) => x.run.steps[0].d), [...arrowsFor('BO'), '']);
+  assert.ok(mv.items.every((x) => x.run.steps[0].act === 'tarrow-set' && x.run.steps[0].id === pid));
+  assert.equal(mv.items.find((x) => x.checked).label, 'Skos do środka');
+  // Bramkarz: bez podmenu
+  assert.ok(!flat(menu(g, g.tactics.xi[0], 'tactics')).some((x) => x.label === 'Ruch w ataku (strzałka)'));
 });

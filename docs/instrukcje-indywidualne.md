@@ -18,7 +18,7 @@ Projekt zatwierdzony przez właściciela Nov 18, 2026 (burza mózgów: trener i 
 | Strzały z dystansu | mniej / jak drużyna / więcej | ŚP, OP, BP, SN, NAP (DP ograniczone) | więcej strzałów | niższe xG na strzał, mniej podań do przodu | DYS |
 | Dośrodkowania | mniej / jak drużyna / więcej | BO, WB, BP, SN | więcej wrzutek | mniej gry środkiem, straty, zmęczenie | DOS, SZY, WYT; w polu GLO, SKO |
 | Odbiór | łagodny / jak drużyna / twardy | pole (bez BR) | twardy: więcej odbiorów | faule, kartki, karne; łagodny: słabsza obrona | ODB, SIL; ryzyko AGR, słabe OPA |
-| Pozycja | z tyłu / jak drużyna / do przodu | BO, WB, DP, ŚP, BP | do przodu: atak (udział strefy DEF -> ATT ok. 15 %) | kontry rywala (counterVuln +0.04 na zawodnika), zmęczenie, spalone | WYT, SZY, PRA, UST |
+| Pozycja (od v1.19: Ruch) | z tyłu / jak drużyna / do przodu | BO, WB, DP, ŚP, BP (od v1.19 także OP, SN, NAP) | do przodu: atak (udział strefy DEF -> ATT ok. 15 %) | kontry rywala (counterVuln +0.04 na zawodnika), zmęczenie, spalone | WYT, SZY, PRA, UST |
 | Pressing | mniej / jak drużyna / więcej | pole | wyższy odbiór piłki | zmęczenie (x1.08-1.12), faule | PRA, WYT, AGR |
 
 Poza v1 (v2): tempo (brak zaczepienia na poziomie zawodnika), krycie wybranego rywala (cel na konkretny mecz), wyjście bramkarza.
@@ -140,3 +140,7 @@ Wersja gry bez zmian (v1.17 Beta).
 - Znacznik: ikona (podkładka z haczykiem) przy nazwisku w listach składu, na boisku (Skład i taktyka i okno zmian w meczu), w tabeli; opis w `title` i `aria-label`, np. „Instrukcje: odbiór twardy, pressing więcej”; na boisku także w etykiecie miejsca.
 - Jakość wykonania (q, u, `T.piReport`) nigdzie nie jest pokazywana.
 - Testy: `tests/playerInstrView.test.mjs` (okno tylko z instrukcjami dla pozycji, tabela N x 7 z polami „nie dotyczy”, filtry, widok telefonu, znacznik, zmiana i reset w taktyce, menu w meczu, zmiana ze szkicu przez `changeTactics` z kosztem i w przerwie bez kosztu), `tests/contextMenu.test.mjs` (akcja `pi-open`).
+
+## 12. Strzałki ruchu (Nov 18, 2026, v1.19 Beta)
+
+Instrukcja „Pozycja” nazywa się teraz „Ruch” i jest składową pionową strzałki na boisku; składowa pozioma to klucz `lat` (do środka, szeroko). Ruch działa też na OP, SN i NAP, a w oknie zawodnika i w tabeli pokazuje kierunek (tabela nadal ma 7 kolumn). q i u 7 instrukcji bez zmian (losowania `lat` po dotychczasowych). Projekt, wdrożenie i pomiar: `docs/strzalki-ruchu.md`.

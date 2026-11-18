@@ -7,6 +7,7 @@ import { emit, ensureGoalkeeper } from './core.js';
 import { onPitch, applyTacticChange, goalkeeper, fieldPlayers } from './teams.js';
 import { INSTRUCTIONS } from '../../data/instructions.js';
 import { playerInstruction, PI_TEAM_LABEL } from '../../data/playerInstructions.js';
+import { moveText } from './playerInstr.js';
 import { SHOUTS, SHOUT_COOLDOWN, SHOUT_DURATION, K, COACHQ } from './constants.js';
 import { unlimitedSubs } from './rules.js';
 
@@ -141,12 +142,16 @@ export function describePatch(T, patch) {
     const x = [...T.players, ...T.bench].find((y) => String(y.id) === String(pid));
     const who = x ? last(x) : 'zawodnik';
     if (o === null) { pi.push(`${who}: ${PI_TEAM_LABEL.toLowerCase()}`); continue; }
+    // Ruch (strzałka: run i lat) jako jeden kierunek po zmianie, np. „ruch: skos do środka”
+    const mv = 'run' in o || 'lat' in o ? moveText(T.tactics.playerInstr?.[pid] ?? {}) : null;
     const what = Object.entries(o).map(([k, v]) => {
+      if (k === 'run' || k === 'lat') return null;
       const def = playerInstruction(k);
       if (!def) return null;
       const opt = def.options.find((op) => op.v === v);
       return `${def.label.toLowerCase()} ${(opt?.label ?? PI_TEAM_LABEL).toLowerCase()}`;
     }).filter(Boolean);
+    if (mv) what.push(mv);
     if (what.length) pi.push(`${who}: ${what.join(', ')}`);
   }
   if (pi.length) parts.push(`instrukcje indywidualne (${pi.join('; ')})`);

@@ -12,7 +12,8 @@ import { esc } from './dom.js';
 import { profBand } from './positionMap.js';
 import { renderPlayerCard, cardFact, barFactHtml } from './playerCard.js'; // karta wspólna z oknem zmian w meczu
 import { piMarker, piSummary } from './playerInstrView.js'; // instrukcje indywidualne (docs/instrukcje-indywidualne.md)
-import { playerInstrCount } from '../data/playerInstructions.js';
+import { playerInstrCount, arrowAllowed, arrowsFor, arrowLabel } from '../data/playerInstructions.js';
+import { arrowsSvg, arrowLegendHtml, compassHtml, fbWarning, drawnDir } from './arrowsView.js'; // strzałki ruchu (docs/strzalki-ruchu.md)
 
 const band = (prof) => (prof >= 85 ? 'ok' : prof >= 60 ? 'mid' : 'bad');
 const few = (n) => n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14);
@@ -35,6 +36,7 @@ function moraleArrow(m) {
   return `<svg class="tp-marr" data-l="${l}" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" transform="rotate(${ARROW_ROT[l]} 8 8)"/></svg>`;
 }
 const posText = (p) => `${p.pos}${p.side ? ` ${p.side}` : ''}`;
+const ARROW_ICON = '<svg class="tac__arrows-i" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13 12 4M7 4h5v5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 /** Atrybuty wspólne dla elementów, które da się przeciągnąć (dane do „ducha” pod palcem). */
 const dragAttrs = (loc, p) => `data-drag="${esc(locKey(loc))}" data-gname="${esc(p.name)}" data-gpos="${esc(p.pos)}" data-gg="${GROUP[p.pos]}"`;
@@ -64,8 +66,10 @@ const hitsWord = (n) => (n !== 1 && few(n) ? 'pasują' : 'pasuje');
  * strengthOpen: rozwinięta siła składu (tylko wide).
  * rzChips: plakietki rezerw (src/ui/reservesView.js, rzChipFn), rzStrip: pasek rezerw nad ławką (klub bez rezerw: brak).
  * analyses: { n, alert } przycisk „Analizy meczów” (src/ui/postMatchView.js analysesBadge); brak: bez przycisku.
+ * arrows: { on, pick } tryb strzałek ruchu (on: klik zawodnika otwiera kompas, przeciąganie wyłączone; pick: indeks
+ * miejsca z otwartym kompasem albo null). Strzałki na boisku widać zawsze.
  */
-export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg = '', numbers = null, kit = null, infoExtra = '', rzChips = null, rzStrip = '', cards = null, wide = false, strengthOpen = true, assistant = true, analyses = null }) {
+export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg = '', numbers = null, kit = null, infoExtra = '', rzChips = null, rzStrip = '', cards = null, wide = false, strengthOpen = true, assistant = true, analyses = null, arrows = null }) {
   const byId = new Map(squad.map((p) => [p.id, p]));
   const f = formationById(tactics.formation);
   const check = checkTactics(tactics, squad, { benchSize });
@@ -91,6 +95,21 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
   const count = (r, zone) => { if (r && r.b in tally) { tally[r.b] += 1; if (r.b === 'opt') hits[zone] += 1; } };
   const hitsHtml = (zone) => (hits[zone] ? ` <span class="tp-sec__hits">${hits[zone]} ${hitsWord(hits[zone])}</span>` : '');
 
+  // ---------- Strzałki ruchu: kierunek dozwolony na miejscu zawodnika (niedozwolony silnik pomija, więc go nie rysujemy)
+  const arrOn = !!arrows?.on;
+  const dirAt = f.slots.map((s, i) => { const p = byId.get(tactics.xi[i]); return p ? drawnDir(pim[p.id], (d) => arrowAllowed(s.pos, d)) : null; });
+  const arrowItems = f.slots.map((s, i) => ({ x: s.x, y: s.y, dir: dirAt[i], pos: s.pos })).filter((it) => it.dir);
+  const arrowSvgHtml = arrowsSvg(arrowItems, { map: (x, y) => [x, 100 - y], vw: 68, vh: 100, id: 'tpa' });
+  const fbWarn = fbWarning(arrowItems);
+  const pickIdx = arrOn && arrows.pick != null ? arrows.pick : null;
+  const pickP = pickIdx != null ? byId.get(tactics.xi[pickIdx]) : null;
+  const pickS = pickP ? f.slots[pickIdx] : null;
+  const compass = pickP && arrowsFor(pickS.pos).length ? compassHtml({
+    name: pickP.name, pos: pickS.pos, x: pickS.x, dirs: arrowsFor(pickS.pos), cur: dirAt[pickIdx],
+    attr: (d) => `data-act="tarrow-set" data-id="${esc(pickP.id)}" data-d="${d}"`, closeAttr: 'data-act="tarrow-close"',
+    style: `--px:${pickS.x};--py:${100 - pickS.y}`,
+  }) : '';
+
   // ---------- Boisko
   const slotsHtml = f.slots.map((s, i) => {
     const loc = { zone: 'xi', idx: i };
@@ -99,9 +118,14 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
     const prof = p ? proficiency(p, s.pos, s.side) : 0;
     const isSel = selKey === key;
     const r = repAt(p, i);
-    const cls = ['slot-btn', p ? `slot-btn--${band(prof)}` : 'slot-btn--empty', s.pos === 'BR' ? 'slot-btn--gk' : '', isSel ? 'is-sel' : ''].filter(Boolean).join(' ');
-    return `<button class="${cls}" style="left:${s.x}%;top:${100 - s.y}%" data-act="tslot" data-loc="${key}" data-drop="${key}" data-handle ${p ? `${dragAttrs(loc, p)} data-pid="${esc(p.id)}"` : ''}${repAttr(r)}
-      aria-pressed="${isSel}" aria-label="${esc(s.pos)}: ${p ? esc(p.name) : 'puste miejsce'}${p && prof < 85 ? `, poza pozycją (${prof}%)` : ''}${esc(repAria(r))}${p && pim[p.id] ? esc(`, instrukcje: ${piSummary(pim[p.id])}`) : ''}">
+    const cls = ['slot-btn', p ? `slot-btn--${band(prof)}` : 'slot-btn--empty', s.pos === 'BR' ? 'slot-btn--gk' : '', isSel ? 'is-sel' : '', pickIdx === i ? 'is-arrow' : ''].filter(Boolean).join(' ');
+    const mv = dirAt[i] ? `, ruch: ${arrowLabel(dirAt[i]).toLowerCase()}` : arrOn && p && arrowsFor(s.pos).length ? ', bez ruchu' : '';
+    // Tryb strzałek: klik otwiera kompas (bez przeciągania i bez wyboru dwoma dotknięciami)
+    const acts = arrOn
+      ? `data-act="tarrow-pick" data-idx="${i}"${p ? ` data-pid="${esc(p.id)}"` : ''} data-sx="${s.x}" data-sy="${s.y}" data-dirs="${arrowsFor(s.pos).join(' ')}" aria-haspopup="dialog" aria-expanded="${pickIdx === i}"${p && arrowsFor(s.pos).length ? '' : ' aria-disabled="true"'}`
+      : `data-act="tslot" data-loc="${key}" data-drop="${key}" data-handle ${p ? `${dragAttrs(loc, p)} data-pid="${esc(p.id)}"` : ''}${repAttr(r)} aria-pressed="${isSel}"`;
+    return `<button class="${cls}" style="left:${s.x}%;top:${100 - s.y}%" ${acts}
+      aria-label="${esc(s.pos)}: ${p ? esc(p.name) : 'puste miejsce'}${p && prof < 85 ? `, poza pozycją (${prof}%)` : ''}${esc(repAria(r))}${p && pim[p.id] ? esc(`, instrukcje: ${piSummary(pim[p.id])}`) : ''}${esc(arrOn || !pim[p?.id] ? mv : '')}">
       ${r && r.b !== 'no' ? `<span class="slot-btn__rep" aria-hidden="true">${r.v}%</span>` : ''}
       <span class="slot-btn__dot">${p ? (numbers?.get(p.id) ?? Math.round(p.ovr)) : '+'}</span>
       <span class="slot-btn__name">${p ? esc(p.last) : esc(s.pos)}</span>
@@ -178,7 +202,8 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
   const status = msg || (selPlayer
     ? `Wybrano: ${selPlayer.name}. Wskaż miejsce, na które ma przejść, albo zawodnika do zamiany.${repSum}`
     : sel?.zone === 'xi' ? `Wybrano puste miejsce (${f.slots[sel.idx]?.pos}). Wskaż zawodnika z listy.${repSum}`
-      : 'Przeciągnij zawodnika na inne miejsce albo dotknij dwóch miejsc po kolei. Dwuklik na nazwisku pokazuje atrybuty, prawy przycisk albo przytrzymanie nazwiska: więcej opcji.');
+      : fbWarn || (arrOn ? `Strzałki: dotknij zawodnika i wybierz kierunek ruchu w ataku${wide ? ' albo przeciągnij od niego strzałkę' : ''}. Bramkarz i środkowi obrońcy nie mają strzałek.`
+        : 'Przeciągnij zawodnika na inne miejsce albo dotknij dwóch miejsc po kolei. Dwuklik na nazwisku pokazuje atrybuty, prawy przycisk albo przytrzymanie nazwiska: więcej opcji.'));
 
   // ---------- Siła składu (PC: zwijana w kolumnie boiska, błędy składu zawsze widoczne nad zwijaną częścią)
   const z = check.rating.zones;
@@ -205,14 +230,15 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
     .map((c) => renderPlayerInfo(byId.get(c.id), tactics, f, c.extra ?? '', { wide, pinned: !!c.pinned, slot: c.slot ?? 0 })).join('');
 
   return `
-  <div class="tac${sel ? ' has-sel' : ''}">
+  <div class="tac${sel ? ' has-sel' : ''}${arrOn ? ' is-arrows' : ''}">
     <div class="tac__form">
       <div class="chips chips--wrap" role="group" aria-label="Formacja">${FORMATIONS.map((x) => `<button class="chip" data-act="tform" data-f="${x.id}" aria-pressed="${x.id === f.id}">${esc(x.name)}</button>`).join('')}</div>
-      <div class="tac__hintrow"><p class="hint" title="${esc(f.nick)}: ${esc(f.note)}">${esc(f.nick)}: ${esc(f.note)}</p><button class="btn btn--quiet btn--sm" data-act="pi-table">Instrukcje indywidualne (${playerInstrCount(pim)})</button></div>
+      <div class="tac__hintrow"><p class="hint" title="${esc(f.nick)}: ${esc(f.note)}">${esc(f.nick)}: ${esc(f.note)}</p><div class="tac__hintbtns"><button class="btn btn--quiet btn--sm" data-act="pi-table">Instrukcje indywidualne (${playerInstrCount(pim)})</button><button class="btn btn--quiet btn--sm tac__arrows" data-act="tarrows" aria-pressed="${arrOn}" title="Strzałki ruchu: kierunek zawodnika w ataku">${ARROW_ICON}Strzałki${arrowItems.length ? ` (${arrowItems.length})` : ''}</button></div></div>
     </div>
     <div class="tac__pitch">
-      <div class="pitch2" ${kit ? `style="--kit:${kit.shirt};--kit-ink:${kit.ink};--kit-trim:${kit.trim}"` : ''} role="group" aria-label="Boisko, formacja ${esc(f.name)}">${slotsHtml}</div>
-      <p class="tac__msg${msg ? ' is-msg' : ''}" role="status">${esc(status)}</p>
+      <div class="pitch2${arrOn ? ' is-arrows' : ''}" ${kit ? `style="--kit:${kit.shirt};--kit-ink:${kit.ink};--kit-trim:${kit.trim}"` : ''} role="group" aria-label="Boisko, formacja ${esc(f.name)}${arrOn ? ', tryb strzałek ruchu' : ''}">${arrowSvgHtml}${slotsHtml}${compass}</div>
+      ${arrowItems.length || arrOn ? arrowLegendHtml() : ''}
+      <p class="tac__msg${msg || fbWarn ? ' is-msg' : ''}${fbWarn && !msg ? ' is-warn' : ''}" role="status">${esc(status)}</p>
       <div class="tac__actions">
         ${assistant ? `<details class="tac__auto"><summary class="btn btn--quiet">Poproś asystenta</summary>
           <div class="tac__auto-menu" role="menu">${Object.entries(AUTO_MODES).map(([k, m]) => `<button role="menuitem" data-act="tauto" data-mode="${k}"><b>${esc(m.label)}</b><small>${esc(m.note)}</small></button>`).join('')}</div></details>`

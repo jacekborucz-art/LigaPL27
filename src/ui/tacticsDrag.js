@@ -22,7 +22,7 @@ export function mountTacticsDrag(root, { resolve, onDrop, onReject }) {
     if (drag || !ev.isPrimary) return;
     if (ev.pointerType === 'mouse' && ev.button !== 0) return;
     const el = ev.target.closest('[data-drag]');
-    if (!el || !el.closest('.tac')) return;
+    if (!el || !el.closest('.tac') || el.closest('.tac.is-arrows')) return; // tryb strzałek: bez przeciągania zawodników
     // Na dotyku przeciągamy tylko za uchwyt (albo slot boiska), żeby nie blokować przewijania.
     if (ev.pointerType === 'touch' && !ev.target.closest('[data-handle]')) return;
     const src = parseLoc(el.dataset.drag);

@@ -33,6 +33,9 @@ import { renderTactics } from './ui/tacticsView.js';
 import { renderReserves, rzHead, rzCard, handleReservesAction, isReservesAction, reservesStrip, rzChipFn, hasReserves } from './ui/reservesView.js'; // Kadra > Rezerwy
 import { resolveMove, resolveTap, parseLoc, locKey, playerAt, sameLoc } from './ui/tacticsMoves.js';
 import { mountTacticsDrag } from './ui/tacticsDrag.js';
+import { mountArrowDraw } from './ui/tacticsArrows.js'; // strzałki ruchu: rysowanie przeciągnięciem (PC)
+import { formationById } from './data/formations.js';
+import { arrowsFor, arrowLabel } from './data/playerInstructions.js';
 import { WIDE_CARD, cardPos, placeCard, bindCardDrag } from './ui/playerCard.js';
 import { createTactics, changeFormation, setInstruction, refreshTactics, removeFromBench, checkTactics, AUTO_MODES } from './engine/lineup.js';
 import { COMPETITIONS } from './config/competitions.js';
@@ -72,7 +75,7 @@ import { runDecision } from './core/decisions.js';
 import { startNegotiation, renderNegotiation, handleNegotiationAction, isNegotiationAction, readNegotiationForm, refreshNegotiationHints } from './ui/negotiationView.js';
 import { bindContextTrigger, openMenu, showToast } from './ui/contextMenu.js';
 import { playerMenu } from './ui/playerMenus.js';
-import { piPlayerHtml, piTableHtml, piRowsFromTactics, piWith, piWithout } from './ui/playerInstrView.js'; // instrukcje indywidualne (docs/instrukcje-indywidualne.md)
+import { piPlayerHtml, piTableHtml, piRowsFromTactics, piWith, piWithout, piWithDir } from './ui/playerInstrView.js'; // instrukcje indywidualne (docs/instrukcje-indywidualne.md)
 import { renderAssistantReport } from './ui/assistantReportView.js';
 import { ensureAssistantReport } from './career/assistantReport.js';
 import { ensureTeamReport, requestTeamReport } from './career/teamReport.js'; // raport ogólny o drużynie (docs/raport-druzyny.md)
@@ -526,7 +529,7 @@ function renderTab(tab, g, club) {
     if (state.sqSub === 'tactics') {
       queueMicrotask(mountTacticsScreen); // po wstawieniu HTML: okno atrybutów i fokus
       const wide = matchMedia(WIDE_INFO).matches;
-      return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), info: state.tInfo, msg: state.tMsg, numbers: shirtNumbers(g, g.clubId, squadOf(g.world, g.clubId)), kit: kitColors(clubById(g.clubId)), cards: tCardsFor(g, wide), wide, strengthOpen: tUi.strOpen, assistant: hasAssistant(g), rzChips, rzStrip: rzOn ? reservesStrip(g) : '', analyses: analysesBadge(g) });
+      return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), info: state.tInfo, msg: state.tMsg, numbers: shirtNumbers(g, g.clubId, squadOf(g.world, g.clubId)), kit: kitColors(clubById(g.clubId)), cards: tCardsFor(g, wide), wide, strengthOpen: tUi.strOpen, assistant: hasAssistant(g), rzChips, rzStrip: rzOn ? reservesStrip(g) : '', analyses: analysesBadge(g), arrows: state.tArrows });
     }
     const ovrs = leagueOvrs(g, club.tier);
     const p = state.playerOpen && g.world.players[state.playerOpen];
@@ -1149,7 +1152,7 @@ function mountTacticsScreen() {
 // ---------- Instrukcje indywidualne (src/ui/playerInstrView.js): okno zawodnika i okno z tabelą ----------
 // state.pi: { view: 'player'|'table', id, from: 'table'|null, f: filtr pozycji, k: instrukcja na telefonie }.
 // Zmiana zapisuje grę od razu; znaczniki na ekranie składu odświeżają się po zamknięciu okna.
-const PI_KEYS = ['act', 'id', 'k', 'v', 'f'];
+const PI_KEYS = ['act', 'id', 'k', 'v', 'f', 'd'];
 const piAttr = (name, data) => `data-act="pi-${name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}"${Object.entries(data).map(([k, v]) => ` data-${k}="${esc(String(v))}"`).join('')}`;
 let piReturn = null; // fokus po zamknięciu okna (element ekranu składu)
 /** Selektor elementu w oknie (ten sam przycisk albo lista wyboru po przebudowie treści). */
@@ -1213,6 +1216,9 @@ async function piAction(act, el) {
     showPi({ focus: '#piTitle' });
   } else if (act === 'pi-set' && own(d.id)) {
     g.tactics = { ...g.tactics, playerInstr: piWith(g.tactics.playerInstr, d.id, d.k, Number(d.v)) };
+    await save(); showPi();
+  } else if (act === 'pi-dir' && own(d.id)) { // Ruch: kierunek strzałki (run i lat razem)
+    g.tactics = { ...g.tactics, playerInstr: piWithDir(g.tactics.playerInstr, d.id, d.d) };
     await save(); showPi();
   } else if (act === 'pi-reset' && d.id) {
     g.tactics = { ...g.tactics, playerInstr: piWithout(g.tactics.playerInstr, d.id) };
@@ -1323,6 +1329,72 @@ mountTacticsDrag(app, {
   onReject: (reason) => { state.tMsg = reason; renderTacticsAfter(); },
 });
 
+// ---------- Strzałki ruchu (docs/strzalki-ruchu.md): tryb na boisku składu, kompas, rysowanie na PC, klawiatura ----------
+// state.tArrows: { on, pick: indeks miejsca z otwartym kompasem albo null }. Zapis: run i lat w g.tactics.playerInstr.
+const arrowTok = (pid) => `[data-act="tarrow-pick"][data-pid="${CSS.escape(pid)}"]`;
+function arrowPick(g, el) {
+  const idx = Number(el.dataset.idx);
+  const pid = g.tactics.xi[idx];
+  const pos = formationById(g.tactics.formation).slots[idx]?.pos;
+  if (!pid) { state.tMsg = 'Puste miejsce: najpierw wstaw zawodnika (wyłącz strzałki, żeby zmieniać skład).'; renderTacticsAfter(); return; }
+  if (!arrowsFor(pos).length) { state.tMsg = `${pos}: bez strzałek. Bramkarz i środkowi obrońcy trzymają swoją pozycję.`; renderTacticsAfter(); return; }
+  const open = state.tArrows?.pick === idx;
+  state.tArrows = { on: true, pick: open ? null : idx };
+  state.tMsg = '';
+  renderTacticsAfter(open ? arrowTok(pid) : '.acomp__b.is-on');
+}
+async function arrowSet(g, pid, dir) {
+  if (!pid || g.world.players[pid]?.clubId !== g.clubId) return;
+  const name = g.world.players[pid].name;
+  g.tactics = { ...g.tactics, playerInstr: piWithDir(g.tactics.playerInstr, pid, dir) };
+  state.tArrows = { on: true, pick: null };
+  state.tMsg = `${name}: ${dir ? `ruch ${arrowLabel(dir).toLowerCase()}` : 'bez ruchu, jak drużyna'}.`;
+  await save();
+  renderTacticsAfter(arrowTok(pid));
+}
+function arrowClose() {
+  const i = state.tArrows?.pick;
+  if (i == null) return;
+  const pid = state.game?.tactics.xi[i];
+  state.tArrows = { ...state.tArrows, pick: null };
+  renderTacticsAfter(pid ? arrowTok(pid) : null);
+}
+mountArrowDraw(app, {
+  onSet: (pid, dir) => arrowSet(state.game, pid, dir),
+  onReject: (text) => { state.tMsg = text; renderTacticsAfter(); },
+});
+// Klawiatura: Enter na zawodniku otwiera kompas (przycisk), strzałki przechodzą między kierunkami, Delete usuwa, Escape zamyka
+app.addEventListener('keydown', (ev) => {
+  if (!tacticsOpen() || !state.tArrows?.on || ev.defaultPrevented) return;
+  const comp = ev.target.closest('.acomp');
+  const tok = ev.target.closest('[data-act="tarrow-pick"]');
+  const del = ev.key === 'Delete' || ev.key === 'Backspace';
+  if (comp && ev.key.startsWith('Arrow')) {
+    ev.preventDefault();
+    const btns = [...comp.querySelectorAll('.acomp__b')];
+    const c = (b) => { const r = b.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+    const [x0, y0] = c(ev.target.closest('.acomp__b') ?? btns[0]);
+    const [vx, vy] = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] }[ev.key] ?? [0, 0];
+    let best = null; let bd = Infinity;
+    for (const b of btns) {
+      const [x, y] = c(b); const dx = x - x0; const dy = y - y0;
+      const along = dx * vx + dy * vy;
+      if (along < 4) continue;
+      const dist = along + 2 * Math.abs(dx * vy - dy * vx);
+      if (dist < bd) { bd = dist; best = b; }
+    }
+    best?.focus();
+    return;
+  }
+  if (comp && del) { ev.preventDefault(); comp.querySelector('.acomp__b--none')?.click(); return; }
+  if (tok && del && tok.dataset.pid) { ev.preventDefault(); arrowSet(state.game, tok.dataset.pid, ''); return; }
+  if (ev.key === 'Escape' && state.tArrows.pick != null) { ev.preventDefault(); ev.stopPropagation(); arrowClose(); }
+});
+// Dotknięcie boiska albo ekranu poza kompasem zamyka kompas
+app.addEventListener('click', (ev) => {
+  if (tacticsOpen() && state.tArrows?.pick != null && !ev.target.closest('[data-act], .acomp')) arrowClose();
+});
+
 // Escape w Rezerwach: zamyka dialog prośby i oddaje fokus na przycisk źródłowy.
 app.addEventListener('keydown', (ev) => {
   if (ev.key !== 'Escape' || !state.rzAsk || state.tab !== 'kadra' || state.sqSub !== 'reserves') return;
@@ -1357,7 +1429,7 @@ app.addEventListener('change', async (ev) => {
   if (ev.target.matches?.('input[data-act="sys-theme"]')) { await sysAction('sys-theme', ev.target); return; } // Opcje: motyw
   if (ev.target.matches?.('input[data-act="sys-speed"]')) { await sysAction('sys-speed', ev.target); return; } // Opcje: tempo dni
   const ps = ev.target.closest('#piDlg select.pit-sel'); // tabela instrukcji indywidualnych
-  if (ps) { await piAction('pi-set', { dataset: { id: ps.dataset.id, k: ps.dataset.k, v: ps.value } }); return; }
+  if (ps) { await piAction(ps.dataset.k === 'run' ? 'pi-dir' : 'pi-set', { dataset: { id: ps.dataset.id, k: ps.dataset.k, v: ps.value, d: ps.value } }); return; }
   const sel = ev.target.closest('select[data-act="trole"]');
   if (!sel) return;
   await setRole(sel.dataset.role, sel.value);
@@ -1649,7 +1721,7 @@ async function dispatchAct(el, { root = app } = {}) {
       render(); window.scrollTo({ top: 0 });
     }
     if (act === 'clubback') { state.extClub = null; state.extPlayer = null; render(); }
-    if (act === 'tsub') { state.ma = null; state.sqSub = el.dataset.s; state.rzAsk = null; state.rzMsg = null; state.trepMsg = ''; state.tSel = null; state.tInfo = null; state.tCards = []; state.tMsg = ''; state.playerOpen = null; state.ttResult = null; state.ttMeeting = null; render(); }
+    if (act === 'tsub') { state.tArrows = null; state.ma = null; state.sqSub = el.dataset.s; state.rzAsk = null; state.rzMsg = null; state.trepMsg = ''; state.tSel = null; state.tInfo = null; state.tCards = []; state.tMsg = ''; state.playerOpen = null; state.ttResult = null; state.ttMeeting = null; render(); }
     if (act === 'tcancel') { state.tSel = null; state.tMsg = ''; renderTacticsAfter('[data-act="tauto"]'); }
     if (act === 'tform') { g.tactics = changeFormation(g.tactics, mySquad(g), el.dataset.f); state.tSel = null; state.tMsg = ''; await save(); renderTacticsAfter(); }
     if (act === 'tauto' && !hasAssistant(g)) { state.tMsg = 'W sztabie nie ma asystenta trenera. Zatrudnisz go w Trening, Sztab.'; renderTacticsAfter(); }
@@ -1670,6 +1742,10 @@ async function dispatchAct(el, { root = app } = {}) {
       state.tSel = null; renderTacticsAfter();
     }
     if (act === 'tslot' || act === 'tpick') await tacticsClick(g, el);
+    if (act === 'tarrows') { state.tArrows = { on: !state.tArrows?.on, pick: null }; state.tSel = null; state.tMsg = ''; renderTacticsAfter('[data-act="tarrows"]'); }
+    if (act === 'tarrow-pick') arrowPick(g, el);
+    if (act === 'tarrow-set') await arrowSet(g, el.dataset.id, el.dataset.d);
+    if (act === 'tarrow-close') arrowClose();
     if (act === 'tmove') {
       const r = await applyMove(parseLoc(el.dataset.src), parseLoc(el.dataset.dst));
       if (!r.ok) { state.tMsg = r.reason || 'Ten ruch nic nie zmienia.'; renderTacticsAfter(); }

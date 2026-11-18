@@ -1279,3 +1279,22 @@
   .md-dlg.mm-dlg.pi-host--player { width: 100vw; height: auto; max-height: 92dvh; margin: auto 0 0; border-top: 1px solid var(--line); border-radius: 14px 14px 0 0; }
   .pi-host--player .pi { max-height: 92dvh; }
 }
+
+/* ---------- Strzałki ruchu w oknie „Zmiany i taktyka” (docs/strzalki-ruchu.md); wspólne style strzałek w app.css ---------- */
+.mm-arrbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 10px; }
+.mm-arrbar .hint { margin: 0; font-size: 12px; }
+.mm-arrows[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.mm-field .pa--h { display: none; }
+.mm-field.is-arrows .mm-tok[aria-disabled="true"] { opacity: .55; }
+.mm-field .mm-tok.is-arrow .mm-tok__dot { outline: 3px solid var(--pa-run); outline-offset: 2px; }
+.mm-field .acomp { left: clamp(72px, calc(var(--x) * 1%), calc(100% - 72px)); top: clamp(72px, calc((94 - var(--y) * .98) * 1%), calc(100% - 96px)); }
+.mm .pa-legend { margin: 0; }
+@media (max-width: 699px) {
+  /* Telefon: boisko poziomo (do przodu w prawo), druga warstwa strzałek i kompas obrócony */
+  .mm-field .pa--v { display: none; }
+  .mm-field .pa--h { display: block; }
+  .mm-field .acomp { left: clamp(74px, calc((var(--y) * .92 + 3) * 1%), calc(100% - 74px)); top: clamp(70px, calc((var(--x) * .86 + 7) * 1%), calc(100% - 70px)); }
+  .mm-field .acomp__b { grid-column: var(--lc); grid-row: var(--lr); }
+  .mm-field .acomp__b svg { transform: rotate(var(--la, 0deg)); }
+  .mm-field .acomp__cap { position: absolute; top: 100%; margin-top: 2px; }
+}

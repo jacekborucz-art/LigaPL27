@@ -2,6 +2,8 @@
 // Wariant: instrukcja dla wszystkich uprawnionych zawodników jedenastki gospodarzy (drużyna: ustawienia domyślne),
 // odniesienie: ten sam mecz bez instrukcji. Obie drużyny bez AI (bez zmian trenera), Ekstraklasa.
 // Uruchom: node tools/pi-kalibracja.mjs [mecze=400] [instrukcja:poziom ...]
+// Strzałki ruchu (docs/strzalki-ruchu.md): node tools/pi-kalibracja.mjs 300 strzalki [grupa:kierunek ...], np. BO:i NAP:b;
+// grupa w formacji, w której gra (tests/piHelpers.mjs ARROW_GROUPS), odniesienie: ta sama formacja bez strzałek.
 
 import { generateWorld, squadOf } from '../src/world/worldGen.js';
 import { createTactics } from '../src/engine/lineup.js';
@@ -55,6 +57,23 @@ function measure(pi, teamInstr = null) {
 }
 
 const fmt = (v) => (Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(3));
+if (only[0] === 'strzalki') {
+  const { ARROW_GROUPS, abRunArrow, abArrowDiff } = await import('../tests/piHelpers.mjs');
+  const { arrowsFor } = await import('../src/data/playerInstructions.js');
+  // Próby kalibracji bez zmiany kodu: PI_ARROW='{"cen":0.1}' nadpisuje wartości PI.arrow
+  if (process.env.PI_ARROW) Object.assign((await import('../src/engine/match/playerInstr.js')).PI.arrow, JSON.parse(process.env.PI_ARROW));
+  const want = only.slice(1);
+  const bases = {};
+  for (const [g, G] of Object.entries(ARROW_GROUPS)) {
+    for (const dir of arrowsFor(G.pos[0])) {
+      if (want.length && !want.includes(`${g}:${dir}`)) continue;
+      const base = bases[g] ?? (bases[g] = abRunArrow(N, g, null));
+      const d = abArrowDiff(base, abRunArrow(N, g, dir));
+      console.log(`${g}:${dir}`, Object.entries(d).filter(([, v]) => Math.abs(v) > 1e-9).map(([k, v]) => `${k} ${v > 0 ? '+' : ''}${fmt(v)}`).join(', '));
+    }
+  }
+  process.exit(0);
+}
 const base = measure(null);
 console.log(`Mecze: ${N} na wariant. Odniesienie (gospodarze):`, Object.entries(base).map(([k, v]) => `${k} ${fmt(v)}`).join(', '));
 const variants = [];
