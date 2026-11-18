@@ -14,7 +14,7 @@ import { squadOf } from '../world/worldGen.js';
 import {
   LIMITS, checkClub, checkPlayer, editClub, editPlayer, clubValues, playerValues, resetClub, resetPlayer, clearPack,
   packCounts, originalOf, peopleValues, checkCoach, checkOwner, checkStaff, editCoach, editOwner, editStaff,
-  OWNER_LABELS, PERSON_AGE, ALT_MAX,
+  OWNER_LABELS, PERSON_AGE, ALT_MAX, ALT_POSITIONS,
 } from '../career/editor.js';
 import { proficiency } from '../engine/positions.js';
 import { COACH_KEYS, COACH_ATTRS, COACH_STYLES } from '../career/coaches.js';
@@ -176,29 +176,36 @@ function readPeople(root, key, game, id) {
   return staff;
 }
 
-// Boisko pozycji zawodnika (kopia boiska z taktyki): główna z listy „Pozycja”, kliknięcie dodaje albo usuwa dodatkową.
-// Procent przy pozycji: biegłość, tak jak liczy ją silnik meczu (naturalna z pozycji głównej albo dodatkowa).
+// Boisko pozycji zawodnika (kopia boiska z taktyki): główna z listy „Pozycja”, dodatkowe z dopasowaniem w procentach
+// wpisanym przez gracza (0-90 %). Kliknięcie pozycji na boisku przenosi do jej pola. Puste pole: tylko naturalne
+// dopasowanie z pozycji głównej (podpowiedź w polu). Mecz bierze wyższą wartość z naturalnej i wpisanej.
 const PITCH_SPOTS = [['NAP', 50, 11], ['SN', 17, 18], ['SN', 83, 18], ['OP', 50, 30], ['BP', 14, 41], ['BP', 86, 41], ['ŚP', 50, 46],
   ['DP', 50, 60], ['WB', 13, 61], ['WB', 87, 61], ['BO', 15, 76], ['BO', 85, 76], ['ŚO', 50, 79], ['BR', 50, 92]];
+export const altState = (lvl) => (lvl >= 70 ? 'alt' : lvl > 0 ? 'learn' : 'none');
 function posPitch(v, pid) {
   const main = v.pos; const alt = v.alt ?? {};
+  const gk = main === 'BR';
   const spots = PITCH_SPOTS.map(([k, x, y]) => {
-    const lvl = alt[k] ?? 0;
-    const prof = Math.round(proficiency({ pos: main, alt }, k));
-    const state = k === main ? 'main' : lvl >= 70 ? 'alt' : lvl > 0 ? 'learn' : 'none';
-    const dis = k === main || k === 'BR' || main === 'BR';
-    const what = state === 'main' ? 'pozycja główna' : state === 'alt' ? 'pozycja dodatkowa' : state === 'learn' ? 'w nauce' : 'bez pozycji dodatkowej';
-    return `<button type="button" class="ed-pp" style="left:${x}%;top:${y}%" data-act="ed-altpos" data-id="${esc(pid)}" data-pos="${esc(k)}" data-s="${state}"${dis ? ' disabled' : ''} aria-pressed="${state === 'main' || state === 'alt'}" aria-label="${esc(POS_NAMES[k] ?? k)}: ${what}, biegłość ${prof} %"><b>${esc(k)}</b><small>${prof} %</small></button>`;
+    const lvl = Number(alt[k]) || 0;
+    const state = k === main ? 'main' : altState(lvl);
+    const dis = k === main || k === 'BR' || gk;
+    const label = state === 'main' ? 'główna' : lvl > 0 ? `${lvl} %` : '';
+    const what = state === 'main' ? 'pozycja główna' : lvl > 0 ? `dopasowanie ${lvl} %` : 'bez pozycji dodatkowej';
+    return `<button type="button" class="ed-pp" style="left:${x}%;top:${y}%" data-act="ed-altpos" data-id="${esc(pid)}" data-pos="${esc(k)}" data-s="${state}"${dis ? ' disabled' : ''} aria-label="${esc(POS_NAMES[k] ?? k)}: ${what}"><b>${esc(k)}</b>${label ? `<small>${label}</small>` : ''}</button>`;
   }).join('');
+  const inputs = gk ? '' : `<div class="ed-alts">${ALT_POSITIONS.filter((k) => k !== main).map((k) => {
+    const nat = Math.round(proficiency({ pos: main, alt: {} }, k));
+    return `<label class="ed-attr"><span>${esc(k)} <small class="muted">${esc(POS_NAMES[k] ?? '')}</small></span><input id="ed-alt-${esc(k)}" data-alt="${esc(k)}" type="number" min="0" max="${ALT_MAX}" step="1" inputmode="numeric" placeholder="${nat}" value="${esc(alt[k] ?? '')}"></label>`;
+  }).join('')}</div>`;
   return `<fieldset class="ed-attrs"><legend>Pozycje</legend><div class="ed-pitchbox">
     <div class="pitch2 ed-pitch" role="group" aria-label="Boisko: pozycje zawodnika">${spots}</div>
     <div class="ed-pitchinfo">
       <p class="ed-ppl"><i data-s="main"></i>Pozycja główna (wybierasz ją w polu „Pozycja”)</p>
-      <p class="ed-ppl"><i data-s="alt"></i>Pozycja dodatkowa (dodana tutaj: ${ALT_MAX} % biegłości)</p>
-      <p class="ed-ppl"><i data-s="learn"></i>Pozycja w nauce na treningu</p>
-      <p class="fld__help">${main === 'BR' ? 'Bramkarz nie ma pozycji dodatkowych w polu.' : 'Kliknij pozycję, żeby dodać ją jako dodatkową albo usunąć. Procent to biegłość w meczu: naturalna z pozycji głównej albo dodatkowa, wyższa z nich. Zmiany zapisuje przycisk „Zapisz zmiany”.'}</p>
-    </div>
-    <input type="hidden" id="ed-alt" value="${esc(JSON.stringify(alt))}"></div></fieldset>`;
+      <p class="ed-ppl"><i data-s="alt"></i>Dobrze pasuje: od 70 %</p>
+      <p class="ed-ppl"><i data-s="learn"></i>Słabiej pasuje: poniżej 70 %</p>
+      ${gk ? '<p class="fld__help">Bramkarz nie ma pozycji dodatkowych w polu.</p>' : `<p class="fld__help">Wpisz, jak zawodnik pasuje na pozycję: od 0 do ${ALT_MAX} % (np. 90 prawie jak na swojej, 75 dobrze, 60 przyzwoicie, 40 słabo). Puste pole: tylko naturalne dopasowanie z pozycji głównej (szara liczba). Mecz bierze wyższą z tych dwóch wartości. Kliknięcie pozycji na boisku przenosi do jej pola.</p>`}
+      ${inputs}
+    </div></div></fieldset>`;
 }
 
 const natOptions = (cur) => Object.entries(NAT_NAMES).sort((a, b) => a[1].localeCompare(b[1], 'pl'))
@@ -315,8 +322,8 @@ function readClubForm(root, hasFin) {
 function readPlayerForm(root) {
   const attrs = {};
   for (const k of Object.keys(ATTRS)) attrs[k] = val(root, `ed-a-${k}`);
-  let alt = {};
-  try { alt = JSON.parse(val(root, 'ed-alt') || '{}'); } catch { /* puste */ }
+  const alt = {}; // pozycje dodatkowe: puste pole = bez wpisu
+  for (const el of root?.querySelectorAll?.('input[data-alt]') ?? []) if (String(el.value).trim() !== '') alt[el.dataset.alt] = el.value;
   return { first: val(root, 'ed-first'), last: val(root, 'ed-last'), nat: val(root, 'ed-nat'), pos: val(root, 'ed-pos'), birthDate: val(root, 'ed-birth'), attrs, pot: val(root, 'ed-pot'), alt };
 }
 
@@ -359,14 +366,10 @@ export function handleEditorAction(game, ed, act, data, root) {
     return { save: n > 0, squadChanged: n > 0 && game.world.players[pid]?.clubId === game.clubId };
   }
   if (act === 'ed-altpos') {
-    // Przełączenie pozycji dodatkowej: szkic formularza (wpisane pola zostają), zapis dopiero przyciskiem
+    // Kliknięcie pozycji na boisku: pole dopasowania tej pozycji (szkic formularza, wpisane pola zostają)
     const pid = data.id; const k = data.pos;
-    const raw = readPlayerForm(root);
-    const alt = { ...raw.alt };
-    if ((alt[k] ?? 0) >= 70) delete alt[k]; else alt[k] = ALT_MAX;
-    raw.alt = alt;
-    ed.draft = { key: `player:${pid}`, v: raw }; ed.errors = null; ed.msg = null;
-    return { focus: `[data-act="ed-altpos"][data-pos="${k}"]` };
+    ed.draft = { key: `player:${pid}`, v: readPlayerForm(root) }; ed.errors = null; ed.msg = null;
+    return { focus: `#ed-alt-${k}` };
   }
   const people = { 'ed-save-coach': ['coach', checkCoach, editCoach], 'ed-save-staff': ['staff', checkStaff, editStaff], 'ed-save-owner': ['owner', checkOwner, editOwner] }[act];
   if (people) {

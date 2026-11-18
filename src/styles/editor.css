@@ -66,6 +66,8 @@
 .ed-pp:not(:disabled):hover b { transform: scale(1.08); }
 .ed-pp:focus-visible { outline: 0; }
 .ed-pp:focus-visible b { outline: 3px solid var(--focus); outline-offset: 2px; }
+.ed-alts { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-2) var(--space-3); margin-top: var(--space-3); }
+.ed-alts .ed-attr span small { display: block; font-size: 11px; }
 .ed-ppl { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-2); font-size: var(--step--1); }
 .ed-ppl i { flex: none; width: 20px; height: 20px; border-color: var(--text-muted); background: color-mix(in srgb, var(--murawa) 60%, transparent); }
 .ed-people { margin-top: var(--space-4); }

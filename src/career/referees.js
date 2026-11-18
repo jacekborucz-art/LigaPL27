@@ -103,7 +103,7 @@ function newReferee(id, list, rng, used) {
 }
 
 /** Średnia surowość list (normalizacja: średnia surowość dla silnika = 1,0 na każdej liście). */
-function computeNorm(R) {
+export function computeNorm(R) {
   const norm = [1, 1, 1, 1, 1];
   for (let l = 1; l <= 4; l++) {
     const xs = R.list.filter((r) => r.l === l).map((r) => r.s);

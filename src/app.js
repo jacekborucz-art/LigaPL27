@@ -56,7 +56,7 @@ import { renderClubView, hasClubView } from './ui/clubView.js';
 import { renderTransfers, handleTransferAction, isTransferAction } from './ui/transfersView.js';
 import { renderClubHub, handleClubAction, isClubAction } from './ui/klubView.js';
 import { sysNavHtml, sysHeaderBtn, sysDialogHtml } from './ui/sysMenu.js';
-import { renderEditor, handleEditorAction, isEditorAction, newEditorState, clubListHtml, playerListHtml } from './ui/editorView.js'; // edytor i datapack (docs/edytor.md)
+import { renderEditor, handleEditorAction, isEditorAction, newEditorState, clubListHtml, playerListHtml, altState } from './ui/editorView.js'; // edytor i datapack (docs/edytor.md)
 import { canPromote, promoteYouth } from './career/academy.js'; // wychowankowie do pierwszego składu
 import { checkClub, editClub } from './career/editor.js';
 import { applyPack, restoreOriginals, clubNamesSnapshot, exportPack, packFileName, parsePack, importPack, importSummary } from './career/editor.js';
@@ -313,6 +313,16 @@ app.addEventListener('change', async (ev) => {
 });
 app.addEventListener('input', (ev) => {
   if (state.screen !== 'editor' || !state.ed) return;
+  // Dopasowanie do pozycji dodatkowej: boisko w formularzu zawodnika pokazuje wpisaną wartość od razu
+  if (ev.target.dataset?.alt) {
+    const k = ev.target.dataset.alt; const n = Math.max(0, Math.min(90, Math.round(Number(ev.target.value) || 0)));
+    for (const b of app.querySelectorAll(`.ed-pp[data-pos="${k}"]`)) {
+      b.dataset.s = altState(n);
+      let s = b.querySelector('small');
+      if (!n) s?.remove(); else { if (!s) { s = document.createElement('small'); b.append(s); } s.textContent = `${n} %`; }
+    }
+    return;
+  }
   const id = ev.target.id;
   if (id !== 'ed-q' && id !== 'ed-pq') return;
   if (id === 'ed-q') state.ed.q = ev.target.value; else state.ed.pq = ev.target.value;

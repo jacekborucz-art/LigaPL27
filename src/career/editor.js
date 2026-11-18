@@ -27,6 +27,10 @@ import { GAME_VERSION } from '../config/version.js';
 import { coachOf, COACH_KEYS, COACH_ATTRS, COACH_STYLES } from './coaches.js';
 import { ownerOf, OWNER_KEYS } from './owners.js';
 import { rosterOf, syncStaff, STAFF_ROLE_IDS } from './staffMarket.js';
+import { completeTransfer, editorRelease } from './transfers.js';
+import { computeNorm, REF_ATTRS } from './referees.js';
+import { genPlayer } from '../world/playerGen.js';
+import { Rng } from '../core/rng.js';
 
 export const PACK_TYPE = 'ligapl27-datapack';
 // Wersje pliku datapacku (eksport zawsze w najnowszej, import każdej od PACK_V_MIN, starsze pliki bez błędu):
@@ -220,7 +224,7 @@ export function checkPlayer(src, { form = false, date = null } = {}) {
       for (const [k0, v] of Object.entries(src.alt)) {
         const k = normPos(k0);
         if (!ALT_POSITIONS.includes(k)) { errors.alt = `Pozycje dodatkowe: nieznana pozycja ${String(k0).slice(0, 6)}.`; continue; }
-        const r = num(v, { label: `Biegłość na pozycji ${k}`, min: 0, max: ALT_MAX, int: false });
+        const r = num(v, { label: `Dopasowanie do pozycji ${k}`, min: 0, max: ALT_MAX, int: false, form });
         if (r.err) errors.alt = r.err; else if (r.v > 0) a[k] = r.v;
       }
       value.alt = a;
@@ -414,6 +418,146 @@ export function editStaff(game, id, v) {
     });
   }
   if (n) { syncStaff(game, id); recordPeople(game, id, 'staff'); }
+  return n;
+}
+
+// ------------------------------------------------------------ Kadra: wolni zawodnicy do klubu i z klubu
+// Edytor zmienia dane gry, nie decyzje klubów: bez opłat i negocjacji, ale z limitem kadry pierwszej drużyny.
+export const EDIT_SQUAD = { min: 21, max: 32 };
+export const squadSize = (game, clubId) => game.world?.clubs?.[clubId]?.squad?.length ?? 0;
+/** Koniec sezonu (rok) dla daty, np. 2026-10-01 -> 2027. */
+const seasonEndYear = (date) => Number(date.slice(0, 4)) + (Number(date.slice(5, 7)) >= 7 ? 1 : 0);
+
+/** Czy zawodnika można przenieść z kadry do wolnych (tekst powodu albo ''). */
+export function releaseBlock(game, pid) {
+  const p = game.world?.players?.[pid];
+  if (!p?.clubId || !game.world.clubs[p.clubId]) return 'Zawodnik nie ma klubu.';
+  if (p.loan) return 'Zawodnik jest wypożyczony: najpierw zakończ wypożyczenie w grze.';
+  const n = squadSize(game, p.clubId);
+  if (n <= EDIT_SQUAD.min) return `Kadra ma ${n} zawodników, a minimum to ${EDIT_SQUAD.min}.`;
+  return '';
+}
+/** Czy wolnego zawodnika można dodać do kadry klubu (tekst powodu albo ''). */
+export function joinBlock(game, pid, clubId) {
+  const p = game.world?.players?.[pid];
+  if (!p || p.clubId || !game.market?.free?.includes(pid)) return 'To nie jest wolny zawodnik.';
+  if (!game.world.clubs[clubId]) return 'Ten klub nie ma kadry w grze.';
+  const n = squadSize(game, clubId);
+  if (n >= EDIT_SQUAD.max) return `Kadra ma ${n} zawodników, a maksimum to ${EDIT_SQUAD.max}.`;
+  return '';
+}
+function recordTeam(game, pid) {
+  const E = ensureEditor(game);
+  if (E.created?.[pid]) return; // nowy zawodnik: klub zapisuje się przy nim w sekcji created
+  E.players[pid] = { ...(E.players[pid] ?? {}), team: game.world.players[pid].clubId ?? null };
+}
+/** Zawodnik z kadry do wolnych (bez kosztów). Zwraca '' albo powód odmowy. */
+export function releaseToFree(game, pid) {
+  const why = releaseBlock(game, pid);
+  if (why) return why;
+  editorRelease(game, pid);
+  recordTeam(game, pid);
+  return '';
+}
+/** Wolny zawodnik do kadry klubu: kontrakt do końca następnego sezonu, pensja jak jego oczekiwania. */
+export function joinFromFree(game, pid, clubId) {
+  const why = joinBlock(game, pid, clubId);
+  if (why) return why;
+  const p = game.world.players[pid];
+  const wage = Math.max(1000, Math.round((p.askWage || 0) / 100) * 100);
+  completeTransfer(game, { playerId: pid, to: clubId, kind: 'free', contract: { wage, until: `${seasonEndYear(game.date) + 1}-06-30`, clause: 0 } });
+  recordTeam(game, pid);
+  return '';
+}
+
+/** Wolni zawodnicy do dodania (najwyżej cap, od najwyższego OVR), z wyszukiwaniem po imieniu i nazwisku. */
+export function freeAgents(game, q = '', cap = 60) {
+  const f = String(q).toLowerCase().trim();
+  const all = (game.market?.free ?? []).map((id) => game.world.players[id]).filter((p) => p && !p.clubId && (!f || String(p.name).toLowerCase().includes(f)));
+  all.sort((a, b) => b.ovr - a.ovr);
+  return { total: all.length, rows: all.slice(0, cap) };
+}
+
+// ------------------------------------------------------------ Nowy wolny zawodnik (narodowość z całego świata)
+export const NEW_LEVEL = { min: 3, max: 18 };
+const tierForLevel = (L) => (L >= 11 ? 1 : L >= 9.5 ? 2 : L >= 8 ? 3 : 4);
+
+/** Sprawdza dane nowego zawodnika: { first, last, nat, pos, age, level }. */
+export function checkNewPlayer(src, { form = false } = {}) {
+  const r = checkPlayer({ first: src.first, last: src.last, nat: src.nat, pos: src.pos }, { form });
+  const put = (k, x) => { if (x.err) r.errors[k] = x.err; else r.value[k] = x.v; };
+  for (const k of ['first', 'last']) if (!r.value[k] && !r.errors[k]) r.errors[k] = `${k === 'first' ? 'Imię' : 'Nazwisko'}: pole nie może być puste.`;
+  put('age', num(src.age, { label: 'Wiek', min: LIMITS.ageMin, max: LIMITS.ageMax, form }));
+  put('level', num(src.level, { label: 'Poziom', min: NEW_LEVEL.min, max: NEW_LEVEL.max, int: false, form }));
+  return r;
+}
+
+/** Tworzy wolnego zawodnika (atrybuty losowane z poziomu i pozycji, jak u wolnych zawodników w grze). */
+export function createFreePlayer(game, v, id = `ed-${Date.now().toString(36)}-${(ensureEditor(game).seq = (game.editor.seq ?? 0) + 1)}`) {
+  const rng = new Rng(`edytor-zawodnik:${id}`);
+  const L = v.level; const tier = tierForLevel(L);
+  const p = genPlayer(rng, { id, L, pos: v.pos, age: v.age, nat: v.nat, tier, club: { id: 'wolny', tier, prestige: 2, L }, date: game.date });
+  p.first = v.first; p.last = v.last; p.name = `${v.first} ${v.last}`.trim(); p.nat = v.nat; p.eu = EU.has(v.nat);
+  p.clubId = null; p.free = true; p.askWage = p.contract?.wage ?? 1000; p.contract = null; p.wage = 0; p.freeSince = game.date;
+  game.world.players[id] = p;
+  game.market.free.push(id);
+  const E = ensureEditor(game);
+  (E.created ??= {})[id] = 1;
+  return p;
+}
+
+/** Nowi zawodnicy z edytora do pliku: pełne dane (działają w każdym świecie gry) i klub. */
+function exportCreated(game) {
+  const out = {};
+  for (const id of Object.keys(game.editor?.created ?? {})) {
+    const p = game.world?.players?.[id];
+    if (!p) continue;
+    const cur = playerValues(p);
+    if (!cur.birthDate) delete cur.birthDate;
+    if (typeof cur.pot === 'number') cur.pot = Math.round(cur.pot * 10) / 10;
+    const { value } = checkPlayer(cur);
+    out[id] = { ...value, team: p.clubId ?? null };
+  }
+  return out;
+}
+
+// ------------------------------------------------------------ Sędziowie
+export const REF_LIMITS = { ageMin: 20, ageMax: 60, strictMin: 0.7, strictMax: 1.4 };
+/** Bieżące wartości sędziego (do formularza i datapacku). */
+export function refValues(game, r) {
+  return { name: r.n, age: Number(game.date.slice(0, 4)) - r.b, a: [...r.a], e: r.e, s: r.s };
+}
+/** Sprawdza sędziego { name, age, a: [7 atrybutów], e, s }. Błędy atrybutów: a.0 ... a.6. */
+export function checkReferee(src, { form = false } = {}) {
+  const value = {}; const errors = {};
+  if (!isObj(src)) return { value, errors: { ref: 'Sędzia: zły format.' } };
+  const put = (k, r) => { if (r.err) errors[k] = r.err; else value[k] = r.v; };
+  if (src.name !== undefined) put('name', personName(src.name));
+  if (src.age !== undefined) put('age', num(src.age, { label: 'Wiek', min: REF_LIMITS.ageMin, max: REF_LIMITS.ageMax, form }));
+  if (src.a !== undefined) {
+    if (!Array.isArray(src.a) || src.a.length !== REF_ATTRS.length) errors.a = `Atrybuty sędziego: oczekiwano ${REF_ATTRS.length} wartości.`;
+    else {
+      value.a = src.a.map((x, i) => { const r = num(x, { label: REF_ATTRS[i], min: 1, max: 20, form }); if (r.err) errors[`a.${i}`] = r.err; return r.v; });
+    }
+  }
+  if (src.e !== undefined) put('e', num(src.e, { label: 'Doświadczenie', min: 1, max: 20, form }));
+  if (src.s !== undefined) {
+    const r = num(src.s, { label: 'Surowość', min: REF_LIMITS.strictMin, max: REF_LIMITS.strictMax, int: false, form });
+    put('s', r.err ? r : { v: Math.round(r.v * 100) / 100 });
+  }
+  return { value, errors };
+}
+/** Zmiana sędziego (values po checkReferee). Surowość zmienia średnią listy (normalizacja dla silnika). */
+export function editReferee(game, rid, v) {
+  const R = game.refs; const r = R?.list?.find((x) => x.id === rid);
+  if (!r) return 0;
+  let n = 0;
+  if (v.name !== undefined && v.name !== r.n) { r.n = v.name; n++; }
+  if (v.age !== undefined) { const b = Number(game.date.slice(0, 4)) - v.age; if (b !== r.b) { r.b = b; n++; } }
+  if (v.a) v.a.forEach((x, i) => { if (x !== undefined && x !== r.a[i]) { r.a[i] = x; n++; } });
+  if (v.e !== undefined && v.e !== r.e) { r.e = v.e; n++; }
+  if (v.s !== undefined && v.s !== r.s) { r.s = v.s; n++; R.norm = computeNorm(R); }
+  if (n) { const E = ensureEditor(game); (E.refs ??= {})[rid] = refValues(game, r); }
   return n;
 }
 

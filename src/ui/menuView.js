@@ -5,7 +5,7 @@
 import { CLUBS_PL, LEAGUE_NAMES, L3_GROUP_NAMES, leagueLabel } from '../data/clubs_pl.js';
 import { POLISH_EUROPE_2026, SEASON, SEASON_YEAR, GAME_START } from '../config/calendar2026.js';
 import { clubFinanceData } from '../data/finanse_klubow.js';
-import { NAT_NAMES, NATIONALITIES, randomName } from '../data/names.js';
+import { NAT_NAMES, NATIONALITIES, randomName, UEFA } from '../data/names.js';
 import { seasonGoalFor } from '../career/board.js';
 import { clubPlan, initClub, stadiumCapacity } from '../career/finance.js';
 import { rivalry, fmtZl } from '../career/fans.js';
@@ -239,7 +239,7 @@ export function renderMenu(ctx) {
 // ------------------------------------------------------------ Kreator: dane i walidacja
 const NAT_EXTRA = { ROU: 'Rumunia', SUI: 'Szwajcaria', EST: 'Estonia', ALB: 'Albania', JPN: 'Japonia', KOR: 'Korea Południowa', MEX: 'Meksyk', USA: 'Stany Zjednoczone', URU: 'Urugwaj', AUS: 'Australia', ARM: 'Armenia', KAZ: 'Kazachstan', MDA: 'Mołdawia', KOS: 'Kosowo' };
 const NAT_ALL = { ...NAT_EXTRA, ...NAT_NAMES };
-const WORLD = new Set(['NGA', 'GHA', 'CMR', 'SEN', 'CIV', 'BRA', 'ARG', 'COL', 'JPN', 'KOR', 'MEX', 'USA', 'URU', 'AUS']);
+const WORLD = new Set(Object.keys(NAT_ALL).filter((k) => !UEFA.has(k))); // poza Europą (federacje spoza UEFA)
 const byName = (a, b) => NAT_ALL[a].localeCompare(NAT_ALL[b], 'pl');
 const NAT_EUROPE = Object.keys(NAT_ALL).filter((k) => k !== 'POL' && !WORLD.has(k)).sort(byName);
 const NAT_WORLD = [...WORLD].filter((k) => NAT_ALL[k]).sort(byName);

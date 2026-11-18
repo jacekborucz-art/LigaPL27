@@ -140,4 +140,43 @@ export const NAT_NAMES = {
   URU: 'Urugwaj', ECU: 'Ekwador', PAR: 'Paragwaj', VEN: 'Wenezuela', CHI: 'Chile', PER: 'Peru', MAR: 'Maroko', ALG: 'Algieria', TUN: 'Tunezja', MLI: 'Mali', GUI: 'Gwinea', COD: 'DR Konga', LBN: 'Liban', JOR: 'Jordania', IRQ: 'Irak', SYR: 'Syria',
 };
 
+// Pozostałe reprezentacje FIFA (Nov 18, 2026): edytor tworzy zawodników z całego świata. Kraje bez puli imion
+// losują imiona z puli polskiej (randomName), a gracz wpisuje imię i nazwisko sam.
+const NAT_MORE = {
+  RUS: 'Rosja', SMR: 'San Marino',
+  // AFC
+  AFG: 'Afganistan', AUS: 'Australia', BHR: 'Bahrajn', BAN: 'Bangladesz', BHU: 'Bhutan', BRU: 'Brunei', CAM: 'Kambodża', CHN: 'Chiny',
+  TPE: 'Chińskie Tajpej', GUM: 'Guam', HKG: 'Hongkong', IND: 'Indie', IDN: 'Indonezja', IRN: 'Iran', JPN: 'Japonia', KUW: 'Kuwejt',
+  KGZ: 'Kirgistan', LAO: 'Laos', MAC: 'Makau', MAS: 'Malezja', MDV: 'Malediwy', MNG: 'Mongolia', MYA: 'Mjanma', NEP: 'Nepal',
+  PRK: 'Korea Północna', OMA: 'Oman', PAK: 'Pakistan', PLE: 'Palestyna', PHI: 'Filipiny', QAT: 'Katar', KSA: 'Arabia Saudyjska',
+  SIN: 'Singapur', KOR: 'Korea Południowa', SRI: 'Sri Lanka', TJK: 'Tadżykistan', THA: 'Tajlandia', TLS: 'Timor Wschodni',
+  TKM: 'Turkmenistan', UAE: 'Zjednoczone Emiraty Arabskie', UZB: 'Uzbekistan', VIE: 'Wietnam', YEM: 'Jemen',
+  // CAF
+  ANG: 'Angola', BEN: 'Benin', BOT: 'Botswana', BFA: 'Burkina Faso', BDI: 'Burundi', CPV: 'Republika Zielonego Przylądka',
+  CTA: 'Republika Środkowoafrykańska', CHA: 'Czad', COM: 'Komory', CGO: 'Kongo', DJI: 'Dżibuti', EGY: 'Egipt', EQG: 'Gwinea Równikowa',
+  ERI: 'Erytrea', SWZ: 'Eswatini', ETH: 'Etiopia', GAB: 'Gabon', GAM: 'Gambia', GNB: 'Gwinea Bissau', KEN: 'Kenia', LES: 'Lesotho',
+  LBR: 'Liberia', LBY: 'Libia', MAD: 'Madagaskar', MWI: 'Malawi', MTN: 'Mauretania', MRI: 'Mauritius', MOZ: 'Mozambik', NAM: 'Namibia',
+  NIG: 'Niger', RWA: 'Rwanda', STP: 'Wyspy Świętego Tomasza i Książęca', SEY: 'Seszele', SLE: 'Sierra Leone', SOM: 'Somalia',
+  RSA: 'Republika Południowej Afryki', SSD: 'Sudan Południowy', SDN: 'Sudan', TAN: 'Tanzania', TOG: 'Togo', UGA: 'Uganda',
+  ZAM: 'Zambia', ZIM: 'Zimbabwe',
+  // CONCACAF
+  AIA: 'Anguilla', ATG: 'Antigua i Barbuda', ARU: 'Aruba', BAH: 'Bahamy', BRB: 'Barbados', BLZ: 'Belize', BER: 'Bermudy',
+  VGB: 'Brytyjskie Wyspy Dziewicze', CAN: 'Kanada', CAY: 'Kajmany', CRC: 'Kostaryka', CUB: 'Kuba', CUW: 'Curaçao', DMA: 'Dominika',
+  DOM: 'Dominikana', SLV: 'Salwador', GRN: 'Grenada', GUA: 'Gwatemala', GUY: 'Gujana', HAI: 'Haiti', HON: 'Honduras', JAM: 'Jamajka',
+  MEX: 'Meksyk', MSR: 'Montserrat', NCA: 'Nikaragua', PAN: 'Panama', PUR: 'Portoryko', SKN: 'Saint Kitts i Nevis', LCA: 'Saint Lucia',
+  VIN: 'Saint Vincent i Grenadyny', SUR: 'Surinam', TRI: 'Trynidad i Tobago', TCA: 'Turks i Caicos', USA: 'Stany Zjednoczone',
+  VIR: 'Wyspy Dziewicze Stanów Zjednoczonych',
+  // CONMEBOL
+  BOL: 'Boliwia',
+  // OFC
+  ASA: 'Samoa Amerykańskie', COK: 'Wyspy Cooka', FIJ: 'Fidżi', NZL: 'Nowa Zelandia', PNG: 'Papua-Nowa Gwinea', SAM: 'Samoa',
+  SOL: 'Wyspy Salomona', TAH: 'Tahiti', TGA: 'Tonga', VAN: 'Vanuatu',
+};
+for (const [k, v] of Object.entries(NAT_MORE)) if (!NAT_NAMES[k]) NAT_NAMES[k] = v;
+
+/** Federacje UEFA (Europa); pozostałe kody z NAT_NAMES to reszta świata. */
+export const UEFA = new Set(['ALB', 'AND', 'ARM', 'AUT', 'AZE', 'BLR', 'BEL', 'BIH', 'BUL', 'CRO', 'CYP', 'CZE', 'DEN', 'ENG', 'EST', 'FRO',
+  'FIN', 'FRA', 'GEO', 'GER', 'GIB', 'GRE', 'HUN', 'ISL', 'ISR', 'IRL', 'ITA', 'KAZ', 'KOS', 'LVA', 'LIE', 'LTU', 'LUX', 'MLT', 'MDA',
+  'MNE', 'NED', 'MKD', 'NIR', 'NOR', 'POL', 'POR', 'ROU', 'RUS', 'SMR', 'SCO', 'SRB', 'SVK', 'SVN', 'ESP', 'SWE', 'SUI', 'TUR', 'UKR', 'WAL']);
+
 export const EU = new Set(['POL', 'ESP', 'POR', 'CRO', 'SVN', 'SVK', 'CZE', 'LTU', 'LVA', 'NED', 'BEL', 'GER', 'AUT', 'FRA', 'SWE', 'DEN', 'FIN']);

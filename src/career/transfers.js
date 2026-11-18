@@ -209,6 +209,24 @@ export function releasePlayer(game, playerId) {
   return cost;
 }
 
+/**
+ * Edytor (src/career/editor.js): zawodnik z kadry do wolnych zawodników, bez kosztów i bez wpisu w historii rynku
+ * (zmiana danych gry, nie decyzja klubu). Limity kadry sprawdza edytor.
+ */
+export function editorRelease(game, playerId) {
+  const p = game.world.players[playerId];
+  if (!p?.clubId) return false;
+  spellsOf(p);
+  const C = game.world.clubs[p.clubId];
+  if (C) C.squad = C.squad.filter((id) => id !== playerId);
+  p.askWage = p.contract?.wage || p.askWage || 0; p.contract = null; p.wage = 0; p.clubId = null; p.free = true; p.freeSince = game.date;
+  delete p.moveWish; delete p.preContract; delete p.transfer; p.transferRequest = false;
+  syncSpell(p, game.date); // historia klubowa: koniec okresu w klubie
+  delete game.market.listed[playerId]; delete game.market.userListed[playerId]; delete game.market.talks?.[playerId];
+  if (!game.market.free.includes(playerId)) game.market.free.push(playerId);
+  return true;
+}
+
 // ------------------------------------------------------------ Listy dla gracza
 export function marketLists(game) {
   const W = game.world;
