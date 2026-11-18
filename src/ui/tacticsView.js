@@ -123,7 +123,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
     // Tryb strzałek: klik otwiera kompas (bez przeciągania i bez wyboru dwoma dotknięciami)
     const acts = arrOn
       ? `data-act="tarrow-pick" data-idx="${i}"${p ? ` data-pid="${esc(p.id)}"` : ''} data-sx="${s.x}" data-sy="${s.y}" data-dirs="${arrowsFor(s.pos).join(' ')}" aria-haspopup="dialog" aria-expanded="${pickIdx === i}"${p && arrowsFor(s.pos).length ? '' : ' aria-disabled="true"'}`
-      : `data-act="tslot" data-loc="${key}" data-drop="${key}" data-handle ${p ? `${dragAttrs(loc, p)} data-pid="${esc(p.id)}"${arrowsFor(s.pos).length ? ` data-sx="${s.x}" data-sy="${s.y}" data-dirs="${arrowsFor(s.pos).join(' ')}"` : ''}` : ''}${repAttr(r)} aria-pressed="${isSel}"`;
+      : `data-act="tslot" data-loc="${key}" data-drop="${key}" data-handle ${p ? `${dragAttrs(loc, p)} data-pid="${esc(p.id)}"${arrowsFor(s.pos).length ? ` data-sx="${s.x}" data-sy="${s.y}" data-dirs="${arrowsFor(s.pos).join(' ')}"${dirAt[i] ? ` data-adir="${dirAt[i]}"` : ''}` : ''}` : ''}${repAttr(r)} aria-pressed="${isSel}"`;
     return `<button class="${cls}" style="left:${s.x}%;top:${100 - s.y}%" ${acts}
       aria-label="${esc(s.pos)}: ${p ? esc(p.name) : 'puste miejsce'}${p && prof < 85 ? `, poza pozycją (${prof}%)` : ''}${esc(repAria(r))}${p && pim[p.id] ? esc(`, instrukcje: ${piSummary(pim[p.id])}`) : ''}${esc(arrOn || !pim[p?.id] ? mv : '')}">
       ${r && r.b !== 'no' ? `<span class="slot-btn__rep" aria-hidden="true">${r.v}%</span>` : ''}

@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-a544cf5a55';
+const VERSION = 'v0.3-87aef31897';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -78,7 +78,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', '2efd1edf82'],
+  ['./src/app.js', '1225691c41'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '5cc24e938e'],
@@ -257,10 +257,10 @@ const FILES = [
   ['./src/ui/squadView.js', '26402bd3f1'],
   ['./src/ui/staffView.js', '7682a3584c'],
   ['./src/ui/sysMenu.js', 'fc1677717f'],
-  ['./src/ui/tacticsArrows.js', '1465820237'],
+  ['./src/ui/tacticsArrows.js', '79ec9ea7a0'],
   ['./src/ui/tacticsDrag.js', 'e4a2009a87'],
   ['./src/ui/tacticsMoves.js', '36742ffefc'],
-  ['./src/ui/tacticsView.js', 'ec59a6e711'],
+  ['./src/ui/tacticsView.js', '48de014a91'],
   ['./src/ui/talksView.js', '05a69f841e'],
   ['./src/ui/teamReportView.js', 'c01abc57b6'],
   ['./src/ui/todoView.js', 'bd4d7aa1c4'],

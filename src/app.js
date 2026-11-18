@@ -1347,7 +1347,7 @@ async function arrowSet(g, pid, dir) {
   if (!pid || g.world.players[pid]?.clubId !== g.clubId) return;
   const name = g.world.players[pid].name;
   g.tactics = { ...g.tactics, playerInstr: piWithDir(g.tactics.playerInstr, pid, dir) };
-  state.tArrows = { on: true, pick: null };
+  state.tArrows = { on: !!state.tArrows?.on, pick: null }; // bez włączania trybu (strzałki rysuje prawy przycisk)
   state.tMsg = `${name}: ${dir ? `ruch ${arrowLabel(dir).toLowerCase()}` : 'bez ruchu, jak drużyna'}.`;
   await save();
   renderTacticsAfter(arrowTok(pid));

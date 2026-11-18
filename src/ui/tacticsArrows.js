@@ -19,7 +19,7 @@ export function mountArrowDraw(root, { onSet, onReject }) {
     const el = ev.button === 2 ? ev.target.closest('.tac .pitch2 .slot-btn[data-pid][data-dirs]')
       : ev.button === 0 ? ev.target.closest('.tac.is-arrows .slot-btn[data-act="tarrow-pick"][data-pid]') : null;
     if (!el || !el.dataset.dirs) return;
-    pending = { el, x: ev.clientX, y: ev.clientY, id: ev.pointerId };
+    pending = { el, x: ev.clientX, y: ev.clientY, id: ev.pointerId, right: ev.button === 2 };
   });
 
   window.addEventListener('pointermove', (ev) => {
@@ -56,21 +56,42 @@ export function mountArrowDraw(root, { onSet, onReject }) {
     pitch.dataset.drawHint = ok ? arrowLabel(dir) : 'Ten kierunek nie pasuje do pozycji';
   }, { passive: false });
 
+  let deferred = null; // menu zawodnika wstrzymane, póki prawy przycisk jest wciśnięty (system wysyła „contextmenu” przy wciśnięciu)
+  let passThrough = false;
   const end = (commit) => {
-    const d = draw;
-    draw = null; pending = null;
-    if (!d) return;
+    const d = draw; const p = pending; const menu = deferred;
+    draw = null; pending = null; deferred = null;
+    if (!d) {
+      // Bez przeciągnięcia, prawy przycisk: zawodnik ze strzałką traci ją (bez menu); bez strzałki: menu zawodnika
+      if (commit && p?.right && p.el.dataset.adir) {
+        suppressUntil = performance.now() + 600;
+        onSet(p.el.dataset.pid, '');
+        return;
+      }
+      if (commit && menu && p?.el?.isConnected) {
+        passThrough = true;
+        try { p.el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: menu.x, clientY: menu.y, button: 2, buttons: 0 })); } finally { passThrough = false; }
+      }
+      return;
+    }
     d.path.remove();
     d.pitch.classList.remove('is-drawing');
     delete d.pitch.dataset.drawHint;
-    suppressUntil = performance.now() + 200;
+    suppressUntil = performance.now() + 600;
     if (!commit) return;
     if (d.dir) onSet(d.el.dataset.pid, d.dir);
     else onReject('Ten kierunek nie pasuje do pozycji zawodnika. Dozwolone kierunki: menu zawodnika (prawy przycisk), „Ruch w ataku”.');
   };
-  // Po narysowaniu prawym przyciskiem przeglądarka wysyła „contextmenu”: nie otwieramy wtedy menu zawodnika
+  // Prawy przycisk na zawodniku: menu (gry i przeglądarki) nie otwiera się w trakcie ani po narysowaniu strzałki.
+  // Gdy system wysyła „contextmenu” już przy wciśnięciu, menu czeka do puszczenia przycisku (bez ruchu: pokazujemy je).
   root.addEventListener('contextmenu', (ev) => {
-    if ((draw || performance.now() < suppressUntil) && ev.target.closest('.slot-btn')) { ev.preventDefault(); ev.stopImmediatePropagation(); }
+    if (passThrough) return;
+    // Po rysowaniu kursor bywa już poza zawodnikiem: blokujemy też menu przeglądarki (Wstecz, Odśwież) w całym ekranie
+    if (draw || performance.now() < suppressUntil) { ev.preventDefault(); ev.stopImmediatePropagation(); return; }
+    if (pending?.right) {
+      ev.preventDefault(); ev.stopImmediatePropagation();
+      if (!pending.el.dataset.adir) deferred = { x: ev.clientX, y: ev.clientY };
+    }
   }, true);
   window.addEventListener('pointerup', (ev) => { if (pending && ev.pointerId === pending.id) end(true); });
   window.addEventListener('pointercancel', (ev) => { if (pending && ev.pointerId === pending.id) end(false); });
