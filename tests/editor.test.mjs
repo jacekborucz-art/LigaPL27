@@ -302,8 +302,16 @@ test('Nowy wolny zawodnik: narodowość z całego świata, datapack w innym świ
   assert.ok(g.market.free.includes(p.id) && !p.clubId);
   assert.ok(p.ovr > 8 && p.ovr < 16, `OVR ${p.ovr} blisko poziomu 12`);
   assert.equal(joinFromFree(g, p.id, 'legia'), '');
-  const pk = parsePack(JSON.stringify(exportPack(g)));
+  const out = exportPack(g);
+  assert.equal(typeof out.created, 'string', 'created w nagłówku to data pliku');
+  const pk = parsePack(JSON.stringify(out));
   assert.equal(pk.created[p.id].team, 'legia');
+  // Plik z pierwszego wydania v1.19 (nowi zawodnicy w polu created) też się wczytuje
+  const legacy = { ...out, created: out.newPlayers }; delete legacy.newPlayers;
+  assert.equal(parsePack(JSON.stringify(legacy)).created[p.id].team, 'legia');
+  // Datapack v1 (v1.18): created to data pliku, bez nowych zawodników
+  const v1 = parsePack(JSON.stringify({ type: 'ligapl27-datapack', v: 1, seed: 1, created: '2026-11-18T00:55:16.000Z', full: true, clubs: {}, players: {} }));
+  assert.deepEqual(v1.created, {});
   const friend = structuredClone(G2); // inny świat gry
   const res = importPack(friend, pk);
   assert.equal(res.created, 1);

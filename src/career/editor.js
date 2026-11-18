@@ -675,7 +675,7 @@ export function clearPack(game) {
 export function exportPack(game, now = new Date(), { full = false } = {}) {
   const E = ensureEditor(game);
   const head = { type: PACK_TYPE, v: PACK_V, game: GAME_VERSION, seed: game.seed, created: now.toISOString(), full };
-  const extra = { created: exportCreated(game), refs: structuredClone(E.refs ?? {}) }; // nowi zawodnicy i sędziowie
+  const extra = { newPlayers: exportCreated(game), refs: structuredClone(E.refs ?? {}) }; // nowi zawodnicy i sędziowie (created to data pliku)
   if (!full) return { ...head, clubs: structuredClone(E.clubs), players: structuredClone(E.players), ...extra };
   for (const r of game.refs?.list ?? []) extra.refs[r.id] = refValues(game, r); // pełny: wszyscy sędziowie
   const clubs = {}; const players = {};
@@ -751,9 +751,11 @@ export function parsePack(text) {
     if (Object.keys(r.value).length) players[id] = r.value;
   }
   // Nowi zawodnicy z edytora: pełne dane (działają w każdym świecie gry)
-  if (d.created !== undefined && !isObj(d.created)) throw new Error('Datapack: sekcja nowych zawodników ma zły format.');
+  // created w nagłówku to data pliku (tekst); pliki z pierwszego wydania v1.19 miały tu nowych zawodników (obiekt)
+  const fresh = d.newPlayers !== undefined ? d.newPlayers : (isObj(d.created) ? d.created : undefined);
+  if (fresh !== undefined && !isObj(fresh)) throw new Error('Datapack: sekcja nowych zawodników ma zły format.');
   const created = {};
-  for (const [id, o] of Object.entries(d.created ?? {})) {
+  for (const [id, o] of Object.entries(fresh ?? {})) {
     if (!ID_RE.test(id) || !isObj(o)) throw new Error('Datapack: zły wpis nowego zawodnika.');
     const src = Object.fromEntries(PLAYER_FIELDS.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
     const r = checkPlayer(src);
