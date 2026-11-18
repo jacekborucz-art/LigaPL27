@@ -1662,13 +1662,13 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 :root { --pa-run: #FFC233; --pa-lat: #6FE0FF; --pa-back: #F3F6F1; --pa-halo: rgba(6, 18, 10, .62); --pa-bad: #FF6B5E; }
 .pa { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 0; }
 .pitch2 > .slot-btn, .pitch2 > .mm-tok { z-index: 1; }
-.pa__halo { fill: none; stroke: var(--pa-halo); stroke-width: 6.5; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-.pa__l { fill: none; stroke-width: 3; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-.pa__l--run { stroke: var(--pa-run); stroke-dasharray: 7 5; }
-.pa__l--back { stroke: var(--pa-back); stroke-dasharray: 0.5 6; stroke-width: 3.6; }
+.pa__halo { fill: none; stroke: var(--pa-halo); stroke-width: 3.6; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.pa__l { fill: none; stroke-width: 1.6; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.pa__l--run { stroke: var(--pa-run); stroke-dasharray: 5 4; }
+.pa__l--back { stroke: var(--pa-back); stroke-dasharray: 0.5 4.5; stroke-width: 2.2; }
 .pa__l--lat { stroke: var(--pa-lat); }
 .pa__l--bad { stroke: var(--pa-bad); stroke-dasharray: 3 4; }
-.pa__l--preview { stroke-width: 3.4; }
+.pa__l--preview { stroke-width: 1.8; }
 .pa__m path { stroke: var(--pa-halo); stroke-width: 1.2; stroke-linejoin: round; }
 .pa__m--run path { fill: var(--pa-run); }
 .pa__m--back path { fill: var(--pa-back); }
@@ -1676,7 +1676,7 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 .pa-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; margin: 6px 0 0; font-size: 12px; color: var(--text-muted); }
 .pa-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .pa-legend svg { width: 28px; height: 8px; border-radius: 2px; background: var(--murawa); overflow: visible; }
-.pa-legend .pa__l { stroke-width: 2.4; }
+.pa-legend .pa__l { stroke-width: 1.6; }
 /* Przycisk „Strzałki” obok „Instrukcje indywidualne” */
 .tac__hintbtns { display: flex; flex-wrap: wrap; gap: 8px; }
 .tac__arrows { display: inline-flex; align-items: center; gap: 6px; }

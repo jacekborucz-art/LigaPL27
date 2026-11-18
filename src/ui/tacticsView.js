@@ -123,7 +123,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
     // Tryb strzałek: klik otwiera kompas (bez przeciągania i bez wyboru dwoma dotknięciami)
     const acts = arrOn
       ? `data-act="tarrow-pick" data-idx="${i}"${p ? ` data-pid="${esc(p.id)}"` : ''} data-sx="${s.x}" data-sy="${s.y}" data-dirs="${arrowsFor(s.pos).join(' ')}" aria-haspopup="dialog" aria-expanded="${pickIdx === i}"${p && arrowsFor(s.pos).length ? '' : ' aria-disabled="true"'}`
-      : `data-act="tslot" data-loc="${key}" data-drop="${key}" data-handle ${p ? `${dragAttrs(loc, p)} data-pid="${esc(p.id)}"` : ''}${repAttr(r)} aria-pressed="${isSel}"`;
+      : `data-act="tslot" data-loc="${key}" data-drop="${key}" data-handle ${p ? `${dragAttrs(loc, p)} data-pid="${esc(p.id)}"${arrowsFor(s.pos).length ? ` data-sx="${s.x}" data-sy="${s.y}" data-dirs="${arrowsFor(s.pos).join(' ')}"` : ''}` : ''}${repAttr(r)} aria-pressed="${isSel}"`;
     return `<button class="${cls}" style="left:${s.x}%;top:${100 - s.y}%" ${acts}
       aria-label="${esc(s.pos)}: ${p ? esc(p.name) : 'puste miejsce'}${p && prof < 85 ? `, poza pozycją (${prof}%)` : ''}${esc(repAria(r))}${p && pim[p.id] ? esc(`, instrukcje: ${piSummary(pim[p.id])}`) : ''}${esc(arrOn || !pim[p?.id] ? mv : '')}">
       ${r && r.b !== 'no' ? `<span class="slot-btn__rep" aria-hidden="true">${r.v}%</span>` : ''}
@@ -203,7 +203,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
     ? `Wybrano: ${selPlayer.name}. Wskaż miejsce, na które ma przejść, albo zawodnika do zamiany.${repSum}`
     : sel?.zone === 'xi' ? `Wybrano puste miejsce (${f.slots[sel.idx]?.pos}). Wskaż zawodnika z listy.${repSum}`
       : fbWarn || (arrOn ? `Strzałki: dotknij zawodnika i wybierz kierunek ruchu w ataku${wide ? ' albo przeciągnij od niego strzałkę' : ''}. Bramkarz i środkowi obrońcy nie mają strzałek.`
-        : 'Przeciągnij zawodnika na inne miejsce albo dotknij dwóch miejsc po kolei. Dwuklik na nazwisku pokazuje atrybuty, prawy przycisk albo przytrzymanie nazwiska: więcej opcji.'));
+        : `Przeciągnij zawodnika na inne miejsce albo dotknij dwóch miejsc po kolei. Dwuklik na nazwisku pokazuje atrybuty, prawy przycisk albo przytrzymanie nazwiska: więcej opcji${wide ? ', a prawy przycisk przytrzymany i przeciągnięty od zawodnika na boisku rysuje strzałkę ruchu' : ' (w tym „Ruch w ataku”)'}.`));
 
   // ---------- Siła składu (PC: zwijana w kolumnie boiska, błędy składu zawsze widoczne nad zwijaną częścią)
   const z = check.rating.zones;
@@ -233,7 +233,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
   <div class="tac${sel ? ' has-sel' : ''}${arrOn ? ' is-arrows' : ''}">
     <div class="tac__form">
       <div class="chips chips--wrap" role="group" aria-label="Formacja">${FORMATIONS.map((x) => `<button class="chip" data-act="tform" data-f="${x.id}" aria-pressed="${x.id === f.id}">${esc(x.name)}</button>`).join('')}</div>
-      <div class="tac__hintrow"><p class="hint" title="${esc(f.nick)}: ${esc(f.note)}">${esc(f.nick)}: ${esc(f.note)}</p><div class="tac__hintbtns"><button class="btn btn--quiet btn--sm" data-act="pi-table">Instrukcje indywidualne (${playerInstrCount(pim)})</button><button class="btn btn--quiet btn--sm tac__arrows" data-act="tarrows" aria-pressed="${arrOn}" title="Strzałki ruchu: kierunek zawodnika w ataku">${ARROW_ICON}Strzałki${arrowItems.length ? ` (${arrowItems.length})` : ''}</button></div></div>
+      <div class="tac__hintrow"><p class="hint" title="${esc(f.nick)}: ${esc(f.note)}">${esc(f.nick)}: ${esc(f.note)}</p><div class="tac__hintbtns"><button class="btn btn--quiet btn--sm" data-act="pi-table">Instrukcje indywidualne (${playerInstrCount(pim)})</button></div></div>
     </div>
     <div class="tac__pitch">
       <div class="pitch2${arrOn ? ' is-arrows' : ''}" ${kit ? `style="--kit:${kit.shirt};--kit-ink:${kit.ink};--kit-trim:${kit.trim}"` : ''} role="group" aria-label="Boisko, formacja ${esc(f.name)}${arrOn ? ', tryb strzałek ruchu' : ''}">${arrowSvgHtml}${slotsHtml}${compass}</div>

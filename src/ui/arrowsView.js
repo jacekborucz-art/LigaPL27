@@ -37,7 +37,7 @@ export function arrowsSvg(items, { map, vw = 68, vh = 100, id = 'pa', cls = '' }
     const d = `M${x1} ${y1}L${x2} ${y2}`;
     return `<path class="pa__halo" d="${d}"/><path class="pa__l pa__l--${k}" d="${d}" marker-end="url(#${id}-${MARK[k]})"/>`;
   }).join('');
-  const marker = (k) => `<marker id="${id}-${k}" class="pa__m pa__m--${k}" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="3.4" markerHeight="3.4" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0.8L9.5 5L0 9.2z"/></marker>`;
+  const marker = (k) => `<marker id="${id}-${k}" class="pa__m pa__m--${k}" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="2.4" markerHeight="2.4" markerUnits="userSpaceOnUse" orient="auto"><path d="M0 0.8L9.5 5L0 9.2z"/></marker>`;
   return `<svg class="pa${cls ? ` ${cls}` : ''}" viewBox="0 0 ${vw} ${vh}" preserveAspectRatio="none" aria-hidden="true" focusable="false"><defs>${marker('run')}${marker('back')}${marker('lat')}</defs>${lines}</svg>`;
 }
 

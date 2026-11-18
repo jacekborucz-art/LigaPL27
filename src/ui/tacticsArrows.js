@@ -1,6 +1,7 @@
-// Strzałki ruchu na ekranie składu (docs/strzalki-ruchu.md): skrót na PC, przeciągnięcie od zawodnika w trybie
-// strzałek rysuje strzałkę przyciąganą do 8 kierunków (mysz i pióro; dotyk używa kompasu). Kierunek względny do
-// strony zawodnika (snapDir w arrowsView.js); niedozwolony na pozycji: komunikat zamiast zmiany.
+// Strzałki ruchu na ekranie składu (docs/strzalki-ruchu.md): na PC przytrzymanie PRAWEGO przycisku myszy na zawodniku
+// i przeciągnięcie rysuje strzałkę przyciąganą do 8 kierunków (bez osobnego trybu; samo kliknięcie prawym otwiera menu
+// zawodnika, a w nim „Ruch w ataku”, także na telefonie). Kierunek względny do strony zawodnika (snapDir
+// w arrowsView.js); niedozwolony na pozycji: komunikat zamiast zmiany.
 import { snapDir, arrowVec, arrowKind } from './arrowsView.js';
 import { arrowLabel } from '../data/playerInstructions.js';
 
@@ -13,8 +14,10 @@ export function mountArrowDraw(root, { onSet, onReject }) {
   let suppressUntil = 0;
 
   root.addEventListener('pointerdown', (ev) => {
-    if (draw || !ev.isPrimary || ev.pointerType === 'touch' || ev.button !== 0) return;
-    const el = ev.target.closest('.tac.is-arrows .slot-btn[data-act="tarrow-pick"][data-pid]');
+    if (draw || !ev.isPrimary || ev.pointerType === 'touch') return;
+    // Prawy przycisk na zawodniku (zawsze) albo lewy w dawnym trybie strzałek
+    const el = ev.button === 2 ? ev.target.closest('.tac .pitch2 .slot-btn[data-pid][data-dirs]')
+      : ev.button === 0 ? ev.target.closest('.tac.is-arrows .slot-btn[data-act="tarrow-pick"][data-pid]') : null;
     if (!el || !el.dataset.dirs) return;
     pending = { el, x: ev.clientX, y: ev.clientY, id: ev.pointerId };
   });
@@ -61,8 +64,12 @@ export function mountArrowDraw(root, { onSet, onReject }) {
     suppressUntil = performance.now() + 200;
     if (!commit) return;
     if (d.dir) onSet(d.el.dataset.pid, d.dir);
-    else onReject('Ten kierunek nie pasuje do pozycji zawodnika. Dozwolone pokazuje kompas (kliknij zawodnika).');
+    else onReject('Ten kierunek nie pasuje do pozycji zawodnika. Dozwolone kierunki: menu zawodnika (prawy przycisk), „Ruch w ataku”.');
   };
+  // Po narysowaniu prawym przyciskiem przeglądarka wysyła „contextmenu”: nie otwieramy wtedy menu zawodnika
+  root.addEventListener('contextmenu', (ev) => {
+    if ((draw || performance.now() < suppressUntil) && ev.target.closest('.slot-btn')) { ev.preventDefault(); ev.stopImmediatePropagation(); }
+  }, true);
   window.addEventListener('pointerup', (ev) => { if (pending && ev.pointerId === pending.id) end(true); });
   window.addEventListener('pointercancel', (ev) => { if (pending && ev.pointerId === pending.id) end(false); });
   window.addEventListener('keydown', (ev) => { if (draw && ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); end(false); } }, true);

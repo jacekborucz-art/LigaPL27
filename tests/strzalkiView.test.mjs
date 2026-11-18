@@ -27,11 +27,13 @@ const clean = (html) => {
 };
 const attr = (name, data) => `data-act="pi-${name}"${Object.entries(data).map(([k, v]) => ` data-${k}="${v}"`).join('')}`;
 
-test('Ekran składu: przełącznik Strzałki, tryb bez przeciągania, strzałki SVG pod żetonami zawsze widoczne', () => {
+test('Ekran składu: bez przełącznika trybu, żetony gotowe do rysowania prawym przyciskiem, strzałki SVG pod żetonami', () => {
   const t = { ...base, playerInstr: { [lb]: { run: 1, lat: -1 }, [rb]: { lat: -1 } } };
   const off = renderTactics({ squad, tactics: t, sel: null, benchSize: 9 });
   clean(off.replace(/null/g, ''));
-  assert.match(off, /data-act="tarrows" aria-pressed="false"[^>]*>.*Strzałki \(2\)<\/button>/s);
+  assert.doesNotMatch(off, /data-act="tarrows"/, 'bez przycisku trybu strzałek');
+  assert.match(off, /data-pid="[^"]+" data-sx="15" data-sy="26" data-dirs="f fi fo i b"/, 'żeton z kierunkami do rysowania prawym przyciskiem');
+  assert.doesNotMatch(off, /data-gpos="BR"[^>]*data-dirs/, 'bramkarz bez strzałek');
   // Strzałki widać także poza trybem: SVG przed żetonami (pod nimi), znaczniki w defs, linie bez skalowania grubości
   const pitch = off.slice(off.indexOf('<div class="pitch2'), off.indexOf('</div>', off.indexOf('<div class="pitch2')));
   assert.ok(pitch.indexOf('<svg class="pa"') < pitch.indexOf('slot-btn'), 'warstwa pod żetonami');
@@ -47,7 +49,6 @@ test('Ekran składu: przełącznik Strzałki, tryb bez przeciągania, strzałki 
   const on = renderTactics({ squad, tactics: t, sel: null, benchSize: 9, arrows: { on: true, pick: null } });
   const pitchOn = on.slice(on.indexOf('<div class="pitch2'), on.indexOf('</svg>') + 6) + on.slice(on.indexOf('slot-btn'), on.indexOf('<p class="tac__msg'));
   assert.match(on, /<div class="tac is-arrows/);
-  assert.match(on, /data-act="tarrows" aria-pressed="true"/);
   assert.doesNotMatch(pitchOn, /data-drag=/, 'bez przeciągania zawodników na boisku');
   assert.equal((on.match(/data-act="tarrow-pick"/g) ?? []).length, 11);
   assert.match(on, /data-act="tarrow-pick" data-idx="0"[^>]*aria-disabled="true"/, 'bramkarz bez strzałek');
