@@ -796,8 +796,12 @@ export function importPack(game, pack) {
   // Sędziowie: w każdym świecie gry
   out.refs = 0;
   for (const [id, v] of Object.entries(pack.refs ?? {})) if (game.refs?.list?.some((r) => r.id === id)) { editReferee(game, id, v); out.refs++; }
-  // Nowi zawodnicy z edytora: w każdym świecie gry (już obecni w grze: bez zmian)
   out.created = 0; out.squadSkipped = 0;
+  // Najpierw zawodnicy świata gry (zwolnienia z kadry robią miejsce), potem nowi zawodnicy z edytora
+  const ids = Object.keys(pack.players);
+  if (ids.length && pack.seed !== game.seed) { out.otherWorld = true; out.playersSkipped = ids.length; }
+  else importWorldPlayers(game, pack, ids, out);
+  // Nowi zawodnicy z edytora: w każdym świecie gry (już obecni w grze: bez zmian)
   for (const [id, v] of Object.entries(pack.created ?? {})) {
     if (game.world?.players?.[id] || !game.market) continue;
     const age = clamp(ageAt({ birthDate: v.birthDate }, game.date), LIMITS.ageMin, LIMITS.ageMax);
@@ -809,8 +813,12 @@ export function importPack(game, pack) {
     out.created++;
     if (v.team && joinFromFree(game, id, v.team)) out.squadSkipped++;
   }
-  const ids = Object.keys(pack.players);
-  if (ids.length && pack.seed !== game.seed) { out.otherWorld = true; out.playersSkipped = ids.length; return out; }
+  return out;
+}
+
+/** Zawodnicy świata gry z datapacku (to samo ziarno): dane, potem zmiany kadry (zwolnienia przed dołączeniami). */
+function importWorldPlayers(game, pack, ids, out) {
+  const joins = [];
   for (const id of ids) {
     const p = game.world?.players?.[id];
     if (!p) { out.playersSkipped++; continue; }
@@ -822,13 +830,12 @@ export function importPack(game, pack) {
     editPlayer(game, id, v); out.players++;
     // Przeniesienie z edytora (team: klub albo null = wolny), z limitami kadry
     if (v.team !== undefined && (p.clubId ?? null) !== v.team) {
-      let why = '';
-      if (p.clubId) why = releaseToFree(game, id);
-      if (!why && v.team) why = joinFromFree(game, id, v.team);
+      const why = p.clubId ? releaseToFree(game, id) : '';
       if (why) out.squadSkipped++;
+      else if (v.team) joins.push([id, v.team]); // dołączenie po wszystkich zwolnieniach (miejsce w pełnej kadrze)
     }
   }
-  return out;
+  for (const [id, team] of joins) if (joinFromFree(game, id, team)) out.squadSkipped++;
 }
 
 /** Polskie podsumowanie importu. */

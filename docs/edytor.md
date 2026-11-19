@@ -69,6 +69,9 @@ Plik (`Eksportuj datapack`, nazwa tylko ASCII, np. `LigaPL27-datapack-2026-10-20
 
 Zapisywane są tylko zmienione pola. Klucze atrybutów jak w `src/data/attributes.js` (`POD`, `DRY`, `WYK`, ...).
 
+Datapack z prawdziwymi danymi zbieranymi przez agentów AI: `docs/datapack/agenci.md` (zasady i prompty),
+złoty wzorzec `docs/datapack/wzor.json`, kontrola pliku `node tools/check-datapack.mjs plik.json`.
+
 ### Pełny datapack
 
 Przycisk „Eksportuj datapack” (jedyny eksport w edytorze od Nov 19, 2026) zapisuje plik `LigaPL27-datapack-pelny-<data>.json` z bieżącymi

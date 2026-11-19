@@ -1,5 +1,6 @@
 // Edytor gry i datapack: src/career/editor.js, src/ui/editorView.js (docs/edytor.md).
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { generateWorld, squadOf } from '../src/world/worldGen.js';
 import { createSeason } from '../src/season/season.js';
@@ -498,5 +499,22 @@ test('Nowa kariera z datapackiem: świat z ziarna pliku, zawodnicy i kluby z pli
   assert.equal(p.attr.POD, 19);
   assert.equal(p.clubId, 'lech', 'ten sam skład klubu co w pliku');
   assert.equal(clubById('lech').name, 'Lech Paczkowy');
+  restoreOriginals();
+});
+
+test('Złoty wzorzec datapacku (docs/datapack/wzor.json) wczytuje się w całości, zwolnienia robią miejsce przed dołączeniami', () => {
+  const pk = parsePack(readFileSync(new URL('../docs/datapack/wzor.json', import.meta.url), 'utf8'));
+  const g = structuredClone(G); ensureReferees(g); // wzorzec ma ziarno 7, jak G
+  const legia = g.world.clubs.legia.squad;
+  while (legia.length < EDIT_SQUAD.max) assert.equal(joinFromFree(g, g.market.free.find((id) => !g.world.players[id].clubId), 'legia'), '');
+  g.editor = undefined; // pełna kadra 32 bez wpisów w datapacku gry
+  const r = importPack(g, pk);
+  assert.deepEqual([r.clubsSkipped, r.playersSkipped, r.squadSkipped, r.otherWorld], [0, 0, 1, false]); // 1: nowy zawodnik ponad 32
+  assert.deepEqual([r.clubs, r.players, r.created, r.refs], [2, 5, 1, 1]);
+  assert.equal(g.world.players['legia-25'].clubId, null, 'zwolniony do wolnych');
+  assert.equal(g.world.players['pogon-szczecin-24'].clubId, 'legia', 'transfer do pełnej kadry po zwolnieniu');
+  assert.equal(g.world.players['ed-wzor-1'].clubId, null, 'nowy zawodnik: limit 32 pilnowany (miejsce zajął transfer)');
+  assert.equal(squadSize(g, 'legia'), EDIT_SQUAD.max);
+  assert.equal(g.world.players['legia-8'].injuryDays, 24);
   restoreOriginals();
 });

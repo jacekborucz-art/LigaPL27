@@ -1,0 +1,145 @@
+{
+  "type": "ligapl27-datapack",
+  "v": 2,
+  "game": "v1.19 Beta",
+  "seed": 7,
+  "created": "2026-11-19T10:00:00.000Z",
+  "full": true,
+  "clubs": {
+    "legia": {
+      "name": "Legia Warszawa",
+      "short": "LEG",
+      "stadium": "Stadion Wojska Polskiego",
+      "capacity": 31103,
+      "balance": 38000000,
+      "transferBudget": 15500000,
+      "wageBudget": 1450000,
+      "coach": {
+        "name": "Tomasz Nowicki",
+        "age": 47,
+        "style": "P",
+        "a": { "TAK": 13, "SKL": 13, "MOT": 14, "TRE": 12, "PRE": 12 }
+      },
+      "owner": {
+        "name": "Andrzej Kowalczyk",
+        "cierpliwosc": 8,
+        "ambicja": 16,
+        "temperament": 13,
+        "media": 12,
+        "zasobnosc": 9
+      },
+      "staff": {
+        "asystent": [
+          { "name": "Piotr Zalewski", "age": 44, "q": 14 },
+          { "name": "Marcin Gajewski", "age": 38, "q": 12 },
+          { "name": "Łukasz Domański", "age": 33, "q": 11 }
+        ],
+        "fizyczny": [
+          { "name": "Rafał Kubiak", "age": 41, "q": 13 },
+          { "name": "Adam Sobczyk", "age": 35, "q": 11 }
+        ],
+        "bramkarze": [
+          { "name": "Krzysztof Wrona", "age": 52, "q": 13 }
+        ],
+        "mlodziez": [
+          { "name": "Jacek Michalski", "age": 56, "q": 14 }
+        ],
+        "analityk": [
+          { "name": "Bartosz Lis", "age": 31, "q": 13 },
+          { "name": "Kamil Urban", "age": 29, "q": 11 }
+        ],
+        "kierownik": [
+          { "name": "Grzegorz Pawlak", "age": 58, "q": 12 }
+        ],
+        "fizjoterapeuta": [
+          { "name": "Michał Wróbel", "age": 45, "q": 14 },
+          { "name": "Daniel Kaczmarczyk", "age": 36, "q": 12 }
+        ],
+        "skaut": [
+          { "name": "Robert Szewczyk", "age": 50, "q": 12 },
+          { "name": "Paweł Jasiński", "age": 39, "q": 11 }
+        ]
+      }
+    },
+    "pogon-szczecin": {
+      "name": "Pogoń Szczecin",
+      "short": "POG",
+      "capacity": 21163
+    }
+  },
+  "players": {
+    "legia-1": {
+      "first": "Mateusz",
+      "last": "Zieliński",
+      "nat": "POL",
+      "pos": "BR",
+      "birthDate": "1997-02-14",
+      "attrs": {
+        "POD": 9, "DRY": 6, "WYK": 4, "DYS": 5, "DOS": 4, "GLO": 6, "ODB": 5, "TEC": 9, "SFR": 5,
+        "WIZ": 9, "UST": 14, "DEC": 13, "OPA": 14, "PRA": 11, "AGR": 8, "LID": 12, "RUC": 5,
+        "SZY": 10, "WYT": 11, "SIL": 13, "ZWI": 13, "SKO": 13,
+        "REF": 14, "CHW": 13, "WYJ": 12, "JNJ": 13, "NOG": 11
+      },
+      "pot": 12.8,
+      "club": "Legia Warszawa",
+      "ovr": 12.4
+    },
+    "legia-8": {
+      "first": "Kacper",
+      "last": "Wiśniewski",
+      "nat": "POL",
+      "pos": "BO",
+      "birthDate": "2001-09-03",
+      "attrs": {
+        "POD": 12, "DRY": 11, "WYK": 7, "DYS": 9, "DOS": 13, "GLO": 10, "ODB": 13, "TEC": 12, "SFR": 8,
+        "WIZ": 10, "UST": 13, "DEC": 11, "OPA": 11, "PRA": 14, "AGR": 11, "LID": 9, "RUC": 12,
+        "SZY": 14, "WYT": 14, "SIL": 11, "ZWI": 13, "SKO": 10,
+        "REF": 3, "CHW": 2, "WYJ": 2, "JNJ": 2, "NOG": 3
+      },
+      "pot": 12.9,
+      "alt": { "WB": 80, "BP": 60 },
+      "injury": { "name": "naderwanie mięśnia dwugłowego", "days": 24 },
+      "club": "Legia Warszawa",
+      "ovr": 11.6
+    },
+    "legia-25": {
+      "team": null
+    },
+    "legia-a1": {
+      "first": "Szymon",
+      "last": "Rejewski",
+      "birthDate": "2010-04-21",
+      "pot": 14.5
+    },
+    "pogon-szczecin-24": {
+      "team": "legia"
+    }
+  },
+  "newPlayers": {
+    "ed-wzor-1": {
+      "first": "Luka",
+      "last": "Marić",
+      "nat": "CRO",
+      "pos": "ŚP",
+      "birthDate": "1999-11-30",
+      "attrs": {
+        "POD": 13, "DRY": 11, "WYK": 9, "DYS": 11, "DOS": 9, "GLO": 9, "ODB": 11, "TEC": 13, "SFR": 10,
+        "WIZ": 13, "UST": 12, "DEC": 12, "OPA": 12, "PRA": 13, "AGR": 10, "LID": 10, "RUC": 11,
+        "SZY": 11, "WYT": 13, "SIL": 11, "ZWI": 12, "SKO": 9,
+        "REF": 2, "CHW": 2, "WYJ": 2, "JNJ": 2, "NOG": 3
+      },
+      "pot": 12.2,
+      "alt": { "DP": 75, "OP": 55 },
+      "team": "legia"
+    }
+  },
+  "refs": {
+    "r1": {
+      "name": "Paweł Malinowski",
+      "age": 39,
+      "a": [14, 13, 12, 13, 14, 13, 12],
+      "e": 14,
+      "s": 1.05
+    }
+  }
+}
