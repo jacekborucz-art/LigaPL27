@@ -28,6 +28,7 @@ import { COH } from '../training/config.js';
 import { GROUP, isAvailable } from './squad.js';
 import { estimate, estimateSd, precisionOf, familiarity, ensureAssistantReport, AREP } from './assistantReport.js';
 import { fmtDate } from '../ui/dom.js';
+import { moraleFalling } from './morale.js';
 
 export const TREP = {
   version: 1,
@@ -425,6 +426,9 @@ export function buildTeamReport(game, date = game.date, id = date) {
   if (setPieces.weak) add({ id: 'setpieces', tone: 'info', text: 'Więcej zajęć ze stałych fragmentów.', why: 'słabe wyćwiczenie stałych fragmentów', act: { act: 'tr-accent', v: 'stale', label: 'Akcent: stałe fragmenty' } });
   if (youth.lowMin.length) add({ id: 'youth', tone: 'info', text: `Dać minuty młodym: ${youth.lowMin.join(', ')}.`, why: 'zapas rozwoju, a prawie nie grają' });
   const keyEnd = xiPl.filter((p) => p.contract?.until && !p.loan && daysBetween(date, p.contract.until) <= 183 && daysBetween(date, p.contract.until) >= 0);
+  // Historia morale (career/morale.js): szybki spadek morale u zawodników (asystent widzi zależnie od oceny zawodników)
+  const falling = squad.filter((p) => moraleFalling(p) && sees(`spadek:${p.id}`, Q.depth));
+  if (falling.length >= 2) add({ id: 'morale', tone: 'warn', text: `Porozmawiać z zawodnikami, którym szybko spada morale: ${falling.slice(0, 4).map((p) => p.name).join(', ')}.`, why: 'spadek morale o 4 i więcej w ostatnich tygodniach', act: { act: 'tsub', s: 'talks', label: 'Rozmowy' } });
   if (keyEnd.length) add({ id: 'contracts', tone: 'warn', text: `Przedłużyć kontrakty: ${keyEnd.map((p) => p.name).join(', ')}.`, why: 'podstawowi zawodnicy, umowa kończy się w ciągu pół roku', act: { act: 'tab', tab: 'transfery', label: 'Transfery' } });
   if (!recs.length) add({ id: 'keep', tone: 'good', text: 'Bez pilnych zmian: utrzymać kierunek.', why: 'kadra i wyniki bez wyraźnych problemów' });
   recs.splice(TREP.maxRecs);

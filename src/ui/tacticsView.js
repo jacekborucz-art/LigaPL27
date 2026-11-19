@@ -6,7 +6,7 @@ import { INSTRUCTIONS } from '../data/instructions.js';
 import { proficiency, byPosition } from '../engine/positions.js';
 import { checkTactics, AUTO_MODES } from '../engine/lineup.js';
 import { GROUP, isAvailable } from '../career/squad.js';
-import { moraleLabel } from '../career/morale.js';
+import { moraleLabel, moraleTrend } from '../career/morale.js';
 import { locKey, playerAt } from './tacticsMoves.js';
 import { esc } from './dom.js';
 import { profBand } from './positionMap.js';
@@ -25,15 +25,22 @@ const freshBand = (f) => (f >= 80 ? 'good' : f >= 65 ? 'mid' : 'low');
 function condHtml(p) {
   const f = Math.round(p.fresh ?? 95);
   const m = p.morale ?? 12;
-  return `<span class="tp-cond" role="img" aria-label="Świeżość ${f}%, morale: ${esc(moraleLabel(m).toLowerCase())}" title="Świeżość ${f}%, morale: ${esc(moraleLabel(m).toLowerCase())}">
-    <span class="tp-pct" data-b="${freshBand(f)}">${f}%</span><i class="tp-fresh" data-b="${freshBand(f)}" style="--f:${f}%"></i><span class="mdot" data-m="${m >= 14 ? 'hi' : m >= 10 ? 'mid' : 'lo'}"></span>${moraleArrow(m)}</span>`;
+  const t = moraleTrend(p);
+  const txt = `Świeżość ${f}%, morale: ${moraleLabel(m).toLowerCase()}${t ? `, ${TREND_TXT[trendKey(t)]}` : ''}`;
+  return `<span class="tp-cond" role="img" aria-label="${esc(txt)}" title="${esc(txt)}">
+    <span class="tp-pct" data-b="${freshBand(f)}">${f}%</span><i class="tp-fresh" data-b="${freshBand(f)}" style="--f:${f}%"></i><span class="mdot" data-m="${m >= 14 ? 'hi' : m >= 10 ? 'mid' : 'lo'}"></span>${moraleArrow(m, t ? trendKey(t) : 'flat')}</span>`;
 }
-/** Morale jako strzałka (PC): 5 poziomów od zielonej w górę do czerwonej w dół (skala 1-20). */
+/**
+ * Morale jako strzałka (PC): kierunek = trend z ostatnich tygodni (career/morale.js moraleTrend: w górę rośnie,
+ * poziomo bez zmian albo bez historii, w dół spada, pionowo w dół szybki spadek), kolor = poziom (5 pasm skali 1-20).
+ */
 export const moraleLevel = (m) => (m >= 16 ? 5 : m >= 13 ? 4 : m >= 10 ? 3 : m >= 7 ? 2 : 1);
-const ARROW_ROT = { 5: -90, 4: -45, 3: 0, 2: 45, 1: 90 };
-function moraleArrow(m) {
+const ARROW_ROT = { up: -45, flat: 0, down: 45, fast: 90 };
+const TREND_TXT = { up: 'rośnie', flat: 'bez zmian', down: 'spada', fast: 'szybko spada' };
+const trendKey = (t) => (t.fast ? 'fast' : t.dir);
+function moraleArrow(m, dir = 'flat') {
   const l = moraleLevel(m);
-  return `<svg class="tp-marr" data-l="${l}" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" transform="rotate(${ARROW_ROT[l]} 8 8)"/></svg>`;
+  return `<svg class="tp-marr" data-l="${l}" data-dir="${dir}" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" transform="rotate(${ARROW_ROT[dir]} 8 8)"/></svg>`;
 }
 const posText = (p) => `${p.pos}${p.side ? ` ${p.side}` : ''}`;
 const ARROW_ICON = '<svg class="tac__arrows-i" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13 12 4M7 4h5v5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -249,7 +256,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
       ${wide ? strengthHtml : ''}
     </div>
     <div class="tac__lists">
-      <p class="tp-legend"><span><i class="tp-fresh" data-b="good" style="--f:80%"></i> świeżość${wide ? ' (kondycja w %)' : ''}</span>${wide ? `<span class="tp-cond" title="Morale: od wysokiego (zielona w górę) do niskiego (czerwona w dół)">${[5, 4, 3, 2, 1].map((l) => moraleArrow([16, 13, 10, 7, 1][5 - l])).join('')} morale</span>` : '<span><span class="mdot" data-m="hi"></span> morale</span>'}<span><b>12</b> ocena ogólna (1-20)</span>${wide ? '<span>Dwuklik albo przycisk „i” otwiera kartę zawodnika</span>' : ''}</p>
+      <p class="tp-legend"><span><i class="tp-fresh" data-b="good" style="--f:80%"></i> świeżość${wide ? ' (kondycja w %)' : ''}</span>${wide ? `<span class="tp-cond" title="Morale: kolor to poziom (od zielonego, wysokie, do czerwonego, niskie), kierunek to trend z ostatnich tygodni (w górę rośnie, poziomo bez zmian, w dół spada)">${moraleArrow(16, 'up')}${moraleArrow(10, 'flat')}${moraleArrow(7, 'down')} morale (kolor: poziom, kierunek: trend)</span>` : '<span><span class="mdot" data-m="hi"></span> morale</span>'}<span><b>12</b> ocena ogólna (1-20)</span>${wide ? '<span>Dwuklik albo przycisk „i” otwiera kartę zawodnika</span>' : ''}</p>
       <section class="tp-sec tp-sec--xi" aria-labelledby="tp-h-xi">
         <h3 id="tp-h-xi">Pierwszy skład <span class="muted">${inXI.size} z ${f.slots.length}</span>${hitsHtml('xi')}</h3>
         <ul class="tp-list">${xiRows}</ul>

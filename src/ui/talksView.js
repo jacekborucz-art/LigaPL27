@@ -1,7 +1,7 @@
 // Kadra -> Rozmowy: zebranie drużyny i rozmowy indywidualne (akcje „tt-”).
 import { esc, fmtDate, fmtDay } from './dom.js';
 import { squadOf } from '../world/worldGen.js';
-import { moraleLabel } from '../career/morale.js';
+import { moraleLabel, teamMoraleTrend, moraleTrend } from '../career/morale.js';
 import {
   MEETING_TONES, PLAYER_TALKS, teamSituation, canHoldMeeting, holdMeeting, talkSuggestions, talkToPlayer, talksThisWeek, talkThisWeek,
   talkBlockedText,
@@ -26,14 +26,32 @@ function moraleSummary(game) {
   const newcomers = sq.filter((p) => p.acclim).length;
   // Długo bez rozmowy, a potrzebują uwagi (career/attention.js, docs/bierna-gra.md)
   const waiting = sq.filter((p) => attentionNeed(p, game.date).need > 0 && daysSinceAttention(p, game.date, game.attStart ?? game.date) >= ATTN.grace).length;
-  return { avg, low, unhappy, newcomers, waiting };
+  const trend = teamMoraleTrend(sq.map((p) => ({ morale: p.morale, moraleHist: p.moraleHist, minutes: p.season?.min ?? 0 })));
+  return { avg, low, unhappy, newcomers, waiting, trend };
+}
+const TREND_WORD = { up: 'rośnie', down: 'spada', flat: 'bez zmian' };
+const TREND_ICO = { up: '▲', down: '▼', flat: '•' };
+
+/** Trend morale zawodnika przy etykiecie (rośnie albo spada; bez zmian: nic). */
+function trendTag(p) {
+  const t = moraleTrend(p);
+  return t && t.dir !== 'flat' ? `, ${TREND_WORD[t.dir]} <i class="tt-trend" data-dir="${t.dir}" aria-hidden="true">${TREND_ICO[t.dir]}</i>` : '';
+}
+
+/** Skutek rozmowy tydzień później (m0 przed rozmową, m7 po 7 dniach; career/morale.js talkFollowUp). */
+function followUp(x) {
+  if (x.m7 == null || x.m7 < 0 || x.m0 == null) return '';
+  const d = Math.round((x.m7 - x.m0) * 10) / 10;
+  const dir = d >= 0.5 ? 'up' : d <= -0.5 ? 'down' : 'flat';
+  const txt = dir === 'up' ? 'morale wyżej niż przed rozmową' : dir === 'down' ? 'morale niżej niż przed rozmową' : 'morale jak przed rozmową';
+  return ` <small class="tt-follow" data-dir="${dir}">Tydzień później: ${txt} (${esc(moraleLabel(x.m7).toLowerCase())}).</small>`;
 }
 
 // Kolory i kolejność (projekt: Kadra > Rozmowy). Ton zebrania i powód rozmowy mają stały kolor znaczeniowy.
 const TONE_HUE = { praise: 'good', demand: 'push', calm: 'calm', unity: 'unity', criticize: 'risk' };
 const REASON_KIND = {
   'Niskie morale': 'bad', 'Jest niezadowolony': 'bad', 'Wrażliwy, długo bez rozmowy': 'bad', 'Długo bez rozmowy': 'bad', 'Nowy w klubie, czeka na rozmowę': 'bad',
-  'Kontrakt kończy się w ciągu roku': 'warn', 'Dużo kartek': 'warn', 'Słaba forma': 'warn',
+  'Kontrakt kończy się w ciągu roku': 'warn', 'Dużo kartek': 'warn', 'Słaba forma': 'warn', 'Morale szybko spada': 'warn',
   'Mało gra': 'info', 'Ambitny, mało gra': 'info', 'Bardzo dobra forma': 'good',
 };
 const reasonKind = (r) => REASON_KIND[r] ?? 'info';
@@ -49,7 +67,7 @@ function talkRow(p, rs, done, recommended) {
   return `<li class="tt-row${recommended && !done ? ' is-rec' : ''}${done ? ' is-done' : ''}" data-pid="${esc(p.id)}">
     <span class="pos" data-g="${GROUP[p.pos]}">${esc(p.pos)}</span>
     <span class="tt-who"><b>${esc(p.name)}</b>
-      <span class="tt-tags">${doneTag}<span class="tt-mor" data-m="${moraleBand(mor)}">Morale: ${esc(moraleLabel(mor).toLowerCase())}</span>${p.acclim ? `<span class="tt-tag" data-k="info">Aklimatyzacja ${esc(acclimLabel(p.acclim.level))}</span>` : ''}${done ? '' : rs.map((r) => `<span class="tt-tag" data-k="${reasonKind(r[1])}">${esc(r[1])}</span>`).join('')}</span></span>
+      <span class="tt-tags">${doneTag}<span class="tt-mor" data-m="${moraleBand(mor)}">Morale: ${esc(moraleLabel(mor).toLowerCase())}${trendTag(p)}</span>${p.acclim ? `<span class="tt-tag" data-k="info">Aklimatyzacja ${esc(acclimLabel(p.acclim.level))}</span>` : ''}${done ? '' : rs.map((r) => `<span class="tt-tag" data-k="${reasonKind(r[1])}">${esc(r[1])}</span>`).join('')}</span></span>
     <span class="tt-act">${done ? '<span class="tt-done-ico" aria-hidden="true">✓</span>'
       : `<button class="btn btn--sm ${recommended ? 'tt-go' : 'btn--quiet'}" data-act="tt-open" data-id="${esc(p.id)}">Porozmawiaj</button>`}</span>
   </li>`;
@@ -141,7 +159,7 @@ export function renderTalks(game, ui = {}) {
   const auth = authoritySummary(game);
   return `<div class="tt">
     <section class="tt-head" aria-label="Stan drużyny">
-      <div class="tt-kpi" data-m="${moraleBand(m.avg)}"><small>Atmosfera w drużynie</small><b>${esc(moraleLabel(m.avg))}</b><small>${esc(sit.label)}${sit.last.length ? `: ${sit.last.join(' ')}` : ''}</small></div>
+      <div class="tt-kpi" data-m="${moraleBand(m.avg)}"><small>Atmosfera w drużynie</small><b>${esc(moraleLabel(m.avg))}${m.trend && m.trend.dir !== 'flat' ? ` <i class="tt-trend" data-dir="${m.trend.dir}" title="Trend z ostatnich tygodni: ${TREND_WORD[m.trend.dir]}" aria-label="trend: ${TREND_WORD[m.trend.dir]}">${TREND_ICO[m.trend.dir]}</i>` : ''}</b><small>${m.trend ? `Trend: ${TREND_WORD[m.trend.dir]}. ` : ''}${esc(sit.label)}${sit.last.length ? `: ${sit.last.join(' ')}` : ''}</small></div>
       <div class="tt-kpi" data-m="${need + m.waiting > 0 ? 'low' : 'good'}"><small>Wymaga uwagi</small><b>${need + m.waiting}</b><small>${m.low} z niskim morale, ${m.unhappy} niezadowolonych${m.newcomers ? `, ${m.newcomers} nowych w aklimatyzacji` : ''}${m.waiting ? `, ${m.waiting} czeka na rozmowę` : ''}</small></div>
       <div class="tt-kpi tt-kpi--auth" data-m="${auth.level === 'high' ? 'good' : auth.level === 'low' ? 'bad' : 'mid'}"><small>Autorytet trenera</small><b>${esc(auth.label)}</b><small>${esc(auth.tip)}</small></div>
       <div class="tt-kpi" data-m="calm"><small>Rozmowy w tym tygodniu</small><b>${used}</b><small>Z każdym zawodnikiem raz w tygodniu, bez limitu dla kadry</small></div>
@@ -160,7 +178,7 @@ export function renderTalks(game, ui = {}) {
         <div class="tt-tones">${Object.entries(MEETING_TONES).map(([k, t]) => `<button class="tt-tone" data-hue="${TONE_HUE[k] ?? 'calm'}" data-act="tt-meet" data-t="${k}" ${meetingOk ? '' : 'disabled'}><strong>${esc(t.label)}</strong><span class="tt-quote">${esc(t.quote)}</span><small>${esc(t.hint)}</small></button>`).join('')}</div>
         ${ui.ttMeeting ? `<ul class="tt-react">${ui.ttMeeting.map((r) => `<li><span>${esc(r.name)}</span><span class="react" data-r="${esc(r.reaction === 'obojetny' ? 'obojętny' : r.reaction === 'urazony' ? 'urażony' : r.reaction)}">${esc(r.label.toLowerCase())}</span></li>`).join('')}</ul>` : ''}
       </section>
-      ${T.log.length ? `<section class="tt-panel tt-log" aria-labelledby="tt-h-log"><h3 id="tt-h-log">Ostatnie rozmowy</h3><ol>${T.log.slice(0, 8).map((x) => `<li data-k="${x.kind === 'meeting' ? 'meet' : 'talk'}"><time>${esc(fmtDay(x.date))}</time><span>${x.kind === 'meeting' ? `<b>Zebranie, ${esc(MEETING_TONES[x.tone].label.toLowerCase())}.</b> ${esc(x.summary)}` : `<b>${x.by === 'assistant' ? 'Asystent: ' : ''}${esc(game.world.players[x.playerId]?.name ?? '')}, ${esc(PLAYER_TALKS[x.talk].label.toLowerCase())}.</b> ${esc(x.reply)}`}</span></li>`).join('')}</ol></section>` : ''}
+      ${T.log.length ? `<section class="tt-panel tt-log" aria-labelledby="tt-h-log"><h3 id="tt-h-log">Ostatnie rozmowy</h3><ol>${T.log.slice(0, 8).map((x) => `<li data-k="${x.kind === 'meeting' ? 'meet' : 'talk'}"><time>${esc(fmtDay(x.date))}</time><span>${x.kind === 'meeting' ? `<b>Zebranie, ${esc(MEETING_TONES[x.tone].label.toLowerCase())}.</b> ${esc(x.summary)}` : `<b>${x.by === 'assistant' ? 'Asystent: ' : ''}${esc(game.world.players[x.playerId]?.name ?? '')}, ${esc(PLAYER_TALKS[x.talk].label.toLowerCase())}.</b> ${esc(x.reply)}${followUp(x)}`}</span></li>`).join('')}</ol></section>` : ''}
     </aside>
     ${talkDialog(game, ui, reasonsOf)}
   </div>`;

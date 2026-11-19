@@ -21,7 +21,7 @@ import { squadOf } from '../world/worldGen.js';
 import { ephemeralSquad } from '../world/ephemeral.js';
 import { quickMatch, quickKnockout } from '../engine/quickSim.js';
 import { tableConfidence } from '../engine/teamStrength.js';
-import { afterMatchDelta, applyMorale, weeklyDrift } from '../career/morale.js';
+import { afterMatchDelta, applyMorale, weeklyDrift, recordMoraleWeek, talkFollowUp } from '../career/morale.js';
 import { INJURY_TYPES } from '../engine/match/constants.js';
 import { fmtDate } from '../ui/dom.js';
 import { UEFA_CLUBS, createUefa } from './uefa.js';
@@ -717,8 +717,13 @@ registerDailySystem({
       if (debt > 0) p.matchDebt = debt; else delete p.matchDebt;
       p.fresh = Math.min(100 - debt, Math.round((p.fresh ?? 95) + 18 * (0.8 + 0.02 * wyt) * ((p.age ?? 25) >= 31 ? 0.85 : 1)));
       if (!p.lastMatch || p.lastMatch < sharpCut) p.sharp = Math.max(40, (p.sharp ?? 70) - 1);
-      if (monday) p.morale = weeklyDrift(p.morale ?? 12, leaders.has(p.clubId));
+      if (monday) {
+        if (p.clubId && game.world.clubs[p.clubId]) recordMoraleWeek(p); // historia morale: kluby z kadrą w grze
+        else if (p.moraleHist) delete p.moraleHist; // poza klubem w grze (wolny, zagranica): historia bez znaczenia
+        p.morale = weeklyDrift(p.morale ?? 12, leaders.has(p.clubId));
+      }
     }
+    talkFollowUp(game, date); // skutek rozmowy tydzień później (Kadra > Rozmowy)
     return { messages };
   },
 });

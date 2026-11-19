@@ -1527,6 +1527,11 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 .ttd-out[data-k="good"] { --c: var(--tt-good); } .ttd-out[data-k="warn"] { --c: var(--tt-push); } .ttd-out[data-k="bad"] { --c: var(--tt-risk); }
 .ttd-out b { font: 700 var(--step-0)/1.1 var(--font-display); color: color-mix(in srgb, var(--c) 75%, var(--text)); }
 .ttd-out i { font-style: normal; } .ttd-out i[data-dir="up"] { color: var(--tt-good); } .ttd-out i[data-dir="down"] { color: var(--tt-risk); }
+/* Historia morale: trend przy morale zawodnika i atmosferze, skutek rozmowy tydzień później */
+.tt-trend { font-style: normal; font-size: 0.85em; color: var(--text-muted); }
+.tt-trend[data-dir="up"] { color: var(--tt-good); } .tt-trend[data-dir="down"] { color: var(--tt-risk); }
+.tt-follow { display: block; margin-top: 2px; color: var(--text-muted); }
+.tt-follow[data-dir="up"]::before { content: '▲ '; color: var(--tt-good); } .tt-follow[data-dir="down"]::before { content: '▼ '; color: var(--tt-risk); }
 .ttd-out small { color: var(--text-muted); }
 .ttd-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); }
 .ttd-topic:focus-visible, .ttd-say:focus-visible, .ttd-x:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }

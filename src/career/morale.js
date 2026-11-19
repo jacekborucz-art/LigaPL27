@@ -63,6 +63,61 @@ export function weeklyDrift(value, hasLeader = false) {
   return value + (value < MORALE.DRIFT_TARGET ? step : -step);
 }
 
+// ------------------------------------------------------------ Historia morale (docs/historia-morale.md)
+// p.moraleHist: morale w poniedziałki (przed tygodniowym dryfem, czyli stan po minionym tygodniu), najstarsze pierwsze,
+// najwyżej WEEKS wpisów. Tylko informacja dla gracza: balans gry bez zmian. Stare zapisy: brak historii = brak trendu.
+export const MORALE_HIST = { WEEKS: 8, TREND: 1, FAST_DROP: 4 };
+
+/** Wpis tygodnia (poniedziałek, przed dryfem). */
+export function recordMoraleWeek(p) {
+  const h = p.moraleHist ?? [];
+  h.push(Math.round((p.morale ?? MORALE.START) * 10) / 10);
+  if (h.length > MORALE_HIST.WEEKS) h.splice(0, h.length - MORALE_HIST.WEEKS);
+  p.moraleHist = h;
+}
+
+/**
+ * Trend morale: obecne wobec wpisu sprzed 1-2 tygodni (przedostatni poniedziałek; przy jednym wpisie ostatni).
+ * Zwraca { d, dir: 'up'|'down'|'flat', fast } albo null bez historii. fast: spadek o FAST_DROP i więcej.
+ */
+export function moraleTrend(p) {
+  const h = p?.moraleHist;
+  if (!h?.length) return null;
+  const ref = h.length >= 2 ? h[h.length - 2] : h[h.length - 1];
+  const d = Math.round(((p.morale ?? MORALE.START) - ref) * 10) / 10;
+  return { d, dir: d >= MORALE_HIST.TREND ? 'up' : d <= -MORALE_HIST.TREND ? 'down' : 'flat', fast: d <= -MORALE_HIST.FAST_DROP };
+}
+
+/** Szybki spadek morale (do raportów, Rozmów i listy zadań). */
+export const moraleFalling = (p) => !!moraleTrend(p)?.fast;
+
+/** Seria do wykresu: wpisy tygodniowe i obecna wartość na końcu. */
+export const moraleSeries = (p) => [...(p?.moraleHist ?? []), Math.round((p?.morale ?? MORALE.START) * 10) / 10];
+
+/** Trend morale drużyny (te same 18 osób co teamMorale): obecna średnia wobec średniej z tych samych wpisów. */
+export function teamMoraleTrend(players) {
+  const top = [...players].filter((p) => p.moraleHist?.length).sort((a, b) => (b.minutes ?? 0) - (a.minutes ?? 0)).slice(0, 18);
+  if (top.length < 5) return null;
+  const now = top.reduce((s, p) => s + (p.morale ?? MORALE.START), 0) / top.length;
+  const was = top.reduce((s, p) => s + (p.moraleHist.length >= 2 ? p.moraleHist[p.moraleHist.length - 2] : p.moraleHist[p.moraleHist.length - 1]), 0) / top.length;
+  const d = Math.round((now - was) * 10) / 10;
+  return { d, dir: d >= 0.8 ? 'up' : d <= -0.8 ? 'down' : 'flat' };
+}
+
+/**
+ * Skutek rozmowy tydzień później (Kadra > Rozmowy): wpis rozmowy w game.talks.log dostaje m7 = morale po 7 dniach.
+ * Wywoływane codziennie (season.js, system recovery).
+ */
+export function talkFollowUp(game, date) {
+  const t = Date.parse(`${date}T12:00:00Z`);
+  for (const x of game.talks?.log ?? []) {
+    if (x.kind !== 'talk' || x.m7 != null || x.m0 == null) continue;
+    if ((t - Date.parse(`${x.date}T12:00:00Z`)) / 864e5 < 7) continue;
+    const p = game.world?.players?.[x.playerId];
+    x.m7 = p && p.clubId === game.clubId ? Math.round((p.morale ?? MORALE.START) * 10) / 10 : -1; // -1: odszedł z klubu
+  }
+}
+
 /** Morale drużyny: średnia 18 zawodników z największą liczbą minut. */
 export function teamMorale(players) {
   const top = [...players].sort((a, b) => (b.minutes ?? 0) - (a.minutes ?? 0)).slice(0, 18);

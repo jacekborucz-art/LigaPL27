@@ -3,6 +3,7 @@
 // Starsze zapisy mają tylko p.form (5 ostatnich ocen), wtedy wykres pokazuje same oceny.
 import { anyClub } from '../season/season.js';
 import { esc, fmtDate } from './dom.js';
+import { moraleSeries, moraleTrend, moraleLabel, MORALE_HIST } from '../career/morale.js';
 
 export const FORM_MATCHES = 10;
 const Y_MIN = 4.5, Y_MAX = 9.5; // stała skala, żeby karty różnych zawodników dało się porównać
@@ -37,6 +38,54 @@ function pointTitle(m) {
   if (m.g) parts.push(`gole: ${m.g}`);
   if (m.a) parts.push(`asysty: ${m.a}`);
   return parts.join(', ');
+}
+
+/**
+ * Wykres morale z ostatnich tygodni (historia z career/morale.js: wpisy z poniedziałków i obecna wartość na końcu).
+ * Ten sam wygląd co wykres formy, skala morale 1-20. Bez historii: krótka informacja.
+ */
+export function moraleChartHtml(p) {
+  const list = moraleSeries(p);
+  const title = 'Morale w ostatnich tygodniach';
+  if (list.length < 2) {
+    return `<section class="fch fch--empty" aria-label="${esc(title)}"><header class="fch__head"><h3>${esc(title)}</h3></header>
+      <p class="fch__none">Wykres pojawi się po pierwszym tygodniu w klubie.</p></section>`;
+  }
+  const slots = MORALE_HIST.WEEKS + 1;
+  const n = list.length;
+  const step = (W - PAD_L - PAD_R) / (slots - 1);
+  const x = (i) => PAD_L + (slots - n + i) * step;
+  const y = (v) => PAD_T + (1 - (Math.min(20, Math.max(1, v)) - 1) / 19) * (H - PAD_T - PAD_B);
+  const pts = list.map((v, i) => [x(i), y(v)]);
+  const line = pts.map(([px, py], i) => `${i ? 'L' : 'M'}${px.toFixed(1)} ${py.toFixed(1)}`).join(' ');
+  const base = H - PAD_B;
+  const area = `${line} L${pts[n - 1][0].toFixed(1)} ${base} L${pts[0][0].toFixed(1)} ${base} Z`;
+  const band = (v) => (v >= 17 ? 'top' : v >= 14 ? 'good' : v >= 10 ? 'mid' : 'low');
+  const t = moraleTrend(p);
+  const [tk, tl] = !t ? ['flat', '► bez zmian'] : t.fast ? ['down', '▼ szybki spadek'] : t.dir === 'up' ? ['up', '▲ rośnie'] : t.dir === 'down' ? ['down', '▼ spada'] : ['flat', '► bez zmian'];
+  const grid = [5, 10, 15].map((v) => `<line class="fch__grid" x1="${PAD_L}" x2="${W - PAD_R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"/><text class="fch__ax" x="${PAD_L - 6}" y="${(y(v) + 3.5).toFixed(1)}">${v}</text>`).join('');
+  const dots = list.map((v, i) => {
+    const lastPt = i === n - 1;
+    const when = lastPt ? 'teraz' : (n - 1 - i === 1 ? 'ostatni poniedziałek' : `${n - 1 - i} tygodnie temu`.replace(/^([5-9]) tygodnie/, '$1 tygodni'));
+    return `<g class="fch__pt${lastPt ? ' is-last' : ''}" data-b="${band(v)}" tabindex="0"><title>${esc(`${when}: ${moraleLabel(v).toLowerCase()} (${v.toFixed(1)})`)}</title>
+      <circle cx="${pts[i][0].toFixed(1)}" cy="${pts[i][1].toFixed(1)}" r="${lastPt ? 5.5 : 3.8}"/></g>`;
+  }).join('');
+  const last = list[n - 1];
+  const desc = `Morale w ostatnich tygodniach: ${list.map((v) => v.toFixed(1)).join(', ')} (skala 1-20).`;
+  return `<section class="fch fch--morale" aria-label="${esc(title)}">
+    <header class="fch__head"><h3>${esc(title)}</h3>
+      <span class="fch__meta">teraz <b data-b="${band(last)}">${esc(moraleLabel(last).toLowerCase())}</b></span>
+      <span class="fch__trend" data-t="${tk}">${tl}</span></header>
+    <svg class="fch__svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(desc)}" preserveAspectRatio="xMidYMid meet">
+      <rect class="fch__zone fch__zone--top" x="${PAD_L}" y="${PAD_T}" width="${W - PAD_L - PAD_R}" height="${(y(14) - PAD_T).toFixed(1)}"/>
+      <rect class="fch__zone fch__zone--low" x="${PAD_L}" y="${y(8).toFixed(1)}" width="${W - PAD_L - PAD_R}" height="${(base - y(8)).toFixed(1)}"/>
+      ${grid}
+      <path class="fch__area" d="${area}"/>
+      <path class="fch__line" d="${line}"/>
+      ${dots}
+    </svg>
+    <p class="fch__foot">Stan w poniedziałki, ostatni punkt to dziś, najnowszy po prawej</p>
+  </section>`;
 }
 
 /** Panel z wykresem liniowym formy (SVG, skaluje się do szerokości kontenera). */

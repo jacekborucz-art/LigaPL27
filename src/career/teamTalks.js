@@ -6,7 +6,7 @@
 
 import { Rng, clamp } from '../core/rng.js';
 import { squadOf } from '../world/worldGen.js';
-import { applyMorale } from './morale.js';
+import { applyMorale, moraleFalling } from './morale.js';
 import { applyTrust, classifyReaction, REACTIONS } from '../match/briefings.js';
 import { noteAttention, attentionNeed, daysSinceAttention, ATTN } from './attention.js';
 import { logEngage } from './authority.js';
@@ -147,6 +147,7 @@ export function talkSuggestions(game) {
     const months = p.contract?.until ? daysBetween(game.date, p.contract.until) / 30 : 99;
     const reasons = [];
     if ((p.morale ?? 12) <= 8) reasons.push(['encourage', 'Niskie morale']);
+    else if (moraleFalling(p)) reasons.push(['encourage', 'Morale szybko spada']); // ostrzeżenie przed niskim poziomem
     if (p.unhappy || p.transferRequest) reasons.push(['role', 'Jest niezadowolony']);
     if (share < 0.3 && (p.age ?? 25) >= 21 && (p.season?.apps ?? 0) + 3 < (game.fixtures ?? []).filter((f) => f.played && (f.home === game.clubId || f.away === game.clubId)).length) reasons.push(['role', 'Mało gra']);
     if (months <= 12) reasons.push(['future', 'Kontrakt kończy się w ciągu roku']);
@@ -231,6 +232,7 @@ export function talkToPlayer(game, playerId, kind, { approach = null, assistant 
   if (assistant == null) logEngage(game, z >= 0.8 ? 'talkGood' : z <= -0.5 ? 'talkBad' : 'talkMeh'); // trafność rozmowy (career/authority.js)
   const reaction = classifyReaction(z * 1.8, trustD);
   T.perPlayer[playerId] = [...hist, { date: game.date, kind }];
-  T.log = [{ date: game.date, kind: 'talk', playerId, talk: kind, reaction, reply, approach, ...(assistant != null ? { by: 'assistant' } : {}) }, ...T.log].slice(0, 20);
+  // m0: morale przed rozmową, m7: tydzień później (career/morale.js talkFollowUp), do oceny skutku rozmowy
+  T.log = [{ date: game.date, kind: 'talk', playerId, talk: kind, reaction, reply, approach, m0: moraleBefore, ...(assistant != null ? { by: 'assistant' } : {}) }, ...T.log].slice(0, 20);
   return { ok: true, reaction, label: REACTIONS[reaction].label, reply: same ? `${reply} Słyszał to już niedawno.` : reply, moraleBefore, moraleAfter: p.morale, same: !!same };
 }

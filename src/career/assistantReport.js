@@ -22,7 +22,7 @@ import { loadSummary, acwrLabel, trainingInjuryChance } from '../training/load.j
 import { staleness } from '../training/variety.js';
 import { teamCohesion } from '../training/cohesion.js';
 import { DEV, MODES, ACCENTS, LOAD_LEVELS, PROGRAMS } from '../training/config.js';
-import { teamMorale, moraleLabel } from './morale.js';
+import { teamMorale, moraleLabel, moraleFalling, moraleTrend } from './morale.js';
 import { personalityOf, AGENT_TYPES, computeMindset } from './personality.js';
 import { relationWith } from './negotiation.js';
 import { talkSuggestions, talkCooldown, PLAYER_TALKS } from './teamTalks.js';
@@ -662,6 +662,9 @@ export function squadReport(game, date = game.date, periodId = date) {
   if (unhappy.length) atm.push(`Niezadowoleni: ${unhappy.slice(0, maxN).map((p) => `${p.name}${p.transferRequest ? ' (chce odejść)' : ''}`).join(', ')}.`);
   const low = squad.filter((p) => (p.morale ?? 12) <= 8 && !p.unhappy && !p.transferRequest && sees(`low:${p.id}`, (p.morale ?? 12) <= 5));
   if (low.length) atm.push(`Niskie morale: ${low.slice(0, maxN).map((p) => p.name).join(', ')}.`);
+  // Historia morale (career/morale.js): szybki spadek, zanim morale zrobi się niskie
+  const falling = squad.filter((p) => (p.morale ?? 12) > 8 && !p.unhappy && !p.transferRequest && moraleFalling(p) && sees(`spadek:${p.id}`));
+  if (falling.length) atm.push(`Morale szybko spada: ${falling.slice(0, maxN).map((p) => `${p.name} (o ${num(-moraleTrend(p).d)} w ostatnich tygodniach)`).join(', ')}. Warto porozmawiać, zanim będzie źle.`);
   const leaders = squad.filter((p) => p.persona === 'Lider');
   if (!leaders.length && q >= 8) atm.push('W szatni brakuje naturalnego lidera; kapitan musi wziąć więcej na siebie.');
   const sadLeaders = leaders.filter((p) => (p.morale ?? 12) <= 9 && sees(`lider:${p.id}`));
