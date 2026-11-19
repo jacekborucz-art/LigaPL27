@@ -22,6 +22,8 @@ const crest = (club, size) => crestHtml(club, { size, clubsById, ...(club?.realN
 /** Klub zapisu z nazwą i herbem, z którymi kariera została rozpoczęta (zapis bez znacznika: prawdziwe nazwy). */
 function slotClub(s) {
   const c = clubsById.get(s.summary?.clubId);
+  // Nazwa z zapisu kariery (datapack kariery albo nazwy, z którymi ją rozpoczęto; core/store.js slotClubInfo)
+  if (c && s.club?.name) return { ...c, name: s.club.name, short: s.club.short ?? c.short, ...(s.club.crest ? { crest: s.club.crest } : {}) };
   const f = c && FICTIONAL[c.id];
   if (!f) return c;
   const real = s.summary?.names ? s.summary.names === 'real' : true;
@@ -168,7 +170,7 @@ function saveRow(s, confirmDel) {
        <button class="btn btn--quiet" data-act="delete" data-slot="${s.slot}" aria-label="Usuń zapis ze slotu ${s.slot}">Usuń</button>`;
   return `<li class="save">
     <span class="save__no" aria-hidden="true">${s.slot}</span>
-    ${club ? crest(club, 40) : ''}
+    ${club ? crestHtml(club, { size: 40, clubsById, hidden: !!s.club?.pack, real: s.summary?.names ? s.summary.names === 'real' : true }) : ''}
     <div class="save__body">
       <b class="save__club">${esc(name)}</b>
       <span class="save__meta">${esc(manager)}${typeof s.summary?.season === 'string' ? `, sezon ${esc(s.summary.season)}` : ''}</span>

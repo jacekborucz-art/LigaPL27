@@ -60,10 +60,10 @@ export function fallbackCrestSvg(club) {
  * HTML herbu. size w px CSS; dla <= 24 px używamy miniatury 48, wyżej 128.
  * base: ścieżka do katalogu assets (względna względem strony).
  */
-export function crestHtml(club, { size = 32, base = 'assets/crests', clubsById = null, real = realNamesOn() } = {}) {
+export function crestHtml(club, { size = 32, base = 'assets/crests', clubsById = null, real = realNamesOn(), hidden = crestsAreHidden() } = {}) {
   // real: herby prawdziwe albo nowe (lista zapisów w menu: każda kariera z nazwami, z którymi ją rozpoczęto)
   // Rezerwy z własnym nowym herbem (np. Legat II) używają go, pozostałe herbu pierwszej drużyny z plakietką „II”
-  const hidden = crestsAreHidden(); // gra z datapackiem: tylko tarcze w barwach klubów
+  // hidden: gra z datapackiem, tylko tarcze w barwach klubów (lista zapisów podaje to dla każdej kariery osobno)
   const custom = (c) => typeof c?.crest === 'string' && c.crest.startsWith('data:image/'); // własny herb z datapacku (edytor)
   const own = custom(club) || (!hidden && fictionalCrest(club.id, real) && FICTIONAL_CRESTS.has(club.id));
   const parent = !own && club.parent && clubsById ? clubsById.get(club.parent) : null;

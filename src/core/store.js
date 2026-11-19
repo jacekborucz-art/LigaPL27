@@ -86,12 +86,29 @@ export async function deleteSlot(slot) {
   await tx(db, 'readwrite', (s) => s.delete(slot));
 }
 
+/**
+ * Klub kariery tak, jak go widzi zapis (także stary zapis): nazwa i skrót z datapacku kariery (game.editor.clubs)
+ * albo z nazw kariery (game.names), czy kariera ma wczytany datapack (tarcze w barwach) i własny herb.
+ * Bez tego lista zapisów pokazywałaby domyślną nazwę z danych gry.
+ */
+function slotClubInfo(rec) {
+  const g = rec?.game;
+  const id = rec?.summary?.clubId ?? g?.clubId;
+  if (!g || !id) return null;
+  const ed = g.editor?.clubs?.[id] ?? {};
+  const saved = Array.isArray(g.names?.[id]) ? g.names[id] : [];
+  const name = (typeof ed.name === 'string' && ed.name) || (typeof saved[0] === 'string' && saved[0]) || null;
+  const short = (typeof ed.short === 'string' && ed.short) || (typeof saved[1] === 'string' && saved[1]) || null;
+  const crest = typeof ed.crest === 'string' && ed.crest.startsWith('data:image/') ? ed.crest : null;
+  return { name, short, pack: !!g.editor?.packLoaded, crest };
+}
+
 /** Lista slotów 1..3 z podsumowaniem (bez wczytywania całej gry do UI). */
 export async function listSlots() {
   const out = [];
   for (let slot = 1; slot <= SLOT_COUNT; slot++) {
     const rec = await loadSlot(slot);
-    out.push(rec ? { slot, savedAt: rec.savedAt, summary: rec.summary } : { slot, empty: true });
+    out.push(rec ? { slot, savedAt: rec.savedAt, summary: rec.summary, club: slotClubInfo(rec) } : { slot, empty: true });
   }
   return out;
 }
