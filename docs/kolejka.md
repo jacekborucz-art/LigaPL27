@@ -53,3 +53,58 @@ Do zrobienia:
 - obywatelstwo UE z drugim paszportem: później (na razie tylko narodowość `p.nat`).
 
 Źródło: https://pzpn.pl/public/system/files/site_content/635/6576-Regulamin%201.%20Ligi%202.%20Ligi%20i%203.%20Ligi%20na%20sezon%202025-2026.pdf
+
+## 4. Skauci i skauting zagraniczny (dodane Nov 19, 2026)
+
+Cel: gracz zleca skautowi poszukiwanie konkretnego profilu zawodnika za granicą. Skaut wyrusza w swój region i wraca
+z listą kandydatów, których nie ma na żadnej liście w grze. Wynik zależy od cech skauta i losu. Te same zasady dla
+gracza i klubów AI (AI korzysta z uproszczonej wersji albo wcale; do decyzji przy wdrożeniu, bez przewagi gracza).
+
+Stan dziś: rola „skaut” w sztabie (rynek sztabu, `src/career/staffMarket.js`) z 3 atrybutami: ocena potencjału,
+ocena umiejętności, znajomość rynków (`docs/sztab-atrybuty.md`). Skaut tylko poprawia dokładność oceny potencjału
+zawodników innych klubów. Widoczna pula ok. 100 zawodników z zagranicy (`src/career/foreignPool.js`) zostaje bez zmian.
+
+Decyzje (właściciel zostawił je do wyboru; wybrane opcje najbliższe realiom):
+- Skauci w klubie od początku gry jak dziś (kluby Ekstraklasy i 1 Ligi mają zwykle 1-3 skautów, niższe ligi mniej,
+  w III lidze rola niedostępna). Gracz może zwalniać i zatrudniać nowych.
+- Dwie formy pracy:
+  - na stałe: osoba w sztabie (pensja miesięczna, limit sztabu jak dziś), zlecenia bez dodatkowej opłaty poza kosztami wyjazdu;
+  - na zlecenie (freelancer): jedna misja, opłata z góry (zależna od jakości i długości wyjazdu) plus prowizja przy
+    podpisaniu znalezionego zawodnika (np. 3-8 % kwoty transferu albo ryczałt przy wolnym zawodniku) [SZAC].
+- Lista wolnych skautów (do zatrudnienia albo na zlecenie): ok. 50 osób, odświeżana co pół roku (1 lipca i 1 stycznia),
+  regiony losowane bez równego podziału (raz więcej ekspertów od Bałkanów, raz od Ameryki Południowej). Najlepsi
+  skauci są drodzy i często poza zasięgiem mniejszych klubów (wysoka pensja i prowizja, renoma klubu jak przy sztabie).
+
+Atrybuty skauta (zamiast obecnych 3; migracja i nowa wersja datapacku, starsze pliki działają):
+- Doświadczenie: szansa powodzenia wyprawy, mniej pustych wyjazdów.
+- Ocena zawodnika: jak dokładnie skaut opisuje umiejętności i potencjał kandydata (błąd raportu).
+- Wiedza o rynku: realne ceny i pensje kandydata, czy zawodnik naprawdę chce przyjść do Polski.
+- Sieć kontaktów: liczba kandydatów na liście, dostęp do zawodników z kontraktem (agenci, kluby).
+- Ocena charakteru (propozycja): adaptacja, profesjonalizm, ryzyko „nie odnajdzie się w Polsce”.
+Plus wiedza o regionach: każdy skaut ma 1-3 regiony z poziomem znajomości (mieszane umiejętności, np. Bałkany;
+Półwysep Iberyjski i Afryka; Ameryka Południowa). Regiony do ustalenia, np. Bałkany, Europa Środkowa, Skandynawia,
+Półwysep Iberyjski, Europa Zachodnia, Europa Wschodnia i Kaukaz, Afryka Zachodnia, Afryka Północna, Ameryka
+Południowa, Ameryka Północna i Środkowa, Azja, Bliski Wschód. Poza swoimi regionami skaut pracuje dużo słabiej.
+
+Zlecenie (gracz określa profil):
+- region (z listy regionów skauta albo dowolny, wtedy słabiej), pozycja, wiek od-do, poziom (np. podstawowy w obecnym
+  klubie, wzmocnienie, perspektywa), maksymalna kwota transferu i pensja, wolny zawodnik albo z kontraktem;
+- czas wyjazdu (np. 2, 4 albo 6 tygodni): dłużej = większa szansa i więcej kandydatów, ale wyższy koszt
+  i skaut nieobecny w klubie (jego zwykła praca w sztabie w tym czasie słabsza);
+- tylko zagranica: skaut nie szuka w polskich ligach 1-4 (ani niżej).
+
+Wynik wyprawy:
+- Kandydatów nie ma na żadnej liście przed wyjazdem: system tworzy ich dopiero, gdy wyprawa się uda (bez ukrytej puli).
+- Szansa powodzenia i liczba kandydatów (0-5): doświadczenie, sieć kontaktów, znajomość regionu, czas wyjazdu,
+  trudność profilu (np. tani, młody i bardzo dobry to rzadkość) + RNG. Słabszy skaut częściej wraca z pustymi rękami.
+- Atrybuty kandydata: stała z profilu zlecenia (poziom, pozycja, wiek, region) + RNG w górę albo w dół; skaut widzi
+  je z błędem zależnym od oceny zawodnika i znajomości regionu (lepszy skaut: mniej pomyłek, rzadziej „wydmuszki”).
+- Raport w poczcie po powrocie: lista kandydatów z opisem skauta (mocne i słabe strony, cena, pensja, chęć przyjścia,
+  ryzyko adaptacji). Znaleziony zawodnik trafia na listę obserwowanych gracza i do zwykłej mechaniki transferu
+  (oferta do klubu zagranicznego albo kontrakt wolnego zawodnika); po kilku tygodniach bez działania może zniknąć
+  z rynku albo trafić do innego klubu.
+
+Do zrobienia: burza mózgów (ekspert piłkarski i skaut z doświadczeniem, Sonnet medium) nad regionami, liczbami
+i kosztami [SZAC], potem wdrożenie: atrybuty i regiony skautów, lista wolnych skautów, ekran zleceń, wyprawa jako
+system dnia, generowanie kandydatów, raport w poczcie, prowizje w finansach, edytor i datapack (nowa wersja pliku
+z migracją), testy (ten sam profil i ziarno = ten sam wynik, słabszy skaut statystycznie gorzej).
