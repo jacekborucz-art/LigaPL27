@@ -69,6 +69,40 @@ export const KIBICE = {
   'sokol-kleczew': k(1, 1, 1),
 };
 
+// ------------------------------------------------------------ Rywalizacje z edytora (docs/edytor.md)
+// Nadpisania pary klubów z datapacku gry (game.editor.rivals, klucz „a|b” w kolejności alfabetycznej): intensywność
+// 0-3, 0 = brak rywalizacji (także zamiast derby lokalnych z regionu). Nakłada je career/editor.js (applyPack).
+export const rivalKey = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+const OVERRIDES = new Map();
+let overVer = 0;
+/** Ustawia nadpisania rywalizacji ({ 'a|b': 0-3 }); pusty obiekt = tylko dane gry. */
+export function setRivalOverrides(o) {
+  OVERRIDES.clear();
+  for (const [k, v] of Object.entries(o ?? {})) if (Number.isInteger(v) && v >= 0 && v <= 3) OVERRIDES.set(k, v);
+  overVer++;
+}
+/** Nadpisanie pary albo undefined. */
+export const rivalOverride = (a, b) => OVERRIDES.get(rivalKey(a, b));
+/** Numer zmiany nadpisań (pamięć podręczna widoków). */
+export const rivalVersion = () => overVer;
+/** Intensywność pary z danych gry (bez edytora i bez derby z regionu) albo 0. */
+export function baseRivalry(a, b) {
+  for (const [x, y, v] of RIVALRIES) if ((x === a && y === b) || (x === b && y === a)) return v;
+  return 0;
+}
+/** Najwięksi rywale klubu z listy (dane gry i edytor, bez derby z regionu): [{ id, v }] od najsilniejszej rywalizacji. */
+export function listedRivalsOf(id) {
+  const m = new Map();
+  for (const [a, b, v] of RIVALRIES) if (a === id || b === id) m.set(a === id ? b : a, v);
+  for (const [k, v] of OVERRIDES) {
+    const [a, b] = k.split('|');
+    if (a !== id && b !== id) continue;
+    const other = a === id ? b : a;
+    if (v > 0) m.set(other, v); else m.delete(other);
+  }
+  return [...m].map(([oid, v]) => ({ id: oid, v })).sort((x, y) => y.v - x.v || x.id.localeCompare(y.id));
+}
+
 // Rywalizacje: [klub A, klub B, intensywność 1-3]. 3 = wielkie derby (najwyższe ryzyko incydentów i emocji).
 // Derby lokalne bez wpisu wykrywa fans.js po regionie z clubs_pl.js (intensywność 1).
 export const RIVALRIES = [

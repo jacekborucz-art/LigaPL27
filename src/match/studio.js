@@ -14,6 +14,7 @@ import { teamRating, pickXI } from '../engine/teamStrength.js';
 import { statsFromEvents } from '../engine/matchStats.js';
 import { createMessage } from '../core/inbox.js';
 import { GROUP } from '../career/squad.js';
+import { rivalOverride } from '../data/kibice.js';
 
 const r2 = (v) => Math.round(v * 100) / 100;
 const r3 = (v) => Math.round(v * 1000) / 1000;
@@ -60,9 +61,12 @@ export const KLASYKI = [['legia', 'lech'], ['legia', 'widzew'], ['lech', 'wisla-
 export function isDerby(home, away) {
   if (!home || !away) return false;
   if (home.parent === away.id || away.parent === home.id) return false;
+  if (rivalOverride(home.id, away.id) === 0) return false; // edytor: gracz usunął tę rywalizację
   return !!home.region && home.region === away.region;
 }
 function isKlasyk(home, away) {
+  const ov = rivalOverride(home.id, away.id); // edytor: rywal z intensywnością 2-3 to mecz rangi klasyku
+  if (ov !== undefined) return ov >= 2;
   return KLASYKI.some(([a, b]) => (home.id === a && away.id === b) || (home.id === b && away.id === a));
 }
 

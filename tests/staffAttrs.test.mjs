@@ -119,7 +119,7 @@ test('Edytor i datapack: atrybuty w pliku v3, stary plik z samą jakością prze
   assert.equal(lead.q, 13);
   // Eksport v3 z atrybutami i import w innej grze
   const pk = exportPack(g, new Date('2026-11-19T10:00:00Z'), { full: true });
-  assert.equal(pk.v, PACK_V); assert.equal(PACK_V, 3);
+  assert.equal(pk.v, PACK_V); assert.ok(PACK_V >= 3);
   const other = newGame(77);
   importPack(other, parsePack(JSON.stringify(pk)));
   assert.deepEqual(peopleValues(other, id).staff.asystent[0].a, { TAK: 18, OCE: 12, MOT: 9 });
@@ -134,7 +134,7 @@ test('Edytor i datapack: atrybuty w pliku v3, stary plik z samą jakością prze
   // Zły atrybut i wartość spoza skali
   assert.ok(Object.keys(checkStaff({ asystent: [{ a: { REG: 10 } }] }).errors).length);
   assert.ok(Object.keys(checkStaff({ asystent: [{ a: { TAK: 25 } }] }).errors).length);
-  assert.throws(() => parsePack(JSON.stringify({ type: 'ligapl27-datapack', v: 4, clubs: {}, players: {} })), /nowszej gry/);
+  assert.throws(() => parsePack(JSON.stringify({ type: 'ligapl27-datapack', v: PACK_V + 1, clubs: {}, players: {} })), /nowszej gry/);
 });
 
 test('Widok Trening, Sztab: atrybuty roli i wpływ na grę bez pustych wartości', () => {

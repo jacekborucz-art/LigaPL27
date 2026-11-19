@@ -2,6 +2,7 @@
 // (trener, klub, kontrakt). Widok składa HTML; stan i akcje trzyma src/app.js.
 // Każdy tekst wpisany przez gracza przechodzi przez esc(). Profil trenera nie opuszcza urządzenia.
 
+import { rivalVersion } from '../data/kibice.js';
 import { CLUBS_PL, LEAGUE_NAMES, L3_GROUP_NAMES, leagueLabel } from '../data/clubs_pl.js';
 import { POLISH_EUROPE_2026, SEASON, SEASON_YEAR, GAME_START } from '../config/calendar2026.js';
 import { clubFinanceData } from '../data/finanse_klubow.js';
@@ -427,7 +428,8 @@ const pickable = (tier) => CLUBS_PL.filter((c) => c.tier === tier && !c.parent);
 const factsCache = new Map();
 /** Dane klubu do panelu: wyłącznie z danych i wzorów gry (finanse jak na starcie kariery). */
 export function clubFacts(club) {
-  if (factsCache.has(club.id)) return factsCache.get(club.id);
+  const ck = `${club.id}:${rivalVersion()}`; // rywale z datapacku zmieniają fakty klubu
+  if (factsCache.has(ck)) return factsCache.get(ck);
   const goal = seasonGoalFor(club);
   const plan = clubPlan(club);
   const start = initClub({ clubs: {}, players: {} }, club); // ten sam wzór co createFinance na starcie gry
@@ -442,7 +444,7 @@ export function clubFacts(club) {
     capEst: est.has('pojemnosc'), attEst: est.has('frekwencja'),
     owner: plan.ownerName, ownerType: OWNER[plan.ownerType] ?? '', rivals,
   };
-  factsCache.set(club.id, f);
+  factsCache.set(ck, f);
   return f;
 }
 

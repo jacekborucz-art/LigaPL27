@@ -14,6 +14,7 @@ import { CLUBS_PL } from '../data/clubs_pl.js';
 import { CLUBS_L3 } from '../data/clubs_l3.js';
 import { CLUBS_L4 } from '../data/clubs_l4.js';
 import { setCrestsHidden } from '../data/clubNames.js';
+import { rivalKey, setRivalOverrides, baseRivalry, listedRivalsOf } from '../data/kibice.js';
 import { NAT_NAMES, EU } from '../data/names.js';
 import { ATTRS, POS_NAMES, VARIANTS, ovrAt } from '../data/attributes.js';
 import { clubFinanceData } from '../data/finanse_klubow.js';
@@ -42,12 +43,14 @@ export const PACK_TYPE = 'ligapl27-datapack';
 //      tylko nowe pola, plik w wersji 1 wczytuje się bez zmian
 //   3  v1.19 Beta: atrybuty osób sztabu (staff: { rola: [{ name, age, q, a: { atrybut: 1-20 } }] }, docs/sztab-atrybuty.md);
 //      plik bez atrybutów (v1, v2): jakość q przesuwa cały profil osoby, jak dotąd
-export const PACK_V = 3;
+//   4  v1.19 Beta: najwięksi rywale klubu (rivals: { id klubu: intensywność 0-3 }, 0 = bez rywalizacji); tylko nowe pole
+export const PACK_V = 4;
 export const PACK_V_MIN = 1;
 /** Migracje starszych plików do bieżącej wersji: MIGRATE[v] zamienia plik z wersji v na v + 1. */
 const MIGRATE = {
   1: (d) => d, // wersja 2 tylko dodaje pola
   2: (d) => d, // wersja 3 tylko dodaje atrybuty sztabu (bez nich działa sama jakość)
+  3: (d) => d, // wersja 4 tylko dodaje rywali klubu
 };
 export const LIMITS = {
   name: 40, short: 5, stadium: 60,
@@ -56,7 +59,8 @@ export const LIMITS = {
   attrMin: 1, attrMax: 20,
   ageMin: 15, ageMax: 45,
 };
-export const CLUB_FIELDS = ['name', 'short', 'stadium', 'crest', 'capacity', 'balance', 'transferBudget', 'wageBudget'];
+export const CLUB_FIELDS = ['name', 'short', 'stadium', 'crest', 'capacity', 'balance', 'transferBudget', 'wageBudget', 'rivals'];
+export const RIVALS_MAX = 12; // rywali na klub w pliku
 export const PLAYER_FIELDS = ['first', 'last', 'nat', 'pos', 'birthDate', 'attrs', 'pot', 'alt', 'injury', 'team'];
 // Pozycje dodatkowe (p.alt: biegłość 0-90 %, jak nauka pozycji na treningu, src/engine/positions.js): bez bramki
 export const ALT_POSITIONS = POSITIONS.filter((x) => x !== 'BR');
@@ -78,6 +82,7 @@ const clubObj = (id) => known().find((c) => c.id === id) ?? null;
 /** Przywraca oryginalne nazwy, skróty i stadiony wszystkich klubów. */
 export function restoreOriginals() {
   setCrestsHidden(false);
+  setRivalOverrides({}); // rywalizacje tylko z danych gry
   for (const c of allClubs()) {
     const o = ORIGINAL.get(c.id);
     if (!o) continue;
@@ -115,6 +120,7 @@ export function applyPack(game) {
   applySavedNames(game);
   const E = game?.editor;
   setCrestsHidden(!!E?.packLoaded); // gra z wczytanym datapackiem: tarcze w barwach zamiast herbów
+  setRivalOverrides(E?.rivals); // najwięksi rywale z edytora (data/kibice.js)
   if (!E?.clubs) return;
   for (const [id, o] of Object.entries(E.clubs)) {
     const c = clubObj(id);
@@ -185,7 +191,50 @@ export function checkClub(src, { form = false } = {}) {
   if (src.balance !== undefined) put('balance', num(src.balance, { label: 'Saldo', min: LIMITS.balanceMin, max: LIMITS.moneyMax, form }));
   if (src.transferBudget !== undefined) put('transferBudget', num(src.transferBudget, { label: 'Budżet transferowy', min: 0, max: LIMITS.moneyMax, form }));
   if (src.wageBudget !== undefined) put('wageBudget', num(src.wageBudget, { label: 'Budżet płac', min: 0, max: LIMITS.moneyMax, form }));
+  if (src.rivals !== undefined) put('rivals', checkRivals(src.rivals));
   return { value, errors };
+}
+
+/** Rywale klubu z pliku: { id klubu: 0-3 } (0 = bez rywalizacji), znane kluby, najwyżej RIVALS_MAX. */
+function checkRivals(o) {
+  if (!isObj(o)) return { err: 'Rywale: zły format.' };
+  const e = Object.entries(o);
+  if (e.length > RIVALS_MAX) return { err: `Rywale: najwyżej ${RIVALS_MAX} klubów.` };
+  const v = {};
+  for (const [id, x] of e) {
+    if (!clubObj(id)) return { err: `Rywale: nieznany klub ${String(id).slice(0, 30)}.` };
+    if (!Number.isInteger(x) || x < 0 || x > 3) return { err: 'Rywale: intensywność od 0 do 3.' };
+    v[id] = x;
+  }
+  return { v };
+}
+
+/**
+ * Rywalizacja pary klubów (edytor, datapack): intensywność 0-3 (0 = bez rywalizacji, także zamiast derby z regionu).
+ * Wartość równa danym gry usuwa nadpisanie. Zwraca 1 przy zmianie, inaczej 0.
+ */
+export function editRival(game, id, other, v) {
+  if (!clubObj(id) || !clubObj(other) || id === other || !Number.isInteger(v) || v < 0 || v > 3) return 0;
+  const E = ensureEditor(game);
+  const key = rivalKey(id, other);
+  const cur = E.rivals?.[key];
+  const base = baseRivalry(id, other);
+  const sameAsBase = v === base && (v > 0 || !sameRegion(id, other));
+  if (sameAsBase) { if (cur === undefined) return 0; delete E.rivals[key]; }
+  else { if (cur === v) return 0; (E.rivals ??= {})[key] = v; }
+  setRivalOverrides(E.rivals);
+  return 1;
+}
+const sameRegion = (a, b) => { const A = clubObj(a); const B = clubObj(b); return !!(A?.region && A.region === B?.region && !A.parent && !B.parent); };
+
+/** Rywale klubu do formularza i pliku: lista z danych gry i edytora plus usunięte pary (0). */
+export function rivalsOf(game, id) {
+  const out = Object.fromEntries(listedRivalsOf(id).map((x) => [x.id, x.v]));
+  for (const [k, v] of Object.entries(game.editor?.rivals ?? {})) {
+    const [a, b] = k.split('|');
+    if (v === 0 && (a === id || b === id)) out[a === id ? b : a] = 0;
+  }
+  return out;
 }
 
 const validDate = (s) => {
@@ -297,6 +346,7 @@ export function editClub(game, id, values) {
   for (const k of CLUB_FIELDS) {
     if (values[k] === undefined) continue;
     const v = values[k];
+    if (k === 'rivals') { for (const [o, x] of Object.entries(v)) n += editRival(game, id, o, x); continue; } // pary w game.editor.rivals
     if (STATIC.includes(k)) {
       if (v !== cur[k]) n++;
       if (k === 'stadium' || k === 'crest') { if (v) c[k] = v; else delete c[k]; } else c[k] = v;
@@ -698,13 +748,19 @@ export function exportPack(game, now = new Date(), { full = false } = {}) {
   const E = ensureEditor(game);
   const head = { type: PACK_TYPE, v: PACK_V, game: GAME_VERSION, seed: game.seed, created: now.toISOString(), full };
   const extra = { newPlayers: exportCreated(game), refs: structuredClone(E.refs ?? {}) }; // nowi zawodnicy i sędziowie (created to data pliku)
-  if (!full) return { ...head, clubs: structuredClone(E.clubs), players: structuredClone(E.players), ...extra };
+  if (!full) {
+    const clubs = structuredClone(E.clubs);
+    for (const k of Object.keys(E.rivals ?? {})) for (const id of k.split('|')) if (clubObj(id)) (clubs[id] ??= {}).rivals = rivalsOf(game, id); // rywale z edytora
+    return { ...head, clubs, players: structuredClone(E.players), ...extra };
+  }
   for (const r of game.refs?.list ?? []) extra.refs[r.id] = refValues(game, r); // pełny: wszyscy sędziowie
   const clubs = {}; const players = {};
   for (const id of Object.keys(game.world?.clubs ?? {})) {
     if (!clubObj(id)) continue;
     const cur = Object.fromEntries(Object.entries(clubValues(game, id)).filter(([, v]) => v != null && v !== ''));
     const { value } = checkClub(cur);
+    const rv = rivalsOf(game, id); // najwięksi rywale (dane gry i edytor; 0 = usunięta rywalizacja)
+    if (Object.keys(rv).length) value.rivals = Object.fromEntries(Object.entries(rv).slice(0, RIVALS_MAX));
     const ppl = peopleValues(game, id); // trener, właściciel i sztab z bieżącymi wartościami
     if (ppl.coach) { const r = checkCoach(ppl.coach); if (!Object.keys(r.errors).length) value.coach = r.value; }
     if (ppl.owner) { const r = checkOwner(ppl.owner); if (!Object.keys(r.errors).length) value.owner = r.value; }

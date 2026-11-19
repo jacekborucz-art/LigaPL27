@@ -1,7 +1,7 @@
 # Datapack z prawdziwymi danymi: instrukcja dla agentów AI
 
 Ten dokument opisuje, jak zespół trzech agentów AI zbiera prawdziwe dane o klubach, zawodnikach, sztabach i sędziach
-i składa z nich datapack, który gra wczyta bez błędów. Dotyczy gry v1.19 Beta, format pliku `v: 3` (gra wczytuje też starsze pliki `v: 1` i `v: 2`).
+i składa z nich datapack, który gra wczyta bez błędów. Dotyczy gry v1.19 Beta, format pliku `v: 4` (gra wczytuje też starsze pliki `v: 1` do `v: 3`).
 Stan na Nov 19, 2026.
 
 Pliki:
@@ -32,7 +32,7 @@ Złamanie którejkolwiek zasady kończy się tak: gra odrzuca cały plik albo po
 
 1. Plik to czysty JSON w UTF-8: bez komentarzy, bez przecinka po ostatnim elemencie, liczby jako liczby
    (`12`, nie `"12"`), teksty w cudzysłowach prostych `"`. Rozmiar najwyżej 40 MB.
-2. Nagłówek: `"type": "ligapl27-datapack"`, `"v": 3`, `"seed"` skopiowany bez zmian z `baza.json`.
+2. Nagłówek: `"type": "ligapl27-datapack"`, `"v": 4`, `"seed"` skopiowany bez zmian z `baza.json`.
 3. Identyfikatory klubów, zawodników i sędziów tylko z `baza.json`. Nowych identyfikatorów nie wolno wymyślać,
    z jednym wyjątkiem: sekcja `newPlayers` (identyfikator `ed-<cokolwiek>`, litery, cyfry, `_ . : -`, do 80 znaków).
 4. Jeden identyfikator raz w sekcji. Przy powtórzeniu JSON zostawia tylko ostatni wpis, bez ostrzeżenia.
@@ -56,7 +56,7 @@ w grze bez zmian. Wczytanie pliku do gry zmienia tylko pola, które różnią si
 | Pole | Wartość |
 | --- | --- |
 | `type` | zawsze `"ligapl27-datapack"` |
-| `v` | zawsze `3` |
+| `v` | zawsze `4` |
 | `seed` | liczba z `baza.json`, bez zmian (inne ziarno: gra pominie całą sekcję `players`) |
 | `game` | wersja gry, np. `"v1.19 Beta"` (tylko informacja) |
 | `created` | data pliku, tekst ISO, np. `"2026-11-19T10:00:00.000Z"` (tylko informacja) |
@@ -75,6 +75,7 @@ w grze bez zmian. Wczytanie pliku do gry zmienia tylko pola, które różnią si
 | `transferBudget` | liczba całkowita, zł, 0-10000000000 | budżet transferowy na sezon |
 | `wageBudget` | liczba całkowita, zł, 0-10000000000 | tygodniowy budżet płac (nie roczny i nie miesięczny) |
 | `crest` | pomiń | herby dodaje właściciel w Edytorze |
+| `rivals` | `{ "id klubu": 0-3 }`, najwyżej 12 | najwięksi rywale: 1 lokalna rywalizacja, 2 duża, 3 wielkie derby, 0 brak rywalizacji (także zamiast derby z regionu); para działa w obie strony, wpisz ją przy obu klubach tą samą wartością |
 | `coach` | obiekt, niżej | trener klubu (trener klubu gracza jest pomijany, to gracz) |
 | `owner` | obiekt, niżej | właściciel lub prezes decydujący o klubie |
 | `staff` | obiekt, niżej | sztab |
@@ -359,7 +360,8 @@ Ekstraklasa, 1 Liga, 2 Liga, III liga. Każdy klub zapisz do research/<id klubu>
 dokumentu docs/datapack/agenci.md.
 
 Zbierz dla każdego klubu:
-1. Pełną nazwę, skrót (2-5 liter), nazwę i pojemność stadionu.
+1. Pełną nazwę, skrót (2-5 liter), nazwę i pojemność stadionu, największych rywali (z kim kibice mają
+   rywalizację, jak silną: derby, klasyki, zgody i konflikty kibiców, ze źródłami).
 2. Finanse tylko z wiarygodnych źródeł (sprawozdania, raport Deloitte, media biznesowe). Brak danych: null.
    Nie zgaduj na tym etapie.
 3. Trenera pierwszej drużyny: imię i nazwisko, data urodzenia albo wiek, styl gry (ofensywny, ostrożny,
@@ -430,12 +432,12 @@ kluby z kadrą poniżej 21 lub powyżej 32, pełna tabela z duplikaty.md.
 ### Agent 3: budowa datapacku
 
 ```
-Jesteś budowniczym datapacku gry LigaPL27 (format v3). Dostajesz baza.json (pełny eksport z gry), pliki
+Jesteś budowniczym datapacku gry LigaPL27 (format v4). Dostajesz baza.json (pełny eksport z gry), pliki
 zweryfikowane/<id klubu>.json, duplikaty.md, docs/datapack/agenci.md i złoty wzorzec docs/datapack/wzor.json.
 Wynik: jeden plik LigaPL27-datapack-<RRRR-MM-DD>.json (tylko litery ASCII w nazwie), który gra wczyta bez błędów.
 
 Zasady bezwzględne (rozdział 2 dokumentu):
-- Zacznij od kopii nagłówka baza.json: type "ligapl27-datapack", v 3, ten sam seed. Format pól 1:1 jak w wzor.json.
+- Zacznij od kopii nagłówka baza.json: type "ligapl27-datapack", v 4, ten sam seed. Format pól 1:1 jak w wzor.json.
 - Tylko identyfikatory z baza.json. Nowe tylko w newPlayers (ed-<klub>-<numer>).
 - Każdy identyfikator raz w sekcji. Każdy człowiek raz w całym pliku.
 - Atrybuty całkowite 1-20, wszystkie 27 przy każdym zawodniku, którego zmieniasz. pot 1-20 z jednym miejscem
@@ -458,7 +460,8 @@ Krok po kroku dla każdego klubu:
 7. Trener, właściciel i sztab: liczby 1-20 według rozdziału 5 i opisów z researchu. Liczba osób w każdej roli
    sztabu dokładnie jak w baza.json. Każda osoba sztabu: "a" z 3 atrybutami swojej roli (tabela w rozdziale 3.2),
    bez pola "q" (jakość gra policzy sama).
-8. Klub: name, short, stadium, capacity. Finanse tylko przy klubach, które mają je w baza.json,
+8. Klub: name, short, stadium, capacity, rivals (prawdziwe rywalizacje kibiców, intensywność z historii i
+   incydentów; ta sama wartość przy obu klubach pary). Finanse tylko przy klubach, które mają je w baza.json,
    wageBudget jako budżet tygodniowy w złotych. Kwoty w skali klubów tej samej ligi z baza.json.
 9. Sędziowie: prawdziwi sędziowie na miejsca list ich ligi (r1-r20 Ekstraklasa, r21-r42 1 Liga, r43-r64 2 Liga,
    r65-r136 III liga). Atrybuty: 7 liczb w kolejności z rozdziału 3.5, e, s 0.7-1.4.

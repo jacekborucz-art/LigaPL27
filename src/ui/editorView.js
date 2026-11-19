@@ -16,7 +16,7 @@ import {
   packCounts, originalOf, peopleValues, checkCoach, checkOwner, checkStaff, editCoach, editOwner, editStaff,
   OWNER_LABELS, PERSON_AGE, ALT_MAX, ALT_POSITIONS,
   EDIT_SQUAD, squadSize, releaseBlock, releaseToFree, joinFromFree, freeAgents, checkNewPlayer, createFreePlayer, NEW_LEVEL,
-  REF_LIMITS, refValues, checkReferee, editReferee, INJURY_LIST, INJ_DAYS_MAX,
+  REF_LIMITS, refValues, checkReferee, editReferee, INJURY_LIST, INJ_DAYS_MAX, rivalsOf, editRival, RIVALS_MAX,
 } from '../career/editor.js';
 import { REF_ATTRS } from '../career/referees.js';
 import { proficiency } from '../engine/positions.js';
@@ -210,6 +210,7 @@ function clubForm(game, ed, id) {
       ${inPack ? `<button class="btn btn--quiet" data-act="ed-reset-club" data-id="${esc(id)}">Przywróć oryginał</button>` : ''}
     </div>
     ${peopleForms(game, ed, id)}
+    ${rivalsForm(game, id)}
     ${inPack ? '<p class="ed-note">Przywróć oryginał: wracają nazwa, skrót, stadion i herb z danych gry, a klub znika z datapacku. Finanse, pojemność, trener, sztab i właściciel zostają tacy, jak teraz.</p>' : ''}
     <section class="ed-squad" aria-labelledby="ed-squad-h"><h3 id="ed-squad-h">Kadra (${squad.length})</h3>
       <p class="fld__help">Kadra pierwszej drużyny: od ${EDIT_SQUAD.min} do ${EDIT_SQUAD.max} zawodników. Zawodnika przeniesiesz do wolnych w jego karcie.</p>
@@ -218,6 +219,28 @@ function clubForm(game, ed, id) {
         <div id="ed-free">${freeListHtml(game, ed)}</div></div>` : ''}
       ${squad.length ? playerRows(game, squad, 'ed-cplayer', null) : '<p class="ed-empty">Brak zawodników.</p>'}</section>
   </div>`;
+}
+
+// Najwięksi rywale klubu (data/kibice.js): intensywność wpływa na kibiców, frekwencję, odprawy i rangę meczu
+export const RIVAL_LEVELS = { 0: 'Bez rywalizacji', 1: 'Lokalna rywalizacja', 2: 'Duża rywalizacja', 3: 'Wielkie derby' };
+const rivalSelect = (id, v, withNone = true) => `<select id="${id}">${Object.entries(RIVAL_LEVELS).filter(([k]) => withNone || k !== '0').map(([k, l]) => `<option value="${k}"${Number(k) === v ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+function rivalsForm(game, id) {
+  const cur = rivalsOf(game, id);
+  const listed = Object.entries(cur).filter(([, v]) => v > 0);
+  const removed = Object.entries(cur).filter(([, v]) => v === 0);
+  const objOf = (cid) => [...CLUBS_PL, ...CLUBS_L3].find((c) => c.id === cid) ?? null;
+  const nameOf = (cid) => objOf(cid)?.name ?? cid;
+  const options = [...CLUBS_PL, ...CLUBS_L3].filter((c) => c.id !== id && !c.parent && !(cur[c.id] > 0))
+    .sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name, 'pl'));
+  const rows = listed.map(([cid, v]) => `<div class="ed-rival"><span class="ed-rival__nm">${crest(objOf(cid), 22)}${esc(nameOf(cid))}</span>
+    <label class="sr-only" for="ed-rv-${esc(cid)}">Rywalizacja z ${esc(nameOf(cid))}</label>${rivalSelect(`ed-rv-${esc(cid)}`, v)}</div>`).join('');
+  return `<fieldset class="ed-attrs ed-people ed-rivals"><legend>Najwięksi rywale</legend>
+    ${rows || '<p class="muted">Brak rywali na liście. Kluby z tego samego regionu grają derby lokalne.</p>'}
+    ${listed.length < RIVALS_MAX ? `<div class="ed-rival ed-rival--add"><label class="ed-rival__nm" for="ed-rv-new"><span class="sr-only">Nowy rywal</span><select id="ed-rv-new"><option value="">Dodaj rywala...</option>${options.map((c) => `<option value="${esc(c.id)}">${esc(c.name)} (${esc(LEAGUE_NAMES[c.tier] ?? '')})</option>`).join('')}</select></label>
+      <label class="sr-only" for="ed-rv-new-v">Intensywność nowej rywalizacji</label>${rivalSelect('ed-rv-new-v', 2, false)}</div>` : ''}
+    ${removed.length ? `<p class="fld__help">Usunięte rywalizacje: ${esc(removed.map(([cid]) => nameOf(cid)).join(', '))} (także bez derby lokalnych).</p>` : ''}
+    <p class="fld__help">Rywalizacja działa w obie strony. Intensywność wpływa na emocje kibiców, frekwencję, odprawy i rangę meczu: wielkie derby to najwyższe emocje i ryzyko incydentów. „Bez rywalizacji” usuwa też derby lokalne z regionu. Najwyżej ${RIVALS_MAX} rywali.</p>
+    <div class="ed-actions"><button class="btn btn--primary btn--sm" data-act="ed-save-rivals" data-id="${esc(id)}">Zapisz rywali</button></div></fieldset>`;
 }
 
 // Trener, sztab i właściciel klubu: osobne sekcje z własnym przyciskiem zapisu
@@ -535,6 +558,18 @@ export function handleEditorAction(game, ed, act, data, root) {
     if (Object.keys(r.errors).length) { ed.errors = r.errors; ed.draft = { key: `${key}:${id}`, v: raw }; ed.msg = 'Popraw zaznaczone pola.'; return { focus: '[aria-invalid="true"]' }; }
     const n = edit(game, id, r.value);
     ed.errors = null; ed.draft = null; ed.msg = changed(n);
+    return { save: n > 0 };
+  }
+  if (act === 'ed-save-rivals') {
+    const id = data.id;
+    let n = 0;
+    for (const cid of Object.keys(rivalsOf(game, id))) {
+      const v = Number(val(root, `ed-rv-${cid}`));
+      if (Number.isInteger(v) && v >= 0 && v <= 3) n += editRival(game, id, cid, v);
+    }
+    const nid = val(root, 'ed-rv-new');
+    if (nid && Object.keys(rivalsOf(game, id)).filter((k) => rivalsOf(game, id)[k] > 0).length < RIVALS_MAX) n += editRival(game, id, nid, Number(val(root, 'ed-rv-new-v')) || 2);
+    clearMsg(); ed.msg = changed(n);
     return { save: n > 0 };
   }
   if (act === 'ed-crest-clear') { const n = editClub(game, data.id, { crest: '' }); clearMsg(); ed.msg = 'Usunięto własny herb klubu.'; return { save: n > 0 }; }

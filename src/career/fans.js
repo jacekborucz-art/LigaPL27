@@ -15,7 +15,7 @@
 import { Rng, clamp } from '../core/rng.js';
 import { createMessage } from '../core/inbox.js';
 import { CLUBS_PL, clubById } from '../data/clubs_pl.js';
-import { KIBICE, RIVALRIES } from '../data/kibice.js';
+import { KIBICE, RIVALRIES, rivalOverride, listedRivalsOf } from '../data/kibice.js';
 import { anyClub } from '../season/season.js';
 import { isDecider, tieWinner } from '../season/cup.js';
 import { standings } from '../season/standings.js';
@@ -113,6 +113,8 @@ const ULTRAS_LABELS = ['', 'Brak zorganizowanego młyna', 'Mała grupa', 'Zorgan
 let rivalMap = null;
 /** Intensywność rywalizacji 0-3: lista z kibice.js, inaczej derby lokalne z regionu (1). */
 export function rivalry(a, b) {
+  const ov = rivalOverride(a, b); // edytor: rywale ustawieni przez gracza (także 0 = brak rywalizacji)
+  if (ov !== undefined) return ov;
   if (!rivalMap) {
     rivalMap = new Map();
     for (const [x, y, v] of RIVALRIES) { rivalMap.set(`${x}|${y}`, v); rivalMap.set(`${y}|${x}`, v); }
@@ -632,8 +634,7 @@ export function fansSummary(game, clubId = game.clubId) {
   const P = fanProfile(clubId);
   const club = anyClub(clubId);
   const mood = Math.round(moodOf(game, clubId));
-  const rivals = RIVALRIES.filter(([a, b]) => a === clubId || b === clubId).sort((x, y) => y[2] - x[2])
-    .map(([a, b, v]) => ({ id: a === clubId ? b : a, name: anyClub(a === clubId ? b : a)?.name ?? (a === clubId ? b : a), intensity: v }));
+  const rivals = listedRivalsOf(clubId).map(({ id, v }) => ({ id, name: anyClub(id)?.name ?? id, intensity: v }));
   const sanctions = C.sanctions.filter((s) => s.left > 0).map((s) => ({
     ...s,
     text: s.kind === 'noFans' ? 'Najbliższy mecz domowy bez publiczności'

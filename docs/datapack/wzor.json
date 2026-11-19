@@ -1,6 +1,6 @@
 {
   "type": "ligapl27-datapack",
-  "v": 3,
+  "v": 4,
   "game": "v1.19 Beta",
   "seed": 7,
   "created": "2026-11-19T10:00:00.000Z",
@@ -14,6 +14,7 @@
       "balance": 38000000,
       "transferBudget": 15500000,
       "wageBudget": 1450000,
+      "rivals": { "lech": 2, "widzew": 2, "wisla-krakow": 2, "polonia-warszawa": 2, "jagiellonia": 1 },
       "coach": {
         "name": "Tomasz Nowicki",
         "age": 47,

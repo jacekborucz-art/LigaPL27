@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-223aeeebe3';
+const VERSION = 'v0.3-831d8dcf97';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -197,8 +197,8 @@ const FILES = [
   ['./src/career/careerSystem.js', 'cd7a0226ec'],
   ['./src/career/coachMarket.js', '127756aa97'],
   ['./src/career/coaches.js', '041155fd9c'],
-  ['./src/career/editor.js', '8a1944e776'],
-  ['./src/career/fans.js', '737d9449e9'],
+  ['./src/career/editor.js', '55bf72be1c'],
+  ['./src/career/fans.js', '329e0cfdc9'],
   ['./src/career/fansSystem.js', 'ced36b7dd1'],
   ['./src/career/finance.js', 'f6fb7c16a5'],
   ['./src/career/foreignMarket.js', 'de8611d4a2'],
@@ -249,7 +249,7 @@ const FILES = [
   ['./src/data/finanse_klubow.js', '6d44dc85bb'],
   ['./src/data/formations.js', 'fdc9ab1756'],
   ['./src/data/instructions.js', 'b422ada136'],
-  ['./src/data/kibice.js', '9c3baf12b0'],
+  ['./src/data/kibice.js', 'ed4625d3f7'],
   ['./src/data/kluby_uefa.json', 'e579c6760e'],
   ['./src/data/names.js', '160544f719'],
   ['./src/data/playerInstructions.js', 'c83822cb91'],
@@ -274,7 +274,7 @@ const FILES = [
   ['./src/match/matchday.js', 'dea990a12a'],
   ['./src/match/press.js', 'a0c01d2832'],
   ['./src/match/pressSystem.js', 'f08d4d2743'],
-  ['./src/match/studio.js', '13cae950dc'],
+  ['./src/match/studio.js', '2021deb5e4'],
   ['./src/season/cup.js', '830ec558a6'],
   ['./src/season/dailySystems.js', '565bfaf2cc'],
   ['./src/season/europe.js', 'fb7489f63d'],
@@ -305,7 +305,7 @@ const FILES = [
   ['./src/styles/club.css', '6615e08e49'],
   ['./src/styles/contextmenu.css', '55d14f38c2'],
   ['./src/styles/dashboard.css', 'e950cf99bc'],
-  ['./src/styles/editor.css', '71a1406412'],
+  ['./src/styles/editor.css', '769ecc0bb5'],
   ['./src/styles/fonts.css', '372f3ee1fc'],
   ['./src/styles/history.css', '6e342b15ec'],
   ['./src/styles/klub.css', '62ff25555a'],
@@ -341,7 +341,7 @@ const FILES = [
   ['./src/ui/crest.js', '61a5e64fb5'],
   ['./src/ui/daySpeed.js', '73d29c5b52'],
   ['./src/ui/dom.js', '0ce16300f6'],
-  ['./src/ui/editorView.js', 'c46e86afa2'],
+  ['./src/ui/editorView.js', '1231d161e7'],
   ['./src/ui/europeView.js', '3ee900afcf'],
   ['./src/ui/fixturesView.js', '8ad243c712'],
   ['./src/ui/formChart.js', '12324f252e'],
@@ -351,7 +351,7 @@ const FILES = [
   ['./src/ui/masonry.js', 'abee5a105a'],
   ['./src/ui/matchReportView.js', '1dd8a4917d'],
   ['./src/ui/matchdayView.js', '4826993af0'],
-  ['./src/ui/menuView.js', '62e504301a'],
+  ['./src/ui/menuView.js', 'd3691ed5b3'],
   ['./src/ui/nationalView.js', '92d610d773'],
   ['./src/ui/negotiationView.js', '82b6da6b0d'],
   ['./src/ui/playerCard.js', '9f75750223'],
