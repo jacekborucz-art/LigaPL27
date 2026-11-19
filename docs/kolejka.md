@@ -84,13 +84,17 @@ Atrybuty skauta (zamiast obecnych 3; migracja i nowa wersja datapacku, starsze p
 Plus wiedza o regionach: każdy skaut ma 1-3 regiony z poziomem znajomości (mieszane umiejętności, np. Bałkany;
 Półwysep Iberyjski i Afryka; Ameryka Południowa). Regiony do ustalenia, np. Bałkany, Europa Środkowa, Skandynawia,
 Półwysep Iberyjski, Europa Zachodnia, Europa Wschodnia i Kaukaz, Afryka Zachodnia, Afryka Północna, Ameryka
-Południowa, Ameryka Północna i Środkowa, Azja, Bliski Wschód. Poza swoimi regionami skaut pracuje dużo słabiej.
+Południowa, Ameryka Północna i Środkowa, Azja, Bliski Wschód. Poza swoimi regionami skaut pracuje dużo słabiej,
+chyba że ma bardzo wysoką sieć kontaktów: kontakty częściowo zastępują znajomość regionu (skaut z kontaktami 18
+w obcym regionie radzi sobie wyraźnie lepiej niż skaut z kontaktami 8, ale gorzej niż ekspert od tego regionu) [SZAC].
 
 Zlecenie (gracz określa profil):
-- region (z listy regionów skauta albo dowolny, wtedy słabiej), pozycja, wiek od-do, poziom (np. podstawowy w obecnym
+- region: dowolny, nie tylko ten, w którym skaut jest ekspertem (poza jego regionami dużo mniejsza skuteczność,
+  łagodzona przez sieć kontaktów); pozycja, wiek od-do, poziom (np. podstawowy w obecnym
   klubie, wzmocnienie, perspektywa), maksymalna kwota transferu i pensja, wolny zawodnik albo z kontraktem;
-- czas wyjazdu (np. 2, 4 albo 6 tygodni): dłużej = większa szansa i więcej kandydatów, ale wyższy koszt
-  i skaut nieobecny w klubie (jego zwykła praca w sztabie w tym czasie słabsza);
+- czas wyjazdu (np. 1, 2, 4 albo 6 tygodni): krótszy wyjazd kosztuje mniej, ale szansa znalezienia kandydata jest
+  niska (tydzień: często pusta lista); dłuższy kosztuje więcej, daje większą szansę i więcej kandydatów, a skaut jest
+  dłużej nieobecny w klubie (jego zwykła praca w sztabie w tym czasie słabsza);
 - tylko zagranica: skaut nie szuka w polskich ligach 1-4 (ani niżej).
 
 Wynik wyprawy:
