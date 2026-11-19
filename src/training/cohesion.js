@@ -7,7 +7,7 @@
 
 import { clamp } from '../core/rng.js';
 import { COH, SESSIONS, INTENSITY, CAMP, staffMul } from './config.js';
-import { staffQ } from './staff.js';
+import { staffA } from './staff.js';
 import { aiClubZ } from './state.js';
 import { managerThreat, THREAT } from '../career/threat.js';
 import { scoutEdge, fpKey, rehearsed, SCOUT } from './scouting.js';
@@ -58,14 +58,14 @@ export function teamCohesion(game, clubId = game.clubId, tactics = clubId === ga
 export function applySessionToClub(game, clubId, session, date, nextMatch, campQ = 0) {
   const c = game.training.clubs[clubId];
   const def = SESSIONS[session.type];
-  const tac = staffMul.tac(staffQ(game, clubId, 'asystent'));
+  const tac = staffMul.tac(staffA(game, clubId, 'asystent', 'TAK'));
   const im = INTENSITY[session.int].fam * (1 + CAMP.inCamp.cohesion * campQ); // na obozie zgranie rośnie szybciej
   const form = clubId === game.clubId ? game.tactics?.formation ?? c.form : c.form;
   if (def.fam) c.fam[form] = Math.min(100, famOf(c, form) + def.fam * im * tac);
   if (def.instr) c.instr = Math.min(100, c.instr + def.instr * im * tac);
   if (def.sp) c.sp = Math.min(100, c.sp + def.sp * im * tac);
   if (def.prep && nextMatch && nextMatch.date > date) {
-    const v = staffMul.prep(staffQ(game, clubId, 'analityk'));
+    const v = staffMul.prep(staffA(game, clubId, 'analityk', 'RYW'));
     if (!c.prep || c.prep.date !== nextMatch.date || c.prep.v < v) c.prep = { date: nextMatch.date, opp: nextMatch.opp, v: Math.round(v * 1000) / 1000 };
   }
 }
@@ -170,7 +170,7 @@ export function aiPrepToday(game) {
       if (id === game.clubId || !game.training?.clubs?.[id]) continue;
       // Rozpracowany (albo nieczytelny) schemat rywala: docs/bierna-gra.md, ta sama reguła dla gracza i AI
       const edge = scoutEdge(game, id, opp);
-      const q = staffQ(game, id, 'analityk');
+      const q = staffA(game, id, 'analityk', 'RYW'); // rozpracowanie rywala
       if (q < AI_PREP_MIN_ANALYST) { if (edge) map.set(id, edge); continue; }
       const mul = opp === game.clubId ? 1 + THREAT.prepMul * managerThreat(game) : 1;
       map.set(id, Math.round((staffMul.prep(q) * mul + edge) * 1000) / 1000);

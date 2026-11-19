@@ -6,7 +6,7 @@
 import { addDays } from '../core/gameLoop.js';
 import { SESSIONS, INT_ORDER, ACCENTS, LOAD_LEVELS } from './config.js';
 import { clubMatchDates, daysBetween, weekdayIdx, mondayOf } from './state.js';
-import { staffQ } from './staff.js';
+import { staffA } from './staff.js';
 import { campOn } from './camps.js';
 
 export const ROLE_LABELS = {
@@ -120,8 +120,8 @@ export function autoDay(game, date, ctx = dayContext(game, date), club = null) {
   const clubId = club?.clubId ?? game.clubId;
   const accent = ACCENTS[club?.accent ?? T.settings?.accent] ?? ACCENTS.zrownowazony;
   const loadShift = LOAD_LEVELS[club?.load ?? T.settings?.load]?.shift ?? 0;
-  const asst = staffQ(game, clubId, 'asystent');
-  const analyst = staffQ(game, clubId, 'analityk');
+  const asst = staffA(game, clubId, 'asystent', 'TAK'); // plan tygodnia: analiza taktyczna
+  const analyst = staffA(game, clubId, 'analityk', 'RYW'); // rozpracowanie rywala
   const wd = weekdayIdx(date);
   let sessions = [];
   let kind = 'train';

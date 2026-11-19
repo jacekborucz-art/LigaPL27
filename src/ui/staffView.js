@@ -9,10 +9,10 @@ import { crestHtml } from './crest.js';
 import { formatZl } from '../career/negotiation.js';
 import { clubById } from '../data/clubs_pl.js';
 import { NAT_NAMES } from '../data/names.js';
-import { Rng, clamp } from '../core/rng.js';
+import { clamp } from '../core/rng.js';
 import { daysBetween } from '../training/state.js';
-import { staffLabel } from '../training/staff.js';
-import { STAFF_ATTRS, TREP } from '../career/teamReport.js';
+import { staffLabel, roleAttrKeys } from '../training/staff.js';
+import { ROLE_ATTRS } from '../training/config.js';
 import {
   STAFF_MARKET as K, STAFF_ROLE_ORDER, staffSummary, staffBudget, budgetRoomFor, listFreeStaff, listClubStaff, seenQuality,
   expectedWage, offerHint, clubAppeal, makeOffer, checkOffer, pendingOffers, fireStaff, renewStaff, canRenew, combineQ,
@@ -120,6 +120,13 @@ function subTabs(sub, sum, free, pend, date) {
 }
 
 // ------------------------------------------------------------ Mój sztab
+/** Atrybuty osoby z własnego sztabu (klub zna je dokładnie): nazwa i wartość, podpowiedź z wpływem na grę. */
+function ownAttrs(p) {
+  const keys = roleAttrKeys(p.role);
+  if (!keys.length || !p.a) return '';
+  return `<ul class="st-oattr" aria-label="Atrybuty">${keys.map((k) => `<li data-t="${tone(p.a[k])}" title="${esc(ROLE_ATTRS[p.role][k].text)}"><span>${esc(ROLE_ATTRS[p.role][k].name)}</span><b>${p.a[k]}</b></li>`).join('')}</ul>`;
+}
+
 function personRow(game, p, i, role, ui) {
   const date = game.date;
   const adapting = p.adapt && date < p.adapt.to;
@@ -140,6 +147,7 @@ function personRow(game, p, i, role, ui) {
       <p class="st-who__nm"><b>${esc(p.name)}</b> <span class="st-nat" title="${esc(natName(p.nat))}">${esc(p.nat ?? '')}</span>
         <span class="st-share" data-k="${share.k}"${share.k === 'warn' ? ' title="Pomocnik słabszy niż 7 nie podnosi jakości roli. Warto rozważyć zwolnienie."' : ''}>${esc(share.t)}</span>${p.demoted ? ' <span class="st-share" data-k="warn" title="Stracił rolę lidera i chętniej odejdzie">niezadowolony</span>' : ''}</p>
       <p class="st-meta">${p.age} l., ${esc(kzl(p.wage))} / mies., <span class="st-until"${untilK ? ` data-k="${untilK}"` : ''}>umowa do ${esc(fmtDate(p.until))}</span></p>
+      ${ownAttrs(p)}
       ${adaptHtml}
     </div>
     <div class="st-person__acts">
@@ -350,12 +358,15 @@ function marketView(game, sum, B, ui) {
 }
 
 // ------------------------------------------------------------ Karta osoby i oferta
-/** Atrybuty osoby (asystent: ocena i taktyka, analityk: dane i wideo) z jakości widzianej, stałe dla osoby i klubu. */
+/**
+ * Atrybuty osoby (docs/sztab-atrybuty.md) tak, jak widzi je klub: prawdziwy profil osoby przesunięty o błąd oceny
+ * jakości (seenQuality), więc mocne i słabe strony widać, a dokładność zależy od tego, jak dobrze klub zna osobę.
+ */
 function personAttrs(game, p, v) {
-  const keys = Object.keys(STAFF_ATTRS[p.role] ?? {});
+  const keys = roleAttrKeys(p.role);
   if (!keys.length) return null;
-  const d = clamp(Math.round(new Rng(`sztab-atrybuty:${game.seed}:${game.clubId}:${p.role}:${p.name}`).gauss(0, TREP.attrSd)), -TREP.attrMax, TREP.attrMax);
-  return [[STAFF_ATTRS[p.role][keys[0]], clamp(Math.round(v + d), 1, 20)], [STAFF_ATTRS[p.role][keys[1]], clamp(Math.round(v - d), 1, 20)]];
+  const shift = v - (p.q ?? v);
+  return keys.map((k) => [ROLE_ATTRS[p.role][k].name, clamp(Math.round((p.a?.[k] ?? p.q ?? v) + shift), 1, 20), ROLE_ATTRS[p.role][k].text]);
 }
 
 function offerState(game, p, ui, seen) {
@@ -430,7 +441,7 @@ function personCard(game, pid, sum, B, ui) {
   const attrs = personAttrs(game, p, v);
   const precWord = { exact: 'dokładnie', approx: 'w przybliżeniu', vague: 'ogólnie' }[seen.prec];
   const attrHtml = attrs
-    ? attrs.map(([l, x]) => `<div class="st-attr"><span>${esc(l)}</span><b>${seen.prec === 'exact' ? x : seen.prec === 'approx' ? `${Math.max(1, x - 2)}-${Math.min(20, x + 2)}` : esc(staffLabel(x).toLowerCase())}</b><span class="tr-meter" aria-hidden="true"><i style="width:${pct(x, 20)}%"></i></span></div>`).join('')
+    ? attrs.map(([l, x, tip]) => `<div class="st-attr" title="${esc(tip)}"><span>${esc(l)}</span><b>${seen.prec === 'exact' ? x : seen.prec === 'approx' ? `${Math.max(1, x - 2)}-${Math.min(20, x + 2)}` : esc(staffLabel(x).toLowerCase())}</b><span class="tr-meter" aria-hidden="true"><i style="width:${pct(x, 20)}%"></i></span></div>`).join('')
     : `<div class="st-attr"><span>Mocne strony</span><b>${esc(staffLabel(Math.round(v)).toLowerCase())}</b><span class="tr-meter" aria-hidden="true"><i style="width:${pct(v, 20)}%"></i></span></div>`;
   const hist = (p.hist ?? []).slice(0, 4).map((h) => `${clubName(h.club)} (${h.from ? h.from.slice(0, 4) : '?'}-${h.to ? h.to.slice(0, 4) : '?'})`).join(', ');
   const winter = +date.slice(5, 7) < 7;

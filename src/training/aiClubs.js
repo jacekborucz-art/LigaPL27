@@ -15,7 +15,7 @@ import { applyMorale } from '../career/morale.js';
 import { clubById } from '../data/clubs_pl.js';
 import { squadOf } from '../world/worldGen.js';
 import { SESSIONS, INTENSITY, GK_SESSION, GK_JOIN, LOAD, CAMP, staffMul, AI_PLAN } from './config.js';
-import { staffQ, healDays, physioInjMul } from './staff.js';
+import { staffA, healDays, physioInjMul } from './staff.js';
 import { dayContext, autoDay } from './plan.js';
 import { campWindow, halfOf, halfKey, baseFactor, aiCampChoice } from './camps.js';
 import { aiSessionToClub } from './cohesion.js';
@@ -207,12 +207,12 @@ export function processAiDay(game, date) {
     c.legs = r3((c.legs ?? 0) * LOAD.legsDecay);
     if (day.kind === 'match' || day.kind === 'off') continue;
     const campQ = camp?.q ?? 0;
-    const fitQ = staffQ(game, clubId, 'fizyczny');
+    const fitQ = staffA(game, clubId, 'fizyczny', 'OBC'); const fitReg = staffA(game, clubId, 'fizyczny', 'REG'); // planowanie obciążeń: urazy; regeneracja: świeżość
     // Akcent indywidualny dla młodych tylko w klubach z dobrym trenerem młodzieży (decyzja gracza)
-    const youthFocus = staffQ(game, clubId, 'mlodziez') >= AI_PLAN.focusMinYouthQ;
+    const youthFocus = staffA(game, clubId, 'mlodziez', 'ROZ') >= AI_PLAN.focusMinYouthQ; // rozwój młodych
     // Metodyka treningu trenera (TRE, docs/trener-ai-atrybuty.md): zgranie, ostrość i urazy na zajęciach
     const tre = trainingSkill(game, clubId);
-    const tac = staffMul.tac(staffQ(game, clubId, 'asystent')) * (1 + COACH.train.cohesion * tre);
+    const tac = staffMul.tac(staffA(game, clubId, 'asystent', 'TAK')) * (1 + COACH.train.cohesion * tre);
     // Forma bazowa (obóz): brak przygotowania wolniej buduje ostrość i podnosi ryzyko urazu przez 6 tygodni
     const f = c.cb && c.cb.key === key ? baseFactor(c.cb.start, date) : 0;
     const lack = f ? Math.max(0, 1 - c.cb.base) * f : 0;
@@ -231,7 +231,7 @@ export function processAiDay(game, date) {
     }
     // Skutki dnia dla pełnego uczestnika (z pola, bramkarz) i dla rezerwowych po meczu, którzy zamiast
     // regeneracji mają trening uzupełniający (jak w planie gracza). Na zawodnika zostają tylko mnożniki osobiste.
-    const rec = staffMul.recover(fitQ) + im.rec;
+    const rec = staffMul.recover(fitReg) + im.rec;
     const prof = (list, gk) => profileOf(list, gk, campQ, rec, sharpMul);
     const subsList = ctx.role === 'MD+1' && team.length ? [sessionStim({ type: 'gierki', int: 'mid' }, campQ, !!camp), ...team.slice(1)] : null;
     const P = { out: prof(team, false), gk: prof(team, true), subsOut: subsList && prof(subsList, false), subsGk: subsList && prof(subsList, true) };

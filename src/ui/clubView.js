@@ -11,7 +11,7 @@ import { ownerOf, ownerBlurb, OWNER_TYPES } from '../career/owners.js';
 import { NAT_NAMES } from '../data/names.js';
 import { GROUP } from '../career/squad.js';
 import { shirtNumbers, kitColors } from '../career/shirts.js';
-import { staffOf, staffQ } from '../training/staff.js';
+import { staffOf, staffA } from '../training/staff.js';
 import { STAFF_ROLES } from '../training/config.js';
 import { standings } from '../season/standings.js';
 import { clubFixtures, recordOf, statObj, sumStats, CLUB_GROUPS } from '../season/history.js';
@@ -42,7 +42,7 @@ export function coachCardHtml(game, clubId) {
   }
   const c = coachOf(game, clubId);
   if (!c) return '';
-  const q = staffQ(game, game.clubId, 'analityk');
+  const q = staffA(game, game.clubId, 'analityk', 'RYW'); // rozpracowanie rywala: ocena trenera rywala
   const prec = q >= 14 ? 'exact' : q >= 8 ? 'approx' : 'vague';
   const rows = COACH_KEYS.map((k) => {
     const v = c.a[k];

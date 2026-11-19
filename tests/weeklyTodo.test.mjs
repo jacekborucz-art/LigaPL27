@@ -53,7 +53,8 @@ test('kierownik drużyny: rola sztabu w każdym klubie (1-20), także w starym z
   ensureTraining(old);
   for (const id of Object.keys(old.world.clubs)) {
     assert.deepEqual(old.training.staff[id].kierownik, generateStaffFor(old, id).kierownik, id);
-    assert.deepEqual(old.training.staff[id].kierownik, g.training.staff[id].kierownik, id);
+    const { d: _d, ...synced } = g.training.staff[id].kierownik; // odchylenia atrybutów (d) wracają przy przeliczeniu sztabu
+    assert.deepEqual(old.training.staff[id].kierownik, synced, id);
   }
   const after = JSON.parse(JSON.stringify(old.training.staff));
   for (const st of Object.values(after)) delete st.kierownik;

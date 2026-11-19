@@ -13,7 +13,7 @@ import { Rng, clamp } from '../core/rng.js';
 import { addDays } from '../core/gameLoop.js';
 import { DOMESTIC } from '../config/calendar2026.js';
 import { squadOf } from '../world/worldGen.js';
-import { staffOf, staffQ } from '../training/staff.js';
+import { staffOf, staffQ, staffA } from '../training/staff.js';
 import { daysBetween, mondayOf } from '../training/state.js';
 import { loadSummary } from '../training/load.js';
 import { CAMP, STAFF_ROLES } from '../training/config.js';
@@ -93,10 +93,12 @@ export function todoSkills(game, clubId = game.clubId) {
   const OCE = a.OCE ?? q('asystent'); const TAK = a.TAK ?? q('asystent');
   return {
     kierownik: q('kierownik'), asystent: q('asystent'), OCE, TAK,
+    // Kierownik drużyny według sprawy (docs/sztab-atrybuty.md): okno i kontrakty, licencja, obozy
+    kDOK: staffA(game, clubId, 'kierownik', 'DOK'), kORG: staffA(game, clubId, 'kierownik', 'ORG'), kLOG: staffA(game, clubId, 'kierownik', 'LOG'),
     meeting: 0.5 * TAK + 0.5 * OCE,
     talk: OCE,
     sensitive: 0.7 * OCE + 0.3 * q('asystent'),
-    load: 0.7 * q('fizyczny') + 0.3 * OCE,
+    load: 0.7 * staffA(game, clubId, 'fizyczny', 'OBC') + 0.3 * OCE,
   };
 }
 
@@ -185,7 +187,7 @@ export function collectTodo(game, date = game.date) {
     const o = { key: `okno:${tw.to}`, type: 'window', area: 'transfer', due: tw.to, title: 'Okno transferowe się zamyka',
       why: left === 0 ? 'Dziś ostatni dzień okna. Potem tylko wolni zawodnicy i przedłużenia kontraktów.' : `Okno zamyka się ${fmtDate(tw.to)}, za ${left} ${dniWord(left)}. Potem tylko wolni zawodnicy i przedłużenia kontraktów.`, act: STEPS.transfers('rynek') };
     if (left <= TODO.hardFrom) fact({ ...o, from: kName ? `${kName}, kierownik drużyny` : 'Kierownik drużyny', prio: pPrio(tw.to) });
-    else obs({ ...o, role: 'kierownik', qe: sk.kierownik, sev: false, prio: 'wazne', since: sinceOf(o.key, addDays(tw.to, -TODO.okno)) });
+    else obs({ ...o, role: 'kierownik', qe: sk.kDOK, sev: false, prio: 'wazne', since: sinceOf(o.key, addDays(tw.to, -TODO.okno)) });
   }
 
   // 5. Obóz: rezerwacja przed ostatnim terminem (ostatnie dni: fakt, wcześniej: kierownik drużyny)
@@ -199,7 +201,7 @@ export function collectTodo(game, date = game.date) {
       const o = { key: `oboz:${w.key}`, type: 'camp', area: 'train', due: lastCall, title: `Zarezerwuj: ${name.toLowerCase()}`,
         why: `Obóz musi zmieścić się między ${fmtDate(w.from)} a ${fmtDate(w.to)}. Ostatni dzień na rezerwację najkrótszego obozu: ${fmtDate(lastCall)}.`, act: STEPS.camp() };
       if (left <= TODO.hardFrom) fact({ ...o, from: kName ? `${kName}, kierownik drużyny` : 'Kierownik drużyny', prio: pPrio(lastCall) });
-      else obs({ ...o, role: 'kierownik', qe: sk.kierownik, sev: false, prio: date >= w.open ? 'wazne' : 'rozw', since: sinceOf(o.key, addDays(w.open, -TODO.campEarly)) });
+      else obs({ ...o, role: 'kierownik', qe: sk.kLOG, sev: false, prio: date >= w.open ? 'wazne' : 'rozw', since: sinceOf(o.key, addDays(w.open, -TODO.campEarly)) });
     }
   }
 
@@ -219,14 +221,14 @@ export function collectTodo(game, date = game.date) {
     if (left > TODO.contractDays) continue;
     const key = `kontrakt:${p.id}:${until}`;
     const sev = top.has(p.id) && left <= TODO.renewDays;
-    obs({ key, type: 'contract', role: 'kierownik', qe: sk.kierownik, sev, escalate: true, from: kName ? `${kName}, kierownik drużyny` : 'Kierownik drużyny', area: 'contract', pid: p.id, due: until, prio: sev ? 'wazne' : 'rozw', since: addDays(until, -TODO.contractDays),
+    obs({ key, type: 'contract', role: 'kierownik', qe: sk.kDOK, sev, escalate: true, from: kName ? `${kName}, kierownik drużyny` : 'Kierownik drużyny', area: 'contract', pid: p.id, due: until, prio: sev ? 'wazne' : 'rozw', since: addDays(until, -TODO.contractDays),
       title: `Przedłuż kontrakt: ${p.name}`, act: STEPS.card(p.id), data: { until, top: top.has(p.id) } });
   }
 
   // 7. Licencja: braki w infrastrukturze (kierownik drużyny, bez terminu w grze); bez braków z wnioskiem w toku
   const lic = game.infra ? licenceNeeds(game, clubId).filter((x) => !game.infra.clubs[clubId]?.req?.[x.track]) : [];
   if (lic.length) {
-    obs({ key: `licencja:${lic.map((x) => x.track).join('-')}`, type: 'licence', role: 'kierownik', qe: sk.kierownik, sev: false, area: 'club', due: null, prio: 'rozw', since: sinceOf(`licencja:${lic.map((x) => x.track).join('-')}`),
+    obs({ key: `licencja:${lic.map((x) => x.track).join('-')}`, type: 'licence', role: 'kierownik', qe: sk.kORG, sev: false, area: 'club', due: null, prio: 'rozw', since: sinceOf(`licencja:${lic.map((x) => x.track).join('-')}`),
       title: 'Uzupełnij wymogi licencyjne', act: STEPS.klub('infrastruktura'), data: { lines: lic.map((x) => x.text) } });
   }
 

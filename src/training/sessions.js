@@ -15,7 +15,7 @@ import { SESSIONS, INTENSITY, GK_SESSION, GK_JOIN, LOAD, COH, CAMP, FRIENDLY, st
 import { ageAt, defaultPlayerTraining, daysBetween } from './state.js';
 import { dayContext, planDay, matchSets } from './plan.js';
 import { campWindow, halfOf, baseFactor, baseTerm, HALF_NAMES } from './camps.js';
-import { staffQ, healDays, physioInjMul } from './staff.js';
+import { staffA, healDays, physioInjMul } from './staff.js';
 import { shiftLog, addLoad, loadSummary, fatigueMul, regenMul, trainingInjuryChance } from './load.js';
 import { applySessionToClub, applyClubMatch, syncTacticsChange } from './cohesion.js';
 import { focusAttrs } from './development.js';
@@ -29,11 +29,11 @@ const LEARN_CAP = 90;
 export function sessionPreview(game, type, int, clubId = game.clubId) {
   const def = SESSIONS[type];
   const I = INTENSITY[def.noIntensity ? 'low' : int];
-  const fitQ = staffQ(game, clubId, 'fizyczny');
-  const tac = staffMul.tac(staffQ(game, clubId, 'asystent'));
+  const fitQ = staffA(game, clubId, 'fizyczny', 'OBC'); const fitReg = staffA(game, clubId, 'fizyczny', 'REG'); // planowanie obciążeń: urazy; regeneracja: świeżość
+  const tac = staffMul.tac(staffA(game, clubId, 'asystent', 'TAK'));
   const im = trainingMods(game, clubId); // baza treningowa (career/infrastructure.js)
   return {
-    fresh: def.recover ? r1(staffMul.recover(fitQ) + im.rec) : -r1(I.fat * def.fat),
+    fresh: def.recover ? r1(staffMul.recover(fitReg) + im.rec) : -r1(I.fat * def.fat),
     load: Math.round(I.load * def.load),
     injury: Math.round(LOAD.injBase * I.inj * def.inj * staffMul.inj(fitQ) * im.inj * 10000) / 100, // % na zawodnika
     dev: r1(I.dev * def.dev),
@@ -43,7 +43,7 @@ export function sessionPreview(game, type, int, clubId = game.clubId) {
     fam: def.fam ? r1(def.fam * I.fam * tac) : 0,
     instr: def.instr ? r1(def.instr * I.fam * tac) : 0,
     sp: def.sp ? r1(def.sp * I.fam * tac) : 0,
-    prep: def.prep ? staffMul.prep(staffQ(game, clubId, 'analityk')) : 0,
+    prep: def.prep ? staffMul.prep(staffA(game, clubId, 'analityk', 'RYW')) : 0,
     attrs: def.attrs,
   };
 }
@@ -148,8 +148,8 @@ export function processUserDay(game, date, rng) {
   const camp = !!ctx.camp; // zarezerwowany obóz (bez rezerwacji okres przygotowawczy jest w klubie)
   const campQ = ctx.camp?.q ?? 0;
   const prep = trackPreparation(game, date, sets.official, ctx, day, messages);
-  const fitQ = staffQ(game, clubId, 'fizyczny');
-  const tac = staffMul.tac(staffQ(game, clubId, 'asystent'));
+  const fitQ = staffA(game, clubId, 'fizyczny', 'OBC'); const fitReg = staffA(game, clubId, 'fizyczny', 'REG'); // planowanie obciążeń: urazy; regeneracja: świeżość
+  const tac = staffMul.tac(staffA(game, clubId, 'asystent', 'TAK'));
   const im = trainingMods(game, clubId); // baza treningowa: regeneracja i urazy (career/infrastructure.js)
   const physio = physioInjMul(game, clubId); // fizjoterapeuta: profilaktyka urazów (career/staffMarket.js)
   const squad = squadOf(game.world, clubId);
@@ -227,7 +227,7 @@ export function processUserDay(game, date, rng) {
       const I = INTENSITY[x.int] ?? INTENSITY.mid;
       const gkSwap = p.pos === 'BR' && !GK_JOIN.has(x.type);
       if (def.recover) {
-        fresh += (staffMul.recover(fitQ) + im.rec) * regenMul(p, age);
+        fresh += (staffMul.recover(fitReg) + im.rec) * regenMul(p, age);
         t.legs = Math.max(0, t.legs + def.legs);
       } else {
         fresh -= I.fat * def.fat * fatigueMul(p, age) * modeMul * (1 - CAMP.inCamp.fatigue * campQ) * (gkSwap ? 0.7 : 1);

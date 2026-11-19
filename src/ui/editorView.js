@@ -23,7 +23,8 @@ import { proficiency } from '../engine/positions.js';
 import { COACH_KEYS, COACH_ATTRS, COACH_STYLES } from '../career/coaches.js';
 import { OWNER_KEYS } from '../career/owners.js';
 import { STAFF_ROLE_ORDER } from '../career/staffMarket.js';
-import { STAFF_ROLES } from '../training/config.js';
+import { STAFF_ROLES, ROLE_ATTRS } from '../training/config.js';
+import { roleAttrKeys, qFromAttrs } from '../training/staff.js';
 import { crestHtml } from './crest.js';
 import { esc } from './dom.js';
 
@@ -243,13 +244,16 @@ function peopleForms(game, ed, id) {
     const { v, e } = sec('staff');
     const rows = STAFF_ROLE_ORDER.filter((r) => v[r]?.length).map((role) => v[role].map((p, i) => {
       const k = `ed-st-${role}-${i}`; const er = (f) => e[`${role}.${i}.${f}`];
-      return `<div class="ed-staff"><span class="ed-staff__role">${esc(STAFF_ROLES[role]?.name ?? role)}</span>
+      // Atrybuty roli (docs/sztab-atrybuty.md); jakość to ich średnia, liczona przez grę
+      const keys = roleAttrKeys(role);
+      const q = keys.length && p.a ? qFromAttrs(Object.fromEntries(keys.map((x) => [x, Number(String(p.a[x] ?? '').replace(',', '.')) || p.q || 10]))) : p.q;
+      return `<div class="ed-staff"><span class="ed-staff__role">${esc(STAFF_ROLES[role]?.name ?? role)} <small>jakość ${esc(q ?? '')}</small></span>
         <label class="ed-staff__f ed-staff__name"><span>Imię i nazwisko</span>${textIn(`${k}-name`, p.name, { max: LIMITS.name, err: er('name') })}</label>
         <label class="ed-staff__f"><span>Wiek</span>${numIn(`${k}-age`, p.age, er('age'), PERSON_AGE)}</label>
-        <label class="ed-staff__f"><span>Jakość</span>${numIn(`${k}-q`, p.q, er('q'))}</label></div>`;
+        ${keys.map((x) => `<label class="ed-staff__f" title="${esc(ROLE_ATTRS[role][x].text)}"><span>${esc(ROLE_ATTRS[role][x].name)}</span>${numIn(`${k}-a-${x}`, p.a?.[x] ?? p.q, er(`a.${x}`))}</label>`).join('')}</div>`;
     }).join('')).join('');
     out.push(`<fieldset class="ed-attrs ed-people"><legend>Sztab</legend>${firstErr(e)}${rows}
-      <p class="fld__help">Jakość od 1 do 20: jak dobrze osoba wykonuje swoją pracę w sztabie.</p>
+      <p class="fld__help">Atrybuty od 1 do 20 dopasowane do roli. Jakość osoby to ich średnia: od niej zależą pensja i pozycja w sztabie, a od atrybutów konkretne efekty w grze (najedź na nazwę atrybutu).</p>
       <div class="ed-actions"><button class="btn btn--primary btn--sm" data-act="ed-save-staff" data-id="${esc(id)}">Zapisz sztab</button></div></fieldset>`);
   }
   if (cur.owner) {
@@ -269,7 +273,7 @@ function readPeople(root, key, game, id) {
   if (key === 'owner') return { name: val(root, 'ed-ow-name'), ...Object.fromEntries(OWNER_KEYS.map((k) => [k, val(root, `ed-ow-${k}`)])) };
   const staff = {};
   for (const [role, list] of Object.entries(peopleValues(game, id).staff ?? {})) {
-    staff[role] = list.map((_, i) => ({ name: val(root, `ed-st-${role}-${i}-name`), age: val(root, `ed-st-${role}-${i}-age`), q: val(root, `ed-st-${role}-${i}-q`) }));
+    staff[role] = list.map((_, i) => ({ name: val(root, `ed-st-${role}-${i}-name`), age: val(root, `ed-st-${role}-${i}-age`), a: Object.fromEntries(roleAttrKeys(role).map((x) => [x, val(root, `ed-st-${role}-${i}-a-${x}`)])) }));
   }
   return staff;
 }

@@ -193,10 +193,14 @@ export function headCoachName(game, clubId) {
  * trener: 3,5 + 0,8 prestiżu, stąd 2 + 0,62 q). Bez tego asystent dużego klubu byłby lepszy od trenerów AI
  * i pasywny gracz miałby przewagę. Gracz sam jest trenerem, więc jego decyzje nie mają atrybutów.
  */
-export function assistantProfile(q, tier = 1) {
+export function assistantProfile(src, tier = 1) {
   const A = COACH.assistant;
-  const v = clamp(Math.round(A.base + A.perQ * (q ?? 13.5) + (A.tier[tier] ?? 0)), 1, 20);
-  return { name: 'Asystent', style: 'P', a: { TAK: v, SKL: v, MOT: v, TRE: v, PRE: v }, assistant: true };
+  // src: jakość (liczba) albo asystent z widoku sztabu { q, d: { TAK, OCE, MOT } } (docs/sztab-atrybuty.md, d: odchylenie
+  // atrybutu od jakości): taktyka z analizy taktycznej, dobór składu z oceny zawodników, motywacja z pracy z zawodnikami
+  const q = typeof src === 'number' ? src : src?.q ?? 13.5;
+  const d = typeof src === 'object' && src?.d ? src.d : {};
+  const v = (k) => clamp(Math.round(A.base + A.perQ * (q + (k ? d[k] ?? 0 : 0)) + (A.tier[tier] ?? 0)), 1, 20);
+  return { name: 'Asystent', style: 'P', a: { TAK: v('TAK'), SKL: v('OCE'), MOT: v('MOT'), TRE: v(null), PRE: v(null) }, assistant: true };
 }
 
 /** Waga meczu 0-1 z rangi 0-3. */

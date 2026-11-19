@@ -22,7 +22,7 @@ import { clubById } from '../data/clubs_pl.js';
 import { NATIONALITIES, randomName } from '../data/names.js';
 import { payLevel } from '../data/finanse_klubow.js';
 import { STAFF_ROLES } from '../training/config.js';
-import { generateStaffFor, staffLabel } from '../training/staff.js';
+import { generateStaffFor, staffLabel, roleAttrKeys, ensurePersonAttrs, attrsAround, qFromAttrs } from '../training/staff.js';
 import { ensureTraining, daysBetween } from '../training/state.js';
 import { clubPlan, book } from './finance.js';
 import { clubReputation } from './reputation.js';
@@ -154,6 +154,14 @@ export function personQ(p, date = null) {
   return Math.max(1, p.q - p.adapt.pen * Math.min(1, left / K.adapt.days));
 }
 
+/** Atrybut osoby w danym dniu (adaptacja jak przy jakości). Osoba bez atrybutów: jej jakość. */
+export function personAttr(p, key, date = null) {
+  const v = p.a?.[key] ?? p.q;
+  if (!p.adapt || !date || date >= p.adapt.to) return v;
+  const left = daysBetween(date, p.adapt.to);
+  return Math.max(1, v - p.adapt.pen * Math.min(1, left / K.adapt.days));
+}
+
 /** Jakość efektywna roli z jakości osób (najlepszy prowadzi, pozostali pomagają z malejącą wagą). */
 export function combineQ(qs, role) {
   if (!qs.length) return K.vacantQ[role] ?? 3;
@@ -207,7 +215,8 @@ function makePerson(game, S, key, opts = {}) {
   const nm = randomName(NATIONALITIES.includes(nat) ? nat : 'POL', rng);
   const q = clamp(Math.round((opts.mean ?? 8.5) + (foreign ? K.pool.foreignBonus : 0) + rng.gauss(0, K.pool.sd)), 1, 19);
   const age = opts.age ?? (role === 'asystent' || role === 'analityk' || role === 'skaut' ? rng.int(28, 58) : rng.int(32, 64));
-  return { id: newPersonId(S), name: `${nm.first} ${nm.last}`, nat, age, role, q, wage: 0, until: null, since: null, club: null, free: opts.free ?? game.date ?? null, coach: null, adapt: null, pl: nat === 'POL', lead: false, demoted: null, hist: [] };
+  const id = newPersonId(S);
+  return { id, name: `${nm.first} ${nm.last}`, nat, age, role, q, a: attrsAround(q, role, `${game.seed}:${id}`), wage: 0, until: null, since: null, club: null, free: opts.free ?? game.date ?? null, coach: null, adapt: null, pl: nat === 'POL', lead: false, demoted: null, hist: [] };
 }
 
 /** Poziom kandydata z puli (udział poziomów lig, średnie q). */
@@ -322,6 +331,13 @@ export function syncStaff(game, clubId, date = game.date) {
       if (q > lq) { lead = p; lq = q; }
     }
     const o = { name: lead.name, q: combineQ(qs, role), age: lead.age };
+    // Atrybuty roli: ten sam wzór co jakość (lider i pomocnicy, adaptacja obcokrajowca obniża wszystkie atrybuty),
+    // zapisane jako odchylenie od jakości roli (d), więc atrybut = q + d (training/staff.js staffA)
+    const keys = roleAttrKeys(role);
+    if (keys.length) {
+      o.d = {};
+      for (const k of keys) { const x = r1(combineQ(list.map((p) => personAttr(p, k, date)), role) - o.q); if (x) o.d[k] = x; }
+    }
     if (list.length > 1) o.n = list.length;
     view[role] = o;
   }
@@ -356,6 +372,7 @@ function buildClub(game, S, clubId, date) {
   const add = (role, src, k) => {
     const rng = new Rng(`sztab-start:${game.seed}:${clubId}:${role}:${k}`);
     const p = { id: newPersonId(S), name: src.name, nat: 'POL', age: src.age ?? rng.int(31, 62), role, q: clamp(Math.round(src.q ?? 10), 1, 20), wage: 0, until: startUntil(rng, t, date), since, club: clubId, free: null, coach: null, adapt: null, pl: true, lead: k === 1, demoted: null, hist: [] };
+    ensurePersonAttrs(p, `${game.seed}:${p.id}`); // atrybuty roli wokół jakości (średnia = jakość)
     p.wage = Math.max(K.wage.min, r100(expectedWage(p) * pm));
     S.people[p.id] = p; ids.push(p.id);
     return p;
@@ -403,6 +420,12 @@ export function ensureStaff(game) {
     fresh = true;
   }
   S.block ??= {}; S.adapting ??= []; S.based ??= {}; S.cool ??= {}; S.stats ??= {}; S.poach ??= { ban: {}, tried: {}, userHalf: {} };
+  // Atrybuty osób sztabu (stare zapisy, raz): wokół dotychczasowej jakości, średnia = jakość, więc efekty bez skoku
+  if (!S.attrs) {
+    for (const p of Object.values(S.people)) ensurePersonAttrs(p, `${game.seed}:${p.id}`);
+    S.attrs = 1;
+    if (!fresh) for (const id of Object.keys(S.clubs)) if (game.world.clubs[id]) syncStaff(game, id, date);
+  }
   // Kluby rozwiązane (spadek do IV ligi): sztab do puli
   for (const id of Object.keys(S.clubs)) if (!game.world.clubs[id]) dissolveClub(game, S, id, date);
   // Nowe kluby (stary zapis, awans z IV ligi): sztab z widoku i ziarna
@@ -1222,8 +1245,16 @@ export function staffNewSeason(game, date) {
   for (const p of Object.values(S.people)) {
     p.age = (p.age ?? 45) + 1;
     const rng = new Rng(`sztab-rozwoj:${game.seed}:${p.id}:${y}`);
-    if (p.age <= D.upAge && rng.chance(D.up)) p.q = Math.min(20, p.q + 1);
-    else if (p.age >= D.downAge && rng.chance(D.down)) p.q = Math.max(1, p.q - 1);
+    // Rozwój i spadek: zmiana atrybutów (razem 3 punkty, czyli jakość o 1 jak dotąd): jeden obszar o 2, drugi o 1
+    const step = p.age <= D.upAge && rng.chance(D.up) ? 1 : p.age >= D.downAge && rng.chance(D.down) ? -1 : 0;
+    if (step) {
+      ensurePersonAttrs(p, `${game.seed}:${p.id}`);
+      const keys = roleAttrKeys(p.role).filter((k) => (step > 0 ? p.a[k] < 20 : p.a[k] > 1));
+      const order = keys.map((k) => [k, rng.next()]).sort((x, y) => x[1] - y[1]).map((x) => x[0]);
+      if (order[0]) p.a[order[0]] = clamp(p.a[order[0]] + 2 * step, 1, 20);
+      if (order[1]) p.a[order[1]] = clamp(p.a[order[1]] + step, 1, 20);
+      p.q = order.length ? qFromAttrs(p.a) : clamp(p.q + step, 1, 20);
+    }
     if (p.club && p.until && p.until < date) { st.expired++; toPool(game, p, date, 'koniec umowy'); }
     if (p.age >= P.retire && !p.club) { st.retired++; removePerson(S, p); }
   }

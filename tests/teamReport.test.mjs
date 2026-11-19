@@ -45,15 +45,15 @@ const setAll = (g, q) => { for (const r of Object.keys(g.training.staff[g.clubId
 let shared = null;
 const played = () => { if (!shared) { shared = newGame(); playTo(shared, '2026-09-20'); } return shared; };
 
-test('atrybuty asystenta i analityka: średnia równa jakości, deterministyczne, w skali 1-20', () => {
+test('atrybuty asystenta i analityka: prawdziwe atrybuty roli z widoku sztabu, deterministyczne, w skali 1-20', () => {
   const g = newGame();
   for (const role of Object.keys(STAFF_ATTRS)) {
-    const q = g.training.staff[g.clubId][role].q;
+    const s = g.training.staff[g.clubId][role];
     const a = staffAttrs(g, g.clubId, role);
     const v = Object.values(a);
     assert.equal(v.length, 2);
     for (const x of v) assert.ok(x >= 1 && x <= 20);
-    if (q >= 4 && q <= 17) assert.equal(v[0] + v[1], 2 * q);
+    for (const [k, x] of Object.entries(a)) assert.equal(x, Math.round((s.q + (s.d?.[k] ?? 0)) * 10) / 10, `${role} ${k}`);
     assert.deepEqual(staffAttrs(g, g.clubId, role), a);
   }
   assert.deepEqual(staffAttrs(g, g.clubId, 'fizyczny'), {});

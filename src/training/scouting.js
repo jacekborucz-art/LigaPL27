@@ -8,7 +8,7 @@
 // Wartości [SZAC].
 
 import { clamp } from '../core/rng.js';
-import { staffQ } from './staff.js';
+import { staffA } from './staff.js';
 import { coachOf, coachSkill } from '../career/coaches.js';
 
 /** Wyłącznik do pomiarów balansu (te same ziarna z mechaniką i bez niej). */
@@ -113,7 +113,7 @@ export function familiarityOf(game, clubId) {
  * Klub gracza: sam analityk (decyzje trenera gracza nie mają atrybutów).
  */
 export function analysisQuality(game, clubId) {
-  const q = staffQ(game, clubId, 'analityk');
+  const q = staffA(game, clubId, 'analityk', 'RYW'); // rozpracowanie rywala
   let v = clamp((q - 1.5) / 13.5, 0, 1.2);
   if (clubId !== game?.clubId) {
     const c = coachOf(game, clubId);
@@ -164,7 +164,7 @@ export function scoutingNote(game, oppId, tactics = game.tactics) {
   if (!PASSIVE.enabled) return null;
   const u = userFamiliarity(game, tactics);
   const edge = scoutEdge(game, oppId, game.clubId);
-  const q = staffQ(game, oppId, 'analityk');
+  const q = staffA(game, oppId, 'analityk', 'RYW');
   const staff = q >= 14 ? 'Rywal ma mocny dział analiz' : q >= 8 ? 'Sztab rywala analizuje przeciwników' : 'Rywal ma skromny sztab analityków';
   if (u.base >= SCOUT.warnAt && u.match >= 0.9 && edge > 0.05) {
     return { level: 'known', edge, text: `${staff} i zna nasz schemat (${describeFp(u.pred)}): gramy tak od kilku meczów. Inny plan na ten mecz utrudni im zadanie.` };

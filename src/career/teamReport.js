@@ -19,7 +19,7 @@ import { teamRating } from '../engine/teamStrength.js';
 import { standings } from '../season/standings.js';
 import { compOfClub, compClubIds } from '../season/leagueComps.js';
 import { anyClub, compLabel } from '../season/season.js';
-import { staffOf, staffQ, staffLabel } from '../training/staff.js';
+import { staffOf, staffA, staffLabel } from '../training/staff.js';
 import { daysBetween, ageAt } from '../training/state.js';
 import { loadSummary } from '../training/load.js';
 import { teamCohesion } from '../training/cohesion.js';
@@ -61,23 +61,19 @@ const mecz = (n) => (n === 1 ? 'mecz' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 <
 
 // ------------------------------------------------------------ Atrybuty sztabu
 /**
- * Atrybuty asystenta (OCE, TAK) i analityka (DAN, WID) pochodne z jakości: q + d i q - d, d z ziarna (gra, klub, rola,
- * nazwisko), od -3 do 3. Średnia równa jakości, więc dotychczasowe efekty sztabu bez zmian. Ten sam wzór dla każdego klubu.
+ * Atrybuty asystenta (OCE, TAK) i analityka (DAN, WID) do raportów: prawdziwe atrybuty roli z widoku sztabu
+ * (docs/sztab-atrybuty.md, lider i pomocnicy). Widok bez atrybutów (klub bez stałej kadry): jakość roli.
  */
 export function staffAttrs(game, clubId, role) {
   const keys = Object.keys(STAFF_ATTRS[role] ?? {});
-  if (!keys.length) return {};
-  const s = staffOf(game, clubId)[role] ?? { q: 10 };
-  const q = s.q ?? 10;
-  const d = clamp(Math.round(new Rng(`sztab-atrybuty:${game?.seed}:${clubId}:${role}:${s.name ?? ''}`).gauss(0, TREP.attrSd)), -TREP.attrMax, TREP.attrMax);
-  return { [keys[0]]: clamp(q + d, 1, 20), [keys[1]]: clamp(q - d, 1, 20) };
+  return Object.fromEntries(keys.map((k) => [k, staffA(game, clubId, role, k)]));
 }
 
-/** Jakości używane przez raport: atrybuty asystenta i analityka, jakość pozostałych ról. */
+/** Jakości używane przez raport: atrybuty asystenta i analityka, oceny trenera bramkarzy, fizycznego i młodzieży. */
 export function reportSkills(game, clubId = game.clubId) {
   return {
     ...staffAttrs(game, clubId, 'asystent'), ...staffAttrs(game, clubId, 'analityk'),
-    fiz: staffQ(game, clubId, 'fizyczny'), gk: staffQ(game, clubId, 'bramkarze'), mlo: staffQ(game, clubId, 'mlodziez'),
+    fiz: staffA(game, clubId, 'fizyczny', 'OBC'), gk: staffA(game, clubId, 'bramkarze', 'OCE'), mlo: staffA(game, clubId, 'mlodziez', 'TAL'),
   };
 }
 

@@ -83,7 +83,10 @@
 .ed-free { margin: var(--space-2) 0 var(--space-3); padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-s); }
 .ed-free .ed-list { max-height: 320px; overflow: auto; }
 .ed-people .ed-actions { margin-top: var(--space-3); }
-.ed-staff { display: grid; grid-template-columns: minmax(0, 1fr) 72px 72px; gap: var(--space-1) var(--space-2); align-items: end; padding: var(--space-2) 0; border-bottom: 1px solid var(--line); }
+.ed-staff { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-1) var(--space-2); align-items: end; padding: var(--space-2) 0; border-bottom: 1px solid var(--line); }
+.ed-staff__name { grid-column: span 2; }
+.ed-staff__role small { margin-left: 6px; font: 600 var(--step--1)/1 var(--font-body); color: var(--text-muted); }
+.ed-staff__f span { overflow-wrap: anywhere; }
 .ed-staff__role { grid-column: 1 / -1; font: 700 var(--step--1)/1.2 var(--font-display); }
 .ed-staff__f { display: grid; gap: 2px; min-width: 0; font-size: var(--step--1); }
 .ed-staff__f input { min-width: 0; width: 100%; min-height: 40px; padding: 0 8px; border: 2px solid var(--line); border-radius: var(--radius-s); background: var(--bg); color: var(--text); }

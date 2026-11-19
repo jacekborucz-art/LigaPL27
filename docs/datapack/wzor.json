@@ -1,6 +1,6 @@
 {
   "type": "ligapl27-datapack",
-  "v": 2,
+  "v": 3,
   "game": "v1.19 Beta",
   "seed": 7,
   "created": "2026-11-19T10:00:00.000Z",
@@ -30,34 +30,34 @@
       },
       "staff": {
         "asystent": [
-          { "name": "Piotr Zalewski", "age": 44, "q": 14 },
-          { "name": "Marcin Gajewski", "age": 38, "q": 12 },
-          { "name": "Łukasz Domański", "age": 33, "q": 11 }
+          { "name": "Piotr Zalewski", "age": 44, "a": { "TAK": 16, "OCE": 13, "MOT": 13 } },
+          { "name": "Marcin Gajewski", "age": 38, "a": { "TAK": 12, "OCE": 13, "MOT": 11 } },
+          { "name": "Łukasz Domański", "age": 33, "a": { "TAK": 10, "OCE": 13, "MOT": 10 } }
         ],
         "fizyczny": [
-          { "name": "Rafał Kubiak", "age": 41, "q": 13 },
-          { "name": "Adam Sobczyk", "age": 35, "q": 11 }
+          { "name": "Rafał Kubiak", "age": 41, "a": { "OBC": 14, "REG": 11, "MTR": 14 } },
+          { "name": "Adam Sobczyk", "age": 35, "a": { "OBC": 11, "REG": 11, "MTR": 11 } }
         ],
         "bramkarze": [
-          { "name": "Krzysztof Wrona", "age": 52, "q": 13 }
+          { "name": "Krzysztof Wrona", "age": 52, "a": { "TEC": 15, "NOG": 13, "OCE": 11 } }
         ],
         "mlodziez": [
-          { "name": "Jacek Michalski", "age": 56, "q": 14 }
+          { "name": "Jacek Michalski", "age": 56, "a": { "ROZ": 16, "AKA": 13, "TAL": 13 } }
         ],
         "analityk": [
-          { "name": "Bartosz Lis", "age": 31, "q": 13 },
-          { "name": "Kamil Urban", "age": 29, "q": 11 }
+          { "name": "Bartosz Lis", "age": 31, "a": { "RYW": 13, "DAN": 14, "WID": 12 } },
+          { "name": "Kamil Urban", "age": 29, "a": { "RYW": 10, "DAN": 13, "WID": 10 } }
         ],
         "kierownik": [
-          { "name": "Grzegorz Pawlak", "age": 58, "q": 12 }
+          { "name": "Grzegorz Pawlak", "age": 58, "a": { "DOK": 13, "ORG": 10, "LOG": 13 } }
         ],
         "fizjoterapeuta": [
-          { "name": "Michał Wróbel", "age": 45, "q": 14 },
-          { "name": "Daniel Kaczmarczyk", "age": 36, "q": 12 }
+          { "name": "Michał Wróbel", "age": 45, "a": { "LEC": 14, "REH": 14, "PRF": 14 } },
+          { "name": "Daniel Kaczmarczyk", "age": 36, "a": { "LEC": 14, "REH": 12, "PRF": 10 } }
         ],
         "skaut": [
-          { "name": "Robert Szewczyk", "age": 50, "q": 12 },
-          { "name": "Paweł Jasiński", "age": 39, "q": 11 }
+          { "name": "Robert Szewczyk", "age": 50, "a": { "POT": 14, "OCU": 11, "RYN": 11 } },
+          { "name": "Paweł Jasiński", "age": 39, "a": { "POT": 11, "OCU": 12, "RYN": 10 } }
         ]
       }
     },

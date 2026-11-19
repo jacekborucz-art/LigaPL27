@@ -85,9 +85,12 @@ export function developPlayer(p, ctx) {
   const youth = age <= 21;
   const prog = p.training?.prog;
   if (youth && prog === 'mlodzi') minMul = Math.max(minMul, 0.85);
-  const staffDev = gk ? staffMul.gk(st.bramkarze) : staffMul.dev((st.asystent + st.fizyczny) / 2);
-  const youthMul = youth ? staffMul.youth(st.mlodziez) : 1;
-  const progMul = youth && prog === 'mlodzi' ? 1.1 + 0.01 * st.mlodziez : 1;
+  // Atrybuty sztabu (docs/sztab-atrybuty.md); bez nich (testy, stare wywołania) jakość roli
+  const sa = (k, role) => st[k] ?? st[role] ?? 10;
+  const staffDev = gk ? staffMul.gk(sa('gkDev', 'bramkarze')) : staffMul.dev((st.asystent + sa('fizDev', 'fizyczny')) / 2);
+  const youthQ = p.squad === 'Y' ? sa('aka', 'mlodziez') : sa('roz', 'mlodziez'); // akademia albo młodzi w kadrze
+  const youthMul = youth ? staffMul.youth(youthQ) : 1;
+  const progMul = youth && prog === 'mlodzi' ? 1.1 + 0.01 * sa('roz', 'mlodziez') : 1;
   const infraMul = ctx.infra ? ctx.infra.dev * (youth ? ctx.infra.youth : 1) : 1; // baza treningowa i akademia (career/infrastructure.js)
   const g = DEV.rate(age) * Math.max(0, pot - p.ovr) / 12 * minMul * (0.8 + 0.02 * prf) * staffDev * youthMul * trainMul * progMul * infraMul;
 
@@ -109,7 +112,7 @@ export function developPlayer(p, ctx) {
 
   // Spadek i dojrzewanie
   const declinePrf = 1.2 - 0.02 * prf;
-  const fit = staffMul.decline(st.fizyczny);
+  const fit = staffMul.decline(sa('fizDev', 'fizyczny')); // rozwój motoryki
   let physStim = 0;
   if (stim) for (const a of DEV.physAttrs) physStim += stim[a] ?? 0;
   const physRatio = standard ? 1 : physStim / (DEV.refStim * 0.2);
@@ -124,7 +127,7 @@ export function developPlayer(p, ctx) {
     for (const a of ['REF', 'JNJ', 'WYJ']) delta[a] = (delta[a] ?? 0) - d;
     for (const a of DEV.physAttrs) delta[a] = (delta[a] ?? 0) - phys * 0.5;
   }
-  const mg = DEV.mentalGrowth(age) * staffMul.tac(st.asystent);
+  const mg = DEV.mentalGrowth(age) * staffMul.tac(sa('mental', 'asystent')); // praca z zawodnikami
   if (mg) for (const a of DEV.mentalAttrs) delta[a] = (delta[a] ?? 0) + mg;
 
   // Zastosowanie z losowym zaokrągleniem i limitem POT + 3
@@ -141,7 +144,7 @@ export function developPlayer(p, ctx) {
   }
   // Skok rozwojowy: rzadki, tylko do 21 lat (3 % na sezon, częściej z dobrym trenerem młodzieży)
   let spurt = false;
-  if (youth && rng.next() < (DEV.spurtSeason / 12) * staffMul.spurt(st.mlodziez) && pot < 20) {
+  if (youth && rng.next() < (DEV.spurtSeason / 12) * staffMul.spurt(sa('tal', 'mlodziez')) && pot < 20) { // wyławianie talentów
     p.hidden.POT = Math.min(20, Math.round((pot + DEV.spurtPot) * 10) / 10);
     spurt = true;
   }
@@ -160,7 +163,15 @@ function clubMatchCounts(game) {
   return out;
 }
 
-const qOf = (s) => ({ asystent: s.asystent.q, fizyczny: s.fizyczny.q, bramkarze: s.bramkarze.q, mlodziez: s.mlodziez.q, analityk: s.analityk.q });
+// Jakości ról i atrybuty użyte w rozwoju (docs/sztab-atrybuty.md); widok bez atrybutów: jakość roli
+const qOf = (s) => {
+  const A = (role, k) => (s[role]?.q ?? 10) + (s[role]?.d?.[k] ?? 0); // jakość roli + odchylenie atrybutu
+  return {
+    asystent: s.asystent.q, fizyczny: s.fizyczny.q, bramkarze: s.bramkarze.q, mlodziez: s.mlodziez.q, analityk: s.analityk.q,
+    gkDev: 0.6 * A('bramkarze', 'TEC') + 0.4 * A('bramkarze', 'NOG'), fizDev: A('fizyczny', 'MTR'), mental: A('asystent', 'MOT'),
+    roz: A('mlodziez', 'ROZ'), aka: A('mlodziez', 'AKA'), tal: A('mlodziez', 'TAL'),
+  };
+};
 
 /**
  * Miesięczny krok rozwoju dla wszystkich klubów ze stałą kadrą.

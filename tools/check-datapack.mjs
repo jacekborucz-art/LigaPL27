@@ -12,6 +12,7 @@ import { ensureTraining } from '../src/training/index.js';
 import { ensureCareer } from '../src/career/careerSystem.js';
 import { ensureReferees } from '../src/career/referees.js';
 import { rosterOf } from '../src/career/staffMarket.js';
+import { roleAttrKeys } from '../src/training/staff.js';
 import { CLUBS_PL } from '../src/data/clubs_pl.js';
 import { CLUBS_L3 } from '../src/data/clubs_l3.js';
 import { GAME_START, SEASON } from '../src/config/calendar2026.js';
@@ -59,6 +60,13 @@ for (const [id, o] of Object.entries(d.clubs ?? {})) {
   if (bad.length && typo.clubs++ < 10) warnings.push(`Klub ${id}: nieznane pola: ${bad.join(', ')}.`);
   if (o.coach) unknown(`Klub ${id}, trener`, o.coach, new Set(['name', 'age', 'style', 'a']));
   if (o.owner) unknown(`Klub ${id}, właściciel`, o.owner, new Set(['name', 'cierpliwosc', 'ambicja', 'temperament', 'media', 'zasobnosc']));
+  for (const [role, list] of Object.entries(o.staff ?? {})) {
+    for (const [i, x] of (Array.isArray(list) ? list : []).entries()) {
+      unknown(`Klub ${id}, sztab ${role} ${i + 1}`, x, new Set(['name', 'age', 'q', 'a']));
+      if (d.v >= 3 && !x.a) warnings.push(`Klub ${id}, sztab ${role} ${i + 1}: brak atrybutów (a), gra użyje samej jakości q.`);
+      else if (x.a && roleAttrKeys(role).some((k) => x.a[k] === undefined)) warnings.push(`Klub ${id}, sztab ${role} ${i + 1}: niepełne atrybuty (potrzebne: ${roleAttrKeys(role).join(', ')}).`);
+    }
+  }
 }
 for (const sec of ['players', 'newPlayers']) {
   for (const [id, o] of Object.entries(d[sec] ?? {})) {

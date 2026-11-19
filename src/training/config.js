@@ -143,6 +143,55 @@ export const STAFF_ROLES = {
   skaut: { name: 'Skaut', effect: 'Dokładność oceny potencjału zawodników innych klubów i z zagranicy' },
 };
 
+/**
+ * Atrybuty członków sztabu (1-20, po 3 na rolę; docs/sztab-atrybuty.md). Jakość osoby q = średnia atrybutów
+ * (zaokrąglona), więc pensje, rynek sztabu i decyzje klubów AI liczą się jak dotąd. Efekty w grze czytają konkretny
+ * atrybut roli (staffA w training/staff.js). Przy równych atrybutach gra działa dokładnie jak z samą jakością.
+ * Klucze OCE, TAK (asystent) oraz DAN, WID (analityk) są wspólne z raportem ogólnym (career/teamReport.js).
+ */
+export const ROLE_ATTRS = {
+  asystent: {
+    TAK: { name: 'Analiza taktyczna', text: 'Zgranie drużyny i nauka pozycji na treningu, plan tygodnia, taktyka asystenta w meczu' },
+    OCE: { name: 'Ocena zawodników', text: 'Dokładność raportów asystenta (zawodnicy, forma, potencjał), dobór składu przez asystenta w meczu' },
+    MOT: { name: 'Praca z zawodnikami', text: 'Rozmowy prowadzone przez asystenta, motywacja w meczu, rozwój cech mentalnych' },
+  },
+  fizyczny: {
+    OBC: { name: 'Planowanie obciążeń', text: 'Ryzyko urazu na treningu, ocena zmęczenia i przeciążeń w raportach' },
+    REG: { name: 'Regeneracja', text: 'Powrót świeżości po treningu i meczu' },
+    MTR: { name: 'Rozwój motoryki', text: 'Rozwój cech fizycznych, wolniejszy spadek formy fizycznej po 29 latach' },
+  },
+  bramkarze: {
+    TEC: { name: 'Technika bramkarska', text: 'Rozwój bramkarzy (refleks, chwytanie, sam na sam)' },
+    NOG: { name: 'Gra nogami i na przedpolu', text: 'Rozwój bramkarzy w grze nogami i na przedpolu' },
+    OCE: { name: 'Ocena bramkarzy', text: 'Dokładność ocen bramkarzy w raportach (forma, potencjał)' },
+  },
+  mlodziez: {
+    ROZ: { name: 'Rozwój młodych', text: 'Rozwój zawodników do 21 lat w pierwszej drużynie' },
+    AKA: { name: 'Praca z akademią', text: 'Rozwój juniorów w akademii' },
+    TAL: { name: 'Wyławianie talentów', text: 'Szansa skoku rozwojowego, dokładność ocen potencjału młodych' },
+  },
+  analityk: {
+    RYW: { name: 'Rozpracowanie rywala', text: 'Analiza rywala przed meczem (bonus w meczu), znajomość rywali' },
+    DAN: { name: 'Analiza danych', text: 'Dokładność raportów: siła formacji, wyniki i gra, najbliżsi rywale' },
+    WID: { name: 'Analiza wideo', text: 'Dokładność raportów: styl i taktyka, stałe fragmenty' },
+  },
+  kierownik: {
+    DOK: { name: 'Dokumenty i terminy', text: 'Kontrakty, okno transferowe i terminy na liście „Do zrobienia”' },
+    ORG: { name: 'Organizacja klubu', text: 'Licencja i sprawy klubu na liście „Do zrobienia”' },
+    LOG: { name: 'Logistyka', text: 'Obozy i wyjazdy na liście „Do zrobienia”' },
+  },
+  fizjoterapeuta: {
+    LEC: { name: 'Leczenie urazów', text: 'Krótsza przerwa po lekkich i średnich urazach' },
+    REH: { name: 'Rehabilitacja', text: 'Krótsza przerwa po ciężkich urazach (ponad 4 tygodnie)' },
+    PRF: { name: 'Profilaktyka', text: 'Mniejsze ryzyko urazu na treningu' },
+  },
+  skaut: {
+    POT: { name: 'Ocena potencjału', text: 'Dokładność oceny potencjału zawodników innych klubów' },
+    OCU: { name: 'Ocena umiejętności', text: 'Dokładność oceny obecnych umiejętności przy ocenie potencjału' },
+    RYN: { name: 'Znajomość rynków', text: 'Dokładność ocen zawodników z zagranicy' },
+  },
+};
+
 export const staffMul = {
   dev: (q) => 0.85 + 0.015 * q,
   tac: (q) => 0.8 + 0.02 * q,

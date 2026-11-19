@@ -28,6 +28,8 @@ import { GAME_VERSION } from '../config/version.js';
 import { coachOf, COACH_KEYS, COACH_ATTRS, COACH_STYLES } from './coaches.js';
 import { ownerOf, OWNER_KEYS } from './owners.js';
 import { rosterOf, syncStaff, STAFF_ROLE_IDS } from './staffMarket.js';
+import { roleAttrKeys, ensurePersonAttrs, shiftPersonQ, qFromAttrs } from '../training/staff.js';
+import { ROLE_ATTRS } from '../training/config.js';
 import { completeTransfer, editorRelease } from './transfers.js';
 import { computeNorm, REF_ATTRS } from './referees.js';
 import { genPlayer } from '../world/playerGen.js';
@@ -38,11 +40,14 @@ export const PACK_TYPE = 'ligapl27-datapack';
 //   1  v1.18 Beta: kluby (nazwa, skrót, stadion, pojemność, finanse) i zawodnicy (dane, atrybuty, potencjał)
 //   2  v1.19 Beta: herb klubu, trener, sztab i właściciel klubu, pozycje dodatkowe zawodnika (alt);
 //      tylko nowe pola, plik w wersji 1 wczytuje się bez zmian
-export const PACK_V = 2;
+//   3  v1.19 Beta: atrybuty osób sztabu (staff: { rola: [{ name, age, q, a: { atrybut: 1-20 } }] }, docs/sztab-atrybuty.md);
+//      plik bez atrybutów (v1, v2): jakość q przesuwa cały profil osoby, jak dotąd
+export const PACK_V = 3;
 export const PACK_V_MIN = 1;
 /** Migracje starszych plików do bieżącej wersji: MIGRATE[v] zamienia plik z wersji v na v + 1. */
 const MIGRATE = {
   1: (d) => d, // wersja 2 tylko dodaje pola
+  2: (d) => d, // wersja 3 tylko dodaje atrybuty sztabu (bez nich działa sama jakość)
 };
 export const LIMITS = {
   name: 40, short: 5, stadium: 60,
@@ -365,6 +370,16 @@ export function checkStaff(src, { form = false } = {}) {
       if (o.name !== undefined) put('name', personName(o.name));
       if (o.age !== undefined) put('age', personAge(o.age, form));
       if (o.q !== undefined) put('q', num(o.q, { label: 'Jakość', min: 1, max: 20, form }));
+      // Atrybuty roli (datapack v3, docs/sztab-atrybuty.md): każdy 1-20, tylko klucze tej roli
+      if (o.a !== undefined) {
+        if (!isObj(o.a)) errors[`${role}.${i}.a`] = 'Atrybuty sztabu: oczekiwano listy wartości.';
+        else {
+          const keys = roleAttrKeys(role);
+          const bad = Object.keys(o.a).find((k) => !keys.includes(k));
+          if (bad) errors[`${role}.${i}.a`] = `Atrybuty sztabu: nieznany atrybut ${String(bad).slice(0, 6)} w roli ${role}.`;
+          else v.a = attrs1to20(o.a, keys, Object.fromEntries(keys.map((k) => [k, ROLE_ATTRS[role][k].name])), form, errors, `${role}.${i}.a.`);
+        }
+      }
       return v;
     });
   }
@@ -377,7 +392,7 @@ export function peopleValues(game, id) {
   const co = id === game.clubId ? null : coachOf(game, id);
   const ow = ownerOf(game, id);
   let staff = null;
-  for (const p of rosterOf(game, id)) ((staff ??= {})[p.role] ??= []).push({ name: p.name, age: p.age, q: p.q });
+  for (const p of rosterOf(game, id)) ((staff ??= {})[p.role] ??= []).push({ name: p.name, age: p.age, q: p.q, ...(p.a ? { a: { ...p.a } } : {}) });
   return {
     coach: co ? { name: co.name, age: co.age, style: co.style, a: { ...co.a } } : null,
     owner: ow ? { name: ow.name, ...Object.fromEntries(OWNER_KEYS.map((k) => [k, ow[k]])) } : null,
@@ -427,7 +442,14 @@ export function editStaff(game, id, v) {
     list.forEach((o, i) => {
       const p = ppl[i];
       if (!p) return;
-      for (const k of ['name', 'age', 'q']) if (o[k] !== undefined && o[k] !== p[k]) { p[k] = o[k]; n++; }
+      for (const k of ['name', 'age']) if (o[k] !== undefined && o[k] !== p[k]) { p[k] = o[k]; n++; }
+      ensurePersonAttrs(p, `${game.seed}:${p.id}`);
+      // Atrybuty (datapack v3, formularz) mają pierwszeństwo; sama jakość (datapack v1-v2) przesuwa cały profil osoby
+      const keys = roleAttrKeys(p.role);
+      if (o.a && keys.some((k) => o.a[k] !== undefined)) {
+        for (const k of keys) if (o.a[k] !== undefined && o.a[k] !== p.a[k]) { p.a[k] = o.a[k]; n++; }
+        p.q = qFromAttrs(p.a);
+      } else if (o.q !== undefined && o.q !== p.q) { shiftPersonQ(p, o.q); n++; }
     });
   }
   if (n) { syncStaff(game, id); recordPeople(game, id, 'staff'); }

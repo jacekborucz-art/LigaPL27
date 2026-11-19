@@ -13,7 +13,7 @@ import { squadOf } from '../world/worldGen.js';
 import { fmtDate } from '../ui/dom.js';
 import { LOAD } from './config.js';
 import { ensureTraining, attachTraining, activeGame, weekdayIdx, daysBetween } from './state.js';
-import { staffQ, reportPrecision } from './staff.js';
+import { staffA, reportPrecision } from './staff.js';
 import { pruneOverrides } from './plan.js';
 import { aiCampBase, halfOf, halfKey, baseFactor, baseTerm } from './camps.js';
 import { addDays } from '../core/gameLoop.js';
@@ -91,7 +91,7 @@ export function weeklyStep(game, date) {
 }
 
 function reportBody(report, game) {
-  const q = staffQ(game, game.clubId, 'asystent');
+  const q = staffA(game, game.clubId, 'asystent', 'OCE'); // raport rozwoju: ocena zawodników
   const prec = reportPrecision(q);
   const fmt = (r) => {
     if (prec === 'vague') return `${r.name}`;
@@ -177,7 +177,7 @@ export { weekPlan, planDay, autoDay, dayContext, heavyBeforeMatch, setSession, r
 export { developPlayer, monthlyDevelopment, focusAttrs } from './development.js';
 export { processAiDay, aiPlanFor, aiFocusAttr, aiStimFor, aiCampFor } from './aiClubs.js';
 export { loadSummary, acwrLabel, trainingInjuryChance } from './load.js';
-export { staffOf, staffQ, staffLabel } from './staff.js';
+export { staffOf, staffQ, staffA, staffLabel } from './staff.js';
 export { sessionPreview, processUserDay } from './sessions.js';
 export { campWindow, campCost, campPreview, campStarts, bookCamp, cancelCamp, bookingFor, campOn, estimateBase, aiCampChoice, aiCampBase, halfOf, halfKey, HALF_NAMES, officialDates } from './camps.js';
 export { friendlyPeriod, friendlyDates, friendlyOpponents, createFriendly, cancelFriendly, clubFriendlies, levelText } from './friendlies.js';

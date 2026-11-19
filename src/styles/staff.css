@@ -273,3 +273,9 @@
   .st-ask { animation: st-rise 150ms ease-out; }
   @keyframes st-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 }
+/* Atrybuty osoby we własnym sztabie (docs/sztab-atrybuty.md) */
+.st-oattr { display: flex; flex-wrap: wrap; gap: 4px 6px; margin: 4px 0 0; padding: 0; list-style: none; }
+.st-oattr li { --c: var(--text-muted); display: inline-flex; align-items: baseline; gap: 5px; padding: 1px 8px; border-radius: 999px; font-size: var(--step--1); line-height: 1.5;
+  background: color-mix(in srgb, var(--c) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--c) 30%, var(--line)); }
+.st-oattr li[data-t="good"] { --c: var(--accent); } .st-oattr li[data-t="warn"] { --c: #F08A24; }
+.st-oattr b { font: 700 var(--step-0)/1 var(--font-display); font-variant-numeric: tabular-nums; color: var(--text); }

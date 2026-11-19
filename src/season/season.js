@@ -27,7 +27,7 @@ import { fmtDate } from '../ui/dom.js';
 import { UEFA_CLUBS, createUefa } from './uefa.js';
 import { aiChooseSpeech, postMatchBriefing, closeMatchMemory, POST_TONES } from '../match/briefings.js';
 import { coachOf, coachStyle, matchCoach, quickCoachTerm, formRng, assistantProfile, motivationSkill, COACH } from '../career/coaches.js';
-import { staffQ, healDays } from '../training/staff.js';
+import { staffOf, healDays } from '../training/staff.js';
 import { statGroup, addPlayerMatch, syncSpell, recordTeamMatch, CLUB_GROUPS } from './history.js';
 import { matchRepEvents } from '../career/reputation.js';
 import { refStrictFor, refereeAfterMatch } from '../career/referees.js';
@@ -216,7 +216,7 @@ export function quickRank(game, f, cache = new Map()) {
  * ze sztabu), dyspozycja dnia z ziarna meczu, waga meczu. Wynik w punktach atrybutu dla stref drużyny.
  */
 function quickCoach(game, f, clubId, rank) {
-  const prof = clubId === game.clubId ? assistantProfile(staffQ(game, clubId, 'asystent'), clubById(clubId)?.tier) : coachOf(game, clubId, anyClub(clubId));
+  const prof = clubId === game.clubId ? assistantProfile(staffOf(game, clubId).asystent, clubById(clubId)?.tier) : coachOf(game, clubId, anyClub(clubId));
   return quickCoachTerm(matchCoach(prof, { rank, rng: formRng(game, f.id, clubId) }));
 }
 

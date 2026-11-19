@@ -13,11 +13,11 @@ import {
   ensureTraining, attachTraining, weekPlan, setSession, removeSession, setRestDay, resetDay, resetWeek,
   teamCohesion, sessionPreview, loadSummary, acwrLabel, staffOf, staffLabel, PHASES, ROLE_LABELS, dayContext,
 } from '../training/index.js';
-import { SESSIONS, INTENSITY, INT_ORDER, ACCENTS, LOAD_LEVELS, STAFF_ROLES, PROGRAMS, MODES, staffMul, COH } from '../training/config.js';
+import { SESSIONS, INTENSITY, INT_ORDER, ACCENTS, LOAD_LEVELS, STAFF_ROLES, PROGRAMS, MODES, staffMul, COH, ROLE_ATTRS } from '../training/config.js';
 import { mondayOf, ageAt } from '../training/state.js';
 import { squadOf, academyOf } from '../world/worldGen.js';
 import { academyCapOf } from '../career/infrastructure.js'; // miejsca w akademii według poziomu
-import { reportPrecision } from '../training/staff.js';
+import { reportPrecision, staffA } from '../training/staff.js';
 import { formatZl } from '../career/negotiation.js';
 import { clubById, CLUBS_PL } from '../data/clubs_pl.js';
 import { CAMP, FRIENDLY } from '../training/config.js';
@@ -34,7 +34,6 @@ import { focusAttrs } from '../training/development.js';
 import { daysBetween } from '../training/state.js';
 import { REPORT_FREQS, ensureAssistantReport, setReportFreq, nextReportDate } from '../career/assistantReport.js';
 import { detectChance, shiftChance, delaySd } from '../career/weeklyTodo.js'; // kierownik drużyny: dokładność listy „Do zrobienia”
-import { staffAttrs, STAFF_ATTRS } from '../career/teamReport.js'; // atrybuty asystenta i analityka (raport ogólny)
 import { renderStaff } from './staffView.js'; // Sztab: Mój sztab, Rynek sztabu, Oferty w toku (docs/sztab.md)
 
 const WD = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
@@ -565,18 +564,22 @@ function loadTab(game) {
 
 // ------------------------------------------------------------ Sztab
 function staffTab(game, ui = {}) {
+  // Wpływ roli liczony z atrybutów sztabu (docs/sztab-atrybuty.md): każdy efekt z właściwego atrybutu
+  const A = (k, key) => staffA(game, game.clubId, k, key);
+  const PREC = { exact: 'dokładny', approx: 'przybliżony', vague: 'ogólny' };
   const eff = {
-    asystent: (q) => `zgranie i nauka pozycji x${num(staffMul.tac(q), 2)}, rozwój x${num(staffMul.dev(q), 2)}, raport rozwoju: ${({ exact: 'dokładny', approx: 'przybliżony', vague: 'ogólny' })[reportPrecision(q)]}`,
-    fizyczny: (q) => `ryzyko urazu na treningu x${num(staffMul.inj(q), 2)}, regeneracja +${num(staffMul.recover(q))} świeżości, spadek po 29 latach x${num(staffMul.decline(q), 2)}`,
-    bramkarze: (q) => `rozwój bramkarzy x${num(staffMul.gk(q), 2)}`,
-    mlodziez: (q) => `rozwój do 21 lat x${num(staffMul.youth(q), 2)}, skok rozwojowy x${num(staffMul.spurt(q), 2)}`,
-    analityk: (q) => `analiza rywala +${num(staffMul.prep(q), 3)} pkt na mecz`,
-    kierownik: (q) => `lista „Do zrobienia”: zauważa ok. ${Math.round(detectChance(q) * 100)} % spraw organizacyjnych w tygodniu, myli pilność w ${Math.round(shiftChance(q) * 100)} %, ${delaySd(q) * 0.8 < 0.5 ? 'przypomina na czas' : `przypomina średnio ${num(delaySd(q) * 0.8, 1)} dnia później`}`,
-    fizjoterapeuta: (q) => `przerwa po urazie x${num(staffMul.heal(q), 2)}, ryzyko urazu na treningu x${num(staffMul.physio(q), 2)}`,
-    skaut: (q) => `ocena potencjału zawodników innych klubów: ${({ exact: 'dokładna', approx: 'przybliżona', vague: 'ogólna' })[reportPrecision(q)]}`,
+    asystent: () => `zgranie i nauka pozycji x${num(staffMul.tac(A('asystent', 'TAK')), 2)} (analiza taktyczna), raporty: ${PREC[reportPrecision(A('asystent', 'OCE'))]} (ocena zawodników), rozwój cech mentalnych x${num(staffMul.tac(A('asystent', 'MOT')), 2)} (praca z zawodnikami)`,
+    fizyczny: () => `ryzyko urazu na treningu x${num(staffMul.inj(A('fizyczny', 'OBC')), 2)} (obciążenia), regeneracja +${num(staffMul.recover(A('fizyczny', 'REG')))} świeżości, spadek po 29 latach x${num(staffMul.decline(A('fizyczny', 'MTR')), 2)} (motoryka)`,
+    bramkarze: () => `rozwój bramkarzy x${num(staffMul.gk(0.6 * A('bramkarze', 'TEC') + 0.4 * A('bramkarze', 'NOG')), 2)} (technika i gra nogami), oceny bramkarzy: ${PREC[reportPrecision(A('bramkarze', 'OCE'))]}`,
+    mlodziez: () => `rozwój do 21 lat x${num(staffMul.youth(A('mlodziez', 'ROZ')), 2)}, akademia x${num(staffMul.youth(A('mlodziez', 'AKA')), 2)}, skok rozwojowy x${num(staffMul.spurt(A('mlodziez', 'TAL')), 2)} (wyławianie talentów)`,
+    analityk: () => `analiza rywala +${num(staffMul.prep(A('analityk', 'RYW')), 3)} pkt na mecz (rozpracowanie rywala), raporty: dane ${PREC[reportPrecision(A('analityk', 'DAN'))]}, wideo ${PREC[reportPrecision(A('analityk', 'WID'))]}`,
+    kierownik: () => { const q = A('kierownik', 'DOK'); return `lista „Do zrobienia”: kontrakty i okno zauważa w ok. ${Math.round(detectChance(q) * 100)} %, licencję w ${Math.round(detectChance(A('kierownik', 'ORG')) * 100)} %, obozy w ${Math.round(detectChance(A('kierownik', 'LOG')) * 100)} %, myli pilność w ${Math.round(shiftChance(q) * 100)} %`; },
+    fizjoterapeuta: () => `przerwa po urazie x${num(staffMul.heal(A('fizjoterapeuta', 'LEC')), 2)}, po ciężkim urazie x${num(staffMul.heal(A('fizjoterapeuta', 'REH')), 2)}, ryzyko urazu na treningu x${num(staffMul.physio(A('fizjoterapeuta', 'PRF')), 2)}`,
+    skaut: () => `ocena potencjału zawodników innych klubów: ${PREC[reportPrecision(A('skaut', 'POT'))].replace(/y$/, 'a')}, z zagranicy także znajomość rynków`,
   };
   const qTxt = (q) => (Number.isInteger(q) ? String(q) : num(q, 1));
-  const attrs = (k) => (STAFF_ATTRS[k] ? `<p class="muted">Raport ogólny: ${Object.entries(staffAttrs(game, game.clubId, k)).map(([a, v]) => `${esc(STAFF_ATTRS[k][a].toLowerCase())} ${esc(qTxt(v))}`).join(', ')}</p>` : '');
+  // Atrybuty roli (lider i pomocnicy razem, jak jakość roli)
+  const attrs = (k) => (ROLE_ATTRS[k] ? `<p class="muted">Atrybuty roli: ${Object.entries(ROLE_ATTRS[k]).map(([a, d]) => `${esc(d.name.toLowerCase())} ${esc(qTxt(A(k, a)))}`).join(', ')}</p>` : '');
   return renderStaff(game, ui, { effect: (k, q) => eff[k]?.(q) ?? STAFF_ROLES[k]?.effect ?? '', attrs, footer: reportSetting(game) });
 }
 

@@ -16,7 +16,7 @@ import { clubById, CLUBS_PL } from '../data/clubs_pl.js';
 import { classKeyOfTier } from '../season/leagueComps.js';
 import { ATTRS, OFF, POS_NAMES, ovrAt } from '../data/attributes.js';
 import { proficiency, POSITIONS } from '../engine/positions.js';
-import { staffOf, staffQ, staffLabel } from '../training/staff.js';
+import { staffOf, staffA, staffLabel } from '../training/staff.js';
 import { daysBetween, mondayOf, ageAt } from '../training/state.js';
 import { loadSummary, acwrLabel, trainingInjuryChance } from '../training/load.js';
 import { staleness } from '../training/variety.js';
@@ -179,12 +179,19 @@ function trueValue(game, p, key) {
   return t[key] ?? (key === 'POT' ? p.ovr : 10);
 }
 
+// Atrybut specjalisty dla oceny (docs/sztab-atrybuty.md): nastroje i zaufanie zna asystent pracujący z zawodnikami,
+// resztę ocenia asystent (ocena zawodników), analityk (dane), trener fizyczny (obciążenia), bramkarzy i młodzieży (oceny)
+const SPEC_ATTR = { asystent: 'OCE', analityk: 'DAN', fizyczny: 'OBC', bramkarze: 'OCE', mlodziez: 'TAL' };
+const MOOD_KEYS = new Set(['morale', 'trust']);
+const asystQ = (game) => staffA(game, game.clubId, 'asystent', 'OCE');
+
 function qualityFor(game, p, key) {
-  const q = staffQ(game, game.clubId, 'asystent');
+  const q = asystQ(game);
   const f = FIELDS[key] ?? { spec: null, mul: 1 };
   let spec = f.spec;
   if (key === 'POT') spec = p.pos === 'BR' ? 'bramkarze' : ageAt(p, game.date) <= 21 ? 'mlodziez' : 'asystent';
-  return { q, qs: spec ? staffQ(game, game.clubId, spec) : q };
+  const attr = spec === 'asystent' && MOOD_KEYS.has(key) ? 'MOT' : SPEC_ATTR[spec];
+  return { q, qs: spec ? staffA(game, game.clubId, spec, attr) : q };
 }
 
 /**
@@ -195,7 +202,7 @@ function qualityFor(game, p, key) {
 export function estimate(game, p, key, { value = null, subject = null } = {}) {
   const f = FIELDS[key] ?? { mul: 1 };
   const month = (game.date ?? '2026-07-01').slice(0, 7);
-  const { q, qs } = p ? qualityFor(game, p, key) : { q: staffQ(game, game.clubId, 'asystent'), qs: staffQ(game, game.clubId, 'asystent') };
+  const { q, qs } = p ? qualityFor(game, p, key) : { q: asystQ(game), qs: MOOD_KEYS.has(key) ? staffA(game, game.clubId, 'asystent', 'MOT') : asystQ(game) };
   const age = p ? ageAt(p, game.date) : 25;
   const fam = p ? familiarity(p, `${month}-01`) : 1;
   const mul = (f.mul ?? 1) * (key === 'POT' && age <= 21 ? 1.15 : 1);
@@ -256,10 +263,13 @@ export function hiddenLine(game, p, key) {
  * Ten sam model błędu co ocena asystenta; precyzja rośnie z jakością skauta klubu.
  */
 export function scoutLine(game, p) {
-  const q = staffQ(game, game.clubId, 'asystent');
-  const qs = staffQ(game, game.clubId, 'skaut');
+  const q = asystQ(game);
+  // Skaut (docs/sztab-atrybuty.md): ocena potencjału i umiejętności, przy zawodnikach z zagranicy także znajomość rynków
+  const home = !!(p.clubId && game.world?.clubs?.[p.clubId]);
+  const sk = (k) => staffA(game, game.clubId, 'skaut', k);
+  const qs = home ? 0.7 * sk('POT') + 0.3 * sk('OCU') : 0.5 * sk('POT') + 0.2 * sk('OCU') + 0.3 * sk('RYN');
   const qe = AREP.scoutAssist * q + (1 - AREP.scoutAssist) * qs;
-  const fam = p.clubId && game.world?.clubs?.[p.clubId] ? AREP.scoutFam.pl : AREP.scoutFam.abroad;
+  const fam = home ? AREP.scoutFam.pl : AREP.scoutFam.abroad;
   const age = ageAt(p, game.date);
   const sd = estimateSd(qe, fam, { mul: age <= 21 ? 1.15 : 1 });
   const month = (game.date ?? '2026-07-01').slice(0, 7);
@@ -478,7 +488,7 @@ export function playerReport(game, pid) {
   if (!p || p.clubId !== game.clubId) return null;
   const st = ensureAssistantReport(game);
   const staff = staffOf(game, game.clubId).asystent ?? { q: 10, name: 'Asystent' };
-  const q = staff.q ?? 10;
+  const q = clamp((staff.q ?? 10) + (staff.d?.OCE ?? 0), 1, 20); // ocena zawodników (docs/sztab-atrybuty.md)
   const age = ageAt(p, game.date);
   const fam = familiarity(p, `${game.date.slice(0, 7)}-01`);
   const prec = precisionOf(estimateSd(q, fam));
@@ -491,6 +501,8 @@ export function playerReport(game, pid) {
 
   // Cechy ukryte
   const hidden = ['POT', 'KON', 'WAZ', 'ODP', 'PRF', 'TMP', 'ADP'].map((k) => hiddenLine(game, p, k));
+  // Raport ogólny (słaba ocena asystenta): bez liczbowych przedziałów, nawet gdy specjalista ocenia dokładniej
+  if (prec === 'vague') for (const h of hidden) h.range = null;
   const potE = hidden[0].e;
   const head = potE.v - p.ovr;
   // Charakter (psycholog): cechy wyraźnie odbiegające od przeciętnej w ocenie asystenta
@@ -548,7 +560,7 @@ export function playerReport(game, pid) {
   // Historia urazów (od początku obserwacji asystenta) i ryzyko
   const injHist = st.inj.filter((x) => x.id === p.id).slice(-5).reverse();
   const odp = hidden.find((h) => h.key === 'ODP');
-  const fitQ = staffQ(game, game.clubId, 'fizyczny');
+  const fitQ = staffA(game, game.clubId, 'fizyczny', 'OBC'); // planowanie obciążeń
   const risk = s.inj ? null : trainingInjuryChance({ ...p, hidden: { ...p.hidden, ODP: odp.e.v } }, {
     sessions: [{ type: 'gierki', int: 'mid' }], age, acwr: s.acwr, fitQ, fresh: s.fresh, mode: p.training?.mode,
     rtp: (p.training?.rtp ?? 0) > 0, returning: s.returned != null && s.returned <= 14,
@@ -641,7 +653,7 @@ function detectChance(q, severe = false) {
 export function squadReport(game, date = game.date, periodId = date) {
   const st = ensureAssistantReport(game);
   const staff = staffOf(game, game.clubId).asystent ?? { q: 10, name: 'Asystent' };
-  const q = staff.q ?? 10;
+  const q = clamp((staff.q ?? 10) + (staff.d?.OCE ?? 0), 1, 20); // ocena zawodników (docs/sztab-atrybuty.md)
   const prec = precisionOf(estimateSd(q, 1));
   const maxN = AREP.items(q);
   const rng = (tag) => new Rng(`asystent-raport:${game.seed}:${game.clubId}:${periodId}:${tag}`);
@@ -727,7 +739,7 @@ export function squadReport(game, date = game.date, periodId = date) {
   sections.push({ title: 'Trening i obciążenia', lines: tr });
 
   // 3. Ryzyko urazów (prognoza z modelu urazów treningowych, odporność w ocenie sztabu)
-  const fitQ = staffQ(game, game.clubId, 'fizyczny');
+  const fitQ = staffA(game, game.clubId, 'fizyczny', 'OBC'); // planowanie obciążeń
   const riskOf = (p) => trainingInjuryChance({ ...p, hidden: { ...p.hidden, ODP: estimate(game, p, 'ODP').v } }, {
     sessions: [{ type: 'gierki', int: 'mid' }], age: ageAt(p, date), acwr: sum(p).acwr, fitQ, fresh: p.fresh ?? 95, mode: p.training?.mode,
     rtp: (p.training?.rtp ?? 0) > 0, returning: !!p.training?.returnedAt && daysBetween(p.training.returnedAt, date) <= 14,

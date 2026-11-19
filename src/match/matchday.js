@@ -28,7 +28,7 @@ import { winnerOf } from '../season/cup.js';
 import { preMatchStudio, postMatchStudio, postMatchMessages, preMatchMessages, odds1X2, matchRank, boardExpectation } from './studio.js';
 import { aiPlanTactics } from './aiPlan.js';
 import { coachOf, coachStyle, matchCoach, formRng, assistantProfile, coachBlurb, COACH } from '../career/coaches.js';
-import { staffQ } from '../training/staff.js';
+import { staffOf } from '../training/staff.js';
 import {
   preMatchBriefing, halftimeBriefing, postMatchBriefing, assistantAdvice, aiBriefing, newSpeechMemory, closeMatchMemory,
   applyBriefing, POST_TONES, briefingContext, toneQuotes,
@@ -301,7 +301,7 @@ export function startMatchday(game, f) {
   }).level;
   const oppCoach = coachOf(game, oppId, anyClub(oppId));
   const oppQ = comp === 'friendly' ? null : matchCoach(oppCoach, { rank: rank0, rng: formRng(game, f.id, oppId) });
-  const myQ = matchCoach(assistantProfile(staffQ(game, game.clubId, 'asystent'), clubById(game.clubId)?.tier), { rank: rank0, rng: formRng(game, f.id, game.clubId) });
+  const myQ = matchCoach(assistantProfile(staffOf(game, game.clubId).asystent, clubById(game.clubId)?.tier), { rank: rank0, rng: formRng(game, f.id, game.clubId) });
   const formation = aiPreMatchFormation(game, f, { userSide, mySquad, oppSquad, comp });
   const { tactics: oppTactics, plan: oppPlan } = aiPlanTactics(oppSquad, { formation, benchSize: matchBench, benchGk, cq: oppQ, rng: new Rng(`ai-plan:${game.seed}:${f.id}`), oppSquad: mySquad });
   const weather = weatherFor(f.date, rng);

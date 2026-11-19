@@ -7,7 +7,7 @@ import {
   talkBlockedText,
 } from '../career/teamTalks.js';
 import { rosterOf } from '../career/staffMarket.js';
-import { staffQ } from '../training/staff.js';
+import { staffOf } from '../training/staff.js';
 import { assistantProfile } from '../career/coaches.js';
 import { clubById } from '../data/clubs_pl.js';
 import { acclimLabel } from '../career/acclimatization.js';
@@ -120,7 +120,7 @@ const TOPIC_HINT = {
 /** Motywowanie asystenta trenera (MOT 1-20) albo null, gdy w sztabie nie ma asystenta. */
 function assistantMot(game) {
   if (game.staff && !rosterOf(game, game.clubId).some((p) => p.role === 'asystent')) return null;
-  return assistantProfile(staffQ(game, game.clubId, 'asystent'), clubById(game.clubId)?.tier).a.MOT;
+  return assistantProfile(staffOf(game, game.clubId).asystent, clubById(game.clubId)?.tier).a.MOT;
 }
 /** Polecani bez rozmowy w tym tygodniu, z tematem najważniejszego powodu. */
 function assistantQueue(game, rec) {
