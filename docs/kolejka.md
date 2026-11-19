@@ -35,6 +35,12 @@ Krok 2, burza mózgów (3 agentów równolegle, Sonnet medium, z raportem z krok
 
 Wynik: jedna lista pomysłów z miejscem podpięcia w logice gry i meczu, oceną pracy i wpływem na balans, do decyzji właściciela. Powiązane: punkt 1 (historia morale).
 
+Nowa rola w sztabie: psycholog sportowy (trener mentalny), dodane Nov 19, 2026. Dziś gra nie ma tej roli; psychikę obsługują po kawałku asystent (praca z zawodnikami), rozmowy, zebrania i osobowość zawodnika.
+- Realia: część klubów Ekstraklasy zatrudnia psychologa na stałe, niższe ligi zwykle dorywczo albo wcale; limit osób w roli według ligi (np. Ekstraklasa 1-2, 1 Liga 1, 2 Liga i III liga 0-1) [SZAC].
+- Propozycja 3 atrybutów (jak inne role, `docs/sztab-atrybuty.md`) [SZAC, do burzy mózgów]: przygotowanie do presji (wielkie mecze, karne, derby), odbudowa pewności siebie (po błędach, serii porażek, długiej kontuzji), praca z grupą (konflikty w szatni, adaptacja obcokrajowców i młodych, wypalenie).
+- Możliwe miejsca podpięcia do sprawdzenia w burzy mózgów: presja w meczu i karne, spadek morale po porażkach i błędach, powrót po ciężkim urazie, aklimatyzacja, rozmowy, raport asystenta o charakterze.
+- Wdrożenie razem z rynkiem sztabu (pensje, pula wolnych, limity), widokiem Sztab, edytorem i datapackiem (nowa rola w sekcji `staff`, nowa wersja pliku z migracją: starsze pliki bez psychologa wczytują się bez zmian).
+
 ## 3. Limit zawodników spoza UE w 1, 2 i 3 lidze (dodane Nov 18, 2026)
 
 Stan dziś: limit wyłączony we wszystkich ligach (`src/config/competitions.js`), pole `p.eu` (27 państw UE, `EU` w `src/data/names.js`) jest liczone, ale nieużywane.
