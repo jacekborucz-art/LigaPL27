@@ -131,9 +131,10 @@ w Skład i taktyka (`src/ui/tacticsView.js`) i w meczu (`src/ui/matchdayView.js`
 
 Do zrobienia [SZAC, ok. 1 dzień]:
 - wspólne otwieranie karty z dowolnego miejsca Transferów (np. `data-pcard="<id>"` na nazwisku, delegacja w `src/app.js`);
-- karta dla zawodnika innego klubu, wolnego i z zagranicy: tylko to, co klub wie (atrybuty i potencjał z dokładnością
-  zależną od skauta i asystenta, bez morale, świeżości i pensji, jak w profilu `foreign`), klub, kontrakt, cena,
-  przycisk „Pełny profil” i skrót do oferty;
+- karta pokazuje to samo co dzisiejszy profil zawodnika innego klubu (`renderPlayerProfile` z `foreign: true`
+  w `src/ui/squadView.js`: atrybuty, pozycje, forma, kontrakt; bez morale, świeżości i pensji, jak w profilu), tylko
+  w okienku zamiast przejścia przez profil drużyny; do tego cena i skrót do oferty, bez nowych ograniczeń wiedzy
+  (uwaga właściciela, Nov 19, 2026: te dane i tak są dostępne przez profil drużyny i zawodnika);
 - nazwiska w Transferach jako przycisk: lista transferowa, wyszukiwarka, wolni zawodnicy, zawodnicy z zagranicy,
   oferty i rozmowy w toku, kontrakty, wypożyczenia; tam, gdzie kliknięcie wiersza już coś robi (np. otwiera ofertę),
   kartę otwiera samo nazwisko;
