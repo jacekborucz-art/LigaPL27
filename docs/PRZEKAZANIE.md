@@ -1,5 +1,19 @@
 # Przekazanie projektu LigaPL27 (Manager Piłkarski)
 
+## 0. Praca wielu profili Claude (od Nov 19, 2026)
+
+- Projekt prowadzą na zmianę różne profile Claude na różnych komputerach. Jedyna wspólna pamięć to repozytorium
+  github.com/jacekborucz-art/LigaPL27 (`main`).
+- Start pracy: `git pull` (albo klon repozytorium), potem kolejno: `CLAUDE.md`, najnowsze wpisy w `docs/dziennik.md`,
+  ten plik, `docs/kolejka.md`.
+- Po każdej skończonej pracy: wpis w `docs/dziennik.md` (zasady i szablon w tym pliku), commit i `git push`.
+  Dziennik wraca w ten sposób do kolejnego profilu.
+- Stan na Nov 19, 2026 (ostatni commit `8564f53`, gra v1.19 Beta): podsumowanie okresu od tego dokumentu (Nov 15)
+  jest w pierwszym wpisie `docs/dziennik.md`. Rozdział 5 poniżej opisuje stan na Nov 15-18; nowsze rzeczy są w dzienniku.
+- Stałe polecenia właściciela z ostatnich sesji: nie zadawaj pytań, wybieraj rozwiązania najbliższe realiom futbolu
+  (te same zasady dla gracza i AI), na koniec daj tylko changelog; odpowiedzi krótkie, bez kodu; nie podnoś wersji gry
+  bez zgody (stoi na v1.19 Beta); nie dotykaj zapisów właściciela; nie commituj folderu `nowe-herby/`.
+
 Stan na Nov 15, 2026, ostatni commit przed tym plikiem: `9b4403e` na `main`.
 Dokument dla nowej sesji Claude, która nie zna historii rozmów. Źródła: repozytorium (docs/, kod, 139 commitów),
 transkrypt bieżącej sesji (od Nov 10, 2026, wiadomość „kontynuuj z etapem 8”) i podsumowania jej wcześniejszych części.

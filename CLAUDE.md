@@ -1,7 +1,10 @@
 # LigaPL27 (Manager Piłkarski): instrukcje dla Claude
 
 Prywatna gra menedżerska PWA (vanilla ES modules, bez budowania), mobile-first, UI po polsku.
-Przed pracą przeczytaj `docs/PRZEKAZANIE.md` (role agentów, decyzje, pułapki) i `docs/PLAN.md` (specyfikacja).
+Przed pracą: `git pull`, potem przeczytaj najnowsze wpisy `docs/dziennik.md` (co zmieniły inne profile Claude),
+`docs/PRZEKAZANIE.md` (rozdział 0: praca wielu profili; role agentów, decyzje, pułapki), `docs/kolejka.md` i `docs/PLAN.md` (specyfikacja).
+Po każdej skończonej pracy dopisz wpis na górze listy w `docs/dziennik.md` (szablon w pliku) i wypchnij go na `main`:
+następny profil Claude zna tylko to, co jest w repozytorium.
 
 ## Tryb pracy
 - Po „wykonaj”, „dodaj”, „zacznij prace”, „tak”, „wdroz”: sam edytuj, testuj, commituj i pushuj na `main`, bez dodatkowego pytania.
