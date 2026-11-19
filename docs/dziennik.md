@@ -85,4 +85,5 @@ Zostało (kolejka `docs/kolejka.md`, tylko na prośbę właściciela):
 2. Rozbudowa psychiki zawodnika, z nową rolą psychologa sportowego w sztabie.
 3. Limit zawodników spoza UE w 1, 2 i 3 Lidze.
 4. Skauci i skauting zagraniczny (wyprawy, 0-7 kandydatów, regiony).
+5. Karta zawodnika w okienku po kliknięciu nazwiska, tylko w Transferach i na liście transferowej.
 - Drobne: obsada sędziów i raport pomeczowy wykrywają derby tylko po regionie (nie widzą rywali z edytora).
