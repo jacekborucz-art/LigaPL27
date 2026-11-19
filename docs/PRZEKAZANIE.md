@@ -12,7 +12,7 @@
   jest w pierwszym wpisie `docs/dziennik.md`. Rozdział 5 poniżej opisuje stan na Nov 15-18; nowsze rzeczy są w dzienniku.
 - Stałe polecenia właściciela z ostatnich sesji: nie zadawaj pytań, wybieraj rozwiązania najbliższe realiom futbolu
   (te same zasady dla gracza i AI), na koniec daj tylko changelog; odpowiedzi krótkie, bez kodu; nie podnoś wersji gry
-  bez zgody (stoi na v1.19 Beta); nie dotykaj zapisów właściciela; nie commituj folderu `nowe-herby/`.
+  bez zgody (stoi na v1.19 Beta); nie dotykaj zapisów właściciela. Folder `nowe-herby/` (źródłowe PNG nowych herbów) jest w repozytorium (decyzja właściciela, Nov 19, 2026); gra używa przetworzonych plików z `assets/crests/f`.
 
 Stan na Nov 15, 2026, ostatni commit przed tym plikiem: `9b4403e` na `main`.
 Dokument dla nowej sesji Claude, która nie zna historii rozmów. Źródła: repozytorium (docs/, kod, 139 commitów),
