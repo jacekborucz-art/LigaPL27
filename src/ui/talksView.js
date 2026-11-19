@@ -51,7 +51,7 @@ function followUp(x) {
 const TONE_HUE = { praise: 'good', demand: 'push', calm: 'calm', unity: 'unity', criticize: 'risk' };
 const REASON_KIND = {
   'Niskie morale': 'bad', 'Jest niezadowolony': 'bad', 'Wrażliwy, długo bez rozmowy': 'bad', 'Długo bez rozmowy': 'bad', 'Nowy w klubie, czeka na rozmowę': 'bad',
-  'Kontrakt kończy się w ciągu roku': 'warn', 'Dużo kartek': 'warn', 'Słaba forma': 'warn', 'Morale szybko spada': 'warn',
+  'Kontrakt kończy się w ciągu roku': 'warn', 'Dużo kartek': 'warn', 'Słaba forma': 'warn', 'Morale szybko spada': 'warn', 'Chce zostać po wypożyczeniu': 'warn',
   'Mało gra': 'info', 'Ambitny, mało gra': 'info', 'Bardzo dobra forma': 'good',
 };
 const reasonKind = (r) => REASON_KIND[r] ?? 'info';
@@ -89,7 +89,7 @@ function talkDialog(game, ui, reasonsOf) {
   let foot = '';
   if (D.step === 'topic') {
     body += `<h3 class="ttd-h">O czym chcesz porozmawiać?</h3><div class="ttd-topics">${Object.entries(PLAYER_TALKS).map(([k, t]) => `<button class="ttd-topic${k === suggested ? ' is-sugg' : ''}" data-act="tt-topic" data-id="${esc(p.id)}" data-k="${k}">
-      <b>${esc(t.label)}</b><small>${esc(TOPIC_HINT[k] ?? '')}</small>${k === suggested && rs.length ? `<span class="ttd-sugg">Asystent poleca: ${esc(rs[0][1].toLowerCase())}</span>` : ''}</button>`).join('')}</div>`;
+      <b>${esc(t.label)}</b><small>${esc(k === 'future' && p.loan && p.loan.from !== game.clubId ? 'Pozostanie po wypożyczeniu' : TOPIC_HINT[k] ?? '')}</small>${k === suggested && rs.length ? `<span class="ttd-sugg">Asystent poleca: ${esc(rs[0][1].toLowerCase())}</span>` : ''}</button>`).join('')}</div>`;
   } else if (D.step === 'say') {
     body += `<p class="ttd-topic-chosen">Temat: <b>${esc(PLAYER_TALKS[D.kind].label)}</b></p><h3 class="ttd-h">Jak to powiesz?</h3>
       <div class="ttd-says">${coachOptions(game, p, D.kind).map((o) => `<button class="ttd-say" data-act="tt-say" data-id="${esc(p.id)}" data-k="${esc(D.kind)}" data-ap="${o.approach}"><span class="ttd-say__k">${esc(o.label)}</span><span class="ttd-say__line">${esc(o.line)}</span><small>${esc(o.hint)}</small></button>`).join('')}</div>`;

@@ -591,7 +591,9 @@ export function playerReport(game, pid) {
     p.unhappy || p.transferRequest ? { k: 'Nastroje', v: p.transferRequest ? 'chce odejść z klubu' : 'jest niezadowolony', tone: 'bad' } : null,
     need.need ? { k: 'Uwaga trenera', v: `${{ sensitive: 'wrażliwy, potrzebuje rozmów', new: 'nowy w klubie, potrzebuje rozmowy o roli', bench: 'ambitny rezerwowy, czeka na sygnał' }[need.why] ?? 'potrzebuje rozmowy'}; ${sinceTalk == null ? 'jeszcze bez rozmowy indywidualnej' : `ostatnia rozmowa ${sinceTalk} ${dniWord(sinceTalk)} temu`}`, tone: sinceTalk == null || sinceTalk >= ATTN.grace ? 'warn' : 'info' } : null,
     p.acclim ? { k: 'Aklimatyzacja', v: `${acclimLabel(p.acclim.level)} (${Math.round(p.acclim.level)} %)` } : null,
-    { k: 'Kontrakt', v: p.contract?.until ? `do ${fmtDate(p.contract.until)}${months != null && months <= 12 ? ' (kończy się w ciągu roku)' : ''}${p.loan ? ', wypożyczony' : ''}` : 'brak danych', tone: months != null && months <= 6 ? 'warn' : 'info' },
+    p.loan && p.loan.from !== game.clubId // wypożyczony do nas: kontrakt w klubie macierzystym, liczy się koniec wypożyczenia
+      ? { k: 'Wypożyczenie', v: `z ${clubById(p.loan.from)?.name ?? 'innego klubu'} do ${fmtDate(p.loan.until)}${p.loan.stay ? (p.loan.stay.want ? ', chce zostać' : ', planuje powrót') : ''}`, tone: 'info' }
+      : { k: 'Kontrakt', v: p.contract?.until ? `do ${fmtDate(p.contract.until)}${months != null && months <= 12 ? ' (kończy się w ciągu roku)' : ''}${p.loan ? ', wypożyczony' : ''}` : 'brak danych', tone: months != null && months <= 6 ? 'warn' : 'info' },
     { k: 'Agent', v: AGENT_TYPES[p.agent]?.label ?? 'brak danych' },
     { k: 'Nastawienie przy negocjacjach', v: mind ? mind.label.toLowerCase() : 'trudno powiedzieć, czego oczekuje' },
   ].filter(Boolean);

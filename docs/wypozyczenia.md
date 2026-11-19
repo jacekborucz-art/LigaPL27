@@ -86,6 +86,22 @@ Sprawdzane codziennie (`p.loan.until < data`), koniec sezonu w `rollover.js` (pr
 
 `ensureLoans` (wywoływane z `ensureCareer`) uzupełnia dawne rekordy (`type: 'sezon'`, `start`, obietnica, liczniki) i odbudowuje listy klubów macierzystych.
 
+### Wypożyczony do klubu gracza a jego przyszłość (Nov 19, 2026)
+
+- Kontrakt wypożyczonego zawodnika należy do klubu macierzystego, więc zawodnik nie prosi o rozmowę o kontrakcie
+  (bez powodu „Kontrakt kończy się w ciągu roku” w Rozmowach), a przedłużenie jest zablokowane także w logice rozmów.
+  Raport asystenta pokazuje wypożyczenie (z jakiego klubu, do kiedy) zamiast kontraktu.
+- Ok. 6 tygodni przed końcem wypożyczenia (`LOAN.STAY_DAYS` 45, raz, bez obowiązku wykupu i bez wykonanej opcji)
+  agent zawodnika daje znać, co dalej (`loanStayNotice`, `p.loan.stay = { want, date, plan }`). Chęć pozostania:
+  0,12 x (morale - 12) + 1,5 x (udział minut - obietnica) + 0,12 x (prestiż naszego klubu - macierzystego)
+  + wiek (30+ +0,2, do 21 -0,1) + los (sd 0,6) > 0 [SZAC].
+  - Chce zostać: pyta o wykup (opcja wykupu: kwota i termin decyzji; bez opcji: oferta transferowa do klubu
+    macierzystego w oknie), a gdy kontrakt kończy się razem z wypożyczeniem: może potem podpisać umowę jako wolny.
+    W Rozmowach powód „Chce zostać po wypożyczeniu” (raz), temat „Rozmowa o przyszłości” z kwestiami o pozostaniu.
+  - Nie chce: wraca do klubu macierzystego i rozmawia o nowym kontrakcie, chce stamtąd odejść albo walczyć o skład;
+    przy kończącym się kontrakcie szuka nowego klubu.
+- Tylko informacja i powód rozmowy: zasady wykupu i transferu bez zmian, kluby AI bez zmian.
+
 ## 3. Sprawdzenie wielu sezonów
 
 Skrypt symulacji (3 sezony, gracz w tle, decyzje odrzucane), Nov 13, 2026:

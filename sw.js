@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-831d8dcf97';
+const VERSION = 'v0.3-725c170d0f';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -189,7 +189,7 @@ const FILES = [
   ['./src/app.js', 'a26ef75ccd'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
-  ['./src/career/assistantReport.js', '8872b26bca'],
+  ['./src/career/assistantReport.js', '019bb0029e'],
   ['./src/career/attention.js', '22c71f439f'],
   ['./src/career/authority.js', '7cceeaaf58'],
   ['./src/career/board.js', '8351732e7c'],
@@ -204,7 +204,7 @@ const FILES = [
   ['./src/career/foreignMarket.js', 'de8611d4a2'],
   ['./src/career/foreignPool.js', 'df311e562f'],
   ['./src/career/infrastructure.js', 'd64aff3a8f'],
-  ['./src/career/loans.js', '6b12fbe674'],
+  ['./src/career/loans.js', '6ff6e21d87'],
   ['./src/career/mindset.js', 'b8a1c39ce7'],
   ['./src/career/morale.js', '1c7d0eb69f'],
   ['./src/career/moveWish.js', '83a156f749'],
@@ -225,9 +225,9 @@ const FILES = [
   ['./src/career/squadLimit.js', '8c60ef88b2'],
   ['./src/career/squadLimitSystem.js', 'f25b8c5a64'],
   ['./src/career/staffMarket.js', 'f832537a7e'],
-  ['./src/career/talkDialog.js', '8751a88a9d'],
+  ['./src/career/talkDialog.js', 'ad42f70af9'],
   ['./src/career/teamReport.js', '48d35ad88d'],
-  ['./src/career/teamTalks.js', 'b59b462cea'],
+  ['./src/career/teamTalks.js', '316bb1f3e2'],
   ['./src/career/threat.js', 'bd519d5790'],
   ['./src/career/transferDeals.js', '116a88df52'],
   ['./src/career/transferSystem.js', '91a3d49d4c'],
@@ -353,7 +353,7 @@ const FILES = [
   ['./src/ui/matchdayView.js', '4826993af0'],
   ['./src/ui/menuView.js', 'd3691ed5b3'],
   ['./src/ui/nationalView.js', '92d610d773'],
-  ['./src/ui/negotiationView.js', '82b6da6b0d'],
+  ['./src/ui/negotiationView.js', 'ead706966a'],
   ['./src/ui/playerCard.js', '9f75750223'],
   ['./src/ui/playerInstrView.js', '9e2555a798'],
   ['./src/ui/playerMenus.js', 'c3d2bde3f2'],
@@ -370,7 +370,7 @@ const FILES = [
   ['./src/ui/tacticsDrag.js', 'e4a2009a87'],
   ['./src/ui/tacticsMoves.js', '36742ffefc'],
   ['./src/ui/tacticsView.js', '7c3186d1c5'],
-  ['./src/ui/talksView.js', 'd4fe1d517e'],
+  ['./src/ui/talksView.js', '4a00b34822'],
   ['./src/ui/teamReportView.js', 'c01abc57b6'],
   ['./src/ui/todoView.js', 'bd4d7aa1c4'],
   ['./src/ui/trainingView.js', '7d8160bc72'],

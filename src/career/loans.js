@@ -47,6 +47,7 @@ export const LOAN = {
   YOUNG_BONUS: 0.3, // młody bez gry chętniej idzie na wypożyczenie (nastawienie)
   OFFER_DAYS: 6, // ważność propozycji wypożyczenia
   REQUEST_CHANCE: 0.05, // klub AI pyta o młodego rezerwowego gracza (na zawodnika i tydzień okna) [SZAC]
+  STAY_DAYS: 45, // wypożyczony do klubu gracza mówi, czy chce zostać, ok. 6 tygodni przed końcem wypożyczenia [SZAC]
 };
 export const LOAN_TYPE_NAMES = { runda: 'na rundę', sezon: 'do końca sezonu', rok: 'na rok' };
 const STARTERS = { GK: 1, DEF: 4, MID: 4, ATT: 2 };
@@ -704,6 +705,39 @@ function aiLoanRequests(game, date, rng) {
 }
 
 // ------------------------------------------------------------ Dzień
+/**
+ * Co dalej po wypożyczeniu (zawodnik wypożyczony do klubu gracza, raz, LOAN.STAY_DAYS przed końcem): chęć pozostania
+ * z morale, minut wobec obietnicy, poziomu klubu wobec klubu macierzystego, wieku i losu [SZAC]. Chce zostać: prosi
+ * o rozmowę o wykupie (albo o umowę, gdy kontrakt w klubie macierzystym kończy się razem z wypożyczeniem).
+ * Nie chce: wraca do klubu macierzystego (rozmowy o nowym kontrakcie, chęć odejścia albo walka o skład).
+ * Zapis: p.loan.stay = { want, date, plan }. Tylko informacja i powód rozmowy, bez zmiany zasad transferu.
+ */
+export function loanStayNotice(game, p, L, date) {
+  const rng = new Rng(`wyp-pozostanie:${game.seed}:${p.id}:${L.start}`);
+  const share = L.games ? L.minutes / (L.games * 90) : L.promise;
+  const prest = (id) => clubById(id)?.prestige ?? 5;
+  const age = p.age ?? 25;
+  const score = 0.12 * ((p.morale ?? 12) - 12) + 1.5 * (share - L.promise) + 0.12 * (prest(game.clubId) - prest(L.from))
+    + (age >= 30 ? 0.2 : age <= 21 ? -0.1 : 0) + rng.gauss(0, 0.6);
+  const want = score > 0;
+  const ends = !!p.contract?.until && p.contract.until <= addDays(L.until, 1); // kontrakt w klubie macierzystym kończy się z wypożyczeniem
+  const plan = want ? 'stay' : ends ? 'free' : rng.pick(['renew', 'leave', 'return']);
+  L.stay = { want, date, plan };
+  const parent = name(L.from);
+  const stats = `U nas: ${L.apps} meczów, ${pct(share)} minut.`;
+  let body;
+  if (want && ends) body = `${p.name} dobrze czuje się w klubie i chciałby zostać. Jego kontrakt z ${parent} kończy się razem z wypożyczeniem, ${fmtDate(L.until)}: potem jako wolny zawodnik może podpisać umowę z nami. ${stats}`;
+  else if (want && L.option) body = `${p.name} chciałby zostać u nas na stałe i pyta, czy skorzystamy z opcji wykupu (${fmtZl(L.option.fee)}, decyzja w ostatnich ${LOAN.DECIDE_DAYS} dniach wypożyczenia). ${stats}`;
+  else if (want) body = `${p.name} chciałby zostać u nas na stałe i pyta, czy go wykupimy. Kontrakt ma z ${parent}, więc decyzja o transferze należy do nich: jeśli chcesz go zatrzymać, złóż ofertę w oknie transferowym. ${stats}`;
+  else body = `${p.name} raczej nie jest zainteresowany pozostaniem. Po wypożyczeniu (${fmtDate(L.until)}) ${{
+    free: `jego kontrakt z ${parent} się kończy i rozgląda się za nowym klubem`,
+    renew: `wraca do ${parent}, z którym rozmawia o nowym kontrakcie`,
+    leave: `wraca do ${parent}, ale chce stamtąd odejść i szuka nowego klubu`,
+    return: `wraca do ${parent} i chce tam walczyć o miejsce w składzie`,
+  }[plan]}. ${stats}`;
+  return msg(date, { key: `wyp-przyszlosc:${p.id}:${L.start}`, from: `Agent zawodnika ${p.name}`, subject: want ? `${p.name} chce zostać po wypożyczeniu` : `${p.name} po wypożyczeniu wraca do ${parent}`, body, priority: want ? 'important' : 'info' });
+}
+
 function loansDay(game, date) {
   const out = [];
   const prev = addDays(date, -1);
@@ -757,6 +791,12 @@ function loansDay(game, date) {
           if (L.from === game.clubId) out.push(msg(date, { key: `wyp-opcja-ai:${p.id}:${L.start}`, subject: `${name(p.clubId)} wykupi ${p.name}`, body: `${name(p.clubId)} korzysta z opcji wykupu ${p.name} za ${fmtZl(L.option.fee)}. Transfer nastąpi ${fmtDate(addDays(L.until, 1))}.`, priority: 'important' }));
         }
       }
+    }
+    // Wypożyczony do klubu gracza: przed końcem wypożyczenia mówi, czy chce zostać (nie pyta o swój kontrakt,
+    // bo kontrakt jest w klubie macierzystym)
+    if (p.clubId === game.clubId && L.from !== game.clubId && !L.obligation && !L.exercised && !L.stay && daysBetween(date, L.until) <= LOAN.STAY_DAYS) {
+      const m = loanStayNotice(game, p, L, date);
+      if (m) out.push(m);
     }
   }
   // Prośby gracza o propozycje

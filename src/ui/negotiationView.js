@@ -198,6 +198,7 @@ export function startNegotiation(game, opts = {}) {
   if (!club) return { ok: false, reason: 'noClub', text: 'Nie znaleziono klubu.', save: false };
   const own = (game.world.clubs?.[game.clubId]?.squad ?? []).includes(playerId) || player.clubId === game.clubId;
   if (kind === 'renew' && !own) return { ok: false, reason: 'notOwn', text: 'Przedłużyć można tylko kontrakt zawodnika z własnej kadry.', save: false };
+  if (kind === 'renew' && player.loan && player.loan.from !== game.clubId) return { ok: false, reason: 'loanee', text: 'Zawodnik jest u nas na wypożyczeniu: jego kontrakt należy do klubu macierzystego. Możesz go wykupić (opcja wykupu albo oferta transferowa).', save: false };
   if (kind === 'sign' && own) return { ok: false, reason: 'ownPlayer', text: 'Ten zawodnik już gra w Twoim klubie. Wybierz przedłużenie kontraktu.', save: false };
 
   const fromClub = kind === 'sign' ? resolveClub(opts.fromClub ?? null) : null;

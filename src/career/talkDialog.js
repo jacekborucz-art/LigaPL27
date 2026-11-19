@@ -162,8 +162,15 @@ export function openingLines(game, p, sit) {
 /** Trzy propozycje zdań trenera do tematu (po jednej na podejście). */
 export function coachOptions(game, p, kind) {
   const rng = new Rng(seedOf(game, p, kind, 'coach'));
-  return Object.keys(APPROACHES).map((a) => ({ approach: a, ...APPROACHES[a], line: pick(rng, COACH[kind]?.[a] ?? ['„Porozmawiajmy.”']) }));
+  // Wypożyczony do nas: o przyszłości mówimy jako o pozostaniu po wypożyczeniu (kontrakt ma w klubie macierzystym)
+  const bank = kind === 'future' && p?.loan && p.loan.from !== game.clubId ? FUTURE_LOAN : COACH[kind];
+  return Object.keys(APPROACHES).map((a) => ({ approach: a, ...APPROACHES[a], line: pick(rng, bank?.[a] ?? ['„Porozmawiajmy.”']) }));
 }
+const FUTURE_LOAN = {
+  wsparcie: ['„Dobrze się u nas spisujesz. Chciałbym, żebyś został na dłużej, jeśli kluby się dogadają.”', '„Pasujesz do tej drużyny. Porozmawiajmy, czy widzisz się tu po wypożyczeniu.”'],
+  rzeczowo: ['„Wypożyczenie niedługo się kończy. Jak widzisz swoją przyszłość: zostajesz u nas czy wracasz?”', '„Rozważamy wykup. Zanim porozmawiamy z twoim klubem, chcę znać twoje zdanie.”'],
+  stanowczo: ['„Chcę jasnej odpowiedzi: jesteś zainteresowany grą u nas na stałe?”', '„Jeśli mamy cię wykupić, musisz tego naprawdę chcieć. Jak jest?”'],
+};
 
 /** Ostatnie słowo zawodnika po rozmowie. */
 export function closingLine(game, p, kind, reaction) {

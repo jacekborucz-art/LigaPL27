@@ -138,19 +138,25 @@ export function talksThisWeek(game) {
   return T.log.filter((x) => x.kind === 'talk' && daysBetween(x.date, game.date) < 7).length;
 }
 
+/** Wypożyczony do klubu gracza (kontrakt w innym klubie). */
+export const isLoanee = (game, p) => !!p?.loan && p.loan.from !== game.clubId && p.clubId === game.clubId;
+
 /** Kto potrzebuje rozmowy: niskie morale, niezadowolenie, ławka, kończący się kontrakt, dobra forma. */
 export function talkSuggestions(game) {
   const out = [];
   for (const p of squadOf(game.world, game.clubId)) {
     const form = avg(p.form ?? []);
     const share = minutesShare(game, p);
-    const months = p.contract?.until ? daysBetween(game.date, p.contract.until) / 30 : 99;
+    const loanee = isLoanee(game, p); // wypożyczony do nas: kontrakt jest w klubie macierzystym
+    const months = !loanee && p.contract?.until ? daysBetween(game.date, p.contract.until) / 30 : 99;
     const reasons = [];
     if ((p.morale ?? 12) <= 8) reasons.push(['encourage', 'Niskie morale']);
     else if (moraleFalling(p)) reasons.push(['encourage', 'Morale szybko spada']); // ostrzeżenie przed niskim poziomem
     if (p.unhappy || p.transferRequest) reasons.push(['role', 'Jest niezadowolony']);
     if (share < 0.3 && (p.age ?? 25) >= 21 && (p.season?.apps ?? 0) + 3 < (game.fixtures ?? []).filter((f) => f.played && (f.home === game.clubId || f.away === game.clubId)).length) reasons.push(['role', 'Mało gra']);
     if (months <= 12) reasons.push(['future', 'Kontrakt kończy się w ciągu roku']);
+    // Wypożyczony, który chce zostać (career/loans.js loanStayNotice): prosi o rozmowę o wykupie, raz
+    if (loanee && p.loan.stay?.want && !p.loan.stay.talked) reasons.push(['future', 'Chce zostać po wypożyczeniu']);
     if (form != null && form >= 7.2) reasons.push(['praise', 'Bardzo dobra forma']);
     if (form != null && form < 6.2 && (p.season?.apps ?? 0) >= 3) reasons.push(['demand', 'Słaba forma']);
     if ((p.season?.yc ?? 0) >= 4) reasons.push(['warn', 'Dużo kartek']);
@@ -207,6 +213,13 @@ export function talkToPlayer(game, playerId, kind, { approach = null, assistant 
       reply = z > 0.8 ? 'Rozumie swoją sytuację i zapowiada walkę o skład.' : z < 0 ? 'Oczekuje gry, a nie słów. Nadal jest niezadowolony.' : 'Przyjmuje wyjaśnienia.';
       break;
     case 'future': {
+      if (isLoanee(game, p)) { // wypożyczony: rozmowa o pozostaniu po wypożyczeniu, nie o jego kontrakcie
+        const want = !!p.loan.stay?.want;
+        z = want ? 1.2 : 0.2;
+        if (p.loan.stay) p.loan.stay.talked = game.date;
+        reply = want ? 'Cieszy się, że klub chce go zatrzymać. Wie, że o transferze zdecydują kluby.' : p.loan.stay ? 'Dziękuje za rozmowę, ale po wypożyczeniu chce wrócić do swojego klubu.' : 'Mówi, że na razie skupia się na grze. O przyszłości porozmawia bliżej końca wypożyczenia.';
+        break;
+      }
       const months = p.contract?.until ? daysBetween(game.date, p.contract.until) / 30 : 99;
       z = months <= 12 ? 1.0 + (trust - 50) / 40 : 0.3;
       if (months <= 12 && z > 0.8) p.renewMood = Math.min(3, (p.renewMood ?? 0) + 1);
