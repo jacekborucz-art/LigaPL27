@@ -94,11 +94,17 @@ Zlecenie (gracz określa profil):
 - tylko zagranica: skaut nie szuka w polskich ligach 1-4 (ani niżej).
 
 Wynik wyprawy:
-- Kandydatów nie ma na żadnej liście przed wyjazdem: system tworzy ich dopiero, gdy wyprawa się uda (bez ukrytej puli).
-- Szansa powodzenia i liczba kandydatów (0-5): doświadczenie, sieć kontaktów, znajomość regionu, czas wyjazdu,
-  trudność profilu (np. tani, młody i bardzo dobry to rzadkość) + RNG. Słabszy skaut częściej wraca z pustymi rękami.
-- Atrybuty kandydata: stała z profilu zlecenia (poziom, pozycja, wiek, region) + RNG w górę albo w dół; skaut widzi
-  je z błędem zależnym od oceny zawodnika i znajomości regionu (lepszy skaut: mniej pomyłek, rzadziej „wydmuszki”).
+- Bez statycznej listy ukrytych zawodników: kandydatów nie ma nigdzie przed wyjazdem. Po wyprawie system przelicza
+  i losuje zdarzenia wyjazdu (np. dobry mecz obserwowany, polecenie agenta, kontuzja kandydata, ślepy zaułek)
+  i dopiero wtedy tworzy listę od 0 do 7 kandydatów; liczba jest losowa (każda wyprawa inna, także dla tego samego
+  zlecenia powtórzonego później).
+- Szansa i liczba kandydatów: doświadczenie, sieć kontaktów, znajomość regionu, czas wyjazdu, trudność profilu
+  (np. tani, młody i bardzo dobry to rzadkość) + RNG. Słabszy skaut częściej wraca z pustą listą albo z 1-2 nazwiskami.
+- Atrybuty kandydata: oczekiwany profil ze zlecenia (poziom, pozycja, wiek) jako środek, odchylenie z szerokim RNG
+  w górę albo w dół. Atrybuty skauta (ocena zawodnika, znajomość regionu, doświadczenie) zawężają rozrzut: dobry
+  skaut przywozi kandydatów bliższych oczekiwaniom, słaby dalszych (także wyraźnie słabszych, rzadziej lepszych).
+  Do tego skaut widzi atrybuty z błędem zależnym od oceny zawodnika i znajomości regionu (słabszy częściej się myli
+  i przywozi „wydmuszki”).
 - Raport w poczcie po powrocie: lista kandydatów z opisem skauta (mocne i słabe strony, cena, pensja, chęć przyjścia,
   ryzyko adaptacji). Znaleziony zawodnik trafia na listę obserwowanych gracza i do zwykłej mechaniki transferu
   (oferta do klubu zagranicznego albo kontrakt wolnego zawodnika); po kilku tygodniach bez działania może zniknąć
