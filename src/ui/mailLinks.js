@@ -15,6 +15,7 @@ const TO = {
   training: (tab, label) => go(label, [{ act: 'tab', tab: 'trening' }, { act: 'tr-tab', tab }]),
   squad: (s, label) => go(label, [{ act: 'tab', tab: 'kadra' }, { act: 'tsub', s }]),
   comp: (c, label) => go(label, c ? [{ act: 'tab', tab: 'rozgrywki' }, { act: 'ccomp', c }] : [{ act: 'tab', tab: 'rozgrywki' }]),
+  lastRound: (id) => go('Ostatnia runda rozmów', [{ act: 'tab', tab: 'transfery', sub: 'wtoku' }, { act: 'tf-lastround', id }]),
 };
 
 // Rodzaj wiadomości (początek klucza) -> odnośniki do ekranów
@@ -36,6 +37,8 @@ const BY_KIND = {
   'pre-pyta': () => [TO.transfers('wtoku', 'W toku')],
   'pre-rozmawia': () => [TO.transfers('wtoku', 'W toku')],
   'pre-podpisal': () => [TO.transfers('wtoku', 'W toku')],
+  namysl: () => [TO.transfers('wtoku', 'Propozycje i transakcje w toku')], // odpowiedź zawodnika po namyśle (proposals.js)
+  'namysl-zmiany': () => [TO.transfers('wtoku', 'Propozycje i transakcje w toku')],
   'wyp-rynek': () => [TO.transfers('kontrakty', 'Wypożyczenia')],
   'wyp-propozycje': () => [TO.transfers('kontrakty', 'Wypożyczenia')],
   'wyp-koniec': () => [TO.transfers('kontrakty', 'Wypożyczenia')],
@@ -107,6 +110,9 @@ export function mailLinks(game, m) {
   const kind = String(m.key ?? '').split(':')[0];
   const out = [];
   const p = playerOf(game, m);
+  // Zawodnik chce zmian w kontrakcie: ostatnia runda rozmów, dopóki propozycja na nią czeka
+  const lr = m.refs?.kind === 'proposal' && m.refs.lastRound ? (game.market?.pending ?? []).find((x) => x.id === m.refs.propId && x.status === 'changes') : null;
+  if (lr) out.push(TO.lastRound(lr.pid));
   if (p) {
     const own = p.clubId === game.clubId;
     if (own && game.world.clubs?.[game.clubId]?.squad?.includes(p.id)) out.push(TO.profile(p.id), TO.talk(p.id));

@@ -29,6 +29,35 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 20, 2026, agent (worktree, gałąź do scalenia), namysł zawodnika przed podpisem (v1.21 Beta)
+Zrobione:
+- Nowy moduł `src/career/proposals.js` (stan `game.market.pending`): udane rozmowy gracza i klubów AI to propozycja,
+  nie podpis. Zawodnik namyśla się 2-5 dni (3 + RNG od -1 do +2, ziarno: seed, zawodnik, klub, data), zawodnik
+  z klubem najpóźniej do ostatniego dnia okna. W tym czasie inne kluby (gracz i AI, jedna propozycja na klub) mogą
+  złożyć własne; w dniu decyzji porównuje wszystkie wzorem `offerUtility` z prekontraktów.
+- Odpowiedzi w liście (klucz `namysl:`, odnośniki w `mailLinks.js`): zgoda (transakcja od testów medycznych), odmowa
+  (blokada 14 dni bez urazy), wybrał inny klub, chce zmian (ostatnia runda rozmów do 2 dni: ultimatum, porozumienie
+  to podpis od razu, słabsza oferta to fiasko). Klub AI przy „chce zmian”: pensja +10 % w budżecie albo rezygnacja.
+- Kluby AI (`aiBuy`) i przyjęcie oferty klubu AI za zawodnika gracza (`answerIncoming`) też przez propozycje.
+  Odstępne propozycji w toku zarezerwowane (`pendingFees`). Klub AI czeka na odpowiedź przed kolejnym zakupem,
+  zawodnika w namyśle ocenia o 1,2 OVR niżej za każdą propozycję, po odmowie albo przegranej szuka dalej w tym tygodniu.
+- UI: ekran rozmów „Propozycja złożona, zawodnik odpowie ok. <data>” i tryb ostatniej rundy (`tf-lastround`),
+  W toku: „Propozycje czekają na odpowiedź” (wycofanie, ostatnia runda) i „Ostatnie odpowiedzi zawodników”, karta
+  transferowa i okienko karty („Status: Rozważa oferty, odpowie do ...”), kwadrat TR z obrysem w Kadrze, znacznik
+  w Kontraktach, sprawa w „Do zrobienia”.
+- Testy: `tests/proposals.test.mjs` (12), poprawione `tests/career.test.mjs` i `tests/transferDeals.test.mjs`.
+  Docs: transfery.md rozdz. 10 (z kalibracją), negocjacje.md rozdz. 9, 10, 13 i nowy 14.
+Decyzje i pułapki:
+- Poprawka przy okazji: `applyOutcome` zapisuje nowy kontrakt tylko przy przedłużeniu. Wcześniej porozumienie przy
+  podpisaniu (także prekontrakt) od razu nadpisywało obecny kontrakt zawodnika w starym klubie.
+- Decyzja w ostatnim dniu okna zapada od razu po akcji gracza (`resolveNow`), bo systemy dnia już się wykonały.
+- Prekontrakty, przedłużenia, wypożyczenia, prawo pierwokupu, limit kadry (zarząd) i sprzedaż za granicę bez namysłu.
+- Kalibracja 5 ziaren: OVR top14 Ekstraklasy po 1. i 2. sezonie bez zmian (11,63 i 11,77 wobec 11,63 i 11,79),
+  po 3. sezonie 11,73 wobec 11,84 (we wszystkich ziarnach niżej o ok. 0,1). Perf: sezon 11,1 s (przed 11,5 s).
+Zostało / dalej:
+- Do decyzji właściciela: progi szansy zgody (0,78 + 0,4 x różnica, 0,5-0,92), „chce zmian” 60 %, pensja +8-18 %,
+  termin 2 dni, blokada po odmowie 14 dni [SZAC]; obserwować trzeci sezon Ekstraklasy (OVR ok. 0,1 niżej).
+
 ## Nov 20, 2026, profil B, ranking UEFA: prawdziwe współczynniki 5 sezonów (v1.21 Beta)
 Zrobione:
 - Dane: `tools/uefa-ranking-gen.mjs` czyta plik właściciela `tools/data/ranking_uefa_2026_27.txt` (55 federacji, 415 klubów,

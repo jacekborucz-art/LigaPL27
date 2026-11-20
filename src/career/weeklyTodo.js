@@ -21,6 +21,7 @@ import { coreVacancies } from './staffMarket.js'; // wakaty w sztabie (docs/szta
 import { campWindow, bookingFor, halfOf, HALF_NAMES } from '../training/camps.js';
 import { talkSuggestions, teamSituation, TALK_COOLDOWN } from './teamTalks.js';
 import { canApproach } from './preContracts.js';
+import { openProposals } from './proposals.js'; // namysł zawodnika: ostatnia runda rozmów (docs/transfery.md, rozdz. 10)
 import { limitStatus } from './squadLimitSystem.js';
 import { licenceNeeds } from './infrastructure.js';
 import { staffAttrs } from './teamReport.js';
@@ -164,6 +165,13 @@ export function collectTodo(game, date = game.date) {
     if (Wsh?.stage !== 'oficjalna' || Wsh.reacted || Wsh.club !== clubId) continue;
     fact({ key: `prosba-oficjalna:${p.id}`, type: 'wish', from: 'Dyrektor sportowy', area: 'contract', pid: p.id, due: null, prio: 'wazne', title: `${p.name} oficjalnie prosi o transfer`,
       why: 'Wystaw go na listę, obiecaj zgodę na dobrą ofertę albo spróbuj go przekonać rozmową lub podwyżką.', act: STEPS.card(p.id) });
+  }
+
+  // 2a. Zawodnik chce zmian w kontrakcie: ostatnia runda rozmów z terminem (fakt)
+  for (const x of openProposals(game)) {
+    if (x.status !== 'changes' || !x.user || x.to !== clubId || x.deadline < date) continue;
+    fact({ key: `namysl:${x.id}`, type: 'proposal', from: `Agent zawodnika ${x.name}`, area: 'transfer', pid: x.pid, due: x.deadline, prio: pPrio(x.deadline), title: `Ostatnia runda rozmów: ${x.name}`,
+      why: `${x.name} chce zmian w kontrakcie. Odpowiedz do ${fmtDate(x.deadline)}, potem propozycja wygaśnie.`, act: { steps: [{ act: 'tab', tab: 'transfery', sub: 'wtoku' }, { act: 'tf-lastround', id: x.pid }] } });
   }
 
   // 3. Limit kadry (fakt, zarząd)
@@ -361,7 +369,7 @@ function signature(game, date) {
   const st = staffOf(game, game.clubId);
   return [date, game.clubId, S.rev, inbox.length, open, game.talks?.lastMeeting ?? '', game.talks?.log?.length ?? 0, game.talks?.log?.[0]?.date ?? '',
     (game.training?.camps ?? []).length, (game.market?.offers ?? []).filter((o) => o.status === 'open').map((o) => `${o.id}${o.expires}`).join(), (game.sponsors?.clubs?.[game.clubId]?.offers ?? []).map((o) => o.id).join(), game.squadLimit?.case?.id ?? '',
-    (game.tactics?.xi ?? []).join(), Object.values(st).map((s) => s?.q).join(), sq].join('|');
+    (game.tactics?.xi ?? []).join(), Object.values(st).map((s) => s?.q).join(), sq, openProposals(game).map((x) => `${x.id}${x.status}`).join()].join('|');
 }
 
 /**

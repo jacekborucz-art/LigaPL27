@@ -1,7 +1,8 @@
 // System dnia „transfers” (kolejność 53: po karierze 50, sponsorach 51 i limicie kadry 52, przed aklimatyzacją 92).
 // Nastawienie zawodników (poniedziałki), prośby o transfer (1. dnia miesiąca i poniedziałki), prekontrakty
 // (propozycje 1. dnia Jan-May, decyzje w poniedziałki Jan-Jun, wcześniejsze transfery zimą), kupcy z zagranicy
-// (poniedziałki w oknie), pula zawodników z zagranicy (uzupełnienie przed oknem) i przebieg transakcji (codziennie). Spec: docs/transfery.md.
+// (poniedziałki w oknie), pula zawodników z zagranicy (uzupełnienie przed oknem), decyzje zawodników po namyśle
+// (propozycje klubów, codziennie przed transakcjami) i przebieg transakcji (codziennie). Spec: docs/transfery.md.
 
 import { registerDailySystem } from '../core/gameLoop.js';
 import { windowOf } from './transfers.js';
@@ -11,12 +12,14 @@ import { mindsetWeek, retireFreeAgents } from './mindset.js';
 import { requestsMonth, requestsWeek } from './moveWish.js';
 import { foreignWeek } from './foreignMarket.js';
 import { ensureForeignPool, foreignPoolDay } from './foreignPool.js';
+import { ensureProposals, proposalsDay } from './proposals.js'; // namysł zawodnika przed podpisem (docs/transfery.md, rozdz. 10)
 
 /** Leniwa inicjalizacja (stare zapisy). */
 export function ensureTransferState(game) {
   if (!game.market) return;
   ensureDeals(game);
   ensurePre(game);
+  ensureProposals(game); // stary zapis: brak game.market.pending
   ensureForeignPool(game); // zawodnicy z zagranicy: stary zapis dostaje pulę raz (foreignPool.js)
 }
 
@@ -35,6 +38,7 @@ export function transfersDay(game, date) {
   if (dow === 1 && month >= 1 && month <= 6) out.push(...preDecisions(game, date));
   if (w && dow === 1) out.push(...earlySales(game, date));
   if (w && (dow === 1 || date === w.from)) out.push(...foreignWeek(game, date));
+  out.push(...proposalsDay(game, date)); // przed transakcjami: zgoda w ostatnim dniu okna zdąży na zgłoszenie
   out.push(...dealsDay(game, date));
   return out;
 }

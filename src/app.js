@@ -90,8 +90,8 @@ import { renderTalks, handleTalkAction, isTalkAction } from './ui/talksView.js';
 import { ensureCareer } from './career/careerSystem.js';
 import { ensureReputation } from './career/reputationSystem.js'; // dynamiczna reputacja (docs/reputacja.md)
 import { fmtZl } from './career/transfers.js';
-import { startDeal, expectedRegistration } from './career/transferDeals.js'; // transfer jako proces (docs/transfery.md)
 import { signUserPre } from './career/preContracts.js';
+import { submitUserProposal, finishLastRound } from './career/proposals.js'; // namysł zawodnika przed podpisem (docs/transfery.md, rozdz. 10)
 import { trustLabel } from './career/board.js';
 import { spendable, wageBill, monthSummary } from './career/finance.js';
 import { teamMorale, moraleLabel } from './career/morale.js';
@@ -1796,11 +1796,14 @@ async function dispatchAct(el, { root = app } = {}) {
     const d = r.done;
     if (d?.accepted && d.kind === 'sign' && d.pre) {
       state.tfMsg = signUserPre(state.game, d.playerId, d.contract).text; // umowa od 1 lipca (career/preContracts.js)
+    } else if (d && d.lastRound) {
+      // Ostatnia runda (zawodnik chciał zmian): porozumienie to podpis od razu, inaczej koniec propozycji
+      state.tfMsg = finishLastRound(state.game, d.lastRound, d.contract, !!d.accepted).text;
     } else if (d?.accepted && d.kind === 'sign') {
-      const p = state.game.world.players[d.playerId];
-      // Po rozmowach: testy medyczne i zgłoszenie (zakładka Transfery, W toku)
-      const deal = startDeal(state.game, { playerId: d.playerId, to: state.game.clubId, fee: d.fee ?? 0, contract: d.contract, kind: d.fromClub ? 'transfer' : 'free', stage: 'medical' });
-      state.tfMsg = deal ? `${p.name} zgodził się na warunki. Teraz testy medyczne, zgłoszenie spodziewane ${fmtDate(expectedRegistration(deal))}.` : `${p.name} jest już w trakcie innej transakcji.`;
+      // Po rozmowach: propozycja, zawodnik namyśla się 2-5 dni (zakładka Transfery, W toku; odpowiedź w poczcie)
+      const sub = submitUserProposal(state.game, { playerId: d.playerId, fee: d.fee ?? 0, contract: d.contract, fromClub: d.fromClub });
+      state.tfMsg = sub.text;
+      if (sub.prop) d.proposal = { id: sub.prop.id, decide: sub.prop.decide };
     } else if (d?.accepted) state.tfMsg = 'Kontrakt przedłużony.';
     state.ng = r.ng; // null = powrót do Transferów
     if (r.save || d) await save();

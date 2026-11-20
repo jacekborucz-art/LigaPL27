@@ -738,7 +738,7 @@ export class NegotiationSession {
 // ---------------------------------------------------------------- Zastosowanie skutków
 /**
  * Zapisuje skutki w zawodniku (mutuje): relacja z klubem (zaufanie, uraza z wygaszaniem, blokada, historia),
- * morale, renewRefused (czytane przez squad.js), transferRequest + unhappy, nowy kontrakt.
+ * morale, renewRefused (czytane przez squad.js), transferRequest + unhappy, nowy kontrakt (tylko przedłużenie).
  */
 export function applyOutcome(player, out) {
   if (!out) return player;
@@ -753,9 +753,11 @@ export function applyOutcome(player, out) {
   if (out.moraleDelta) player.morale = clamp((player.morale ?? 12) + out.moraleDelta, 1, 20);
   if (out.renewRefused) player.renewRefused = true;
   if (out.transferRequest) { player.transferRequest = true; player.unhappy = true; }
-  if (out.accepted && out.contract) {
+  // Nowy kontrakt od razu tylko przy przedłużeniu. Przy podpisaniu zawodnik zostaje na starym kontrakcie do zgłoszenia
+  // (kontrakt przenosi moduł transferów; wcześniej rozmowy nadpisywały go już przy porozumieniu)
+  if (out.accepted && out.contract && out.kind === 'renew') {
     player.contract = { ...out.contract, bonus: { ...out.contract.bonus }, promise: { ...out.contract.promise } };
-    if (out.kind === 'renew') { player.renewRefused = false; delete player.moveWish; player.transferRequest = false; } // nowy kontrakt kończy prośbę o transfer
+    player.renewRefused = false; delete player.moveWish; player.transferRequest = false; // nowy kontrakt kończy prośbę o transfer
   }
   return player;
 }

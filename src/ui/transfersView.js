@@ -22,7 +22,8 @@ import { limitStatus, toggleKeep, ageWord } from '../career/squadLimitSystem.js'
 import { boardCaps, appealStatus } from '../career/boardRequests.js';
 import { openLoanOffers } from '../career/loans.js'; // status „szukamy klubu na wypożyczenie” w tabeli kadry
 import { loanInForm, loanOutPanel, loanedInPanel, loanedOutPanels, loansSection, loanInAction, handleLoanAction, isLoanAction, isLoanedOut } from './loansView.js'; // wypożyczenia (docs/wypozyczenia.md)
-import { dealsView, dealTags, ownDealPanels, otherDealPanel, handleDealAction } from './transferDealsView.js'; // W toku, prekontrakty, prośby (docs/transfery.md)
+import { dealsView, dealTags, ownDealPanels, otherDealPanel, handleDealAction, proposalPanel } from './transferDealsView.js'; // W toku, prekontrakty, prośby (docs/transfery.md)
+import { userProposal, thinkingUntil } from '../career/proposals.js'; // namysł zawodnika przed podpisem
 import { effectiveAsk } from '../career/mindset.js';
 import { renderPlayerCard, cardFact } from './playerCard.js'; // karta w okienku jak w Skład i taktyka
 import { playerStatsHtml } from './playerStatsView.js';
@@ -337,6 +338,9 @@ function playerCard(game, p, ui) {
   const dp = otherDealPanel(game, p); // transakcja w toku, umowa od 1 lipca (transferDealsView.js)
   if (dp.blocked) actions.length = 0;
   if (dp.html) actions.push(dp.html);
+  const pp = dp.blocked ? null : proposalPanel(game, p); // namysł zawodnika: twoja propozycja, oferty innych klubów
+  if (pp?.blocked) actions.length = 0;
+  if (pp?.html) actions.unshift(pp.html);
   const blocked = will.verdict === 'odmowa' || !cap.ok;
   const appeal = game.board?.requests?.vetoes?.some((v) => v.playerId === p.id && v.status === 'open') ? appealStatus(game, p.id) : null; // weto zarządu
   const deal = `${ui.tfMsg ? `<p class="notice">${esc(ui.tfMsg)}</p>` : ''}
@@ -721,9 +725,16 @@ export function handleTransferAction(game, act, ds = {}, root = null) {
       if (sold && !inWindow(game.date)) return { ui: { tfMsg: 'Okno transferowe jest zamknięte.' } };
       if (!sold && lateFree(game, p)) return { ui: { tfMsg: 'Zawodnik został wolny po zamknięciu okna transferowego. Zgłosisz go dopiero w następnym oknie (FIFA RSTP art. 6.1).' } };
       if (p.transfer) return { ui: { tfMsg: 'Zawodnik jest w trakcie transferu.' } };
+      if (userProposal(game, p.id)) return { ui: { tfMsg: `${p.name} rozważa twoją propozycję. Odpowie ok. ${fmtDate(thinkingUntil(game, p.id))}.` } };
       const cap = canSign(game);
       if (!cap.ok) return { ui: { tfMsg: cap.text } };
       return { ui: {}, negotiate: { kind: 'sign', playerId: p.id, fromClub: abroad ? poolSellerClub(p) : p.clubId ?? null, fee, limits: negotiationLimits(game, 'sign', p) } };
+    }
+    case 'tf-lastround': { // ostatnia runda rozmów: zawodnik chce zmian w kontrakcie (src/career/proposals.js)
+      const x = p && userProposal(game, p.id);
+      if (!x || x.status !== 'changes' || x.deadline < game.date) return { ui: { tfMsg: 'Propozycja jest już nieaktualna.' } };
+      const abroad = x.fromState === 'pool';
+      return { ui: {}, negotiate: { kind: 'sign', playerId: p.id, fromClub: abroad ? poolSellerClub(p) : p.clubId ?? null, fee: x.fee, limits: negotiationLimits(game, 'sign', p), lastRound: { propId: x.id, want: x.want, until: x.deadline } } };
     }
     case 'tf-renew': return { ui: {}, negotiate: { kind: 'renew', playerId: p.id, fromClub: null, fee: 0, limits: negotiationLimits(game, 'renew', p) } };
     case 'tf-pre': { // umowa od 1 lipca (src/career/preContracts.js)
@@ -782,6 +793,7 @@ export function transferCardHtml(game, p, { wide = false } = {}) {
     cardFact(valueLabel(game, p), esc(valueOrScoutPrice(game, p, fmtZl))),
     ...(price ? [cardFact('Cena', esc(price))] : []),
     ...(mine ? [cardFact('Morale', esc(moraleLabel(p.morale ?? 12)))] : []),
+    ...(thinkingUntil(game, p.id) ? [cardFact('Status', esc(`Rozważa oferty, odpowie do ${fmtDate(thinkingUntil(game, p.id))}`))] : []), // namysł (proposals.js)
   ];
   const go = `<p class="tf-pcard__go"><button class="btn btn--primary btn--sm" data-act="tf-open" data-id="${esc(p.id)}">${mine ? 'Otwórz kartę transferową' : 'Przejdź do oferty'}</button></p>`;
   return renderPlayerCard(p, {

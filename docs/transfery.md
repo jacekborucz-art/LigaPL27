@@ -28,7 +28,8 @@ koniec okna, wycofanie się strony.
   `isAvailable` (src/career/squad.js) i studio meczowe go pomijają, kluby AI go nie wystawiają, a asystent zdejmuje
   go ze składu gracza przed meczem (`refreshTactics`).
 - Zawodnik z otwartą transakcją nie dostaje innych ofert (oferty gracza, kluby AI, zagranica, prekontrakty).
-  Odstępne w otwartych transakcjach jest zarezerwowane w budżecie kupującego, a zawodnik w drodze liczy się do limitu kadry.
+  Odstępne w otwartych transakcjach (i w propozycjach w toku, rozdz. 10) jest zarezerwowane w budżecie kupującego,
+  a zawodnik w drodze liczy się do limitu kadry.
 - Testy medyczne: `pFail = 0,01 + 0,004 max(0, 10 - ODP) + (uraz ? 0,20 : 0) + (wiek >= 31 ? 0,01 : 0)`,
   ODP to ukryty atrybut odporności na urazy (`p.hidden.ODP`). Przy porażce 50 % renegocjacja (kwota -15 %),
   50 % koniec transakcji. Kupiec AI przy urazie ponad 28 dni wycofuje się w 70 %.
@@ -40,9 +41,11 @@ koniec okna, wycofanie się strony.
 - Listy w poczcie tylko dla transakcji gracza: „Porozumienie z X w sprawie Y”, „Y przeszedł testy medyczne”,
   „Y jest już w mieście” (zagranica), „Oficjalnie: Y zawodnikiem klubu X”, „Transfer Y upadł (powód)”.
   Transakcje AI-AI trafiają tylko do tygodniowego podsumowania rynku.
-- `completeTransfer` (src/career/transfers.js) jest ostatnim krokiem. Transfer gracza po udanych rozmowach zaczyna
-  się od testów medycznych. Wyjątek: działania zarządu przy limicie kadry (src/career/squadLimitSystem.js) zostają
-  natychmiastowe, bo zarząd liczy kadrę od razu po działaniu.
+- `completeTransfer` (src/career/transfers.js) jest ostatnim krokiem. Udane rozmowy (gracza i klubu AI) to propozycja
+  dla zawodnika, który namyśla się 2-5 dni (rozdz. 10); po jego zgodzie transakcja zaczyna się od testów medycznych.
+  Wyjątki: działania zarządu przy limicie kadry (src/career/squadLimitSystem.js) zostają natychmiastowe, bo zarząd
+  liczy kadrę od razu po działaniu; prekontrakty, wypożyczenia i prawo pierwokupu bez namysłu; sprzedaż za granicę
+  ma własny etap warunków osobistych (2-4 dni).
 
 ## 2. Prekontrakty (umowa od 1 lipca)
 
@@ -154,8 +157,8 @@ do Jun 30, wolni z puli startowej) są do zgłoszenia przez cały rok.
 
 ## 6. Interfejs
 
-Zakładka Transfery, podzakładka „W toku”: transakcje twojego klubu z paskiem etapów, spodziewaną datą zgłoszenia
-i przyciskiem wycofania, ostatnio zakończone, transakcje w Polsce, umowy od 1 lipca (przyjdą, odejdą), prośby
+Zakładka Transfery, podzakładka „W toku”: propozycje czekające na odpowiedź zawodnika i ostatnie odpowiedzi
+(rozdz. 10), transakcje twojego klubu z paskiem etapów, spodziewaną datą zgłoszenia i przyciskiem wycofania, ostatnio zakończone, transakcje w Polsce, umowy od 1 lipca (przyjdą, odejdą), prośby
 o transfer. Kontrakty: znaczniki „porozumienie z X od Jul 1, 2027”, „chce odejść”, „prosi o transfer”,
 „transfer w toku”. Karta własnego zawodnika: panel prośby o transfer z reakcjami, transakcja w toku. Karta zawodnika
 innego klubu: „Umowa od Jul 1” (do 6 miesięcy przed końcem kontraktu), wcześniejszy transfer zimą, stan transakcji.
@@ -266,6 +269,82 @@ z czołówki co czwarty, importy 22, przesunięcie -0,3) podnosiła Ekstraklasę
 Z puli w sezonie: 17-23 wolnych podpisanych przez transakcje i 3-6 kupionych przez kluby AI (ziarno 5,
 `tstats.poolFree`, `poolBought`), uzupełnienia 21-69 zawodników na okno.
 
+
+## 10. Namysł zawodnika przed podpisem (Nov 20, 2026)
+
+Decyzja właściciela: kluby AI nie mogą „przechwytywać” zawodników z rynku z dnia na dzień, a gracz musi móc złożyć
+kontrofertę. Kod: `src/career/proposals.js` (stan `game.market.pending`), system dnia „transfers” (decyzje codziennie,
+przed transakcjami), ekran rozmów (`src/ui/negotiationView.js`), widoki w `src/ui/transferDealsView.js`.
+Testy: `tests/proposals.test.mjs`. Wszystkie liczby [SZAC].
+
+Przebieg:
+- Udane rozmowy (gracza na ekranie rozmów, klubu AI przez `aiNegotiate`) kończą się propozycją dla zawodnika, nie
+  podpisem. Dotyczy wolnych zawodników i zawodników z klubem (po porozumieniu klubów), także z puli zagranicznej
+  i oferty klubu AI za zawodnika gracza (gracz przyjmuje ofertę, potem namyśla się jego zawodnik).
+- Namysł: 3 dni + RNG od -1 do +2, czyli 2-5 dni, `Rng('namysl:${seed}:${zawodnik}:${klub}:${data}')`. Zawodnik
+  z klubem decyduje najpóźniej w ostatnim dniu okna (decyzja = min(namysł, koniec okna)); wolny zawodnik bez limitu
+  (reguła `lateFree` bez zmian). Propozycja złożona w trakcie namysłu dołącza do tej samej decyzji.
+- W czasie namysłu zawodnik nie jest zajęty: dostaje propozycje gracza i klubów AI, najwyżej jedną od klubu.
+  Zajęty jest dopiero po wyborze (otwarta transakcja). Klub AI z propozycją w toku nie składa w tym tygodniu kolejnej,
+  a zawodnika, który już rozważa propozycje, ocenia o 1,2 OVR niżej za każdą (woli cel bez licytacji). Klub,
+  któremu w ostatnim tygodniu zawodnik odmówił albo wybrał inny klub, szuka dalej w najbliższym tygodniu rynku.
+- Odstępne propozycji w toku jest zarezerwowane (`pendingFees`). Do limitu kadry zawodnik liczy się dopiero po
+  wyborze (transakcja); gdy w dniu decyzji kadra klubu jest pełna, propozycja przepada.
+
+Decyzja (dzień namysłu, `Rng('namysl-decyzja:${seed}:${zawodnik}:${data}')`):
+- Każda propozycja dostaje użyteczność ze wzoru prekontraktów (rozdz. 2, `offerUtility`: pieniądze z `moneyW`,
+  prestiż klubu z ambicją, rola z `roleW`, puchary; premia za podpis rozłożona na tygodnie kontraktu) z szumem
+  N(0; 0,08). Odniesienie: zawodnik z klubem porównuje z pozostaniem (ta sama funkcja dla obecnego klubu z lojalnością
+  i zaufaniem; -0,2, gdy jest na liście transferowej, -0,3, gdy jest niezadowolony albo prosi o transfer); wolny
+  zawodnik z ofertą klubu o reputacji o 15 wyższej od własnej przy oczekiwanej pensji, minus 0,4 x gotowość do zejścia
+  niżej (rozdz. 3).
+- Propozycje od najlepszej: szansa zgody `clamp(0,78 + 0,4 (U - U_odniesienia), 0,5; 0,92)`; bez zgody 60 %
+  „chce zmian”, 40 % odmowa. Pierwsza zgoda wygrywa, pozostałe kluby dostają „wybrał inny klub”. Odmowa przechodzi
+  do następnej propozycji.
+- Odpowiedzi dla gracza (list „Agent zawodnika X” w poczcie, odnośniki do W toku i karty zawodnika):
+  - zgoda: transakcja od testów medycznych (rozdz. 1), morale +2;
+  - odmowa: zawodnik nie rozmawia z klubem 14 dni (blokada bez urazy);
+  - wybrał inny klub (z nazwą);
+  - chce zmian: pensja wyżej o 8-18 %, ostatnia runda rozmów do 2 dni (najpóźniej koniec okna). Ekran rozmów
+    w trybie ostatniej rundy: zawodnik stawia ultimatum, jedna oferta. Warunki zawodnika albo lepsze to podpis od razu
+    (bez kolejnego namysłu), słabsza oferta albo „Zakończ rozmowy” kończy propozycję ze zwykłymi skutkami fiaska
+    (docs/negocjacje.md, rozdz. 7). Brak odpowiedzi do terminu: propozycja wygasa. Inne propozycje czekają do końca
+    ostatniej rundy.
+- Klub AI przy „chce zmian” robi to, co w drugiej rundzie `aiNegotiate`: pensja +10 %, jeśli mieści się w budżecie
+  z rozmów, inaczej rezygnuje.
+- Propozycja przepada, gdy zawodnik zmienił klub, ma inną transakcję albo prekontrakt, zamknęło się okno, trener
+  zmienił klub albo zabrakło pieniędzy.
+- Ostatni dzień okna: systemy dnia już się wykonały, więc propozycja gracza (i przyjęcie oferty klubu AI za jego
+  zawodnika) dostaje odpowiedź od razu, a transakcja jest zgłaszana w ostatniej chwili jak dotąd.
+
+Interfejs: ekran rozmów po porozumieniu pokazuje „Propozycja złożona, zawodnik odpowie ok. <data>” i przycisk
+„Wróć do transferów”. Transfery > W toku: „Propozycje czekają na odpowiedź” (status, „Wycofaj propozycję”, przy
+„chce zmian” przycisk „Ostatnia runda rozmów”) i „Ostatnie odpowiedzi zawodników”. Karta transferowa: twoja
+propozycja w toku albo „Rozważa oferty, odpowie do <data>” (bez wyniku); karta w okienku: wiersz „Status”.
+Kwadrat „TR” z obrysem przy nazwisku i znacznik „rozważa ofertę” w Kontraktach. Ostatnia runda trafia do listy
+„Do zrobienia” na Pulpicie.
+
+Zapis: `game.market.pending` (propozycje, zamknięte trzymane 60 dni) i `pendingSeq`; stary zapis dostaje pustą listę
+(`ensureProposals` w `ensureTransferState`). Rozmowy przy podpisaniu nie nadpisują już kontraktu zawodnika
+(`applyOutcome` zapisuje nowy kontrakt tylko przy przedłużeniu), bo zawodnik zostaje na starym kontrakcie do zgłoszenia.
+
+Kalibracja (Nov 20, 2026, `node tools/transfery-kalibracja.mjs widzew <ziarno> 3`), OVR top14 Ekstraklasy po
+sezonach 2026/27, 2027/28, 2028/29:
+
+| Ziarno | Przed | Po |
+|---|---|---|
+| 5 | 11,60 / 11,77 / 11,83 | 11,57 / 11,70 / 11,69 |
+| 7 | 11,66 / 11,72 / 11,84 | 11,62 / 11,77 / 11,75 |
+| 9 | 11,69 / 11,89 / 11,85 | 11,66 / 11,85 / 11,74 |
+| 11 | 11,55 / 11,70 / 11,78 | 11,64 / 11,64 / 11,71 |
+| 23 | 11,66 / 11,88 / 11,88 | 11,67 / 11,87 / 11,76 |
+
+Średnio Ekstraklasa 11,63 / 11,79 / 11,84 przed i 11,63 / 11,77 / 11,73 po, 1 Liga 10,16 / 10,27 / 10,33 przed
+i 10,12 / 10,31 / 10,30 po. Propozycje klubów AI w sezonie: 54-106, zgoda 78-87 %, wybrał inny klub 1-9, odmowa
+2-9, nieaktualne 1-7. Wolni podpisani przez kluby AI ok. 7 % mniej w dwóch pierwszych sezonach, transakcje ogółem
+podobnie (110-150 na sezon). Kluby AI z ujemnym saldem: 0. Do obserwacji: trzeci sezon Ekstraklasy niżej
+o ok. 0,1 OVR we wszystkich pięciu ziarnach (pierwsze dwa sezony bez zmian); pierwsza wersja bez kary za licytację
+dawała 28 przegranych propozycji w sezonie i 11,51 po pierwszym sezonie.
 
 ## Rotacja wolnych zawodników (Nov 14, 2026)
 
