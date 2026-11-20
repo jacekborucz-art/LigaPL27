@@ -3,15 +3,19 @@
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
 <<<<<<< HEAD
-const VERSION = 'v0.3-f52697547e';
+<<<<<<< HEAD
+const VERSION = 'v0.3-0d65ad60ea';
 =======
 const VERSION = 'v0.3-62876db151';
 >>>>>>> main
+=======
+const VERSION = 'v0.3-a93ed2f43c';
+>>>>>>> worktree-agent-adbdd0a6657d32dcc
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
   // AUTO-FILES-START
-  ['./index.html', 'f515af4ef7'],
+  ['./index.html', '59d34b3447'],
   ['./manifest.webmanifest', 'f15cbe83ae'],
   ['./assets/crests/arka-48.webp', '466a65579c'],
   ['./assets/crests/arka.webp', '58f2c8f4ad'],
@@ -190,7 +194,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', '918c4be39c'],
+  ['./src/app.js', 'b161e92406'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', 'db514a2a68'],
@@ -324,6 +328,7 @@ const FILES = [
   ['./src/styles/menu.css', '39f5cbacdd'],
   ['./src/styles/negotiation.css', '949f233adc'],
   ['./src/styles/reserves.css', '71951b8110'],
+  ['./src/styles/skauting.css', '562cb1dacb'],
   ['./src/styles/staff.css', 'b926559481'],
   ['./src/styles/todo.css', 'd7bb59a735'],
   ['./src/styles/tokens.css', 'a7865d38be'],
@@ -376,6 +381,7 @@ const FILES = [
   ['./src/ui/positionMap.js', 'ef2c032d52'],
   ['./src/ui/postMatchView.js', 'acdba6d632'],
   ['./src/ui/reservesView.js', '0768b9e72d'],
+  ['./src/ui/scoutingView.js', 'b9ea2fb8c4'],
   ['./src/ui/sponsorsView.js', '93ea7f72b4'],
   ['./src/ui/squadView.js', '510502fef8'],
   ['./src/ui/staffView.js', 'e81a09aea9'],
@@ -389,7 +395,7 @@ const FILES = [
   ['./src/ui/todoView.js', 'bd4d7aa1c4'],
   ['./src/ui/trainingView.js', 'c98bf204dd'],
   ['./src/ui/transferDealsView.js', 'aab9223d97'],
-  ['./src/ui/transfersView.js', '3593e0342d'],
+  ['./src/ui/transfersView.js', '1728700dd7'],
   ['./src/world/ephemeral.js', '216b6bcdd9'],
   ['./src/world/playerGen.js', '7033b8b243'],
   ['./src/world/worldGen.js', '494992346d'],
