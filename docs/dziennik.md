@@ -29,6 +29,15 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 20, 2026, profil B, wersja v1.20 Beta
+Zrobione:
+- Wersja gry podniesiona do v1.20 Beta (zgoda właściciela). Wchodzą do niej: karta zawodnika w okienku w Transferach,
+  odnośniki w Poczcie, poczta tylko z ligi gracza i media o innych klubach, kariera trenera (Klub > Kariera, plakietki,
+  reputacja, popularność, rynek pracy bez klubu).
+Zostało / dalej:
+- Pytanie do właściciela bez odpowiedzi: czy bezrobotny trener z Ekstraklasy ma tak szybko dostawać oferty z Ekstraklasy
+  (test: reputacja 47, po 60 dniach oferta Wisły Płock).
+
 ## Nov 20, 2026, profil B, kontrola jakości kariery trenera (v1.19 Beta)
 Zrobione:
 - Sprawdzenie w Chromium (1600 i 390 px): rezygnacja, wszystkie zakładki bez klubu, Dalej przez 60 i 120 dni,
