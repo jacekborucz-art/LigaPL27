@@ -2,12 +2,12 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-eca988afb9';
+const VERSION = 'v0.3-79ad686004';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
   // AUTO-FILES-START
-  ['./index.html', '196f138ffe'],
+  ['./index.html', 'f515af4ef7'],
   ['./manifest.webmanifest', 'f15cbe83ae'],
   ['./assets/crests/arka-48.webp', '466a65579c'],
   ['./assets/crests/arka.webp', '58f2c8f4ad'],
@@ -186,7 +186,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', 'fa20124a83'],
+  ['./src/app.js', 'd2c75dbab4'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '019bb0029e'],
@@ -195,6 +195,7 @@ const FILES = [
   ['./src/career/board.js', '8351732e7c'],
   ['./src/career/boardRequests.js', 'c412b89b00'],
   ['./src/career/careerSystem.js', 'cd7a0226ec'],
+  ['./src/career/coachCareer.js', 'fff987f48a'],
   ['./src/career/coachMarket.js', '127756aa97'],
   ['./src/career/coaches.js', '041155fd9c'],
   ['./src/career/editor.js', '55bf72be1c'],
@@ -204,6 +205,7 @@ const FILES = [
   ['./src/career/foreignMarket.js', 'de8611d4a2'],
   ['./src/career/foreignPool.js', 'df311e562f'],
   ['./src/career/infrastructure.js', 'd64aff3a8f'],
+  ['./src/career/jobMarket.js', '057e3f0b49'],
   ['./src/career/leagueNews.js', '5f8f30a71c'],
   ['./src/career/loans.js', '6ff6e21d87'],
   ['./src/career/mindset.js', 'b8a1c39ce7'],
@@ -310,6 +312,7 @@ const FILES = [
   ['./src/styles/editor.css', '769ecc0bb5'],
   ['./src/styles/fonts.css', '372f3ee1fc'],
   ['./src/styles/history.css', '6e342b15ec'],
+  ['./src/styles/kariera.css', 'bda96390ca'],
   ['./src/styles/klub.css', '62ff25555a'],
   ['./src/styles/matchday.css', '877f3c6ff4'],
   ['./src/styles/menu.css', '9a0ce5f7a9'],
@@ -336,7 +339,9 @@ const FILES = [
   ['./src/training/variety.js', '31ec815b77'],
   ['./src/ui/arrowsView.js', 'de09da93ff'],
   ['./src/ui/assistantReportView.js', 'ad1ef0c14d'],
+  ['./src/ui/badges.js', 'b7a51128d4'],
   ['./src/ui/boardRequestsView.js', '14afde7d17'],
+  ['./src/ui/careerView.js', '1495497a21'],
   ['./src/ui/clubView.js', 'd798bb6b4f'],
   ['./src/ui/competitionsView.js', '6df6a9a5c1'],
   ['./src/ui/contextMenu.js', '5590f7bc7f'],
@@ -348,7 +353,7 @@ const FILES = [
   ['./src/ui/fixturesView.js', '8ad243c712'],
   ['./src/ui/formChart.js', '12324f252e'],
   ['./src/ui/infraView.js', '4518a9e3c7'],
-  ['./src/ui/klubView.js', 'd55225df54'],
+  ['./src/ui/klubView.js', '5e989bc716'],
   ['./src/ui/loansView.js', 'a695d82a14'],
   ['./src/ui/mailLinks.js', 'd1ed0bbde3'],
   ['./src/ui/masonry.js', 'abee5a105a'],
