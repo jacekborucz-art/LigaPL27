@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-cd6665531e';
+const VERSION = 'v0.3-c2ba7814c6';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -204,7 +204,7 @@ const FILES = [
   ['./src/career/finance.js', 'b4eb190068'],
   ['./src/career/foreignMarket.js', 'd04cc0ac5b'],
   ['./src/career/foreignPool.js', '283c73474b'],
-  ['./src/career/infrastructure.js', 'd64aff3a8f'],
+  ['./src/career/infrastructure.js', '855ad58d60'],
   ['./src/career/jobMarket.js', 'baf5c575b8'],
   ['./src/career/leagueNews.js', '4652647fb3'],
   ['./src/career/loans.js', '6ff6e21d87'],
@@ -223,7 +223,7 @@ const FILES = [
   ['./src/career/reputationSystem.js', '68df5d28ba'],
   ['./src/career/reserves.js', '07b46b62ea'],
   ['./src/career/retirement.js', '8a4b15af72'],
-  ['./src/career/scoutOps.js', '0745f1949c'],
+  ['./src/career/scoutOps.js', '9e976a1c8d'],
   ['./src/career/scoutRegions.js', '903ba80c24'],
   ['./src/career/shirts.js', '848f4d409c'],
   ['./src/career/sponsors.js', 'e59ba257b8'],
@@ -239,7 +239,7 @@ const FILES = [
   ['./src/career/transferSystem.js', '91a3d49d4c'],
   ['./src/career/transfers.js', 'b1811d619b'],
   ['./src/career/weeklyTodo.js', '436c3d1ccc'],
-  ['./src/config/calendar2026.js', '7af3df5b12'],
+  ['./src/config/calendar2026.js', '472a17ae89'],
   ['./src/config/competitions.js', '1ba35856b2'],
   ['./src/config/version.js', '1127788e45'],
   ['./src/core/decisions.js', 'b9fda961b7'],

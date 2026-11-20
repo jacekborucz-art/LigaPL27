@@ -647,11 +647,11 @@ export function candidateUntil(date, free) {
   const shifted = next ? addDays(next.from, SCOUT.afterWindow) : base;
   return shifted < max ? (shifted > base ? shifted : base) : max;
 }
-/** Okna transferowe bieżącego sezonu (kalendarz) i następne letnie (1 lipca - 1 września). */
+/** Okna transferowe bieżącego sezonu (kalendarz) i następne letnie (1 lipca - 9 września). */
 function transferWindows() {
   const out = [...(DOMESTIC.transferWindows ?? [])];
   const last = out.map((w) => w.from).sort().at(-1);
-  if (last) { const y = +last.slice(0, 4) + (+last.slice(5, 7) >= 7 ? 1 : 0); out.push({ from: `${y}-07-01`, to: `${y}-09-01` }); }
+  if (last) { const y = +last.slice(0, 4) + (+last.slice(5, 7) >= 7 ? 1 : 0); out.push({ from: `${y}-07-01`, to: `${y}-09-09` }); }
   return out;
 }
 

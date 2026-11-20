@@ -99,7 +99,7 @@ test('oferta z terminem: jutro pilna, za 5 dni ważna, po terminie albo po odpow
 test('okno transferowe: ostatnie 3 dni to fakt (2 dni: pilne), 8 dni przed końcem brak sprawy', () => {
   const g = fresh();
   setAll(g, 1);
-  const end = '2026-09-01';
+  const end = '2026-09-09';
   const at = (d) => { g.date = d; return buildWeeklyTodo(g).items.find((x) => x.key === `okno:${end}`); };
   assert.equal(at(addDays(end, -8)), undefined);
   const three = at(addDays(end, -3));

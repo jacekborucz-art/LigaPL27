@@ -40,7 +40,7 @@ test('Prefiks akcji i pomocnicze funkcje', () => {
   assert.ok(isNegotiationAction('ng-propose'));
   assert.ok(!isNegotiationAction('tr-day'));
   assert.ok(!isNegotiationAction(undefined));
-  assert.equal(windowEndFor('2026-08-10'), '2026-09-01');
+  assert.equal(windowEndFor('2026-08-10'), '2026-09-09');
   assert.equal(windowEndFor('2026-11-10'), '2027-06-30');
   assert.equal(ageLabel(24), '24 lata');
   assert.equal(ageLabel(25), '25 lat');

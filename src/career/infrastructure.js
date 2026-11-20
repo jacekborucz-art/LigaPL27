@@ -760,6 +760,8 @@ export function infraSeason(game, date) {
     if (!mine) I.fund += Math.round((F.clubs[id].ledger?.[date.slice(0, 7)]?.out?.invest ?? 0) * INFRA.AI_FUND_SHARE);
     // Licencja: sezon na rozpoczęcie inwestycji, potem kara
     const needs = licenceNeeds(game, id);
+    // Klub AI ponawia wniosek licencyjny przed rozliczeniem kary (gracz może go złożyć w każdej chwili po odmowie)
+    if (!mine && !club.parent && I.licence) for (const n of needs) if (!I.proj?.[n.track] && !I.req?.[n.track]) aiLicenceRequest(game, id, n, date);
     if (!needs.length) I.licence = null;
     else if (!I.licence || (I.licence.tier != null && I.licence.tier !== club.tier)) {
       // Nowa liga (awans, także dwa awanse z rzędu z III ligi): znowu sezon na rozpoczęcie inwestycji

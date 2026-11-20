@@ -32,7 +32,7 @@ export const DOMESTIC = {
     ],
   },
   transferWindows: [
-    { from: '2026-07-01', to: '2026-09-01', sure: false },
+    { from: '2026-07-01', to: '2026-09-09', sure: false }, // decyzja właściciela Nov 20, 2026: lato zawsze 1 lipca - 9 września (transfery.info)
     { from: '2027-02-01', to: '2027-02-26', sure: false },
   ],
 };
@@ -110,6 +110,8 @@ export function setSeasonYear(y, { windows = null, polishEurope = null } = {}) {
   SEASON_END = `${y + 1}-06-30`;
   replaceContents(DOMESTIC, shiftDeep(BASE.DOMESTIC, days));
   replaceContents(UEFA, shiftDeep(BASE.UEFA, days));
+  // Letnie okno transferowe co roku w tych samych datach: 1 lipca - 9 września (decyzja właściciela), nie przesuwane z kalendarzem
+  DOMESTIC.transferWindows[0] = { ...DOMESTIC.transferWindows[0], from: `${y}-07-01`, to: `${y}-09-09` };
   // Rok Euro albo mistrzostw świata: finały pucharów UEFA przed oknem sparingów przed turniejem (jak w 2016, 2021, 2024)
   const prep = windows?.find((w) => w.kind === 'prep');
   if (prep) {

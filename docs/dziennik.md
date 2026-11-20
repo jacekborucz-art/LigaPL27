@@ -29,6 +29,20 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 20, 2026, profil A (chmura), okno transferowe 9 września (v1.21 Beta)
+Zrobione:
+- Letnie okno transferowe co roku stałe: 1 lipca do 9 września (`src/config/calendar2026.js`: BASE i `setSeasonYear`;
+  `src/career/scoutOps.js`: termin dołączenia zawodnika z klubu w następnym oknie).
+- Infrastruktura: klub AI ponawia wniosek licencyjny 1 lipca przed rozliczeniem kary (`infraSeason`). Wcześniej po
+  odmowie zarządu w czerwcu kara wpadała, zanim AI mogło złożyć nowy wniosek; gracz może go złożyć od razu.
+- Testy dat okna: gameLoop, negotiationView, weeklyTodo, transferDeals.
+Decyzje i pułapki:
+- Właściciel: data 9 września sztywno co roku (ruchomy kalendarz nie przesuwa końca okna).
+- Błąd licencji AI wyszedł przy innej ścieżce RNG (multiseason, Resovia w 1 Lidze z saldem -376 tys.).
+Zostało / dalej:
+- Spis funkcji gry w docs (prośba właściciela: najpierw dokumentacja, potem kod).
+
+
 ## Nov 20, 2026, profil B, kluby zagraniczne z nazwami (v1.21 Beta)
 Zrobione:
 - Nowy plik `src/data/kluby_swiat.js`: ok. 950 prawdziwych klubów w 95 krajach (ligi kupców, rynki KSA i USA, kraje puli i skautingu), siła L i prestiż [SZAC], nazwy z ogólnej wiedzy (niezweryfikowane).

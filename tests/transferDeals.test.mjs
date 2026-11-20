@@ -88,14 +88,14 @@ test('Testy medyczne: wzór ryzyka (ODP, uraz, wiek), kupiec AI wycofuje się pr
 });
 
 test('Ostatni dzień okna: transakcja na etapie warunków upada, po testach medycznych zawodnik jest zgłaszany', () => {
-  const g = newGame('widzew', 44, '2026-08-31');
+  const g = newGame('widzew', 44, '2026-09-08');
   const a = midSquad(g, 'piast');
   const b = squadOf(g.world, 'korona').filter((p) => p.pos === 'ŚO').sort((x, y) => x.ovr - y.ovr)[0];
-  const early = startDeal(g, { playerId: a.id, to: 'widzew', fee: 100000, contract: { wage: 4000, until: '2029-06-30' }, kind: 'transfer', stage: 'terms', date: '2026-09-01' });
-  const late = startDeal(g, { playerId: b.id, to: 'widzew', fee: 100000, contract: { wage: 4000, until: '2029-06-30' }, kind: 'transfer', stage: 'medical', date: '2026-09-01' });
-  early.plan.terms = 3; early.due = '2026-09-04';
-  late.plan.medical = 3; late.due = '2026-09-04';
-  step(g, 1); // 2026-09-01: ostatni dzień okna
+  const early = startDeal(g, { playerId: a.id, to: 'widzew', fee: 100000, contract: { wage: 4000, until: '2029-06-30' }, kind: 'transfer', stage: 'terms', date: '2026-09-09' });
+  const late = startDeal(g, { playerId: b.id, to: 'widzew', fee: 100000, contract: { wage: 4000, until: '2029-06-30' }, kind: 'transfer', stage: 'medical', date: '2026-09-09' });
+  early.plan.terms = 3; early.due = '2026-09-12';
+  late.plan.medical = 3; late.due = '2026-09-12';
+  step(g, 1); // 2026-09-09: ostatni dzień okna
   assert.equal(early.end?.result, 'failed');
   assert.equal(early.end.reason, 'deadline');
   assert.ok(late.end, 'transakcja po testach rozstrzygnięta w dniu zamknięcia okna');

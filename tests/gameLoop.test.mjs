@@ -67,7 +67,7 @@ test('Ważna wiadomość zatrzymuje upływ dni (np. 3 dni do końca okna transfe
     const r = continueUntilStop(s, { maxDays: 120 });
     stops.push([r.reason, s.date]);
   }
-  assert.ok(stops.some(([, d]) => d === '2026-08-29'), JSON.stringify(stops));
+  assert.ok(stops.some(([, d]) => d === '2026-09-06'), JSON.stringify(stops));
   assert.ok(stops.every(([reason]) => reason === 'message' || reason === 'limit'));
 });
 
