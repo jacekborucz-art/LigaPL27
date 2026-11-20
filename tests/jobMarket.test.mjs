@@ -169,3 +169,23 @@ test('Sezon bez pracy: koniec sezonu i nowy terminarz bez klubu gracza, oferty g
   assert.ok(g.manager.rep < rep0, 'długie bezrobocie obniża reputację');
   assert.ok(g.manager.rep >= 0.6 * g.manager.career.rep.peak - 1e-9, 'nie niżej niż 0,6 szczytu');
 });
+
+test('Odejście zamyka decyzje dawnego klubu; wycofanie aplikacji nie kasuje oferty agenta z kilkoma klubami', () => {
+  const g = newGame('korona', 27, '2026-09-01');
+  // Decyzja dawnego klubu w poczcie (np. sztab): po odejściu nie blokuje Dalej i nie da się jej podjąć
+  g.inbox.unshift({ id: 'qa-dec', key: 'qa-dec', date: g.date, category: 'staff', from: 'Sztab', subject: 'Decyzja klubu', body: '', priority: 'important', actions: [{ id: 'a', label: 'Tak' }], read: false, resolved: false, refs: { kind: 'staffRenew' } });
+  g.inbox = [...enterUnemployment(g, g.date, 'zwolnienie'), ...g.inbox];
+  assert.ok(g.inbox.find((m) => m.id === 'qa-dec').resolved, 'decyzja dawnego klubu zamknięta');
+  assert.notEqual(primaryAction(g).kind, 'decide');
+  // Oferta agenta (dwa kluby) i aplikacja do jednego z nich
+  const ids = Object.keys(g.world.clubs).filter((id) => clubById(id) && !clubById(id).parent && clubById(id).tier >= 3 && id !== 'korona').slice(0, 2);
+  for (const id of ids) { fireCoach(g, id, g.date, { why: 'wyniki' }); g.coaches[id].until = addDays(g.date, 20); }
+  g.manager.job.since = addDays(g.date, -JOB.fallback1);
+  const offer = jobMarketDay(g, g.date).find((m) => m.refs?.kind === 'jobOffer');
+  assert.ok(offer);
+  g.inbox.unshift(offer);
+  const target = offer.refs.jobClubs.find((id) => ids.includes(id)) ?? ids[0];
+  assert.ok(applyJob(g, target).ok);
+  assert.ok(withdrawApplication(g, target).ok);
+  assert.equal(g.inbox.find((m) => m.id === offer.id).resolved, false, 'oferta agenta zostaje');
+});

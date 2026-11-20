@@ -989,8 +989,8 @@ function renderJoblessDashboard(g, club) {
       <li><span>Wakaty</span><b>${js.vacancies.length}</b></li>
       <li><span>Aplikacje</span><b>${apps.length ? esc(apps.map((a) => `${a.name}: ${JOB_APP_STATE[a.state] ?? a.state}`).join(', ')) : 'brak'}</b></li>
     </ul>
-    ${offers.length ? `<p><button class="btn btn--primary btn--sm" data-act="mail" data-id="${esc(offers[0].id)}">Oferta pracy: ${esc(offers[0].subject ?? '')}</button></p>` : ''}
-    ${vac.length ? `<ul class="plain">${vac.map((v) => `<li>${esc(v.name)} (${esc(v.league)}), szansa: ${esc(v.chance)}${v.applied ? ', aplikacja wysłana' : ''}</li>`).join('')}</ul>` : '<p class="muted">Żaden klub nie szuka teraz trenera. Wakaty pojawiają się po zwolnieniach trenerów.</p>'}`;
+    ${offers.length ? `<p><button class="btn btn--primary btn--sm" data-act="mail" data-id="${esc(offers[0].id)}">${esc(/ofert/i.test(offers[0].subject ?? '') ? offers[0].subject : `Oferta pracy: ${offers[0].subject ?? ''}`)}</button></p>` : ''}
+    ${vac.length ? `<ul class="plain">${vac.map((v) => `<li>${esc(v.name)} (${esc(v.league)}), ${v.cooldownUntil ? `karencja do ${esc(fmtDate(v.cooldownUntil))}` : `szansa: ${esc(v.chance)}`}${v.applied ? ', aplikacja wysłana' : ''}</li>`).join('')}</ul>` : '<p class="muted">Żaden klub nie szuka teraz trenera. Wakaty pojawiają się po zwolnieniach trenerów.</p>'}`;
   const tableOf = dashTables(g);
   return `<div class="dash">
     <h2 class="dash__title">Pulpit</h2>
@@ -1813,7 +1813,7 @@ async function dispatchAct(el, { root = app } = {}) {
       await new Promise((r) => setTimeout(r, matchMedia('(prefers-reduced-motion: reduce)').matches ? 150 : 450)); // podpis widoczny przed generowaniem świata
       await newGame(nc.slot, nc.clubId, profileOf(nc));
     }
-    if (act === 'tab') { state.tab = el.dataset.tab; state.ma = null; state.mailOpen = null; state.playerOpen = null; state.repOpen = null; state.fx = null; state.todo = null; state.extPlayer = null; state.extClub = null; if (el.dataset.sub) { if (state.tab === 'klub') state.kTab = el.dataset.sub; else state.tfTab = el.dataset.sub; } else if (state.tab === 'klub' && state.game && isUnemployed(state.game)) state.kTab = 'kariera'; render(); }
+    if (act === 'tab') { state.tab = el.dataset.tab; state.kMsg = null; state.crResign = false; state.ma = null; state.mailOpen = null; state.playerOpen = null; state.repOpen = null; state.fx = null; state.todo = null; state.extPlayer = null; state.extClub = null; if (el.dataset.sub) { if (state.tab === 'klub') state.kTab = el.dataset.sub; else state.tfTab = el.dataset.sub; } else if (state.tab === 'klub' && state.game && isUnemployed(state.game)) state.kTab = 'kariera'; render(); }
     // Terminarz i wyniki (Pulpit > Pokaż wszystko): sezon, rozgrywki, miejsce meczu
     if (act === 'fixtures') { state.tab = 'pulpit'; state.fx = { season: null, comp: 'all', venue: 'all' }; render(); window.scrollTo({ top: 0 }); app.querySelector('.fxs h2')?.setAttribute('tabindex', '-1'); app.querySelector('.fxs h2')?.focus({ preventScroll: true }); }
     if (act === 'fxback') { state.fx = null; render(); app.querySelector('[data-act="fixtures"]')?.focus(); }

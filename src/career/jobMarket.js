@@ -147,8 +147,11 @@ export function withdrawApplication(game, clubId) {
   const a = J.apps.find((x) => x.clubId === clubId && ACTIVE.has(x.state));
   if (!a) return { ok: false, text: 'Brak aktywnej aplikacji do tego klubu.' };
   J.apps = J.apps.filter((x) => x !== a);
-  if (a.state === 'oferta') releaseHold(game, clubId, game.date);
-  game.inbox = (game.inbox ?? []).map((m) => (m.refs?.kind === 'jobOffer' && m.refs?.jobClubs?.includes(clubId) && !m.resolved ? { ...m, resolved: true } : m));
+  if (a.state === 'oferta') {
+    releaseHold(game, clubId, game.date);
+    // Tylko oferta z tej aplikacji (jeden klub); oferta agenta z kilkoma klubami zostaje w poczcie
+    game.inbox = (game.inbox ?? []).map((m) => (m.refs?.kind === 'jobOffer' && m.refs?.jobClubs?.length === 1 && m.refs.jobClubs[0] === clubId && !m.resolved ? { ...m, resolved: true } : m));
+  }
   return { ok: true, text: `Wycofano aplikację do ${nameOf(clubId)}.` };
 }
 
@@ -349,6 +352,10 @@ export function enterUnemployment(game, date, why, { inSeason = true, dropped = 
   J.refused[clubId] = addDays(date, JOB.ownClubCooldown);
   game.market && (game.market.userListed = {});
   if (game.squadLimit) game.squadLimit.case = null;
+  // Decyzje dawnego klubu (oferty za zawodników, sponsorzy, wypożyczenia, sztab) przestają dotyczyć trenera:
+  // bez tego blokowały Dalej albo pozwalały decydować za klub prowadzony już przez AI (jak przy switchClub)
+  for (const o of game.market?.offers ?? []) if (o.kind === 'incoming' && o.status === 'open') o.status = 'expired'; // wiadomości zamknie przegląd dnia
+  game.inbox = (game.inbox ?? []).map((m) => (!m.resolved && m.actions?.length && m.refs?.kind !== 'jobOffer' ? { ...m, resolved: true } : m));
   playPending(game, clubId, date);
   userLeftClub(game, clubId, date, why);
   const d = Math.round((game.manager.rep - repBefore) * 10) / 10;
