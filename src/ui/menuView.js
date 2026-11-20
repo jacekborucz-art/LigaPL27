@@ -544,7 +544,7 @@ function packBox(nc) {
        <button class="btn btn--quiet btn--sm" data-act="ncPackClear">Usuń datapack</button>`
     : '<p class="hint">Opcjonalnie: wczytaj datapack z Edytora (Opcje, Edytor, Eksportuj), żeby zacząć z jego kadrami. Bez pliku kadry zostaną wylosowane.</p>';
   return `<div class="nc-pack">${info}
-    <label class="btn btn--quiet btn--sm nc-pack__load">${P ? 'Wczytaj inny datapack' : 'Wczytaj datapack'}<input type="file" data-act="nc-pack" hidden></label>
+    <label class="btn btn--sm nc-pack__load" title="Tutaj możesz wczytać swój datapack">${P ? 'Wczytaj inny datapack' : 'Wczytaj datapack'}<input type="file" data-act="nc-pack" hidden></label>
     ${nc.packMsg ? `<p class="nc-pack__err" role="alert">${esc(nc.packMsg)}</p>` : ''}</div>`;
 }
 
