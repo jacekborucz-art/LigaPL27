@@ -1,9 +1,10 @@
 // Rozgrywki: zakładki Liga Mistrzów, Liga Europy, Liga Konferencji.
-// Przebieg (eliminacje, baraże, drabinka), tabela fazy ligowej, mecze wg dat, strzelcy, ranking krajów,
+// Przebieg (eliminacje, baraże, drabinka), tabela fazy ligowej, mecze wg dat, strzelcy, ranking UEFA (kluby i kraje),
 // pokaz losowania (kule wyciągane po kolei, z przyspieszeniem i od razu wynikiem).
 import { CLUBS_PL } from '../data/clubs_pl.js';
 import { anyClub } from '../season/season.js';
 import { UCOMP_NAMES, ROUND_NAMES, ROUND_SHORT, ORDER, leagueTable, countryOf, COUNTRY_NAMES, uefaClub } from '../season/uefa.js';
+import { rankingTables } from '../season/uefaCoef.js';
 import { crestHtml } from './crest.js';
 import { esc, fmtDate, weekday, fmtDay } from './dom.js';
 
@@ -14,7 +15,7 @@ const name = (id) => anyClub(id)?.name ?? id;
 const flag = (id) => (isPolish(id) ? '' : `<small class="ctry" title="${esc(COUNTRY_NAMES[countryOf(id)] ?? countryOf(id))}">${esc(countryOf(id))}</small>`);
 const shortDay = (iso) => `${weekday(iso).slice(0, 3)} ${fmtDay(iso)}`;
 export const EUROPE_TABS = [['LM', 'Liga Mistrzów'], ['LE', 'Liga Europy'], ['LK', 'Liga Konferencji']];
-export const EUROPE_VIEWS = [['path', 'Przebieg'], ['league', 'Tabela'], ['fixtures', 'Mecze'], ['scorers', 'Strzelcy'], ['ranking', 'Kraje']];
+export const EUROPE_VIEWS = [['path', 'Przebieg'], ['league', 'Tabela'], ['fixtures', 'Mecze'], ['scorers', 'Strzelcy'], ['ranking', 'Ranking UEFA']];
 
 /**
  * Wiersz meczu w pucharach (wyniki w tle, przebieg, Superpuchar Europy).
@@ -147,13 +148,63 @@ function scorersView(game, comp) {
   return `<ol class="stat-list stat-list--cols">${rows.map((s) => `<li>${crest(s.club, 18)}<span>${esc(s.name)}<small>${esc(name(s.club))}</small></span><b>${s.g}</b></li>`).join('')}</ol>`;
 }
 
-function rankingView(game) {
-  const U = game.season.uefa;
-  const clubs = new Map();
-  for (const c of Object.keys(U.comps)) for (const r of Object.values(U.comps[c].rounds)) for (const id of r.entrants) clubs.set(countryOf(id), (clubs.get(countryOf(id)) ?? 0) + 1);
-  const rows = [...clubs].map(([cc, n]) => ({ cc, n, pts: Math.round(((U.countryPts[cc] ?? 0) / n) * 1000) / 1000 })).sort((a, b) => b.pts - a.pts);
-  return `<p class="hint">Punkty krajów w sezonie 2026/27: zwycięstwo 2 pkt, remis 1 pkt (w eliminacjach połowa), podzielone przez liczbę klubów. Premie za awanse dojdą w kolejnych sezonach.</p>
-    <ol class="stat-list rank stat-list--cols">${rows.map((r, i) => `<li class="${r.cc === 'POL' ? 'is-me' : ''}"><span></span><span>${esc(COUNTRY_NAMES[r.cc] ?? r.cc)}<small>${r.n} ${r.n === 1 ? 'klub' : r.n < 5 ? 'kluby' : 'klubów'}</small></span><b>${r.pts.toFixed(3).replace('.', ',')}</b></li>`).join('')}</ol>`;
+// ------------------------------------------------------------ Ranking UEFA (5 sezonów, src/season/uefaCoef.js)
+const fmt3 = (x) => (x == null ? '-' : (Math.round(x * 1000) / 1000).toFixed(3).replace('.', ','));
+const short = (season) => season.slice(2);
+/** Zmiana miejsca od początku sezonu: strzałka i liczba (w górę = awans w rankingu). */
+function moveCell(place, startPlace) {
+  const d = startPlace ? startPlace - place : 0;
+  if (!d) return '<span class="rk-mv" data-d="0" title="Bez zmian od początku sezonu">=</span>';
+  const up = d > 0;
+  return `<span class="rk-mv" data-d="${up ? 'up' : 'down'}" title="${up ? 'Awans' : 'Spadek'} o ${Math.abs(d)} od początku sezonu">${up ? '▲' : '▼'}${Math.abs(d)}</span>`;
+}
+function seasonHeads(seasons, live) {
+  return seasons.map((x, i) => `<th scope="col"${i === 4 && live ? ' title="Sezon w trakcie: punkty z gry"' : ''}>${esc(short(x))}${i === 4 && live ? '*' : ''}</th>`).join('');
+}
+
+const RANK_TOP = 100;
+function rankingView(game, ui = {}) {
+  const T = rankingTables(game, { nameOf: (id) => anyClub(id)?.name ?? null });
+  const kind = ui.rank === 'countries' ? 'countries' : 'clubs';
+  const pills = `<div class="chips chips--sm" role="group" aria-label="Ranking UEFA">${[['clubs', 'Kluby'], ['countries', 'Kraje']].map(([k, l]) => `<button class="chip" data-act="urank" data-k="${k}" aria-pressed="${kind === k}">${l}</button>`).join('')}</div>`;
+  const pol = T.countries.find((c) => c.code === 'POL');
+  const span = `${T.seasons[0]}-${T.seasons[4]}`;
+  const lead = `<p class="xl-note">Ranking UEFA, sezony ${esc(span)}${T.live ? ` (sezon ${esc(T.seasons[4])} trwa, punkty z gry)` : ''}. Polska: ${pol ? `${pol.place}. miejsce, ${fmt3(pol.total)} pkt` : 'brak'}. Strzałka: zmiana miejsca od początku sezonu.</p>`;
+  if (kind === 'countries') {
+    const rows = T.countries.map((c) => `<tr class="${c.code === 'POL' ? 'is-pl' : ''}">
+      <th scope="row" class="xl__pos rk-pos"><b>${c.place}</b>${moveCell(c.place, c.startPlace)}</th>
+      <td class="xl__nm rk-nm"><span class="rk-cn">${esc(c.name)}</span><small class="ctry">${esc(c.code)}</small></td>
+      ${c.vals.map((v) => `<td${v == null ? ' class="xl__na"' : ''}>${fmt3(v)}</td>`).join('')}
+      <td class="rk-sum"><b>${fmt3(c.total)}</b></td><td>${c.clubs ? `${c.alive}/${c.clubs}` : '-'}</td></tr>`).join('');
+    return `${pills}${lead}<p class="xl-note">Suma pięciu współczynników sezonowych; sezon to punkty klubów kraju podzielone przez liczbę klubów w pucharach. Kluby: wciąż w grze w tym sezonie.</p>
+      <div class="xl-wrap rk-xl" tabindex="0" role="region" aria-label="Ranking krajów UEFA, tabela przewijana w poziomie"><table class="xl rk"><thead><tr>
+      <th scope="col" class="xl__pos">#</th><th scope="col" class="xl__nm">Kraj</th>${seasonHeads(T.seasons, T.live)}<th scope="col">5 sezonów</th><th scope="col">Kluby</th>
+      </tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+  const cc = ui.rankCc && T.countries.some((c) => c.code === ui.rankCc) ? ui.rankCc : '';
+  const all = cc ? T.clubs.filter((c) => c.country === cc) : T.clubs;
+  // Bez filtra: pierwsza setka i polskie kluby spod setki (cała lista ponad 400 wierszy na życzenie)
+  const cut = !cc && !ui.rankAll && all.length > RANK_TOP ? RANK_TOP : null;
+  const list = cut ? [...all.slice(0, cut), ...all.slice(cut).filter((c) => c.country === 'POL' || c.id === game.clubId)] : all;
+  const opts = [['', 'Wszystkie kraje'], ...[...T.countries].sort((a, b) => a.name.localeCompare(b.name, 'pl')).map((c) => [c.code, c.name])]
+    .map(([k, l]) => `<option value="${esc(k)}"${k === cc ? ' selected' : ''}>${esc(l)}</option>`).join('');
+  const filter = `<label class="rk-filter">Kraj <select data-urank-cc aria-label="Filtr klubów według kraju">${opts}</select></label>`;
+  const rows = list.map((c, i) => {
+    const gap = cut && i === cut ? `<tr class="rk-gap"><td colspan="11">Dalej polskie kluby spoza pierwszej setki</td></tr>` : '';
+    const cls = c.id && c.id === game.clubId ? 'is-me' : c.country === 'POL' ? 'is-pl' : '';
+    const cr = c.id && anyClub(c.id) ? crest(c.id, 18) : '<span class="rk-nocrest" aria-hidden="true"></span>';
+    return `${gap}<tr class="${cls}">
+      <th scope="row" class="xl__pos rk-pos"><b>${c.place}</b>${moveCell(c.place, c.startPlace)}</th>
+      <td class="xl__nm rk-nm"><span class="rk-club">${cr}<span class="rk-cn">${esc(c.name)}</span></span><small class="ctry" title="${esc(COUNTRY_NAMES[c.country] ?? c.country)}">${esc(c.country)}</small></td>
+      ${c.vals.map((v) => `<td${v == null ? ' class="xl__na"' : ''}>${fmt3(v)}</td>`).join('')}
+      <td>${fmt3(c.own)}</td><td class="${c.coef > c.own ? 'rk-thr' : 'xl__na'}">${fmt3(c.threshold)}</td><td class="rk-sum"><b>${fmt3(c.coef)}</b></td></tr>`;
+  }).join('');
+  const n = all.length;
+  const more = cut ? `<p class="rk-more"><button class="btn btn--quiet btn--sm" data-act="urankall">Pokaż wszystkie kluby (${n})</button></p>` : '';
+  return `${pills}${lead}<div class="rk-bar">${filter}<span class="xl-note">${n} ${n === 1 ? 'klub' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'kluby' : 'klubów'}${cut ? `, pokazana pierwsza setka i polskie kluby` : ''}. Współczynnik: wyższa z wartości, punkty własne albo 20 % współczynnika kraju.</span></div>
+    <div class="xl-wrap rk-xl" tabindex="0" role="region" aria-label="Ranking klubów UEFA, tabela przewijana w poziomie"><table class="xl rk"><thead><tr>
+    <th scope="col" class="xl__pos">#</th><th scope="col" class="xl__nm">Klub</th>${seasonHeads(T.seasons, T.live)}<th scope="col">Pkt własne</th><th scope="col">Próg 20%</th><th scope="col">Współcz.</th>
+    </tr></thead><tbody>${rows || '<tr><td colspan="11">Brak klubów.</td></tr>'}</tbody></table></div>${more}`;
 }
 
 // ------------------------------------------------------------ Pokaz losowania
@@ -201,11 +252,11 @@ export function mountDrawAnimation(root) {
   box.scrollIntoView({ block: 'start' });
 }
 
-export function renderEurope(game, comp, { view = 'path', round = null, filter = 'pl', draw = null } = {}) {
+export function renderEurope(game, comp, { view = 'path', round = null, filter = 'pl', draw = null, rank = 'clubs', rankCc = '', rankAll = false } = {}) {
   const v = EUROPE_VIEWS.some(([k]) => k === view) ? view : 'path';
   const views = `<div class="subtabs subtabs--5" role="tablist">${EUROPE_VIEWS.map(([k, l]) => `<button role="tab" data-act="cview" data-v="${k}" aria-selected="${v === k}">${l}</button>`).join('')}</div>`;
   if (!game.season?.uefa) return `${views}<p class="hint">Puchary pojawią się po wczytaniu gry.</p>`;
-  const body = v === 'league' ? leagueView(game, comp, round) : v === 'fixtures' ? fixturesView(game, comp, filter) : v === 'scorers' ? scorersView(game, comp) : v === 'ranking' ? rankingView(game) : pathView(game, comp, { draw });
+  const body = v === 'league' ? leagueView(game, comp, round) : v === 'fixtures' ? fixturesView(game, comp, filter) : v === 'scorers' ? scorersView(game, comp) : v === 'ranking' ? rankingView(game, { rank, rankCc, rankAll }) : pathView(game, comp, { draw });
   return `<div class="eu">${views}${body}</div>`;
 }
 export { uefaClub };

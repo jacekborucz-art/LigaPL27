@@ -89,7 +89,15 @@ while (g.date < end) {
   g.date = addDays(g.date, 1); processDay(g);
   if (SEASON !== before) {
     const a = g.archive.at(-1);
-    console.log(`\n== ${a.season} (${Math.round(performance.now() - t0)} ms) mistrz ${a.champion}, PP ${a.cup}, user ${g.clubId} ${a.user.pos}. w lidze ${a.user.tier}, Polska ranking ${a.polandRank}`);
+    console.log(`\n== ${a.season} (${Math.round(performance.now() - t0)} ms) mistrz ${a.champion}, PP ${a.cup}, user ${g.clubId} ${a.user?.pos ?? '-'}. w lidze ${a.user?.tier ?? '-'}, Polska ranking ${a.polandRank}`);
+    { // Współczynniki UEFA (src/season/uefaCoef.js): ranking po sezonie, lista dostępu, polskie kluby
+      const C = g.uefaCoef; const cc = C.countries;
+      const tot = (k) => Math.round(cc[k].reduce((x, y) => x + (y ?? 0), 0) * 1000) / 1000;
+      const top = Object.keys(cc).sort((x, y) => tot(y) - tot(x)).slice(0, 14).map((k, i) => `${i + 1}.${k} ${tot(k)}`).join(' ');
+      console.log(`  UEFA okno ${C.seasons[0]}-${C.seasons[3]} (+${C.seasons[4]}): Polska ${a.polandRank}. (sezon ${C.countries.POL[3]}), dostęp ${a.polandAccessRank}. | ${top}`);
+      const pl = Object.entries(C.clubs).filter(([k]) => CLUBS_PL.some((c) => c.id === k)).map(([k, v]) => [k, Math.round(v.reduce((x, y) => x + (y ?? 0), 0) * 100) / 100, v[3]]).sort((x, y) => y[1] - x[1]).slice(0, 6);
+      console.log(`  UEFA polskie kluby (suma 4 sezonów okna, ostatni sezon): ${pl.map(([k, s5, l]) => `${k} ${s5} (${l ?? '-'})`).join(', ')}`);
+    }
     console.log('  awans EK:', a.promoted[1].join(','), '| spadek:', a.relegated[2].join(','), '| z III ligi:', a.promoted[3].join(','), '| do III ligi:', a.relegated[4].join(','));
     console.log('  OVR top14:', avg(1), avg(2), avg(3), 'zawodników', Object.keys(g.world.players).length, 'wolnych', g.market.free.length);
     const sizes = CLUBS_PL.filter((c) => c.tier <= 3).map((c) => squadOf(g.world, c.id).length);

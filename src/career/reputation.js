@@ -59,7 +59,7 @@ export const REP = {
 };
 /** Widoczność ligi (ta sama skala co p.rep): 1 Liga, 2 Liga, III liga, IV liga. Ekstraklasa ze współczynnika Polski. */
 export const LEAGUE_VIS = { 2: 26, 3: 17, 4: 10, 5: 6 };
-export const POL_COEF_BASE = 35;
+export const POL_COEF_BASE = 45.725; // współczynnik Polski w rankingu UEFA na start gry (plik UEFA, stan Nov 5, 2026); game.countryCoef po każdym sezonie
 /** Gole i asysty na 90 minut przeciętnego zawodnika pozycji (bramkarz tylko przez ocenę). */
 export const GA_EXPECTED = { NAP: 0.45, SN: 0.40, OP: 0.35, BP: 0.30, ŚP: 0.15, WB: 0.12, DP: 0.08, BO: 0.08, ŚO: 0.05, BR: 0 };
 /** Punkty trofeów (okno 3 sezonów z wagą 1 / 0,6 / 0,3). */

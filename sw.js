@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-cd6665531e';
+const VERSION = 'v0.3-dfc51f0719';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -186,7 +186,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', '695348b0fd'],
+  ['./src/app.js', 'e8309f39bc'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '3cd6d72f9f'],
   ['./src/career/assistantReport.js', 'db514a2a68'],
@@ -219,7 +219,7 @@ const FILES = [
   ['./src/career/preContracts.js', '2e79c35210'],
   ['./src/career/prizes.js', 'eed7f4e394'],
   ['./src/career/referees.js', 'e6a9ed319a'],
-  ['./src/career/reputation.js', 'c89eb66b85'],
+  ['./src/career/reputation.js', 'd82c0e8e86'],
   ['./src/career/reputationSystem.js', '68df5d28ba'],
   ['./src/career/reserves.js', '07b46b62ea'],
   ['./src/career/retirement.js', '8a4b15af72'],
@@ -261,6 +261,7 @@ const FILES = [
   ['./src/data/kluby_uefa.json', 'e579c6760e'],
   ['./src/data/names.js', 'dc6269c5ae'],
   ['./src/data/playerInstructions.js', 'c83822cb91'],
+  ['./src/data/ranking_uefa.json', '5fb827a754'],
   ['./src/data/reprezentacje.json', '551a9d5bdd'],
   ['./src/data/reprezentacje_swiat.json', '29c3c96adf'],
   ['./src/engine/lineup.js', 'fd8c7c295e'],
@@ -298,16 +299,17 @@ const FILES = [
   ['./src/season/matchReport.js', 'be9864d533'],
   ['./src/season/national.js', '1b51378924'],
   ['./src/season/nationalSystem.js', '56b1056ddd'],
-  ['./src/season/rollover.js', '2a66e32196'],
+  ['./src/season/rollover.js', 'cf4a299125'],
   ['./src/season/schedule.js', 'a608f6730f'],
   ['./src/season/season.js', '7fa356162b'],
   ['./src/season/standings.js', 'b3bdff91e2'],
   ['./src/season/superCupEU.js', 'f728d6d300'],
   ['./src/season/suspension.js', '7671748aa6'],
   ['./src/season/thirdLeague.js', 'b37f1d8a44'],
-  ['./src/season/uefa.js', '4880cc084f'],
+  ['./src/season/uefa.js', '3faac7aaf2'],
+  ['./src/season/uefaCoef.js', 'e978b7d220'],
   ['./src/season/worldNations.js', '6003d36e12'],
-  ['./src/styles/app.css', 'ed50debc91'],
+  ['./src/styles/app.css', '9e6d61f2f3'],
   ['./src/styles/assistant.css', 'a1dd04f875'],
   ['./src/styles/base.css', 'f2fee58203'],
   ['./src/styles/club.css', '6615e08e49'],
@@ -348,13 +350,13 @@ const FILES = [
   ['./src/ui/boardRequestsView.js', '14afde7d17'],
   ['./src/ui/careerView.js', '823345518a'],
   ['./src/ui/clubView.js', 'd798bb6b4f'],
-  ['./src/ui/competitionsView.js', '0383bb8e91'],
+  ['./src/ui/competitionsView.js', 'c0c1ca400f'],
   ['./src/ui/contextMenu.js', '5590f7bc7f'],
   ['./src/ui/crest.js', '58e767edc7'],
   ['./src/ui/daySpeed.js', '73d29c5b52'],
   ['./src/ui/dom.js', '0ce16300f6'],
   ['./src/ui/editorView.js', '1231d161e7'],
-  ['./src/ui/europeView.js', '3ee900afcf'],
+  ['./src/ui/europeView.js', '50817d42cc'],
   ['./src/ui/fixturesView.js', '8ad243c712'],
   ['./src/ui/formChart.js', '12324f252e'],
   ['./src/ui/infraView.js', '4518a9e3c7'],
