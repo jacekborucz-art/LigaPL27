@@ -28,6 +28,7 @@ import { ensureLoans } from './loans.js'; // wypożyczenia: systemy dnia i stare
 import { ensureTransferState } from './transferSystem.js'; // transakcje w toku, prekontrakty, prośby o transfer, zagranica (docs/transfery.md)
 import { foreignOfferMessage } from './foreignMarket.js';
 import { ensureStaff } from './staffMarket.js'; // sztab: zatrudnianie i zwalnianie, pensje sztabu (docs/sztab.md)
+import './scoutOps.js'; // skauting zagraniczny: skauci, misje, kandydaci (docs/skauting.md)
 import { ensureCareerHistory, careerScan, careerMonth, careerPress, careerLeave, boardStartTrust } from './coachCareer.js'; // kariera trenera (docs/kariera-trenera.md)
 import { ensureJob, coachFired, jobAccepted, jobDeclined, unsolicitedOffers, offerMessage as jobOfferMessage } from './jobMarket.js'; // rynek pracy trenera
 import { clubReputation } from './reputation.js';

@@ -30,9 +30,9 @@ function newGame(seed = 21) {
 let shared = null;
 const fresh = () => structuredClone(shared ??= newGame());
 
-test('Każda rola ma 3 atrybuty z opisem wpływu na grę', () => {
+test('Każda rola ma 3 atrybuty z opisem wpływu na grę (skaut 5, docs/skauting.md)', () => {
   for (const [role, attrs] of Object.entries(ROLE_ATTRS)) {
-    assert.equal(Object.keys(attrs).length, 3, role);
+    assert.equal(Object.keys(attrs).length, role === 'skaut' ? 5 : 3, role);
     for (const a of Object.values(attrs)) assert.ok(a.name && a.text.length > 10, role);
   }
 });

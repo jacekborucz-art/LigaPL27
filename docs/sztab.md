@@ -80,6 +80,8 @@ Ekran: Trening, Sztab (`src/ui/staffView.js`, style `src/styles/staff.css`, test
   `x(1 - 0,005 (q - 3))`, od 0,92. Wakat (q 3) = dawne zachowanie gry. Urazy na zgrupowaniach reprezentacji bez zmian.
 - Skaut: ocena potencjału zawodników spoza klubu w profilu zawodnika (`scoutLine` w `src/career/assistantReport.js`):
   jakość oceny 0,3 asystenta + 0,7 skauta, znajomość zawodnika 0,6 (polski klub) albo 0,35 (zagranica, wolni).
+  Od v1.20 Beta (Nov 20, 2026) skaut ma 5 atrybutów, regiony i jeździ za granicę po kandydatów (misje, lista ok. 50
+  wolnych skautów, praca na zlecenie z prowizją, nieobecność w sztabie w czasie wyjazdu): `docs/skauting.md`.
 
 ## 3. Kluby AI
 
@@ -140,4 +142,5 @@ nie działa). Wyniki z Nov 16, 2026 [SZAC]:
 - Zgoda zarządu w formularzu oferty: twardy budżet (przycisk nieaktywny z powodem), bez `requestScore`.
 - Zgoda zarządu przez `requestScore` przy ofercie ponad budżet (projekt 3.3): teraz twardy budżet i +20 % przy wakacie w rdzeniu.
 - `keepCaretaker` (asystent zostaje trenerem na stałe) nie zwalnia roli w sztabie.
-- Skaut nie wpływa na decyzje transferowe klubów AI (AI zna prawdziwe wartości, jak dotąd).
+- Skaut nie wpływa na ocenę zawodników przez kluby AI (AI zna prawdziwe wartości, jak dotąd); kluby AI wysyłają
+  skautów na misje za granicę tymi samymi wzorami co gracz (`docs/skauting.md`, rozdz. 8).

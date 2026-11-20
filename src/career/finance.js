@@ -267,6 +267,7 @@ export const FIN_LABELS = {
   invest: 'Spłata długów i inwestycje', camps: 'Obozy przygotowawcze', fines: 'Kary PZPN',
   infra: 'Inwestycje w obiekty', upkeep: 'Utrzymanie obiektów',
   staff: 'Pensje sztabu', staffComp: 'Rekompensaty za sztab',
+  scouts: 'Skauci: wyprawy i prowizje', // skauting zagraniczny (src/career/scoutOps.js)
 };
 
 /** Ile klub może dziś wydać (budżet transferowy ograniczony saldem). */

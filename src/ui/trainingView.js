@@ -575,7 +575,7 @@ function staffTab(game, ui = {}) {
     analityk: () => `analiza rywala +${num(staffMul.prep(A('analityk', 'RYW')), 3)} pkt na mecz (rozpracowanie rywala), raporty: dane ${PREC[reportPrecision(A('analityk', 'DAN'))]}, wideo ${PREC[reportPrecision(A('analityk', 'WID'))]}`,
     kierownik: () => { const q = A('kierownik', 'DOK'); return `lista „Do zrobienia”: kontrakty i okno zauważa w ok. ${Math.round(detectChance(q) * 100)} %, licencję w ${Math.round(detectChance(A('kierownik', 'ORG')) * 100)} %, obozy w ${Math.round(detectChance(A('kierownik', 'LOG')) * 100)} %, myli pilność w ${Math.round(shiftChance(q) * 100)} %`; },
     fizjoterapeuta: () => `przerwa po urazie x${num(staffMul.heal(A('fizjoterapeuta', 'LEC')), 2)}, po ciężkim urazie x${num(staffMul.heal(A('fizjoterapeuta', 'REH')), 2)}, ryzyko urazu na treningu x${num(staffMul.physio(A('fizjoterapeuta', 'PRF')), 2)}`,
-    skaut: () => `ocena potencjału zawodników innych klubów: ${PREC[reportPrecision(A('skaut', 'POT'))].replace(/y$/, 'a')}, z zagranicy także znajomość rynków`,
+    skaut: () => `ocena potencjału zawodników innych klubów: ${PREC[reportPrecision(A('skaut', 'OCE'))].replace(/y$/, 'a')}, z zagranicy także wiedza o rynku; wyjazdy za granicę w Transfery, Skauting`,
   };
   const qTxt = (q) => (Number.isInteger(q) ? String(q) : num(q, 1));
   // Atrybuty roli (lider i pomocnicy razem, jak jakość roli)

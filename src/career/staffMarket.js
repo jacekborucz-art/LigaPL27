@@ -22,7 +22,7 @@ import { clubById } from '../data/clubs_pl.js';
 import { NATIONALITIES, randomName } from '../data/names.js';
 import { payLevel } from '../data/finanse_klubow.js';
 import { STAFF_ROLES } from '../training/config.js';
-import { generateStaffFor, staffLabel, roleAttrKeys, ensurePersonAttrs, attrsAround, qFromAttrs } from '../training/staff.js';
+import { generateStaffFor, staffLabel, roleAttrKeys, ensurePersonAttrs, attrsAround, qFromAttrs, ensureScoutReg } from '../training/staff.js';
 import { ensureTraining, daysBetween } from '../training/state.js';
 import { clubPlan, book } from './finance.js';
 import { clubReputation } from './reputation.js';
@@ -139,12 +139,19 @@ export const halfKeyOf = (date) => { const y = +date.slice(0, 4); return +date.s
 /** Oczekiwana pensja (zł / mies.): jakość, rola, narodowość, okres bez pracy (opcjonalnie). */
 export function expectedWage(p, date = null, { idle = true } = {}) {
   const W = K.wage;
-  let w = W.base * (W.R[p.role] ?? 0.5) * W.growth ** ((p.q ?? 10) - 10) * (isForeign(p) ? W.foreign : 1);
+  let w = W.base * (W.R[p.role] ?? 0.5) * W.growth ** ((p.q ?? 10) - 10) * (isForeign(p) ? W.foreign : 1) * scoutRegionPremium(p);
   if (idle && p.free && date && !p.club) {
     const d = daysBetween(p.free, date);
     if (d > W.idleFree) w *= Math.max(W.idleMin, 1 - W.idlePerMonth * (d - W.idleFree) / 30);
   }
   return Math.max(W.min, r100(w));
+}
+
+/** Skaut: premia za znajomość regionu x clamp(1 + 0,03 (najlepszy region - 10), 0,9, 1,2) (docs/skauting.md) [SZAC]. */
+export function scoutRegionPremium(p) {
+  if (p?.role !== 'skaut' || !p.reg) return 1;
+  const best = Math.max(0, ...Object.values(p.reg));
+  return clamp(1 + 0.03 * (best - 10), 0.9, 1.2);
 }
 
 /** Jakość osoby w danym dniu (adaptacja obcokrajowca obniża ją przez 3 miesiące, liniowo do zera). */
@@ -216,7 +223,8 @@ function makePerson(game, S, key, opts = {}) {
   const q = clamp(Math.round((opts.mean ?? 8.5) + (foreign ? K.pool.foreignBonus : 0) + rng.gauss(0, K.pool.sd)), 1, 19);
   const age = opts.age ?? (role === 'asystent' || role === 'analityk' || role === 'skaut' ? rng.int(28, 58) : rng.int(32, 64));
   const id = newPersonId(S);
-  return { id, name: `${nm.first} ${nm.last}`, nat, age, role, q, a: attrsAround(q, role, `${game.seed}:${id}`), wage: 0, until: null, since: null, club: null, free: opts.free ?? game.date ?? null, coach: null, adapt: null, pl: nat === 'POL', lead: false, demoted: null, hist: [] };
+  const p = { id, name: `${nm.first} ${nm.last}`, nat, age, role, q, a: attrsAround(q, role, `${game.seed}:${id}`), wage: 0, until: null, since: null, club: null, free: opts.free ?? game.date ?? null, coach: null, adapt: null, pl: nat === 'POL', lead: false, demoted: null, hist: [] };
+  return ensureScoutReg(p, `${game.seed}:${id}`); // skaut: regiony (career/scoutRegions.js)
 }
 
 /** Poziom kandydata z puli (udział poziomów lig, średnie q). */
@@ -316,7 +324,8 @@ export function rosterOf(game, clubId) {
 export function syncStaff(game, clubId, date = game.date) {
   const T = game.training; const S = game.staff;
   if (!T?.staff || !S?.clubs?.[clubId]) return;
-  const ppl = rosterOf(game, clubId);
+  // Skaut na wyjeździe za granicą (p.away: data powrotu, src/career/scoutOps.js) nie pracuje w klubie: rola liczona bez niego
+  const ppl = rosterOf(game, clubId).filter((p) => !(p.away && date < p.away));
   const view = {};
   let adapting = false;
   for (const role of STAFF_ROLE_IDS) {
@@ -420,10 +429,11 @@ export function ensureStaff(game) {
     fresh = true;
   }
   S.block ??= {}; S.adapting ??= []; S.based ??= {}; S.cool ??= {}; S.stats ??= {}; S.poach ??= { ban: {}, tried: {}, userHalf: {} };
-  // Atrybuty osób sztabu (stare zapisy, raz): wokół dotychczasowej jakości, średnia = jakość, więc efekty bez skoku
-  if (!S.attrs) {
+  // Atrybuty osób sztabu (stare zapisy, raz): wokół dotychczasowej jakości, średnia = jakość, więc efekty bez skoku.
+  // Wersja 2 (skauting, docs/skauting.md): skaut z 3 na 5 atrybutów i regiony, jakość bez zmian
+  if ((S.attrs ?? 0) < 2) {
     for (const p of Object.values(S.people)) ensurePersonAttrs(p, `${game.seed}:${p.id}`);
-    S.attrs = 1;
+    S.attrs = 2;
     if (!fresh) for (const id of Object.keys(S.clubs)) if (game.world.clubs[id]) syncStaff(game, id, date);
   }
   // Kluby rozwiązane (spadek do IV ligi): sztab do puli

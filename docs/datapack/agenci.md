@@ -32,7 +32,7 @@ Złamanie którejkolwiek zasady kończy się tak: gra odrzuca cały plik albo po
 
 1. Plik to czysty JSON w UTF-8: bez komentarzy, bez przecinka po ostatnim elemencie, liczby jako liczby
    (`12`, nie `"12"`), teksty w cudzysłowach prostych `"`. Rozmiar najwyżej 40 MB.
-2. Nagłówek: `"type": "ligapl27-datapack"`, `"v": 4`, `"seed"` skopiowany bez zmian z `baza.json`.
+2. Nagłówek: `"type": "ligapl27-datapack"`, `"v": 5`, `"seed"` skopiowany bez zmian z `baza.json`.
 3. Identyfikatory klubów, zawodników i sędziów tylko z `baza.json`. Nowych identyfikatorów nie wolno wymyślać,
    z jednym wyjątkiem: sekcja `newPlayers` (identyfikator `ed-<cokolwiek>`, litery, cyfry, `_ . : -`, do 80 znaków).
 4. Jeden identyfikator raz w sekcji. Przy powtórzeniu JSON zostawia tylko ostatni wpis, bez ostrzeżenia.
@@ -99,7 +99,7 @@ Właściciel `owner`: `name` (2-40 znaków) i cechy 1-20: `cierpliwosc` (cierpli
 `temperament` (impulsywność decyzji), `media` (wrażliwość na media), `zasobnosc` (pieniądze, które może dołożyć).
 Typ właściciela (miasto, prywatny, stowarzyszenie) zostaje z gry.
 
-Sztab `staff`: `{ "rola": [ { "name", "age", "a": { atrybuty roli } }, ... ] }`. Każda osoba ma 3 atrybuty swojej roli,
+Sztab `staff`: `{ "rola": [ { "name", "age", "a": { atrybuty roli } }, ... ] }`. Każda osoba ma 3 atrybuty swojej roli (skaut 5),
 każdy liczba całkowita 1-20; jakość osoby gra liczy sama jako ich średnią (od niej pensja i pozycja w sztabie).
 Pole `q` (sama jakość, pliki v1 i v2) jest dozwolone, ale przy obecnym `a` gra je pomija; bez `a` przesuwa cały profil osoby.
 
@@ -112,8 +112,11 @@ Pole `q` (sama jakość, pliki v1 i v2) jest dozwolone, ale przy obecnym `a` gra
 | `analityk` | `RYW` rozpracowanie rywala, `DAN` analiza danych, `WID` analiza wideo |
 | `kierownik` | `DOK` dokumenty i terminy, `ORG` organizacja klubu, `LOG` logistyka |
 | `fizjoterapeuta` | `LEC` leczenie urazów, `REH` rehabilitacja, `PRF` profilaktyka |
-| `skaut` | `POT` ocena potencjału, `OCU` ocena umiejętności, `RYN` znajomość rynków |
+| `skaut` | `DOS` doświadczenie, `OCE` ocena zawodnika, `RYN` wiedza o rynku, `SIE` sieć kontaktów, `CHA` ocena charakteru |
 
+Skaut ma też regiony `reg`: `{ "region": poziom 1-20 }`, najwyżej 3, klucze: `balkany`, `srodkowa`, `skandynawia`,
+`iberia`, `zachodnia`, `wschodnia`, `afrykaZach`, `afrykaPln`, `amerykaPd`, `amerykaPln`, `azja`, `bliskiWschod`
+(`docs/skauting.md`). Stare klucze skauta (`POT`, `OCU`, `RYN`) gra przelicza tylko w plikach do wersji 4.
 Atrybut nieznany w danej roli (np. `REG` u asystenta) odrzuca cały plik. Wpływ każdego atrybutu na grę:
 `docs/sztab-atrybuty.md`. Mocne i słabe strony osoby wpisuj z opisu jej pracy (np. trener od przygotowania
 motorycznego z wynikami w rozwoju młodych: `MTR` wyżej, `OBC` niżej, jeśli drużyna miała dużo urazów).

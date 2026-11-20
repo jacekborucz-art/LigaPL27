@@ -29,6 +29,36 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 20, 2026, profil B, skauting zagraniczny: logika (gałąź robocza agenta, do scalenia z widokiem) (v1.20 Beta)
+Zrobione:
+- Kolejka, punkt 4 (skauci i skauting zagraniczny), część logiki według zatwierdzonego projektu (burza mózgów):
+  `src/career/scoutOps.js` (stan `game.scoutOps`, system dnia `scoutOps` 52.5), `src/career/scoutRegions.js`
+  (12 regionów `SCOUT_REGIONS`). Opis, wzory, kalibracja i API widoku: `docs/skauting.md`.
+- Skaut ma 5 atrybutów (DOS, OCE, RYN, SIE, CHA) zamiast 3 (migracja w `ensureStaff`, `game.staff.attrs = 2`,
+  jakość bez zmian) i regiony `p.reg`; premia regionu do pensji; `scoutLine` czyta OCE i RYN.
+- Lista ok. 50 wolnych skautów (1 lipca i 1 stycznia, nierówny miks regionów), praca na stałe (oferta sztabu)
+  albo na zlecenie (opłata i prowizja 3-8 %, ryczałt przy wolnym), misje 1-6 tygodni z kosztem w finansach
+  (kategoria `scouts`), nieobecność skauta w sztabie (`syncStaff`), zdarzenia tygodni, 0-7 kandydatów z błędem
+  raportu (wydmuszki), wyłączność 14 dni, wygasanie 45/35/20, poczta (`scout-*`, `refs.kind = 'scoutReport'`),
+  misje klubów AI (te same wzory) i zakup kandydatów przez `aiBuy`.
+- `foreignPool.js`: `genPoolPlayerFor` (pula z tego samego ziarna identyczna, test skrótu), `topUpPool` i
+  `poolCandidates` z kandydatami skautów; wyłączność także w zakupach wolnych (`aiBuy`), `fillSquad` i rotacji wolnych.
+- Pule imion dla 22 krajów regionów (osobno od `NATIONALITIES`), datapack v5 (`MIGRATE[4]`, regiony skauta),
+  blok akcji `sk-*` w `src/app.js`, odnośniki poczty do Transfery, Skauting, `tools/scoutsim.mjs` (siatka i sezon).
+- Testy: `tests/scoutOps.test.mjs` (19); `tests/staffAttrs.test.mjs`: skaut ma 5 atrybutów.
+Decyzje i pułapki:
+- Widok (Transfery, zakładka Skauting, `state.skOrder`, `state.skMsg`) buduje osobny agent; przy scalaniu
+  `npm run sw` jeszcze raz (konflikt w `sw.js`). Pensja w zleceniu (`maxWage`) i w raporcie jest tygodniowa.
+- Skuteczność `s`: wagi 0,30 DOS + 0,40 region + 0,15 SIE + 0,15 OCE (projekt 0,30/0,30/0,25/0,15), bo przy
+  wagach z projektu skaut z siecią 18 w obcym regionie był prawie równy ekspertowi. Kalibracja: `docs/skauting.md` rozdz. 9.
+- Karta zawodnika w Transferach pokazuje prawdziwy OVR wszystkich zawodników rynku, więc błąd raportu widać
+  głównie w potencjale, cenie, chęci i adaptacji (do decyzji właściciela).
+- Liczba skautów na starcie gry bez zmian (plan sztabu jak dotąd). Rosja pominięta w regionach.
+- Kod plików z CRLF (staffMarket, editor, assistantReport, foreignPool i in.): zmieniać z zachowaniem końców linii.
+Zostało / dalej:
+- Scalenie z widokiem i sprawdzenie w przeglądarce (PC 1600 px, telefon 390 px).
+- Na później (projekt, LATER): obserwowanie dowolnego zawodnika, misje cykliczne, raport porównawczy, misje krajowe.
+
 ## Nov 20, 2026, profil B, wersja v1.20 Beta
 Zrobione:
 - Wersja gry podniesiona do v1.20 Beta (zgoda właściciela). Wchodzą do niej: karta zawodnika w okienku w Transferach,

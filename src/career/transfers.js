@@ -21,7 +21,7 @@ import { spellsOf, syncSpell } from '../season/history.js';
 import { boardCaps, clubBoardData, feeIssues, checkUserFee } from './boardRequests.js'; // weto zarządu (docs/finanse.md)
 import { makeLoan, dropLoanIndex, requestLoanIn, firstRefusal } from './loans.js'; // wypożyczenia (docs/wypozyczenia.md)
 import { startDeal, hasOpenDeal, pendingFees, stat } from './transferDeals.js'; // transfer jako proces (docs/transfery.md)
-import { ensureForeignPool, isPoolContracted, foreignAskingPrice, poolSellerClub, poolCandidates, offerForForeign, poolList } from './foreignPool.js'; // zawodnicy z zagranicy (docs/transfery.md, rozdz. 9)
+import { ensureForeignPool, isPoolContracted, foreignAskingPrice, poolSellerClub, poolCandidates, offerForForeign, poolList, scoutBlocked, scoutCommission, scoutedGroup } from './foreignPool.js'; // zawodnicy z zagranicy (docs/transfery.md, rozdz. 9)
 import { onOfferRejected, onUserRejected } from './moveWish.js';
 import { effectiveAsk } from './mindset.js';
 
@@ -175,6 +175,14 @@ export function completeTransfer(game, { playerId, to, fee = 0, contract, kind =
   delete p.transfer; delete p.moveWish; delete p.preContract; delete p.freeSince; delete p.stepDown; delete p.stepDownFree;
   delete game.market.listed[playerId]; delete game.market.userListed[playerId]; delete game.market.talks[playerId];
   const F = game.finance;
+  // Skauting (scoutOps.js): kandydat z raportu skauta; zlecający klub płaci freelancerowi prowizję (12 miesięcy od raportu)
+  if (p.scout && !p.scout.signed && kind !== 'loan') {
+    const s = p.scout; const own = s.club === to;
+    s.signed = date; s.signedTo = to;
+    const amount = own && s.pct && date <= (s.commUntil ?? '') ? scoutCommission(p, fee, p.contract?.wage) : 0;
+    if (amount) book(F, to, date, 'out', 'scouts', amount, `Prowizja skauta (${p.name})`);
+    if (game.scoutOps) (game.scoutOps.outbox ??= []).push({ kind: 'signed', pid: playerId, name: p.name, to, own, fee, amount, pct: s.pct, scout: s.scout, date });
+  }
   if (fee) { book(F, to, date, 'out', 'transfers', fee, `${p.name} (${clubById(from)?.name ?? origin?.name ?? 'wolny'})`); book(F, from, date, 'in', 'sales', fee, `${p.name} do ${clubById(to)?.name}`); if (F.clubs[to]) F.clubs[to].transferBudget = Math.max(0, F.clubs[to].transferBudget - fee); if (F.clubs[from]) F.clubs[from].transferBudget += Math.round(fee * 0.5); }
   if (contract?.signOn) book(F, to, date, 'out', 'signOn', contract.signOn);
   if (contract?.agentFee) book(F, to, date, 'out', 'agents', contract.agentFee);
@@ -283,14 +291,15 @@ function aiBuy(game, club, date, rng, log) {
   const squad = squadOf(W, club.id);
   const needs = squadDeficits(squad).filter((n) => n.scope === 'squad');
   const groups = needs.length ? needs.map((n) => n.group).filter((g) => g !== 'ALL') : ['GK', 'DEF', 'MID', 'ATT'];
-  const g = needs.length ? groups[0] ?? rng.pick(['DEF', 'MID', 'ATT']) : rng.pick(groups);
+  const sg = needs.length ? null : scoutedGroup(game, club.id, date, groupOf); // kandydat z misji skauta klubu (scoutOps.js)
+  const g = needs.length ? groups[0] ?? rng.pick(['DEF', 'MID', 'ATT']) : sg ?? rng.pick(groups);
   const inGroup = squad.filter((p) => groupOf(p) === g).sort((a, b) => a.ovr - b.ovr);
   const bar = needs.length ? 0 : (inGroup[Math.floor(inGroup.length / 2)]?.ovr ?? 0);
   const money = spendable(F, club.id) - pendingFees(game, club.id); // odstępne w otwartych transakcjach jest zarezerwowane
   const room = wageRoom(F, W, club.id) + (squad.length > 26 ? inGroup[0]?.contract?.wage ?? 0 : 0);
   const pool = [];
   const busy = (p) => p.transfer || p.preContract || hasOpenDeal(game, p.id); // transakcja w toku albo umowa od 1 lipca
-  for (const id of game.market.free) { const p = W.players[id]; if (p && groupOf(p) === g && p.ovr > bar && !busy(p)) pool.push({ p, fee: 0 }); }
+  for (const id of game.market.free) { const p = W.players[id]; if (p && groupOf(p) === g && p.ovr > bar && !busy(p) && !scoutBlocked(p, club.id, date)) pool.push({ p, fee: 0 }); } // kandydat skauta innego klubu: wyłączność 14 dni
   for (const [id, l] of Object.entries(game.market.listed)) {
     const p = W.players[id];
     if (!p || l.kind === 'loan' || p.clubId === club.id || p.clubId === game.clubId || groupOf(p) !== g || p.ovr <= bar || busy(p) || (p.value ?? 0) * 0.5 > money || (p.clubId && breaksMinimum(game, p))) continue;
@@ -396,7 +405,7 @@ export function marketWeek(game, date) {
     // Brak w kadrze (np. bramkarz po powrocie z wypożyczenia): klub szuka co tydzień, inaczej co ok. 2,5 tygodnia
     const gap = squadDeficits(squadOf(game.world, c.id)).some((n) => n.scope === 'squad');
     // III liga kupuje rzadziej (ok. co 5 tygodni) i tanio (mały budżet), docs/iii-liga.md
-    if (rng.chance(c.tier === 4 ? 0.2 : 0.4) || gap) aiBuy(game, c, date, rng, moves);
+    if (rng.chance(c.tier === 4 ? 0.2 : 0.4) || gap || game.scoutOps?.aiIdx?.[c.id]?.length) aiBuy(game, c, date, rng, moves); // kandydaci skautów klubu: co tydzień
     aiBalance(game, c, date);
   }
   const offers = aiOffersForUser(game, date, rng);

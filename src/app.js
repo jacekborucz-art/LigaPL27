@@ -56,6 +56,7 @@ import { shirtNumbers, kitColors } from './career/shirts.js';
 import { playerStatsHtml } from './ui/playerStatsView.js';
 import { renderClubView, hasClubView } from './ui/clubView.js';
 import { renderTransfers, handleTransferAction, isTransferAction, transferCardHtml } from './ui/transfersView.js';
+import { startMission, cancelMission, hireScout, fireScout, watchCandidate, markCandidatesSeen } from './career/scoutOps.js'; // skauting zagraniczny (docs/skauting.md)
 import { renderClubHub, handleClubAction, isClubAction } from './ui/klubView.js';
 // Kariera i rynek pracy: okno odblokowania odznak i akcje job-* (docs: Klub > Kariera)
 import { mountUnlocks } from './ui/careerView.js';
@@ -1663,6 +1664,7 @@ app.addEventListener('click', (ev) => {
  * Wykonuje akcję data-act. el: przycisk albo { dataset } z menu kontekstowego.
  * root: miejsce, z którego handlery czytają pola formularzy (null = tylko wartości z dataset).
  */
+const SK_ACTS = new Set(['sk-start', 'sk-cancel', 'sk-hire', 'sk-fire', 'sk-watch', 'sk-seen']); // skauting (blok w dispatchAct)
 async function dispatchAct(el, { root = app } = {}) {
   const act = el.dataset.act;
   if (act?.startsWith('sys-') && state.game) { await sysAction(act, el); return; } // Opcje, Zapis, Wyjście
@@ -1698,6 +1700,22 @@ async function dispatchAct(el, { root = app } = {}) {
     await save();
     render();
     if (act === 'career-unlocks-seen' && el.dataset.go) window.scrollTo({ top: 0 });
+    return;
+  }
+  // ----- Skauting: akcje sk-* (src/career/scoutOps.js, docs/skauting.md). Zlecenie z obiektu state.skOrder (UI),
+  // wynik akcji w state.skMsg (tekst) i state.skOk (powodzenie); zapis gry i odświeżenie widoku -----
+  if (SK_ACTS.has(act) && state.game) {
+    const g = state.game; const ds = el.dataset;
+    let r = null;
+    if (act === 'sk-start') r = startMission(g, state.skOrder ?? {});
+    else if (act === 'sk-cancel') r = cancelMission(g, ds.id);
+    else if (act === 'sk-hire') r = hireScout(g, ds.id, 'permanent');
+    else if (act === 'sk-fire') r = fireScout(g, ds.id);
+    else if (act === 'sk-watch') r = watchCandidate(g, ds.id, ds.on === '1');
+    else markCandidatesSeen(g); // sk-seen
+    state.skMsg = r?.text ?? null; state.skOk = r ? !!r.ok : null;
+    await save();
+    render();
     return;
   }
   if (isTransferAction(act) && state.game) {

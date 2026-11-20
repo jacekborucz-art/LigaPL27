@@ -37,9 +37,11 @@ Wdrożone Nov 19, 2026 (v1.19 Beta). Wcześniej osoba sztabu miała jedną jako�
 | Fizjoterapeuta | LEC leczenie urazów | krótsza przerwa po urazie do 28 dni |
 | | REH rehabilitacja | krótsza przerwa po urazie ponad 28 dni |
 | | PRF profilaktyka | mniejsze ryzyko urazu na treningu |
-| Skaut | POT ocena potencjału | dokładność oceny potencjału zawodników innych klubów (waga 0,7 w kraju, 0,5 z zagranicy) |
-| | OCU ocena umiejętności | ta sama ocena (waga 0,3 w kraju, 0,2 z zagranicy) |
-| | RYN znajomość rynków | ocena zawodników z zagranicy (waga 0,3) |
+| Skaut (5 atrybutów od v1.20 Beta, `docs/skauting.md`) | DOS doświadczenie | skuteczność wyjazdu za granicę (mniej pustych raportów), trafność profilu kandydatów |
+| | OCE ocena zawodnika | ocena potencjału zawodników innych klubów (waga 1,0 w kraju, 0,7 z zagranicy), błąd raportu z wyjazdu (wydmuszki) |
+| | RYN wiedza o rynku | ocena zawodników z zagranicy (waga 0,3), przedział ceny i pensji, trafność chęci przyjścia w raporcie |
+| | SIE sieć kontaktów | liczba kandydatów, praca poza znanymi regionami (zastępuje część znajomości regionu) |
+| | CHA ocena charakteru | trafność oceny adaptacji kandydata w raporcie |
 
 Bez zmian (ogólna jakość): asystent jako trener tymczasowy, liczba spraw zgłaszanych przez członka sztabu na liście
 „Do zrobienia”, wakaty (wakat ma wszystkie atrybuty równe jakości wakatu).
@@ -48,6 +50,8 @@ Bez zmian (ogólna jakość): asystent jako trener tymczasowy, liczba spraw zgł
 
 - Nowe osoby (pula, start gry) i stare zapisy (migracja raz, `game.staff.attrs`): atrybuty wokół jakości,
   odchylenia do 3 punktów z ziarna gry i osoby, suma odchyleń zero, więc jakość osoby się nie zmienia.
+- Skaut (v1.20 Beta, `game.staff.attrs = 2`): dawne `POT, OCU, RYN` przeliczone na `DOS, OCE, RYN, SIE, CHA`
+  (`migrateScoutAttrs` w `src/training/staff.js`, jakość bez zmian) i regiony `p.reg` (`docs/skauting.md`).
 - Rozwój w nowym sezonie (szansa jak dotąd): jeden atrybut +2, drugi +1, czyli jakość +1; spadek tak samo w dół.
 - Widok Sztab: atrybuty własnych osób dokładnie; kandydaci z rynku: atrybuty przesunięte o błąd oceny jakości
   (dokładnie, w przybliżeniu albo ogólnie, jak dotąd).
@@ -55,7 +59,9 @@ Bez zmian (ogólna jakość): asystent jako trener tymczasowy, liczba spraw zgł
 
 ## Edytor i datapack
 
-- Edytor, klub, Sztab: dla każdej osoby imię i nazwisko, wiek i 3 atrybuty; jakość wyliczana obok nazwy roli.
+- Edytor, klub, Sztab: dla każdej osoby imię i nazwisko, wiek i 3 atrybuty (skaut 5); jakość wyliczana obok nazwy roli.
+- Datapack v5 (v1.20 Beta): skaut z 5 atrybutami i regionami `reg` (najwyżej 3); pliki v1-v4 ze starymi atrybutami
+  skauta przeliczane przy wczytaniu (`MIGRATE[4]`, `docs/skauting.md` rozdz. 11).
 - Datapack v3: `staff: { rola: [{ name, age, q, a: { atrybut: 1-20 } }] }` (eksport zapisuje też `q` do podglądu).
 - Wsteczna zgodność: pliki v1 i v2 (tylko `q`) wczytują się, jakość przesuwa cały profil osoby o tyle samo.
   Nieznany atrybut roli albo wartość spoza 1-20 odrzuca plik. Plik v3 w starszej grze: komunikat o nowszej wersji.

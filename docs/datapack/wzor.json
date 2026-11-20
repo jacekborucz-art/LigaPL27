@@ -1,7 +1,7 @@
 {
   "type": "ligapl27-datapack",
-  "v": 4,
-  "game": "v1.19 Beta",
+  "v": 5,
+  "game": "v1.20 Beta",
   "seed": 7,
   "created": "2026-11-19T10:00:00.000Z",
   "full": true,
@@ -57,8 +57,8 @@
           { "name": "Daniel Kaczmarczyk", "age": 36, "a": { "LEC": 14, "REH": 12, "PRF": 10 } }
         ],
         "skaut": [
-          { "name": "Robert Szewczyk", "age": 50, "a": { "POT": 14, "OCU": 11, "RYN": 11 } },
-          { "name": "Paweł Jasiński", "age": 39, "a": { "POT": 11, "OCU": 12, "RYN": 10 } }
+          { "name": "Robert Szewczyk", "age": 50, "a": { "DOS": 13, "OCE": 13, "RYN": 11, "SIE": 12, "CHA": 11 }, "reg": { "balkany": 15, "wschodnia": 10 } },
+          { "name": "Paweł Jasiński", "age": 39, "a": { "DOS": 10, "OCE": 11, "RYN": 10, "SIE": 12, "CHA": 12 }, "reg": { "skandynawia": 13 } }
         ]
       }
     },

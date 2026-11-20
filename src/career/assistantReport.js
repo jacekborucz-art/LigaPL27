@@ -264,10 +264,11 @@ export function hiddenLine(game, p, key) {
  */
 export function scoutLine(game, p) {
   const q = asystQ(game);
-  // Skaut (docs/sztab-atrybuty.md): ocena potencjału i umiejętności, przy zawodnikach z zagranicy także znajomość rynków
+  // Skaut (docs/sztab-atrybuty.md): ocena zawodnika, przy zawodnikach z zagranicy także wiedza o rynku
+  // (dawne 0,7 POT + 0,3 OCU i 0,5 POT + 0,2 OCU + 0,3 RYN po migracji na 5 atrybutów, docs/skauting.md)
   const home = !!(p.clubId && game.world?.clubs?.[p.clubId]);
   const sk = (k) => staffA(game, game.clubId, 'skaut', k);
-  const qs = home ? 0.7 * sk('POT') + 0.3 * sk('OCU') : 0.5 * sk('POT') + 0.2 * sk('OCU') + 0.3 * sk('RYN');
+  const qs = home ? sk('OCE') : 0.7 * sk('OCE') + 0.3 * sk('RYN');
   const qe = AREP.scoutAssist * q + (1 - AREP.scoutAssist) * qs;
   const fam = home ? AREP.scoutFam.pl : AREP.scoutFam.abroad;
   const age = ageAt(p, game.date);

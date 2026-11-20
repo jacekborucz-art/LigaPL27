@@ -82,6 +82,13 @@ const BY_KIND = {
   'aplikacja-odmowa': () => [TO.klub('kariera', 'Rynek pracy')],
   'aplikacja-zajete': () => [TO.klub('kariera', 'Rynek pracy')],
   'reputacja-poziom': () => [TO.klub('kariera', 'Kariera')],
+  // Skauting zagraniczny (docs/skauting.md): zakładka Transfery, Skauting
+  'scout-report': () => [TO.transfers('skauting', 'Skauting: kandydaci')],
+  'scout-start': () => [TO.transfers('skauting', 'Skauting')],
+  'scout-event': () => [TO.transfers('skauting', 'Skauting')],
+  'scout-gone': () => [TO.transfers('skauting', 'Skauting: obserwowani')],
+  'scout-pool': () => [TO.transfers('skauting', 'Skauting: obserwowani')],
+  'scout-commission': () => [TO.transfers('skauting', 'Skauting')],
 };
 
 /** Zawodnik, którego dotyczy wiadomość: segment klucza albo refs (tylko gdy nadal jest w grze). */
