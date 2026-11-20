@@ -21,9 +21,9 @@ test('Zapis: tylko zapis pliku, bez udostępniania i bez Google Drive', () => {
   assert.ok(!/sys-share|Google Drive/.test(html));
 });
 
-test('Opcje: okienko z wersją gry w formacie vX.Y (z ewentualnym dopiskiem)', async () => {
+test('Opcje: okienko z wersją gry w formacie vX.Y albo vX.Y.Z (z ewentualnym dopiskiem)', async () => {
   const { GAME_VERSION } = await import('../src/config/version.js');
-  assert.match(GAME_VERSION, /^v\d+\.\d+( \S+)?$/);
+  assert.match(GAME_VERSION, /^v\d+\.\d+(\.\d+)?( \S+)?$/);
   assert.match(sysDialogHtml('options', { theme: 'auto' }), new RegExp(`Wersja gry <b>${GAME_VERSION}</b>`));
 });
 

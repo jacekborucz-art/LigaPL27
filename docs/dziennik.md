@@ -29,6 +29,15 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 20, 2026, profil A (chmura), wersja v1.21.1 Beta
+Zrobione:
+- Właściciel ustalił wersję v1.21.1 Beta (`src/config/version.js`). Zawiera: okno do 9 września, ranking UEFA
+  z prawdziwych danych, spis funkcji `docs/funkcje.md`, namysł zawodnika przed podpisem.
+Decyzje i pułapki:
+- Trzecia liczba wersji tylko na prośbę właściciela; zwykła zasada podnoszenia (v1.22 itd.) bez zmian.
+Zostało / dalej:
+- Do decyzji: szansa zgody przy namyśle, OVR Ekstraklasy w 3. sezonie (-0,1), kara 1,2 OVR za licytację tylko dla AI.
+
 ## Nov 20, 2026, agent (worktree, gałąź do scalenia), namysł zawodnika przed podpisem (v1.21 Beta)
 Zrobione:
 - Nowy moduł `src/career/proposals.js` (stan `game.market.pending`): udane rozmowy gracza i klubów AI to propozycja,
