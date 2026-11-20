@@ -229,7 +229,8 @@ export function renderMenu(ctx) {
         ${notice ? `<p class="notice" role="status">${esc(notice)}</p>` : ''}
         ${memoryOnly ? '<p class="notice" role="status">Ta przeglądarka nie pozwala zapisać gry na stałe. Postęp zniknie po zamknięciu karty; użyj eksportu.</p>' : ''}
         <ol class="saves__list">${slots.map((s) => saveRow(s, confirmDel)).join('')}</ol>
-        <label class="btn btn--quiet saves__import">Wczytaj zapis z pliku JSON
+        <label class="btn saves__import">Wczytaj zapisaną karierę
+          <small class="saves__import-hint">Tutaj nie wczytuj datapacku</small>
           <input type="file" data-act="import" class="sr-only">
         </label>
         <p class="saves__note">Zapisy zostają w tej przeglądarce. Gra działa bez internetu.</p>
