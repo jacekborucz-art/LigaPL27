@@ -30,7 +30,7 @@ import { moraleLabel } from '../career/morale.js';
 import { checkUserPre } from '../career/preContracts.js';
 import { DOMESTIC } from '../config/calendar2026.js';
 import { renderSkauting } from './scoutingView.js'; // zakładka Skauting
-import { isPoolContracted, poolClubLabel, poolSellerClub, REGION_FILTERS, regionOf } from '../career/foreignPool.js'; // zawodnicy z zagranicy
+import { isPoolContracted, poolClubLabel, playsAbroad, poolSellerClub, REGION_FILTERS, regionOf } from '../career/foreignPool.js'; // zawodnicy z zagranicy
 import { scoutHidden, scoutEye, ovrOrEye, shownOvr, hiddenAttrsHtml, valueOrScoutPrice, valueLabel } from './scoutMask.js'; // kandydaci skauta: ocena ukryta (lornetka)
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
@@ -304,7 +304,7 @@ function cardHead(game, p, extra = '') {
   return `<header class="tf-ch" data-pid="${esc(p.id)}">
     <span class="tf-ch__crest">${p.clubId ? crest(p.clubId, 48) : ''}</span>
     <div class="tf-ch__who"><h2>${esc(p.name)}</h2>
-      <p>${posBadge(p)} <span>${esc(POS_NAMES?.[p.pos] ?? p.pos)}, ${p.age} lat, ${esc(NAT_NAMES[p.nat] ?? p.nat)}${p.clubId ? `, ${esc(clubById(p.clubId)?.name)}` : isPoolContracted(p) ? `, ${esc(poolClubLabel(p))}` : ', wolny zawodnik'}</span></p>
+      <p>${posBadge(p)} <span>${esc(POS_NAMES?.[p.pos] ?? p.pos)}, ${p.age} lat, ${esc(NAT_NAMES[p.nat] ?? p.nat)}${p.clubId ? `, ${esc(clubById(p.clubId)?.name)}` : p.abroad ? `, ${esc(poolClubLabel(p))}` : ', wolny zawodnik'}</span></p>
       ${extra}</div>
     ${scoutHidden(game, p) ? `<b class="tf-ch__ovr tf-ch__ovr--eye"><small>OVR</small>${scoutEye()}</b>` : `<b class="tf-ch__ovr" title="Ocena ogólna 1-20"><small>OVR</small>${ovrTxt(p)}</b>`}
   </header>`;
@@ -774,8 +774,8 @@ export const cardLink = (p) => `<span class="pc-link" data-pcard="${esc(p.id)}" 
 export function transferCardHtml(game, p, { wide = false } = {}) {
   const mine = p.clubId === game.clubId;
   const abroad = isPoolContracted(p);
-  const club = p.clubId ? clubById(p.clubId)?.name ?? '' : abroad ? poolClubLabel(p) : 'Wolny zawodnik';
-  const price = mine ? null : !p.clubId && !abroad ? 'Bez odstępnego' : notForSale(game, p) && !p.contract?.clause ? 'Nie na sprzedaż' : fmtZl(askingPrice(game, p));
+  const club = p.clubId ? clubById(p.clubId)?.name ?? '' : p.abroad ? poolClubLabel(p) : 'Wolny zawodnik';
+  const price = mine || playsAbroad(p) && !abroad ? null : !p.clubId && !abroad ? 'Bez odstępnego' : notForSale(game, p) && !p.contract?.clause ? 'Nie na sprzedaż' : fmtZl(askingPrice(game, p));
   const facts = [
     cardFact('Klub', esc(club)),
     cardFact('Kontrakt', p.contract?.until ? `do ${esc(fmtDate(p.contract.until))}` : 'Brak'),

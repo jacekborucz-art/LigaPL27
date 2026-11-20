@@ -304,7 +304,7 @@ function otherItems(game, p, { view, ui = {} } = {}) {
 
 // ------------------------------------------------------------ Nagłówek
 function header(game, p, own, L) {
-  const club = p.clubId ? clubById(p.clubId)?.name : isPoolContracted(p) ? poolClubLabel(p) : null;
+  const club = p.clubId ? clubById(p.clubId)?.name : p.abroad ? poolClubLabel(p) : null; // także sprzedany za granicę
   const meta = [`${p.age} lat`, scoutHidden(game, p) ? 'ocenę zna skaut' : `OVR ${Math.round(p.ovr)}`, own ? null : (club ?? 'wolny zawodnik')].filter(Boolean).join(', ');
   let note = null;
   if (own) {

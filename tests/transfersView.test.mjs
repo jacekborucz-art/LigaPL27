@@ -125,3 +125,13 @@ test('Kontrakty: status „do wypożyczenia” przy zawodniku, dla którego szuk
   const html = renderTransfers(g, { tfTab: 'kontrakty' });
   assert.match(html, /do wypożyczenia, szukamy klubu/);
 });
+
+test('Zawodnik sprzedany za granicę: karta pokazuje klub zagraniczny, nie „wolny zawodnik”', async () => {
+  const { transferCardHtml } = await import('../src/ui/transfersView.js');
+  const { generateWorld } = await import('../src/world/worldGen.js');
+  const g = { seed: 3, clubId: 'widzew', date: '2026-10-20', world: generateWorld(3), market: { listed: {}, talks: {}, userListed: {}, foreign: [], free: [], history: [] }, finance: { clubs: {} }, inbox: [] };
+  const p = g.world.players[g.world.clubs.legia.squad[2]];
+  p.clubId = null; p.contract = null; p.abroad = { country: 'ITA', countryName: 'Włochy', club: 'Calcio Rivale', clubId: null, since: '2026-08-01' };
+  const html = transferCardHtml(g, p);
+  assert.ok(html.includes('Calcio Rivale') && !html.includes('Wolny zawodnik'), 'klub zagraniczny');
+});

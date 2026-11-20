@@ -114,6 +114,11 @@ export function poolSellerClub(p) {
 /** Opis klubu zawodnika: „Hajduk Split (Chorwacja)”; opis ligi bez kraju („klub z ligi brazylijskiej”). */
 export const poolClubLabel = (p) => (!p.abroad ? '' : p.abroad.clubId || !/^klub z ligi /.test(p.abroad.club) ? `${p.abroad.club} (${p.abroad.countryName ?? NAT_NAMES[p.abroad.country] ?? p.abroad.country})` : p.abroad.club);
 
+/** Gdzie gra zawodnik (tekst): polski klub, klub zagraniczny (także sprzedany za granicę, p.abroad) albo „wolny zawodnik”. */
+export const whereLabel = (p, nameOfClub) => (p?.clubId ? nameOfClub(p.clubId) ?? '' : p?.abroad ? poolClubLabel(p) : 'wolny zawodnik');
+/** Zawodnik sprzedany za granicę (poza pulą obcokrajowców): nie jest wolny i nie jest na naszym rynku. */
+export const playsAbroad = (p) => !!p && !p.clubId && !!p.abroad && !p.free;
+
 /** Cena wywoławcza klubu zagranicznego: wartość rynkowa (poziom ligi) x mnożnik ligi (słabe ligi 1,0-1,15, mocne 1,3-1,5). */
 export function foreignAskingPrice(game, p) {
   const a = p.abroad;
