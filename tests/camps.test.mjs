@@ -116,6 +116,7 @@ test('Przerwa zimowa: Dalej zatrzymuje się na końcu rundy, przy obozie (start 
   const stops = new Map();
   let guard = 0;
   while (g.date < '2027-02-03' && guard++ < 4000) {
+    if (g.board) g.board.trust = Math.max(g.board.trust ?? 60, 60); // test przystanków obozu: trener nie może stracić pracy (kariera trenera)
     const a = primaryAction(g);
     if (a.kind === 'play') { const f = a.match; if (f.comp === 'friendly' || !f.away || !f.home) { f.played = true; f.result = { score: [1, 1] }; } else applyResult(g, f, playQuick(g, f, rng), rng); continue; }
     if (a.kind === 'decide') { g.inbox = g.inbox.map((m) => ({ ...m, resolved: true })); continue; }

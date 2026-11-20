@@ -37,7 +37,7 @@ Zrobione:
 - Czynnik „mało gry” liczony z prawdziwych minut (wobec najczęściej grającego w kadrze); wcześniej stała 0,5, a statystyki
   były zerowane przed decyzją. Test: `tests/retirement.test.mjs`.
 Do sprawdzenia (było już przed tą zmianą na main):
-- `tests/camps.test.mjs` „Przerwa zimowa: Dalej zatrzymuje się...” nie przechodzi (brak przystanku campremind 2 sty 2027).
+- `tests/camps.test.mjs` „Przerwa zimowa”: trener autopilota był zwolniony 1 sty 2027 (bez klubu brak przypomnień o obozie); test trzyma zaufanie zarządu, gra bez zmian.
 
 ## Nov 20, 2026, profil B, skauting: wolny albo z klubem losowo, cena zamiast wartości (v1.21 Beta)
 Zrobione (decyzje właściciela):
