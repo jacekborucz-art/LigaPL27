@@ -29,6 +29,30 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 20, 2026, profil B, ranking UEFA: prawdziwe współczynniki 5 sezonów (v1.21 Beta)
+Zrobione:
+- Dane: `tools/uefa-ranking-gen.mjs` czyta plik właściciela `tools/data/ranking_uefa_2026_27.txt` (55 federacji, 415 klubów,
+  sprawdza sumy i progi) i zapisuje `src/data/ranking_uefa.json`. 165 klubów gry połączonych z rankingiem (155 ze 156
+  zagranicznych i 10 polskich); bez wpisu: Dniepr Mohylew. Aliasy nazw w `ALIASES` (opis w docs/kluby_uefa.md).
+- `src/season/uefaCoef.js`: współczynnik klubu = max(punkty własne z 5 sezonów, 20 % kraju), kraj = suma 5 sezonów,
+  punkty sezonu z rozgrywek w grze (eliminacje połową tylko dla kraju, stałe punkty odpadłych w eliminacjach, premie LM 6,
+  miejsca 1-8, 1/4, 1/2, finał [SZAC]). Zapis `game.uefaCoef` (okno 5 sezonów + `prev`), migracja starych zapisów.
+- Koniec sezonu (rollover): sezon z gry do okna, przesunięcie okna, `game.countryCoef` = suma 5 sezonów. Lista dostępu jak
+  w UEFA: ranking po sezonie N-2 (pierwszy raz Polska 12. po 2025/26). Rozstawienia (`coefOf`): ranking po poprzednim
+  sezonie; w 2026/27 dane startowe z kluby_uefa.json. Wiadomość i Historia: miejsce po sezonie i miejsce do przydziału.
+- Widok: Rozgrywki > LM/LE/LK > „Ranking UEFA” z przełącznikiem Kluby i Kraje (5 sezonów, punkty własne, próg 20 %,
+  współczynnik, zmiana od początku sezonu, filtr kraju, polskie wiersze wyróżnione, setka klubów i „Pokaż wszystkie”).
+- Testy: `tests/uefaCoef.test.mjs` (nowy), asercje w `tests/multiseason.test.mjs`; `tools/multiseason.mjs` pokazuje ranking.
+Decyzje i pułapki:
+- Gra symuluje ok. 160 klubów zamiast ok. 230: dzielnik kraju to prawdziwa liczba klubów z pliku, brakujące liczone po 1 pkt
+  [SZAC]. Bez tego kraj z jednym klubem w grze (Islandia) dostawał 11,5 za sezon i rósł w rankingu.
+- Reputacja: `POL_COEF_BASE` 35 -> 45,725 (Polska na start gry), bo `game.countryCoef` ma teraz prawdziwą sumę 5 sezonów
+  (test infrastruktury zaktualizowany).
+- Symulacja 5 sezonów (`node tools/multiseason.mjs widzew 5 5`): Polska 12.-15., bez błędów.
+- `reputation.js`, `uefa.js`, `app.css` mają końce linii CRLF (app.css miesza CRLF i LF): edytować bez ich zmiany.
+Zostało / dalej:
+- Premie za fazę ligową i pucharową to dopasowanie do 2024/25 [SZAC]; warto sprawdzić w regulaminie UEFA.
+
 ## Nov 20, 2026, profil A (chmura), okno transferowe 9 września (v1.21 Beta)
 Zrobione:
 - Letnie okno transferowe co roku stałe: 1 lipca do 9 września (`src/config/calendar2026.js`: BASE i `setSeasonYear`;

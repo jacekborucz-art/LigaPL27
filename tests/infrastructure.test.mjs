@@ -276,7 +276,7 @@ test('Akademia: miejsca według poziomu, od 3 (brak akademii) do 24 (akademia ś
 });
 
 test('Sufit klubu AI rośnie z pozycją w Europie (lata w Lidze Mistrzów), polski szczyt na drabinie z gry', () => {
-  const g = { seed: 1, clubId: 'widzew', date: '2026-07-01', countryCoef: { POL: 35 } };
+  const g = { seed: 1, clubId: 'widzew', date: '2026-07-01', countryCoef: { POL: 45.725 } }; // współczynnik Polski na start gry (POL_COEF_BASE)
   assert.equal(aiMaxLevel(g, 'legia'), AI_MAX, 'bez pucharów: zwykły sufit');
   g.repState = { clubPts: { legia: [10, 10, 10, 10, 10] } }; // kilka sezonów fazy ligowej LM
   assert.ok(aiMaxLevel(g, 'legia') >= 9, `scena ${aiMaxLevel(g, 'legia')}`);

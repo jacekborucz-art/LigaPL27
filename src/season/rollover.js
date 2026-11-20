@@ -23,7 +23,8 @@ import { applyLeagueState, computeMoves, validateTiers, knownClub, dissolveDropp
 import { L3_COMPS, compClubIds } from './leagueComps.js';
 import { L3_GROUPS } from '../config/competitions.js';
 import { allocateEuropeanSpots } from './europeAccess.js';
-import { COUNTRY_COEF_2026, UCOMP_NAMES } from './uefa.js';
+import { UCOMP_NAMES } from './uefa.js';
+import { ensureUefaCoef, accessRankForNext, closeSeason, shiftWindow, applyCoefSource, windowValues, computeCoefs, countryRank } from './uefaCoef.js';
 import { seasonWindows } from './intl/windows.js';
 import { initClub, seasonSummary, FIN } from '../career/finance.js';
 import { academyMods, academyCapOf } from '../career/infrastructure.js';
@@ -41,6 +42,7 @@ import { reputationSeasonEnd, applyClubRep } from '../career/reputationSystem.js
 import { pruneSuspWhy } from './suspension.js';
 
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
+const fmtCoef = (x) => (Math.round(x * 1000) / 1000).toFixed(3).replace('.', ',');
 const groupOf = (p) => GROUP[p.pos] ?? 'MID';
 const name = (id) => anyClub(id)?.name ?? id;
 const LEAGUE_L = { 1: 11.5, 2: 10, 3: 8.5, 4: 7.5 };
@@ -51,6 +53,7 @@ export function applySeasonState(game) {
   setSeasonYear(y, { windows: seasonWindows(y), polishEurope: y === 2026 ? null : game.season?.polishEurope ?? [] });
   applyLeagueState(game);
   applyClubRep(game); // marka krajowa klubów z zapisu (club.rep), po ustaleniu lig
+  applyCoefSource(game); // rozstawienia UEFA: współczynniki z zapisu (game.uefaCoef), nowa gra: dane startowe
 }
 
 // ------------------------------------------------------------ Wyniki sezonu
@@ -81,22 +84,24 @@ export function seasonResults(game) {
 }
 
 // ------------------------------------------------------------ Puchary na kolejny sezon
+// Współczynniki UEFA (src/season/uefaCoef.js): punkty kończącego się sezonu z gry trafiają do okna 5 sezonów, okno
+// przesuwa się o rok. Lista dostępu na nowy sezon jak w UEFA: ranking krajów po sezonie N-2, czyli ranking z początku
+// kończącego się sezonu (pierwszy raz: 12. miejsce Polski po sezonie 2025/26 z danych). Rozstawienia w nowym sezonie:
+// współczynniki klubów po właśnie zakończonym sezonie.
 function polandNextSeason(game, res) {
-  const coef = game.countryCoef ?? { ...COUNTRY_COEF_2026 };
-  const U = game.season.uefa;
-  if (U) {
-    const clubs = {};
-    for (const c of Object.values(U.comps)) for (const r of Object.values(c.rounds)) for (const id of r.entrants) {
-      const cc = CLUBS_PL.some((x) => x.id === id) ? 'POL' : (anyClub(id)?.country ?? '?');
-      clubs[cc] = (clubs[cc] ?? 0) + 1;
-    }
-    for (const cc of Object.keys(coef)) coef[cc] = Math.round((coef[cc] * 0.8 + (U.countryPts[cc] ?? 0) / (clubs[cc] || 1)) * 1000) / 1000;
-  }
-  game.countryCoef = coef;
-  const rank = Object.entries(coef).sort((a, b) => b[1] - a[1]).findIndex(([cc]) => cc === 'POL') + 1;
+  const C = ensureUefaCoef(game);
+  const access = accessRankForNext(C);
+  closeSeason(C, game.season.uefa);
+  const W = windowValues(C, null, { live: false });
+  const { totals } = computeCoefs({}, W.countries);
+  game.countryCoef = Object.fromEntries(totals); // suma 5 sezonów po zakończonym sezonie (reputacja: widoczność Ekstraklasy)
+  const rankNow = countryRank(W.countries);
+  const seasons = [...C.seasons];
+  shiftWindow(C);
+  applyCoefSource(game);
   const eligible = (id) => !clubById(id)?.parent;
-  const spots = allocateEuropeanSpots(res.tables[1], res.cup, Math.max(1, rank), eligible);
-  return { rank, spots };
+  const spots = allocateEuropeanSpots(res.tables[1], res.cup, Math.max(1, access.rank), eligible);
+  return { rank: access.rank, rankNow, coefNow: totals.get('POL') ?? 0, accessSeason: access.season, window: `${seasons[0]}-${seasons[4]}`, spots };
 }
 
 // ------------------------------------------------------------ Zawodnicy
@@ -254,7 +259,7 @@ export function rolloverSeason(game) {
     tables: Object.fromEntries([1, 2, 3].map((t) => [t, res.rows[t].map((r) => ({ id: r.id, pts: r.points, gd: r.gf - r.ga }))])),
     l3: Object.fromEntries(L3_GROUPS.map((g) => [g, res.groupRows[g].map((r) => ({ id: r.id, pts: r.points, gd: r.gf - r.ga }))])),
     l3Playoff: (moves.l3Playoff ?? []).map((x) => ({ keeper: x.keeper, challenger: x.challenger, winner: x.winner })),
-    user: uid ? { club: uid, tier: userTier, pos: userPos, ...(userTier === 4 ? { group: userGroup } : {}) } : null, promoted: moves.promoted, relegated: moves.relegated, polandRank: europe.rank,
+    user: uid ? { club: uid, tier: userTier, pos: userPos, ...(userTier === 4 ? { group: userGroup } : {}) } : null, promoted: moves.promoted, relegated: moves.relegated, polandRank: europe.rankNow, polandAccessRank: europe.rank,
   }].slice(-15);
 
   // Nowy sezon: kalendarz, ligi. Zapis tylko odstępstw od danych (kluby w innej lidze lub grupie niż na start gry)
@@ -380,7 +385,7 @@ export function rolloverSeason(game) {
       ...(errors.length ? [`Uwaga techniczna: ${errors.join('; ')}`] : []),
     ].join('\n'),
   }));
-  msgs.push(createMessage({ date: newStart, key: `europa:${year}`, category: 'competitions', from: 'UEFA', priority: 'info', subject: `Europejskie puchary ${SEASON}`, body: `Polska w rankingu krajów UEFA: ${europe.rank}. miejsce.\n\n${europe.spots.map((s) => `${name(s.club)}: ${UCOMP_NAMES[s.comp]}, ${s.entry === 'LP' ? 'faza ligowa' : `runda ${s.entry}`} (${s.via})`).join('\n')}` }));
+  msgs.push(createMessage({ date: newStart, key: `europa:${year}`, category: 'competitions', from: 'UEFA', priority: 'info', subject: `Europejskie puchary ${SEASON}`, body: `Polska w rankingu krajów UEFA po sezonie ${oldSeason}: ${europe.rankNow}. miejsce (${fmtCoef(europe.coefNow)} pkt, sezony ${europe.window}).\nMiejsca w pucharach ${SEASON} przydziela ranking po sezonie ${europe.accessSeason} (jak w UEFA, z rocznym opóźnieniem): Polska na ${europe.rank}. miejscu.\n\n${europe.spots.map((s) => `${name(s.club)}: ${UCOMP_NAMES[s.comp]}, ${s.entry === 'LP' ? 'faza ligowa' : `runda ${s.entry}`} (${s.via})`).join('\n')}` }));
   const squadLines = [
     pre.in.length ? `Dołączyli na podstawie umów od 1 lipca: ${pre.in.join(', ')}.` : '',
     pre.out.length ? `Odeszli na podstawie umów od 1 lipca: ${pre.out.join(', ')}.` : '',

@@ -165,13 +165,13 @@ function playoffView(game) {
     ${ties ? `<section class="stat-sec ccard"><h3>Rozstrzygnięcia</h3><ul class="plain-list">${ties}</ul></section>` : ''}</div>`;
 }
 
-export function renderCompetitions(game, { comp = 'ekstraklasa', view = 'table', round = null, filter = 'pl', draw = null } = {}) {
+export function renderCompetitions(game, { comp = 'ekstraklasa', view = 'table', round = null, filter = 'pl', draw = null, rank = 'clubs', rankCc = '', rankAll = false } = {}) {
   if (comp === 'liga3' || isL3Comp(comp)) comp = l3Comp(game, comp);
   const tabs = COMP_TABS.map(([k, v]) => `<button class="chip" data-act="ccomp" data-c="${k}" aria-pressed="${comp === k || (k === 'liga3' && isL3Comp(comp))}">${esc(v)}</button>`).join('');
   const wrap = (body) => `<div class="comp" data-comp="${esc(comp)}"><h2>Rozgrywki</h2><div class="chips">${tabs}</div>${body}</div>`;
   if (comp === 'HIST') return wrap(historyView(game));
   if (comp === 'NT') return wrap(renderNational(game, view));
-  if (EUROPE_TABS.some(([k]) => k === comp)) return wrap(renderEurope(game, comp, { view, round, filter, draw }));
+  if (EUROPE_TABS.some(([k]) => k === comp)) return wrap(renderEurope(game, comp, { view, round, filter, draw, rank, rankCc, rankAll }));
   const l3 = isL3Comp(comp);
   const allowed = ['table', 'fixtures', 'stats', ...(l3 ? ['playoff'] : [])];
   if (!allowed.includes(view)) view = 'table';
@@ -194,7 +194,7 @@ function historyView(game) {
     ${a.promoted?.[3]?.length ? `<li><span class="k">Awans z III ligi</span><span>${esc(a.promoted[3].map(name).join(', '))}</span></li>` : ''}
     ${a.user ? `<li><span class="k">Twoja drużyna</span><span>${crest(a.user.club)} ${esc(name(a.user.club))}: ${a.user.pos}. miejsce (${esc(['', 'Ekstraklasa', '1 Liga', '2 Liga', `III liga${a.user.group ? `, grupa ${L3_GROUP_NAMES[a.user.group]}` : ''}`][a.user.tier] ?? '')})</span></li>` : '<li><span class="k">Twoja drużyna</span><span>bez klubu</span></li>'}
     ${a.superCupEU ? `<li><span class="k">Superpuchar Europy</span><span>${esc(name(a.superCupEU))}</span></li>` : ''}
-    <li><span class="k">Polska w UEFA</span><span>${a.polandRank}. miejsce w rankingu krajów</span></li>
+    <li><span class="k">Polska w UEFA</span><span>${a.polandRank}. miejsce w rankingu krajów${a.polandAccessRank && a.polandAccessRank !== a.polandRank ? ` (miejsca w pucharach z ${a.polandAccessRank}. miejsca, ranking sprzed roku)` : ''}</span></li>
   </ul></section>`).join('')}</div>`;
 }
 

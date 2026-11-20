@@ -61,6 +61,11 @@ test('Trzy sezony: ligi po 18 klubów, reguły rezerw, kadry i finanse w normie,
     assert.equal(new Date(DOMESTIC.ekstraklasa.start).getUTCDay(), new Date('2026-07-24').getUTCDay());
     assert.ok(game.fixtures.every((f) => f.date >= `${SEASON_YEAR}-07-01` && f.date <= `${SEASON_YEAR + 1}-06-30`), 'mecze w datach sezonu');
     assert.ok(game.fixtures.some((f) => f.comp === 'ekstraklasa'));
+    // Współczynniki UEFA: okno 5 sezonów kończy się nowym sezonem, zakończony sezon zapisany z gry
+    const C = game.uefaCoef;
+    assert.equal(C.seasons[4], SEASON);
+    assert.ok(C.countries.POL[3] != null && C.countries.ENG[3] > 0, `${SEASON}: punkty krajów z gry`);
+    assert.ok(Object.values(C.clubs).every((a) => a.length === 5 && a[4] == null));
     checks.push(SEASON);
   });
   assert.deepEqual(checks, ['2027/28', '2028/29', '2029/30']);
@@ -69,6 +74,10 @@ test('Trzy sezony: ligi po 18 klubów, reguły rezerw, kadry i finanse w normie,
     assert.ok(a.champion && a.cup, `${a.season}: mistrz i zdobywca PP`);
     assert.ok(a.uefa.LM && a.uefa.LE && a.uefa.LK, `${a.season}: zwycięzcy pucharów`);
   }
+  // Lista dostępu z rankingu sprzed roku: pierwszy przydział z 12. miejsca Polski po sezonie 2025/26
+  assert.equal(g.archive[0].polandAccessRank, 12);
+  for (const a of g.archive) assert.ok(a.polandRank >= 1 && a.polandRank <= 55 && a.polandAccessRank >= 1, a.season);
+  assert.deepEqual(g.uefaCoef.seasons, ['2025/26', '2026/27', '2027/28', '2028/29', '2029/30']);
   // Starzenie: zawodnik z pierwszego sezonu jest o 3 lata starszy
   const any = Object.values(g.world.players).find((p) => p.history?.length === 3);
   if (any) assert.ok(any.history.every((h) => h.s));

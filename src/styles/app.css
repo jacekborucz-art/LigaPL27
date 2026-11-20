@@ -1286,6 +1286,34 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 .xl tfoot td, .xl tfoot th { position: sticky; bottom: 0; background: color-mix(in srgb, var(--text) 8%, var(--surface)); font-weight: 700; border-top: 2px solid var(--line); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .xl__a[data-b="top"] { color: #7BD69A; } :root:not([data-theme="light"]) .xl__a[data-b="good"] { color: #6FC48C; } }
 :root[data-theme="dark"] .xl__a[data-b="top"] { color: #7BD69A; } :root[data-theme="dark"] .xl__a[data-b="good"] { color: #6FC48C; }
+/* Ranking UEFA (Rozgrywki, puchary europejskie): kluby i kraje, 5 sezonów; polskie wiersze wyróżnione */
+.rk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin-bottom: var(--space-2); }
+.rk-bar .xl-note { margin: 0; }
+.rk-filter { display: inline-flex; align-items: center; gap: 6px; font-size: var(--step--1); color: var(--text-muted); }
+.rk-filter select { min-height: 36px; max-width: 220px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--surface); color: var(--text); font: inherit; }
+.rk .xl__pos { width: 64px; }
+.rk .xl__nm { left: 64px; max-width: 46vw; }
+.rk-pos b { display: inline-block; min-width: 24px; font: 700 var(--step--1)/1 var(--font-display); }
+.rk-mv { font-size: 10.5px; font-weight: 600; color: var(--text-muted); }
+.rk-mv[data-d="up"] { color: #2E8A4E; } .rk-mv[data-d="down"] { color: var(--bad-text); } .rk-mv[data-d="0"] { opacity: .5; }
+.rk-nm { display: table-cell; }
+.rk-club { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 240px; vertical-align: middle; }
+.rk-cn { overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.rk-nm .ctry { margin-left: 6px; vertical-align: middle; }
+.rk-nocrest { flex: none; display: inline-block; width: 18px; height: 18px; border-radius: 50%; background: color-mix(in srgb, var(--text) 8%, transparent); }
+.rk-gap td { padding: 8px; text-align: left; font-size: var(--step--1); color: var(--text-muted); font-style: italic; }
+.rk-more { margin: var(--space-2) 0 0; }
+.rk-sum { font: 700 var(--step--1)/1 var(--font-display); }
+.rk-thr { color: var(--text); font-weight: 600; }
+.rk tbody tr.is-pl td, .rk tbody tr.is-pl th { background: color-mix(in srgb, #1E5AA8 12%, var(--surface)); }
+.rk tbody tr.is-pl .xl__pos { box-shadow: inset 3px 0 0 #1E5AA8; }
+.rk tbody tr.is-me td, .rk tbody tr.is-me th { background: color-mix(in srgb, var(--led) 24%, var(--surface)); }
+.rk tbody tr.is-me .xl__pos { box-shadow: inset 3px 0 0 var(--led); }
+@media (max-width: 599px) {
+  .rk .xl__pos { width: 52px; } .rk .xl__nm { left: 52px; }
+  .rk-club { max-width: 150px; }
+  .rk-filter select { max-width: 170px; }
+}
 /* PC: cała szerokość, w Przeglądzie lista + panel podsumowania po prawej */
 @media (min-width: 1280px) {
   .hub__main:has(.sqx) { max-width: 1840px; }

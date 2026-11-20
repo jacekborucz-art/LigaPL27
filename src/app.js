@@ -45,6 +45,7 @@ import { mountMatchday } from './ui/matchdayView.js';
 import { mountDrawAnimation } from './ui/europeView.js';
 import { matchReportHtml } from './ui/matchReportView.js'; // raport meczu po kliknięciu wyniku (docs/raport-meczu.md)
 import { ensureUefa, syncSuperCupEU } from './season/europe.js';
+import { ensureUefaCoef } from './season/uefaCoef.js';
 import { ensureNational, ensureIntl } from './season/nationalSystem.js';
 import { applySeasonState } from './season/rollover.js';
 import { ensureThirdLeague } from './season/thirdLeague.js';
@@ -417,6 +418,7 @@ function ensureGameShape(g) {
   if (g.season?.fixtures && g.fixtures && g.season.fixtures !== g.fixtures) g.season.fixtures = g.fixtures; // po imporcie z pliku JSON
   ensureThirdLeague(g); // zapis sprzed grywalnej III ligi: kadry, finanse i terminarz 4 grup (docs/iii-liga.md)
   ensureUefa(g); // zapis sprzed etapu 8: puchary UEFA nadrobione w tle
+  ensureUefaCoef(g); // współczynniki UEFA 5 sezonów (stare zapisy: okno z danych UEFA i rozegranych sezonów), rozstawienia
   syncSuperCupEU(g); // zapis sprzed Superpucharu Europy: mecz sezonu (rozegrany w tle, jeśli termin minął)
   ensureNational(g);
   ensureIntl(g, addDays(g.date, 1)); // silnik reprezentacji (zapisy sprzed wiecznego kalendarza: nadrobienie w tle)
@@ -611,7 +613,7 @@ function renderTab(tab, g, club) {
     return renderTransfers(g, state) + transferCardHtml(g, cp, { wide: matchMedia(WIDE_CARD).matches });
   }
   if (tab === 'klub') return renderClubHub(g, state);
-  if (tab === 'rozgrywki') return renderCompetitions(g, { comp: state.cComp ?? compOfClub(club) ?? 'ekstraklasa', view: state.cView, round: state.cRound, filter: state.uFilter, draw: state.uDraw });
+  if (tab === 'rozgrywki') return renderCompetitions(g, { comp: state.cComp ?? compOfClub(club) ?? 'ekstraklasa', view: state.cView, round: state.cRound, filter: state.uFilter, draw: state.uDraw, rank: state.uRank, rankCc: state.uRankCc, rankAll: state.uRankAll });
   if (tab === 'kadra') {
     if (state.ma) return renderMatchAnalysis(g, state.ma); // analiza meczu albo archiwum (Skład i taktyka, Analizy meczów)
     // Rezerwy: podzakładka tylko w klubie z grywalnymi rezerwami (po zmianie klubu powrót do „Zawodnicy”)
@@ -1699,6 +1701,12 @@ async function skautingAction(act, el) {
     (sel && app.querySelector(sel))?.focus?.({ preventScroll: true });
   }
 }
+// Ranking UEFA: filtr klubów według kraju (SELECT)
+app.addEventListener('change', (ev) => {
+  if (!state.game || !ev.target.matches?.('[data-urank-cc]')) return;
+  state.uRankCc = ev.target.value; render();
+  app.querySelector('[data-urank-cc]')?.focus({ preventScroll: true });
+});
 // Pola arkusza zlecenia (data-sk-f) i filtry wolnych skautów (INPUT i SELECT nie przechodzą przez dispatchAct)
 app.addEventListener('change', (ev) => {
   const t = ev.target;
@@ -1936,6 +1944,8 @@ async function dispatchAct(el, { root = app } = {}) {
     if (act === 'resultdone') { state.screen = 'hub'; state.tab = 'pulpit'; render(); }
     if (act === 'ccomp') { state.cComp = el.dataset.c; state.cRound = null; state.uDraw = null; render(); }
     if (act === 'ufilter') { state.uFilter = el.dataset.f; render(); }
+    if (act === 'urank') { state.uRank = el.dataset.k; render(); }
+    if (act === 'urankall') { state.uRankAll = true; render(); }
     if (act === 'udraw') { state.uDraw = `${el.dataset.c}:${el.dataset.r}`; state.cView = 'path'; render(); }
     if (act === 'udrawclose') { state.uDraw = null; render(); }
     if (act === 'cview') { state.cView = el.dataset.v; state.cRound = null; state.uDraw = null; render(); }

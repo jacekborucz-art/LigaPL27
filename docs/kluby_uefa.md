@@ -134,9 +134,69 @@ Gwiazdka przy współczynniku oznacza szacunek.
 | 39 | Sunderland AFC | ENG | 23.00* | 129 | 14.1 | B | 5 | S | LE |
 | 40 | Brighton & Hove Albion | ENG | 23.00* | 129 | 14.1 | B | 6 | O | LK |
 
+## Ranking UEFA: prawdziwe współczynniki 5 sezonów (od Nov 20, 2026)
+
+Źródło: plik od właściciela `tools/data/ranking_uefa_2026_27.txt` (oficjalny ranking UEFA za sezony 2022/23-2026/27,
+stan punktacji Nov 5, 2026; sezon 2026/27 częściowy). Plik powołuje się na:
+[UEFA, ranking federacji](https://www.uefa.com/nationalassociations/uefarankings/country/?year=2027),
+[UEFA, ranking klubów](https://www.uefa.com/nationalassociations/uefarankings/club/?year=2027),
+[UEFA, zasady współczynników klubów](https://www.uefa.com/nationalassociations/uefarankings/club/about/),
+[Bert Kassies, crank2027](https://kassiesa.net/uefa/data/method5/crank2027.html) i regulamin LM 2026/27 (aneks D.2, okresy odniesienia).
+
+- **Generator:** `node tools/uefa-ranking-gen.mjs` (opcja `-v`: każde dopasowanie, `--check`: zgodność z plikiem danych)
+  czyta tabele „Pełny ranking federacji” (55) i „Pełny ranking klubów” (415; Paris Saint-Germain jest w pliku dwa razy,
+  liczy się raz), sprawdza sumy, progi 20 % i współczynniki z pliku i zapisuje `src/data/ranking_uefa.json`:
+  kraje `{ kod: { name, seasons[5], place, entrants } }` i kluby `{ klucz: { name, country, seasons[5], place, game? } }`.
+- **Dopasowanie nazw:** po kraju i znormalizowanej nazwie (bez znaków diakrytycznych, kropek i przedrostków FC, AS, KKS,
+  MKS, KS itd.; słowa ogólne jak Real, United, Inter, Borussia, Dinamo nie wystarczą). Trudne przypadki w tabeli `ALIASES`
+  (np. FC Internazionale Milano -> inter, GNK Dinamo -> dinamo-zagrzeb, F.C. Copenhagen -> kopenhaga, ML Vitebsk ->
+  witebsk, PFC CSKA Sofia -> cska-sofia; FC CSKA 1948 to inny klub). Polskie kluby po prawdziwych nazwach
+  (`FICTIONAL[id].real`): Legia Warszawa, KKS Lech Poznań, Jagiellonia Białystok, Raków Częstochowa, Górnik Zabrze,
+  GKS Katowice, Wisła Kraków, Śląsk Wrocław, MKS Pogoń Szczecin, KS Lechia Gdańsk. W grze widać nazwy wyświetlane
+  w grze (fikcyjne albo prawdziwe, jak w karierze).
+- **Wynik:** 165 klubów gry ma prawdziwe dane (155 ze 156 zagranicznych i 10 polskich). Bez wpisu w rankingu:
+  Dniepr Mohylew (BLR). Pozostałe 250 klubów rankingu nie gra w grze: są tylko w tabeli (klucz `x-kraj-nazwa`),
+  ich punkty z kolejnych sezonów to brak, więc z czasem spadają do progu 20 % kraju.
+
+### Zasady (src/season/uefaCoef.js)
+
+- Współczynnik klubu = max(suma własnych punktów z 5 sezonów, 20 % pięcioletniego współczynnika kraju); wzór odtwarza
+  kolumnę „Współcz.” z pliku dla wszystkich 415 klubów (test `tests/uefaCoef.test.mjs`).
+- Współczynnik kraju = suma 5 współczynników sezonowych. Sezon: punkty wszystkich klubów kraju podzielone przez liczbę
+  klubów kraju w pucharach (obcięte do 3 miejsc po przecinku).
+- Mecz: zwycięstwo 2, remis 1 (faza ligowa i pucharowa, z barażami). Eliminacje Q1-PO: połowa (1 i 0,5), tylko dla kraju.
+- Klub odpadły w eliminacjach (bez fazy ligowej) ma stałe punkty za ostatnią przegraną rundę: Q1 1, Q2 1,5, Q3 2, PO 2,5
+  (z pliku: Valletta 1,5, GKS 2,0, Raków i Górnik 2,5); te punkty nie liczą się krajowi (Polska 3,600 = 18 / 5).
+- Premie: udział w fazie ligowej LM 6 (z pliku: PSG i Real 14 pkt po 4 kolejkach); LE i LK bez premii za udział
+  (Lech 1 pkt po remisie, Ararat-Armenia 0). [SZAC] dopasowane do sezonu 2024/25 z pliku (Liverpool, Barcelona, Arsenal,
+  Inter, PSG, Man Utd, Tottenham, Chelsea zgadzają się co do punktu): miejsca 1-8 fazy ligowej (25 - miejsce) * 0,25
+  plus premia za bezpośredni awans do 1/8; premia za 1/4, 1/2 i finał: LM 1,5, LE 1, LK 0. Klub z baraży nie dostaje
+  premii za 1/8. Bayern i Brugge 2024/25 różnią się o 1-4 pkt (prawdopodobnie błąd w odtworzeniu ich wyników z pamięci).
+- Gra symuluje 156 klubów zagranicznych zamiast ok. 230. Dzielnik kraju to prawdziwa liczba klubów (kolumna „Kluby 26/27”),
+  a brakujące kluby liczą się jako odpadające w eliminacjach po 1 pkt kraju [SZAC]. Kraj bez klubów w grze: średnia
+  z czterech wcześniejszych sezonów okna [SZAC]. Rosja (zawieszona) bez punktów.
+
+### Okno sezonów, rozstawienia i lista dostępu
+
+- Zapis: `game.uefaCoef = { v, seasons: ['2022/23', ...], clubs: { id: [5] }, countries: { kod: [5] }, prev }`. Ostatni
+  sezon okna to sezon bieżący: w trakcie liczony na żywo z rozgrywek w grze, przy końcu sezonu (rollover) zapisany,
+  potem okno przesuwa się o rok (najstarszy sezon do `prev`). Częściowy sezon 2026/27 z pliku zastępują wyniki z gry.
+- Rozstawienia (`coefOf` w uefa.js) jak w UEFA: współczynniki po poprzednim sezonie (`prev` i cztery zakończone sezony
+  okna). W sezonie 2026/27 (plik nie ma sezonu 2021/22) zostają wartości startowe z `kluby_uefa.json`, dobrane do
+  prawdziwych koszyków 2026/27.
+- Lista dostępu (miejsca polskich klubów, src/season/europeAccess.js) jak w UEFA z rocznym opóźnieniem: miejsca w sezonie N
+  przydziela ranking po sezonie N-2. Pierwszy przydział w grze (2027/28): Polska 12. po sezonie 2025/26 (docs/ekspert_sedzia.md,
+  B6), potem ranking z okna w zapisie. Wiadomość na koniec sezonu i Historia pokazują oba miejsca: po sezonie i do przydziału.
+- Stare zapisy (`ensureUefaCoef`): okno z pliku; za sezony rozegrane przed zmianą sezon 2026/27 z pliku (stan Nov 5, 2026),
+  późniejsze bez wyników: kraje średnią z okna. `game.countryCoef` = suma 5 sezonów po każdym sezonie (reputacja:
+  widoczność Ekstraklasy liczona względem 45,725, współczynnika Polski na start gry).
+- Współczynniki nie zmieniają siły drużyn L: tylko rozstawienia, przydział miejsc i rankingi.
+- Widok: Rozgrywki, zakładka pucharu, „Ranking UEFA” z przełącznikiem Kluby i Kraje (pierwsza setka klubów i polskie
+  kluby, filtr kraju, cała lista na życzenie; zmiana miejsca od początku sezonu).
+
 ## Niepewności
 
-1. **Współczynniki klubowe** są w większości szacunkami (134 ze 156). WebFetch nie miał dostępu do kassiesa.net, rsssf.org i si.com (ograniczenia sieci sesji), a wyniki wyszukiwania podawały tylko fragmenty tabel, więc nie dało się pobrać pełnej tabeli 2026. Przed wydaniem gry warto podmienić wartości i przeliczyć L skryptem.
+1. **Współczynniki klubowe** w polu `wspolczynnik` są w większości szacunkami (134 ze 156) i służą już tylko rozstawieniom w sezonie 2026/27 oraz renomie startowej; ranking w grze liczy prawdziwe punkty z `ranking_uefa.json` (rozdz. Ranking UEFA). WebFetch nie miał dostępu do kassiesa.net, rsssf.org i si.com (ograniczenia sieci sesji), a wyniki wyszukiwania podawały tylko fragmenty tabel, więc nie dało się pobrać pełnej tabeli 2026. Przed wydaniem gry warto podmienić wartości i przeliczyć L skryptem.
 2. **Ranking krajów 2025**: pewne są wartości 12 krajów (m.in. Holandia 67.150, Portugalia 62.266, Belgia 56.850, Turcja 43.900, Norwegia 39.687, Grecja 39.312, Polska 35.000, Dania 33.981, Cypr 27.537, Szwecja 27.125, Chorwacja 27.025, Słowacja 21.250). Pozostałe 42 to szacunki. Kolejność w dolnej części tabeli (miejsca 29 do 54) jest przybliżona.
 3. **Miejsca w rankingu klubowym** to w całości interpolacja, bez oficjalnej tabeli.
 4. **Mistrz i Puchar Polski 2025/26**: Lech i Górnik potwierdzone w kilku źródłach, ale żadne z nich nie jest oficjalnym komunikatem Ekstraklasy lub PZPN. Data finału PP (May 2, 2026) pochodzi z jednego źródła; inne podaje May 31.

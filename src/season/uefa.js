@@ -154,7 +154,21 @@ export function allocateEntrants(polish = POLISH_EUROPE_2026) {
 
 // ------------------------------------------------------------ Pomocnicze
 export const countryOf = (id) => (POLISH.has(id) || !byId.has(id) ? 'POL' : byId.get(id).country);
-export function coefOf(id) { return byId.get(id)?.coef ?? POLISH.get(id)?.wspolczynnik ?? 5; }
+// Współczynnik klubu do rozstawień i remisów w tabeli: ranking UEFA po poprzednim sezonie (5 zakończonych sezonów,
+// src/season/uefaCoef.js, game.uefaCoef). W sezonie 2026/27 (bez sezonu 2021/22 w danych) wartości startowe
+// z kluby_uefa.json, dobrane do prawdziwych koszyków 2026/27.
+let COEF_SRC = null;
+/** Źródło współczynników: { clubs: Map(id -> współczynnik), countries: Map(kod -> suma 5 sezonów) } albo null (dane startowe). */
+export function setCoefSource(src) { COEF_SRC = src ?? null; }
+export function coefSource() { return COEF_SRC; }
+export function coefOf(id) {
+  if (COEF_SRC) {
+    const v = COEF_SRC.clubs.get(id);
+    if (v != null) return v;
+    return Math.floor(0.2 * (COEF_SRC.countries.get(countryOf(id)) ?? 0) * 1000) / 1000; // klub bez punktów: 20 % kraju
+  }
+  return byId.get(id)?.coef ?? POLISH.get(id)?.wspolczynnik ?? 5;
+}
 const datesOf = (comp, round) => [].concat(UEFA[comp][round] ?? []);
 const TIMES = ['21:00', '18:45'];
 
