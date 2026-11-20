@@ -29,6 +29,13 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 20, 2026, profil B, skauting: wolny albo z klubem losowo, cena zamiast wartości (v1.21 Beta)
+Zrobione (decyzje właściciela):
+- Zlecenie skauta bez wyboru „wolny / z kontraktem”: kandydat jest wolny albo z klubem losowo (`SCOUT.freeShare` 0,5 [SZAC];
+  polecenie agenta zawsze z klubem). Cena zawodnika z klubem jak dotąd: z kraju (`priceMulFor`) + RNG.
+- Wolny kandydat skauta dołącza w każdej chwili (`lateFree` pomija `p.scout`); z klubem tylko w oknie transferowym.
+- U ukrytego kandydata zamiast wartości rynkowej (zdradzała poziom) „Cena wg skauta: od do” (`valueOrScoutPrice`).
+
 ## Nov 20, 2026, profil B, kontrola jakości skautingu, wydajność, ukryta ocena kandydatów, commity 9acbd87..e3eab2c (v1.21 Beta)
 Zrobione:
 - Wersja gry v1.21 Beta (decyzja właściciela). Wchodzą do niej: skauting zagraniczny (Transfery, Skauting), ukryta

@@ -31,7 +31,7 @@ import { checkUserPre } from '../career/preContracts.js';
 import { DOMESTIC } from '../config/calendar2026.js';
 import { renderSkauting } from './scoutingView.js'; // zakładka Skauting
 import { isPoolContracted, poolClubLabel, poolSellerClub, REGION_FILTERS, regionOf } from '../career/foreignPool.js'; // zawodnicy z zagranicy
-import { scoutHidden, scoutEye, ovrOrEye, shownOvr, hiddenAttrsHtml } from './scoutMask.js'; // kandydaci skauta: ocena ukryta (lornetka)
+import { scoutHidden, scoutEye, ovrOrEye, shownOvr, hiddenAttrsHtml, valueOrScoutPrice, valueLabel } from './scoutMask.js'; // kandydaci skauta: ocena ukryta (lornetka)
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size = 20) => (clubById(id) ? crestHtml(clubById(id), { size, clubsById }) : '');
@@ -200,7 +200,7 @@ function marketTable(game, rows, list, sort, total) {
     return `<tr data-pid="${esc(p.id)}"><td class="xl__pos">${posBadge(p)}</td>
       <th scope="row" class="xl__nm"><button data-act="tf-open" data-id="${esc(p.id)}" data-pid="${esc(p.id)}"><span>${cardLink(p)}</span></button></th>
       <td class="xl__ovr">${ovrOrEye(game, p)}</td><td class="tf-num tf-price">${x.price == null ? '<span class="tf-nfs">nie na sprzedaż</span>' : `${fmtZl(x.price)}${free || list === 'loan' ? '<small>/tydz.</small>' : ''}`}</td>
-      <td>${p.age}</td>${free ? '' : `<td class="tf-l">${clubCell(p.clubId)}</td>`}<td class="tf-num">${fmtZl(p.value ?? 0)}</td>${free ? '' : `<td>${p.contract?.until ? esc(fmtDate(p.contract.until)) : '-'}</td>`}
+      <td>${p.age}</td>${free ? '' : `<td class="tf-l">${clubCell(p.clubId)}</td>`}<td class="tf-num">${esc(valueOrScoutPrice(game, p, fmtZl))}</td>${free ? '' : `<td>${p.contract?.until ? esc(fmtDate(p.contract.until)) : '-'}</td>`}
       <td>${tag(x.will, willTone(x.will))}</td>
       <td class="tf-l tf-why">${(whyTags(x.reasons, free && recentlyMoved(p, game.date)) + dealTags(game, p)) || '<span class="xl__z">·</span>'}</td></tr>`;
   }).join('');
@@ -259,7 +259,7 @@ function marketView(game, ui) {
   const needWill = sort.k === 'will';
   const withWill = (x) => ({ ...x, will: playerWillingness(game, x.p).verdict });
   const val = (x, k) => (k === 'pos' ? POS_ORDER.indexOf(x.p.pos) : k === 'name' ? x.p.name : k === 'ovr' ? shownOvr(game, x.p) : k === 'price' ? (x.price ?? Infinity)
-    : k === 'age' ? x.p.age : k === 'club' ? (clubById(x.p.clubId)?.name ?? x.p.abroad?.club ?? '') : k === 'value' ? x.p.value ?? 0 : k === 'until' ? (x.p.contract?.until ?? '9999')
+    : k === 'age' ? x.p.age : k === 'club' ? (clubById(x.p.clubId)?.name ?? x.p.abroad?.club ?? '') : k === 'value' ? (scoutHidden(game, x.p) ? (game.scoutOps?.cands?.[x.p.id]?.rep?.priceRange?.[0] ?? 0) : x.p.value ?? 0) : k === 'until' ? (x.p.contract?.until ?? '9999')
       : k === 'nat' ? (NAT_NAMES[x.p.nat] ?? x.p.nat) : k === 'wage' ? x.wage ?? 0
       : k === 'will' ? ['chętny', 'otwarty', 'niechętny', 'odmowa'].indexOf(x.will) : 0);
   const sorted = sortBy(needWill ? all.map(withWill) : all, sort, val).slice(0, 80);
@@ -354,7 +354,7 @@ function playerCard(game, p, ui) {
       <div class="tf-main">
         ${cardHead(game, p, `<button class="btn btn--quiet btn--sm" data-act="extplayer" data-id="${esc(p.id)}">Profil i statystyki</button>`)}
         <ul class="tf-facts">
-          ${fact('Wartość', fmtZl(p.value))}
+          ${fact(valueLabel(game, p), esc(valueOrScoutPrice(game, p, fmtZl)))}
           ${free ? fact('Oczekuje', `ok. ${fmtZl(effectiveAsk(p, clubById(game.clubId)?.tier ?? 1))}<small> tygodniowo</small>`, 'warn') : fact('Cena klubu', nfs ? 'nie na sprzedaż' : fmtZl(price), nfs ? 'bad' : 'good')}
           ${free ? '' : fact('Pensja', `${fmtZl(p.contract.wage)}<small> tygodniowo</small>`)}
           ${free ? '' : fact('Kontrakt do', esc(fmtDate(p.contract.until)))}
@@ -405,7 +405,7 @@ function ownCard(game, p, ui) {
           ${fact('Pensja', `${fmtZl(p.contract.wage)}<small> tygodniowo</small>`)}
           ${fact('Kontrakt do', esc(fmtDate(p.contract.until)), ml <= 6 ? 'bad' : ml <= 12 ? 'warn' : '')}
           ${fact('Pozostało', `${Math.max(0, ml)} mies.`, ml <= 6 ? 'bad' : ml <= 12 ? 'warn' : 'good')}
-          ${fact('Wartość', fmtZl(p.value))}
+          ${fact(valueLabel(game, p), esc(valueOrScoutPrice(game, p, fmtZl)))}
           ${fact('Morale', `${mor}<small>/20</small>`, mor >= 14 ? 'good' : mor >= 10 ? 'info' : 'warn')}
           ${fact('Wiek', `${p.age} lat`)}
         </ul>
@@ -757,6 +757,7 @@ export function handleTransferAction(game, act, ds = {}, root = null) {
 /** Wolny zawodnik bez klubu od dnia po zamknięciu ostatniego okna: poza oknem nie do zgłoszenia (FIFA RSTP art. 6.1). */
 export function lateFree(game, p) {
   if (inWindow(game.date) || !p.freeSince) return false;
+  if (p.scout) return false; // wolny kandydat skauta jest bez klubu od dawna: można go zgłosić w każdej chwili (FIFA RSTP art. 6.1)
   const last = (DOMESTIC.transferWindows ?? []).filter((w) => w.to < game.date).map((w) => w.to).sort().at(-1);
   return !!last && p.freeSince > last;
 }
@@ -778,7 +779,7 @@ export function transferCardHtml(game, p, { wide = false } = {}) {
   const facts = [
     cardFact('Klub', esc(club)),
     cardFact('Kontrakt', p.contract?.until ? `do ${esc(fmtDate(p.contract.until))}` : 'Brak'),
-    cardFact('Wartość', esc(fmtZl(p.value ?? 0))),
+    cardFact(valueLabel(game, p), esc(valueOrScoutPrice(game, p, fmtZl))),
     ...(price ? [cardFact('Cena', esc(price))] : []),
     ...(mine ? [cardFact('Morale', esc(moraleLabel(p.morale ?? 12)))] : []),
   ];

@@ -113,3 +113,14 @@ test('Zdanie skauta: ocena z raportu, słabsza pewność to ostrożniejsze słow
   const v = scoutingView(g);
   assert.ok(v.candidates.length && v.candidates.every((c) => /poziomie/.test(c.opinion)));
 });
+
+test('Kandydat skauta: wolny dołącza w każdej chwili, wartość zastąpiona ceną wg skauta', async () => {
+  const { lateFree } = await import('../src/ui/transfersView.js');
+  const { valueOrScoutPrice, valueLabel } = await import('../src/ui/scoutMask.js');
+  const g = { date: '2026-10-20', clubId: 'widzew', scoutOps: { cands: { x: { rep: { priceRange: [1000000, 1500000] } } } } };
+  assert.equal(lateFree(g, { id: 'x', freeSince: '2026-10-10', scout: { club: 'widzew' } }), false, 'wolny kandydat skauta bez czekania na okno');
+  const fmt = (n) => `${n} zł`;
+  const hidden = { id: 'x', clubId: null, abroad: { club: 'K' }, value: 2100000, scout: { club: 'widzew', until: '2026-12-31' } };
+  const shown = valueOrScoutPrice(g, hidden, fmt);
+  if (valueLabel(g, hidden) === 'Cena wg skauta') assert.ok(!shown.includes('2100000') && shown.includes('1000000'));
+});

@@ -13,7 +13,7 @@ import { positionMapHtml } from './positionMap.js';
 import { playerStatsHtml } from './playerStatsView.js';
 import { scoutLine } from '../career/assistantReport.js'; // raport skauta: potencjał zawodników spoza klubu (docs/sztab.md)
 import { anyClub } from '../season/season.js';
-import { scoutEye, hiddenAttrsHtml } from './scoutMask.js'; // kandydat skauta: ocena i atrybuty ukryte
+import { scoutEye, hiddenAttrsHtml, valueOrScoutPrice, valueLabel } from './scoutMask.js'; // kandydat skauta: ocena i atrybuty ukryte
 import { playerTags, suspSplit, suspText } from './playerTags.js'; // znaczniki stanu za nazwiskiem (docs/tagi-zawodnika.md)
 
 /** Potencjał w profilu: zawodnik spoza klubu gracza oceniany przez skauta (precyzja z jakości skauta). */
@@ -292,7 +292,7 @@ export function renderPlayerProfile(p, opts = {}) {
           ${!p.contract ? '<li><span class="k">Status</span><span>Wolny zawodnik, bez kontraktu</span></li>' : `${foreign ? '' : `<li><span class="k">Pensja</span><span>${esc(formatZl(p.contract.wage))} tygodniowo</span></li>`}
           <li><span class="k">Do</span><span>${esc(fmtDate(p.contract.until))}</span></li>
           <li><span class="k">Klauzula</span><span>${p.contract.clause ? esc(formatZl(p.contract.clause)) : 'Brak'}</span></li>`}
-          <li><span class="k">Wartość</span><span>${esc(formatZl(p.value))}</span></li>
+          <li><span class="k">${hidden ? esc(valueLabel(opts.game, p)) : 'Wartość'}</span><span>${esc(hidden ? valueOrScoutPrice(opts.game, p, formatZl) : formatZl(p.value))}</span></li>
           ${foreign ? '' : `<li><span class="k">Agent</span><span>${esc(AGENT_TYPES[p.agent]?.label ?? 'Brak danych')}</span></li>`}
         </ul>
         <h3>Charakter</h3>

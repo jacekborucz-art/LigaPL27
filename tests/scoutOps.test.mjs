@@ -147,8 +147,9 @@ test('Granice: 0-7 kandydatów, wiek w zleceniu, cena i pensja w limicie (+10 %)
       assert.ok(p.pos === 'ŚP' && p.foreignPool);
     }
   }
-  const free = trip('f1', { s: 0.9, weeks: 6, D: 0.1, contract: 'free' });
-  assert.ok(free.players.every(({ p }) => p.free));
+  // Wolny albo z kontraktem losowo (decyzja właściciela): w wielu wyjazdach są oba rodzaje
+  const all = Array.from({ length: 40 }, (_, i) => trip(`f${i}`, { s: 0.9, weeks: 6, D: 0.1 }).players).flat();
+  assert.ok(all.some(({ p }) => p.free) && all.some(({ p }) => !p.free));
 });
 
 test('Raport: błąd rośnie przy słabej ocenie i regionie, wydmuszki zgodne ze wzorem 0,30 (1 - a)^1,5', () => {
@@ -349,7 +350,7 @@ test('Pula zagraniczna: uzupełnienie nie usuwa kandydatów skautów i liczy 100
   const ids = [];
   for (let i = 0; i < 6; i++) {
     let p = null;
-    for (let k = 0; !p; k++) p = trip(`u${i}-${k}`, { s: 0.9, weeks: 6, D: 0.1, contract: 'contract', game: { ...bare, seed: g.seed, date } }).players[0]?.p;
+    for (let k = 0; !p; k++) p = trip(`u${i}-${k}`, { s: 0.9, weeks: 6, D: 0.1, game: { ...bare, seed: g.seed, date } }).players.find(({ p: x }) => !x.free)?.p;
     p.id = `skaut-test-${i}`;
     p.scout = { club: g.clubId, mission: 'mT', found: date, excl: addDays(date, 14), until: addDays(date, 120), pct: null };
     g.world.players[p.id] = p; g.market.foreign.push(p.id); ids.push(p.id);

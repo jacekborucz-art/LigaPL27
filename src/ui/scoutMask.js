@@ -25,3 +25,13 @@ export function shownOvr(game, p) {
   const r = game.scoutOps?.cands?.[p.id]?.rep;
   return r?.seenOvr ?? (r?.ovrRange ? (r.ovrRange[0] + r.ovrRange[1]) / 2 : 0);
 }
+
+/** Wartość rynkowa do pokazania: dla ukrytego kandydata zamiast wartości (zdradza poziom) ramka ceny z raportu skauta. */
+export function valueOrScoutPrice(game, p, fmt) {
+  if (!scoutHidden(game, p)) return fmt(p.value ?? 0);
+  const r = game.scoutOps?.cands?.[p.id]?.rep;
+  if (r?.free || (!p.clubId && p.free)) return 'wolny, bez odstępnego';
+  return r?.priceRange ? `${fmt(r.priceRange[0])} do ${fmt(r.priceRange[1])} (wg skauta)` : 'cena wg skauta w raporcie';
+}
+/** Etykieta wiersza: „Wartość” albo „Cena wg skauta”. */
+export const valueLabel = (game, p) => (scoutHidden(game, p) ? 'Cena wg skauta' : 'Wartość');

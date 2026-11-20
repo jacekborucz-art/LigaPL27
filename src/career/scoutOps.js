@@ -45,6 +45,7 @@ export const SCOUT = {
   ev: { zaulek: 0.09, mecz: 0.18, agent: 0.15, uraz: 0.10, short: 0.5 }, // zdarzenia na tydzień (1 tydzień: połowa)
   sW: { dos: 0.30, reg: 0.40, sie: 0.15, oce: 0.15 }, // wagi skuteczności s (region ważniejszy niż w projekcie: ekspert wyraźnie przed siecią kontaktów)
   restPerWeek: 1, cancelDays: 2, refund: 0.5,
+  freeShare: 0.5, // szansa, że kandydat jest wolny (decyzja właściciela Nov 20, 2026: losowo, bez wyboru w zleceniu) [SZAC]
   excl: 14, valid: { free: 28, contract: 42 }, validMax: 98, afterWindow: 14, freeze: 7,
   outcome: { signed: 0.45, gone: 0.35 }, // reszta (20 %): zwykły rynek
   repeatDays: 14, satDays: 56, satMul: 0.7, maxActive: 3, tries: 12,
@@ -297,7 +298,7 @@ export function normalizeOrder(o = {}) {
   return {
     scoutId: o.scoutId ?? null, freeScoutId: o.freeScoutId ?? null, region: o.region, pos: o.pos, ageFrom, ageTo: Math.max(ageFrom, ageTo), level,
     maxFee: Math.max(0, Math.round(Number(o.maxFee) || 0)), maxWage: Math.max(0, Math.round(Number(o.maxWage) || 0)),
-    contract: CONTRACTS.includes(o.contract) ? o.contract : 'any', weeks: SCOUT.weeks.includes(Number(o.weeks)) ? Number(o.weeks) : null,
+    contract: 'any', /* bez wyboru wolny albo z kontraktem (decyzja właściciela) */ weeks: SCOUT.weeks.includes(Number(o.weeks)) ? Number(o.weeks) : null,
   };
 }
 const orderKey = (o) => [o.region, o.pos, o.ageFrom, o.ageTo, o.level, o.contract].join('|');
@@ -496,7 +497,7 @@ export function rollCandidates(game, m, scout) {
     const flags = { mecz: i < ev.mecz, agent: i >= ev.mecz && i < ev.mecz + ev.agent };
     let got = null;
     for (let t = 0; t < SCOUT.tries && !got; t++) {
-      const status = m.contract === 'free' ? 'free' : flags.agent || m.contract === 'contract' ? 'contract' : rng.chance(0.4) ? 'free' : 'contract'; // polecenie agenta: zawodnik z kontraktem (chyba że zlecenie na wolnych)
+      const status = flags.agent ? 'contract' : rng.chance(SCOUT.freeShare) ? 'free' : 'contract'; // decyzja właściciela: gracz nie wybiera, wynik zero-jedynkowy (polecenie agenta: zawodnik z kontraktem)
       const target = m.calc.c + shift + rng.gauss(0, sd) + (flags.mecz ? 0.4 : 0);
       const age = rng.int(m.ageFrom, m.ageTo);
       const nat = rng.weighted(R.nats, (x) => R.w[x]);
