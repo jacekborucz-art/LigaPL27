@@ -10,6 +10,7 @@ import { anyClub, yellowSuspension } from '../season/season.js';
 import { ntName } from '../season/national.js';
 import { familyOf } from '../career/reserves.js';
 import { dealOf, buyerName, STAGE_LABELS } from '../career/transferDeals.js';
+import { thinkingUntil } from '../career/proposals.js'; // namysł zawodnika nad propozycjami klubów
 import { openLoanOffers } from '../career/loans.js';
 import { isLoanedOut } from '../career/squad.js';
 import { formatZl } from '../career/negotiation.js';
@@ -103,6 +104,9 @@ export function playerTagList(game, p, opts = {}) {
     const stage = d ? (STAGE_LABELS[d.stage] ?? '').toLowerCase() : '';
     const head = d && d.from === p.clubId && d.to !== view ? `Odchodzi do ${buyerName(d)}` : 'Transfer w toku';
     add('tr', 'TR', `${head}${stage ? `: ${stage}` : ''}${p.transfer?.hold ? '. Po testach medycznych nie gra' : ''}`);
+  } else if (M?.pending?.length) {
+    const until = thinkingUntil(game, p.id); // propozycja w toku: obrys, wynik nieznany
+    if (until) add('tr', 'TR', `Rozważa oferty, odpowie do ${fmtDate(until)}`, true);
   }
   if (p.preContract) {
     const pc = p.preContract;

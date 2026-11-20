@@ -5,10 +5,12 @@
 // renderNegotiation(game, ng) zwraca HTML ekranu.
 // handleNegotiationAction(game, ng, act, dataset, form) obsługuje kliknięcia (data-act z prefiksem „ng-”)
 // i zwraca { ng, done, save }. Po zakończeniu rozmów skutki trafiają do zawodnika przez applyOutcome.
-// Przy podpisaniu zawodnik NIE zmienia klubu: przenosi go moduł transferów na podstawie done.contract.
+// Przy podpisaniu zawodnik NIE zmienia klubu: udane rozmowy to propozycja, nad którą zawodnik się namyśla
+// (src/career/proposals.js), a klub zmienia moduł transferów. Ostatnia runda (lastRound, gdy zawodnik chce zmian):
+// jedno ultimatum zawodnika, porozumienie to podpis od razu, słabsza oferta kończy rozmowy.
 
 import {
-  openNegotiation, applyOutcome, normalizeOffer, marketWage, seasonEndOf,
+  openNegotiation, applyOutcome, normalizeOffer, valueOffer, marketWage, seasonEndOf,
   ROLES, ROLE_LABELS, MAX_YEARS, formatZl, yearsLabel,
 } from '../career/negotiation.js';
 import { anyClub } from '../season/season.js';
@@ -192,7 +194,7 @@ export function offerSummary(o) {
  * save: true, gdy odmowa zmieniła zawodnika (odmowa przedłużenia zapisuje renewRefused).
  */
 export function startNegotiation(game, opts = {}) {
-  const { kind = 'sign', playerId, limits = {}, fee = 0, rival = null, relegationRisk, pre = false, stayBonus = 0 } = opts;
+  const { kind = 'sign', playerId, limits = {}, fee = 0, rival = null, relegationRisk, pre = false, stayBonus = 0, lastRound = null } = opts;
   const player = game.world?.players?.[playerId];
   if (!player) return { ok: false, reason: 'noPlayer', text: 'Nie ma takiego zawodnika.', save: false };
   const club = resolveClub(game.clubId);
@@ -205,6 +207,7 @@ export function startNegotiation(game, opts = {}) {
   const fromClub = kind === 'sign' ? resolveClub(opts.fromClub ?? null) : null;
   const ctx = negotiationContext(game, { kind, player, club, fromClub, rival, relegationRisk });
   if (stayBonus) { ctx.stayBonus = stayBonus; ctx.forceRenew = true; } // podwyżka przy prośbie o transfer (career/moveWish.js)
+  if (kind === 'sign' && !pre && !lastRound) ctx.proposal = true; // kwestie agenta: propozycja, nie podpis
   const rng = new Rng(`${game.seed}:ng:${playerId}:${game.date}`);
   const r = openNegotiation({ kind, player, club, fromClub, date: game.date, rng, mode: 'player', ctx });
   if (!r.ok) {
@@ -223,8 +226,20 @@ export function startNegotiation(game, opts = {}) {
     draft: defaultDraft(player, view, L, hasAgent, club),
     log: [],
     counter: null, counterType: null, demand: null,
-    error: null, notice: null, done: null, veto: null,
+    error: null, notice: null, done: null, veto: null, lastRound: lastRound?.propId ?? null, lastUntil: lastRound?.until ?? null,
   };
+  if (lastRound?.want) {
+    // Ostatnia runda: zawodnik chce zmian i stawia ultimatum (jedna oferta: porozumienie albo koniec rozmów)
+    const want = normalizeOffer(lastRound.want);
+    const c = { offer: want, weq: valueOffer(want, s.d).weq };
+    Object.assign(s.d.st, { ultimatum: c, lastCounter: c, ask: Math.round(c.weq) });
+    s.d.hidden.maxRounds = 1;
+    ng.draft = cloneOffer(want);
+    ng.counter = cloneOffer(want);
+    ng.counterType = 'ultimatum';
+    pushLine(ng, { speaker: r.opening?.speaker ?? player.name, text: `Jesteśmy blisko, ale ${player.name.split(' ')[0]} chce lepszych warunków: ${offerSummary(want)}. To nasza ostatnia rozmowa.` });
+    return { ok: true, ng };
+  }
   pushLine(ng, r.opening);
   return { ok: true, ng };
 }
@@ -292,7 +307,7 @@ export function handleNegotiationAction(game, ng, act, dataset = {}, form = null
       if (s.round === 0) {
         // Bez żadnej oferty nic się nie wydarzyło: brak skutków w zawodniku.
         s.d.st.status = 'failed';
-        ng.done = { accepted: false, outcome: null, contract: null, kind: ng.kind, playerId: ng.playerId, fromClub: ng.fromClub, fee: ng.fee };
+        ng.done = { accepted: false, outcome: null, contract: null, kind: ng.kind, playerId: ng.playerId, fromClub: ng.fromClub, fee: ng.fee, lastRound: ng.lastRound };
         ng.counter = null;
         return { ng, done: ng.done, save: false };
       }
@@ -338,13 +353,15 @@ function finish(game, ng) {
   const s = ng.session;
   const outcome = s.outcome();
   const player = game.world.players[ng.playerId];
-  if (outcome && player) applyOutcome(player, outcome);
+  // Propozycja (podpisanie bez prekontraktu i bez ostatniej rundy): morale +2 dopiero, gdy zawodnik się zgodzi (proposals.js)
+  const proposal = ng.kind === 'sign' && !ng.pre && !ng.lastRound && outcome?.accepted;
+  if (outcome && player) applyOutcome(player, proposal ? { ...outcome, moraleDelta: 0 } : outcome);
   ng.counter = null;
   ng.counterType = null;
   ng.demand = null;
   ng.done = {
     accepted: !!outcome?.accepted, outcome, contract: outcome?.contract ?? null,
-    kind: ng.kind, playerId: ng.playerId, fromClub: ng.fromClub, fee: ng.fee, pre: !!ng.pre,
+    kind: ng.kind, playerId: ng.playerId, fromClub: ng.fromClub, fee: ng.fee, pre: !!ng.pre, lastRound: ng.lastRound,
   };
   return { ng, done: ng.done, save: true };
 }
@@ -404,7 +421,7 @@ function header(game, ng, player, view) {
     ? (c ? `Obecny kontrakt: ${formatZl(c.wage)} tygodniowo do ${fmtDate(c.until)}` : 'Bez kontraktu')
     : ng.pre && c ? `Kontrakt w obecnym klubie kończy się ${fmtDate(c.until)}. Nowa umowa od ${fmtDate(`${c.until.slice(0, 4)}-07-01`)}, bez kwoty odstępnego.`
       : ng.fromClub && c ? `Kontrakt w obecnym klubie: ${formatZl(c.wage)} tygodniowo do ${fmtDate(c.until)}` : 'Wolny zawodnik: bez kwoty odstępnego';
-  const title = ng.kind === 'renew' ? 'Przedłużenie kontraktu' : ng.pre ? 'Umowa od 1 lipca (prekontrakt)' : 'Rozmowy o transferze';
+  const title = ng.kind === 'renew' ? 'Przedłużenie kontraktu' : ng.pre ? 'Umowa od 1 lipca (prekontrakt)' : ng.lastRound ? 'Ostatnia runda rozmów' : 'Rozmowy o transferze';
   return `
   <header class="panel ng-head">
     <div class="ng-who">
@@ -533,19 +550,25 @@ function contractRows(c, ng) {
 function outcomePanel(ng) {
   const { outcome, accepted, contract } = ng.done;
   if (accepted && contract) {
+    // Propozycja: zawodnik namyśla się 2-5 dni (proposals.js); app.js dopisuje ng.done.proposal z datą decyzji
+    const prop = ng.kind === 'sign' && !ng.pre && !ng.lastRound;
+    const pr = ng.done.proposal;
     const note = ng.kind === 'renew'
       ? 'Nowy kontrakt obowiązuje od dziś. Zawodnik pamięta obietnicę roli.'
       : ng.pre ? 'Zawodnik zgodził się na warunki. Umowa zacznie obowiązywać 1 lipca, do tego czasu gra w swoim klubie.'
-        : 'Zawodnik zgodził się na warunki. Transfer domyka klub.';
+        : ng.lastRound ? 'Zawodnik przyjął warunki i podpisał kontrakt. Teraz testy medyczne i zgłoszenie (Transfery, W toku).'
+          : pr?.decide > ng.date ? `Propozycja złożona, zawodnik odpowie ok. ${fmtDate(pr.decide)}. Do tego czasu może rozważać oferty innych klubów. Odpowiedź przyjdzie w poczcie.`
+            : pr ? 'Propozycja złożona. To ostatni dzień okna, więc zawodnik odpowiedział od razu: sprawdź pocztę.'
+              : 'Propozycja złożona. Zawodnik namyśli się kilka dni, odpowiedź przyjdzie w poczcie.';
     return `<section class="panel ng-result" data-result="ok" aria-label="Wynik rozmów">
-      <h3>Porozumienie</h3>
+      <h3>${prop ? 'Propozycja złożona' : 'Porozumienie'}</h3>
       <p>${esc(note)}</p>
       ${contractRows(contract, ng)}
-      <div class="ng-actions"><button class="btn btn--primary" data-act="ng-close">Podpisz kontrakt</button></div>
+      <div class="ng-actions"><button class="btn btn--primary" data-act="ng-close">${prop ? 'Wróć do transferów' : 'Podpisz kontrakt'}</button></div>
     </section>`;
   }
   const lines = [];
-  if (!outcome) lines.push('Rozmowy zakończone przed złożeniem oferty. Zawodnik nie ma pretensji.');
+  if (!outcome) lines.push(ng.lastRound ? 'Ostatnia runda zakończona bez oferty. Propozycja przepadła.' : 'Rozmowy zakończone przed złożeniem oferty. Zawodnik nie ma pretensji.');
   else {
     lines.push(`${BREAK_REASONS[outcome.reason] ?? 'Brak porozumienia'}.`);
     if (outcome.lock) lines.push(`Zawodnik nie chce rozmawiać z klubem do ${fmtDate(outcome.lock.until)}.`);
@@ -566,7 +589,8 @@ export function renderNegotiation(game, ng) {
   const player = game.world.players[ng.playerId];
   const view = ng.session.view();
   const notices = [];
-  if (view.ultimatum && !ng.done) notices.push('<p class="notice notice--err">Ostatnia szansa: zawodnik postawił ultimatum. Oferta słabsza od jego warunków zerwie rozmowy.</p>');
+  if (ng.lastRound && !ng.done) notices.push(`<p class="notice notice--err">Ostatnia runda: jedna oferta. Warunki zawodnika (albo lepsze) to podpis od razu, słabsza oferta kończy rozmowy.${ng.lastUntil ? ` Termin: ${esc(fmtDate(ng.lastUntil))}.` : ''}</p>`);
+  else if (view.ultimatum && !ng.done) notices.push('<p class="notice notice--err">Ostatnia szansa: zawodnik postawił ultimatum. Oferta słabsza od jego warunków zerwie rozmowy.</p>');
   if (ng.error) notices.push(`<p class="notice notice--err" role="alert">${esc(ng.error)}</p>`);
   if (ng.notice) notices.push(`<p class="notice">${esc(ng.notice)}</p>`);
   return `<div class="ng">

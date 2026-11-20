@@ -128,16 +128,17 @@ test('Zapis i wczytanie w trakcie transakcji: ten sam przebieg', () => {
   assert.equal(run(false), run(true));
 });
 
-test('Oferta klubu AI przyjęta przez gracza: transakcja, kluby AI w sezonie kupują przez transakcje (bez natychmiastowych ruchów)', () => {
+test('Oferta klubu AI przyjęta przez gracza: propozycja i namysł zawodnika, kluby AI w sezonie kupują przez transakcje (bez natychmiastowych ruchów)', () => {
   const g = newGame('widzew', 47, '2026-07-06');
   const p = squadOf(g.world, 'widzew')[7];
   g.market.offers.unshift({ id: 'of-t', kind: 'incoming', playerId: p.id, from: 'lech', fee: 2e6, status: 'open', date: g.date, expires: addDays(g.date, 6) });
   const r = answerIncoming(g, 'of-t', 'accept');
   if (r.deal) {
     assert.equal(p.clubId, 'widzew');
-    assert.ok(dealOf(g, p.id));
-    step(g, 1);
-    assert.ok(g.inbox.some((m) => /Porozumienie z/.test(m.subject)), 'list o porozumieniu');
+    assert.equal(dealOf(g, p.id), null, 'najpierw namysł zawodnika (src/career/proposals.js)');
+    assert.match(r.text, /odpowie do/);
+    step(g, 5);
+    assert.ok(g.inbox.some((m) => m.refs?.kind === 'proposal' && m.refs.pid === p.id), 'list z odpowiedzią zawodnika');
   }
   step(g, 30);
   const regs = g.market.deals.filter((d) => d.end?.result === 'registered');

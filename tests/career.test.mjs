@@ -101,7 +101,7 @@ test('Rozwiązanie kontraktu: koszt połowy pozostałej pensji, zawodnik wolny',
   assert.equal(g.finance.clubs.widzew.balance, bal - cost);
 });
 
-test('Oferta klubu AI za zawodnika gracza: przyjęcie zakłada transakcję (zgłoszenie po kilku dniach), odrzucenie zamyka ofertę', () => {
+test('Oferta klubu AI za zawodnika gracza: przyjęcie to propozycja i namysł, potem transakcja (zgłoszenie po kilku dniach), odrzucenie zamyka ofertę', () => {
   const g = newGame('widzew', 9, '2026-07-06');
   const p = squadOf(g.world, 'widzew')[5];
   const o1 = { id: 'of-test-1', kind: 'incoming', playerId: p.id, from: 'legia', fee: 2e6, status: 'open', date: g.date, expires: addDays(g.date, 6) };
@@ -109,14 +109,21 @@ test('Oferta klubu AI za zawodnika gracza: przyjęcie zakłada transakcję (zgł
   const r = answerIncoming(g, o1.id, 'accept');
   assert.ok(r.text);
   if (r.deal) {
-    // Transfer jako proces (src/career/transferDeals.js): do zgłoszenia zawodnik zostaje w klubie
+    // Najpierw namysł zawodnika (src/career/proposals.js), potem transfer jako proces (src/career/transferDeals.js):
+    // do zgłoszenia zawodnik zostaje w klubie
     assert.equal(o1.status, 'accepted');
     assert.equal(p.clubId, 'widzew');
-    const d = g.market.deals.find((x) => x.pid === p.id && !x.end);
-    assert.ok(d && d.to === 'legia');
-    for (let i = 0; i < 6 && !d.end; i++) { g.date = addDays(g.date, 1); processDay(g); }
-    assert.ok(d.end, 'transakcja zamknięta po kilku dniach');
-    if (d.end.result === 'registered') assert.equal(p.clubId, 'legia'); else assert.equal(p.clubId, 'widzew');
+    const x = g.market.pending.find((y) => y.pid === p.id && y.to === 'legia');
+    assert.ok(x && x.status === 'open' && x.sale === o1.id);
+    for (let i = 0; i < 6 && x.status === 'open'; i++) { g.date = addDays(g.date, 1); processDay(g); }
+    assert.notEqual(x.status, 'open', 'odpowiedź po 2-5 dniach');
+    const d = g.market.deals.find((y) => y.pid === p.id && y.prop === x.id);
+    if (x.status === 'accepted') {
+      assert.ok(d && d.to === 'legia');
+      for (let i = 0; i < 6 && !d.end; i++) { g.date = addDays(g.date, 1); processDay(g); }
+      assert.ok(d.end, 'transakcja zamknięta po kilku dniach');
+      if (d.end.result === 'registered') assert.equal(p.clubId, 'legia'); else assert.equal(p.clubId, 'widzew');
+    } else assert.equal(p.clubId, 'widzew');
   } else assert.equal(o1.status, 'failed');
   const q = squadOf(g.world, 'widzew')[6];
   const o2 = { id: 'of-test-2', kind: 'incoming', playerId: q.id, from: 'lech', fee: 1e6, status: 'open', date: g.date, expires: addDays(g.date, 6) };

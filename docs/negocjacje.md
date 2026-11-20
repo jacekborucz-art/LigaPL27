@@ -290,13 +290,15 @@ Po udanych rozmowach: przedłużenie +3 morale i +5 zaufania, podpisanie +2 mora
 
 Wynik: `{ result: 'signed'|'failed'|'refused', rounds <= 2, contract, outcome }`. Fiasko AI też blokuje rozmowy z tym klubem, więc rynek jest spójny.
 
+Przy zakupie (`aiBuy`, oferta klubu AI za zawodnika gracza) `signed` oznacza propozycję dla zawodnika, nie podpis: zawodnik namyśla się 2-5 dni jak przy propozycji gracza (rozdz. 14). Przy „chce zmian” klub AI robi to samo co w drugiej rundzie: pensja +10 % w budżecie z rozmów albo rezygnacja.
+
 ## 10. Dane i integracja
 
 | Pole zawodnika | Zapisuje | Czyta |
 |---|---|---|
 | `traits`, `agent` | `generatePersonality` (przy generowaniu) | negocjacje, obietnice |
 | `relations[clubId]` `{trust, grudge, grudgeDate, brokenPromises, lockUntil, lockReason, history[]}` | `applyOutcome`, `applyPromiseCheck` | `openNegotiation`, `canNegotiate` |
-| `contract` (z `promise`, `clause`, `clauseForeignOnly`, `bonus`, `raise`, `relegationCut`, `agentFee`, `signOn`) | `applyOutcome` | gra, `applyPromiseCheck` |
+| `contract` (z `promise`, `clause`, `clauseForeignOnly`, `bonus`, `raise`, `relegationCut`, `agentFee`, `signOn`) | `applyOutcome` (tylko przedłużenie), przy podpisaniu `completeTransfer` | gra, `applyPromiseCheck` |
 | `renewRefused` | `applyOutcome` | `squad.js` (lista transferowa), `openNegotiation` |
 | `transferRequest`, `unhappy` | `applyOutcome`, `applyPromiseCheck` | `squad.js`, `reputation.js` |
 | `morale` | `applyOutcome`, `applyPromiseCheck` | silnik |
@@ -368,7 +370,7 @@ Kod: `src/ui/negotiationView.js`, style `src/styles/negotiation.css`. Testy: `te
 - **Oferta:** pensja tygodniowa (pole liczbowe, krok 100 zł, przyciski -1 tys., -100, +100, +1 tys.), długość 1-5 lat, obiecana rola (oczekiwana oznaczona „oczekuje”), premia za podpis, premia za gola, premia za występ, klauzula odstępnego (opcjonalna, z opcją „tylko dla klubów zagranicznych”) i prowizja agenta (tylko gdy zawodnik ma agenta). Nad polami limity klubu.
 - **Limity:** pensja ponad `maxWage` albo premia za podpis ponad `maxSignOn` blokują przycisk „Złóż ofertę” i pokazują ostrzeżenie. Taka oferta nie trafia do silnika (nie zużywa rundy). Kontroferty ponad limit też nie da się przyjąć.
 - **Przyciski:** „Złóż ofertę”, „Sprawdź blef” (tylko gdy `view().canCallBluff`), „Zakończ rozmowy”. Przy ultimatum ostrzeżenie, że słabsza oferta zerwie rozmowy.
-- **Koniec:** po porozumieniu podsumowanie kontraktu i przycisk „Podpisz kontrakt”; po fiasku powód, data blokady, spadek morale i ewentualna prośba o transfer oraz przycisk „Wróć”. Oba przyciski zamykają ekran.
+- **Koniec:** po porozumieniu przy przedłużeniu i prekontrakcie podsumowanie kontraktu i przycisk „Podpisz kontrakt”; przy podpisaniu zawodnika „Propozycja złożona, zawodnik odpowie ok. <data>”, warunki i przycisk „Wróć do transferów” (rozdz. 14); po fiasku powód, data blokady, spadek morale i ewentualna prośba o transfer oraz przycisk „Wróć”. Przyciski zamykają ekran.
 - **Zakończenie rozmów przez klub:** przed pierwszą ofertą bez skutków. Po złożeniu oferty działa jak zerwanie (rozliczenie silnika `_finish(false, 'walkaway')`: blokada, uraza, przy przedłużeniu morale i szansa na prośbę o transfer), żeby nie dało się „zresetować” rozmów bez kosztu.
 
 ### 13.2 Integracja
@@ -387,7 +389,8 @@ if (r.ok) state.ng = r.ng; else pokażTekst(r.text);    // r.save: odmowa przed�
 // Kliknięcia (data-act z prefiksem „ng-”):
 if (isNegotiationAction(act)) {
   const res = handleNegotiationAction(game, state.ng, act, el.dataset, readNegotiationForm(app));
-  if (res.done?.accepted && res.done.kind === 'sign') { /* moduł transferów przenosi zawodnika: res.done.contract */ }
+  if (res.done?.accepted && res.done.kind === 'sign') { /* propozycja dla zawodnika: submitUserProposal (proposals.js) */ }
+  if (res.done?.lastRound) { /* ostatnia runda: finishLastRound(game, id, contract, accepted) */ }
   state.ng = res.ng;                                    // null = wyjście z ekranu
   if (res.save) await save();
   render();
@@ -399,6 +402,25 @@ app.addEventListener('input', (ev) => { if (state.ng && ev.target.closest('[data
 
 - `startNegotiation(game, { kind, playerId, fromClub = null, limits = { maxWage, maxSignOn }, fee = 0, rival = null, relegationRisk })` buduje kontekst z gry: klub gracza z `anyClub(game.clubId)`, udział w minutach z `player.season.min` (minuty / (rozegrane mecze klubu x 90), 0,5 przed 3. meczem), średnią ocenę z `player.season.rating`, puchary UEFA (mecz z `comp: 'uefa'` w `game.fixtures`), koniec sezonu i koniec okna transferowego z `DOMESTIC.transferWindows`. Ziarno: `${game.seed}:ng:${playerId}:${game.date}`, więc ponowne otwarcie tego samego dnia daje te same rozmowy. Zwraca `{ ok: true, ng }` albo `{ ok: false, reason, text, speaker, until, save }`; dodatkowe powody ekranu: `noPlayer`, `noClub`, `notOwn` (przedłużenie cudzego zawodnika), `ownPlayer` (podpisanie własnego).
 - `ng` żyje tylko w pamięci i nie trafia do zapisu: sesja, rozmowa `log: [{ who: 'agent'|'player'|'me', speaker, text }]`, szkic oferty `draft`, `limits`, `kind`, `playerId`, `fromClub`, `fee`, ostatnia kontroferta i `done`.
-- `handleNegotiationAction` zwraca `{ ng, done, save }`. `done` pojawia się raz, w akcji kończącej rozmowy: `{ accepted, outcome, contract, kind, playerId, fromClub, fee }`. Skutki są już zapisane w zawodniku przez `applyOutcome` (relacja z klubem, blokada, uraza, morale, przy porozumieniu `player.contract`, także przy podpisaniu). Zawodnik nie zmienia klubu: przy podpisaniu robi to moduł transferów.
+- `handleNegotiationAction` zwraca `{ ng, done, save }`. `done` pojawia się raz, w akcji kończącej rozmowy: `{ accepted, outcome, contract, kind, playerId, fromClub, fee, pre, lastRound }`. Skutki są już zapisane w zawodniku przez `applyOutcome` (relacja z klubem, blokada, uraza, morale; `player.contract` tylko przy przedłużeniu). Zawodnik nie zmienia klubu: przy podpisaniu udane rozmowy to propozycja (rozdz. 14), a klub zmienia moduł transferów. Przy propozycji morale +2 dopiero po zgodzie zawodnika.
 - Akcje: `ng-propose`, `ng-wage` (`data-d` = zmiana pensji), `ng-take` (przyjęcie kontroferty), `ng-fill` (kontroferta do formularza), `ng-bluff`, `ng-walk`, `ng-close`.
 - Pomocnicze czyste funkcje (testowane bez DOM): `negotiationContext`, `minutesShareOf`, `clubInEurope`, `windowEndFor`, `mergeDraft`, `offerIssues`, `offerSummary`, `ageLabel`.
+
+## 14. Namysł zawodnika i ostatnia runda (Nov 20, 2026)
+
+Decyzja właściciela: rozmowy zostają jak są, ale ich udany koniec przy podpisaniu zawodnika (transfer albo wolny
+zawodnik) to propozycja, nie podpis. Pełny opis z liczbami: docs/transfery.md, rozdz. 10. Kod: `src/career/proposals.js`.
+
+- Zawodnik namyśla się 2-5 dni (3 dni + RNG od -1 do +2), zawodnik z klubem najpóźniej do ostatniego dnia okna.
+  W tym czasie może dostać propozycje innych klubów (gracza i AI, jedna na klub) i porównuje wszystkie wzorem
+  użyteczności z prekontraktów (`offerUtility`: pieniądze, prestiż, rola, puchary, szum). Gracz nie wie z góry,
+  czy zawodnik się zgodzi.
+- Odpowiedź w liście: zgoda (transakcja od testów medycznych), odmowa (blokada rozmów 14 dni bez urazy), wybrał inny
+  klub (z nazwą), chce zmian.
+- Chce zmian: ostatnia szansa, jedna runda rozmów do 2 dni (najpóźniej koniec okna). Ekran rozmów w trybie ostatniej
+  rundy (`startNegotiation(..., { lastRound: { propId, want, until } })`, akcja `tf-lastround`): zawodnik od razu
+  stawia ultimatum z pensją wyżej o 8-18 % [SZAC], `maxRounds = 1`. Oferta co najmniej tak dobra (albo „Przyjmij te
+  warunki”) to podpis od razu, bez kolejnego namysłu; słabsza oferta albo „Zakończ rozmowy” po ofercie kończy rozmowy
+  ze zwykłymi skutkami fiaska (rozdz. 7). Bez odpowiedzi w terminie propozycja wygasa.
+- Klub AI w tej samej sytuacji: pensja +10 % w budżecie albo rezygnacja (rozdz. 9).
+- Prekontrakty, przedłużenia, wypożyczenia i działania zarządu przy limicie kadry bez zmian.

@@ -1,5 +1,6 @@
-// Transfery w toku, umowy od 1 lipca i prośby o transfer w zakładce Transfery (docs/transfery.md).
-// Zakładka „W toku”: transakcje z paskiem etapów i spodziewaną datą zgłoszenia, prekontrakty, prośby o transfer.
+// Transfery w toku, propozycje w namyśle, umowy od 1 lipca i prośby o transfer w zakładce Transfery (docs/transfery.md).
+// Zakładka „W toku”: propozycje czekające na odpowiedź zawodnika, transakcje z paskiem etapów i spodziewaną datą
+// zgłoszenia, prekontrakty, prośby o transfer.
 // Elementy kart zawodników: znaczniki, panel prośby o transfer (reakcje), panel umowy od 1 lipca.
 // Style: src/styles/transfers.css (prefiks .td-). Akcje z prefiksem „tf-”, obsługa w transfersView.js.
 import { cardLink } from './transfersView.js'; // nazwisko jak link do karty w okienku
@@ -12,6 +13,7 @@ import { canApproach, checkUserPre, preOpensOn, earlyPrice, earlyBuy, userPreCon
 import { reactToWish, WISH_ACTIONS } from '../career/moveWish.js';
 import { squadOf } from '../world/worldGen.js';
 import { anyClub } from '../season/season.js';
+import { proposalsFor, userProposal, thinkingUntil, withdrawProposal } from '../career/proposals.js'; // namysł zawodnika (docs/transfery.md, rozdz. 10)
 
 const posBadge = (p) => `<span class="pos" data-g="${GROUP[p.pos] ?? 'MID'}">${esc(p.pos)}</span>`;
 const tag = (txt, k = 'info') => `<span class="tf-tag" data-k="${k}">${esc(txt)}</span>`;
@@ -29,7 +31,53 @@ export function dealTags(game, p) {
   if (d) out.push(tag(d.from === p.clubId && d.to !== game.clubId ? `odchodzi: ${STAGE_LABELS[d.stage].toLowerCase()}` : `transfer w toku: ${STAGE_LABELS[d.stage].toLowerCase()}`, 'info'));
   if (p.preContract) out.push(tag(`porozumienie z ${preClubName(p.preContract)} od ${fmtDate(p.preContract.start)}`, p.clubId === game.clubId ? 'bad' : 'misc'));
   if (p.moveWish && !p.transferRequest) out.push(tag('chce odejść', 'warn'));
+  if (!d && proposalsFor(game, p.id).length) out.push(tag(`rozważa ofertę, odpowie do ${fmtDate(thinkingUntil(game, p.id))}`, 'info'));
   return out.join('');
+}
+
+// ------------------------------------------------------------ Propozycje (namysł zawodnika)
+const PROP_END = { accepted: 'zgoda', rejected: 'odmowa', lost: 'wybrał inny klub', expired: 'nieaktualna', withdrawn: 'wycofana', failed: 'ostatnia runda bez porozumienia' };
+
+/** Wiersz propozycji gracza (albo oferty klubu AI za jego zawodnika). */
+function propRow(game, x) {
+  const p = game.world.players[x.pid];
+  const sale = !x.user;
+  const route = sale ? `oferta ${clubName(x.to)}` : x.from ? `z ${clubName(x.from)}` : x.fromState === 'pool' ? `z ${p?.abroad?.club ?? 'zagranicy'}` : 'wolny zawodnik';
+  const terms = `${fmtZl(x.contract?.wage ?? 0)} tygodniowo${x.fee ? `, odstępne ${fmtZl(x.fee)}` : ''}`;
+  let meta; let act = '';
+  if (x.status === 'changes') {
+    meta = `Chce zmian w kontrakcie: pensja ${fmtZl(x.want?.wage ?? 0)} tygodniowo. Ostatnia runda rozmów do ${fmtDate(x.deadline)}.`;
+    act = `<div class="td-acts"><button class="btn btn--primary btn--sm" data-act="tf-lastround" data-id="${esc(x.pid)}">Ostatnia runda rozmów</button></div>`;
+  } else if (x.status === 'open') {
+    meta = `Rozważa ${sale ? 'ofertę' : 'oferty'}, odpowie do ${fmtDate(thinkingUntil(game, x.pid) ?? x.decide)}.`;
+    if (x.user) act = `<div class="td-acts"><button class="btn btn--quiet btn--sm" data-act="tf-prop-cancel" data-d="${esc(x.id)}">Wycofaj propozycję</button></div>`;
+  } else meta = `Odpowiedź ${fmtDate(x.end?.date ?? x.date)}: ${PROP_END[x.status] ?? x.status}${x.status === 'lost' && x.end?.winner ? ` (${clubName(x.end.winner)})` : ''}.`;
+  return `<li class="td-deal" data-state="${x.status === 'accepted' ? 'ok' : x.status === 'open' || x.status === 'changes' ? 'open' : 'fail'}"${p ? ` data-pid="${esc(p.id)}"` : ''}>
+    <div class="td-deal__head">${p ? posBadge(p) : ''}<span class="td-deal__who"><b>${p ? cardLink(p) : esc(x.name)}</b><em>${esc(route)}</em></span><b class="td-deal__fee">${esc(terms)}</b></div>
+    <p class="td-deal__meta">${esc(meta)}</p>${act}
+  </li>`;
+}
+
+/** Propozycje twojego klubu (i oferty za twoich zawodników) czekające na odpowiedź oraz ostatnie odpowiedzi. */
+export function proposalsSection(game) {
+  const all = (game.market?.pending ?? []).filter((x) => (x.user && x.to === game.clubId) || (x.from && x.from === game.clubId));
+  const open = all.filter((x) => x.status === 'open' || x.status === 'changes');
+  const done = all.filter((x) => !(x.status === 'open' || x.status === 'changes')).slice(-6).reverse();
+  if (!open.length && !done.length) return '';
+  return `${open.length ? panel('Propozycje czekają na odpowiedź', open.some((x) => x.status === 'changes') ? 'bad' : 'warn', `<ul class="td-deals">${open.map((x) => propRow(game, x)).join('')}</ul>`, open.length) : ''}
+    ${done.length ? panel('Ostatnie odpowiedzi zawodników', 'info', `<ul class="td-deals">${done.map((x) => propRow(game, x)).join('')}</ul>`) : ''}`;
+}
+
+/**
+ * Panel karty zawodnika innego klubu albo wolnego: twoja propozycja w toku (wtedy bez nowych ofert) albo informacja,
+ * że zawodnik rozważa oferty innych klubów (bez wyniku). Zwraca { html, blocked } albo null.
+ */
+export function proposalPanel(game, p) {
+  const mine = userProposal(game, p.id);
+  if (mine) return { blocked: true, html: `<ul class="td-deals">${propRow(game, mine)}</ul>` };
+  const until = thinkingUntil(game, p.id);
+  if (!until) return null;
+  return { blocked: false, html: `<p class="notice">Rozważa oferty, odpowie do ${esc(fmtDate(until))}. Możesz złożyć własną propozycję: zawodnik porówna wszystkie.</p>` };
 }
 
 // ------------------------------------------------------------ Pasek etapów
@@ -75,6 +123,7 @@ export function dealsView(game, ui = {}) {
   const msg = ui.tfMsg ? `<p class="notice">${esc(ui.tfMsg)}</p>` : '';
   return `${msg}<div class="td-view">
       <div class="td-col">
+        ${proposalsSection(game)}
         ${panel('Transakcje twojego klubu', mineOpen.length ? 'warn' : 'info', mineOpen.length ? list(mineOpen, true) : '<p class="tf-p__txt">Brak transakcji w toku. Po porozumieniu klubów zawodnik przechodzi warunki osobiste, testy medyczne i zgłoszenie. Transfer krajowy trwa 2 do 4 dni, zagraniczny 5 do 9.</p>', mineOpen.length)}
         ${mineDone.length ? panel('Ostatnio zakończone', 'good', list(mineDone, false)) : ''}
         ${panel('Transakcje w Polsce', 'misc', others.length ? list(others.slice(0, 12), false) : '<p class="tf-p__txt">Kluby nie prowadzą teraz transakcji.</p>', others.length)}
@@ -92,6 +141,8 @@ export function ownDealPanels(game, p, ui = {}) {
   const out = [];
   const d = dealOf(game, p.id);
   if (d) out.push(panel('Transfer w toku', 'warn', `<ul class="td-deals">${dealRow(game, d, { mine: true })}</ul>`));
+  const props = d ? [] : proposalsFor(game, p.id);
+  if (props.length) out.push(panel('Rozważa ofertę', 'warn', `<ul class="td-deals">${props.map((x) => propRow(game, x)).join('')}</ul>`));
   if (p.preContract) out.push(panel('Umowa od 1 lipca', 'bad', `<p class="tf-p__txt">${esc(p.name)} podpisał umowę z ${esc(preClubName(p.preContract))} od ${esc(fmtDate(p.preContract.start))}. Do tego dnia jest twoim zawodnikiem. Przedłużenie nie jest już możliwe.</p>`));
   const W = p.moveWish;
   if (W) {
@@ -137,6 +188,7 @@ export function otherDealPanel(game, p) {
 export function handleDealAction(game, act, ds = {}) {
   switch (act) {
     case 'tf-deal-cancel': { const r = cancelDeal(game, ds.d); return { ui: { tfMsg: r.text }, save: r.ok }; }
+    case 'tf-prop-cancel': { const r = withdrawProposal(game, ds.d); return { ui: { tfMsg: r.text }, save: r.ok }; }
     case 'tf-early': { const r = earlyBuy(game, ds.id); return { ui: { tfMsg: r.text }, save: r.ok }; }
     case 'tf-wish': {
       const r = reactToWish(game, ds.id, ds.a);

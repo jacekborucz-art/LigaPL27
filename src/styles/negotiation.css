@@ -10,7 +10,7 @@
 
 /* Nagłówek: zawodnik i to, co o nim wiadomo */
 .ng-head { display: grid; gap: var(--space-3); }
-.ng-kicker { margin: 0 0 2px; color: var(--accent); font: 700 var(--step--1)/1.2 var(--font-display); letter-spacing: 0.06em; text-transform: uppercase; }
+.ng-kicker { margin: 0 0 2px; color: var(--accent); font: 700 var(--step--1)/1.2 var(--font-display); }
 .ng-who p { margin: 2px 0 0; }
 .ng-contract { font-size: var(--step--1); }
 .ng-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: 0; }

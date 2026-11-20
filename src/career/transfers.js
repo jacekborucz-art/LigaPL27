@@ -1,7 +1,8 @@
 // Rynek transferowy (etap 9, poziom średni, PLAN 2.5): listy (transferowa, do wypożyczenia, wolni,
 // wyszukiwarka), oferty gracza dla klubów AI i odpowiedzi klubów, oferty klubów AI za zawodników gracza,
 // transfery między klubami AI, wolni zawodnicy, rozwiązanie kontraktu, przedłużenia AI.
-// Kontrakt z zawodnikiem negocjuje ekran rozmów (src/ui/negotiationView.js) albo aiNegotiate.
+// Kontrakt z zawodnikiem negocjuje ekran rozmów (src/ui/negotiationView.js) albo aiNegotiate. Udane rozmowy to
+// propozycja dla zawodnika, który namyśla się 2-5 dni (src/career/proposals.js), potem transakcja (transferDeals.js).
 
 import { Rng, clamp } from '../core/rng.js';
 import { addMessages } from '../core/inbox.js';
@@ -24,6 +25,8 @@ import { startDeal, hasOpenDeal, pendingFees, stat } from './transferDeals.js'; 
 import { ensureForeignPool, isPoolContracted, foreignAskingPrice, poolSellerClub, poolCandidates, offerForForeign, poolList, scoutBlocked, scoutCommission, scoutedGroup } from './foreignPool.js'; // zawodnicy z zagranicy (docs/transfery.md, rozdz. 9)
 import { onOfferRejected, onUserRejected } from './moveWish.js';
 import { effectiveAsk } from './mindset.js';
+import { makeProposal, proposalsFor, resolveNow } from './proposals.js'; // namysł zawodnika przed podpisem (docs/transfery.md, rozdz. 10)
+import { fmtDate } from '../ui/dom.js';
 
 export { SEASON_END };
 const round = (x, step = 5000) => Math.round(x / step) * step;
@@ -35,7 +38,7 @@ export const inWindow = (date) => !!windowOf(date);
 
 // ------------------------------------------------------------ Stan rynku
 export function createMarket(game) {
-  const M = { listed: {}, free: [], offers: [], talks: {}, history: [], userListed: {}, lastRefresh: null, foreign: [] };
+  const M = { listed: {}, free: [], offers: [], talks: {}, history: [], userListed: {}, lastRefresh: null, foreign: [], pending: [] };
   game.market = M;
   addFreeAgents(game, 65, game.date ?? '2026-07-01', SEASON_YEAR === 2026 ? 'start' : `lato-${SEASON_YEAR}`); // 126 klubów z kadrami (było 45 przy 54)
   ensureForeignPool(game); // 100 zawodników z zagranicy (src/career/foreignPool.js)
@@ -125,6 +128,8 @@ export function offerForPlayer(game, playerId, fee) {
   if (p.loan) return { result: 'reject', text: `Zawodnik jest wypożyczony z ${clubById(p.loan.from)?.name ?? 'innego klubu'}. Klub wypożyczający nie może go sprzedać, a macierzysty sprzeda go po powrocie.` };
   if (hasOpenDeal(game, p.id)) return { result: 'reject', text: 'Zawodnik jest w trakcie transferu do innego klubu.' };
   if (p.preContract) return { result: 'reject', text: `${p.name} ma już umowę od 1 lipca z innym klubem.` };
+  const mine = proposalsFor(game, p.id).find((x) => x.to === game.clubId);
+  if (mine) return { result: 'reject', text: `${p.name} rozważa twoją propozycję. Odpowie do ${fmtDate(mine.status === 'changes' ? mine.deadline : mine.decide)}.` };
   const cap = canSign(game);
   if (!cap.ok) return { result: 'reject', text: cap.text };
   if (spendable(game.finance, game.clubId) - pendingFees(game, game.clubId) < fee) return { result: 'reject', text: 'Kwota przekracza budżet transferowy albo saldo klubu.' };
@@ -298,7 +303,7 @@ function aiBuy(game, club, date, rng, log) {
   const money = spendable(F, club.id) - pendingFees(game, club.id); // odstępne w otwartych transakcjach jest zarezerwowane
   const room = wageRoom(F, W, club.id) + (squad.length > 26 ? inGroup[0]?.contract?.wage ?? 0 : 0);
   const pool = [];
-  const busy = (p) => p.transfer || p.preContract || hasOpenDeal(game, p.id); // transakcja w toku albo umowa od 1 lipca
+  const busy = (p) => p.transfer || p.preContract || hasOpenDeal(game, p.id); // transakcja w toku albo umowa od 1 lipca (namysł nie zajmuje)
   for (const id of game.market.free) { const p = W.players[id]; if (p && groupOf(p) === g && p.ovr > bar && !busy(p) && !scoutBlocked(p, club.id, date)) pool.push({ p, fee: 0 }); } // kandydat skauta innego klubu: wyłączność 14 dni
   for (const [id, l] of Object.entries(game.market.listed)) {
     const p = W.players[id];
@@ -331,7 +336,12 @@ function aiBuy(game, club, date, rng, log) {
   // Najlepszy z chętnych: odmowa najlepszego nie blokuje zakupu (pięciu pierwszych; braki w kadrze, np. bramkarz po powrocie z wypożyczenia)
   // Przy braku w kadrze także pensja w zasięgu budżetu płac (inaczej rozmowy z najlepszym upadają co tydzień)
   const asks = (x) => (x.p.contract?.wage ?? effectiveAsk(x.p, club.tier, payLevel(club))) <= Math.max(500, room) * 1.1;
-  const rank = (a, b) => (b.p.ovr - b.fee / 5e6) - (a.p.ovr - a.fee / 5e6);
+  // Zawodnik, który już rozważa propozycje (gracza albo innych klubów AI), jest mniej atrakcyjny: klub woli cel bez
+  // licytacji (kara 1,2 OVR za każdą propozycję w toku [SZAC]); bez tego kilka klubów brało tego samego wolnego
+  const contested = new Map();
+  for (const x of game.market.pending ?? []) if (x.status === 'open' || x.status === 'changes') contested.set(x.pid, (contested.get(x.pid) ?? 0) + 1);
+  const score = (x) => x.p.ovr - x.fee / 5e6 - 1.2 * (contested.get(x.p.id) ?? 0);
+  const rank = (a, b) => score(b) - score(a);
   // Brak w kadrze: najpierw najlepsi z tych, na których klub stać (wcześniej drodzy wolni wypierali tanich z ośmiu kandydatów)
   const ordered = needs.length ? [...pool.filter(asks).sort(rank).slice(0, 8), ...pool.filter((x) => !asks(x)).sort(rank).slice(0, 3)]
     : pool.sort(rank).slice(0, 5);
@@ -346,10 +356,11 @@ function aiBuy(game, club, date, rng, log) {
   if (!pick) return null;
   const p = pick.p;
   if (p.clubId && firstRefusal(game, p, club.id, pick.fee, date, neg.contract).blocked) return null; // prawo pierwokupu (loans.js)
-  // Transfer jako proces: porozumienie, testy medyczne, zgłoszenie (src/career/transferDeals.js)
-  const deal = startDeal(game, { playerId: p.id, to: club.id, fee: pick.fee, contract: neg.contract, kind: pick.fee || p.clubId ? 'transfer' : 'free', date });
-  if (deal) log.push(deal);
-  return deal;
+  // Propozycja dla zawodnika: namysł 2-5 dni, potem transakcja (proposals.js, transferDeals.js). Budżet pensji
+  // zostaje w propozycji na drugą rundę, gdy zawodnik zechce zmian
+  const prop = makeProposal(game, { playerId: p.id, to: club.id, fee: pick.fee, contract: neg.contract, kind: pick.fee || p.clubId ? 'transfer' : 'free', date, maxWage: Math.min(Math.max(500, room), boardCaps(game, club.id, p, 'sign', cb).wage) });
+  if (prop) log.push(prop);
+  return prop;
 }
 
 /** Klub AI pozbywa się nadmiaru ponad maksimum kadry (limit kadry, src/career/squadLimit.js) i uzupełnia braki akademią. */
@@ -396,20 +407,31 @@ function aiOffersForUser(game, date, rng) {
   return out;
 }
 
-/** Tydzień rynku: wystawienia, zakupy AI, równowaga kadr, oferty dla gracza. Zwraca { moves, offers }. */
+/**
+ * Tydzień rynku: wystawienia, zakupy AI (propozycje dla zawodników), równowaga kadr, oferty dla gracza.
+ * Zwraca { moves (transakcje klubów AI zaczęte w ostatnim tygodniu), props (nowe propozycje AI), offers }.
+ */
 export function marketWeek(game, date) {
   const rng = new Rng(`rynek:${game.seed}:${date}`);
   refreshListings(game, date);
-  const moves = [];
+  const props = [];
+  // Klub AI z propozycją w toku czeka na odpowiedź zawodnika (namysł 2-5 dni) przed kolejnym zakupem;
+  // odpowiedź przypadająca na dziś (system transferów po rynku) nie wstrzymuje zakupu
+  const waiting = new Set((game.market.pending ?? []).filter((x) => (x.status === 'open' && x.decide > date) || x.status === 'changes').map((x) => x.to));
+  // Klub, któremu w ostatnim tygodniu zawodnik odmówił albo wybrał inny klub, szuka dalej już w tym tygodniu
+  // (wcześniej przy zajętym zawodniku wybierał od razu innego) [SZAC]
+  const since = addDaysIso(date, -7);
+  const retry = new Set((game.market.pending ?? []).filter((x) => !x.user && x.end && x.end.date >= since && ['lost', 'rejected', 'expired'].includes(x.status)).map((x) => x.to));
   for (const c of rng.shuffle(CLUBS_PL.filter((x) => x.id !== game.clubId && game.world.clubs[x.id]))) {
     // Brak w kadrze (np. bramkarz po powrocie z wypożyczenia): klub szuka co tydzień, inaczej co ok. 2,5 tygodnia
     const gap = squadDeficits(squadOf(game.world, c.id)).some((n) => n.scope === 'squad');
     // III liga kupuje rzadziej (ok. co 5 tygodni) i tanio (mały budżet), docs/iii-liga.md
-    if (rng.chance(c.tier === 4 ? 0.2 : 0.4) || gap || game.scoutOps?.aiIdx?.[c.id]?.length) aiBuy(game, c, date, rng, moves); // kandydaci skautów klubu: co tydzień
+    if (!waiting.has(c.id) && (rng.chance(c.tier === 4 ? 0.2 : 0.4) || gap || retry.has(c.id) || game.scoutOps?.aiIdx?.[c.id]?.length)) aiBuy(game, c, date, rng, props); // kandydaci skautów klubu: co tydzień
     aiBalance(game, c, date);
   }
   const offers = aiOffersForUser(game, date, rng);
-  return { moves, offers };
+  const moves = (game.market.deals ?? []).filter((d) => d.prop && d.start >= since && d.start < date && d.to && d.to !== game.clubId && d.from !== game.clubId);
+  return { moves, props, offers };
 }
 
 /** Odpowiedź na ofertę klubu AI za zawodnika gracza. action: 'accept' | 'reject' | 'more'. */
@@ -445,11 +467,17 @@ export function answerIncoming(game, offerId, action) {
   if (squadCount(game, o.from).full) { o.status = 'withdrawn'; return { text: `${buyer.name} wycofuje ofertę: nie ma miejsca w kadrze (limit kadry).` }; }
   if (o.pre && p.preContract?.club === o.from) return ok(startDeal(game, { playerId: p.id, to: o.from, fee: o.fee, contract: { ...p.preContract.contract, signedOn: game.date }, kind: 'transfer', early: true }));
   const caps = boardCaps(game, o.from, p, 'sign');
-  const neg = aiNegotiate({ kind: 'sign', player: p, club: buyer, fromClub: clubById(game.clubId), date: game.date, rng, budget: { wage: Math.min(caps.wage, Math.max(p.contract.wage * 1.6, wageRoom(game.finance, game.world, o.from) + p.contract.wage)), maxYears: caps.years, total: caps.total } });
+  const maxWage = Math.min(caps.wage, Math.max(p.contract.wage * 1.6, wageRoom(game.finance, game.world, o.from) + p.contract.wage));
+  const neg = aiNegotiate({ kind: 'sign', player: p, club: buyer, fromClub: clubById(game.clubId), date: game.date, rng, budget: { wage: maxWage, maxYears: caps.years, total: caps.total } });
   if (neg.result !== 'signed') { o.status = 'failed'; return { text: `${p.name} nie dogadał się z ${buyer.name}. Zostaje w klubie.` }; }
   const rofr = firstRefusal(game, p, o.from, o.fee, game.date, neg.contract); // prawo pierwokupu klubu, w którym był wypożyczony (loans.js)
   if (rofr.blocked) { o.status = 'accepted'; return { text: rofr.text ?? `${p.name}: transfer czeka na decyzję klubu z prawem pierwokupu.`, sold: !!rofr.matched }; }
-  return ok(startDeal(game, { playerId: p.id, to: o.from, fee: o.fee, contract: neg.contract, kind: 'transfer' }));
+  // Propozycja klubu AI dla zawodnika: namysł 2-5 dni (proposals.js), potem testy medyczne i zgłoszenie
+  const prop = makeProposal(game, { playerId: p.id, to: o.from, fee: o.fee, contract: neg.contract, kind: 'transfer', maxWage, sale: o.id });
+  if (!prop) { o.status = 'failed'; return { text: `${p.name} jest już w trakcie innej transakcji.` }; }
+  o.status = 'accepted'; o.prop = prop.id;
+  if (prop.decide <= game.date) { resolveNow(game, p.id); return { text: `Porozumienie z ${buyer.name} w sprawie ${p.name} (${fmtZl(o.fee)}). To ostatni dzień okna: zawodnik odpowiedział od razu, sprawdź pocztę.`, deal: true }; }
+  return { text: `Porozumienie z ${buyer.name} w sprawie ${p.name} (${fmtZl(o.fee)}). Zawodnik rozważa warunki osobiste i odpowie do ${fmtDate(prop.decide)}. Potem testy medyczne. Do zgłoszenia zawodnik zostaje w klubie.`, deal: true };
 }
 
 /** Nazwa kupca z oferty (klub z Polski albo z zagranicy). */

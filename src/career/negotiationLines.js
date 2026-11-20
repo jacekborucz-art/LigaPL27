@@ -27,6 +27,14 @@ export const LINES = [
   ['accept', 'P', 'vet', 'Dobrze. Jeszcze pokażę, ile jestem wart.'],
   ['accept', 'P', 'young', 'Dziękuję za zaufanie! To dla mnie wielka szansa.'],
 
+  // ------------------------------------------- propozycja złożona (namysł 2-5 dni, src/career/proposals.js)
+  ['accept_prop', 'A', '', 'Warunki są do przyjęcia. {imie} da odpowiedź w ciągu kilku dni.'],
+  ['accept_prop', 'A', 'rekin', 'Zapisuję. Mamy też inne rozmowy, odezwiemy się za kilka dni.'],
+  ['accept_prop', 'A', 'rozsadny', 'To uczciwa oferta. {imie} przemyśli ją i odpowie w ciągu kilku dni.'],
+  ['accept_prop', 'A', 'rodzinny', 'Porozmawiamy o tym w domu. Odpowiedź dostaniecie za kilka dni.'],
+  ['accept_prop', 'P', '', 'Dziękuję, to dobra oferta. Muszę to przemyśleć, odezwę się za kilka dni.'],
+  ['accept_prop', 'P', 'young', 'Dziękuję za zaufanie! Dajcie mi kilka dni do namysłu.'],
+
   // ---------------------------------------------------------------- kontroferta
   ['counter', 'A', '', 'Nasza propozycja: {kwota} tygodniowo, {lata}, rola: {rola}.'],
   ['counterSignOn', 'A', 'rekin', '{kwota} tygodniowo i {premia} za podpis. Poniżej nie schodzimy.'],

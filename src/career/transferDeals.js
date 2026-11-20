@@ -54,8 +54,12 @@ export function ensureDeals(game) {
 export const openDeals = (game) => (game.market?.deals ?? []).filter((d) => !d.end);
 export const dealOf = (game, pid) => (game.market?.deals ?? []).find((d) => d.pid === pid && !d.end) ?? null;
 export const hasOpenDeal = (game, pid) => !!dealOf(game, pid);
-/** Odstępne w otwartych transakcjach, w których klub kupuje (zarezerwowane w budżecie). */
-export const pendingFees = (game, clubId) => openDeals(game).filter((d) => d.to === clubId).reduce((s, d) => s + (d.fee || 0), 0);
+/**
+ * Odstępne w otwartych transakcjach i w propozycjach w toku (namysł zawodnika, src/career/proposals.js),
+ * w których klub kupuje: zarezerwowane w budżecie.
+ */
+export const pendingFees = (game, clubId) => openDeals(game).filter((d) => d.to === clubId).reduce((s, d) => s + (d.fee || 0), 0)
+  + (game.market?.pending ?? []).filter((x) => x.to === clubId && (x.status === 'open' || x.status === 'changes')).reduce((s, x) => s + (x.fee || 0), 0);
 /** Liczba zawodników w drodze do klubu (liczą się do limitu kadry). */
 export const pendingIn = (game, clubId) => openDeals(game).filter((d) => d.to === clubId).length;
 
@@ -101,12 +105,13 @@ export function dealStages(d) { return DEAL_STAGES.filter((s) => s !== 'travel' 
 /**
  * Zakłada transakcję. opts: { playerId, to (id klubu albo null przy sprzedaży za granicę), fee, contract,
  * kind: 'transfer'|'free'|'abroad', foreign: { country, name, clubId?, rep, wage }|null, stage: 'terms'|'medical',
- * needsTerms (kupiec AI negocjuje kontrakt na końcu etapu warunków), date, early (wcześniejszy transfer prekontraktu) }.
+ * needsTerms (kupiec AI negocjuje kontrakt na końcu etapu warunków), date, early (wcześniejszy transfer prekontraktu),
+ * prop (id propozycji, po której zawodnik się zgodził: src/career/proposals.js) }.
  * Zwraca transakcję albo null (zawodnik ma już otwartą transakcję).
  */
 export function startDeal(game, opts) {
   ensureDeals(game);
-  const { playerId, to = null, fee = 0, contract = null, kind = 'transfer', foreign = null, needsTerms = false, early = false } = opts;
+  const { playerId, to = null, fee = 0, contract = null, kind = 'transfer', foreign = null, needsTerms = false, early = false, prop = null } = opts;
   const date = opts.date ?? game.date;
   const p = game.world.players[playerId];
   if (!p || hasOpenDeal(game, playerId)) return null;
@@ -121,6 +126,7 @@ export function startDeal(game, opts) {
   const d = {
     id, pid: playerId, name: p.name, pos: p.pos, from: p.clubId ?? null, to, fee, contract, kind, foreign, origin, type, needsTerms, early,
     start: date, stage: opts.stage ?? 'terms', due: null, plan, renegotiated: false, end: null, windowTo: kind === 'free' ? null : windowOn(date)?.to ?? null,
+    ...(prop ? { prop } : {}), // po propozycji i namyśle zawodnika (src/career/proposals.js)
   };
   // Kupiec AI z małą liczbą dni do końca okna: etapy skrócone, żeby zdążyć (zgłoszenie najpóźniej w ostatnim dniu)
   if (type === 'ai' && d.windowTo) {
