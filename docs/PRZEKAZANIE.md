@@ -289,7 +289,7 @@ Cała ta praca została później dokończona i scalona na `main`. Gałąź nie 
 4. (Zamknięte Nov 20, 2026: właściciel uznał, że konferencja przedmeczowa w okienku wygląda dobrze i zostaje bez zmian.)
 5. Miesięczny raport trenera akademii (kto jest gotowy do pierwszego składu).
 6. (Zamknięte Nov 20, 2026: właściciel uznał za zrobione; zostaje automat na koniec sezonu i ręczne przeniesienie w trakcie.)
-7. Puchar Polski: ścisła zasada dla klubu gracza z III ligi (teraz zawsze gra rundę wstępną).
+7. (Odłożone na daleką przyszłość, decyzja właściciela Nov 20, 2026: klub gracza z III ligi zostaje zawsze w rundzie wstępnej PP; ścisłą zasadę rozważyć dopiero, gdy IV liga będzie grywalna, razem z pucharami wojewódzkimi dla pozostałych klubów III ligi.)
 8. (Zamknięte Nov 20, 2026: właściciel uznał drobne starsze tematy za zrobione.)
 
 ### Znane problemy
