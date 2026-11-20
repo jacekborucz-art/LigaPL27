@@ -286,7 +286,7 @@ Cała ta praca została później dokończona i scalona na `main`. Gałąź nie 
 1. Przemowy przed dogrywką i przed serią rzutów karnych.
 2. Raport skauta szacujący potencjał zawodników innych klubów.
 3. Daty okien transferowych: sprawdzić i poprawić rozjazd (lato do ok. Sep 9, zima do ok. Jan 25).
-4. Konferencja przedmeczowa w układzie pełnej strony (jak pomeczowa).
+4. (Zamknięte Nov 20, 2026: właściciel uznał, że konferencja przedmeczowa w okienku wygląda dobrze i zostaje bez zmian.)
 5. Miesięczny raport trenera akademii (kto jest gotowy do pierwszego składu).
 6. Decyzja gracza na koniec sezonu o 19-latkach z akademii (teraz automat: dobry do kadry, reszta odchodzi).
 7. Puchar Polski: ścisła zasada dla klubu gracza z III ligi (teraz zawsze gra rundę wstępną).
