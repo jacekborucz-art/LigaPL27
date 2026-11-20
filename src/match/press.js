@@ -98,8 +98,10 @@ export function climateFactors(ctx, state = {}) {
  */
 export function pickClimate(ctx, state = {}, seed = 'prasa') {
   const { factors, score } = climateFactors(ctx, state);
-  const pAgr = clamp(0.28 - 0.09 * score, 0.04, 0.88);
-  const pPos = clamp(0.28 + 0.09 * score, 0.04, 0.88);
+  // Popularność trenera w mediach (src/career/coachCareer.js): do +-8 % w stronę życzliwej albo krytycznej prasy [SZAC]
+  const tilt = 0.08 * clamp(((ctx.coachMedia ?? 50) - 50) / 50, -1, 1);
+  const pAgr = clamp(0.28 - 0.09 * score - tilt, 0.04, 0.88);
+  const pPos = clamp(0.28 + 0.09 * score + tilt, 0.04, 0.88);
   const weights = { agresywna: pAgr, pozytywna: pPos, neutralna: Math.max(0.12, 1 - pAgr - pPos) };
   const inertia = (state.left ?? 0) > 0 && CLIMATES[state.climate];
   if (inertia) weights[state.climate] += 0.3;
@@ -984,7 +986,7 @@ export function nextPressState(state, eff, { climate, date, season, matchId, see
   return {
     ...s, v: 1, climate, left, streak: same ? (s.streak ?? 0) + 1 : 1, relation, promises: promises.slice(-4),
     last: { mode: eff.mode, date, matchId },
-    log: [...(s.log ?? []), { date, climate, mode: eff.mode, headline: eff.headline?.text ?? null }].slice(-6),
+    log: [...(s.log ?? []), { date, matchId, climate, mode: eff.mode, headline: eff.headline?.text ?? null, fans: eff.fans ?? 0, media: eff.media ?? 0 }].slice(-6), // fans i media: popularność trenera (src/career/coachCareer.js)
   };
 }
 
@@ -1000,7 +1002,7 @@ export function nextPressStatePre(state, eff, { date, matchId } = {}) {
   for (const p of eff.promisesAdd ?? []) promises = [...promises.filter((x) => x.kind !== p.kind), p];
   return {
     ...s, relation, promises: promises.slice(-4), pre: { mode: eff.mode, date, matchId },
-    preLog: [...(s.preLog ?? []), { date, climate: eff.climate, mode: eff.mode, headline: eff.headline?.text ?? null }].slice(-6),
+    preLog: [...(s.preLog ?? []), { date, matchId, climate: eff.climate, mode: eff.mode, headline: eff.headline?.text ?? null, fans: eff.fans ?? 0, media: eff.media ?? 0 }].slice(-6),
   };
 }
 

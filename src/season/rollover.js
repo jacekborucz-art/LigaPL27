@@ -29,9 +29,11 @@ import { academyMods, academyCapOf } from '../career/infrastructure.js';
 import { addFreeAgents } from '../career/transfers.js';
 import { returnLoansAtRollover } from '../career/loans.js';
 import { applyPreContracts } from '../career/preContracts.js'; // umowy od 1 lipca (docs/transfery.md)
-import { boardGoal, jobOffers, ensureBoard } from '../career/board.js';
+import { boardGoal, ensureBoard } from '../career/board.js';
 import { coachesNewSeason } from '../career/coaches.js';
-import { coachMarketNewSeason } from '../career/coachMarket.js';
+import { coachMarketNewSeason, coachMatches } from '../career/coachMarket.js';
+import { careerSeasonEnd, aiCoachSeasonEnd, fireThreshold } from '../career/coachCareer.js'; // kariera trenera i reputacja trenerów AI (docs/kariera-trenera.md)
+import { coachFired } from '../career/jobMarket.js';
 import { fmtDate } from '../ui/dom.js';
 import { archivePlayerSeason, archiveSeasonMatches, syncSpell } from './history.js';
 import { reputationSeasonEnd, applyClubRep } from '../career/reputationSystem.js'; // docs/reputacja.md
@@ -219,15 +221,20 @@ export function rolloverSeason(game) {
   const oldSeason = SEASON; const oldYear = SEASON_YEAR; const oldEnd = SEASON_END;
   const rng = new Rng(`koniec-sezonu:${game.seed}:${oldYear}`);
   const res = seasonResults(game);
-  const userClub = clubById(game.clubId);
-  const userTier = userClub.tier; const userGroup = userClub.group;
-  const userTable = userTier === 4 ? res.groupTables[userGroup] ?? [] : res.tables[userTier] ?? [];
-  const userPos = userTable.indexOf(game.clubId) + 1;
+  // Trener bez klubu (src/career/jobMarket.js): w pętli dnia game.clubId = null, ostatni klub prowadzi AI
+  const uid = game.clubId;
+  const userClub = uid ? clubById(uid) : null;
+  const userTier = userClub?.tier; const userGroup = userClub?.group;
+  const userTable = !uid ? [] : userTier === 4 ? res.groupTables[userGroup] ?? [] : res.tables[userTier] ?? [];
+  const userPos = uid ? userTable.indexOf(uid) + 1 : null;
   // Ruchy między ligami (III liga z tabel grup i baraży, IV liga: uzupełnienie grup, docs/iii-liga.md)
   const moves = computeMoves(res.tables, res.playoffWinners, res.groupTables, rng.fork('ligi'), { l3Playoff: res.l3Playoff });
   const tiers4 = Object.fromEntries(Object.entries(moves.tiers).filter(([, t]) => t <= 4));
   const errors = validateTiers(tiers4, moves.groups);
   const europe = polandNextSeason(game, res);
+  // Kariera trenera: wiersz sezonu, trofea, awans, cel, kary, odznaki; trenerzy AI: te same punkty (przed zmianą lig)
+  const careerMsgs = careerSeasonEnd(game, `${oldYear + 1}-07-01`, { res, moves, goal: uid ? game.board?.goal : null });
+  aiCoachSeasonEnd(game, res, moves, (id, p) => coachMatches(game, id, p));
   // Reputacja: punkty UEFA klubów, marka krajowa, trofea i zdarzenia zawodników (przed archiwizacją statystyk i zmianą lig)
   reputationSeasonEnd(game, res, moves);
   archiveSeasonMatches(game, oldSeason); // historia meczów drużyny gracza: sezon zamknięty przed nowym terminarzem
@@ -240,7 +247,7 @@ export function rolloverSeason(game) {
     tables: Object.fromEntries([1, 2, 3].map((t) => [t, res.rows[t].map((r) => ({ id: r.id, pts: r.points, gd: r.gf - r.ga }))])),
     l3: Object.fromEntries(L3_GROUPS.map((g) => [g, res.groupRows[g].map((r) => ({ id: r.id, pts: r.points, gd: r.gf - r.ga }))])),
     l3Playoff: (moves.l3Playoff ?? []).map((x) => ({ keeper: x.keeper, challenger: x.challenger, winner: x.winner })),
-    user: { club: game.clubId, tier: userTier, pos: userPos, ...(userTier === 4 ? { group: userGroup } : {}) }, promoted: moves.promoted, relegated: moves.relegated, polandRank: europe.rank,
+    user: uid ? { club: uid, tier: userTier, pos: userPos, ...(userTier === 4 ? { group: userGroup } : {}) } : null, promoted: moves.promoted, relegated: moves.relegated, polandRank: europe.rank,
   }].slice(-15);
 
   // Nowy sezon: kalendarz, ligi. Zapis tylko odstępstw od danych (kluby w innej lidze lub grupie niż na start gry)
@@ -248,12 +255,12 @@ export function rolloverSeason(game) {
   const newStart = `${year}-07-01`;
   const prev = game.leagueState ?? { tiers: {}, groups: {} };
   const merged = { ...prev.tiers, ...moves.tiers };
-  const userDown = merged[game.clubId] > 4; // klub gracza spada do IV ligi: kadra zostaje do zmiany pracy
+  const userDown = !!uid && merged[uid] > 4; // klub gracza spada do IV ligi: kadra zostaje do zmiany pracy
   game.leagueState = {
     year,
     tiers: Object.fromEntries(Object.entries(merged).filter(([id, t]) => knownClub(id) && knownClub(id).tier0 !== t)),
     groups: Object.fromEntries(Object.entries(moves.groups).filter(([id]) => merged[id] === 4 && (knownClub(id)?.tier0 !== 4 || knownClub(id)?.group0 !== moves.groups[id]))),
-    ...(userDown ? { keep: [game.clubId] } : {}),
+    ...(userDown ? { keep: [uid] } : {}),
   };
   game.seasonYear = year;
   coachesNewSeason(game, year); // trenerzy AI: rok starsi, doświadczenie albo spadek formy (career/coaches.js)
@@ -318,29 +325,33 @@ export function rolloverSeason(game) {
   }
   F.merit = {};
 
-  // Zarząd: ocena sezonu, nowy cel
-  const B = ensureBoard(game);
-  const goal = B.goal; const target = goal?.target ?? 10;
-  let delta = clamp((target - userPos) * 1.5, -15, 12);
-  if (moves.promoted[userTier - 1]?.includes(game.clubId)) delta += 15;
-  if ((moves.relegated[userTier + 1] ?? []).includes(game.clubId)) delta -= 25;
-  if (res.tables[1][0] === game.clubId) delta += 15;
-  if (res.cup.winner === game.clubId) delta += 8;
-  B.trust = Math.round(clamp(50 + (B.trust - 50) * 0.5 + delta, 0, 100));
-  B.reviews = [{ date: newStart, trust: B.trust, delta: Math.round(delta * 10) / 10, pos: userPos, notes: [`Sezon ${oldSeason} zakończony na ${userPos}. miejscu.`] }, ...(B.reviews ?? [])].slice(0, 12);
-  game.manager.seasons = [...(game.manager.seasons ?? []), { season: oldSeason, club: game.clubId, tier: userTier, pos: userPos, target }];
-  B.goal = boardGoal(game, clubById(game.clubId)); B.goalClub = game.clubId;
-  const droppedOut = clubById(game.clubId).tier > 4; // IV liga nie jest prowadzona: trener szuka nowego klubu
-  const fired = B.trust < 18 || droppedOut;
+  // Zarząd: ocena sezonu, nowy cel (tylko trener z klubem)
+  let B = null; let droppedOut = false; let fired = false;
+  if (uid) {
+    B = ensureBoard(game);
+    const goal = B.goal; const target = goal?.target ?? 10;
+    let delta = clamp((target - userPos) * 1.5, -15, 12);
+    if (moves.promoted[userTier - 1]?.includes(uid)) delta += 15;
+    if ((moves.relegated[userTier + 1] ?? []).includes(uid)) delta -= 25;
+    if (res.tables[1][0] === uid) delta += 15;
+    if (res.cup.winner === uid) delta += 8;
+    B.trust = Math.round(clamp(50 + (B.trust - 50) * 0.5 + delta, 0, 100));
+    B.reviews = [{ date: newStart, trust: B.trust, delta: Math.round(delta * 10) / 10, pos: userPos, notes: [`Sezon ${oldSeason} zakończony na ${userPos}. miejscu.`] }, ...(B.reviews ?? [])].slice(0, 12);
+    game.manager.seasons = [...(game.manager.seasons ?? []), { season: oldSeason, club: uid, tier: userTier, pos: userPos, target }];
+    B.goal = boardGoal(game, clubById(uid)); B.goalClub = uid;
+    droppedOut = clubById(uid).tier > 4; // IV liga nie jest prowadzona: trener szuka nowego klubu
+    // Próg zwolnienia zależy od popularności trenera u kibiców (src/career/coachCareer.js)
+    fired = B.trust < fireThreshold(game.manager?.career?.pop?.fans) || droppedOut;
+  }
 
   // Rynek i nowy terminarz
   Object.assign(game.market, { listed: {}, talks: {}, offers: [], userListed: {}, history: game.market.history.slice(0, 150) });
   const champion = res.tables[1][0];
   const cupWinner = res.cup.winner && res.cup.winner !== champion ? res.cup.winner : res.tables[1][1];
-  game.season = createSeason(`${game.seed}:${year}`, { playerClub: game.clubId, superCup: [champion, cupWinner], holder: res.uefa.LM ?? undefined, uefaHolders: res.uefa });
+  game.season = createSeason(`${game.seed}:${year}`, { playerClub: uid && !fired ? uid : null, superCup: [champion, cupWinner], holder: res.uefa.LM ?? undefined, uefaHolders: res.uefa });
   game.season.polishEurope = polishEurope;
   game.fixtures = game.season.fixtures;
-  game.tactics = createTactics(squadOf(game.world, game.clubId), { benchSize: 12, formation: game.tactics?.formation, instructions: game.tactics?.instructions, playerInstr: game.tactics?.playerInstr });
+  if (uid) game.tactics = createTactics(squadOf(game.world, uid), { benchSize: 12, formation: game.tactics?.formation, instructions: game.tactics?.instructions, playerInstr: game.tactics?.playerInstr });
   if (game.summary) game.summary.season = SEASON;
 
   // Wiadomości
@@ -350,7 +361,7 @@ export function rolloverSeason(game) {
     date: newStart, key: `koniec:${oldSeason}`, category: 'competitions', from: 'Rozgrywki', priority: 'important',
     subject: `Koniec sezonu ${oldSeason}: ${name(champion)} mistrzem Polski`,
     body: [
-      `Twoja drużyna: ${userPos}. miejsce (${userTier === 4 ? `III liga, grupa ${['', 'I', 'II', 'III', 'IV'][userGroup] ?? userGroup}` : LEAGUE_NAMES[userTier]}).`,
+      ...(uid ? [`Twoja drużyna: ${userPos}. miejsce (${userTier === 4 ? `III liga, grupa ${['', 'I', 'II', 'III', 'IV'][userGroup] ?? userGroup}` : LEAGUE_NAMES[userTier]}).`] : []),
       `Puchar Polski: ${res.cup.winner ? name(res.cup.winner) : 'brak rozstrzygnięcia'}.`,
       `Awans do Ekstraklasy: ${list(moves.promoted[1])}. Spadek: ${list(moves.relegated[2])}.`,
       `Awans do 1 Ligi: ${list(moves.promoted[2])}. Spadek z 1 Ligi: ${list(moves.relegated[3])}.`,
@@ -373,14 +384,14 @@ export function rolloverSeason(game) {
     report.newYouth.length ? `Nowi juniorzy w akademii: ${report.newYouth.join(', ')}.` : '',
     report.signed.length ? `Asystent uzupełnił kadrę do minimum: ${report.signed.join(', ')}.` : '',
   ].filter(Boolean);
-  const sq = squadOf(game.world, game.clubId).length;
-  msgs.push(createMessage({ date: newStart, key: `kadra-lato:${year}`, category: 'staff', from: 'Dyrektor sportowy', priority: 'important', subject: `Kadra przed sezonem ${SEASON}: ${sq} zawodników`, body: `${squadLines.join('\n\n') || 'Bez zmian w kadrze.'}${sq < 22 ? '\n\nKadra liczy mniej niż 22 zawodników. Uzupełnij ją w zakładce Transfery (wolni zawodnicy są dostępni od razu).' : ''}` }));
-  const fin = F.clubs[game.clubId];
+  const sq = uid ? squadOf(game.world, uid).length : 0;
+  if (uid && !fired) msgs.push(createMessage({ date: newStart, key: `kadra-lato:${year}`, category: 'staff', from: 'Dyrektor sportowy', priority: 'important', subject: `Kadra przed sezonem ${SEASON}: ${sq} zawodników`, body: `${squadLines.join('\n\n') || 'Bez zmian w kadrze.'}${sq < 22 ? '\n\nKadra liczy mniej niż 22 zawodników. Uzupełnij ją w zakładce Transfery (wolni zawodnicy są dostępni od razu).' : ''}` }));
+  const fin = uid ? F.clubs[uid] : null;
+  msgs.push(...careerMsgs);
   if (fired) {
-    game.manager.fired = (game.manager.fired ?? 0) + 1;
-    const offers = jobOffers(game, newStart, true);
-    msgs.push(createMessage({ date: newStart, key: `zwolnienie-lato:${year}`, category: 'board', from: 'Zarząd', priority: 'urgent', subject: `${name(game.clubId)}: zarząd rozwiązuje umowę`, body: droppedOut ? `${name(game.clubId)} spada do IV ligi, której gra nie prowadzi. Wybierz nowy klub, żeby kontynuować karierę.` : `Po sezonie ${oldSeason} zarząd nie widzi cię na stanowisku trenera. Wybierz nowy klub.`, actions: offers.map((o) => ({ id: o.clubId, label: `${o.name} (${o.league})` })), refs: { kind: 'jobOffer' } }));
-  } else {
+    // Zwolnienie po sezonie: trener bez klubu (rynek pracy, src/career/jobMarket.js), klub prowadzi AI
+    msgs.push(...coachFired(game, newStart, { inSeason: false, dropped: droppedOut }));
+  } else if (uid) {
     msgs.push(createMessage({ date: newStart, key: `zarzad-lato:${year}`, category: 'board', from: 'Zarząd', priority: 'important', subject: `Cel na sezon ${SEASON}: ${B.goal.text}`, body: `Ocena sezonu ${oldSeason}: ${userPos}. miejsce. Zaufanie zarządu: ${B.trust} na 100.\n\nBudżet transferowy: ${Math.round(fin.transferBudget / 1000)} tys. zł. Budżet płac: ${Math.round(fin.wageBudget / 100) * 100} zł tygodniowo. Saldo: ${Math.round(fin.balance / 1000)} tys. zł.` }));
   }
   return { messages: msgs, moves, errors, europe, res };

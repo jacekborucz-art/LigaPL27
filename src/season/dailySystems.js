@@ -87,6 +87,7 @@ registerDailySystem({
   run(state, date) {
     const out = [];
     const club = clubById(state.clubId);
+    if (!club) return {}; // trener bez klubu (src/career/jobMarket.js): brak wiadomości o lidze klubu
     const leagueStart = DOMESTIC[['ekstraklasa', 'liga1', 'liga2', 'liga3'][club.tier - 1]]?.start;
     if (!leagueStart) return {};
     if (date === addDays(leagueStart, -1)) {

@@ -8,7 +8,7 @@
 
 import { Rng, clamp } from '../core/rng.js';
 import { createMessage } from '../core/inbox.js';
-import { registerDailySystem, addDays } from '../core/gameLoop.js';
+import { registerDailySystem, addDays, userClubId } from '../core/gameLoop.js';
 import { CLUBS_PL, clubById, LEAGUE_NAMES } from '../data/clubs_pl.js';
 import { NATIONALITIES, randomName } from '../data/names.js';
 import { SEASON_YEAR } from '../config/calendar2026.js';
@@ -25,6 +25,8 @@ import { fmtDate } from '../ui/dom.js';
 import { ownerOf } from './owners.js';
 import { COACH, COACH_KEYS, COACH_STYLES, coachOf, coachAvg, coachLevelFor, replaceCoach } from './coaches.js';
 import { staffOnCoachHire } from './staffMarket.js'; // nowy trener a sztab: przywozi asystenta (docs/sztab.md)
+import { aiCoachFired, aiPoolDecay, hireRepTerm } from './coachCareer.js'; // reputacja trenerów AI (docs/kariera-trenera.md)
+import { summerUserBid } from './jobMarket.js'; // trener gracza bez klubu jako kandydat po sezonie
 
 const LEAGUE_COMPS = new Set(ALL_LEAGUE_COMPS);
 
@@ -279,7 +281,7 @@ function closeHist(p, clubId, date, why) {
  * Zwraca { out, caretaker, messages } albo null.
  */
 export function fireCoach(game, clubId, date, opts = {}) {
-  if (!game?.world?.clubs?.[clubId] || clubId === game.clubId) return null;
+  if (!game?.world?.clubs?.[clubId] || clubId === userClubId(game)) return null;
   const M = ensureCoachMarket(game);
   const rng = opts.rng ?? new Rng(`zwolnienie:${game.seed}:${clubId}:${date}`);
   const old = coachOf(game, clubId);
@@ -287,6 +289,7 @@ export function fireCoach(game, clubId, date, opts = {}) {
   const messages = [];
   if (old && !old.caretaker) {
     if (!opts.poached) closeHist(old, clubId, date, why);
+    if (why !== 'odejście' && !opts.poached) aiCoachFired(old, tierOf(clubId)); // ta sama kara reputacji co u gracza
     // Podebrany trener przechodzi do innego klubu (hireCoach), pozostali trafiają do puli wolnych trenerów
     if (!opts.poached) M.pool.push({ ...old, id: old.id ?? `${clubId}#${old.n ?? 0}`, lastClub: clubId, lastTier: tierOf(clubId), free: date, caretaker: false, boost: 0, fit: 0, fitY: null, credit: false });
     const comp = MARKET.pay.months * coachPay(game, clubId);
@@ -316,6 +319,33 @@ export function fireCoach(game, clubId, date, opts = {}) {
 }
 
 
+/**
+ * Gracz odchodzi z klubu (zwolnienie, rezygnacja: src/career/jobMarket.js): zespół przejmuje asystent jako trener
+ * tymczasowy, klub szuka trenera jak każdy klub AI (wakat dla rynku pracy gracza). Zwraca trenera tymczasowego.
+ */
+export function userLeftClub(game, clubId, date, why = 'zwolnienie') {
+  if (!game?.world?.clubs?.[clubId]) return null;
+  const rng = new Rng(`trener-po-graczu:${game.seed}:${clubId}:${date}`);
+  const o = ownerOf(game, clubId);
+  const [d0, d1] = MARKET.caretaker[o.type] ?? MARKET.caretaker.prywatny;
+  const out = `${game.manager?.profile?.firstName ?? ''} ${game.manager?.profile?.lastName ?? ''}`.trim() || 'Trener';
+  return holdVacancy(game, clubId, date, addDays(date, rng.int(d0, d1)), { out, why: why === 'zwolnienie' ? 'wyniki' : 'odejście', user: true });
+}
+
+/** Trener tymczasowy do dnia until (wakat: klub czeka z wyborem trenera, np. na odpowiedź gracza). */
+export function holdVacancy(game, clubId, date, until, { out = null, why = 'po sezonie', user = false } = {}) {
+  ensureCoachMarket(game);
+  const prev = game.coaches?.[clubId];
+  const ct = caretakerProfile(game, clubId, date, new Rng(`trener-wakat:${game.seed}:${clubId}:${date}`));
+  Object.assign(ct, { until, n: (prev?.n ?? 0) + 1, since: date, from: date });
+  (game.coaches ??= {})[clubId] = ct;
+  const log = (game.coachLog ??= []);
+  log.unshift({ date, club: clubId, out: out ?? prev?.name ?? null, in: ct.name, why, caretaker: true, ...(user ? { user: true } : {}) });
+  game.coachLog = log.slice(0, 80);
+  (ensureCoachMarket(game).clubs[clubId] ??= {}).shocks = [];
+  return ct;
+}
+
 /** Poziom trenera, na jakiego stać klub: poziom ligi i prestiżu, ambicja i pieniądze właściciela. */
 export function hireLevel(game, clubId) {
   const o = ownerOf(game, clubId);
@@ -329,7 +359,7 @@ export function hireLevel(game, clubId) {
  * Zwraca { coach, from, messages }.
  */
 export function hireCoach(game, clubId, date, { rng = null, inDrop = false, quiet = false } = {}) {
-  if (!game?.world?.clubs?.[clubId] || clubId === game.clubId) return null;
+  if (!game?.world?.clubs?.[clubId] || clubId === userClubId(game)) return null;
   const M = ensureCoachMarket(game);
   rng ??= new Rng(`zatrudnienie:${game.seed}:${clubId}:${date}`);
   const H = MARKET.hire;
@@ -339,7 +369,7 @@ export function hireCoach(game, clubId, date, { rng = null, inDrop = false, quie
   const cands = M.pool.filter((c) => coachAvg(c) <= L + H.reach && c.lastClub !== clubId).map((c) => ({ c, src: null }));
   if (rng.chance(H.poachP)) {
     for (const [id, p] of Object.entries(game.coaches ?? {})) {
-      if (id === clubId || id === game.clubId || p.caretaker || tierOf(id) <= t || clubById(id)?.parent) continue;
+      if (id === clubId || id === userClubId(game) || p.caretaker || tierOf(id) <= t || clubById(id)?.parent) continue;
       const avg = coachAvg(p);
       if (avg >= L - 0.5 && avg <= L + H.reach && p.credit) cands.push({ c: p, src: id });
     }
@@ -350,7 +380,8 @@ export function hireCoach(game, clubId, date, { rng = null, inDrop = false, quie
     // Lepszy trener niż poziom klubu jest drogi i rzadko chce przyjść: nadwyżka liczy się w ocenie tylko w 40 %
     const avg = coachAvg(x.c);
     const foreign = x.c.nat && x.c.nat !== 'POL' ? (H.foreign[t] ?? 0) + (o.type === 'miliarder' ? 0.3 : 0) : 0;
-    const score = avg - H.over * Math.max(0, avg - L) + rng.gauss(0, sd) + (inDrop && x.c.style === 'S' ? H.rescueS : 0) + foreign - (x.src ? 0.3 : 0);
+    // Reputacja kandydata wobec klubu (docs/kariera-trenera.md): ta sama skala co u gracza na rynku pracy
+    const score = avg - H.over * Math.max(0, avg - L) + rng.gauss(0, sd) + (inDrop && x.c.style === 'S' ? H.rescueS : 0) + foreign - (x.src ? 0.3 : 0) + hireRepTerm(x.c, clubId);
     if (score > bestScore) { bestScore = score; best = x; }
   }
   const S = statsOf(game);
@@ -513,16 +544,19 @@ export function summerReview(game, date) {
       if (!p.caretaker && gap <= -3 && tier > 1) leave = S.poached; // udany sezon: trener odchodzi do lepszego klubu
       if (p.caretaker) {
         if (!rng.chance(pFire)) { keepCaretaker(game, id, date); continue; }
+        if (summerUserBid(game, id, date)) continue; // klub proponuje pracę trenerowi gracza bez klubu (src/career/jobMarket.js)
         const r = hireCoach(game, id, date, { rng, inDrop: false, quiet: true });
         if (r) changes.push({ id, out: p.name, in: r.coach.name, why: 'tymczasowy' });
         continue;
       }
       if (rng.chance(Math.max(0, pFire))) {
         const r = fireCoach(game, id, date, { why, rng, summer: true, quiet: true, direct: true });
+        if (r && summerUserBid(game, id, date)) continue;
         const h = r && hireCoach(game, id, date, { rng: rng.fork('nowy'), quiet: true });
         if (h) changes.push({ id, out: r.out?.name, in: h.coach.name, why });
       } else if (leave && rng.chance(leave)) {
         const r = fireCoach(game, id, date, { why: 'odejście', rng, summer: true, quiet: true, direct: true });
+        if (r && summerUserBid(game, id, date)) continue;
         const h = r && hireCoach(game, id, date, { rng: rng.fork('nowy'), quiet: true });
         if (h) changes.push({ id, out: r.out?.name, in: h.coach.name, why: 'odejście' });
       }
@@ -549,6 +583,7 @@ export function coachMarketNewSeason(game, year) {
     return !(idle > 700 && rng.chance(P.gone));
   });
   for (let i = 0; i < P.perSeason; i++) M.pool.push(poolCoach(game, `${year}:${i}`, { age: rng.int(33, 46), mean: P.mean - 0.6 }));
+  aiPoolDecay(M.pool, `${year}-07-01`); // długo bez pracy: reputacja maleje (podłoga 0,6 szczytu)
   // Historia statystyk: najwyżej 10 sezonów
   const ys = Object.keys(M.stats).sort();
   for (const k of ys.slice(0, Math.max(0, ys.length - 10))) delete M.stats[k];
