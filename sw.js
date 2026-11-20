@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-2919f5fe5a';
+const VERSION = 'v0.3-eca988afb9';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -204,6 +204,7 @@ const FILES = [
   ['./src/career/foreignMarket.js', 'de8611d4a2'],
   ['./src/career/foreignPool.js', 'df311e562f'],
   ['./src/career/infrastructure.js', 'd64aff3a8f'],
+  ['./src/career/leagueNews.js', '5f8f30a71c'],
   ['./src/career/loans.js', '6ff6e21d87'],
   ['./src/career/mindset.js', 'b8a1c39ce7'],
   ['./src/career/morale.js', '1c7d0eb69f'],
@@ -237,8 +238,9 @@ const FILES = [
   ['./src/config/competitions.js', '1ba35856b2'],
   ['./src/config/version.js', 'a202bfc50f'],
   ['./src/core/decisions.js', 'b9fda961b7'],
-  ['./src/core/gameLoop.js', 'd572502469'],
+  ['./src/core/gameLoop.js', 'be5ca508b0'],
   ['./src/core/inbox.js', '689fd5b609'],
+  ['./src/core/mailFilter.js', '645d73d75a'],
   ['./src/core/rng.js', '3712174b88'],
   ['./src/core/store.js', 'f49112a78a'],
   ['./src/data/attributes.js', '892bf10066'],
@@ -292,14 +294,14 @@ const FILES = [
   ['./src/season/nationalSystem.js', '56b1056ddd'],
   ['./src/season/rollover.js', '23f50cb370'],
   ['./src/season/schedule.js', 'a608f6730f'],
-  ['./src/season/season.js', '06bac79be0'],
+  ['./src/season/season.js', '1422bcddec'],
   ['./src/season/standings.js', 'b3bdff91e2'],
   ['./src/season/superCupEU.js', 'f728d6d300'],
   ['./src/season/suspension.js', '7671748aa6'],
   ['./src/season/thirdLeague.js', 'b37f1d8a44'],
   ['./src/season/uefa.js', '4880cc084f'],
   ['./src/season/worldNations.js', '6003d36e12'],
-  ['./src/styles/app.css', 'c6be53f8ce'],
+  ['./src/styles/app.css', 'ed50debc91'],
   ['./src/styles/assistant.css', 'a1dd04f875'],
   ['./src/styles/base.css', 'f2fee58203'],
   ['./src/styles/club.css', '6615e08e49'],

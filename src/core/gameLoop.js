@@ -5,6 +5,7 @@
 // Nowy system = registerDailySystem(), bez zmian w pętli (docs/PLAN.md 4.1).
 
 import { addMessages, PRIORITY, pendingDecisions, pruneInbox } from './inbox.js';
+import { mailRelevant } from './mailFilter.js'; // tylko liga gracza, z innych lig bardzo ważne wydarzenia
 
 const systems = [];
 
@@ -56,7 +57,7 @@ export function processDay(state, date = state.date) {
   }
   // Wiadomości usunięte przez gracza (i przez porządki) nie wracają, nawet gdy system wyśle je ponownie
   const gone = new Set(state.inboxGone ?? []);
-  const { inbox, added } = addMessages(state.inbox || [], messages.filter((m) => !m.key || !gone.has(m.key)));
+  const { inbox, added } = addMessages(state.inbox || [], messages.filter((m) => (!m.key || !gone.has(m.key)) && mailRelevant(state, m)));
   state.inbox = inbox;
   if (new Date(`${date}T12:00:00Z`).getUTCDay() === 1) forgetMessages(state, pruneInbox(state.inbox, date, 'auto'));
   state.processedDate = date;
