@@ -211,7 +211,7 @@ function missionCard(m, game, view, ui) {
 }
 
 function profileChips(m) {
-  return `<ul class="sk-prof" aria-label="Zlecony profil"><li>${posChip(m.pos)}</li><li>${num(m.ageFrom)}-${num(m.ageTo)} lat</li><li>${esc(LEVEL_NAME[m.level] ?? m.level)}</li><li>do ${money(m.maxFee)}</li><li>pensja do ${zl(m.maxWage)}</li></ul>`;
+  return `<ul class="sk-prof" aria-label="Zlecony profil"><li>${posChip(m.pos)}</li><li>${num(m.ageFrom)}-${num(m.ageTo)} lat</li><li>${esc(LEVEL_NAME[m.level] ?? m.level)}</li><li>do ${money(m.maxFee)}</li><li>pensja do ${zl(m.maxWage)}</li><li>${esc(CONTRACT_NAME[m.contract] ?? '')}</li></ul>`;
 }
 
 function misjeTab(game, view, ui) {
@@ -429,7 +429,8 @@ export function orderSheetHtml(game, view, ui, quote = safeQuote) {
         <div class="sk-opts sk-opts--3" role="radiogroup" aria-label="Poziom">${radio('level', o.level, LEVELS)}</div></fieldset>
       <fieldset class="sk-fs"><legend>Pieniądze i umowa</legend>
         <div class="sk-two"><label>Maksymalna kwota transferu, zł<input type="text" inputmode="numeric" value="${fmtIntSp(o.maxFee)}" data-sk-f="maxFee"></label><label>Maksymalna pensja, zł tygodniowo<input type="text" inputmode="numeric" value="${fmtIntSp(o.maxWage)}" data-sk-f="maxWage"></label></div>
-        <p class="hint">Nie wiadomo z góry, czy skaut znajdzie wolnego zawodnika (dołączy w każdej chwili), czy zawodnika z klubem (transfer w najbliższym oknie, cena zależy od kraju).</p></fieldset>
+        <div class="sk-opts sk-opts--3" role="radiogroup" aria-label="Status zawodnika">${radio('contract', o.contract, CONTRACTS)}</div>
+        <p class="hint">Wolny zawodnik dołączy w każdej chwili. Zawodnik z klubem: transfer w najbliższym oknie, cena zależy od kraju. Przy „wolny lub z kontraktem” wynik jest losowy.</p></fieldset>
       <fieldset class="sk-fs"><legend>Czas wyjazdu <small>Dłuższy kosztuje więcej, ale daje większą szansę i więcej kandydatów</small></legend>
         <div class="sk-weeks" role="radiogroup" aria-label="Czas wyjazdu">${wopt}</div></fieldset>
     </form>

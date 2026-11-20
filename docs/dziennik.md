@@ -31,8 +31,8 @@ Zostało / dalej:
 
 ## Nov 20, 2026, profil B, skauting: wolny albo z klubem losowo, cena zamiast wartości (v1.21 Beta)
 Zrobione (decyzje właściciela):
-- Zlecenie skauta bez wyboru „wolny / z kontraktem”: kandydat jest wolny albo z klubem losowo (`SCOUT.freeShare` 0,5 [SZAC];
-  polecenie agenta zawsze z klubem). Cena zawodnika z klubem jak dotąd: z kraju (`priceMulFor`) + RNG.
+- Zlecenie skauta ma instrukcję: tylko wolni, tylko z klubem albo obojętnie; przy „obojętnie” wynik losowy (`SCOUT.freeShare`
+  0,5 [SZAC]; polecenie agenta zawsze z klubem). Cena zawodnika z klubem jak dotąd: z kraju (`priceMulFor`) + RNG.
 - Wolny kandydat skauta dołącza w każdej chwili (`lateFree` pomija `p.scout`); z klubem tylko w oknie transferowym.
 - U ukrytego kandydata zamiast wartości rynkowej (zdradzała poziom) „Cena wg skauta: od do” (`valueOrScoutPrice`).
 

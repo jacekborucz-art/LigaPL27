@@ -147,7 +147,9 @@ test('Granice: 0-7 kandydatów, wiek w zleceniu, cena i pensja w limicie (+10 %)
       assert.ok(p.pos === 'ŚP' && p.foreignPool);
     }
   }
-  // Wolny albo z kontraktem losowo (decyzja właściciela): w wielu wyjazdach są oba rodzaje
+  const free = trip('f1', { s: 0.9, weeks: 6, D: 0.1, contract: 'free' });
+  assert.ok(free.players.every(({ p }) => p.free));
+  // „Wolny lub z kontraktem”: losowo, w wielu wyjazdach są oba rodzaje
   const all = Array.from({ length: 40 }, (_, i) => trip(`f${i}`, { s: 0.9, weeks: 6, D: 0.1 }).players).flat();
   assert.ok(all.some(({ p }) => p.free) && all.some(({ p }) => !p.free));
 });
