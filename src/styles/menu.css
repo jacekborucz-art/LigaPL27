@@ -646,3 +646,8 @@
   .contract__sig[data-sig] { transform: rotate(-2deg); transition: opacity var(--m-150) linear; }
   .intro.is-leaving { transition: none; }
 }
+/* Nowa kariera: przycisk wczytania datapacku, jednolity żółty, dobrze widoczny */
+.nc-pack__load { background: #F2C230; border-color: #F2C230; color: #1B1B1B; cursor: pointer; }
+.nc-pack__load:hover { background: #F7D04F; border-color: #F7D04F; }
+.nc-pack__load:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+
