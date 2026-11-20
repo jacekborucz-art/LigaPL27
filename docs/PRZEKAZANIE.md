@@ -288,10 +288,9 @@ Cała ta praca została później dokończona i scalona na `main`. Gałąź nie 
 3. Daty okien transferowych: sprawdzić i poprawić rozjazd (lato do ok. Sep 9, zima do ok. Jan 25).
 4. (Zamknięte Nov 20, 2026: właściciel uznał, że konferencja przedmeczowa w okienku wygląda dobrze i zostaje bez zmian.)
 5. Miesięczny raport trenera akademii (kto jest gotowy do pierwszego składu).
-6. Decyzja gracza na koniec sezonu o 19-latkach z akademii (teraz automat: dobry do kadry, reszta odchodzi).
+6. (Zamknięte Nov 20, 2026: właściciel uznał za zrobione; zostaje automat na koniec sezonu i ręczne przeniesienie w trakcie.)
 7. Puchar Polski: ścisła zasada dla klubu gracza z III ligi (teraz zawsze gra rundę wstępną).
-8. Starsze, nieodpowiedziane: dalsze rozwinięcie raportu asystenta, szerokość okna negocjacji, szerokość list pucharów
-   europejskich, nazwy stadionów klubów wyższych lig. Szczegółów tych czterech nie pamiętam dokładnie; zapytać użytkownika.
+8. (Zamknięte Nov 20, 2026: właściciel uznał drobne starsze tematy za zrobione.)
 
 ### Znane problemy
 - Testy wydajności (np. „Pełny sezon z pucharami ... poniżej 15 s”) czasem nie przechodzą przy pełnym `npm test`
