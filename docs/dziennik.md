@@ -29,6 +29,16 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 20, 2026, profil B, odnośniki w Poczcie (v1.19 Beta)
+Zrobione:
+- Wiadomość w Poczcie ma pod treścią przyciski „Przejdź do:” do ekranu, którego dotyczy: profil, rozmowa i karta
+  zawodnika (gdy klucz wiadomości zawiera id zawodnika), kontrakty, rynek, oferty, W toku, wypożyczenia, sponsorzy,
+  zarząd, infrastruktura, sztab, obozy, sparingi, rozmowy, rezerwy, rozgrywki, Puchar Polski, reprezentacje.
+  Ten sam mechanizm kroków co „Ten tydzień” (`runMenuItem`). Kod: `src/ui/mailLinks.js`, test `tests/mailLinks.test.mjs`.
+Decyzje i pułapki:
+- Rodzaj wiadomości rozpoznawany z początku klucza (`m.key`); nowe rodzaje wiadomości dopisz do `BY_KIND`.
+- Na zapisie z października 56 ze 143 wiadomości ma odnośniki.
+
 ## Nov 20, 2026, profil B, karta zawodnika w okienku w Transferach (v1.19 Beta)
 Zrobione:
 - Nazwisko w Transferach jak link: karta zawodnika w okienku (to samo okno co w Skład i taktyka), cena i skrót do oferty.
@@ -37,7 +47,7 @@ Decyzje i pułapki:
 - Globalny Escape w `src/app.js` wraca na ekran startowy: własne obsługi Escape muszą robić `stopPropagation()`.
 - Wersja gry bez zmiany (v1.19 Beta), pytanie do właściciela o podniesienie.
 Zostało / dalej:
-- Odnośniki do zadań i okien także w treści wiadomości w Poczcie (prośba właściciela Nov 20, 2026).
+- Odnośniki w Poczcie: zrobione (wpis wyżej).
 
 
 ## Nov 19, 2026, profil A (przekazanie), commity 9b4403e..8564f53 (v1.11 Beta -> v1.19 Beta)

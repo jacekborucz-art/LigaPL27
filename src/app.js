@@ -101,6 +101,7 @@ import { ensureTeamReport, requestTeamReport } from './career/teamReport.js'; //
 import { renderTeamReport } from './ui/teamReportView.js';
 import { ensureMatchReports, recordMatchReport } from './career/postMatchReport.js'; // analiza pomeczowa sztabu (docs/analiza-pomeczowa.md)
 import { renderMatchAnalysis, matchReportMailFoot, analysesBadge } from './ui/postMatchView.js';
+import { mailLinks } from './ui/mailLinks.js'; // odnośniki w wiadomościach do ekranów, których dotyczą
 import { ensureWeeklyTodo, buildWeeklyTodo, noteTodoSeen, todoBadge, snoozeTodo, unhideTodo } from './career/weeklyTodo.js'; // lista „Do zrobienia w tym tygodniu” (docs/do-zrobienia.md)
 import { todoPanelBody, renderTodo } from './ui/todoView.js';
 import { ensureReferees, refStrictFor } from './career/referees.js'; // pula sędziów i obsada meczów (docs/sedziowie.md)
@@ -989,6 +990,7 @@ function mailReader(g, m, nextId) {
     ${needsAnswer(m) ? `<section class="mail-decide"><h3>Twoja decyzja</h3><div class="mail-actions">${m.actions.map((a, i) => `<button class="btn ${i === 0 ? 'btn--primary' : 'btn--quiet'}" data-act="mailaction" data-id="${esc(m.id)}" data-a="${esc(a.id)}">${esc(a.label)}</button>`).join('')}</div></section>` : ''}
     ${m.refs?.kind === 'teamReport' ? '<p class="mail-view__foot"><button class="btn btn--sm" data-act="trep-open">Otwórz pełny raport</button></p>' : ''}
     ${m.refs?.kind === 'matchReport' ? matchReportMailFoot(g, m) : ''}
+    ${(() => { const L = mailLinks(g, m); return L.length ? `<p class="mail-view__foot mail-links"><span class="mail-links__k">Przejdź do:</span>${L.map((l, i) => `<button class="btn btn--sm${i === 0 ? ' btn--primary' : ''}" data-act="mail-go" data-id="${esc(m.id)}" data-i="${i}">${esc(l.label)}</button>`).join('')}</p>` : ''; })()}
     ${m.chosen ? `<p class="mail-chosen">Twoja odpowiedź: <b>${esc(m.actions.find((a) => a.id === m.chosen)?.label ?? '')}</b></p>` : ''}
     ${canDelete(m) ? `<p class="mail-view__foot"><button class="btn btn--quiet btn--sm" data-act="maildel" data-id="${esc(m.id)}">Usuń wiadomość</button></p>` : ''}
   </article>`;
@@ -1738,6 +1740,10 @@ async function dispatchAct(el, { root = app } = {}) {
     if (act === 'todo') { state.tab = 'pulpit'; state.fx = null; state.todo = true; state.todoArea = null; state.todoMsg = null; render(); window.scrollTo({ top: 0 }); app.querySelector('#todo-h')?.focus({ preventScroll: true }); }
     if (act === 'todoback') { state.todo = null; state.todoMsg = null; render(); app.querySelector('[data-act="todo"]')?.focus(); }
     if (act === 'todo-area') { state.todoArea = el.dataset.a || null; state.todoMsg = null; render(); app.querySelector(`[data-act="todo-area"][data-a="${CSS.escape(el.dataset.a ?? '')}"]`)?.focus({ preventScroll: true }); }
+    if (act === 'mail-go') { // odnośnik w wiadomości (src/ui/mailLinks.js)
+      const l = mailLinks(g, g.inbox.find((x) => x.id === el.dataset.id))[Number(el.dataset.i)];
+      if (l?.run?.steps?.length) { state.mailOpen = null; await runMenuItem(l, ''); window.scrollTo({ top: 0 }); }
+    }
     if (act === 'todo-go') {
       const it = buildWeeklyTodo(g).items.find((x) => x.key === el.dataset.key);
       if (it?.act?.steps?.length) { state.todo = null; state.todoMsg = null; await runMenuItem({ run: it.act }, it.pid ?? ''); window.scrollTo({ top: 0 }); }

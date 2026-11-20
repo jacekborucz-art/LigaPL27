@@ -1721,3 +1721,6 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 .pc-link { cursor: pointer; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 55%, transparent); text-underline-offset: 3px; }
 .pc-link:hover { text-decoration-color: currentColor; color: var(--accent, inherit); }
 .tf-pcard__go { margin: 0 0 var(--space-3); }
+/* Poczta: odnośniki do ekranów, których dotyczy wiadomość (src/ui/mailLinks.js) */
+.mail-links { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.mail-links__k { color: var(--text-muted); font-size: var(--step--1); }
