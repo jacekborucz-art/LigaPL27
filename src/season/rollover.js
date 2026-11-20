@@ -198,7 +198,7 @@ export function fillSquad(game, cid, target, date, rng, report = null) {
     const needs = squadDeficits(squad).filter((n) => n.scope === 'squad');
     if (!needs.length && squad.length >= target) break;
     const g = needs.find((n) => n.group !== 'ALL')?.group ?? rng.pick(['DEF', 'MID', 'ATT', 'MID', 'DEF']);
-    const fit = game.market.free.map((id) => W.players[id]).filter((p) => p && !p.transfer && groupOf(p) === g && p.ovr <= c.L + 0.8 && p.ovr >= c.L - 3)
+    const fit = game.market.free.map((id) => W.players[id]).filter((p) => p && !p.transfer && groupOf(p) === g && p.ovr <= c.L + 0.8 && p.ovr >= c.L - 3 && !(p.scout && p.scout.club !== cid && (p.scout.excl ?? '') >= date))
       .sort((a, b) => Math.abs(a.ovr - (c.L + 0.2)) - Math.abs(b.ovr - (c.L + 0.2)))[0];
     let p = fit;
     if (p) {

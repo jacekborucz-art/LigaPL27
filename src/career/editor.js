@@ -29,7 +29,8 @@ import { GAME_VERSION } from '../config/version.js';
 import { coachOf, COACH_KEYS, COACH_ATTRS, COACH_STYLES } from './coaches.js';
 import { ownerOf, OWNER_KEYS } from './owners.js';
 import { rosterOf, syncStaff, STAFF_ROLE_IDS } from './staffMarket.js';
-import { roleAttrKeys, ensurePersonAttrs, shiftPersonQ, qFromAttrs } from '../training/staff.js';
+import { roleAttrKeys, ensurePersonAttrs, shiftPersonQ, qFromAttrs, migrateScoutAttrs } from '../training/staff.js';
+import { SCOUT_REGION } from './scoutRegions.js';
 import { ROLE_ATTRS } from '../training/config.js';
 import { completeTransfer, editorRelease } from './transfers.js';
 import { computeNorm, REF_ATTRS } from './referees.js';
@@ -44,13 +45,33 @@ export const PACK_TYPE = 'ligapl27-datapack';
 //   3  v1.19 Beta: atrybuty osób sztabu (staff: { rola: [{ name, age, q, a: { atrybut: 1-20 } }] }, docs/sztab-atrybuty.md);
 //      plik bez atrybutów (v1, v2): jakość q przesuwa cały profil osoby, jak dotąd
 //   4  v1.19 Beta: najwięksi rywale klubu (rivals: { id klubu: intensywność 0-3 }, 0 = bez rywalizacji); tylko nowe pole
-export const PACK_V = 4;
+//   5  v1.20 Beta: skaut z 5 atrybutami (DOS, OCE, RYN, SIE, CHA zamiast POT, OCU, RYN) i regionami
+//      (reg: { region: 1-20 }, najwyżej 3, docs/skauting.md); plik v4 przelicza stare atrybuty skauta (MIGRATE[4])
+export const PACK_V = 5;
 export const PACK_V_MIN = 1;
+export const SCOUT_REG_MAX = 3; // regionów na skauta w pliku
+/** Skaut w pliku v1-v4: stare atrybuty (POT, OCU, RYN) na 5 nowych; odchylenia sieci i charakteru z imienia osoby. */
+function migrateScoutEntry(o) {
+  if (!isObj(o) || !isObj(o.a) || (o.a.POT === undefined && o.a.OCU === undefined)) return o;
+  const vals = ['POT', 'OCU', 'RYN'].map((k) => o.a[k]).filter((x) => typeof x === 'number');
+  const q = typeof o.q === 'number' ? o.q : vals.length ? Math.round(vals.reduce((s, x) => s + x, 0) / vals.length) : 10;
+  return { ...o, a: migrateScoutAttrs(o.a, q, typeof o.age === 'number' ? o.age : 45, `datapack:${String(o.name ?? '')}`) };
+}
+/** Sekcja klubów pliku: skauci przeliczeni na 5 atrybutów (dane gracza bez zmian poza atrybutami skautów). */
+export function migrateScoutClubs(clubs) {
+  if (!isObj(clubs)) return clubs;
+  const out = {};
+  for (const [id, c] of Object.entries(clubs)) {
+    out[id] = isObj(c) && isObj(c.staff) && Array.isArray(c.staff.skaut) ? { ...c, staff: { ...c.staff, skaut: c.staff.skaut.map(migrateScoutEntry) } } : c;
+  }
+  return out;
+}
 /** Migracje starszych plików do bieżącej wersji: MIGRATE[v] zamienia plik z wersji v na v + 1. */
 const MIGRATE = {
   1: (d) => d, // wersja 2 tylko dodaje pola
   2: (d) => d, // wersja 3 tylko dodaje atrybuty sztabu (bez nich działa sama jakość)
   3: (d) => d, // wersja 4 tylko dodaje rywali klubu
+  4: (d) => ({ ...d, clubs: migrateScoutClubs(d.clubs) }), // wersja 5: skaut z 5 atrybutami i regionami
 };
 export const LIMITS = {
   name: 40, short: 5, stadium: 60,
@@ -135,6 +156,7 @@ export function applyPack(game) {
 export function ensureEditor(game) {
   if (!game.editor || typeof game.editor !== 'object') game.editor = { v: PACK_V, seed: game.seed, clubs: {}, players: {} };
   game.editor.clubs ??= {}; game.editor.players ??= {};
+  if ((game.editor.v ?? PACK_V) < 5) game.editor.clubs = migrateScoutClubs(game.editor.clubs); // skauci z 5 atrybutami
   game.editor.v = PACK_V; // datapack w zapisie gry: nowe pola są dodatkami, więc zapis ze starszej wersji pasuje bez zmian
   game.editor.seed = game.seed;
   return game.editor;
@@ -365,7 +387,8 @@ export function editClub(game, id, values) {
 
 // ------------------------------------------------------------ Trener, sztab i właściciel klubu
 // W datapacku przy klubie: coach { name, age, style, a: { TAK, ... } }, owner { name, cierpliwosc, ... },
-// staff { rola: [{ name, age, q }, ...] } (osoby w kolejności sztabu klubu, więc plik działa też w innym świecie gry).
+// staff { rola: [{ name, age, q }, ...] } (osoby w kolejności sztabu klubu, więc plik działa też w innym świecie gry);
+// skaut ma też reg { region: 1-20 } (najwyżej 3 regiony z SCOUT_REGIONS, src/career/scoutRegions.js).
 // Trener i właściciel to obecni ludzie klubu w chwili wczytania pliku. Trener klubu gracza to gracz (bez edycji).
 export const OWNER_LABELS = { cierpliwosc: 'Cierpliwość', ambicja: 'Ambicja', temperament: 'Temperament', media: 'Wrażliwość na media', zasobnosc: 'Zasobność' };
 export const PERSON_AGE = { min: 18, max: 85 };
@@ -430,6 +453,17 @@ export function checkStaff(src, { form = false } = {}) {
           else v.a = attrs1to20(o.a, keys, Object.fromEntries(keys.map((k) => [k, ROLE_ATTRS[role][k].name])), form, errors, `${role}.${i}.a.`);
         }
       }
+      // Regiony skauta (datapack v5): nieznany region, poziom spoza 1-20 albo więcej niż 3 regiony odrzucają wpis
+      if (o.reg !== undefined) {
+        if (role !== 'skaut' || !isObj(o.reg)) errors[`${role}.${i}.reg`] = 'Regiony: tylko skaut, oczekiwano listy regionów.';
+        else {
+          const ks = Object.keys(o.reg);
+          const bad = ks.find((k) => !SCOUT_REGION[k]);
+          if (bad) errors[`${role}.${i}.reg`] = `Regiony: nieznany region ${String(bad).slice(0, 14)}.`;
+          else if (ks.length > SCOUT_REG_MAX) errors[`${role}.${i}.reg`] = `Regiony: najwyżej ${SCOUT_REG_MAX}.`;
+          else v.reg = attrs1to20(o.reg, ks, Object.fromEntries(ks.map((k) => [k, SCOUT_REGION[k].label])), form, errors, `${role}.${i}.reg.`);
+        }
+      }
       return v;
     });
   }
@@ -442,7 +476,7 @@ export function peopleValues(game, id) {
   const co = id === game.clubId ? null : coachOf(game, id);
   const ow = ownerOf(game, id);
   let staff = null;
-  for (const p of rosterOf(game, id)) ((staff ??= {})[p.role] ??= []).push({ name: p.name, age: p.age, q: p.q, ...(p.a ? { a: { ...p.a } } : {}) });
+  for (const p of rosterOf(game, id)) ((staff ??= {})[p.role] ??= []).push({ name: p.name, age: p.age, q: p.q, ...(p.a ? { a: { ...p.a } } : {}), ...(p.role === 'skaut' && p.reg ? { reg: { ...p.reg } } : {}) });
   return {
     coach: co ? { name: co.name, age: co.age, style: co.style, a: { ...co.a } } : null,
     owner: ow ? { name: ow.name, ...Object.fromEntries(OWNER_KEYS.map((k) => [k, ow[k]])) } : null,
@@ -500,6 +534,8 @@ export function editStaff(game, id, v) {
         for (const k of keys) if (o.a[k] !== undefined && o.a[k] !== p.a[k]) { p.a[k] = o.a[k]; n++; }
         p.q = qFromAttrs(p.a);
       } else if (o.q !== undefined && o.q !== p.q) { shiftPersonQ(p, o.q); n++; }
+      // Regiony skauta (datapack v5): cały zestaw z pliku zastępuje dotychczasowy
+      if (p.role === 'skaut' && o.reg && Object.keys(o.reg).length && JSON.stringify(o.reg) !== JSON.stringify(p.reg ?? {})) { p.reg = { ...o.reg }; n++; }
     });
   }
   if (n) { syncStaff(game, id); recordPeople(game, id, 'staff'); }

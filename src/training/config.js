@@ -140,11 +140,11 @@ export const STAFF_ROLES = {
   kierownik: { name: 'Kierownik drużyny', effect: 'Sprawy organizacyjne (kontrakty, licencje, terminy, okno, obozy): dokładność i terminowość listy „Do zrobienia”' },
   // Nowe role (decyzja właściciela, Nov 16, 2026): na końcu, więc losowanie pozostałych ról z ziarna bez zmian
   fizjoterapeuta: { name: 'Fizjoterapeuta', effect: 'Przerwa po urazie x(1 - 0.01 (q - 3)), od 0.85; ryzyko urazu na treningu x(1 - 0.005 (q - 3)), od 0.92' },
-  skaut: { name: 'Skaut', effect: 'Dokładność oceny potencjału zawodników innych klubów i z zagranicy' },
+  skaut: { name: 'Skaut', effect: 'Ocena potencjału zawodników innych klubów i z zagranicy, wyjazdy po kandydatów za granicą (docs/skauting.md)' },
 };
 
 /**
- * Atrybuty członków sztabu (1-20, po 3 na rolę; docs/sztab-atrybuty.md). Jakość osoby q = średnia atrybutów
+ * Atrybuty członków sztabu (1-20, po 3 na rolę, skaut 5; docs/sztab-atrybuty.md). Jakość osoby q = średnia atrybutów
  * (zaokrąglona), więc pensje, rynek sztabu i decyzje klubów AI liczą się jak dotąd. Efekty w grze czytają konkretny
  * atrybut roli (staffA w training/staff.js). Przy równych atrybutach gra działa dokładnie jak z samą jakością.
  * Klucze OCE, TAK (asystent) oraz DAN, WID (analityk) są wspólne z raportem ogólnym (career/teamReport.js).
@@ -185,10 +185,13 @@ export const ROLE_ATTRS = {
     REH: { name: 'Rehabilitacja', text: 'Krótsza przerwa po ciężkich urazach (ponad 4 tygodnie)' },
     PRF: { name: 'Profilaktyka', text: 'Mniejsze ryzyko urazu na treningu' },
   },
+  // Skaut (docs/skauting.md): 5 atrybutów zamiast dawnych POT, OCU, RYN (migracja w training/staff.js, migrateScoutAttrs)
   skaut: {
-    POT: { name: 'Ocena potencjału', text: 'Dokładność oceny potencjału zawodników innych klubów' },
-    OCU: { name: 'Ocena umiejętności', text: 'Dokładność oceny obecnych umiejętności przy ocenie potencjału' },
-    RYN: { name: 'Znajomość rynków', text: 'Dokładność ocen zawodników z zagranicy' },
+    DOS: { name: 'Doświadczenie', text: 'Szansa powodzenia wyjazdu za granicę, mniej pustych raportów' },
+    OCE: { name: 'Ocena zawodnika', text: 'Dokładność oceny umiejętności i potencjału (raport z wyjazdu, potencjał zawodników innych klubów)' },
+    RYN: { name: 'Wiedza o rynku', text: 'Trafność ceny, pensji i chęci przyjścia kandydata, ocena zawodników z zagranicy' },
+    SIE: { name: 'Sieć kontaktów', text: 'Liczba kandydatów, dostęp do zawodników z kontraktem, praca poza znanymi regionami' },
+    CHA: { name: 'Ocena charakteru', text: 'Trafność oceny adaptacji kandydata w Polsce' },
   },
 };
 

@@ -8,6 +8,7 @@ import { Rng, clamp } from '../core/rng.js';
 import { clubById } from '../data/clubs_pl.js';
 import { randomName } from '../data/names.js';
 import { STAFF_ROLES, staffMul, ROLE_ATTRS } from './config.js';
+import { scoutRegionsFor } from '../career/scoutRegions.js';
 
 export const ROLE_IDS = Object.keys(STAFF_ROLES);
 
@@ -78,10 +79,48 @@ export function attrsAround(q, role, key) {
   return Object.fromEntries(keys.map((k, i) => [k, clamp(base + d[i], 1, 20)]));
 }
 
+/**
+ * Skaut: dawne 3 atrybuty (POT ocena potencjału, OCU ocena umiejętności, RYN znajomość rynków) na 5 nowych
+ * (docs/sztab-atrybuty.md, docs/skauting.md). Odchylenia od jakości q: OCE = 0,6 dPOT + 0,4 dOCU, RYN bez zmian,
+ * DOS z wieku ((wiek - 45) / 6, do 3 punktów), SIE i CHA z ziarna (do 3 punktów). Suma odchyleń wraca do zera,
+ * więc jakość (średnia) zostaje. Deterministyczne z klucza (zapis: ziarno i id osoby; datapack: imię).
+ */
+export function migrateScoutAttrs(old, q, age, key) {
+  const base = clamp(Math.round(q ?? 10), 1, 20);
+  const d0 = (k) => (typeof old?.[k] === 'number' ? old[k] - base : 0);
+  const rng = new Rng(`skaut-migracja:${key}`);
+  const lim = (x) => clamp(Math.round(x), Math.max(-3, 1 - base), Math.min(3, 20 - base));
+  const d = {
+    DOS: lim(clamp(((age ?? 45) - 45) / 6, -3, 3)),
+    OCE: lim(0.6 * d0('POT') + 0.4 * d0('OCU')),
+    RYN: lim(d0('RYN')),
+    SIE: lim(rng.gauss(0, 1.5)),
+    CHA: lim(rng.gauss(0, 1.5)),
+  };
+  // Suma odchyleń do zera: najpierw sieć, charakter i doświadczenie, potem oceny (w granicach 1-20)
+  const order = ['SIE', 'CHA', 'DOS', 'OCE', 'RYN'];
+  let diff = Object.values(d).reduce((s, x) => s + x, 0);
+  for (let i = 0; diff !== 0 && i < 60; i++) {
+    const k = order[i % order.length];
+    const step = diff > 0 ? -1 : 1;
+    if (base + d[k] + step < 1 || base + d[k] + step > 20) continue;
+    d[k] += step; diff += step;
+  }
+  return Object.fromEntries(Object.entries(d).map(([k, x]) => [k, clamp(base + x, 1, 20)]));
+}
+
+/** Skaut bez regionów (stary zapis, nowa osoba): 1-3 regiony z ziarna osoby (career/scoutRegions.js). */
+export function ensureScoutReg(p, key) {
+  if (p?.role === 'skaut' && (!p.reg || typeof p.reg !== 'object')) p.reg = scoutRegionsFor(p, key);
+  return p;
+}
+
 /** Uzupełnia atrybuty osoby (stare zapisy, nowe osoby) i ustawia q jako ich średnią. */
 export function ensurePersonAttrs(p, key) {
   const keys = roleAttrKeys(p.role);
   if (!keys.length) return p;
+  if (p.role === 'skaut' && p.a && (typeof p.a.POT === 'number' || typeof p.a.OCU === 'number')) p.a = migrateScoutAttrs(p.a, p.q, p.age, key);
+  ensureScoutReg(p, key);
   if (!p.a || keys.some((k) => typeof p.a[k] !== 'number')) p.a = { ...attrsAround(p.q ?? 10, p.role, key), ...(p.a ?? {}) };
   for (const k of Object.keys(p.a)) if (!keys.includes(k)) delete p.a[k];
   p.q = qFromAttrs(p.a);

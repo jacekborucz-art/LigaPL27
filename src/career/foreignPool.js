@@ -66,6 +66,10 @@ const LEAGUE_L = {
   BRA: 12.8, ARG: 12.4, COL: 11.0, URU: 10.8, ECU: 10.8, PAR: 10.4, CHI: 10.4, PER: 9.8, VEN: 9.6,
   NGA: 8.6, GHA: 8.6, CMR: 8.4, SEN: 8.8, CIV: 9.0, MAR: 10.6, ALG: 10.0, TUN: 10.2, MLI: 8.2, GUI: 8.0, COD: 9.2,
   LBN: 8.0, JOR: 8.6, IRQ: 8.8, SYR: 7.8,
+  // Regiony skautingu (src/career/scoutRegions.js): kraje spoza puli
+  BOL: 9.0, EGY: 10.2, BFA: 8.0, GAM: 7.8, ZAM: 8.2, RSA: 9.4, KEN: 7.8,
+  USA: 10.8, MEX: 11.2, CAN: 9.8, CRC: 9.4, HON: 9.0, JAM: 8.6, PAN: 8.8,
+  JPN: 11.2, KOR: 10.8, AUS: 9.8, UZB: 9.2, IRN: 9.8, CHN: 9.4, THA: 8.6, KSA: 11.0,
 };
 // Przymiotnik do opisu „klub z ligi brazylijskiej”
 const ADJ = {
@@ -76,6 +80,12 @@ const ADJ = {
   MKD: 'macedońskiej', MNE: 'czarnogórskiej', ALB: 'albańskiej', KOS: 'kosowskiej', BUL: 'bułgarskiej', LBN: 'libańskiej',
   JOR: 'jordańskiej', IRQ: 'irackiej', SYR: 'syryjskiej', ISR: 'izraelskiej', UKR: 'ukraińskiej', GEO: 'gruzińskiej',
   ESP: 'hiszpańskiej', POR: 'portugalskiej', SWE: 'szwedzkiej', NOR: 'norweskiej', DEN: 'duńskiej', FIN: 'fińskiej', ISL: 'islandzkiej',
+  BOL: 'boliwijskiej', EGY: 'egipskiej', BFA: 'burkińskiej', GAM: 'gambijskiej', ZAM: 'zambijskiej', RSA: 'południowoafrykańskiej',
+  KEN: 'kenijskiej', USA: 'amerykańskiej', MEX: 'meksykańskiej', CAN: 'kanadyjskiej', CRC: 'kostarykańskiej', HON: 'honduraskiej',
+  JAM: 'jamajskiej', PAN: 'panamskiej', JPN: 'japońskiej', KOR: 'koreańskiej', AUS: 'australijskiej', UZB: 'uzbeckiej', IRN: 'irańskiej',
+  CHN: 'chińskiej', THA: 'tajskiej', KSA: 'saudyjskiej', TUR: 'tureckiej', GRE: 'greckiej', CYP: 'cypryjskiej', CZE: 'czeskiej',
+  SVK: 'słowackiej', HUN: 'węgierskiej', ROU: 'rumuńskiej', EST: 'estońskiej', LVA: 'łotewskiej', LTU: 'litewskiej', FRO: 'farerskiej',
+  AND: 'andorskiej', BLR: 'białoruskiej', ARM: 'ormiańskiej', AZE: 'azerskiej', KAZ: 'kazachskiej', MDA: 'mołdawskiej',
 };
 const KRAJ = Object.fromEntries(DATA.kraje.map((k) => [k.kod, k]));
 const CLUBS_OF = {};
@@ -162,10 +172,20 @@ function genPoolPlayer(rng, id, date, { free = null } = {}) {
   const age = rng.int(band.age[0], band.age[1]);
   const [pos, side] = rng.pick(SQUAD_LAYOUT);
   const nat = pickNat(rng);
+  return genPoolPlayerFor(rng, id, date, { L, age, pos, side: side ?? null, nat, status, pot: band.pot ?? null, band: band.key });
+}
+
+/**
+ * Zawodnik z zagranicy o zadanym profilu (pula i skauting, src/career/scoutOps.js): spec { L, age, pos, side, nat,
+ * status: 'free'|'contract', pot: [od, do] premii potencjału albo null, band }. Kolejność losowań jak w dawnym
+ * genPoolPlayer, więc pula z tego samego ziarna jest identyczna.
+ */
+export function genPoolPlayerFor(rng, id, date, spec) {
+  const { L, age, pos, side = null, nat, status, pot = null, band = null } = spec;
   const club = { id: 'zagranica', tier: 1, prestige: 2, L };
-  const p = genPlayer(rng, { id, L, pos, age, slotOffset: -0.4, nat, tier: 1, side: side ?? null, club, date });
-  if (band.pot && p.hidden) p.hidden.POT = clamp(Math.round(Math.max(p.hidden.POT ?? 0, p.ovr + band.pot[0] + rng.next() * (band.pot[1] - band.pot[0])) * 10) / 10, 1, 18);
-  p.clubId = null; p.squad = null; p.foreignPool = true; p.poolSince = date; p.poolBand = band.key;
+  const p = genPlayer(rng, { id, L, pos, age, slotOffset: -0.4, nat, tier: 1, side, club, date });
+  if (pot && p.hidden) p.hidden.POT = clamp(Math.round(Math.max(p.hidden.POT ?? 0, p.ovr + pot[0] + rng.next() * (pot[1] - pot[0])) * 10) / 10, 1, 18);
+  p.clubId = null; p.squad = null; p.foreignPool = true; p.poolSince = date; p.poolBand = band;
   const [y, m] = date.split('-').map(Number);
   const startYear = m >= 7 ? y : y - 1;
   if (status === 'free') {
@@ -206,6 +226,33 @@ export function addPoolPlayers(game, n, date, tag, { free = null } = {}) {
   return out;
 }
 
+// ------------------------------------------------------------ Kandydaci skautów (src/career/scoutOps.js)
+/** Kandydat ze skautingu z ważnym raportem (p.scout.until): poza rotacją puli i poza liczeniem do 100. */
+export const scoutHeld = (p, date) => !!p?.scout && !p.scout.released && (p.scout.until ?? '') >= date;
+
+/**
+ * Prowizja skauta na zlecenie przy podpisaniu kandydata: c % kwoty transferu, przy wolnym ryczałt 3 tygodniówki x c / 5 %.
+ * Wołana z completeTransfer (transfers.js); zero dla skauta klubu.
+ */
+export function scoutCommission(p, fee, wage) {
+  const pct = p?.scout?.pct;
+  if (!pct) return 0;
+  return Math.round(fee ? fee * pct / 100 : 3 * (wage ?? 0) * pct / 5);
+}
+
+/** Grupa pozycji kandydata z misji klubu AI (zakup w tym tygodniu celuje w tę grupę), albo null. */
+export function scoutedGroup(game, clubId, date, groupOf) {
+  const C = game.scoutOps?.cands;
+  for (const id of game.scoutOps?.aiIdx?.[clubId] ?? []) {
+    const c = C?.[id]; const p = game.world.players[id];
+    if (c && p && !p.clubId && (c.excl ?? '') >= date) return groupOf(p);
+  }
+  return null;
+}
+
+/** Wyłączność zlecającego: przez 14 dni od raportu inny klub nie bierze kandydata skauta pod uwagę. */
+export const scoutBlocked = (p, clubId, date) => !!p?.scout && p.scout.club !== clubId && (p.scout.excl ?? '') >= date;
+
 // ------------------------------------------------------------ Uzupełnienie przed oknem
 const busy = (game, id) => {
   const p = game.world.players[id];
@@ -228,7 +275,7 @@ export function topUpPool(game, date, tag) {
   const rng = new Rng(`zagranica:${game.seed}:odplyw-${tag}`);
   M.foreign = M.foreign.filter((id) => {
     const p = W.players[id];
-    if (p.free) return true;
+    if (p.free || scoutHeld(p, date)) return true; // kandydat skauta (scoutOps.js): ważny raport, bez rotacji
     if (p.contract.until < date && !busy(game, id) && p.poolBand === 'czolowka') { // najlepsi przedłużają kontrakt za granicą
       const y = Number(date.slice(0, 4)) + (Number(date.slice(5, 7)) >= 7 ? 0 : -1);
       p.contract = { ...p.contract, until: `${y + rng.int(1, 2)}-06-30`, signedOn: date };
@@ -245,7 +292,8 @@ export function topUpPool(game, date, tag) {
     delete W.players[id]; delete M.talks[id]; // zostaje za granicą: znika z gry (nigdy nie grał w Polsce)
     return false;
   });
-  const need = Math.max(0, POOL.size - M.foreign.length);
+  // Kandydaci skautów z ważnym raportem nie liczą się do 100 (lista skautingu, nie zwykła pula)
+  const need = Math.max(0, POOL.size - M.foreign.filter((id) => !scoutHeld(W.players[id], date)).length);
   if (need) addPoolPlayers(game, need, date, tag);
   stat(game, 'poolAdded', need);
   return need;
@@ -270,11 +318,29 @@ export function poolList(game, region = 'all') {
 
 /** Kandydaci dla klubu AI: zawodnicy z kontraktem za granicą w grupie pozycji, lepsi od progu, w zasięgu pieniędzy. */
 export function poolCandidates(game, club, date, { group, bar, money, groupOf }) {
-  if (!new Rng(`zagranica-ai:${game.seed}:${club.id}:${date}`).chance(POOL.aiChance)) return [];
-  const out = [];
+  const out = scoutedFor(game, club, date, { group, bar, money, groupOf }); // kandydaci własnych misji skautów
+  if (!new Rng(`zagranica-ai:${game.seed}:${club.id}:${date}`).chance(POOL.aiChance)) return out;
   for (const p of poolList(game)) {
-    if (p.free || groupOf(p) !== group || p.ovr <= bar + 0.3 || p.transfer || hasOpenDeal(game, p.id)) continue;
+    if (p.free || groupOf(p) !== group || p.ovr <= bar + 0.3 || p.transfer || hasOpenDeal(game, p.id) || scoutBlocked(p, club.id, date)) continue;
     const fee = foreignAskingPrice(game, p);
+    if (fee <= money * POOL.aiMoney) out.push({ p, fee });
+  }
+  return out;
+}
+
+/**
+ * Kandydaci z misji skautów klubu AI (wyłączność 14 dni, poza listami rynku): ocena z raportu skauta (AI też bierze
+ * wydmuszki), wolni i z kontraktem, za co najwyżej POOL.aiMoney wolnych środków. Bez losu aiChance: klub sam ich szukał.
+ */
+function scoutedFor(game, club, date, { group, bar, money, groupOf }) {
+  const C = game.scoutOps?.cands;
+  if (!C) return [];
+  const out = [];
+  for (const id of game.scoutOps.aiIdx?.[club.id] ?? []) {
+    const c = C[id]; const p = game.world.players[id];
+    if (!c || !p || p.clubId || c.club !== club.id || (c.excl ?? '') < date || groupOf(p) !== group || (c.seenOvr ?? p.ovr) <= bar) continue;
+    if (p.transfer || hasOpenDeal(game, p.id)) continue;
+    const fee = p.free ? 0 : foreignAskingPrice(game, p);
     if (fee <= money * POOL.aiMoney) out.push({ p, fee });
   }
   return out;

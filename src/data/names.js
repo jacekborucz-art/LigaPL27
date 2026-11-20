@@ -87,16 +87,46 @@ const POOLS = {
 
 export const NATIONALITIES = Object.keys(POOLS);
 
+// Pule krajów regionów skautingu (src/career/scoutRegions.js): osobno, żeby lista NATIONALITIES (losowanie narodowości
+// w klubach zagranicznych i sędziów) się nie zmieniła. randomName korzysta z obu pul.
+const POOLS_MORE = {
+  JPN: { first: 'Daichi Haruto Hiroki Kaito Kenta Kota Ren Ryota Shota Sota Takumi Yuki Yuto', last: 'Endo Fujita Hayashi Inoue Ito Kato Kimura Kobayashi Matsumoto Nakamura Saito Sato Suzuki Takahashi Tanaka Watanabe Yamada Yamamoto' },
+  KOR: { first: 'Dong-hyun Hyun-woo Ji-hoon Jin-su Jun-ho Min-jae Min-jun Seung-ho Sung-min Tae-hyun Woo-jin Young-gwon', last: 'Cho Choi Han Hwang Jang Jeong Kang Kim Lee Lim Park Seo Shin Song Yoon' },
+  AUS: { first: 'Aiden Bailey Brandon Connor Harrison Jackson Jake Kye Lachlan Mitchell Nathan Riley Ryan Tom', last: 'Anderson Brown Campbell Clarke Harris Kelly King Martin Mitchell Robinson Scott Smith Taylor Thompson Walker White' },
+  USA: { first: 'Brandon Chris Cole Dylan Ethan Jordan Josh Kyle Logan Mason Matt Ryan Tyler Zack', last: 'Adams Baker Bennett Brooks Carter Collins Davis Foster Hayes Johnson Miller Moore Parker Reed Turner Wilson' },
+  MEX: { first: 'Alejandro Alexis Diego Edson Érick Hirving Jesús Jorge José Luis Raúl Santiago Uriel', last: 'Álvarez Castillo Cruz Flores García Gutiérrez Hernández Jiménez López Martínez Morales Ramírez Reyes Sánchez Torres Vega' },
+  CAN: { first: 'Alexandre Cyle Ethan Jacob Jonathan Liam Lucas Mathieu Noah Owen Samuel Tajon', last: 'Bouchard Campbell Gagnon Lavoie Leblanc MacDonald Martin Morin Roy Smith Stewart Tremblay Wilson' },
+  CRC: { first: 'Bryan Celso Christian Francisco Joel Jewison Keylor Kendall Óscar Randall Yeltsin', last: 'Aguilar Bolaños Borges Calvo Campbell Contreras Duarte Leal Matarrita Navas Ruiz Vargas' },
+  HON: { first: 'Alberth Andy Antony Bryan Denil Edwin Jorge Luis Maynor Romell Wilmer', last: 'Acosta Benavídez Castillo Elis Figueroa García Lozano Maldonado Palma Pereira Quioto Rodríguez' },
+  JAM: { first: 'Andre Damion Dexter Kemar Leon Michail Oniel Ravel Shamar Tyrese', last: 'Bailey Bell Blake Brown Campbell Clarke Davis Gordon Lowe Morrison Nicholson Reid Williams' },
+  PAN: { first: 'Abdiel Adalberto Aníbal Cecilio Édgar Eric Fidel Gabriel Ismael José Michael Rolando', last: 'Avila Barcenas Blackburn Carrasquilla Córdoba Davis Escobar Godoy Murillo Quintero Rodríguez Torres' },
+  BOL: { first: 'Carlos Diego Henry Jaume Juan Leonel Marcelo Moisés Ramiro Roberto Víctor', last: 'Algarañaz Arce Chumacero Cuéllar Fernández Haquín Justiniano Martins Ramallo Saucedo Vaca Villarroel' },
+  UZB: { first: 'Abbosbek Akmal Aziz Bobur Dostonbek Eldor Jaloliddin Jamshid Odil Otabek Rustam Sherzod', last: 'Abdullaev Alikulov Ashurmatov Fayzullaev Hamrobekov Masharipov Nasrullaev Rakhmonov Shomurodov Tursunov Urunov Yusupov' },
+  IRN: { first: 'Ali Alireza Ehsan Hossein Karim Majid Mehdi Milad Mohammad Morteza Ramin Reza Saman', last: 'Ahmadi Ansarifard Ezatolahi Ghoddos Hajsafi Hosseini Jahanbakhsh Karimi Mohammadi Nourollahi Rezaei Taremi' },
+  CHN: { first: 'Chen Hao Jun Lei Ming Peng Tao Wei Xin Yang Yu Zhi', last: 'Chen Huang Li Lin Liu Wang Wu Xu Yang Zhang Zhao Zhou' },
+  THA: { first: 'Chanathip Ekanit Jakkapan Kritsada Peeradon Sarach Supachok Suphanat Theerathon Thitiphan Weerathep', last: 'Bunmathan Chamratsamee Kaman Mueanta Panya Poomathai Sarapat Songkrasin Srisai Suksawat Thongsong Wongsa' },
+  KSA: { first: 'Abdulelah Abdullah Fahad Firas Hassan Mohammed Nasser Saleh Salem Saud Sultan Yasser', last: 'Al-Amri Al-Bulaihi Al-Dawsari Al-Faraj Al-Ghannam Al-Malki Al-Najei Al-Owais Al-Shahrani Al-Shehri Kanno' },
+  EGY: { first: 'Ahmed Amr Hamdi Karim Mahmoud Marwan Mohamed Mostafa Omar Ramadan Tarek Zizo', last: 'Abdelmonem Ashour Elneny Fathy Gaber Hamdy Hegazy Kamal Marmoush Mohsen Said Sobhi Trezeguet' },
+  BFA: { first: 'Abdoul Bertrand Blati Cyrille Dango Edmond Gustavo Hassane Issa Mohamed Steeve', last: 'Bandé Bayala Dayo Kaboré Konaté Ouattara Ouédraogo Sanou Sawadogo Tapsoba Traoré Yago Zongo' },
+  GAM: { first: 'Ablie Alieu Bubacarr Ebrima Lamin Modou Musa Omar Pa Saidy Yusupha', last: 'Bah Barrow Ceesay Colley Darboe Gomez Jallow Janneh Jobe Kujabi Sanneh Touray' },
+  ZAM: { first: 'Clatous Collins Emmanuel Enock Fashion Frankie Kings Lameck Lubambo Patson Rally', last: 'Banda Bwalya Chama Chisamba Daka Kangwa Mwanza Mwila Phiri Sakala Tembo Zulu' },
+  RSA: { first: 'Bongani Ethan Lyle Mihlali Percy Ronwen Siyabonga Sipho Teboho Themba Thapelo Zakhele', last: 'Dlamini Foster Khumalo Mokoena Mothiba Mudau Ngcobo Nkosi Rayners Sithole Tau Williams Zwane' },
+  KEN: { first: 'Brian Clifton Daniel Eric Johanna Joseph Kevin Masoud Michael Victor Wilson', last: 'Akumu Ayunga Kibwage Mayanja Musa Odhiambo Ochieng Okumu Olunga Omondi Otieno Wanyama' },
+};
+
 const cache = {};
 function pool(code) {
   if (!cache[code]) {
-    const p = POOLS[code] || POOLS.POL;
+    const p = POOLS[code] || POOLS_MORE[code] || POOLS.POL;
     // Nazwiska wielowyrazowe zapisane z podkreśleniem (np. van_Dijk), żeby nie rozpadły się przy podziale
     const words = (str) => str.split(' ').map((w) => w.replace(/_/g, ' '));
     cache[code] = { first: words(p.first), last: words(p.last) };
   }
   return cache[code];
 }
+
+/** Czy kraj ma własną pulę imion (bez puli: imiona polskie). */
+export const hasNamePool = (code) => !!(POOLS[code] || POOLS_MORE[code]);
 
 /** Fikcyjne imię i nazwisko dla narodowości. */
 export function randomName(code, rng) {
