@@ -10,7 +10,9 @@ import { ensureReserves, reservesOf } from './career/reserves.js';
 import * as store from './core/store.js';
 import { hashString } from './core/rng.js';
 import { CATEGORIES, unreadCount, markRead, markAllRead, resolveMessage, filterInbox, pendingDecisions, addMessages, pruneInbox, canDelete, createMessage } from './core/inbox.js';
-import { processDay, primaryAction, continueUntilStop, finishMatch, forgetMessages } from './core/gameLoop.js';
+import { processDay, primaryAction, continueUntilStop, finishMatch, forgetMessages, isUnemployed } from './core/gameLoop.js';
+import { jobState, applyJob, withdrawApplication, resign } from './career/jobMarket.js'; // rynek pracy trenera (docs/kariera-trenera.md)
+import { markUnlocksSeen, careerSummary } from './career/coachCareer.js'; // kariera trenera: odznaki, reputacja
 import './season/dailySystems.js';
 import { createSeason, compLabel, applyResult, fromEngineResult, squadFor, anyClub, LEAGUE_COMPS } from './season/season.js';
 import { standings, zonesFor } from './season/standings.js';
@@ -528,15 +530,16 @@ function renderHub() {
   const g = state.game;
   const club = clubById(g.clubId);
   const unread = unreadCount(g.inbox);
-  const urgent = state.tab !== 'pulpit' ? todoBadge(g).n : 0; // pilne sprawy tygodnia (na Pulpicie widać panel)
+  const out = isUnemployed(g); // trener bez klubu: ostatni klub prowadzi AI (src/career/jobMarket.js)
+  const urgent = state.tab !== 'pulpit' && !out ? todoBadge(g).n : 0; // pilne sprawy tygodnia (na Pulpicie widać panel)
   const nav = TABS.map((t) => `<button class="nav__btn" data-act="tab" data-tab="${t.id}" aria-current="${state.tab === t.id ? 'page' : 'false'}">${icon(t.id)}<span>${esc(t.label)}</span>${t.id === 'poczta' && unread ? `<span class="badge" aria-label="${unread} nieprzeczytanych">${unread > 99 ? '99+' : unread}</span>` : ''}${t.id === 'pulpit' && urgent ? `<span class="badge" aria-label="${urgent} ${urgent === 1 ? 'pilna sprawa' : 'pilne sprawy'} w tym tygodniu">${urgent > 9 ? '9+' : urgent}</span>` : ''}</button>`).join('');
   app.innerHTML = `
   <div class="hub">
     <header class="hub__head">
       ${crestHtml(club, { size: 36, clubsById })}
       <div class="hub__club">
-        <span class="hub__name">${esc(club.name)}</span>
-        <span class="muted hub__sub"><span>${esc(leagueLabel(club))}</span><span class="hub__mgr">${esc(managerName(g))}</span></span>
+        <span class="hub__name">${esc(out ? 'Bez klubu' : club.name)}</span>
+        <span class="muted hub__sub"><span>${esc(out ? `Ostatnio: ${club.name}` : leagueLabel(club))}</span><span class="hub__mgr">${esc(managerName(g))}</span></span>
       </div>
       <div class="led hub__date" id="leddate" aria-label="Data w grze: ${esc(fmtDate(g.date))}">${esc(fmtDate(g.date))}</div>
       <div class="go-wrap" id="gowrap">${goButton(g)}</div>
@@ -571,6 +574,11 @@ function renderTab(tab, g, club) {
   if (ext) {
     const extClub = ext.clubId ? clubById(ext.clubId) : null;
     return renderPlayerProfile(ext, { leagueOvrs: leagueOvrs(g, extClub?.tier ?? club.tier), clubName: extClub?.name ?? 'Wolny zawodnik', date: g.date, game: g, foreign: true, back: { act: 'extback', label: 'Wróć' } });
+  }
+  // Trener bez klubu: ekrany klubu (Kadra, Transfery, Trening, Klub poza Karierą) zamknięte, Pulpit z rynkiem pracy
+  if (isUnemployed(g)) {
+    if (tab === 'kadra' || tab === 'transfery' || tab === 'trening' || (tab === 'klub' && state.kTab !== 'kariera')) return unemployedNotice(g, tab);
+    if (tab === 'pulpit' && !state.fx) return renderJoblessDashboard(g, club);
   }
   if (tab === 'pulpit' && state.todo) { const res = buildWeeklyTodo(g); noteTodoSeen(g, res); return renderTodo(res, state); }
   if (tab === 'pulpit') return state.fx ? renderFixtures(g, state.fx) : renderDashboard(g, club);
@@ -936,6 +944,65 @@ function renderDashboard(g, club) {
       ${dashWindow(g)}
     </div>
   </div>`;
+}
+
+// ---------- Trener bez klubu (src/career/jobMarket.js) ----------
+const JOB_APP_STATE = { czeka: 'czeka na odpowiedź', rozmowa: 'zaproszenie na rozmowę', oferta: 'oferta w poczcie', odmowa: 'odmowa' };
+/** Krótka informacja zamiast ekranu klubu, gdy trener nie ma pracy. */
+function unemployedNotice(g, tab) {
+  const label = TABS.find((t) => t.id === tab)?.label ?? '';
+  const js = jobState(g);
+  return `<h2>${esc(label)}</h2>
+    <section class="panel">
+      <p class="panel__lead">Nie prowadzisz teraz klubu.</p>
+      <p class="muted">Ostatni klub: ${esc(js.lastClub?.name ?? 'brak')}. Bez pracy od ${esc(fmtDate(js.since ?? g.date))} (${js.days} dni). Wakaty: ${js.vacancies.length}.</p>
+      <button class="btn btn--primary" data-act="tab" data-tab="klub" data-sub="kariera">Rynek pracy i kariera</button>
+    </section>`;
+}
+
+/** Pulpit trenera bez klubu: rynek pracy, poczta, tabela ostatniej ligi. */
+function renderJoblessDashboard(g, club) {
+  const js = jobState(g);
+  const sum = careerSummary(g);
+  const waiting = pendingDecisions(g.inbox);
+  const offers = g.inbox.filter((m) => m.refs?.kind === 'jobOffer' && !m.resolved);
+  const apps = js.apps.filter((a) => a.state !== 'odmowa');
+  const vac = js.vacancies.slice(0, 5);
+  const body = `<ul class="dash-facts">
+      <li><span>Bez pracy od ${esc(shortDate(js.since ?? g.date))}</span><b>${js.days} dni</b></li>
+      <li><span>Reputacja</span><b>${Math.round(sum.rep.value)} (${esc(sum.rep.label)})</b></li>
+      <li><span>Wakaty</span><b>${js.vacancies.length}</b></li>
+      <li><span>Aplikacje</span><b>${apps.length ? esc(apps.map((a) => `${a.name}: ${JOB_APP_STATE[a.state] ?? a.state}`).join(', ')) : 'brak'}</b></li>
+    </ul>
+    ${offers.length ? `<p><button class="btn btn--primary btn--sm" data-act="mail" data-id="${esc(offers[0].id)}">Oferta pracy: ${esc(offers[0].subject ?? '')}</button></p>` : ''}
+    ${vac.length ? `<ul class="plain">${vac.map((v) => `<li>${esc(v.name)} (${esc(v.league)}), szansa: ${esc(v.chance)}${v.applied ? ', aplikacja wysłana' : ''}</li>`).join('')}</ul>` : '<p class="muted">Żaden klub nie szuka teraz trenera. Wakaty pojawiają się po zwolnieniach trenerów.</p>'}`;
+  const tableOf = dashTables(g);
+  return `<div class="dash">
+    <h2 class="dash__title">Pulpit</h2>
+    ${waiting.length ? `<div class="dash-decide" role="status"><span><b>Czeka decyzja:</b> ${esc(waiting[0].subject ?? '')}.</span><button class="btn btn--primary btn--sm" data-act="mail" data-id="${esc(waiting[0].id)}">Otwórz decyzję</button></div>` : ''}
+    <div class="dash__grid">
+      ${dashPanel('board', 'board', 'Rynek pracy', body, dashLink('klub', 'Kariera', 'kariera'))}
+      <div class="dash-side">${dashMail(g)}</div>
+      ${dashTable(g, club, tableOf(club))}
+    </div>
+  </div>`;
+}
+
+// Akcje rynku pracy i kariery (widok Kariera w zakładce Klub): wynik w state.jobMsg (tekst dla gracza)
+const JOB_ACTS = new Set(['job-apply', 'job-withdraw', 'job-resign', 'career-unlocks-seen']);
+async function jobAction(act, el) {
+  const g = state.game;
+  let r = null;
+  if (act === 'job-apply') r = applyJob(g, el.dataset.id);
+  else if (act === 'job-withdraw') r = withdrawApplication(g, el.dataset.id);
+  else if (act === 'job-resign') {
+    r = resign(g);
+    state.jobConfirm = null;
+    if (r.ok) { state.tab = 'klub'; state.kTab = 'kariera'; state.ng = null; state.playerOpen = null; }
+  } else if (act === 'career-unlocks-seen') markUnlocksSeen(g);
+  state.jobMsg = r?.text ?? null;
+  await save();
+  render();
 }
 
 // ---------- Poczta: lista i czytanie (PC: dwie kolumny, telefon: lista albo wiadomość) ----------
@@ -1600,6 +1667,7 @@ app.addEventListener('click', (ev) => {
  */
 async function dispatchAct(el, { root = app } = {}) {
   const act = el.dataset.act;
+  if (JOB_ACTS.has(act) && state.game) { await jobAction(act, el); return; } // rynek pracy i kariera trenera
   if (act?.startsWith('sys-') && state.game) { await sysAction(act, el); return; } // Opcje, Zapis, Wyjście
   if (act === 'mreport' && state.game) { openReport(el); return; } // raport meczu (wynik w terminarzu)
   if (act === 'mreport-close') { app.querySelector('#mrDlg')?.close(); return; }
@@ -1732,7 +1800,7 @@ async function dispatchAct(el, { root = app } = {}) {
       await new Promise((r) => setTimeout(r, matchMedia('(prefers-reduced-motion: reduce)').matches ? 150 : 450)); // podpis widoczny przed generowaniem świata
       await newGame(nc.slot, nc.clubId, profileOf(nc));
     }
-    if (act === 'tab') { state.tab = el.dataset.tab; state.ma = null; state.mailOpen = null; state.playerOpen = null; state.repOpen = null; state.fx = null; state.todo = null; state.extPlayer = null; state.extClub = null; if (el.dataset.sub) { if (state.tab === 'klub') state.kTab = el.dataset.sub; else state.tfTab = el.dataset.sub; } render(); }
+    if (act === 'tab') { state.tab = el.dataset.tab; state.ma = null; state.mailOpen = null; state.playerOpen = null; state.repOpen = null; state.fx = null; state.todo = null; state.extPlayer = null; state.extClub = null; if (el.dataset.sub) { if (state.tab === 'klub') state.kTab = el.dataset.sub; else state.tfTab = el.dataset.sub; } else if (state.tab === 'klub' && state.game && isUnemployed(state.game)) state.kTab = 'kariera'; render(); }
     // Terminarz i wyniki (Pulpit > Pokaż wszystko): sezon, rozgrywki, miejsce meczu
     if (act === 'fixtures') { state.tab = 'pulpit'; state.fx = { season: null, comp: 'all', venue: 'all' }; render(); window.scrollTo({ top: 0 }); app.querySelector('.fxs h2')?.setAttribute('tabindex', '-1'); app.querySelector('.fxs h2')?.focus({ preventScroll: true }); }
     if (act === 'fxback') { state.fx = null; render(); app.querySelector('[data-act="fixtures"]')?.focus(); }

@@ -74,6 +74,14 @@ const BY_KIND = {
   round: () => [TO.comp(null, 'Rozgrywki')],
   'round-end': () => [TO.comp(null, 'Rozgrywki')],
   moved: () => [TO.comp(null, 'Terminarz i rozgrywki')],
+  // Kariera trenera i rynek pracy (docs/kariera-trenera.md): zakładka Klub, Kariera
+  odznaka: () => [TO.klub('kariera', 'Kariera')],
+  'bez-pracy': () => [TO.klub('kariera', 'Rynek pracy')],
+  wakaty: () => [TO.klub('kariera', 'Rynek pracy')],
+  'aplikacja-rozmowa': () => [TO.klub('kariera', 'Rynek pracy')],
+  'aplikacja-odmowa': () => [TO.klub('kariera', 'Rynek pracy')],
+  'aplikacja-zajete': () => [TO.klub('kariera', 'Rynek pracy')],
+  'reputacja-poziom': () => [TO.klub('kariera', 'Kariera')],
 };
 
 /** Zawodnik, którego dotyczy wiadomość: segment klucza albo refs (tylko gdy nadal jest w grze). */
