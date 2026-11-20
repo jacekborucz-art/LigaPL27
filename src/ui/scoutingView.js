@@ -430,7 +430,7 @@ export function orderSheetHtml(game, view, ui, quote = safeQuote) {
       <fieldset class="sk-fs"><legend>Pieniądze i umowa</legend>
         <div class="sk-two"><label>Maksymalna kwota transferu, zł<input type="text" inputmode="numeric" value="${fmtIntSp(o.maxFee)}" data-sk-f="maxFee"></label><label>Maksymalna pensja, zł tygodniowo<input type="text" inputmode="numeric" value="${fmtIntSp(o.maxWage)}" data-sk-f="maxWage"></label></div>
         <div class="sk-opts sk-opts--3" role="radiogroup" aria-label="Status zawodnika">${radio('contract', o.contract, CONTRACTS)}</div>
-        <p class="hint">Wolny zawodnik dołączy w każdej chwili. Zawodnik z klubem: transfer w najbliższym oknie, cena zależy od kraju. Przy „wolny lub z kontraktem” wynik jest losowy.</p></fieldset>
+        <p class="hint">Wolny zawodnik dołączy w każdej chwili. Zawodnik z klubem: transfer w najbliższym oknie, cena zależy od kraju. Przy „wolny lub z kontraktem” skaut może przywieźć samych wolnych, samych z klubem albo jednych i drugich.</p></fieldset>
       <fieldset class="sk-fs"><legend>Czas wyjazdu <small>Dłuższy kosztuje więcej, ale daje większą szansę i więcej kandydatów</small></legend>
         <div class="sk-weeks" role="radiogroup" aria-label="Czas wyjazdu">${wopt}</div></fieldset>
     </form>
