@@ -2,6 +2,12 @@
 
 Lista zadań zatwierdzonych przez właściciela do zrobienia później. Po wdrożeniu zadanie znika z listy (opis trafia do własnego pliku w `docs/`).
 
+## Uwaga: punkty 1 i 2 jako jeden pakiet „Psychika zawodnika” (decyzja właściciela Nov 20, 2026)
+
+Historia morale (1) i rozbudowa psychiki (2) mają wspólny mianownik: morale to bieżący stan, osobowość i charakter
+decydują, jak reaguje, a psycholog sportowy działa na oba. Wdrażać razem: jedna analiza kodu, jedna burza mózgów
+ekspertów, jedno wdrożenie. To duża zmiana: właściciel odłożył ją na później (nie zaczynać bez zgody).
+
 ## 1. Historia morale zawodników: dalsze kroki (dodane Nov 18, 2026)
 
 Zapis podstawowy i informacje dla gracza wdrożone Nov 19, 2026: `docs/historia-morale.md`
