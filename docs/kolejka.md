@@ -66,3 +66,12 @@ Decyzja właściciela: dziś oferty dla trenera bez klubu przychodzą w stałych
 120 dniach). Dodać mały RNG terminu (np. kilka do kilkunastu dni wcześniej albo później) [SZAC], deterministyczny
 z ziarna gry. Kod: `src/career/jobMarket.js`, opis: `docs/kariera-trenera.md`.
 
+
+## Dyrektor sportowy w sztabie (dodane Nov 20, 2026)
+
+Decyzja właściciela: na razie kluby AI mają ukryty, losowy atrybut „Negocjacje” (1-20), który udaje dyrektora
+sportowego (losowany na start, co sezon mała zmiana, czasem „zmiana dyrektora”). Później wprowadzimy prawdziwego
+dyrektora sportowego jako osobę w sztabie, dla gracza i klubów AI, z co najmniej 4 atrybutami, w tym Negocjacje
+(pozostałe do burzy mózgów, np. sieć kontaktów, ocena zawodników, zarządzanie budżetem płac). Ukryty atrybut AI
+ma być zbudowany tak, żeby dało się go podmienić na atrybut dyrektora bez przerabiania negocjacji. Dyrektor już
+występuje w tekstach (rezerwy, wypożyczenia, prośby o transfer), ale bez atrybutów. Nie zaczynać bez zgody.

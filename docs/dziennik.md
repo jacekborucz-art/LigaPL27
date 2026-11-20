@@ -29,6 +29,17 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 20, 2026, profil A (chmura), plan: negocjacje AI i dyrektor sportowy (v1.21.1 Beta)
+Zrobione:
+- Decyzja właściciela: kluby AI dostaną ukryty, losowy atrybut „Negocjacje” (1-20, losowany co jakiś czas),
+  który udaje dyrektora sportowego. Gracz negocjuje sam, AI ma los plus atrybut. Oferty są tajne (zna je tylko zawodnik).
+- Czynniki decyzji zawodnika jako klocki do łatwej rozbudowy (początek pakietu „Psychika zawodnika”).
+- W `docs/kolejka.md` nowa pozycja: prawdziwy dyrektor sportowy w sztabie, co najmniej 4 atrybuty, w tym Negocjacje.
+Decyzje i pułapki:
+- AI ma mieć równe szanse z graczem, najwyżej ledwo odczuwalnie większe.
+Zostało / dalej:
+- Burza mózgów 4 ekspertów (transfery, dyrektor sportowy Ekstraklasy, psycholog, matematyk), plan, wdrożenie (Opus).
+
 ## Nov 20, 2026, profil A (chmura), wersja v1.21.1 Beta
 Zrobione:
 - Właściciel ustalił wersję v1.21.1 Beta (`src/config/version.js`). Zawiera: okno do 9 września, ranking UEFA
