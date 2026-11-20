@@ -144,9 +144,8 @@ zawodnika z zagranicy na poziomie Ekstraklasy (klub reinwestuje pieniądze), ina
 Źródło lata 2026: transfery.info
 (https://transfery.info/aktualnosci/kiedy-koniec-letniego-okna-transferowego-w-2026-roku/280982), koniec Sep 9, 2026.
 Zima 2027 według szacunku: Jan 25 - Feb 24, 2027 [SZAC].
-Gra ma Jul 1 - Sep 1, 2026 i Feb 1 - Feb 26, 2027 (`src/config/calendar2026.js`). Próba przestawienia dat
-zepsuła 5 testów (budżety zarządu, rozwój AI, przystanki dni, karta zawodnika, ostatni dzień okna), więc daty
-zostają; rozbieżność do decyzji osobno.
+Gra ma lato od 1 lipca do 9 września co roku (decyzja właściciela Nov 20, 2026, v1.21 Beta; ruchomy kalendarz
+nie przesuwa końca okna, `setSeasonYear` w `src/config/calendar2026.js`) i zimę Feb 1 - Feb 26.
 
 Wolny zawodnik, który stracił klub po zamknięciu ostatniego okna, nie może być zgłoszony przez gracza przed
 kolejnym oknem (FIFA RSTP art. 6.1, `lateFree` w src/ui/transfersView.js). Zawodnicy wolni od lata (kontrakty

@@ -5,6 +5,8 @@ Przed pracą: `git pull`, potem przeczytaj najnowsze wpisy `docs/dziennik.md` (c
 `docs/PRZEKAZANIE.md` (rozdział 0: praca wielu profili; role agentów, decyzje, pułapki), `docs/kolejka.md` i `docs/PLAN.md` (specyfikacja).
 Po każdej skończonej pracy dopisz wpis na górze listy w `docs/dziennik.md` (szablon w pliku) i wypchnij go na `main`:
 następny profil Claude zna tylko to, co jest w repozytorium.
+Spis funkcji gry: `docs/funkcje.md`. Pytanie „czy to już jest w grze?” zaczynaj od spisu, potem dokument szczegółowy
+z pozycji, dopiero potem kod. Każda nowa lub zmieniona funkcja dopisuje albo poprawia swoją linię w spisie w tym samym commicie.
 
 ## Tryb pracy
 - Po „wykonaj”, „dodaj”, „zacznij prace”, „tak”, „wdroz”: sam edytuj, testuj, commituj i pushuj na `main`, bez dodatkowego pytania.

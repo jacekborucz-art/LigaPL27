@@ -6,10 +6,10 @@ co nie trafi na GitHub, tego następny profil nie zna (pamięć i transkrypty Cl
 ## Zasady prowadzenia dziennika
 
 1. Przed pracą: `git pull`, przeczytaj ostatnie wpisy tego pliku, `CLAUDE.md`, `docs/PRZEKAZANIE.md` (rozdział 0
-   i dalsze) i `docs/kolejka.md`.
+   i dalsze) i `docs/kolejka.md`. Czy funkcja już istnieje: najpierw `docs/funkcje.md` (spis funkcji), potem kod.
 2. Po każdej skończonej pracy (każde zadanie właściciela, także mała poprawka) dopisz wpis NA GÓRZE listy wpisów:
    data, profil (np. „profil B, komputer domowy”), zakres commitów, co zmieniono dla gracza, ważne decyzje i pułapki,
-   co zostało do zrobienia. Krótko, w punktach, bez pauzy em.
+   co zostało do zrobienia. Krótko, w punktach, bez pauzy em. Nowa lub zmieniona funkcja: popraw też jej linię w `docs/funkcje.md`.
 3. Wpis trafia do tego samego commita co zmiana albo do osobnego commita zaraz po niej, potem `git push`.
 4. Gdy kończy się limit profilu: dopisz wpis „Przekazanie” ze stanem w toku (co jest niedokończone, w których plikach,
    co dalej) i wypchnij wszystko, także niedokończoną pracę na osobnej gałęzi `wip-<profil>` (nie scalać bez zgody).
@@ -28,6 +28,16 @@ Zostało / dalej:
 ```
 
 ## Wpisy
+
+## Nov 20, 2026, profil A (chmura), spis funkcji gry (v1.21 Beta)
+Zrobione:
+- Nowy `docs/funkcje.md` (13 działów, ok. 195 pozycji): co robi, gdzie w grze, plik kodu, dokument.
+- Reguła w `CLAUDE.md` i w zasadach dziennika: najpierw spis funkcji, potem kod; nowa funkcja dopisuje swoją linię.
+- `docs/transfery.md` rozdz. 5: aktualne daty letniego okna (1 lipca - 9 września).
+Decyzje i pułapki:
+- Prośba właściciela: dokumentacja ma pozwalać sprawdzić, czy funkcja istnieje, bez szukania w kodzie.
+Zostało / dalej:
+- Namysł zawodnika przed podpisem (2-5 dni, wybór najlepszej oferty): agent w toku.
 
 ## Nov 20, 2026, profil B, ranking UEFA: prawdziwe współczynniki 5 sezonów (v1.21 Beta)
 Zrobione:
