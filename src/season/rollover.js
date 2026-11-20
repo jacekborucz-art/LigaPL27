@@ -11,6 +11,7 @@ import { genPlayer, marketValue } from '../world/playerGen.js';
 import { pickNationality } from '../data/names.js';
 import { setSeasonYear, SEASON, SEASON_YEAR, SEASON_END, SEASON_START } from '../config/calendar2026.js';
 import { GROUP, SQUAD_TARGETS, decideRetirement, squadDeficits } from '../career/squad.js';
+import { minutesShares } from '../career/retirement.js'; // koniec kariery: ogłoszenie 1 marca i prawdziwe minuty
 import { reservesNewSeason } from '../career/reserves.js';
 import { marketWage } from '../career/negotiation.js';
 import { payLevel } from '../data/finanse_klubow.js';
@@ -114,6 +115,9 @@ function processPlayers(game, oldEnd, newStart, rng, report) {
   const W = game.world;
   // Powroty z wypożyczeń: wcześniej, przed rozwiązaniem kadr spadkowiczów do III ligi (returnLoansAtRollover)
   // Statystyki sezonu wyzerowane (historia wyżej), kartki zerowane, wiek
+  // Udział w grze w kończącym się sezonie, zanim statystyki zostaną wyzerowane (czynnik „mało gry” przy emeryturze)
+  const shares = {};
+  for (const cid of Object.keys(W.clubs)) Object.assign(shares, minutesShares(game, cid));
   for (const p of Object.values(W.players)) {
     p.season = { apps: 0, subs: 0, min: 0, g: 0, a: 0, yc: 0, rc: 0, rating: 0, motm: 0, cs: 0 };
     p.yc = {};
@@ -128,7 +132,10 @@ function processPlayers(game, oldEnd, newStart, rng, report) {
     for (const id of [...club.squad]) {
       const p = W.players[id];
       const expiring = !p.contract || p.contract.until <= oldEnd;
-      const ret = (p.age >= 31) ? decideRetirement(p, { leagueL, minutesShare: 0.5, hasContractNextSeason: !expiring, longInjuryDays: p.injuryDays }, rng) : { retire: false };
+      // Ogłoszony 1 marca koniec kariery odchodzi teraz; kończący kontrakt, który 1 marca zdecydował grać dalej, nie losuje drugi raz
+      const decided = p.retireDecided === Number(oldEnd.slice(0, 4)) && expiring;
+      const ret = p.retiring ? { retire: true } : (p.age >= 31 && !decided) ? decideRetirement(p, { leagueL, minutesShare: shares[id] ?? 0.5, hasContractNextSeason: !expiring, longInjuryDays: p.injuryDays }, rng) : { retire: false };
+      delete p.retiring; delete p.retireDecided;
       if (ret.retire) {
         club.squad = club.squad.filter((x) => x !== id);
         if (cid === game.clubId) report.retired.push(`${p.name} (${p.age} lat)`);

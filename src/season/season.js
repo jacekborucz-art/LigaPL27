@@ -747,4 +747,5 @@ import '../career/fansSystem.js';
 import './rollover.js';
 import '../career/acclimatization.js';
 import '../career/reputationSystem.js'; // dynamiczna reputacja zawodników i klubów (docs/reputacja.md)
+import '../career/retirement.js'; // koniec kariery: ogłoszenie 1 marca (docs/PLAN.md 2.5)
 import '../career/leagueNews.js'; // media: duże transfery, ciężkie kontuzje, kłopoty finansowe (liga gracza i wyższe)

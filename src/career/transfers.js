@@ -466,7 +466,7 @@ export function aiRenewals(game, date) {
     const cutoff = [...squad].sort((a, b) => b.ovr - a.ovr)[17]?.ovr ?? 0;
     let cb = null; // progi zarządu klubu (weto), liczone raz na klub
     for (const p of squad) {
-      if (p.contract?.until !== SEASON_END || p.renewRefused || p.ovr < cutoff - 0.3 || p.age >= 34 || p.loan || p.preContract || p.transfer) continue;
+      if (p.contract?.until !== SEASON_END || p.renewRefused || p.retiring || p.ovr < cutoff - 0.3 || p.age >= 34 || p.loan || p.preContract || p.transfer) continue;
       const caps = boardCaps(game, c.id, p, 'renew', cb ??= clubBoardData(game, c.id));
       const r = aiNegotiate({ kind: 'renew', player: p, club: c, date, rng, budget: { wage: Math.min(p.contract.wage * 1.35, caps.wage), maxYears: caps.years, total: caps.total } });
       if (r.result === 'signed') { p.contract = { ...r.contract, signedOn: date }; p.wage = p.contract.wage; renewed++; } else p.renewRefused = true;

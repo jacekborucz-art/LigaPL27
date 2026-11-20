@@ -61,7 +61,7 @@ export function preOpensOn(p) {
 
 /** Czy inny klub może dziś proponować zawodnikowi umowę od 1 lipca. */
 export function canApproach(p, date) {
-  if (!p?.contract?.until || p.loan || p.preContract || !p.clubId) return false;
+  if (!p?.contract?.until || p.loan || p.preContract || p.retiring || !p.clubId) return false;
   if (p.contract.until > SEASON_END) return false; // kontrakt kończy się dopiero po tym sezonie
   return date >= preOpensOn(p) && date <= p.contract.until;
 }

@@ -216,7 +216,7 @@ export function collectTodo(game, date = game.date) {
   const top = new Set([...squad].filter((p) => !p.loan).sort((a, b) => (b.ovr ?? 0) - (a.ovr ?? 0)).slice(0, 11).map((p) => p.id));
   for (const p of squad) {
     const until = p.contract?.until;
-    if (!until || p.loan || p.preContract || until < date) continue;
+    if (!until || p.loan || p.preContract || p.retiring || until < date) continue;
     const left = dueIn(date, until);
     if (left > TODO.contractDays) continue;
     const key = `kontrakt:${p.id}:${until}`;

@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-7b52eeb03b';
+const VERSION = 'v0.3-3defc26f97';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -211,17 +211,18 @@ const FILES = [
   ['./src/career/mindset.js', '5654596582'],
   ['./src/career/morale.js', '1c7d0eb69f'],
   ['./src/career/moveWish.js', '83a156f749'],
-  ['./src/career/negotiation.js', '72f58ffb29'],
+  ['./src/career/negotiation.js', 'b4b7aaa4e5'],
   ['./src/career/negotiationLines.js', '37c64fb89e'],
   ['./src/career/owners.js', '881a7a1333'],
   ['./src/career/personality.js', 'f490724de6'],
   ['./src/career/postMatchReport.js', 'd8bb4cab6b'],
-  ['./src/career/preContracts.js', '140671807a'],
+  ['./src/career/preContracts.js', '2e79c35210'],
   ['./src/career/prizes.js', 'eed7f4e394'],
   ['./src/career/referees.js', 'e6a9ed319a'],
   ['./src/career/reputation.js', 'c89eb66b85'],
   ['./src/career/reputationSystem.js', '68df5d28ba'],
   ['./src/career/reserves.js', '07b46b62ea'],
+  ['./src/career/retirement.js', '8a4b15af72'],
   ['./src/career/scoutOps.js', '0745f1949c'],
   ['./src/career/scoutRegions.js', '903ba80c24'],
   ['./src/career/shirts.js', '848f4d409c'],
@@ -236,8 +237,8 @@ const FILES = [
   ['./src/career/threat.js', 'bd519d5790'],
   ['./src/career/transferDeals.js', '116a88df52'],
   ['./src/career/transferSystem.js', '91a3d49d4c'],
-  ['./src/career/transfers.js', '74f2dd2191'],
-  ['./src/career/weeklyTodo.js', 'ec7d328446'],
+  ['./src/career/transfers.js', 'b1811d619b'],
+  ['./src/career/weeklyTodo.js', '436c3d1ccc'],
   ['./src/config/calendar2026.js', '7af3df5b12'],
   ['./src/config/competitions.js', '1ba35856b2'],
   ['./src/config/version.js', '1127788e45'],
@@ -296,9 +297,9 @@ const FILES = [
   ['./src/season/matchReport.js', 'be9864d533'],
   ['./src/season/national.js', '1b51378924'],
   ['./src/season/nationalSystem.js', '56b1056ddd'],
-  ['./src/season/rollover.js', '85540d1eaa'],
+  ['./src/season/rollover.js', '2a66e32196'],
   ['./src/season/schedule.js', 'a608f6730f'],
-  ['./src/season/season.js', 'f04f56efd1'],
+  ['./src/season/season.js', '7fa356162b'],
   ['./src/season/standings.js', 'b3bdff91e2'],
   ['./src/season/superCupEU.js', 'f728d6d300'],
   ['./src/season/suspension.js', '7671748aa6'],

@@ -29,6 +29,16 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 20, 2026, profil B, koniec kariery: ogłoszenie 1 marca i prawdziwe minuty (v1.21 Beta)
+Zrobione:
+- `src/career/retirement.js`: 1 marca zawodnicy od 31 lat z kontraktem do końca sezonu decydują (0/1) i ogłaszają koniec
+  kariery; klub gracza dostaje wiadomość „po sezonie kończy karierę”. Ogłoszony: brak przedłużenia (gracz i AI), brak
+  umowy od 1 lipca, odejście 1 lipca. Kto 1 marca zdecydował grać dalej, nie losuje drugi raz na koniec sezonu.
+- Czynnik „mało gry” liczony z prawdziwych minut (wobec najczęściej grającego w kadrze); wcześniej stała 0,5, a statystyki
+  były zerowane przed decyzją. Test: `tests/retirement.test.mjs`.
+Do sprawdzenia (było już przed tą zmianą na main):
+- `tests/camps.test.mjs` „Przerwa zimowa: Dalej zatrzymuje się...” nie przechodzi (brak przystanku campremind 2 sty 2027).
+
 ## Nov 20, 2026, profil B, skauting: wolny albo z klubem losowo, cena zamiast wartości (v1.21 Beta)
 Zrobione (decyzje właściciela):
 - Zlecenie skauta ma instrukcję: tylko wolni, tylko z klubem albo obojętnie; przy „obojętnie” każdy wyjazd losuje własną

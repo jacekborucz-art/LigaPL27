@@ -361,6 +361,7 @@ export function openNegotiation(opts) {
     target = w.wageDemand * (1 + 0.35 * (0.55 - willScore)); // niechęć podnosi cenę, chęć ją obniża [SZAC]
   } else {
     if (player.preContract) return { ...fail('preContract', 'refusedAlready'), text: 'Zawodnik podpisał już umowę z innym klubem od 1 lipca. Nie przedłuży kontraktu.' };
+    if (player.retiring) return { ...fail('refused', 'refusedAlready'), text: 'Zawodnik ogłosił, że po sezonie kończy karierę. Nie przedłuży kontraktu.' };
     if (player.renewRefused) return fail('refused', 'refusedAlready');
     if (monthsLeft > RENEW_WINDOW_MONTHS && !ctx.forceRenew) return fail('tooEarly', 'tooEarly', { monthsLeft });
     if (monthsLeft <= 0) return fail('expired', 'tooEarly', { monthsLeft });
