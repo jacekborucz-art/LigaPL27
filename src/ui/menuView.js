@@ -461,7 +461,6 @@ function clubCard(club, selected) {
       <span class="cc__goal">Cel: ${esc(f.goal.text)}</span>
     </span>
     <span class="cc__meta">
-      <span class="strength" data-level="${f.strength}">${f.strength}</span>
       ${eu ? `<span class="tag" title="${esc(EURO[eu.comp])}">${esc(eu.comp)}</span>` : ''}
     </span>
   </button></li>`;
@@ -481,7 +480,7 @@ function clubDetail(club, { inline }) {
     </header>
     <div class="cd__goal"><span>Zarząd oczekuje</span><b>${esc(f.goal.text)}</b><small>Cel: ${f.goal.target <= 1 ? (club.tier === 1 ? 'mistrzostwo' : 'pierwsze miejsce') : `miejsce ${f.goal.target} lub wyżej`}</small></div>
     <dl class="cd__facts">
-      ${row('Siła kadry', `${f.strength}, ${f.goal.rank}. w lidze na ${f.size}`)}
+      ${row('Siła kadry', `${f.goal.rank}. w lidze na ${f.size}`)}
       ${row(`Europa ${esc(SEASON)}`, eu ? `${esc(EURO[eu.comp])}, ${esc(ENTRY[eu.entry] ?? eu.entry)}` : 'Bez europejskich pucharów')}
       ${row('Budżet transferowy', esc(fmtZl(f.transfer)))}
       ${row('Płace kadry', `${esc(fmtZl(f.wages))} na sezon`)}
