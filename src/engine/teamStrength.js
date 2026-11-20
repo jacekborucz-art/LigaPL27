@@ -33,10 +33,17 @@ export function pickXI(squad, shape = DEFAULT_SHAPE, ctx = {}) {
   const pool = squad.filter((p) => isAvailable(p) && !p.benchOnly); // benchOnly: 23+ z pierwszej drużyny ponad limit w jedenastce rezerw
   const used = new Set();
   const xi = [];
+  // Ocena zawodnika w grupie liczona raz na wybór składu (wcześniej od nowa dla każdego miejsca); te same liczby
+  const memo = new Map();
+  const eff = (p, group) => {
+    let m = memo.get(p);
+    if (!m) memo.set(p, (m = {}));
+    return m[group] ?? (m[group] = effective(p, group, ctx));
+  };
   const fill = (group, allowOthers) => {
     const cands = pool
       .filter((p) => !used.has(p.id) && (allowOthers ? GROUP[p.pos] !== 'GK' || group === 'GK' : GROUP[p.pos] === group))
-      .map((p) => ({ player: p, group, ...effective(p, group, ctx) }))
+      .map((p) => ({ player: p, group, ...eff(p, group) }))
       .sort((a, b) => b.value - a.value);
     return cands[0] || null;
   };

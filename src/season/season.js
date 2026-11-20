@@ -358,11 +358,10 @@ function aiPostMatchTalk(game, f, clubId, s, res, squad, played) {
   const dec = moodResult(f, s);
   const dd = dec === 'W' ? Math.max(1, gf - ga) : dec === 'L' ? Math.min(-1, gf - ga) : gf - ga; // awans po karnych to nie remis
   let tone = aiChooseSpeech(coachStyle(game, clubId), { phase: 'post', diff: dd, xgDiff: (xg[s] ?? 0) - (xg[1 - s] ?? 0), memory: mem[clubId] });
-  const talk = (t) => postMatchBriefing({
-    players, tone: t, memory: mem[clubId], seed: `${game.seed}:${f.id}:po-meczu-ai:${clubId}`,
-    // ranga i rozstrzygnięcie jak u gracza (wcześniej Superpuchar, puchary UEFA i finały miały rangę 0 lub 1, a seria karnych była remisem)
-    ctx: { score: { for: gf, against: ga }, decided: moodResult(f, s), firstLeg: f.comp === 'uefa' && f.leg === 1 && f.round !== 'league', xgFor: xg[s] ?? 0, xgAgainst: xg[1 - s] ?? 0, ratings: Object.fromEntries(res.players[s].map((x) => [x.id, x.rating])), rank: Math.max(f.derby ? 2 : 0, quickRank(game, f)), clubId },
-  });
+  // ranga i rozstrzygnięcie jak u gracza (wcześniej Superpuchar, puchary UEFA i finały miały rangę 0 lub 1, a seria karnych była remisem);
+  // kontekst liczony raz (wcześniej przy każdym sprawdzanym tonie)
+  const ctx = { score: { for: gf, against: ga }, decided: moodResult(f, s), firstLeg: f.comp === 'uefa' && f.leg === 1 && f.round !== 'league', xgFor: xg[s] ?? 0, xgAgainst: xg[1 - s] ?? 0, ratings: Object.fromEntries(res.players[s].map((x) => [x.id, x.rating])), rank: Math.max(f.derby ? 2 : 0, quickRank(game, f)), clubId };
+  const talk = (t) => postMatchBriefing({ players, tone: t, memory: mem[clubId], seed: `${game.seed}:${f.id}:po-meczu-ai:${clubId}`, ctx });
   // Motywacja trenera (docs/trener-ai-atrybuty.md): dobry trener częściej trafia z tonem (ocenia wszystkie, jak
   // podpowiedź asystenta gracza), słaby czasem źle czyta szatnię i mówi coś gorszego niż zwykle; siła odprawy
   // x(1 + 0,25 s)
