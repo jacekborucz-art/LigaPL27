@@ -28,6 +28,10 @@ import { ensureLoans } from './loans.js'; // wypożyczenia: systemy dnia i stare
 import { ensureTransferState } from './transferSystem.js'; // transakcje w toku, prekontrakty, prośby o transfer, zagranica (docs/transfery.md)
 import { foreignOfferMessage } from './foreignMarket.js';
 import { ensureStaff } from './staffMarket.js'; // sztab: zatrudnianie i zwalnianie, pensje sztabu (docs/sztab.md)
+import { ensureCareerHistory, careerScan, careerMonth, careerPress, careerLeave, boardStartTrust } from './coachCareer.js'; // kariera trenera (docs/kariera-trenera.md)
+import { ensureJob, coachFired, jobAccepted, jobDeclined, unsolicitedOffers, offerMessage as jobOfferMessage } from './jobMarket.js'; // rynek pracy trenera
+import { clubReputation } from './reputation.js';
+import { isUnemployed } from '../core/gameLoop.js';
 
 
 export function ensureCareer(game) {
@@ -39,10 +43,12 @@ export function ensureCareer(game) {
   if (!game.market) createMarket(game);
   ensureLoans(game);
   ensureTransferState(game);
-  ensureBoard(game);
+  if (game.clubId) ensureBoard(game); // trener bez klubu: zarząd ostatniego klubu nie ocenia (src/career/jobMarket.js)
   ensureCoaches(game); // trenerzy klubów AI z atrybutami (stary zapis: profile z ziarna gry, te same nazwiska)
   ensureCoachMarket(game); // pula wolnych trenerów (stary zapis: tworzona z ziarna gry)
   ensureStaff(game); // osoby sztabu, limity, pensje sztabu w planie (stary zapis: neutralnie, z dzisiejszego sztabu)
+  ensureJob(game); // stan pracy trenera (stary zapis: zatrudniony)
+  ensureCareerHistory(game); // historia kariery (stary zapis: odtworzenie z sezonów, archiwum i historii meczów)
 }
 
 // ------------------------------------------------------------ Mecze: bilety i nagrody
@@ -121,30 +127,56 @@ registerDecision('incomingOffer', (game, m, action) => {
   return out;
 });
 
-/** Zmiana klubu (nowa praca). */
+/**
+ * Zmiana klubu (nowa praca). Trener bez klubu (src/career/jobMarket.js): ostatni klub ma już trenera AI, więc tylko
+ * zatrudnienie w nowym. Zatrudniony: odejście w trakcie umowy (kariera: okres pracy, kibice starego klubu).
+ */
 export function switchClub(game, clubId, date) {
   const old = game.clubId;
+  const wasOut = isUnemployed(game);
+  ensureCareerHistory(game);
+  if (!wasOut && old && old !== clubId) careerLeave(game, date, 'oferta');
   // Trener AI nowego klubu odchodzi do puli wolnych trenerów (career/coachMarket.js)
   if (game.coaches?.[clubId] && game.world?.clubs?.[clubId]) { fireCoach(game, clubId, date, { why: 'wyniki', quiet: true, direct: true }); delete game.coaches[clubId]; }
   game.manager.history = [...(game.manager.history ?? []).map((h) => (h.club === old && !h.to ? { ...h, to: date } : h)), { club: clubId, from: date }];
+  const { trustShift } = jobAccepted(game, clubId, date, { midContract: !wasOut });
   game.clubId = clubId;
   // Poprzedni klub spadł do IV ligi: jego kadra rozwiązana dopiero teraz (src/season/leagues.js)
-  if (game.leagueState?.keep?.includes(old)) dissolveDropped(game, date);
-  // Poprzedni klub gracza zatrudnia trenera z rynku
-  if (old && old !== clubId && game.world?.clubs?.[old]) hireCoach(game, old, date, { quiet: true });
+  if (!wasOut && game.leagueState?.keep?.includes(old)) dissolveDropped(game, date);
+  // Poprzedni klub gracza zatrudnia trenera z rynku (bez pracy: klub ma już trenera tymczasowego albo nowego)
+  if (!wasOut && old && old !== clubId && game.world?.clubs?.[old]) hireCoach(game, old, date, { quiet: true });
   game.tactics = createTactics(squadOf(game.world, clubId), { benchSize: 12 });
   delete game.tacticsSubs; delete game.tacticsLast; // zastępstwa asystenta (match/matchday.js) dotyczyły starej kadry
-  game.board = { trust: 55, fansMood: 55, reviews: [], goal: seasonGoalFor(clubById(clubId)), goalClub: clubId };
+  // Zaufanie na start z reputacji trenera wobec reputacji klubu (docs/kariera-trenera.md)
+  const trust = Math.max(0, boardStartTrust(game.manager.rep, clubReputation(clubById(clubId))) + trustShift);
+  game.board = { trust, fansMood: 55, reviews: [], goal: midSeasonGoal(game, clubId), goalClub: clubId };
   game.market.userListed = {};
   if (game.squadLimit) game.squadLimit.case = null; // sprawa limitu kadry dotyczyła poprzedniego klubu
   game.market.offers = game.market.offers.filter((o) => o.kind !== 'incoming');
   if (game.summary) game.summary.clubId = clubId;
 }
 
+/**
+ * Cel zarządu dla trenera zatrudnionego w trakcie sezonu: klub pod celem (od 5. kolejki) oczekuje najpierw poprawy,
+ * czyli miejsca 2 wyżej niż obecne (nie niżej niż nad strefą spadkową i nie wyżej niż cel z siły kadry) [SZAC].
+ */
+function midSeasonGoal(game, clubId) {
+  const club = clubById(clubId);
+  const goal = seasonGoalFor(club);
+  const comp = compOfClub(club);
+  if (!comp || !game.fixtures) return goal;
+  const t = standings(game.fixtures.filter((f) => f.comp === comp), compClubIds(comp));
+  const row = t.find((r) => r.id === clubId);
+  if (!row || row.played < 5 || row.pos <= goal.target) return goal;
+  const safe = t.length - (club.tier >= 3 ? 4 : 3);
+  const target = Math.max(goal.target, Math.min(safe, row.pos - 2));
+  return { ...goal, target, midSeason: true, text: target >= safe ? 'utrzymanie w lidze' : `poprawa: ${target}. miejsce lub wyżej` };
+}
+
 registerDecision('jobOffer', (game, m, action) => {
-  if (action === 'stay') return [];
+  if (action === 'stay') { jobDeclined(game, m); return []; }
   const club = clubById(action);
-  if (!club) return [];
+  if (!club || !game.world?.clubs?.[action]) return [];
   switchClub(game, action, game.date);
   return [msg(game.date, { key: `nowa-praca:${action}:${game.date}`, priority: 'important', subject: `Witamy w ${club.name}`, body: `Zostałeś nowym trenerem ${club.name}. Cel zarządu: ${game.board.goal.text}. Sprawdź kadrę i ustal skład przed najbliższym meczem.` })];
 });
@@ -156,6 +188,10 @@ registerDailySystem({
     if (!game.world || !game.season) return {};
     ensureCareer(game);
     const messages = [];
+    // Kariera trenera: rozegrane mecze (bilans, serie, trofea w dniu finału), konferencje, miesiąc (forma, zanik)
+    messages.push(...careerScan(game, date));
+    careerPress(game);
+    if (date.endsWith('-01') && date > SEASON_START) messages.push(...careerMonth(game, date));
     financeDay(game.finance, game.world, date);
     if (date.endsWith('-01')) {
       // Długi klubów AI pokrywa właściciel (a rezerw pierwsza drużyna) z zapasem na miesiąc pensji, żeby saldo
@@ -189,17 +225,19 @@ registerDailySystem({
     // Propozycje pracy wygasają po tygodniu
     game.inbox = game.inbox.map((m) => (m.refs?.kind === 'jobOffer' && m.optional && !m.resolved && m.date < addDaysIso(date, -7) ? { ...m, resolved: true } : m));
     // Co miesiąc: zarząd, reputacja trenera, przedłużenia AI (od stycznia), przypomnienie o kontraktach
-    if (date.endsWith('-01') && date > SEASON_START) {
+    if (date.endsWith('-01') && date > SEASON_START && game.clubId) {
       const r = boardMonth(game, date);
       const fin = game.finance.clubs[game.clubId];
       messages.push(msg(date, { key: `zarzad:${date}`, priority: r.review.delta <= -5 ? 'important' : 'info', subject: `Ocena zarządu: ${trustLabel(game.board.trust).toLowerCase()}`, body: `${r.review.notes.join(' ')}\n\nZaufanie zarządu: ${game.board.trust} na 100. Saldo klubu: ${fmtZl(fin?.balance ?? 0)}.` }));
       if (r.fired) {
-        messages.push(createMessage({ date, key: `zwolnienie:${date}`, category: 'board', from: 'Zarząd', priority: 'urgent', subject: `${r.club}: zarząd rozwiązuje umowę`, body: `Zarząd stracił zaufanie i zwalnia cię z funkcji trenera. Kilka klubów chce z tobą rozmawiać. Wybierz nowy klub, żeby kontynuować karierę.`, actions: r.offers.map((o) => ({ id: o.clubId, label: `${o.name} (${o.league})` })), refs: { kind: 'jobOffer' } }));
-      } else if (r.offers.length) {
-        messages.push(createMessage({ date, key: `praca:${date}`, category: 'board', from: 'Agent trenera', priority: 'important', subject: 'Propozycja pracy', body: `Zapytania o twoje usługi: ${r.offers.map((o) => `${o.name} (${o.league})`).join(', ')}. Przyjęcie oznacza odejście z obecnego klubu od razu.`, actions: [...r.offers.map((o) => ({ id: o.clubId, label: `Przejdź: ${o.name}` })), { id: 'stay', label: 'Zostaję' }], refs: { kind: 'jobOffer' }, optional: true }));
+        // Zwolnienie: trener bez klubu (rynek pracy, src/career/jobMarket.js), ostatni klub prowadzi AI
+        messages.push(...coachFired(game, date));
+      } else {
+        const offers = unsolicitedOffers(game, date, 'month');
+        if (offers.length) messages.push(jobOfferMessage(game, date, offers, { key: `praca:${date}`, source: 'w trakcie sezonu', subject: 'Propozycja pracy', body: `Zapytania o twoje usługi: ${offers.map((o) => `${o.name} (${o.league})`).join(', ')}. Przyjęcie oznacza odejście z obecnego klubu od razu.` }));
       }
       if (date >= `${SEASON_YEAR + 1}-01-01` && date <= `${SEASON_YEAR + 1}-06-01`) aiRenewals(game, date);
-      if (date === `${SEASON_YEAR + 1}-01-01`) {
+      if (date === `${SEASON_YEAR + 1}-01-01` && !isUnemployed(game)) {
         const exp = squadOf(game.world, game.clubId).filter((p) => p.contract?.until === SEASON_END && !p.loan);
         if (exp.length) messages.push(createMessage({ date, key: `kontrakty:${SEASON_YEAR + 1}`, category: 'transfers', from: 'Dyrektor sportowy', priority: 'important', subject: `Kontrakty kończące się w czerwcu (${exp.length})`, body: `${exp.map((p) => `${p.name} (${p.pos}, ${p.age} lat)`).join(', ')}.\n\nPrzedłuż ważnych zawodników w zakładce Transfery, Kontrakty. Od 1 stycznia mogą rozmawiać z innymi klubami i podpisać umowę od 1 lipca (prekontrakt). Kluby muszą nas o tym informować.` }));
       }

@@ -9,6 +9,7 @@ import { standings } from '../season/standings.js';
 import { SEASON_YEAR } from '../config/calendar2026.js';
 import { clubReputation } from './reputation.js';
 import { pressBoardTerm } from '../match/press.js';
+import { boardDeltaMul, fireThreshold, CAREER } from './coachCareer.js'; // reputacja i popularność trenera (docs/kariera-trenera.md)
 
 /** Cel sezonu z siły kadry na tle ligi (ranking siły L; w III lidze na tle grupy). */
 export function seasonGoalFor(club) {
@@ -102,16 +103,16 @@ export function boardMonth(game, date) {
   const press = pressBoardTerm(game.press, date);
   delta += press.delta;
   notes.push(...press.notes);
+  delta = boardDeltaMul(game, delta); // znane nazwisko: cierpliwszy zarząd; trener lubiany przez kibiców: łagodniejsza ocena
   B.trust = Math.round(clamp(B.trust + delta, 0, 100));
   const review = { date, trust: B.trust, delta: Math.round(delta * 10) / 10, pos, notes };
   B.reviews.unshift(review); B.reviews.length = Math.min(B.reviews.length, 12);
-  const M = game.manager;
-  M.rep = Math.round(clamp(M.rep + (B.trust - 55) * 0.02 + (pos && pos <= 3 && played >= 8 ? 0.4 : 0), 5, 95) * 10) / 10;
-  const fired = B.trust < 18 && date >= `${SEASON_YEAR}-10-01` && date <= `${SEASON_YEAR + 1}-04-30` && played >= 8;
-  let offers = [];
-  if (fired) { M.fired++; offers = jobOffers(game, date, true); }
-  else if (new Rng(`praca:${game.seed}:${date}`).chance(0.12)) offers = jobOffers(game, date, false);
-  return { review, fired, offers, label: trustLabel(B.trust), club: club.name };
+  // Reputacja trenera zmienia się w karierze (src/career/coachCareer.js: forma miesiąca, wydarzenia sezonu), nie tutaj.
+  // Próg zwolnienia zależy od popularności trenera u kibiców (12-22, przy 50: 18). Oferty pracy: src/career/jobMarket.js.
+  const cur = game.manager?.career?.cur;
+  const coachN = cur?.clubId === game.clubId ? cur.n : played; // nowy trener w trakcie sezonu: najpierw kilka meczów
+  const fired = B.trust < fireThreshold(game.manager?.career?.pop?.fans) && date >= `${SEASON_YEAR}-10-01` && date <= `${SEASON_YEAR + 1}-04-30` && played >= 8 && coachN >= CAREER.board.newMatches;
+  return { review, fired, offers: [], label: trustLabel(B.trust), club: club.name };
 }
 
 /** Kluby, które proponują pracę: po zwolnieniu niżej, przy dobrych wynikach wyżej niż obecny klub. */

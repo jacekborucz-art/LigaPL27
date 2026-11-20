@@ -29,6 +29,36 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 20, 2026, profil B, kariera trenera: logika (gałąź robocza, bez scalenia z main), commity 5ff18cf..(ten) (v1.19 Beta)
+Zrobione:
+- `src/career/coachCareer.js`: reputacja z wydarzeń (punkty x nasycenie x próg ligi, kary, forma miesiąca zamiast
+  starego wzoru z zaufania zarządu, zanik do 0,6 szczytu, minimum 5), popularność (kibice, media), historia sezonów,
+  trofea (zasada 12 meczów), rekordy, okresy pracy, blizny (tylko tekst), 20 odznak z licznikami, migracja starych
+  zapisów (`ensureCareerHistory`, bez podwójnego liczenia), reputacja trenerów AI (start, koniec sezonu, zatrudnianie).
+- `src/career/jobMarket.js`: trener bez klubu, wakaty, aplikacje (3 aktywne, co 3 dni, 90 dni karencji), rozmowa
+  i decyzja klubu (los z ziarna), oferty gwarantowane po 60 i 120 dniach, oferty po sezonie i w trakcie sezonu,
+  rezygnacja, kara za masowe aplikowanie, oferty klubów po przeglądzie 2 czerwca.
+- `src/core/gameLoop.js`: bez pracy `processDay` ustawia `game.clubId = null` na czas systemów dnia (ostatni klub
+  prowadzi AI), `clubMatchOn` zwraca null; `isUnemployed`, `userClubId`.
+- Zarząd: zaufanie na start z reputacji, cierpliwość względem klubu, próg zwolnienia z popularności, zwolnienie po
+  6 meczach nowego trenera, cel „poprawa” dla trenera przyjętego w kryzysie. Prasa: ton z popularności w mediach.
+- `src/app.js`: tryb bez klubu (informacja zamiast Kadry, Transferów, Treningu i Klubu poza Karierą, Pulpit z rynkiem
+  pracy, nagłówek), akcje `job-apply`, `job-withdraw`, `job-resign`, `career-unlocks-seen` (wynik w `state.jobMsg`).
+- Testy: `tests/coachCareer.test.mjs` (13), `tests/jobMarket.test.mjs` (6); `tests/career.test.mjs` po nowemu
+  (zwolnienie = bez pracy). Pełny `npm test`: 878/878. Kalibracja: `tools/kariera-kalibracja.mjs`. Opis:
+  `docs/kariera-trenera.md` (zasady, liczby, model danych, kontrakt API, wyniki kalibracji).
+Decyzje i pułapki:
+- Widoki Kariery, odznak i rynku pracy (careerView.js, badges.js, jobsView.js, kariera.css, podzakładka Klub)
+  buduje osobny agent w innym worktree; przy scalaniu uruchomić `npm run sw` jeszcze raz (konflikt w `sw.js`).
+- Bez pracy `game.clubId` w zapisie i widokach to ostatni klub; w systemach dnia jest null. Nowe systemy dnia muszą
+  znieść `game.clubId === null` (wzór: `competitionCalendar`, `careerSystem`, `rollover`).
+- Kalibracja nie osiąga celów projektu (rozdz. 11): autopilot w III lidze jest często zwalniany przez dawny model
+  zarządu i nie dostaje ofert z 1 Ligi. Do decyzji właściciela.
+- Nie sprawdzono w przeglądarce (środowisko odmówiło uruchomienia serwera HTTP); zrobić po scaleniu z widokami.
+Zostało / dalej:
+- Sprawdzenie w przeglądarce trybu bez klubu (PC 1600 px, telefon 390 px) po scaleniu z widokami.
+- Decyzja o balansie zarządu w III lidze i o deflacji reputacji trenerów AI.
+
 ## Nov 20, 2026, profil B, poczta tylko z ligi gracza i wiadomości z mediów (v1.19 Beta)
 Zrobione:
 - Filtr skrzynki `src/core/mailFilter.js` (pętla dnia): wiadomości o rozgrywkach tylko z ligi gracza; z innych lig

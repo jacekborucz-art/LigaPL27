@@ -192,7 +192,7 @@ function historyView(game) {
     <li><span class="k">Awans</span><span>${esc([...(a.promoted?.[1] ?? [])].map(name).join(', '))} (do Ekstraklasy)</span></li>
     <li><span class="k">Spadek</span><span>${esc([...(a.relegated?.[2] ?? [])].map(name).join(', '))} (z Ekstraklasy)</span></li>
     ${a.promoted?.[3]?.length ? `<li><span class="k">Awans z III ligi</span><span>${esc(a.promoted[3].map(name).join(', '))}</span></li>` : ''}
-    <li><span class="k">Twoja drużyna</span><span>${crest(a.user.club)} ${esc(name(a.user.club))}: ${a.user.pos}. miejsce (${esc(['', 'Ekstraklasa', '1 Liga', '2 Liga', `III liga${a.user.group ? `, grupa ${L3_GROUP_NAMES[a.user.group]}` : ''}`][a.user.tier] ?? '')})</span></li>
+    ${a.user ? `<li><span class="k">Twoja drużyna</span><span>${crest(a.user.club)} ${esc(name(a.user.club))}: ${a.user.pos}. miejsce (${esc(['', 'Ekstraklasa', '1 Liga', '2 Liga', `III liga${a.user.group ? `, grupa ${L3_GROUP_NAMES[a.user.group]}` : ''}`][a.user.tier] ?? '')})</span></li>` : '<li><span class="k">Twoja drużyna</span><span>bez klubu</span></li>'}
     ${a.superCupEU ? `<li><span class="k">Superpuchar Europy</span><span>${esc(name(a.superCupEU))}</span></li>` : ''}
     <li><span class="k">Polska w UEFA</span><span>${a.polandRank}. miejsce w rankingu krajów</span></li>
   </ul></section>`).join('')}</div>`;

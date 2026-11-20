@@ -15,6 +15,7 @@ import {
   offerForPlayer, askingPrice, notForSale, completeTransfer, releasePlayer, releaseCost, answerIncoming, loanIn, marketWeek, createMarket,
 } from '../src/career/transfers.js';
 import { boardMonth, ensureBoard } from '../src/career/board.js';
+import { coachFired } from '../src/career/jobMarket.js';
 import '../src/season/dailySystems.js';
 
 function newGame(clubId, seed, date = '2026-07-01') {
@@ -137,19 +138,24 @@ test('Wypożyczenie: wymaga okna i co najmniej 50 % pensji, gracz płaci częś�
   if (r.ok) { assert.equal(p.clubId, 'legia'); assert.equal(p.contract.wage, Math.round(wage * 0.75 / 100) * 100); assert.ok(p.loan); }
 });
 
-test('Zarząd: niskie zaufanie jesienią kończy się zwolnieniem i ofertami pracy; wybór zmienia klub', () => {
+test('Zarząd: niskie zaufanie jesienią kończy się zwolnieniem (trener bez klubu); przyjęta oferta zmienia klub', () => {
   const g = newGame('widzew', 11, '2026-07-02');
   playUntil(g, '2026-10-20');
   ensureBoard(g);
   g.board.trust = 5;
   const r = boardMonth(g, '2026-11-01');
   assert.equal(r.fired, true);
-  assert.ok(r.offers.length >= 1);
-  const target = r.offers[0].clubId;
-  runDecision(g, { refs: { kind: 'jobOffer' } }, target);
+  // Zwolnienie: stan bez pracy (src/career/jobMarket.js), ostatni klub dostaje trenera tymczasowego
+  const msgs = coachFired(g, '2026-11-01');
+  assert.ok(msgs.some((m) => /rozwiązuje umowę/.test(m.subject)));
+  assert.equal(g.manager.job.status, 'unemployed');
+  assert.ok(g.coaches.widzew?.caretaker, 'ostatni klub prowadzi trener tymczasowy');
+  const target = 'korona';
+  runDecision(g, { refs: { kind: 'jobOffer', jobClubs: [target] } }, target);
   assert.equal(g.clubId, target);
+  assert.equal(g.manager.job.status, 'employed');
   assert.ok(g.tactics.xi.length === 11);
-  assert.equal(g.board.trust, 55);
+  assert.ok(g.board.trust >= 38 && g.board.trust <= 70, `zaufanie na start z reputacji: ${g.board.trust}`);
 });
 
 test('Finanse: przychód bazowy pokrywa płace, budżet płac i transferowy dodatni', () => {

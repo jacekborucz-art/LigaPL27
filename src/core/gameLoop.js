@@ -27,8 +27,14 @@ export function addDays(iso, n) {
   return t.toISOString().slice(0, 10);
 }
 
-/** Mecz klubu gracza w danym dniu (z terminarza w stanie gry). */
+/** Trener bez klubu (zwolniony albo po rezygnacji, src/career/jobMarket.js): game.clubId to ostatni klub, prowadzi go AI. */
+export const isUnemployed = (state) => state?.manager?.job?.status === 'unemployed';
+/** Klub prowadzony przez gracza: null, gdy trener jest bez pracy. */
+export const userClubId = (state) => (isUnemployed(state) ? null : state?.clubId ?? null);
+
+/** Mecz klubu gracza w danym dniu (z terminarza w stanie gry). Trener bez klubu nie ma meczów. */
 export function clubMatchOn(state, date) {
+  if (isUnemployed(state)) return null;
   return (state.fixtures || []).find((f) => f.date === date && !f.played
     && (f.home === state.clubId || f.away === state.clubId)) || null;
 }
@@ -47,13 +53,21 @@ export function processDay(state, date = state.date) {
   const messages = [];
   const events = [];
   const prof = globalThis.__systemTimes; // pomiar czasu systemów (narzędzia wydajności), domyślnie wyłączony
-  for (const s of systems) {
-    const t0 = prof ? performance.now() : 0;
-    const out = s.run(state, date) || {};
-    if (prof) prof[s.id] = (prof[s.id] ?? 0) + performance.now() - t0;
-    if (out.messages) messages.push(...out.messages);
-    if (out.events) events.push(...out.events);
-    if (out.patch) out.patch(state);
+  // Trener bez klubu: na czas systemów dnia game.clubId = null, więc ostatni klub gracza prowadzi AI jak każdy inny
+  // (mecze, skład, transfery, trening, trener). Widoki dalej widzą ostatni klub (docs/kariera-trenera.md).
+  const lastClub = isUnemployed(state) ? state.clubId : undefined;
+  if (lastClub !== undefined) state.clubId = null;
+  try {
+    for (const s of systems) {
+      const t0 = prof ? performance.now() : 0;
+      const out = s.run(state, date) || {};
+      if (prof) prof[s.id] = (prof[s.id] ?? 0) + performance.now() - t0;
+      if (out.messages) messages.push(...out.messages);
+      if (out.events) events.push(...out.events);
+      if (out.patch) out.patch(state);
+    }
+  } finally {
+    if (lastClub !== undefined && state.clubId == null) state.clubId = lastClub;
   }
   // Wiadomości usunięte przez gracza (i przez porządki) nie wracają, nawet gdy system wyśle je ponownie
   const gone = new Set(state.inboxGone ?? []);
