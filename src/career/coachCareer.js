@@ -641,7 +641,7 @@ export function careerSummary(game) {
   const seasons = C.seasons.map((s) => ({ season: s.season, clubId: s.clubId, clubName: s.clubName, league: s.league, pos: s.pos, round: s.round, goal: s.goal, achieved: s.achieved, trophies: s.trophies ?? [], promoted: !!s.promoted, relegated: !!s.relegated, fired: !!s.fired, reconstructed: !!s.reconstructed }));
   if (club && C.cur?.clubId === club.id) {
     const comp = compOfClub(club);
-    const tab = comp ? standings(game.fixtures.filter((f) => f.comp === comp), compClubIds(comp)) : [];
+    const tab = comp ? standings((game.fixtures ?? []).filter((f) => f.comp === comp), compClubIds(comp)) : [];
     const row = tab.find((r) => r.id === club.id);
     const key = seasonKey(game);
     seasons.push({ season: key, clubId: club.id, clubName: club.name, league: leagueLabel(club), pos: row?.played ? row.pos : null, round: C.cur.lg.n, goal: game.board?.goal?.text ?? '', achieved: 'running',
