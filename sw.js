@@ -2,12 +2,12 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-12267a30c9';
+const VERSION = 'v0.3-5c5265b82c';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
   // AUTO-FILES-START
-  ['./index.html', '196f138ffe'],
+  ['./index.html', 'f515af4ef7'],
   ['./manifest.webmanifest', 'f15cbe83ae'],
   ['./assets/crests/arka-48.webp', '466a65579c'],
   ['./assets/crests/arka.webp', '58f2c8f4ad'],
@@ -186,7 +186,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', 'd72264681c'],
+  ['./src/app.js', '6b44c875ab'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '019bb0029e'],
@@ -312,6 +312,7 @@ const FILES = [
   ['./src/styles/editor.css', '769ecc0bb5'],
   ['./src/styles/fonts.css', '372f3ee1fc'],
   ['./src/styles/history.css', '6e342b15ec'],
+  ['./src/styles/kariera.css', 'bda96390ca'],
   ['./src/styles/klub.css', '62ff25555a'],
   ['./src/styles/matchday.css', '877f3c6ff4'],
   ['./src/styles/menu.css', '9a0ce5f7a9'],
@@ -338,7 +339,9 @@ const FILES = [
   ['./src/training/variety.js', '31ec815b77'],
   ['./src/ui/arrowsView.js', 'de09da93ff'],
   ['./src/ui/assistantReportView.js', 'ad1ef0c14d'],
+  ['./src/ui/badges.js', 'b7a51128d4'],
   ['./src/ui/boardRequestsView.js', '14afde7d17'],
+  ['./src/ui/careerView.js', '1495497a21'],
   ['./src/ui/clubView.js', 'd798bb6b4f'],
   ['./src/ui/competitionsView.js', '0383bb8e91'],
   ['./src/ui/contextMenu.js', '5590f7bc7f'],
@@ -350,7 +353,7 @@ const FILES = [
   ['./src/ui/fixturesView.js', '8ad243c712'],
   ['./src/ui/formChart.js', '12324f252e'],
   ['./src/ui/infraView.js', '4518a9e3c7'],
-  ['./src/ui/klubView.js', 'd55225df54'],
+  ['./src/ui/klubView.js', '5e989bc716'],
   ['./src/ui/loansView.js', 'a695d82a14'],
   ['./src/ui/mailLinks.js', 'cf9d014d59'],
   ['./src/ui/masonry.js', 'abee5a105a'],

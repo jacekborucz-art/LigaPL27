@@ -57,6 +57,8 @@ import { playerStatsHtml } from './ui/playerStatsView.js';
 import { renderClubView, hasClubView } from './ui/clubView.js';
 import { renderTransfers, handleTransferAction, isTransferAction, transferCardHtml } from './ui/transfersView.js';
 import { renderClubHub, handleClubAction, isClubAction } from './ui/klubView.js';
+// Kariera i rynek pracy: okno odblokowania odznak i akcje job-* (docs: Klub > Kariera)
+import { mountUnlocks } from './ui/careerView.js';
 import { sysNavHtml, sysHeaderBtn, sysDialogHtml } from './ui/sysMenu.js';
 import { renderEditor, handleEditorAction, isEditorAction, newEditorState, clubListHtml, playerListHtml, altState, freeListHtml, refListHtml } from './ui/editorView.js'; // edytor i datapack (docs/edytor.md)
 import { canPromote, promoteYouth } from './career/academy.js'; // wychowankowie do pierwszego składu
@@ -526,6 +528,18 @@ function nextDate(iso) {
   return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
 }
 
+/** Kariera: po przerysowaniu fokus wraca na odznakę, filtr albo przycisk, którym sterował gracz. */
+function careerFocus(act, ds) {
+  const sel = { 'k-badge': `.kr-slot[data-id="${CSS.escape(ds.id ?? '')}"]`, 'k-bfilter': `.kr-fchip[data-f="${CSS.escape(ds.f ?? '')}"]`, 'k-resign-ask': '[data-act="job-resign"]', 'k-resign-no': '[data-act="k-resign-ask"]' }[act];
+  if (sel) app.querySelector(sel)?.focus({ preventScroll: true });
+}
+
+/** Nowe odznaki trenera: okno z animacją po upływie dni i przy wejściu do gry (src/ui/careerView.js). */
+function showCareerUnlocks() {
+  if (state.screen !== 'hub' || !state.game || state.running) return;
+  mountUnlocks(state.game, { onDone: ({ go, badgeId }) => dispatchAct({ dataset: { act: 'career-unlocks-seen', go: go ? '1' : '', id: badgeId } }) });
+}
+
 function renderHub() {
   const g = state.game;
   const club = clubById(g.clubId);
@@ -552,6 +566,7 @@ function renderHub() {
   mountDrawAnimation(app);
   mountDashMasonry(app); // Pulpit bez pustych pól pod krótszymi panelami (src/ui/masonry.js)
   trackHeadHeight();
+  showCareerUnlocks();
 }
 
 /** Nagłówek stoi w miejscu (position: sticky): jego wysokość w --hub-top, pod nią przyklejają się menu i panele boczne. */
@@ -986,23 +1001,6 @@ function renderJoblessDashboard(g, club) {
       ${dashTable(g, club, tableOf(club))}
     </div>
   </div>`;
-}
-
-// Akcje rynku pracy i kariery (widok Kariera w zakładce Klub): wynik w state.jobMsg (tekst dla gracza)
-const JOB_ACTS = new Set(['job-apply', 'job-withdraw', 'job-resign', 'career-unlocks-seen']);
-async function jobAction(act, el) {
-  const g = state.game;
-  let r = null;
-  if (act === 'job-apply') r = applyJob(g, el.dataset.id);
-  else if (act === 'job-withdraw') r = withdrawApplication(g, el.dataset.id);
-  else if (act === 'job-resign') {
-    r = resign(g);
-    state.jobConfirm = null;
-    if (r.ok) { state.tab = 'klub'; state.kTab = 'kariera'; state.ng = null; state.playerOpen = null; }
-  } else if (act === 'career-unlocks-seen') markUnlocksSeen(g);
-  state.jobMsg = r?.text ?? null;
-  await save();
-  render();
 }
 
 // ---------- Poczta: lista i czytanie (PC: dwie kolumny, telefon: lista albo wiadomość) ----------
@@ -1667,7 +1665,6 @@ app.addEventListener('click', (ev) => {
  */
 async function dispatchAct(el, { root = app } = {}) {
   const act = el.dataset.act;
-  if (JOB_ACTS.has(act) && state.game) { await jobAction(act, el); return; } // rynek pracy i kariera trenera
   if (act?.startsWith('sys-') && state.game) { await sysAction(act, el); return; } // Opcje, Zapis, Wyjście
   if (act === 'mreport' && state.game) { openReport(el); return; } // raport meczu (wynik w terminarzu)
   if (act === 'mreport-close') { app.querySelector('#mrDlg')?.close(); return; }
@@ -1685,6 +1682,22 @@ async function dispatchAct(el, { root = app } = {}) {
     Object.assign(state, r.ui ?? {});
     if (r.save) await save();
     render();
+    careerFocus(act, el.dataset); // Kariera: fokus wraca na klikniętą odznakę, filtr albo przycisk rezygnacji
+    return;
+  }
+  // ----- Kariera i rynek pracy: akcje job-* i okno odblokowania (blok do scalenia z gałęzią logiki) -----
+  if ((act === 'job-apply' || act === 'job-withdraw' || act === 'job-resign' || act === 'career-unlocks-seen') && state.game) {
+    const g = state.game;
+    if (act === 'job-apply') state.kMsg = applyJob(g, el.dataset.id)?.text ?? null;
+    else if (act === 'job-withdraw') state.kMsg = withdrawApplication(g, el.dataset.id)?.text ?? null;
+    else if (act === 'job-resign') { const r = resign(g); state.kMsg = r?.text ?? null; state.crResign = false; if (r?.ok) { state.tab = 'klub'; state.kTab = 'kariera'; state.ng = null; state.playerOpen = null; } }
+    else { // career-unlocks-seen: odznaki obejrzane; go = przejście do Klub > Kariera
+      markUnlocksSeen(g);
+      if (el.dataset.go) { state.tab = 'klub'; state.kTab = 'kariera'; state.crSel = el.dataset.id || state.crSel; state.crFresh = el.dataset.id || null; state.crFilter = 'all'; }
+    }
+    await save();
+    render();
+    if (act === 'career-unlocks-seen' && el.dataset.go) window.scrollTo({ top: 0 });
     return;
   }
   if (isTransferAction(act) && state.game) {
@@ -2123,6 +2136,7 @@ document.addEventListener('keydown', (ev) => {
   if (state.screen === 'matchday') return;
   if (ev.target.closest('#mrDlg')) return; // raport meczu: Escape zamyka tylko okno (przeglądarka), Enter nie gra meczu
   if (ev.target.closest('#piDlg')) return; // instrukcje indywidualne: jak wyżej
+  if (ev.target.closest('#ulDlg')) return; // okno odblokowania odznaki: Escape zamyka tylko okno
   if (ev.key === 'Escape' && state.screen === 'career') { ev.preventDefault(); app.querySelector('[data-act="ncBack"]')?.click(); return; }
   // Wybór klubu w Nowej karierze: ukryty przełącznik prawdziwych nazw klubów (testy, src/data/clubNames.js); przeładowanie strony
   if (state.screen === 'career' && ev.ctrlKey && ev.altKey && !ev.shiftKey && ev.code === 'KeyP') {
