@@ -4,7 +4,7 @@
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
 <<<<<<< HEAD
 <<<<<<< HEAD
-const VERSION = 'v0.3-0d65ad60ea';
+const VERSION = 'v0.3-6bd60a84c8';
 =======
 const VERSION = 'v0.3-62876db151';
 >>>>>>> main
@@ -194,7 +194,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', 'b161e92406'],
+  ['./src/app.js', '431f88b6bf'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', 'db514a2a68'],
@@ -381,7 +381,7 @@ const FILES = [
   ['./src/ui/positionMap.js', 'ef2c032d52'],
   ['./src/ui/postMatchView.js', 'acdba6d632'],
   ['./src/ui/reservesView.js', '0768b9e72d'],
-  ['./src/ui/scoutingView.js', 'b9ea2fb8c4'],
+  ['./src/ui/scoutingView.js', '646d8a8d92'],
   ['./src/ui/sponsorsView.js', '93ea7f72b4'],
   ['./src/ui/squadView.js', '510502fef8'],
   ['./src/ui/staffView.js', 'e81a09aea9'],

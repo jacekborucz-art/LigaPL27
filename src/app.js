@@ -1671,7 +1671,7 @@ async function skautingAction(act, el) {
   const inSheet = !!el.closest?.('.sk-sheet');
   const note = (r) => { state.skMsg = r?.text || null; };
   let needSave = false;
-  if (act === 'sk-tab' && state.skTab === 'kandydaci' && ds.t !== 'kandydaci') needSave = markCandidatesSeen(g)?.ok ?? false; // opuszczenie raportu = przeczytany
+  if (act === 'sk-tab' && state.skTab === 'kandydaci' && ds.t !== 'kandydaci') { markCandidatesSeen(g); needSave = true; } // opuszczenie raportu = przeczytany
   const ui = skUiAction(g, state, act, ds);
   if (ui) {
     if (act === 'sk-open-order' || act === 'sk-repeat') skOpener = { act: 'sk-open-order', scout: ds.scout, free: ds.free, region: ds.region };

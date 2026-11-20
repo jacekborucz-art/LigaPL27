@@ -238,7 +238,7 @@ function misjeTab(game, view, ui) {
 
 // ------------------------------------------------------------ Zakładka 2: kandydaci
 function rngRow(label, r, kind, me) {
-  const lo = 35; const hi = 90;
+  const lo = 5; const hi = 20; // skala OVR i potencjału w grze (1-20)
   const pc = (v) => Math.max(0, Math.min(100, ((num(v) - lo) / (hi - lo)) * 100));
   const a = num(r?.[0]); const b = num(r?.[1]);
   return `<div class="sk-rng__row" data-p="${kind}"><span>${label}</span><span class="sk-rng__track" role="img" aria-label="${label} od ${a} do ${b}"><span class="sk-rng__band" style="--l:${pc(a).toFixed(1)}%;--w:${Math.max(3, pc(b) - pc(a)).toFixed(1)}%"></span>${me ? `<span class="sk-rng__me" style="--l:${pc(me).toFixed(1)}%"></span>` : ''}</span><b>${a}-${b}</b></div>`;
@@ -253,7 +253,7 @@ function candCard(c, game, scoutName) {
   const [confTxt, confK] = CONF_TXT[c.confidence] ?? CONF_TXT['średnia'];
   const err = Math.ceil(Math.max(0, num(c.ovrRange?.[1]) - num(c.ovrRange?.[0])) / 2);
   const price = c.free ? `Bez odstępnego<small>wolny zawodnik</small>` : `${money(c.priceRange?.[0])} do ${money(c.priceRange?.[1])}<small>odstępne, szacunek skauta</small>`;
-  const wageR = `${zl(c.wageRange?.[0])} do ${zl(c.wageRange?.[1])}<small>miesięcznie, brutto</small>`;
+  const wageR = `${zl(c.wageRange?.[0])} do ${zl(c.wageRange?.[1])}<small>tygodniowo</small>`;
   const nm = p ? cardLink(p) : esc(c.name);
   const offerBtn = !p || gone ? '' : `<button class="btn btn--primary" data-act="tf-open" data-id="${esc(c.pid)}">${c.free ? 'Rozmawiaj' : 'Złóż ofertę'}</button>`;
   const watchBtn = gone ? '' : `<button class="btn btn--quiet" data-act="sk-watch" data-id="${esc(c.pid)}" data-on="${watched ? 0 : 1}" aria-pressed="${watched}">${watched ? 'Przestań obserwować' : 'Obserwuj'}</button>`;
@@ -430,7 +430,7 @@ export function orderSheetHtml(game, view, ui, quote = safeQuote) {
         <div class="sk-two"><label>Wiek od<input type="number" inputmode="numeric" min="16" max="45" value="${num(o.ageFrom)}" data-sk-f="ageFrom"></label><label>Wiek do<input type="number" inputmode="numeric" min="16" max="45" value="${num(o.ageTo)}" data-sk-f="ageTo"></label></div>
         <div class="sk-opts sk-opts--3" role="radiogroup" aria-label="Poziom">${radio('level', o.level, LEVELS)}</div></fieldset>
       <fieldset class="sk-fs"><legend>Pieniądze i umowa</legend>
-        <div class="sk-two"><label>Maksymalna kwota transferu, zł<input type="text" inputmode="numeric" value="${fmtIntSp(o.maxFee)}" data-sk-f="maxFee"></label><label>Maksymalna pensja, zł mies.<input type="text" inputmode="numeric" value="${fmtIntSp(o.maxWage)}" data-sk-f="maxWage"></label></div>
+        <div class="sk-two"><label>Maksymalna kwota transferu, zł<input type="text" inputmode="numeric" value="${fmtIntSp(o.maxFee)}" data-sk-f="maxFee"></label><label>Maksymalna pensja, zł tygodniowo<input type="text" inputmode="numeric" value="${fmtIntSp(o.maxWage)}" data-sk-f="maxWage"></label></div>
         <div class="sk-opts sk-opts--3" role="radiogroup" aria-label="Status zawodnika">${radio('contract', o.contract, CONTRACTS)}</div></fieldset>
       <fieldset class="sk-fs"><legend>Czas wyjazdu <small>Dłuższy kosztuje więcej, ale daje większą szansę i więcej kandydatów</small></legend>
         <div class="sk-weeks" role="radiogroup" aria-label="Czas wyjazdu">${wopt}</div></fieldset>
