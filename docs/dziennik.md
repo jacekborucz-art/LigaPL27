@@ -29,6 +29,39 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 20, 2026, profil B, kontrola jakości skautingu, wydajność, ukryta ocena kandydatów, commity 9acbd87..(ten) (v1.21 Beta)
+Zrobione:
+- Wersja gry v1.21 Beta (decyzja właściciela). Wchodzą do niej: skauting zagraniczny (Transfery, Skauting), ukryta
+  ocena kandydatów skauta (lornetka), poprawki wydajności, poprawki ekranu startowego i wyboru klubu (przycisk
+  Wczytaj zapisaną karierę, kolory Przewidywanego celu, żółty przycisk Wczytaj datapack, bez etykiet siły).
+- Wydajność (9acbd87, df14ed6), przebieg gry identyczny (skrót całego stanu po sezonie Lech, Jagiellonia, Raków,
+  Lechia, Weszło taki sam jak przed zmianą): `nextSeasonNeeds` bez przeglądu wszystkich zawodników dla każdego klubu
+  (ok. 0,8 s na sezon), recovery, acclim i leagueNews bez `Object.values` na 4200 zawodnikach co dzień (for-in;
+  leagueNews najpierw sprawdza kadry i akademie klubów w zasięgu), `lossStreakOf` w jednym przejściu bez sortowania,
+  `coachPressure` z meczami ligi z `tablesFor`, `pickXI` liczy ocenę zawodnika raz na wybór składu, kontekst odprawy
+  AI raz na mecz. Test UEFA „poniżej 15 s” sam: Lech przed 15,4-15,8 s, po 12,7-13,7 s (pierwsza maszyna); na drugiej,
+  wolniejszej maszynie stary kod 16,9-17,4 s, nowy 13,7-14,9 s. `npm run perf` (Widzew): 14,8 s przed, 12,8-13,0 s po.
+- Ukryta ocena (decyzja właściciela): kandydat skautingu klubu gracza w Transferach bez OVR i atrybutów, tylko ikona
+  lornetki (`src/ui/scoutMask.js`, `scoutHidden` w `scoutOps.js`): listy rynku, karta transferowa, porównanie z kadrą,
+  karta w okienku, Profil i statystyki, menu zawodnika, nagłówek rozmów. Ocena tylko jako zdanie skauta
+  (`scoutOpinion`) w raporcie w poczcie i na karcie kandydata. Po podpisaniu wszystko widać. Opis: `docs/skauting.md`
+  rozdz. 7. Testy: `tests/scoutHidden.test.mjs`.
+- Kontrola jakości w Chromium (1600 i 390 px, jasny i ciemny): zlecenia (wycena na żywo, pensja tygodniowa), Dalej do
+  powrotu, zdarzenia, raport w poczcie, kandydaci, obserwowanie, karta i okienko, lista Z zagranicy, zwolnienie skauta
+  z pytaniem, zatrudnienie, odwołanie, wygasanie (45/35/20), edytor (skaut z 5 cechami), eksport v5 z regionami,
+  wczytanie datapacku v4, stary zapis. Bez błędów konsoli, bez poziomego przewijania, bez „undefined” i „NaN”.
+- Poprawki: odnośnik z raportu skauta w poczcie otwiera zakładkę Kandydaci (było Skauci i misje), tekst odwołania
+  wyjazdu zgodny z zasadą (w pierwszych 2 dniach wraca połowa kosztów; UI mówił, że nic nie wraca), karta „Wolne
+  miejsce” mówi o pełnym sztabie (było „limit pozwala na jeszcze 2 skautów”, a zatrudnić się nie dało), pytanie
+  „Zwolnić skauta (imię)?”, raport w poczcie nie obiecuje listy obserwowanych.
+Decyzje i pułapki:
+- Test „Pełny sezon ... poniżej 15 s” w pełnym `npm test` (pliki równolegle na 4 rdzeniach) dalej bywa ponad 15 s;
+  sam przechodzi. Dalsze przyspieszenie wymaga pracy w silniku (pickXI, trening AI, recovery).
+- Do decyzji właściciela: wartość rynkowa kandydata dalej widoczna (zdradza poziom); wolny kandydat znaleziony poza
+  oknem może podpisać dopiero w następnym oknie (`lateFree`), choć raport pisze „podpisze bez odstępnego”.
+Zostało / dalej:
+- Na później (projekt): obserwowanie dowolnego zawodnika, misje cykliczne, raport porównawczy, misje krajowe.
+
 ## Nov 20, 2026, profil B, skauting zagraniczny: logika (gałąź robocza agenta, do scalenia z widokiem) (v1.20 Beta)
 Zrobione:
 - Kolejka, punkt 4 (skauci i skauting zagraniczny), część logiki według zatwierdzonego projektu (burza mózgów):
