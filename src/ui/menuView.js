@@ -459,7 +459,7 @@ function clubCard(club, selected) {
     ${crest(club, 44)}
     <span class="cc__body">
       <span class="cc__name">${esc(club.name)}</span>
-      <span class="cc__goal">Cel: ${esc(f.goal.text)}</span>
+      <span class="cc__goal">Prawdopodobny cel: ${esc(f.goal.text)}</span>
     </span>
     <span class="cc__meta">
       ${eu ? `<span class="tag" title="${esc(EURO[eu.comp])}">${esc(eu.comp)}</span>` : ''}
@@ -479,7 +479,7 @@ function clubDetail(club, { inline }) {
       ${crest(club, 64)}
       <div><h2 id="cd-title" class="cd__name">${esc(club.name)}</h2><span class="cd__league">${esc(leagueLabel(club))}, renoma ${club.prestige}/10</span></div>
     </header>
-    <div class="cd__goal"><span>Zarząd oczekuje</span><b>${esc(f.goal.text)}</b><small>Cel: ${f.goal.target <= 1 ? (club.tier === 1 ? 'mistrzostwo' : 'pierwsze miejsce') : `miejsce ${f.goal.target} lub wyżej`}</small></div>
+    <div class="cd__goal"><span>Zarząd oczekuje</span><b>${esc(f.goal.text)}</b><small>Prawdopodobny cel: ${f.goal.target <= 1 ? (club.tier === 1 ? 'mistrzostwo' : 'pierwsze miejsce') : `miejsce ${f.goal.target} lub wyżej`}</small></div>
     <dl class="cd__facts">
       ${row('Siła kadry', `${f.goal.rank}. w lidze na ${f.size}`)}
       ${row(`Europa ${esc(SEASON)}`, eu ? `${esc(EURO[eu.comp])}, ${esc(ENTRY[eu.entry] ?? eu.entry)}` : 'Bez europejskich pucharów')}
