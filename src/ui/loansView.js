@@ -1,6 +1,7 @@
 // Wypożyczenia w zakładce Transfery (docs/wypozyczenia.md): warunki wypożyczenia do klubu (karta cudzego zawodnika),
 // panel „Wypożycz” (własny zawodnik), stan wypożyczenia, sekcja „Wypożyczeni z klubu” w Kontraktach z licznikami
 // limitów PZPN. Akcje z prefiksem „tf-ln-” (obsługa: handleLoanAction, wywoływana z transfersView.js). Style: .ln- w transfers.css.
+import { cardLink } from './transfersView.js'; // nazwisko jak link do karty w okienku
 import { clubById } from '../data/clubs_pl.js';
 import { DOMESTIC } from '../config/calendar2026.js';
 import { crestHtml } from './crest.js';
@@ -164,7 +165,7 @@ export function loansSection(game) {
   const row = (p, mine) => {
     const L = p.loan; const club = mine ? p.clubId : L.from;
     return `<li class="ln-row" data-pid="${esc(p.id)}">
-      <button class="ln-who" data-act="tf-open" data-id="${esc(p.id)}"><span class="pos" data-g="${GROUP[p.pos] ?? 'MID'}">${esc(p.pos)}</span><span class="ln-name">${esc(p.name)}<em>${crest(club, 16)}${esc(mine ? `w ${name(club)}` : `z ${name(club)}`)}, do ${esc(fmtDate(L.until))}</em></span></button>
+      <button class="ln-who" data-act="tf-open" data-id="${esc(p.id)}"><span class="pos" data-g="${GROUP[p.pos] ?? 'MID'}">${esc(p.pos)}</span><span class="ln-name">${cardLink(p)}<em>${crest(club, 16)}${esc(mine ? `w ${name(club)}` : `z ${name(club)}`)}, do ${esc(fmtDate(L.until))}</em></span></button>
       <span class="ln-play"><b>${L.apps ?? 0} meczów</b><small>${pct(minutesShare(L))} minut</small></span>
       <span class="ln-tags">${statusTags(L)}</span>
       <span class="ln-btns">${mine ? outActions(game, p) : inActions(game, p)}</span></li>`;

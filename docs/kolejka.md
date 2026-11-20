@@ -118,24 +118,3 @@ Do zrobienia: burza mózgów (ekspert piłkarski i skaut z doświadczeniem, Sonn
 i kosztami [SZAC], potem wdrożenie: atrybuty i regiony skautów, lista wolnych skautów, ekran zleceń, wyprawa jako
 system dnia, generowanie kandydatów, raport w poczcie, prowizje w finansach, edytor i datapack (nowa wersja pliku
 z migracją), testy (ten sam profil i ziarno = ten sam wynik, słabszy skaut statystycznie gorzej).
-
-## 5. Karta zawodnika w okienku po kliknięciu nazwiska w Transferach (dodane Nov 19, 2026)
-
-Zakres (decyzja właściciela): tylko zakładka Transfery i lista transferowa, nie cała gra.
-
-Cel: kliknięcie (na telefonie dotknięcie) imienia i nazwiska zawodnika otwiera jego kartę w pływającym okienku nad
-listą, bez przechodzenia na inne ekrany, żeby szybko porównywać kandydatów.
-
-Stan dziś: karta w okienku (`renderPlayerCard`, `src/ui/playerCard.js`: zamknij, przypnij, przesuń) działa tylko
-w Skład i taktyka (`src/ui/tacticsView.js`) i w meczu (`src/ui/matchdayView.js`), dla zawodników własnej kadry.
-
-Do zrobienia [SZAC, ok. 1 dzień]:
-- wspólne otwieranie karty z dowolnego miejsca Transferów (np. `data-pcard="<id>"` na nazwisku, delegacja w `src/app.js`);
-- karta pokazuje to samo co dzisiejszy profil zawodnika innego klubu (`renderPlayerProfile` z `foreign: true`
-  w `src/ui/squadView.js`: atrybuty, pozycje, forma, kontrakt; bez morale, świeżości i pensji, jak w profilu), tylko
-  w okienku zamiast przejścia przez profil drużyny; do tego cena i skrót do oferty, bez nowych ograniczeń wiedzy
-  (uwaga właściciela, Nov 19, 2026: te dane i tak są dostępne przez profil drużyny i zawodnika);
-- nazwiska w Transferach jako przycisk: lista transferowa, wyszukiwarka, wolni zawodnicy, zawodnicy z zagranicy,
-  oferty i rozmowy w toku, kontrakty, wypożyczenia; tam, gdzie kliknięcie wiersza już coś robi (np. otwiera ofertę),
-  kartę otwiera samo nazwisko;
-- testy i sprawdzenie na PC (1600 px) i telefonie (390 px).

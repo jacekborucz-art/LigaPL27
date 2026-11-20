@@ -2,6 +2,7 @@
 // Zakładka „W toku”: transakcje z paskiem etapów i spodziewaną datą zgłoszenia, prekontrakty, prośby o transfer.
 // Elementy kart zawodników: znaczniki, panel prośby o transfer (reakcje), panel umowy od 1 lipca.
 // Style: src/styles/transfers.css (prefiks .td-). Akcje z prefiksem „tf-”, obsługa w transfersView.js.
+import { cardLink } from './transfersView.js'; // nazwisko jak link do karty w okienku
 import { clubById } from '../data/clubs_pl.js';
 import { GROUP } from '../career/squad.js';
 import { esc, fmtDate } from './dom.js';
@@ -68,8 +69,8 @@ export function dealsView(game, ui = {}) {
   const preIn = userPreContracts(game);
   const preOut = squadOf(game.world, game.clubId).filter((p) => p.preContract);
   const wishes = squadOf(game.world, game.clubId).filter((p) => p.moveWish);
-  const preList = (ps, dir) => ps.length ? `<ul class="tf-mini">${ps.map((p) => `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${esc(p.name)}<em>${esc(dir === 'in' ? `z ${clubName(p.clubId)}` : `do ${preClubName(p.preContract)}`)}</em></span><small>od ${esc(fmtDate(p.preContract.start))}</small></button></li>`).join('')}</ul>` : '';
-  const wishList = wishes.length ? `<ul class="tf-mini">${wishes.map((p) => `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${esc(p.name)}<em>${esc(p.moveWish.stage === 'oficjalna' ? 'oficjalna prośba o transfer' : 'agent sygnalizuje chęć odejścia')}</em></span><small data-k="${p.moveWish.stage === 'oficjalna' ? 'bad' : 'warn'}">od ${esc(fmtDate(p.moveWish.since))}</small></button></li>`).join('')}</ul>`
+  const preList = (ps, dir) => ps.length ? `<ul class="tf-mini">${ps.map((p) => `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${cardLink(p)}<em>${esc(dir === 'in' ? `z ${clubName(p.clubId)}` : `do ${preClubName(p.preContract)}`)}</em></span><small>od ${esc(fmtDate(p.preContract.start))}</small></button></li>`).join('')}</ul>` : '';
+  const wishList = wishes.length ? `<ul class="tf-mini">${wishes.map((p) => `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${cardLink(p)}<em>${esc(p.moveWish.stage === 'oficjalna' ? 'oficjalna prośba o transfer' : 'agent sygnalizuje chęć odejścia')}</em></span><small data-k="${p.moveWish.stage === 'oficjalna' ? 'bad' : 'warn'}">od ${esc(fmtDate(p.moveWish.since))}</small></button></li>`).join('')}</ul>`
     : '<p class="tf-p__txt">Nikt nie prosi o transfer.</p>';
   const msg = ui.tfMsg ? `<p class="notice">${esc(ui.tfMsg)}</p>` : '';
   return `${msg}<div class="td-view">

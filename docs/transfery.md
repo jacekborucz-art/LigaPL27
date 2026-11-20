@@ -266,3 +266,16 @@ Z puli w sezonie: 17-23 wolnych podpisanych przez transakcje i 3-6 kupionych prz
 ## Rotacja wolnych zawodników (Nov 14, 2026)
 
 1. dnia każdego miesiąca wolny zawodnik, który długo nie znajduje klubu, może zniknąć z rynku (koniec kariery, gra za granicą albo w niższej lidze) [SZAC]: pierwsze 2 miesiące bez zmian, potem 8 % i +5 % za każdy kolejny miesiąc (najwyżej 45 %), zawodnicy 30+ x1,5, weterani 32+ po pół roku co najmniej 15 %. Na jego miejsce od razu pojawia się nowy, losowy wolny zawodnik (za zawodnika z puli zagranicznej: nowy z puli, za pozostałych: zwykły wolny), dopóki na rynku jest mniej niż 150 wolnych. Na każdej grupie pozycji zawsze zostaje kilku wolnych (bramkarze 8, obrońcy i pomocnicy 14, napastnicy 10), bo kluby AI uzupełniają nimi braki w kadrze. Kluby AI z brakiem w kadrze wybierają najpierw najlepszego z wolnych, na których je stać (`aiBuy`).
+
+## Karta zawodnika w okienku (Nov 20, 2026, v1.19 Beta)
+
+- Nazwisko zawodnika w Transferach działa jak link (podkreślone): kliknięcie otwiera jego kartę w okienku nad listą,
+  bez przechodzenia na inny ekran. Dotyczy rynku (wszystkie listy), Kontraktów, W toku, wypożyczeń i list zawodników.
+  Kliknięcie reszty wiersza jak dotąd otwiera kartę transferową.
+- Okno to ta sama karta co w Skład i taktyka (`renderPlayerCard`, `src/ui/playerCard.js`): na PC pływające okno
+  (przeciąganie za pasek, położenie zapamiętane), na telefonie okno modalne od dołu. Zamyka się krzyżykiem, Escape
+  albo dotknięciem tła.
+- Treść jak w profilu zawodnika: atrybuty, pozycje, forma, statystyki, do tego klub, kontrakt, wartość, cena
+  i przycisk „Przejdź do oferty” (własny zawodnik: „Otwórz kartę transferową”, morale zamiast ceny).
+- Kod: `transferCardHtml` i `cardLink` w `src/ui/transfersView.js`, otwieranie i zamykanie (`state.tfCard`) w `src/app.js`.
+

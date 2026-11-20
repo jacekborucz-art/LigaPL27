@@ -53,7 +53,7 @@ import { handleStaffAction, handleStaffField, isStaffAction, offerPreview } from
 import { shirtNumbers, kitColors } from './career/shirts.js';
 import { playerStatsHtml } from './ui/playerStatsView.js';
 import { renderClubView, hasClubView } from './ui/clubView.js';
-import { renderTransfers, handleTransferAction, isTransferAction } from './ui/transfersView.js';
+import { renderTransfers, handleTransferAction, isTransferAction, transferCardHtml } from './ui/transfersView.js';
 import { renderClubHub, handleClubAction, isClubAction } from './ui/klubView.js';
 import { sysNavHtml, sysHeaderBtn, sysDialogHtml } from './ui/sysMenu.js';
 import { renderEditor, handleEditorAction, isEditorAction, newEditorState, clubListHtml, playerListHtml, altState, freeListHtml, refListHtml } from './ui/editorView.js'; // edytor i datapack (docs/edytor.md)
@@ -575,7 +575,14 @@ function renderTab(tab, g, club) {
   if (tab === 'pulpit') return state.fx ? renderFixtures(g, state.fx) : renderDashboard(g, club);
   if (tab === 'poczta') return renderMail(g);
   if (tab === 'trening') return renderTraining(g, state);
-  if (tab === 'transfery') return state.ng ? renderNegotiation(g, state.ng) : renderTransfers(g, state);
+  if (tab !== 'transfery') state.tfCard = null; // karta w okienku tylko w Transferach
+  if (tab === 'transfery') {
+    if (state.ng) return renderNegotiation(g, state.ng);
+    const cp = state.tfCard && g.world.players[state.tfCard];
+    if (!cp) { state.tfCard = null; return renderTransfers(g, state); }
+    queueMicrotask(mountTfCard); // po wstawieniu HTML: okno modalne na telefonie, pływające na PC
+    return renderTransfers(g, state) + transferCardHtml(g, cp, { wide: matchMedia(WIDE_CARD).matches });
+  }
   if (tab === 'klub') return renderClubHub(g, state);
   if (tab === 'rozgrywki') return renderCompetitions(g, { comp: state.cComp ?? compOfClub(club) ?? 'ekstraklasa', view: state.cView, round: state.cRound, filter: state.uFilter, draw: state.uDraw });
   if (tab === 'kadra') {
@@ -1549,9 +1556,39 @@ async function newGame(slot, clubId, profile = null) {
   render();
 }
 
+// ---------- Transfery: karta zawodnika w okienku po kliknięciu nazwiska (src/ui/transfersView.js, transferCardHtml) ----------
+let tfCardReturn = null; // nazwisko, na które wraca fokus po zamknięciu karty
+function openTfCard(pid, el) {
+  state.tfCard = pid;
+  tfCardReturn = el ? `[data-pcard="${CSS.escape(pid)}"]` : null;
+  render();
+}
+function closeTfCard() {
+  if (!state.tfCard) return;
+  state.tfCard = null;
+  const back = tfCardReturn; tfCardReturn = null;
+  render();
+  if (back) app.querySelector(back)?.focus?.({ preventScroll: true });
+}
+function mountTfCard() {
+  const d = app.querySelector('dialog.tf-pcard');
+  if (!d) return;
+  if (!matchMedia(WIDE_CARD).matches) { d.close(); d.showModal(); } // telefon i tablet: okno modalne (arkusz od dołu)
+  else placeCard(d, cardPos(0) ?? null); // PC: pływające okno, położenie jak karty w Skład i taktyka
+  (d.querySelector('.tcard__name') ?? d.querySelector('.tdet__x'))?.focus({ preventScroll: true });
+}
+app.addEventListener('cancel', (ev) => { if (ev.target.matches?.('dialog.tf-pcard')) { ev.preventDefault(); closeTfCard(); } });
+app.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && state.tfCard && state.tab === 'transfery') { ev.preventDefault(); ev.stopPropagation(); closeTfCard(); } });
+
 app.addEventListener('click', (ev) => {
+  // Nazwisko w Transferach działa jak link: otwiera kartę w okienku zamiast karty transferowej
+  const link = state.game && ev.target.closest?.('[data-pcard]');
+  if (link) { ev.preventDefault(); ev.stopPropagation(); openTfCard(link.dataset.pcard, link); return; }
+  if (state.tfCard && ev.target.matches?.('dialog.tf-pcard') && ev.target.matches(':modal')) { closeTfCard(); return; } // dotknięcie tła
   const el = ev.target.closest('[data-act]');
   if (!el || el.tagName === 'INPUT') return;
+  if (el.dataset.act === 'tfcardclose') { closeTfCard(); return; }
+  if (state.tfCard && el.closest('dialog.tf-pcard')) state.tfCard = null; // skrót do oferty zamyka okienko
   return dispatchAct(el);
 });
 

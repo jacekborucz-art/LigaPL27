@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-e094a3f584';
+const VERSION = 'v0.3-8a6fede032';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -186,7 +186,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', 'a26ef75ccd'],
+  ['./src/app.js', 'e89f5d7576'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '019bb0029e'],
@@ -299,7 +299,7 @@ const FILES = [
   ['./src/season/thirdLeague.js', 'b37f1d8a44'],
   ['./src/season/uefa.js', '4880cc084f'],
   ['./src/season/worldNations.js', '6003d36e12'],
-  ['./src/styles/app.css', '0751027759'],
+  ['./src/styles/app.css', '1540da3df1'],
   ['./src/styles/assistant.css', 'a1dd04f875'],
   ['./src/styles/base.css', 'f2fee58203'],
   ['./src/styles/club.css', '6615e08e49'],
@@ -347,7 +347,7 @@ const FILES = [
   ['./src/ui/formChart.js', '12324f252e'],
   ['./src/ui/infraView.js', '4518a9e3c7'],
   ['./src/ui/klubView.js', 'd55225df54'],
-  ['./src/ui/loansView.js', '21eb434f9f'],
+  ['./src/ui/loansView.js', 'a695d82a14'],
   ['./src/ui/masonry.js', 'abee5a105a'],
   ['./src/ui/matchReportView.js', '1dd8a4917d'],
   ['./src/ui/matchdayView.js', '4826993af0'],
@@ -374,8 +374,8 @@ const FILES = [
   ['./src/ui/teamReportView.js', 'c01abc57b6'],
   ['./src/ui/todoView.js', 'bd4d7aa1c4'],
   ['./src/ui/trainingView.js', '7d8160bc72'],
-  ['./src/ui/transferDealsView.js', 'a13fa703b3'],
-  ['./src/ui/transfersView.js', '67e8f5381a'],
+  ['./src/ui/transferDealsView.js', 'aab9223d97'],
+  ['./src/ui/transfersView.js', '3593e0342d'],
   ['./src/world/ephemeral.js', '216b6bcdd9'],
   ['./src/world/playerGen.js', '7033b8b243'],
   ['./src/world/worldGen.js', '494992346d'],

@@ -1717,3 +1717,7 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 .pi-seg--dirs button { flex: 1 1 96px; }
 .pi-seg--sel { display: block; padding: 0; background: none; }
 .pi-seg--sel .pit-sel { min-height: 44px; }
+/* Transfery: nazwisko jak link do karty zawodnika w okienku (transferCardHtml) */
+.pc-link { cursor: pointer; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 55%, transparent); text-underline-offset: 3px; }
+.pc-link:hover { text-decoration-color: currentColor; color: var(--accent, inherit); }
+.tf-pcard__go { margin: 0 0 var(--space-3); }

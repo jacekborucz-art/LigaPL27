@@ -24,6 +24,9 @@ import { openLoanOffers } from '../career/loans.js'; // status „szukamy klubu 
 import { loanInForm, loanOutPanel, loanedInPanel, loanedOutPanels, loansSection, loanInAction, handleLoanAction, isLoanAction, isLoanedOut } from './loansView.js'; // wypożyczenia (docs/wypozyczenia.md)
 import { dealsView, dealTags, ownDealPanels, otherDealPanel, handleDealAction } from './transferDealsView.js'; // W toku, prekontrakty, prośby (docs/transfery.md)
 import { effectiveAsk } from '../career/mindset.js';
+import { renderPlayerCard, cardFact } from './playerCard.js'; // karta w okienku jak w Skład i taktyka
+import { playerStatsHtml } from './playerStatsView.js';
+import { moraleLabel } from '../career/morale.js';
 import { checkUserPre } from '../career/preContracts.js';
 import { DOMESTIC } from '../config/calendar2026.js';
 import { isPoolContracted, poolClubLabel, poolSellerClub, REGION_FILTERS, regionOf } from '../career/foreignPool.js'; // zawodnicy z zagranicy
@@ -73,7 +76,7 @@ export function limitPanel(game) {
   if (L.full) status = `Kadra pełna: nowe transfery, wypożyczenia do klubu i wolni zawodnicy są zablokowani. ${status}`;
   const kept = c ? c.keep.map((id) => game.world.players[id]).filter(Boolean) : [];
   const tRow = (p, kept = false) => `<li class="tf-limit__t" data-pid="${esc(p.id)}">
-      <button class="tf-limit__who" data-act="tf-open" data-id="${esc(p.id)}"><span class="tf-pos">${esc(p.pos)}</span><span class="tf-name">${esc(p.name)}<small>${esc(ageWord(p.age))}, ${fmtZl(p.contract?.wage ?? 0)} tygodniowo${game.market.userListed[p.id] ? `, na liście za ${fmtZl(game.market.userListed[p.id])}` : ''}</small></span><span class="tf-ovr">${ovrTxt(p)}</span></button>
+      <button class="tf-limit__who" data-act="tf-open" data-id="${esc(p.id)}"><span class="tf-pos">${esc(p.pos)}</span><span class="tf-name">${cardLink(p)}<small>${esc(ageWord(p.age))}, ${fmtZl(p.contract?.wage ?? 0)} tygodniowo${game.market.userListed[p.id] ? `, na liście za ${fmtZl(game.market.userListed[p.id])}` : ''}</small></span><span class="tf-ovr">${ovrTxt(p)}</span></button>
       ${c ? `<button class="btn btn--quiet btn--sm" data-act="tf-keep" data-id="${esc(p.id)}"${!kept && c.keep.length >= KEEP_MAX ? ' disabled' : ''}>${kept ? 'Zdejmij osłonę' : 'Osłoń'}</button>` : ''}
     </li>`;
   const targets = L.targets.length ? `<h4>${c ? 'Zarząd wskaże' : 'Zarząd wskazałby'} (najsłabsi poza nietykalnymi)</h4><ul class="tf-limit__list">${L.targets.map((p) => tRow(p)).join('')}</ul>`
@@ -192,7 +195,7 @@ function marketTable(game, rows, list, sort, total) {
   const body = rows.map((x) => {
     const { p } = x;
     return `<tr data-pid="${esc(p.id)}"><td class="xl__pos">${posBadge(p)}</td>
-      <th scope="row" class="xl__nm"><button data-act="tf-open" data-id="${esc(p.id)}" data-pid="${esc(p.id)}"><span>${esc(p.name)}</span></button></th>
+      <th scope="row" class="xl__nm"><button data-act="tf-open" data-id="${esc(p.id)}" data-pid="${esc(p.id)}"><span>${cardLink(p)}</span></button></th>
       <td class="xl__ovr">${ovrTxt(p)}</td><td class="tf-num tf-price">${x.price == null ? '<span class="tf-nfs">nie na sprzedaż</span>' : `${fmtZl(x.price)}${free || list === 'loan' ? '<small>/tydz.</small>' : ''}`}</td>
       <td>${p.age}</td>${free ? '' : `<td class="tf-l">${clubCell(p.clubId)}</td>`}<td class="tf-num">${fmtZl(p.value ?? 0)}</td>${free ? '' : `<td>${p.contract?.until ? esc(fmtDate(p.contract.until)) : '-'}</td>`}
       <td>${tag(x.will, willTone(x.will))}</td>
@@ -219,7 +222,7 @@ function abroadTable(game, rows, sort, total) {
   const body = rows.map((x) => {
     const { p } = x;
     return `<tr data-pid="${esc(p.id)}"><td class="xl__pos">${posBadge(p)}</td>
-      <th scope="row" class="xl__nm"><button data-act="tf-open" data-id="${esc(p.id)}" data-pid="${esc(p.id)}"><span>${esc(p.name)}</span></button></th>
+      <th scope="row" class="xl__nm"><button data-act="tf-open" data-id="${esc(p.id)}" data-pid="${esc(p.id)}"><span>${cardLink(p)}</span></button></th>
       <td class="xl__ovr">${ovrTxt(p)}</td><td class="tf-l fp-nat">${esc(NAT_NAMES[p.nat] ?? p.nat)}</td><td class="tf-l">${originCell(p)}</td>
       <td class="tf-num tf-price">${p.free ? '<span class="fp-free">wolny</span>' : fmtZl(x.price)}</td><td class="tf-num">${fmtZl(x.wage)}<small>/tydz.</small></td>
       <td>${p.age}</td><td>${p.contract?.until ? esc(fmtDate(p.contract.until)) : '-'}</td>
@@ -455,7 +458,7 @@ function contractsView(game, ui) {
       dealTags(game, p),
     ].filter(Boolean).join('');
     return `<tr data-pid="${esc(p.id)}"><td class="xl__pos">${posBadge(p)}</td>
-      <th scope="row" class="xl__nm"><button data-act="tf-open" data-id="${esc(p.id)}" data-pid="${esc(p.id)}"><span>${esc(p.name)}</span></button></th>
+      <th scope="row" class="xl__nm"><button data-act="tf-open" data-id="${esc(p.id)}" data-pid="${esc(p.id)}"><span>${cardLink(p)}</span></button></th>
       <td class="xl__ovr">${ovrTxt(p)}</td>
       <td class="tf-until" data-k="${k}">${esc(fmtDate(p.contract.until))}<small>${ml <= 0 ? 'kończy się' : `${ml} mies.`}</small></td>
       <td class="tf-num">${fmtZl(p.contract.wage)}</td>
@@ -465,7 +468,7 @@ function contractsView(game, ui) {
   const foot = `<tr><td></td><th scope="row" class="xl__nm">Razem (${rows.length})</th><td></td><td></td><td class="tf-num">${fmtZl(bill)}</td><td class="tf-l">budżet ${fmtZl(c.wageBudget)}</td><td></td><td class="tf-num">${fmtZl(rows.reduce((s, x) => s + (x.p.value ?? 0), 0))}</td><td></td></tr>`;
   const ending = rows.filter((x) => !x.p.loan && x.ml <= 12).sort((a, b) => a.ml - b.ml || b.p.ovr - a.p.ovr);
   const endPanel = panel('Kończące się kontrakty', ending.length ? 'warn' : 'good', ending.length
-    ? `<ul class="tf-mini">${ending.slice(0, 8).map(({ p, ml }) => `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${esc(p.name)}</span><small data-k="${ml <= 6 ? 'bad' : 'warn'}">${ml <= 0 ? 'kończy się' : `${ml} mies.`}</small></button></li>`).join('')}</ul>`
+    ? `<ul class="tf-mini">${ending.slice(0, 8).map(({ p, ml }) => `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${cardLink(p)}</span><small data-k="${ml <= 6 ? 'bad' : 'warn'}">${ml <= 0 ? 'kończy się' : `${ml} mies.`}</small></button></li>`).join('')}</ul>`
     : '<p class="tf-p__txt">Żaden kontrakt nie kończy się w ciągu roku.</p>', { count: ending.length });
   return `${moneyStrip(game)}
     <div class="tf-grid tf-grid--table">
@@ -500,10 +503,10 @@ function offersView(game) {
   }).join('')}</ul>` : '<p class="tf-p__txt">Brak ofert. Kluby składają je w oknie transferowym, częściej za zawodników z listy transferowej.</p>';
   const talks = mine.length ? `<ul class="tf-mini">${mine.map(({ p, t }) => {
     const [txt, k] = t.accepted ? [`przyjęta: ${fmtZl(t.accepted)}`, 'good'] : t.until ? [`przerwa do ${fmtDate(t.until)}`, 'bad'] : t.counter ? [`klub chce ${fmtZl(t.counter)}`, 'warn'] : ['odrzucona', 'bad'];
-    return `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${esc(p.name)}<em>${esc(clubById(p.clubId)?.name ?? (isPoolContracted(p) ? poolClubLabel(p) : 'bez klubu'))}</em></span><small data-k="${k}">${esc(txt)}</small></button></li>`;
+    return `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${cardLink(p)}<em>${esc(clubById(p.clubId)?.name ?? (isPoolContracted(p) ? poolClubLabel(p) : 'bez klubu'))}</em></span><small data-k="${k}">${esc(txt)}</small></button></li>`;
   }).join('')}</ul>` : '<p class="tf-p__txt">Nie prowadzisz rozmów. Ofertę złożysz z karty zawodnika na Rynku.</p>';
   const listedOwn = Object.entries(game.market.userListed).map(([id, price]) => ({ p: game.world.players[id], price })).filter((x) => x.p && x.p.clubId === game.clubId);
-  const ownListed = listedOwn.length ? `<ul class="tf-mini">${listedOwn.map(({ p, price }) => `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${esc(p.name)}<em>OVR ${ovrTxt(p)}, wartość ${fmtZl(p.value)}</em></span><small>${fmtZl(price)}</small></button></li>`).join('')}</ul>`
+  const ownListed = listedOwn.length ? `<ul class="tf-mini">${listedOwn.map(({ p, price }) => `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${cardLink(p)}<em>OVR ${ovrTxt(p)}, wartość ${fmtZl(p.value)}</em></span><small>${fmtZl(price)}</small></button></li>`).join('')}</ul>`
     : '<p class="tf-p__txt">Nikogo nie wystawiłeś. Zrobisz to w karcie zawodnika (zakładka Kontrakty).</p>';
   const ownMoves = hist.length ? `<ul class="tf-mini tf-mini--moves">${hist.map((h) => {
     const sold = h.from === game.clubId;
@@ -749,4 +752,32 @@ export function lateFree(game, p) {
   if (inWindow(game.date) || !p.freeSince) return false;
   const last = (DOMESTIC.transferWindows ?? []).filter((w) => w.to < game.date).map((w) => w.to).sort().at(-1);
   return !!last && p.freeSince > last;
+}
+
+// ------------------------------------------------------------ Karta zawodnika w okienku (nazwisko jak link)
+/** Nazwisko zawodnika jako link do karty w okienku (w Transferach; kliknięcie nie otwiera karty transferowej). */
+export const cardLink = (p) => `<span class="pc-link" data-pcard="${esc(p.id)}" title="Pokaż kartę zawodnika">${esc(p.name)}</span>`;
+
+/**
+ * Karta zawodnika w okienku (Transfery): to samo okno co w Skład i taktyka (src/ui/playerCard.js), treść jak
+ * w profilu zawodnika innego klubu (atrybuty, pozycje, forma, kontrakt, statystyki), do tego cena i skrót do oferty.
+ * wide: pływające okno na PC; na węższym ekranie app.js otwiera je jako okno modalne.
+ */
+export function transferCardHtml(game, p, { wide = false } = {}) {
+  const mine = p.clubId === game.clubId;
+  const abroad = isPoolContracted(p);
+  const club = p.clubId ? clubById(p.clubId)?.name ?? '' : abroad ? poolClubLabel(p) : 'Wolny zawodnik';
+  const price = mine ? null : !p.clubId && !abroad ? 'Bez odstępnego' : notForSale(game, p) && !p.contract?.clause ? 'Nie na sprzedaż' : fmtZl(askingPrice(game, p));
+  const facts = [
+    cardFact('Klub', esc(club)),
+    cardFact('Kontrakt', p.contract?.until ? `do ${esc(fmtDate(p.contract.until))}` : 'Brak'),
+    cardFact('Wartość', esc(fmtZl(p.value ?? 0))),
+    ...(price ? [cardFact('Cena', esc(price))] : []),
+    ...(mine ? [cardFact('Morale', esc(moraleLabel(p.morale ?? 12)))] : []),
+  ];
+  const go = `<p class="tf-pcard__go"><button class="btn btn--primary btn--sm" data-act="tf-open" data-id="${esc(p.id)}">${mine ? 'Otwórz kartę transferową' : 'Przejdź do oferty'}</button></p>`;
+  return renderPlayerCard(p, {
+    wide, slot: 0, cls: 'tf-pcard', closeAttrs: 'data-act="tfcardclose"',
+    facts, extra: go + playerStatsHtml(p, game),
+  });
 }

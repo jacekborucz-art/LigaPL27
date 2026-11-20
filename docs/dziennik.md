@@ -29,6 +29,17 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 20, 2026, profil B, karta zawodnika w okienku w Transferach (v1.19 Beta)
+Zrobione:
+- Nazwisko w Transferach jak link: karta zawodnika w okienku (to samo okno co w Skład i taktyka), cena i skrót do oferty.
+  Opis: `docs/transfery.md`, rozdział „Karta zawodnika w okienku”. Pozycja 5 zdjęta z `docs/kolejka.md`.
+Decyzje i pułapki:
+- Globalny Escape w `src/app.js` wraca na ekran startowy: własne obsługi Escape muszą robić `stopPropagation()`.
+- Wersja gry bez zmiany (v1.19 Beta), pytanie do właściciela o podniesienie.
+Zostało / dalej:
+- Odnośniki do zadań i okien także w treści wiadomości w Poczcie (prośba właściciela Nov 20, 2026).
+
+
 ## Nov 19, 2026, profil A (przekazanie), commity 9b4403e..8564f53 (v1.11 Beta -> v1.19 Beta)
 
 Okres Nov 15-19, 2026, ok. 125 commitów. Szczegóły w historii git i w plikach `docs/` podanych przy punktach.
