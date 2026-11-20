@@ -246,3 +246,9 @@ Wnioski [SZAC]:
   lidze, wyższy start reputacji, albo zgoda na to, że kariera z III ligi wymaga aktywnej gry (lepszej od autopilota).
 - Trenerzy AI tracą średnio 4-8 punktów w 8 sezonach (zwolnienia -6, rotacja z puli). Możliwa korekta: mniejsza kara
   za zwolnienie dla AI albo wyższa reputacja nowych trenerów w puli.
+
+## Decyzje właściciela (Nov 20, 2026)
+
+- Wyjście z III ligi ma wymagać lepszej gry niż autopilot: bez łagodniejszego zarządu i bez wyższej reputacji na start
+  (kalibracja: autopilot z III ligi nie dostaje ofert z 1 Ligi; przebiegi z awansami idą ścieżką z projektu).
+- Lekki spadek reputacji trenerów AI w kolejnych sezonach (Ekstraklasa ok. 49 -> ok. 42 po 8 sezonach) zostaje bez zmian.
