@@ -4,7 +4,7 @@
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
 <<<<<<< HEAD
 <<<<<<< HEAD
-const VERSION = 'v0.3-2e7189e7c2';
+const VERSION = 'v0.3-ea88c645c7';
 =======
 const VERSION = 'v0.3-62876db151';
 >>>>>>> main
@@ -324,7 +324,7 @@ const FILES = [
   ['./src/styles/history.css', '6e342b15ec'],
   ['./src/styles/kariera.css', 'bda96390ca'],
   ['./src/styles/klub.css', '62ff25555a'],
-  ['./src/styles/matchday.css', '877f3c6ff4'],
+  ['./src/styles/matchday.css', '851190fca3'],
   ['./src/styles/menu.css', '39f5cbacdd'],
   ['./src/styles/negotiation.css', '949f233adc'],
   ['./src/styles/reserves.css', '71951b8110'],

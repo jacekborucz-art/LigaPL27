@@ -480,6 +480,12 @@
   .mm__queue ul { max-height: 64px; }
 }
 @media (max-width: 699px) {
+  /* Lista zawodników ma zawsze miejsce: przy dodatkowych komunikatach (gra w osłabieniu, błąd ustawienia)
+     okno rośnie i przewija się, zamiast ściskać listę do zera */
+  .md-dlg.mm-dlg { overflow-y: auto; }
+  .mm { height: auto; min-height: 100dvh; grid-template-rows: auto auto auto minmax(240px, 1fr) auto; }
+  .mm__foot { position: sticky; bottom: 0; z-index: 2; }
+  .mm-short { padding: 6px 8px; }
   .mm__x { margin-left: auto; }
   .mm__queue ul { flex-wrap: nowrap; overflow-x: auto; max-height: none; padding-bottom: 2px; }
   .mm-pend { flex: none; white-space: nowrap; }
