@@ -23,8 +23,11 @@ export const JOB = {
   maxApps: 3, gapDays: 3, cooldown: 90, ownClubCooldown: 365, massN: 6, massDays: 30,
   interviewAfter: 1, minDecide: 3, noDateDecide: 14, offerDays: 7,
   fallback1: 60, fallback2: 120, outOfReach: 15, resignDays: 182, summerBids: 2, summerReach: 5,
-  int: { base: 0.5, w: 0.035, media: 0.004, min: 0.03, max: 0.9 },
-  off: { base: 0.45, w: 0.03, min: 0.02, max: 0.85, ambition: 0.015, wealth: 0.01, rivalW: 0.05, rivalMax: 6 },
+  // Kalibracja (docs/kariera-trenera.md rozdz. 11): klub ocenia trenera wobec połowy swojej reputacji (projekt: 0,6),
+  // bazy 0,6 i 0,55 (projekt: 0,5 i 0,45), inaczej trener z III ligi prawie zawsze czekał na ofertę gwarantowaną
+  need: 0.5,
+  int: { base: 0.6, w: 0.035, media: 0.004, min: 0.03, max: 0.9 },
+  off: { base: 0.55, w: 0.03, min: 0.02, max: 0.85, ambition: 0.015, wealth: 0.01, rivalW: 0.033, rivalMax: 6 },
   summer: { base: 0.35, perAchievement: 0.04, max: 0.8 },
   month: { base: 0.04, w: 0.01, max: 0.2 },
   mediaW: 150, mediaBlock: 25,
@@ -62,7 +65,7 @@ export function jobChances(game, clubId) {
   const media = game.manager?.career?.pop?.media ?? 50;
   const LC = clubReputation(club);
   const reach = reachOf(rep);
-  const gap = rep - 0.6 * LC;
+  const gap = rep - JOB.need * LC;
   const out = LC > reach + JOB.outOfReach;
   const I = JOB.int; const O = JOB.off;
   const o = ownerOf(game, clubId);

@@ -41,7 +41,8 @@ export const CAREER = {
   // zwolnień bez zmian wobec dawnego modelu; trener ponad klub dostaje więcej czasu, poniżej mniej
   board: { trust0: 55, trustW: 0.25, trustMin: 45, trustMax: 75, newMatches: 6, patBase: 1, patW: 0.01, patMin: 0.8, patMax: 1.15, fansCalm: 70, fansCalmMul: 0.9, fireBase: 18, fireW: 0.06, fireMin: 12, fireMax: 22 },
   trophyMatches: 12, // trofeum liczy się po co najmniej 12 meczach o stawkę z klubem w sezonie (superpuchary: wystarczy prowadzić mecz)
-  ai: { start: { 1: 6, 2: 3, 3: 0, 4: -3 }, startW: 6, startRef: 4, seasonDecay: 1, idleMonth: 0.4, hireW: 0.04 },
+  // Kalibracja: premie startowe ligi 9/5/1/-3 (projekt: 6/3/0/-3), bez zaniku na sezon (projekt -1,8: średnie spadały o 5-8 w 8 sezonach)
+  ai: { start: { 1: 9, 2: 5, 3: 1, 4: -3 }, startW: 6, startRef: 4, seasonDecay: 0, idleMonth: 0.4, hireW: 0.04 },
   min: 5, // reputacja gracza nie spada poniżej 5 (jak dawniej w board.js)
 };
 
