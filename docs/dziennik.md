@@ -29,7 +29,7 @@ Zostało / dalej:
 
 ## Wpisy
 
-## Nov 20, 2026, profil B, kontrola jakości skautingu, wydajność, ukryta ocena kandydatów, commity 9acbd87..(ten) (v1.21 Beta)
+## Nov 20, 2026, profil B, kontrola jakości skautingu, wydajność, ukryta ocena kandydatów, commity 9acbd87..e3eab2c (v1.21 Beta)
 Zrobione:
 - Wersja gry v1.21 Beta (decyzja właściciela). Wchodzą do niej: skauting zagraniczny (Transfery, Skauting), ukryta
   ocena kandydatów skauta (lornetka), poprawki wydajności, poprawki ekranu startowego i wyboru klubu (przycisk
