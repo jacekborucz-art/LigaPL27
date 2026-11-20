@@ -56,7 +56,7 @@ import { shirtNumbers, kitColors } from './career/shirts.js';
 import { playerStatsHtml } from './ui/playerStatsView.js';
 import { renderClubView, hasClubView } from './ui/clubView.js';
 import { renderTransfers, handleTransferAction, isTransferAction, transferCardHtml } from './ui/transfersView.js';
-import { startMission, cancelMission, hireScout, fireScout, watchCandidate, markCandidatesSeen } from './career/scoutOps.js'; // skauting zagraniczny (docs/skauting.md)
+import { startMission, cancelMission, hireScout, fireScout, watchCandidate, markCandidatesSeen, scoutHidden } from './career/scoutOps.js'; // skauting zagraniczny (docs/skauting.md)
 import { renderClubHub, handleClubAction, isClubAction } from './ui/klubView.js';
 import { skUiAction, setOrderField } from './ui/scoutingView.js'; // Skauting (Transfery): stan ekranu
 // Kariera i rynek pracy: okno odblokowania odznak i akcje job-* (docs: Klub > Kariera)
@@ -590,7 +590,7 @@ function renderTab(tab, g, club) {
   if (!ext && state.extClub) return renderClubView(g, state.extClub);
   if (ext) {
     const extClub = ext.clubId ? clubById(ext.clubId) : null;
-    return renderPlayerProfile(ext, { leagueOvrs: leagueOvrs(g, extClub?.tier ?? club.tier), clubName: extClub?.name ?? 'Wolny zawodnik', date: g.date, game: g, foreign: true, back: { act: 'extback', label: 'Wróć' } });
+    return renderPlayerProfile(ext, { leagueOvrs: leagueOvrs(g, extClub?.tier ?? club.tier), clubName: extClub?.name ?? 'Wolny zawodnik', date: g.date, game: g, foreign: true, hidden: scoutHidden(g, ext), back: { act: 'extback', label: 'Wróć' } });
   }
   // Trener bez klubu: ekrany klubu (Kadra, Transfery, Trening, Klub poza Karierą) zamknięte, Pulpit z rynkiem pracy
   if (isUnemployed(g)) {

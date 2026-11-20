@@ -251,6 +251,9 @@ test('Zlecenie: wycena, koszt raz w finansach, nieobecność skauta w sztabie, r
   assert.ok(msg && msg.category === 'transfers' && msg.priority === 'important');
   assert.ok(mailRelevant(g, msg));
   assert.ok(mailLinks(g, msg).some((l) => l.run.steps.some((s) => s.sub === 'skauting')));
+  assert.ok(mailLinks(g, msg).some((l) => l.run.steps.some((s) => s.act === 'sk-tab' && s.t === 'kandydaci')), 'odnośnik od razu do zakładki Kandydaci');
+  assert.match(msg.body, /(Moim zdaniem|Wygląda mi|Trudno mi)/); // ocena jako zdanie skauta
+  assert.ok(!/ocena \d+-\d+, potencjał/.test(msg.body));
   assert.equal(v2.newCandidates, v2.candidates.filter((c) => c.state === 'nowy').length);
   for (const c of v2.candidates) {
     assert.ok(g.world.players[c.pid] && g.market.foreign.includes(c.pid), 'kandydat na rynku z zagranicy');

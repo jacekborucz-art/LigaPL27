@@ -10,6 +10,7 @@ const TO = {
   talk: (id) => go('Porozmawiaj z zawodnikiem', [{ act: 'tab', tab: 'kadra' }, { act: 'tsub', s: 'talks' }, { act: 'tt-open', id }]),
   card: (id, own) => go(own ? 'Karta transferowa' : 'Karta zawodnika', [{ act: 'tab', tab: 'transfery', sub: own ? 'kontrakty' : 'rynek' }, { act: 'tf-open', id }], '[data-act="tf-close"]'),
   transfers: (sub, label) => go(label, [{ act: 'tab', tab: 'transfery', sub }]),
+  skauting: (t, label) => go(label, [{ act: 'tab', tab: 'transfery', sub: 'skauting' }, { act: 'sk-tab', t }]),
   klub: (sub, label) => go(label, [{ act: 'tab', tab: 'klub', sub }]),
   training: (tab, label) => go(label, [{ act: 'tab', tab: 'trening' }, { act: 'tr-tab', tab }]),
   squad: (s, label) => go(label, [{ act: 'tab', tab: 'kadra' }, { act: 'tsub', s }]),
@@ -83,11 +84,11 @@ const BY_KIND = {
   'aplikacja-zajete': () => [TO.klub('kariera', 'Rynek pracy')],
   'reputacja-poziom': () => [TO.klub('kariera', 'Kariera')],
   // Skauting zagraniczny (docs/skauting.md): zakładka Transfery, Skauting
-  'scout-report': () => [TO.transfers('skauting', 'Skauting: kandydaci')],
+  'scout-report': () => [TO.skauting('kandydaci', 'Skauting: kandydaci')], // od razu zakładka Kandydaci (wcześniej Skauci i misje)
   'scout-start': () => [TO.transfers('skauting', 'Skauting')],
   'scout-event': () => [TO.transfers('skauting', 'Skauting')],
-  'scout-gone': () => [TO.transfers('skauting', 'Skauting: obserwowani')],
-  'scout-pool': () => [TO.transfers('skauting', 'Skauting: obserwowani')],
+  'scout-gone': () => [TO.skauting('kandydaci', 'Skauting: obserwowani')],
+  'scout-pool': () => [TO.skauting('kandydaci', 'Skauting: obserwowani')],
   'scout-commission': () => [TO.transfers('skauting', 'Skauting')],
 };
 

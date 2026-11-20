@@ -37,7 +37,7 @@ const ghost = 'nie-ma-takiego-zawodnika';
 const cand = (o) => ({
   pid, missionId: 'm1', name: 'Zażółć <b>Gęślą</b> "Jaźń"', nat: 'SWE', age: 21, pos: 'ŚP', ovrRange: [58, 66], potRange: [68, 80], confidence: 'wysoka',
   priceRange: [1200000, 1600000], wageRange: [14000, 18000], willingness: 'Chętny', adaptation: 'niskie', strengths: ['Podanie', 'Wizja gry'], weaknesses: ['Szybkość'],
-  note: 'Technicznie czysty & spokojny <i>zawodnik</i>.', free: false, clubLabel: 'Borås Södra IF, umowa do cze 2028', injuredDays: 0, until: '2027-01-15', state: 'nowy', goneText: '', ...o,
+  note: 'Technicznie czysty & spokojny <i>zawodnik</i>.', opinion: 'Moim zdaniem to zawodnik na poziomie ok. 58-66, potencjał do 80.', free: false, clubLabel: 'Borås Södra IF, umowa do cze 2028', injuredDays: 0, until: '2027-01-15', state: 'nowy', goneText: '', ...o,
 });
 const rich = () => ({
   scouts: [
@@ -124,17 +124,22 @@ test('Potwierdzenie zwolnienia i odwołania wyjazdu jest krokiem w interfejsie',
   const cancel = renderSkauting(G, { skTab: 'misje', skAsk: { kind: 'cancel', id: 'm2' } }, { view: v });
   assert.match(cancel, /data-act="sk-cancel" data-id="m2"/);
   assert.match(cancel, /nie wracają/);
+  // W pierwszych 2 dniach wraca połowa kosztów (zasada cancelMission), tekst nie może mówić „nie wracają”
+  const v2 = rich(); v2.missions = v2.missions.map((m) => (m.id === 'm2' ? { ...m, start: G.date } : m));
+  const early = renderSkauting(G, { skTab: 'misje', skAsk: { kind: 'cancel', id: 'm2' } }, { view: v2 });
+  assert.match(early, /Wróci połowa kosztów \(15\s000\szł z 30\s000\szł\)/);
 });
 
-test('Kandydaci: zakresy, kreska własnego składu, przerywana ramka, link do karty i akcje', () => {
+test('Kandydaci: zdanie skauta zamiast liczb, lornetka, przerywana ramka, link do karty i akcje', () => {
   const html = renderSkauting(G, { skTab: 'kandydaci' }, { view: rich() });
   clean(html, 'kandydaci');
   assert.match(html, /Skaut wrócił z 4 kandydatami/);
   assert.match(html, /Zażółć &lt;b&gt;Gęślą&lt;\/b&gt; &quot;Jaźń&quot;|data-pcard/);
   assert.match(html, /class="pc-link" data-pcard="/); // istniejący zawodnik: nazwisko jak link
-  assert.match(html, /58-66/);
-  assert.match(html, /68-80/);
-  assert.match(html, /class="sk-rng__me"/);
+  assert.match(html, /Moim zdaniem to zawodnik na poziomie ok\. 58-66/); // ocena tylko jako zdanie skauta
+  assert.ok(!/class="sk-rng/.test(html)); // bez pasków zakresu
+  assert.ok(!/poziom <b>/.test(html)); // lista obserwowanych: bez liczb, tylko lornetka
+  assert.match(html, /class="scout-eye sk-eye" role="img" aria-label="Ocenę zna tylko skaut/);
   assert.match(html, /data-flag="1"/); // niska pewność oceny
   assert.match(html, /data-act="tf-open" data-id="/);
   assert.match(html, /Złóż ofertę/);

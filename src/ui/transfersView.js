@@ -31,6 +31,7 @@ import { checkUserPre } from '../career/preContracts.js';
 import { DOMESTIC } from '../config/calendar2026.js';
 import { renderSkauting } from './scoutingView.js'; // zakładka Skauting
 import { isPoolContracted, poolClubLabel, poolSellerClub, REGION_FILTERS, regionOf } from '../career/foreignPool.js'; // zawodnicy z zagranicy
+import { scoutHidden, scoutEye, ovrOrEye, shownOvr, hiddenAttrsHtml } from './scoutMask.js'; // kandydaci skauta: ocena ukryta (lornetka)
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size = 20) => (clubById(id) ? crestHtml(clubById(id), { size, clubsById }) : '');
@@ -52,6 +53,7 @@ export function bestOwnAt(game, pos) {
 export function compareText(game, p) {
   const b = bestOwnAt(game, p.pos);
   if (!b) return `Nie masz w kadrze zawodnika na pozycji ${p.pos}.`;
+  if (scoutHidden(game, p)) return `Twój najlepszy ${p.pos}: ${b.name}, OVR ${Math.round(b.ovr)}. Jak wypada ${p.name}, ocenia skaut w raporcie.`;
   const d = Math.round(p.ovr) - Math.round(b.ovr);
   return `Twój najlepszy ${p.pos}: ${b.name}, OVR ${Math.round(b.ovr)} (${d > 0 ? `ten lepszy o ${d}` : d < 0 ? `ten słabszy o ${-d}` : 'ten sam poziom'}).`;
 }
@@ -124,7 +126,7 @@ function sortBy(list, sort, val) {
   return [...list].sort((a, b) => {
     const va = val(a, sort.k); const vb = val(b, sort.k);
     const d = typeof va === 'string' ? va.localeCompare(vb, 'pl') : va - vb;
-    return dir * d || b.p.ovr - a.p.ovr;
+    return dir * d || val(b, 'ovr') - val(a, 'ovr'); // OVR z val: kandydat skauta bez prawdziwej oceny
   });
 }
 const willTone = (v) => (v === 'chętny' ? 'good' : v === 'otwarty' ? 'info' : v === 'niechętny' ? 'warn' : 'bad');
@@ -197,7 +199,7 @@ function marketTable(game, rows, list, sort, total) {
     const { p } = x;
     return `<tr data-pid="${esc(p.id)}"><td class="xl__pos">${posBadge(p)}</td>
       <th scope="row" class="xl__nm"><button data-act="tf-open" data-id="${esc(p.id)}" data-pid="${esc(p.id)}"><span>${cardLink(p)}</span></button></th>
-      <td class="xl__ovr">${ovrTxt(p)}</td><td class="tf-num tf-price">${x.price == null ? '<span class="tf-nfs">nie na sprzedaż</span>' : `${fmtZl(x.price)}${free || list === 'loan' ? '<small>/tydz.</small>' : ''}`}</td>
+      <td class="xl__ovr">${ovrOrEye(game, p)}</td><td class="tf-num tf-price">${x.price == null ? '<span class="tf-nfs">nie na sprzedaż</span>' : `${fmtZl(x.price)}${free || list === 'loan' ? '<small>/tydz.</small>' : ''}`}</td>
       <td>${p.age}</td>${free ? '' : `<td class="tf-l">${clubCell(p.clubId)}</td>`}<td class="tf-num">${fmtZl(p.value ?? 0)}</td>${free ? '' : `<td>${p.contract?.until ? esc(fmtDate(p.contract.until)) : '-'}</td>`}
       <td>${tag(x.will, willTone(x.will))}</td>
       <td class="tf-l tf-why">${(whyTags(x.reasons, free && recentlyMoved(p, game.date)) + dealTags(game, p)) || '<span class="xl__z">·</span>'}</td></tr>`;
@@ -224,7 +226,7 @@ function abroadTable(game, rows, sort, total) {
     const { p } = x;
     return `<tr data-pid="${esc(p.id)}"><td class="xl__pos">${posBadge(p)}</td>
       <th scope="row" class="xl__nm"><button data-act="tf-open" data-id="${esc(p.id)}" data-pid="${esc(p.id)}"><span>${cardLink(p)}</span></button></th>
-      <td class="xl__ovr">${ovrTxt(p)}</td><td class="tf-l fp-nat">${esc(NAT_NAMES[p.nat] ?? p.nat)}</td><td class="tf-l">${originCell(p)}</td>
+      <td class="xl__ovr">${ovrOrEye(game, p)}</td><td class="tf-l fp-nat">${esc(NAT_NAMES[p.nat] ?? p.nat)}</td><td class="tf-l">${originCell(p)}</td>
       <td class="tf-num tf-price">${p.free ? '<span class="fp-free">wolny</span>' : fmtZl(x.price)}</td><td class="tf-num">${fmtZl(x.wage)}<small>/tydz.</small></td>
       <td>${p.age}</td><td>${p.contract?.until ? esc(fmtDate(p.contract.until)) : '-'}</td>
       <td>${tag(x.will, willTone(x.will))}</td>
@@ -256,7 +258,7 @@ function marketView(game, ui) {
   const all = marketRows(game, list, pos, ui);
   const needWill = sort.k === 'will';
   const withWill = (x) => ({ ...x, will: playerWillingness(game, x.p).verdict });
-  const val = (x, k) => (k === 'pos' ? POS_ORDER.indexOf(x.p.pos) : k === 'name' ? x.p.name : k === 'ovr' ? x.p.ovr : k === 'price' ? (x.price ?? Infinity)
+  const val = (x, k) => (k === 'pos' ? POS_ORDER.indexOf(x.p.pos) : k === 'name' ? x.p.name : k === 'ovr' ? shownOvr(game, x.p) : k === 'price' ? (x.price ?? Infinity)
     : k === 'age' ? x.p.age : k === 'club' ? (clubById(x.p.clubId)?.name ?? x.p.abroad?.club ?? '') : k === 'value' ? x.p.value ?? 0 : k === 'until' ? (x.p.contract?.until ?? '9999')
       : k === 'nat' ? (NAT_NAMES[x.p.nat] ?? x.p.nat) : k === 'wage' ? x.wage ?? 0
       : k === 'will' ? ['chętny', 'otwarty', 'niechętny', 'odmowa'].indexOf(x.will) : 0);
@@ -291,6 +293,9 @@ function strengths(p) {
 /** Porównanie z najlepszym zawodnikiem kadry na tej pozycji: dwa paski OVR. */
 function compareBars(game, p) {
   const b = bestOwnAt(game, p.pos);
+  if (scoutHidden(game, p)) { // kandydat skauta: bez paska jego oceny
+    return `<ul class="tf-cmp"><li data-k="him"><span>${esc(p.name)}</span><span class="tf-cmp__bar tf-cmp__bar--eye">${scoutEye()}</span><b>?</b></li>${b ? `<li data-k="me"><span>${esc(`${b.name} (twój najlepszy ${p.pos})`)}</span><span class="tf-cmp__bar"><i style="width:${Math.round((ovrTxt(b) / 20) * 100)}%"></i></span><b>${ovrTxt(b)}</b></li>` : ''}</ul><p class="tf-p__txt">${esc(compareText(game, p))}</p>`;
+  }
   const bar = (who, v, k) => `<li data-k="${k}"><span>${esc(who)}</span><span class="tf-cmp__bar"><i style="width:${Math.round((v / 20) * 100)}%"></i></span><b>${v}</b></li>`;
   return `<ul class="tf-cmp">${bar(p.name, ovrTxt(p), 'him')}${b ? bar(`${b.name} (twój najlepszy ${p.pos})`, ovrTxt(b), 'me') : ''}</ul><p class="tf-p__txt">${esc(compareText(game, p))}</p>`;
 }
@@ -301,7 +306,7 @@ function cardHead(game, p, extra = '') {
     <div class="tf-ch__who"><h2>${esc(p.name)}</h2>
       <p>${posBadge(p)} <span>${esc(POS_NAMES?.[p.pos] ?? p.pos)}, ${p.age} lat, ${esc(NAT_NAMES[p.nat] ?? p.nat)}${p.clubId ? `, ${esc(clubById(p.clubId)?.name)}` : isPoolContracted(p) ? `, ${esc(poolClubLabel(p))}` : ', wolny zawodnik'}</span></p>
       ${extra}</div>
-    <b class="tf-ch__ovr" title="Ocena ogólna 1-20"><small>OVR</small>${ovrTxt(p)}</b>
+    ${scoutHidden(game, p) ? `<b class="tf-ch__ovr tf-ch__ovr--eye"><small>OVR</small>${scoutEye()}</b>` : `<b class="tf-ch__ovr" title="Ocena ogólna 1-20"><small>OVR</small>${ovrTxt(p)}</b>`}
   </header>`;
 }
 const fact = (k, v, m = '') => `<li${m ? ` data-m="${m}"` : ''}><small>${esc(k)}</small><b>${v}</b></li>`;
@@ -358,7 +363,7 @@ function playerCard(game, p, ui) {
           ${fact('Nastawienie', esc(will.verdict), willTone(will.verdict))}
         </ul>
         <div class="tf-cols">
-          ${panel('Mocne strony', 'info', `<ul class="tf-attrs">${strengths(p)}</ul>`)}
+          ${panel('Mocne strony', 'info', scoutHidden(game, p) ? hiddenAttrsHtml() : `<ul class="tf-attrs">${strengths(p)}</ul>`)}
           ${panel('Porównanie z twoją kadrą', 'misc', compareBars(game, p))}
         </div>
         ${will.reasons.length || notes.length ? panel('Uwagi', will.verdict === 'chętny' ? 'good' : 'warn', `<ul class="tf-notes">${notes.map((n) => `<li>${esc(n)}</li>`).join('')}${will.reasons.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>`) : ''}
@@ -779,7 +784,7 @@ export function transferCardHtml(game, p, { wide = false } = {}) {
   ];
   const go = `<p class="tf-pcard__go"><button class="btn btn--primary btn--sm" data-act="tf-open" data-id="${esc(p.id)}">${mine ? 'Otwórz kartę transferową' : 'Przejdź do oferty'}</button></p>`;
   return renderPlayerCard(p, {
-    wide, slot: 0, cls: 'tf-pcard', closeAttrs: 'data-act="tfcardclose"',
+    wide, slot: 0, cls: 'tf-pcard', closeAttrs: 'data-act="tfcardclose"', hidden: scoutHidden(game, p),
     facts, extra: go + playerStatsHtml(p, game),
   });
 }

@@ -18,6 +18,7 @@ import { canSign, KEEP_MAX } from '../career/squadLimit.js';
 import { limitStatus } from '../career/squadLimitSystem.js';
 import { askingPrice, notForSale, playerWillingness, inWindow, releaseCost, fmtZl } from '../career/transfers.js';
 import { isPoolContracted, poolClubLabel } from '../career/foreignPool.js';
+import { scoutHidden } from '../career/scoutOps.js'; // kandydat skauta: bez OVR (ocenę zna skaut)
 import { PLAYER_TALKS, talkBlockedText, talkSuggestions } from '../career/teamTalks.js';
 import { PROGRAMS, MODES } from '../training/config.js';
 import { locKey, playerAt, resolveMove, resolveTap, sameLoc } from './tacticsMoves.js';
@@ -304,7 +305,7 @@ function otherItems(game, p, { view, ui = {} } = {}) {
 // ------------------------------------------------------------ Nagłówek
 function header(game, p, own, L) {
   const club = p.clubId ? clubById(p.clubId)?.name : isPoolContracted(p) ? poolClubLabel(p) : null;
-  const meta = [`${p.age} lat`, `OVR ${Math.round(p.ovr)}`, own ? null : (club ?? 'wolny zawodnik')].filter(Boolean).join(', ');
+  const meta = [`${p.age} lat`, scoutHidden(game, p) ? 'ocenę zna skaut' : `OVR ${Math.round(p.ovr)}`, own ? null : (club ?? 'wolny zawodnik')].filter(Boolean).join(', ');
   let note = null;
   if (own) {
     const lp = L?.byId?.get(p.id) ?? p;

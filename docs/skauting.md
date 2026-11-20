@@ -101,6 +101,18 @@ Kandydat z regionu powyżej szczytu (`Lmax`) jest liczony tylko częściowo: śr
   (zawodnik znika z gry), 20 % zostaje na zwykłym rynku (bez wyłączności).
 - Lista obserwowanych: wszyscy kandydaci gracza (stany nowy, obserwowany, zniknął, podpisał), usuwanie z listy,
   najwyżej 60 wpisów.
+- Ukryta ocena (decyzja właściciela Nov 20, 2026): kandydat skautingu klubu gracza (`scoutHidden(game, p)`: `p.scout`
+  klubu gracza, raport nie wygasł w zwykły rynek, zawodnik bez klubu w Polsce) nie pokazuje w Transferach prawdziwego
+  OVR ani atrybutów. Zamiast liczby jest tylko ikona lornetki (`src/ui/scoutMask.js`, opis „Ocenę zna tylko skaut.
+  Zobacz raport skauta”), bez przedziału: listy rynku (Wolni, Z zagranicy), nagłówek karty transferowej, porównanie
+  z kadrą (bez „lepszy o”), karta w okienku z nazwiska, Profil i statystyki (bez gwiazdek i potencjału), menu
+  zawodnika, nagłówek rozmów. Atrybuty i Mocne strony: ramka z notą „Dokładne atrybuty poznasz po transferze...”.
+  Sortowanie po OVR używa oceny widzianej przez skauta (`rep.seenOvr`), nie prawdziwej. Po podpisaniu w klubie gracza
+  widać wszystko jak u każdego własnego zawodnika; kluby AI bez zmian; po wygaśnięciu raportu w zwykły rynek zawodnik
+  jest jak każdy z puli. Wartość rynkowa, cena, pensja i nastawienie zostają widoczne (jak dotąd).
+- Ocena skauta tylko jako jego zdanie (`scoutOpinion`): w raporcie w poczcie i na karcie kandydata w Skautingu, np.
+  „Moim zdaniem to zawodnik na poziomie ok. 11-12, potencjał do 14.” (pewność wysoka), „Wygląda mi na zawodnika...”
+  (średnia), „Trudno mi go dobrze ocenić. Chyba gra mniej więcej...” (niska). Bez pasków i liczb w kartach i listach.
 
 ## 8. Kluby AI
 
@@ -144,7 +156,9 @@ w grze (`game.editor`) tak samo. Plik v5 w starszej grze: komunikat o nowszej we
 
 ## 12. Ograniczenia i do decyzji
 
-- Karta zawodnika w Transferach pokazuje prawdziwy OVR każdego zawodnika rynku (jak dotąd), więc błąd oceny raportu
-  widać głównie w potencjale, cenie, chęci i adaptacji. Ukrycie OVR kandydatów do decyzji właściciela.
+- OVR kandydatów skautingu ukryty (rozdz. 7). Wartość rynkowa (`p.value`) dalej widoczna i częściowo zdradza poziom
+  (do decyzji właściciela).
+- Wolny kandydat znaleziony poza oknem jest „wolny po zamknięciu okna” (`lateFree`): rozmowy dopiero w następnym oknie,
+  choć raport pisze „podpisze bez odstępnego” (do decyzji właściciela).
 - Początkowa liczba skautów w klubach bez zmian (plan sztabu jak dotąd), nie wg propozycji projektu (Ekstraklasa 2-3).
 - Na później: obserwowanie dowolnego zawodnika, misje cykliczne, raport porównawczy, misje krajowe.

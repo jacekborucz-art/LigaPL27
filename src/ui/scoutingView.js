@@ -4,8 +4,9 @@
 import { esc, fmtDate, fmtDay } from './dom.js';
 import { GROUP } from '../career/squad.js';
 import { clubById } from '../data/clubs_pl.js';
-import { SCOUT_REGIONS, scoutingView, missionQuote } from '../career/scoutOps.js';
+import { SCOUT_REGIONS, SCOUT, scoutingView, missionQuote } from '../career/scoutOps.js';
 import { cardLink, bestOwnAt } from './transfersView.js';
+import { scoutEye } from './scoutMask.js'; // ocena kandydata tylko w zdaniu skauta (bez liczb w kartach i listach)
 
 export const SK_TABS = [['misje', 'Skauci i misje'], ['kandydaci', 'Kandydaci'], ['wolni', 'Wolni skauci']];
 const WEEKS = [1, 2, 4, 6];
@@ -168,7 +169,7 @@ function scoutCard(s, ui, game, view) {
   const asked = ui.skAsk?.kind === 'fire' && ui.skAsk.id === s.id;
   const why = away ? `Wróci ${day(s.busyUntil)}. Wcześniej nie przyjmie nowego zlecenia.` : rest ? `Odpoczywa${s.busyUntil ? ` do ${day(s.busyUntil)}` : ''}. Wcześniej nie przyjmie nowego zlecenia.` : '';
   const foot = asked
-    ? `<div class="sk-ask" role="alertdialog" aria-label="Potwierdzenie zwolnienia"><p>Zwolnić ${esc(s.name)}? Zwolnienie może wiązać się z odprawą.</p><div class="sk-acts"><button class="btn btn--primary" data-act="sk-fire" data-id="${esc(s.id)}">Tak, zwolnij</button><button class="btn btn--quiet" data-act="sk-ask-no">Nie</button></div></div>`
+    ? `<div class="sk-ask" role="alertdialog" aria-label="Potwierdzenie zwolnienia"><p>Zwolnić skauta (${esc(s.name)})? Zwolnienie może wiązać się z odprawą.</p><div class="sk-acts"><button class="btn btn--primary" data-act="sk-fire" data-id="${esc(s.id)}">Tak, zwolnij</button><button class="btn btn--quiet" data-act="sk-ask-no">Nie</button></div></div>`
     : `<div class="sk-sc__foot"><span class="sk-wage">Pensja <b>${zl(s.wage)}</b> / mies.</span>
         <div class="sk-acts"><button class="btn btn--primary" data-act="sk-open-order" data-scout="${esc(s.id)}"${why ? ` disabled aria-describedby="sk-why-${esc(s.id)}"` : ''}>Zleć wyjazd</button><button class="btn btn--quiet" data-act="sk-fire-ask" data-id="${esc(s.id)}">Zwolnij</button></div></div>`;
   return `<article class="sk-card sk-sc" data-k="${k}" aria-label="Skaut ${esc(s.name)}">
@@ -189,9 +190,12 @@ function missionCard(m, game, view, ui) {
   const pct = Math.round((done / total) * 100);
   const asked = ui.skAsk?.kind === 'cancel' && ui.skAsk.id === m.id;
   const events = (m.events ?? []).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  // Zasada z cancelMission: w pierwszych dniach (SCOUT.cancelDays) wraca połowa kosztu, później nic
+  const early = daysBetween(m.start, game.date) < num(SCOUT?.cancelDays ?? 2);
+  const back = early ? Math.round(num(m.cost) * num(SCOUT?.refund ?? 0.5)) : 0;
   const cancel = asked
-    ? `<div class="sk-ask" role="alertdialog" aria-label="Potwierdzenie odwołania"><p>Odwołać wyjazd? Poniesione koszty (${zl(m.cost)}) nie wracają.</p><div class="sk-acts"><button class="btn btn--primary" data-act="sk-cancel" data-id="${esc(m.id)}">Tak, odwołaj</button><button class="btn btn--quiet" data-act="sk-ask-no">Nie</button></div></div>`
-    : `<div class="sk-acts"><button class="btn btn--quiet" data-act="sk-cancel-ask" data-id="${esc(m.id)}">Odwołaj wyjazd</button></div><p class="sk-note">Odwołanie nie zwraca poniesionych kosztów podróży.</p>`;
+    ? `<div class="sk-ask" role="alertdialog" aria-label="Potwierdzenie odwołania"><p>Odwołać wyjazd? ${early ? `Wróci połowa kosztów (${zl(back)} z ${zl(m.cost)}).` : `Poniesione koszty (${zl(m.cost)}) nie wracają.`}</p><div class="sk-acts"><button class="btn btn--primary" data-act="sk-cancel" data-id="${esc(m.id)}">Tak, odwołaj</button><button class="btn btn--quiet" data-act="sk-ask-no">Nie</button></div></div>`
+    : `<div class="sk-acts"><button class="btn btn--quiet" data-act="sk-cancel-ask" data-id="${esc(m.id)}">Odwołaj wyjazd</button></div><p class="sk-note">${early ? 'Odwołanie w pierwszych 2 dniach zwraca połowę kosztów, później nic.' : 'Odwołanie nie zwraca już poniesionych kosztów.'}</p>`;
   return `<article class="sk-card sk-card--tint sk-mis" data-k="warn" aria-label="Misja w toku">
     <div class="sk-mis__top"><h4>${esc(m.scoutName)}, ${esc(m.regionLabel || regionLabel(m.region))}</h4><span class="sk-tag sk-tag--dot" data-k="warn">wraca ${date(m.end)}</span></div>
     ${profileChips(m)}
@@ -214,19 +218,22 @@ function misjeTab(game, view, ui) {
   const slots = view.staffSlots ?? { used: 0, max: 0 };
   const away = view.missions.filter((m) => m.status === 'w toku');
   const freeSlot = slots.used < slots.max;
+  const staffFull = slots.staffFree === 0; // cały sztab pełny (z ofertami w toku): miejsce skauta jest, ale nie ma kogo przyjąć
   const recent = view.missions.filter((m) => m.status !== 'w toku').sort((a, b) => String(b.end).localeCompare(String(a.end))).slice(0, 5);
   const tag = (m) => (m.status === 'odwołana' ? '<span class="sk-tag" data-k="mute">odwołana</span>'
     : num(m.result?.n) ? `<span class="sk-tag" data-k="good">${num(m.result.n)} ${num(m.result.n) === 1 ? 'kandydat' : 'kandydatów'}</span>` : '<span class="sk-tag" data-k="mute">bez kandydatów</span>');
   const side = `<aside class="sk-side" aria-label="Stan skautingu">
     <div class="sk-card"><h4>Miejsca skautów w sztabie</h4><span class="sk-meter" role="img" aria-label="${num(slots.used)} z ${num(slots.max)}"><i style="width:${slots.max ? Math.round((num(slots.used) / slots.max) * 100) : 0}%"></i></span>
-      <p class="sk-note">${num(slots.used)} z ${num(slots.max)} miejsc. Limit zależy od ligi klubu. Skautów zatrudnisz też w Trening, Sztab.</p></div>
+      <p class="sk-note">${num(slots.used)} z ${num(slots.max)} miejsc. Limit zależy od ligi klubu. Skautów zatrudnisz też w Trening, Sztab.${staffFull ? ` Cały sztab jest pełny (${num(slots.staffUsed)} z ${num(slots.staffLimit)} osób z ofertami w toku).` : ''}</p></div>
     <div class="sk-card"><h4>Koszty w tym sezonie</h4><dl class="sk-kv"><div><dt>Pensje skautów</dt><dd>${zl(view.costs?.wagesMonthly)} / mies.</dd></div><div><dt>Wyjazdy</dt><dd>${zl(view.costs?.tripsSeason)}</dd></div><div><dt>Prowizje</dt><dd>${zl(view.costs?.commissionsSeason)}</dd></div></dl></div>
     ${away.length ? '<div class="sk-card"><h4>Skaut w podróży</h4><p class="sk-note">Do powrotu skaut nie przyjmie nowego zlecenia. Wyniki wyjazdu zobaczysz w zakładce Kandydaci.</p></div>' : ''}
   </aside>`;
   const empty = !view.scouts.length
     ? '<div class="sk-empty-slot"><b>Nie masz skautów</b><span>Zatrudnij skauta na stałe albo zleć jednorazowy wyjazd skautowi z listy.</span><button class="btn btn--primary" data-act="sk-tab" data-t="wolni">Znajdź skauta</button></div>' : '';
   const slotCard = freeSlot && view.scouts.length
-    ? `<div class="sk-empty-slot"><b>Wolne miejsce</b><span>Limit sztabu pozwala na jeszcze ${slots.max - slots.used === 1 ? 'jednego skauta' : `${slots.max - slots.used} skautów`}.</span><button class="btn btn--quiet" data-act="sk-tab" data-t="wolni">Znajdź skauta</button></div>` : '';
+    ? (staffFull
+      ? `<div class="sk-empty-slot"><b>Wolne miejsce skauta</b><span>Cały sztab jest pełny (${num(slots.staffUsed)} z ${num(slots.staffLimit)} osób, z ofertami w toku). Zwolnij kogoś, żeby zatrudnić skauta na stałe. Na jedną misję weźmiesz skauta z listy zawsze.</span><button class="btn btn--quiet" data-act="sk-tab" data-t="wolni">Skauci na zlecenie</button></div>`
+      : `<div class="sk-empty-slot"><b>Wolne miejsce</b><span>Limit sztabu pozwala na jeszcze ${slots.max - slots.used === 1 ? 'jednego skauta' : `${slots.max - slots.used} skautów`}.</span><button class="btn btn--quiet" data-act="sk-tab" data-t="wolni">Znajdź skauta</button></div>`) : '';
   return `${heroHtml(view, away.length)}
   <div class="sk-grid sk-grid--side"><div class="sk-main">
     <section aria-labelledby="h-our"><div class="sk-h"><h3 id="h-our">Nasi skauci</h3><p>Pięć cech w skali 1 do 20, kreska to środek skali</p></div>
@@ -237,21 +244,12 @@ function misjeTab(game, view, ui) {
 }
 
 // ------------------------------------------------------------ Zakładka 2: kandydaci
-function rngRow(label, r, kind, me) {
-  const lo = 5; const hi = 20; // skala OVR i potencjału w grze (1-20)
-  const pc = (v) => Math.max(0, Math.min(100, ((num(v) - lo) / (hi - lo)) * 100));
-  const a = num(r?.[0]); const b = num(r?.[1]);
-  return `<div class="sk-rng__row" data-p="${kind}"><span>${label}</span><span class="sk-rng__track" role="img" aria-label="${label} od ${a} do ${b}"><span class="sk-rng__band" style="--l:${pc(a).toFixed(1)}%;--w:${Math.max(3, pc(b) - pc(a)).toFixed(1)}%"></span>${me ? `<span class="sk-rng__me" style="--l:${pc(me).toFixed(1)}%"></span>` : ''}</span><b>${a}-${b}</b></div>`;
-}
-
 function candCard(c, game, scoutName) {
   const p = game.world?.players?.[c.pid] ?? null;
   const gone = c.state === 'zniknął' || c.state === 'podpisał';
   const watched = c.state === 'obserwowany';
   const best = bestOwnAt(game, c.pos);
-  const me = best ? Math.round(best.ovr) : 0;
   const [confTxt, confK] = CONF_TXT[c.confidence] ?? CONF_TXT['średnia'];
-  const err = Math.ceil(Math.max(0, num(c.ovrRange?.[1]) - num(c.ovrRange?.[0])) / 2);
   const price = c.free ? `Bez odstępnego<small>wolny zawodnik</small>` : `${money(c.priceRange?.[0])} do ${money(c.priceRange?.[1])}<small>odstępne, szacunek skauta</small>`;
   const wageR = `${zl(c.wageRange?.[0])} do ${zl(c.wageRange?.[1])}<small>tygodniowo</small>`;
   const nm = p ? cardLink(p) : esc(c.name);
@@ -261,9 +259,9 @@ function candCard(c, game, scoutName) {
     <div class="sk-cand__top"><div><h4 class="sk-cand__nm">${nm}</h4>
       <div class="sk-cand__id">${natChip(c.nat)}${posChip(c.pos)}<span>${num(c.age)} lat</span>${c.state === 'nowy' ? '<span class="sk-tag" data-k="info">nowy</span>' : ''}${num(c.injuredDays) > 0 ? `<span class="sk-tag" data-k="bad">kontuzja, ${num(c.injuredDays)} dni</span>` : ''}</div>
       <p class="sk-cand__club">${esc(c.clubLabel)}</p></div>
-      <div class="sk-conf"><span class="sk-tag sk-tag--dot" data-k="${confK}">${esc(confTxt)}</span><span>błąd oceny do ${err} pkt</span></div></div>
+      <div class="sk-conf">${scoutEye('sk-eye')}<span class="sk-tag sk-tag--dot" data-k="${confK}">${esc(confTxt)}</span></div></div>
     ${gone ? `<p class="sk-gone" role="status">${esc(c.goneText || (c.state === 'podpisał' ? 'Podpisał kontrakt z innym klubem.' : 'Zniknął z rynku.'))}</p>` : ''}
-    <div class="sk-rng">${rngRow('Poziom', c.ovrRange, 'ovr', me)}${rngRow('Potencjał', c.potRange, 'pot', 0)}<p class="sk-rng__legend">${me ? `<i></i>Twój najlepszy ${esc(c.pos)} ma ${me}. ` : ''}Pasek to zakres, w którym skaut widzi zawodnika.</p></div>
+    <blockquote class="sk-opinion sk-opinion--lvl">${esc(c.opinion || '')}<cite>Ocena skauta${scoutName ? `, ${esc(scoutName)}` : ''}${best ? `. Twój najlepszy ${esc(c.pos)}: ${esc(best.name)}, OVR ${Math.round(best.ovr)}` : ''}</cite></blockquote>
     <dl class="sk-facts">
       <div><dt>${c.free ? 'Cena' : 'Cena transferowa'}</dt><dd>${price}</dd></div>
       <div><dt>Oczekiwana pensja</dt><dd>${wageR}</dd></div>
@@ -289,7 +287,7 @@ function watchRow(c, game) {
     : `${p ? `<button class="btn btn--primary btn--sm" data-act="tf-open" data-id="${esc(c.pid)}">${c.free ? 'Rozmawiaj' : 'Złóż ofertę'}</button>` : ''}<button class="btn btn--quiet btn--sm" data-act="sk-watch" data-id="${esc(c.pid)}" data-on="0">Przestań obserwować</button>`;
   return `<li class="sk-w" data-k="${k}" data-gone="${gone ? 1 : 0}">
     <div class="sk-w__who"><span class="sk-w__nm">${nm} ${natChip(c.nat)}${posChip(c.pos)}</span>
-      <span class="sk-w__meta"><span>${num(c.age)} lat</span><span>poziom <b>${num(c.ovrRange?.[0])}-${num(c.ovrRange?.[1])}</b></span><span>potencjał <b>${num(c.potRange?.[0])}-${num(c.potRange?.[1])}</b></span>${gone ? '' : `<span>${c.free ? '<b>wolny</b>' : `cena <b>${money(c.priceRange?.[0])} do ${money(c.priceRange?.[1])}</b>`}</span>`}<span>${esc(c.clubLabel)}</span></span></div>
+      <span class="sk-w__meta"><span>${num(c.age)} lat</span>${scoutEye('sk-eye')}${gone ? '' : `<span>${c.free ? '<b>wolny</b>' : `cena <b>${money(c.priceRange?.[0])} do ${money(c.priceRange?.[1])}</b>`}</span>`}<span>${esc(c.clubLabel)}</span></span></div>
     <div class="sk-w__exp">${exp}</div>
     <div class="sk-acts">${acts}</div>
   </li>`;
@@ -440,7 +438,7 @@ export function orderSheetHtml(game, view, ui, quote = safeQuote) {
       ${q.ok ? `<div class="sk-chance" data-k="${k}"><div class="sk-chance__w"><span>Szansa na kandydatów: ${esc(q.chance)}</span>${q.expected ? `<small>zwykle ${esc(expectedTxt(q.expected))}</small>` : ''}</div><div class="sk-chance__seg" aria-hidden="true"><i class="on"></i><i class="${q.chance !== 'niska' ? 'on' : ''}"></i><i class="${q.chance === 'wysoka' ? 'on' : ''}"></i></div></div>
       <dl class="sk-kv"><div><dt>Koszt wyjazdu</dt><dd>${zl(q.cost)}</dd></div><div><dt>Wraca</dt><dd>${date(q.returnDate)}</dd></div></dl>
       ${q.reasons?.length ? `<ul class="sk-because">${q.reasons.slice(0, 3).map((r) => `<li>${esc(r)}</li>`).join('')}</ul>` : ''}
-      <p class="sk-note-bot">Skaut jest nieobecny w klubie przez cały wyjazd. Koszt płatny od razu, odwołanie go nie zwraca.</p>`
+      <p class="sk-note-bot">Skaut jest nieobecny w klubie przez cały wyjazd. Koszt płatny od razu. Odwołanie w pierwszych 2 dniach zwraca połowę, później nic.</p>`
     : `<p class="sk-fit" data-k="bad" role="alert"><b>${esc(q.text || 'Zlecenie jest niepełne.')}</b></p>`}
       ${ui.skMsg ? `<p class="sk-fit" data-k="bad" role="alert"><b>${esc(ui.skMsg)}</b></p>` : ''}
       <div class="sk-acts"><button type="button" class="btn btn--primary" data-act="sk-start"${q.ok ? '' : ' disabled'}>Zleć wyjazd</button><button type="button" class="btn btn--quiet" data-act="sk-close-order">Anuluj</button></div>

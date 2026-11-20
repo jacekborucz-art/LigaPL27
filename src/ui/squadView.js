@@ -13,6 +13,7 @@ import { positionMapHtml } from './positionMap.js';
 import { playerStatsHtml } from './playerStatsView.js';
 import { scoutLine } from '../career/assistantReport.js'; // raport skauta: potencjał zawodników spoza klubu (docs/sztab.md)
 import { anyClub } from '../season/season.js';
+import { scoutEye, hiddenAttrsHtml } from './scoutMask.js'; // kandydat skauta: ocena i atrybuty ukryte
 import { playerTags, suspSplit, suspText } from './playerTags.js'; // znaczniki stanu za nazwiskiem (docs/tagi-zawodnika.md)
 
 /** Potencjał w profilu: zawodnik spoza klubu gracza oceniany przez skauta (precyzja z jakości skauta). */
@@ -252,12 +253,13 @@ function traitPhrases(traits) {
 export function renderPlayerProfile(p, opts = {}) {
   const { leagueOvrs = [], clubName = '', foreign = false, back = { act: 'squadback', label: 'Wróć do kadry' } } = opts;
   const alt = Object.entries(p.alt || {}).filter(([, v]) => v >= 70).map(([k]) => k);
+  const hidden = !!opts.hidden; // kandydat skauta przed podpisaniem: bez OVR, gwiazdek, atrybutów i potencjału
   return `
     <div class="pp-top"><button class="btn btn--quiet" data-act="${esc(back.act)}">${esc(back.label)}</button>${opts.promote ? (opts.promote.ok ? `<button class="btn btn--primary" data-act="ac-promote" data-id="${esc(p.id)}">Przenieś do pierwszego składu</button>` : `<span class="hint">${esc(opts.promote.text)}</span>`) : ''}</div>
     ${opts.promoteMsg ? `<p class="hint" role="status">${esc(opts.promoteMsg)}</p>` : ''}
     ${foreign ? '<p class="hint">Zawodnik innego klubu: morale, świeżość, pensja i agent są znane tylko jego klubowi.</p>' : ''}
     <header class="pp" data-pid="${esc(p.id)}">
-      <div class="pp__ovr"><span class="pp__ovrn" title="Ocena ogólna w skali 1-20">${Math.round(p.ovr)}</span>${stars(starsFor(p.ovr, leagueOvrs))}</div>
+      <div class="pp__ovr">${hidden ? scoutEye('pp__ovrn pp__ovrn--eye') : `<span class="pp__ovrn" title="Ocena ogólna w skali 1-20">${Math.round(p.ovr)}</span>${stars(starsFor(p.ovr, leagueOvrs))}`}</div>
       <div>
         <h2 class="pp__name">${esc(p.name)}</h2>
         <p class="muted">${esc(POS_NAMES[p.pos])}${p.side ? (p.side === 'L' ? ', lewa strona' : ', prawa strona') : ''}${p.variant ? `, ${esc(p.variant)}` : ''}${alt.length ? `. Gra też: ${esc(alt.join(', '))}` : ''}</p>
@@ -267,7 +269,7 @@ export function renderPlayerProfile(p, opts = {}) {
     <div class="pp__layout">
     <div class="pp__cols">
       <section>
-        ${attrGroupsHtml(p)}
+        ${hidden ? hiddenAttrsHtml() : attrGroupsHtml(p)}
       </section>
       <section>
         <h3>Stan</h3>
@@ -298,7 +300,7 @@ export function renderPlayerProfile(p, opts = {}) {
           <li><span class="k">Osobowość</span><span>${esc(p.persona)}</span></li>
           <li><span class="k">Reputacja</span><span>${repHtml(p)}</span></li>
           ${traitPhrases(p.traits).map((t) => `<li><span class="k"></span><span>${esc(t)}</span></li>`).join('')}
-          <li><span class="k">Potencjał</span><span>${potentialText(p, opts.game)}</span></li>
+          <li><span class="k">Potencjał</span><span>${hidden ? 'Ocena w raporcie skauta (Transfery, Skauting)' : potentialText(p, opts.game)}</span></li>
         </ul>
       </section>
     </div>

@@ -17,6 +17,7 @@ import { POS_NAMES } from '../data/attributes.js';
 import { Rng, clamp } from '../core/rng.js';
 import { contractIssues, recordVeto, appealStatus, appealVeto, boardCaps } from '../career/boardRequests.js';
 import { esc, fmtDate } from './dom.js';
+import { scoutHidden } from '../career/scoutOps.js'; // kandydat skauta: bez OVR (ocenę zna skaut)
 
 export const isNegotiationAction = (act) => typeof act === 'string' && act.startsWith('ng-');
 
@@ -409,7 +410,7 @@ function header(game, ng, player, view) {
     <div class="ng-who">
       <p class="ng-kicker">${esc(title)}</p>
       <h2>${esc(player.name)}</h2>
-      <p class="muted">${esc(`${ageLabel(player.age)}, ${pos}, OVR ${Math.round(player.ovr ?? 0)}, ${where}`)}</p>
+      <p class="muted">${esc(`${ageLabel(player.age)}, ${pos}, ${scoutHidden(game, player) ? 'ocenę zna skaut' : `OVR ${Math.round(player.ovr ?? 0)}`}, ${where}`)}</p>
       <p class="ng-contract">${esc(contractLine)}</p>
       ${ng.kind === 'sign' && ng.fee > 0 ? `<p class="ng-contract">Kwota transferu: <b>${esc(formatZl(ng.fee))}</b></p>` : ''}
     </div>

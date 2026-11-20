@@ -24,7 +24,7 @@ import { marketValue } from '../world/playerGen.js';
 import { attrsAround } from '../training/staff.js';
 import { daysBetween } from '../training/state.js';
 import { SCOUT_REGIONS, SCOUT_REGION, SCOUT_REGION_KEYS, scoutRegionsFor, regionBand, bestRegion, REGION_POPULARITY } from './scoutRegions.js';
-import { ensureStaff, rosterOf, syncStaff, expectedWage, makeOffer, fireStaff, checkOffer, roleCap } from './staffMarket.js';
+import { ensureStaff, rosterOf, syncStaff, expectedWage, makeOffer, fireStaff, checkOffer, roleCap, staffLimit } from './staffMarket.js';
 import { book, spendable, wageRoom } from './finance.js';
 import { clubReputation } from './reputation.js';
 import { genPoolPlayerFor, foreignAskingPrice, poolClubLabel, genericClub, POOL } from './foreignPool.js';
@@ -612,6 +612,28 @@ export function makeReport(game, m, scout, p, flags = {}) {
   };
 }
 
+/**
+ * Ukryta ocena (decyzja właściciela Nov 20, 2026): kandydat ze skautingu klubu gracza, dopóki jest kandydatem
+ * (raport nie wygasł w zwykły rynek) i nie podpisał kontraktu w Polsce. Widoki Transferów pokazują wtedy zamiast
+ * OVR i atrybutów ikonę lornetki; ocenę zna tylko skaut (zdanie w raporcie, scoutOpinion). Kluby AI bez zmian.
+ */
+export const scoutHidden = (game, p) => !!p?.scout && !!game && p.scout.club === game.clubId && !p.scout.released && !p.clubId;
+
+/**
+ * Ocena skauta jako jego zdanie (raport w poczcie i karta kandydata w Skautingu), z przedziałów raportu. Słabsza
+ * pewność to ostrożniejsze, bardziej mgliste słowa. r: { ovrRange, potRange, confidence }.
+ */
+export function scoutOpinion(r) {
+  const [lo, hi] = r?.ovrRange ?? [];
+  if (lo == null) return 'Nie zdążyłem go dobrze ocenić.';
+  const phi = r.potRange?.[1] ?? hi;
+  const lvl = lo === hi ? `${lo}` : `${lo}-${hi}`;
+  const grows = phi > hi;
+  if (r.confidence === 'wysoka') return `Moim zdaniem to zawodnik na poziomie ok. ${lvl}${grows ? `, potencjał do ${phi}` : ', bez dużego zapasu na rozwój'}.`;
+  if (r.confidence === 'średnia') return `Wygląda mi na zawodnika na poziomie ok. ${lvl}${grows ? `, potencjał może sięgnąć ${phi}` : ', raczej bez dużego zapasu na rozwój'}.`;
+  return `Trudno mi go dobrze ocenić. Chyba gra mniej więcej na poziomie ${lvl}${grows ? `, może rozwinąć się do ok. ${phi}, ale to tylko przeczucie` : ''}.`;
+}
+
 /** Termin ważności raportu: wolni 4 tygodnie, z kontraktem 6; poza oknem 14 dni po otwarciu najbliższego, najwyżej 14 tygodni. */
 export function candidateUntil(date, free) {
   const base = addDays(date, free ? SCOUT.valid.free : SCOUT.valid.contract);
@@ -672,10 +694,10 @@ function reportMessage(game, m, ids, date) {
   const lines = ids.map((id) => {
     const c = S.cands[id]; const r = c.rep;
     const price = r.free ? 'wolny' : `cena ${fmtK(r.priceRange[0])} do ${fmtK(r.priceRange[1])}`;
-    return `- ${c.snap.pos} ${c.snap.name}, ${yearsWord(c.snap.age)}, ${NAT_NAMES[c.snap.nat] ?? c.snap.nat}: ocena ${r.ovrRange[0]}-${r.ovrRange[1]}, potencjał ${r.potRange[0]}-${r.potRange[1]}, ${price}. ${r.willingness}.`;
+    return `- ${c.snap.pos} ${c.snap.name}, ${yearsWord(c.snap.age)}, ${NAT_NAMES[c.snap.nat] ?? c.snap.nat}, ${price}. ${r.willingness}. ${scoutOpinion(r)}`;
   });
   const body = ids.length
-    ? `${head}\n\nKandydaci (${ids.length}):\n${lines.join('\n')}${evs.length ? `\n\nZ dziennika wyjazdu:\n${evs.join('\n')}` : ''}\n\nZawodnicy są na liście obserwowanych w Transfery, Skauting. Raporty są ważne kilka tygodni, potem kandydaci mogą zniknąć z rynku.`
+    ? `${head}\n\nKandydaci (${ids.length}):\n${lines.join('\n')}${evs.length ? `\n\nZ dziennika wyjazdu:\n${evs.join('\n')}` : ''}\n\nKarty kandydatów są w Transfery, Skauting, Kandydaci. Moja ocena to szacunek: dokładnie poznasz zawodnika po transferze. Raporty są ważne kilka tygodni, potem kandydaci mogą zniknąć z rynku.`
     : `${head}\n\nSkaut wrócił bez kandydatów.${evs.length ? `\n\nZ dziennika wyjazdu:\n${evs.join('\n')}` : ''}\n\nMożliwe przyczyny: krótki wyjazd, trudny profil albo region poza wiedzą skauta. Możesz powtórzyć zlecenie po 14 dniach albo zmienić profil.`;
   return createMessage({
     date, key: `scout-report:${m.id}`, category: 'transfers', from: m.scoutName, priority: 'important',
@@ -957,7 +979,7 @@ export function scoutingView(game) {
     candidates.push({
       pid: c.pid, missionId: c.mission, name: c.snap.name, nat: c.snap.nat, age: p?.age ?? c.snap.age, pos: c.snap.pos,
       ovrRange: r.ovrRange ?? null, potRange: r.potRange ?? null, confidence: r.confidence ?? 'niska', priceRange: r.priceRange ?? [0, 0], wageRange: r.wageRange ?? [0, 0],
-      willingness: r.willingness ?? 'Wahający się', adaptation: r.adaptation ?? 'średnie', strengths: r.strengths ?? [], weaknesses: r.weaknesses ?? [], note: r.note ?? '',
+      willingness: r.willingness ?? 'Wahający się', adaptation: r.adaptation ?? 'średnie', strengths: r.strengths ?? [], weaknesses: r.weaknesses ?? [], note: r.note ?? '', opinion: scoutOpinion(r),
       free: p ? !!p.free && !p.clubId : !!r.free, clubLabel: p && !p.clubId ? (p.free ? 'bez klubu' : poolClubLabel(p)) : r.clubLabel ?? '', injuredDays: p?.injuryDays ?? 0,
       until: c.state === 'active' ? c.until : null, state, goneText,
     });
@@ -971,7 +993,8 @@ export function scoutingView(game) {
     };
   });
   return {
-    scouts, staffSlots: { used: mine.length, max: roleCap(clubId, 'skaut') },
+    // staffFree: wolne miejsca w całym sztabie (z ofertami w toku); przy pełnym sztabie nie ma miejsca na skauta na stałe
+    scouts, staffSlots: (() => { const L = staffLimit(game, clubId); return { used: mine.length, max: roleCap(clubId, 'skaut'), staffFree: L.free, staffUsed: L.used, staffLimit: L.limit }; })(),
     costs: { wagesMonthly: mine.reduce((s, p) => s + (p.wage ?? 0), 0), tripsSeason: Math.max(0, st.trips), commissionsSeason: st.commissions },
     missions, candidates, freeScouts, refreshDate: nextRefresh(date), newCandidates: fresh,
   };

@@ -10,6 +10,7 @@ import { attrGroupsHtml } from './squadView.js';
 import { esc } from './dom.js';
 import { formChartHtml } from './formChart.js';
 import { positionMapHtml } from './positionMap.js';
+import { scoutEye, hiddenAttrsHtml } from './scoutMask.js'; // kandydat skauta: ocena i atrybuty ukryte
 
 export const WIDE_CARD = '(min-width: 1100px)'; // ten sam próg co pływająca karta w app.css
 const CARD_KEY = 'lp27.tac.card.';
@@ -29,8 +30,9 @@ export function barFactHtml(v) {
  * Karta zawodnika p. facts: lista z cardFact. extra: HTML pod atrybutami (statystyki).
  * wide: pływające okno PC. slot: miejsce okna (0 albo 1). pinned: stan przypięcia (null: bez przycisku przypięcia).
  * closeAttrs / pinAttrs: atrybuty akcji przycisków (np. data-act w Kadrze, data-md w meczu). cls: dodatkowa klasa okna.
+ * hidden: kandydat skauta przed podpisaniem (lornetka zamiast OVR, bez atrybutów; src/ui/scoutMask.js).
  */
-export function renderPlayerCard(p, { facts = [], extra = '', wide = false, slot = 0, pinned = null, closeAttrs = '', pinAttrs = '', cls = '' } = {}) {
+export function renderPlayerCard(p, { facts = [], extra = '', wide = false, slot = 0, pinned = null, closeAttrs = '', pinAttrs = '', cls = '', hidden = false } = {}) {
   const hid = wide ? `tcard-h-${slot}` : 'tdet-h';
   const pin = pinned === null ? '' : `
       <button class="tcard__pin" type="button" ${pinAttrs} aria-pressed="${pinned}" aria-label="Przypnij kartę (zostaje przy otwieraniu drugiej, do porównania)" title="Przypnij kartę"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M15 3l6 6-2 1-3 3 1 5-2 2-4-4-5 5-1-1 5-5-4-4 2-2 5 1 3-3z"/></svg></button>`;
@@ -44,7 +46,7 @@ export function renderPlayerCard(p, { facts = [], extra = '', wide = false, slot
     ${bar}
     <div class="tdet__in">
       <header class="tdet__head">
-        <span class="tdet__ovr" aria-label="Ocena ogólna ${Math.round(p.ovr)} w skali 1-20" title="Ocena ogólna w skali 1-20">${Math.round(p.ovr)}</span>
+        ${hidden ? scoutEye('tdet__ovr tdet__ovr--eye') : `<span class="tdet__ovr" aria-label="Ocena ogólna ${Math.round(p.ovr)} w skali 1-20" title="Ocena ogólna w skali 1-20">${Math.round(p.ovr)}</span>`}
         <span class="pos" data-g="${GROUP[p.pos]}">${esc(posText(p))}</span>
         <button class="tdet__x" ${closeAttrs} aria-label="Zamknij atrybuty">×</button>
         <div class="tdet__title">
@@ -56,7 +58,7 @@ export function renderPlayerCard(p, { facts = [], extra = '', wide = false, slot
         ${facts.map((f) => `<div${f.bad ? ' class="is-bad"' : ''}><dt>${f.k}</dt><dd>${f.html}</dd></div>`).join('\n        ')}
       </dl>
       <div class="tdet__vis">${formChartHtml(p)}${positionMapHtml(p)}</div>
-      ${wide && p.pos === 'BR' // bramkarz na PC: Mentalne nad Fizycznymi, Bramkarskie pod Technicznymi (2 kolumny)
+      ${hidden ? hiddenAttrsHtml() : wide && p.pos === 'BR' // bramkarz na PC: Mentalne nad Fizycznymi, Bramkarskie pod Technicznymi (2 kolumny)
         ? `<div class="tdet__groups tdet__groups--gk">${attrGroupsHtml(p, { heading: 'h4', order: ['mental', 'phys', 'tech', 'gk'] })}</div>`
         : `<div class="tdet__groups">${attrGroupsHtml(p, { heading: 'h4' })}</div>`}
       ${extra ? `<div class="tdet__stats">${extra}</div>` : ''}

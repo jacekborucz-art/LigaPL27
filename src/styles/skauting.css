@@ -184,16 +184,6 @@ body:has(.sk-sheet) { overflow: hidden; }
 .sk-cand__id .pos { min-width: 40px; }
 .sk-cand__club { font-size: var(--step--1); color: var(--text-muted); margin: 4px 0 0; }
 .sk-conf { display: grid; justify-items: end; gap: 2px; font-size: 12px; color: var(--text-muted); text-align: right; }
-.sk-rng { display: grid; gap: 8px; }
-.sk-rng__row { display: grid; grid-template-columns: 74px minmax(0, 1fr) 68px; gap: 8px; align-items: center; font-size: var(--step--1); }
-.sk-rng__row > span { color: var(--text-muted); }
-.sk-rng__row > b { font: 700 var(--step-1)/1 var(--font-display); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.sk-rng__track { position: relative; height: 14px; border-radius: 7px; background: color-mix(in srgb, var(--line) 85%, transparent); }
-.sk-rng__band { position: absolute; top: 2px; bottom: 2px; border-radius: 5px; background: var(--accent); left: var(--l); width: var(--w); }
-.sk-rng__row[data-p="pot"] .sk-rng__band { background: repeating-linear-gradient(135deg, var(--sk-misc) 0 5px, color-mix(in srgb, var(--sk-misc) 70%, #fff) 5px 9px); }
-.sk-rng__me { position: absolute; top: -4px; bottom: -4px; width: 3px; margin-left: -1.5px; border-radius: 2px; background: var(--text); box-shadow: 0 0 0 1.5px var(--surface); left: var(--l); }
-.sk-rng__legend { margin: 0; font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
-.sk-rng__legend i { width: 3px; height: 12px; background: var(--text); border-radius: 2px; }
 .sk-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }
 .sk-facts div { --k: var(--line); padding: 6px 10px 8px; border-radius: var(--radius-s); background: color-mix(in srgb, var(--k) 8%, var(--surface)); border: 1px solid color-mix(in srgb, var(--k) 30%, var(--line)); border-left: 4px solid var(--k); min-width: 0; }
 .sk-facts div:not([data-k]) { border-left-color: var(--line); background: var(--surface); }
@@ -362,3 +352,16 @@ body:has(.sk-sheet) { overflow: hidden; }
 .sk-seg button:focus-visible { outline-offset: -3px; }
 .sk-acts .btn[aria-pressed="true"] { border-color: var(--accent); }
 
+/* Ukryta ocena kandydata: lornetka zamiast liczby (src/ui/scoutMask.js), zdanie skauta zamiast pasków */
+.scout-eye { display: inline-grid; place-items: center; color: var(--accent); line-height: 1; vertical-align: middle; cursor: help; }
+.scout-eye svg { width: 1.15em; height: 1.15em; }
+.xl__ovr .scout-eye svg { width: 20px; height: 20px; }
+.tf-ch__ovr--eye .scout-eye svg { width: 34px; height: 34px; }
+.tdet__ovr--eye svg, .pp__ovrn--eye svg { width: 1em; height: 1em; }
+.pp__ovrn--eye { display: inline-grid; }
+.scout-eye--lg svg { width: 30px; height: 30px; }
+.scout-hid { display: flex; gap: 12px; align-items: center; margin: 8px 0; padding: 12px 14px; border: 1px dashed var(--line); border-radius: var(--radius-s); color: var(--text-muted); font-size: var(--step--1); line-height: 1.45; }
+.scout-hid p { margin: 0; }
+.tf-cmp__bar--eye { display: flex; align-items: center; background: none; }
+.sk-eye svg { width: 18px; height: 18px; }
+.sk-opinion--lvl { border-left-color: var(--accent); font-size: var(--step-0); }
