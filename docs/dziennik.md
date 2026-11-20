@@ -29,6 +29,19 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 20, 2026, profil B, kluby zagraniczne z nazwami (v1.21 Beta)
+Zrobione:
+- Nowy plik `src/data/kluby_swiat.js`: ok. 950 prawdziwych klubów w 95 krajach (ligi kupców, rynki KSA i USA, kraje puli i skautingu), siła L i prestiż [SZAC], nazwy z ogólnej wiedzy (niezweryfikowane).
+- `pickBuyer` (foreignMarket.js) i `pickClub` (foreignPool.js): zawsze prawdziwy klub, okno siły rozszerzane (kupiec -0,8/+2,5 potem -1,5/+3,5, pula -1,2/+1,8 potem -2,2/+3), na końcu najbliższy L. Opis „klub z ligi ...” tylko dla kraju bez klubów. Usunięto 25 % szansy na opis.
+- Testy: `tests/foreignClubs.test.mjs` (nowy), `tests/foreignPool.test.mjs` (pula ma zawsze klub z id) i migawka puli w `tests/scoutOps.test.mjs` (nowy skrót 1960701819, determinizm sprawdzony drugim przebiegiem).
+Decyzje i pułapki:
+- Zapisy: zawodnicy już za granicą zachowują zapisane nazwy, bez migracji.
+- Pula z tego samego ziarna zmienia się względem v1.20 (inne kluby, kolejne losowania), ale nadal jest deterministyczna.
+- `foreignMarket.js` ma końce linii CRLF, edytować bez ich psucia.
+Zostało / dalej:
+- Siły klubów to szacunki, warto je skalibrować, gdy pojawią się dane.
+
+
 ## Nov 20, 2026, profil B, koniec kariery: ogłoszenie 1 marca i prawdziwe minuty (v1.21 Beta)
 Zrobione:
 - `src/career/retirement.js`: 1 marca zawodnicy od 31 lat z kontraktem do końca sezonu decydują (0/1) i ogłaszają koniec

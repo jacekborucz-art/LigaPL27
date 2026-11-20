@@ -78,10 +78,10 @@ test('Skład puli: regiony, poziomy, wolni i kontrakty zgodne z ustawieniami (10
   const young = ps.filter((p) => p.poolBand === 'mlodzi');
   assert.ok(young.every((p) => p.age >= 18 && p.age <= 21));
   assert.ok(young.filter((p) => p.hidden.POT >= p.ovr + 2).length / young.length > 0.9, 'młodzi mają wyższy potencjał');
-  // Klub: prawdziwy z danych UEFA (kraj z klubami) albo opis ligi
+  // Klub: zawsze prawdziwy (kluby_uefa.json i kluby_swiat.js), opis ligi tylko dla kraju bez klubów (v1.21 Beta)
   const con = ps.filter((p) => !p.free);
-  assert.ok(con.some((p) => p.abroad.clubId) && con.some((p) => /^klub z ligi /.test(p.abroad.club)));
-  assert.ok(con.filter((p) => p.nat === 'BRA').every((p) => p.abroad.club === 'klub z ligi brazylijskiej'));
+  assert.ok(con.every((p) => p.abroad.clubId && !/^klub z ligi /.test(p.abroad.club)));
+  assert.ok(con.filter((p) => p.nat === 'BRA').every((p) => p.abroad.clubId.startsWith('sw-bra-')));
   assert.ok(con.some((p) => p.abroad.club === 'Hajduk Split' || p.abroad.club === 'HNK Rijeka' || p.abroad.club === 'Dinamo Zagrzeb'));
   assert.equal(regionOf('BRA'), 'amerykaPd');
   assert.equal(regionOf('ESP'), 'inne');

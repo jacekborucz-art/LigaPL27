@@ -88,10 +88,14 @@ test('Generator puli bez zmian po refaktorze (genPoolPlayerFor): te same ziarna,
   const g = { seed: 61, world: { players: {} }, market: { free: [], foreign: [], talks: {} } };
   const a = addPoolPlayers(g, 40, '2026-07-01', 't');
   const h = JSON.stringify(a);
-  // Skrót całej puli z wersji przed skautingiem (v1.20 Beta, commit d3d6658): identyczny
+  // Migawka generowania puli. Do v1.20 Beta (commit d3d6658) skrót był identyczny jak przed skautingiem (4195643369).
+  // Od v1.21 Beta kluby zagraniczne pochodzą też z src/data/kluby_swiat.js (zawsze prawdziwy klub), więc nazwy klubów
+  // i dalsze losowania puli się zmieniły; skrót przeliczony świadomie, determinizm (to samo ziarno, ta sama pula) bez zmian.
   let x = 7; for (const ch of h) x = (x * 31 + ch.charCodeAt(0)) >>> 0;
   assert.equal(a.length, 40);
-  assert.equal(x, 4195643369);
+  assert.equal(x, 1960701819);
+  const g2 = { seed: 61, world: { players: {} }, market: { free: [], foreign: [], talks: {} } };
+  assert.equal(JSON.stringify(addPoolPlayers(g2, 40, '2026-07-01', 't')), h, 'to samo ziarno, ta sama pula');
 });
 
 test('Determinizm: to samo zlecenie i id misji daje ten sam wynik, inny id inny', () => {

@@ -1,6 +1,6 @@
 // Kupcy z zagranicy (docs/transfery.md, rozdz. 4): ligi z kluby_uefa.json o sile co najmniej Ekstraklasa - 0,5
-// oraz rynki „pieniężne” (Arabia Saudyjska, MLS, Turcja). Kupiec to prawdziwy klub z danych, a gdy nie pasuje
-// poziomem, ogólny opis („klub z ligi tureckiej”). Raz w tygodniu w oknie: oferty za zawodników klubów AI
+// oraz rynki „pieniężne” (Arabia Saudyjska, MLS, Turcja). Kupiec to prawdziwy klub z danych (kluby_uefa.json i
+// kluby_swiat.js, dobrany do poziomu zawodnika); ogólny opis („klub z ligi tureckiej”) tylko, gdy liga nie ma klubów. Raz w tygodniu w oknie: oferty za zawodników klubów AI
 // (sprzedaż, gdy kwota >= 0,85 ceny wywoławczej albo zawodnik prosi o transfer) i za zawodników gracza
 // (oferta w poczcie i w zakładce Oferty). Liczby [SZAC].
 
@@ -16,6 +16,7 @@ import { onOfferRejected } from './moveWish.js';
 import { fmtDate } from '../ui/dom.js';
 import DATA from '../data/kluby_uefa.json' with { type: 'json' };
 import { applyNamesDeep } from '../data/clubNames.js';
+import { mergeClubs, fitClubs } from '../data/kluby_swiat.js';
 applyNamesDeep(DATA); // nazwy do publikacji (prawdziwe w clubNames.js)
 
 const round = (x, step = 5000) => Math.round(x / step) * step;
@@ -45,10 +46,10 @@ const POL_L = DATA.kraje.find((k) => k.kod === 'POL')?.Lliga ?? 12;
 export const FOREIGN_LEAGUES = [
   ...DATA.kraje.filter((k) => k.kod !== 'POL' && k.Lliga >= POL_L - 0.5).map((k) => ({
     kod: k.kod, nazwa: k.nazwa, Lliga: k.Lliga, adj: ADJ[k.kod] ?? null,
-    clubs: DATA.kluby.filter((c) => c.kraj === k.kod).map((c) => ({ id: c.id, name: c.nazwa, L: c.L, prestige: c.prestiz ?? 5 })),
+    clubs: mergeClubs(k.kod, DATA.kluby.filter((c) => c.kraj === k.kod).map((c) => ({ id: c.id, name: c.nazwa, L: c.L, prestige: c.prestiz ?? 5 }))),
     w: k.kod === 'TUR' ? 1.6 : 1, // Turcja: rynek pieniężny
   })),
-  ...MONEY.map((m) => ({ ...m, clubs: [] })),
+  ...MONEY.map((m) => ({ ...m, clubs: mergeClubs(m.kod) })),
 ];
 
 /** Reputacja kupca z siły ligi: 30 + 9 (L - 11). */
@@ -59,8 +60,9 @@ export function pickBuyer(rng, p) {
   const ovr = p.ovr ?? 11;
   const leagues = FOREIGN_LEAGUES.filter((l) => l.Lliga <= ovr + 3); // zbyt mocne ligi nie kupują przeciętnych
   const lg = rng.weighted(leagues.length ? leagues : FOREIGN_LEAGUES, (l) => l.w * (l.Lliga >= ovr + 1.5 ? 0.5 : 1) * ((p.age ?? 25) >= 29 && !l.clubs.length ? 2 : 1));
-  const fit = lg.clubs.filter((c) => c.L >= ovr - 0.8 && c.L <= ovr + 2.5);
-  const club = fit.length && rng.chance(0.75) ? rng.pick(fit) : null;
+  // Prawdziwy klub zawsze, gdy liga ma jakiekolwiek: okno poziomu rozszerzane kolejno, na końcu najbliższe pod względem L
+  const fit = fitClubs(lg.clubs, ovr, [[0.8, 2.5], [1.5, 3.5]]);
+  const club = fit.length ? rng.pick(fit) : null;
   const name = club ? club.name : lg.generic ?? `klub z ligi ${lg.adj ?? lg.nazwa.toLowerCase()}`;
   // rep: reputacja kupca ze wzoru ligi (prośby o transfer); repU: ta sama skala co clubReputation polskich klubów (decyzje zawodnika)
   const rep = buyerRep(club ? Math.min(club.L, lg.Lliga + 1) : lg.Lliga);

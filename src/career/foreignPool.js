@@ -21,6 +21,7 @@ import { hasOpenDeal, pendingFees, stat } from './transferDeals.js';
 import { inWindow, fmtZl } from './transfers.js';
 import DATA from '../data/kluby_uefa.json' with { type: 'json' };
 import { applyNamesDeep } from '../data/clubNames.js';
+import { KLUBY_SWIAT, mergeClubs, fitClubs } from '../data/kluby_swiat.js';
 applyNamesDeep(DATA); // nazwy do publikacji (prawdziwe w clubNames.js)
 
 const round = (x, step = 5000) => Math.round(x / step) * step;
@@ -90,6 +91,7 @@ const ADJ = {
 const KRAJ = Object.fromEntries(DATA.kraje.map((k) => [k.kod, k]));
 const CLUBS_OF = {};
 for (const c of DATA.kluby) (CLUBS_OF[c.kraj] ??= []).push({ id: c.id, name: c.nazwa, L: c.L, prestige: c.prestiz ?? 5 });
+for (const kod of Object.keys(KLUBY_SWIAT)) CLUBS_OF[kod] = mergeClubs(kod, CLUBS_OF[kod]);
 
 /** Siła ligi kraju (dane UEFA albo szacunek). */
 export const leagueL = (nat) => KRAJ[nat]?.Lliga ?? LEAGUE_L[nat] ?? 9.5;
@@ -150,10 +152,10 @@ function pickNat(rng) {
   return rng.weighted(Object.keys(nats), (k) => nats[k]);
 }
 
-/** Klub zagraniczny: prawdziwy klub z danych UEFA o sile blisko poziomu zawodnika, inaczej opis ligi. */
+/** Klub zagraniczny: prawdziwy klub (kluby_uefa.json i kluby_swiat.js) o sile blisko poziomu zawodnika, okno rozszerzane, na końcu najbliższy L; opis ligi tylko dla kraju bez klubów. */
 function pickClub(rng, nat, ovr) {
   const lgL = leagueL(nat);
-  const fit = (CLUBS_OF[nat] ?? []).filter((c) => c.L >= ovr - 1.2 && c.L <= ovr + 1.8);
+  const fit = fitClubs(CLUBS_OF[nat] ?? [], ovr, [[1.2, 1.8], [2.2, 3]]);
   const club = fit.length ? rng.pick(fit) : null;
   const L = club ? club.L : Math.min(lgL, ovr + 0.8); // bez klubu w danych: poziom ligi, ale nie dużo ponad zawodnika
   const rep = club ? Math.min(100, club.prestige * 7 + 25) : repFromL(L) + 25; // skala clubReputation polskich klubów

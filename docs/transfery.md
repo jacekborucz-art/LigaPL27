@@ -123,8 +123,12 @@ i przedłużenie, 10 % nic (zawodnik niezadowolony). Integracja z rozmowami z Ka
 „Porozmawiaj” liczy się jako rozmowa trenera (licznik uwagi, src/career/attention.js), ale ma własny limit 14 dni.
 
 Kupcy z zagranicy: ligi z `src/data/kluby_uefa.json` o sile >= Ekstraklasa - 0,5 (L >= 11,5) oraz rynki pieniężne
-(Turcja z większą wagą, Arabia Saudyjska, MLS). Kupiec to prawdziwy klub z danych o sile bliskiej poziomowi
-zawodnika, inaczej opis („klub z ligi tureckiej”, „klub z MLS”). Reputacja kupca `30 + 9 (L - 11)` (prośby o transfer);
+(Turcja z większą wagą, Arabia Saudyjska, MLS). Kupiec to zawsze prawdziwy klub o sile bliskiej poziomowi
+zawodnika: z `kluby_uefa.json` (czołówka) i z `src/data/kluby_swiat.js` (ok. 950 klubów średniego i niższego
+poziomu w 95 krajach, także puli obcokrajowców i skautingu; nazwy z ogólnej wiedzy, siła [SZAC]). Okno siły:
+od L - 0,8 do L + 2,5, potem od L - 1,5 do L + 3,5, na końcu najbliższe pod względem L; opis („klub z ligi
+tureckiej”) tylko, gdy kraj nie ma żadnego klubu. Te same dane i okna (od -1,2 do +1,8, potem od -2,2 do +3)
+wybierają klub zawodnika z puli (`foreignPool.js`). Zawodnicy już za granicą zachowują zapisaną nazwę klubu. Reputacja kupca `30 + 9 (L - 11)` (prośby o transfer);
 do decyzji zawodnika używamy reputacji w skali polskich klubów (prestiż x 7 + 25), bo wzór ligi daje kupcom
 reputację niższą niż polskim klubom (Widzew 81, liga turecka 43) i zawodnicy nigdy by nie wyjeżdżali.
 Tygodniowo w oknie, zawodnik z reputacją >= 40 albo do 23 lat z POT >= 13:
