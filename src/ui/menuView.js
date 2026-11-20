@@ -410,6 +410,11 @@ export function setFieldError(root, id, msg) {
 }
 
 // ------------------------------------------------------------ Krok 2: klub
+/** Pasmo celu do koloru: góra tabeli (żółty), środek (zielony), walka o utrzymanie (czerwony). */
+function goalBand(club, goal) {
+  if (/utrzymanie/i.test(goal.text)) return 'low';
+  return goal.target <= (club.tier === 4 ? 4 : 6) ? 'top' : 'mid';
+}
 function strengthOf(club) {
   // III liga: średnia siła grupy klubu (4 grupy o różnym poziomie)
   const grp = club.tier === 4 ? CLUBS_PL.filter((c) => c.tier === 4 && c.group === club.group) : [];
@@ -459,7 +464,7 @@ function clubCard(club, selected) {
     ${crest(club, 44)}
     <span class="cc__body">
       <span class="cc__name">${esc(club.name)}</span>
-      <span class="cc__goal">Prawdopodobny cel: ${esc(f.goal.text)}</span>
+      <span class="cc__goal"><small>Przewidywany cel</small><b data-band="${goalBand(club, f.goal)}">${esc(f.goal.text)}</b></span>
     </span>
     <span class="cc__meta">
       ${eu ? `<span class="tag" title="${esc(EURO[eu.comp])}">${esc(eu.comp)}</span>` : ''}
@@ -479,7 +484,7 @@ function clubDetail(club, { inline }) {
       ${crest(club, 64)}
       <div><h2 id="cd-title" class="cd__name">${esc(club.name)}</h2><span class="cd__league">${esc(leagueLabel(club))}, renoma ${club.prestige}/10</span></div>
     </header>
-    <div class="cd__goal"><span>Zarząd oczekuje</span><b>${esc(f.goal.text)}</b><small>Prawdopodobny cel: ${f.goal.target <= 1 ? (club.tier === 1 ? 'mistrzostwo' : 'pierwsze miejsce') : `miejsce ${f.goal.target} lub wyżej`}</small></div>
+    <div class="cd__goal"><span>Zarząd oczekuje</span><b>${esc(f.goal.text)}</b><small>Przewidywany cel: ${f.goal.target <= 1 ? (club.tier === 1 ? 'mistrzostwo' : 'pierwsze miejsce') : `miejsce ${f.goal.target} lub wyżej`}</small></div>
     <dl class="cd__facts">
       ${row('Siła kadry', `${f.goal.rank}. w lidze na ${f.size}`)}
       ${row(`Europa ${esc(SEASON)}`, eu ? `${esc(EURO[eu.comp])}, ${esc(ENTRY[eu.entry] ?? eu.entry)}` : 'Bez europejskich pucharów')}
