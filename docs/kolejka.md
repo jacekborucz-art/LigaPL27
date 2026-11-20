@@ -118,3 +118,10 @@ Do zrobienia: burza mózgów (ekspert piłkarski i skaut z doświadczeniem, Sonn
 i kosztami [SZAC], potem wdrożenie: atrybuty i regiony skautów, lista wolnych skautów, ekran zleceń, wyprawa jako
 system dnia, generowanie kandydatów, raport w poczcie, prowizje w finansach, edytor i datapack (nowa wersja pliku
 z migracją), testy (ten sam profil i ziarno = ten sam wynik, słabszy skaut statystycznie gorzej).
+
+## Rynek pracy trenera: losowy termin ofert (dodane Nov 20, 2026)
+
+Decyzja właściciela: dziś oferty dla trenera bez klubu przychodzą w stałych terminach (agent po 60 dniach, III liga po
+120 dniach). Dodać mały RNG terminu (np. kilka do kilkunastu dni wcześniej albo później) [SZAC], deterministyczny
+z ziarna gry. Kod: `src/career/jobMarket.js`, opis: `docs/kariera-trenera.md`.
+

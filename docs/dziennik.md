@@ -35,8 +35,8 @@ Zrobione:
   odnośniki w Poczcie, poczta tylko z ligi gracza i media o innych klubach, kariera trenera (Klub > Kariera, plakietki,
   reputacja, popularność, rynek pracy bez klubu).
 Zostało / dalej:
-- Pytanie do właściciela bez odpowiedzi: czy bezrobotny trener z Ekstraklasy ma tak szybko dostawać oferty z Ekstraklasy
-  (test: reputacja 47, po 60 dniach oferta Wisły Płock).
+- Decyzja właściciela (Nov 20, 2026): oferty dla bezrobotnego trenera zostają jak są (test: reputacja 47, po 60 dniach
+  oferta Wisły Płock). Na później: mały RNG terminu oferty (czasem szybciej, czasem później).
 
 ## Nov 20, 2026, profil B, kontrola jakości kariery trenera (v1.19 Beta)
 Zrobione:
