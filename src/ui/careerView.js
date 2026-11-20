@@ -64,13 +64,13 @@ function meter({ lab, v, tier, trend, trendSuffix, extra = '', sparkHtml = '', c
     ${extra}${sparkHtml}</div>`;
 }
 
-const reachText = (r) => (r == null || r === '' ? '' : typeof r === 'object' ? String(r.label ?? r.name ?? '') : String(r));
+const reachText = (r) => (r == null || r === '' ? '' : typeof r === 'object' ? String(r.label ?? r.name ?? '') : typeof r === 'number' ? String(Math.round(r)) : String(r));
 
 function heroHtml(S, J) {
   const initials = (S.name || 'T').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || 'T';
   const mt = S.matches ?? {};
-  const seasons = arr(S.seasons);
-  const sub = [S.age ? `${num(S.age)} lat` : null, seasons.length ? `${seasons.length} ${seasons.length === 1 ? 'sezon' : seasons.length < 5 ? 'sezony' : 'sezonów'} w zawodzie` : 'początek drogi', num(mt.n) ? `${num(mt.n)} ${num(mt.n) === 1 ? 'mecz' : 'meczów'}` : null].filter(Boolean).join(' · ');
+  const nSeasons = new Set(arr(S.seasons).map((r) => r.season)).size; // zmiana klubu w trakcie sezonu: dwa wiersze, jeden sezon
+  const sub = [S.age ? `${num(S.age)} lat` : null, nSeasons ? `${nSeasons} ${nSeasons === 1 ? 'sezon' : nSeasons < 5 ? 'sezony' : 'sezonów'} w zawodzie` : 'początek drogi', num(mt.n) ? `${num(mt.n)} ${num(mt.n) === 1 ? 'mecz' : 'meczów'}` : null].filter(Boolean).join(' · ');
   const clubLine = S.club
     ? `<p class="kr-club">${crest(S.club.id, 28)}<span>${esc(S.club.name)}</span><span class="kr-chip kr-chip--live">${esc(S.club.league ?? '')}</span></p>`
     : `<p class="kr-club"><span>Bez klubu</span>${J?.lastClub ? `<span class="kr-chip">ostatnio: ${esc(typeof J.lastClub === 'object' ? J.lastClub.name ?? '' : clubById(J.lastClub)?.name ?? J.lastClub)}</span>` : ''}</p>`;
@@ -179,7 +179,8 @@ function historyHtml(S) {
       <td class="c-tr" data-l="Trofea"><span class="kr-htr">${tr.length ? tr.filter((id) => BADGES[id]).map((id) => `<span class="kr-mini">${badgeSvg(id, { size: 30, label: `${BADGES[id].name}, sezon ${r.season}` })}</span>`).join('') : '<span class="muted" aria-label="brak trofeów">brak</span>'}</span></td></tr>`;
   }).join('');
   const clubs = new Set(rows.map((r) => r.clubId).filter(Boolean)).size;
-  return `<div class="kr-hist-wrap"><table class="kr-hist"><caption class="muted">Historia sezonów, od najnowszego (${rows.length} ${rows.length === 1 ? 'sezon' : rows.length < 5 ? 'sezony' : 'sezonów'}, ${clubs} ${clubs === 1 ? 'klub' : clubs < 5 ? 'kluby' : 'klubów'})</caption>
+  const nS = new Set(rows.map((r) => r.season)).size;
+  return `<div class="kr-hist-wrap"><table class="kr-hist"><caption class="muted">Historia sezonów, od najnowszego (${nS} ${nS === 1 ? 'sezon' : nS < 5 ? 'sezony' : 'sezonów'}, ${clubs} ${clubs === 1 ? 'klub' : clubs < 5 ? 'kluby' : 'klubów'})</caption>
     <thead><tr><th scope="col">Sezon</th><th scope="col">Klub</th><th scope="col">Liga</th><th scope="col">Miejsce</th><th scope="col">Cel</th><th scope="col">Wynik</th><th scope="col">Trofea</th></tr></thead>
     <tbody>${body}</tbody></table></div>`;
 }

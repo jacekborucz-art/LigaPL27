@@ -196,8 +196,8 @@ Liczniki (x N) i ostatnie zdobycie liczy `badgeCounts` z listy `awards`. Nowe zd
 - `applyJob(game, clubId)`, `withdrawApplication(game, clubId)`, `resign(game)`: `{ ok, text }`.
 
 Akcje w `src/app.js` (`dispatchAct`, zapis gry i odświeżenie): `data-act="job-apply" data-id`, `job-withdraw`
-`data-id`, `job-resign` (potwierdzenie robi widok; po akcji `state.jobConfirm = null`), `career-unlocks-seen`.
-Tekst wyniku akcji: `state.jobMsg` (widok może go pokazać i wyczyścić).
+`data-id`, `job-resign` (potwierdzenie robi widok: `k-resign-ask` ustawia `state.crResign`, po akcji `false`),
+`career-unlocks-seen`. Tekst wyniku akcji: `state.kMsg` (pokazuje go nagłówek zakładki Klub, czyści zmiana podzakładki).
 
 Tryb bez pracy w `src/app.js`: Kadra, Transfery, Trening i Klub (poza `state.kTab === 'kariera'`) pokazują krótką
 informację „Nie prowadzisz teraz klubu” z przyciskiem do Kariery; zakładka Klub otwiera się na Karierze; Pulpit

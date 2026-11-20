@@ -18,6 +18,7 @@ import { expectedPoints, rivalry } from './fans.js';
 import { seasonGoalFor } from './board.js';
 import { createMessage } from '../core/inbox.js';
 import { coachAvg } from './coaches.js';
+import { fmtDate } from '../ui/dom.js';
 
 // ------------------------------------------------------------ Liczby [SZAC]
 export const CAREER = {
@@ -579,19 +580,21 @@ export function careerMassApply(game, date) {
 }
 
 // ------------------------------------------------------------ Odczyt dla widoków
+/** Data w rekordach po polsku (20 paź 2026); brak daty: pusty tekst. */
+const dDate = (iso) => (iso ? fmtDate(iso) : '');
 export function careerRecords(game) {
   const C = ensureCareerHistory(game); const R = C.records;
   const out = [];
   const t = C.tot;
   out.push({ key: 'matches', label: 'Mecze w karierze', value: t.n, detail: `${t.w} zwycięstw, ${t.d} remisów, ${t.l} porażek, bramki ${t.gf}:${t.ga}` });
-  if (R.bigWin) out.push({ key: 'bigWin', label: 'Najwyższe zwycięstwo', value: R.bigWin.score, detail: `${R.bigWin.oppName}, ${R.bigWin.date}` });
-  if (R.bigLoss) out.push({ key: 'bigLoss', label: 'Najwyższa porażka', value: R.bigLoss.score, detail: `${R.bigLoss.oppName}, ${R.bigLoss.date}` });
-  if (R.winRun?.v) out.push({ key: 'winRun', label: 'Najdłuższa seria zwycięstw', value: R.winRun.v, detail: `${nameOf(R.winRun.clubId)}, do ${R.winRun.to}` });
-  if (R.unbeaten?.v) out.push({ key: 'unbeaten', label: 'Najdłuższa seria bez porażki', value: R.unbeaten.v, detail: `${nameOf(R.unbeaten.clubId)}, do ${R.unbeaten.to}` });
-  if (R.leagueUnbeaten?.v) out.push({ key: 'leagueUnbeaten', label: 'Najdłuższa seria bez porażki w lidze', value: R.leagueUnbeaten.v, detail: `${nameOf(R.leagueUnbeaten.clubId)}, do ${R.leagueUnbeaten.to}` });
-  if (R.cleanRun?.v) out.push({ key: 'cleanRun', label: 'Najdłuższa seria bez straconego gola', value: R.cleanRun.v, detail: `${nameOf(R.cleanRun.clubId)}, do ${R.cleanRun.to}` });
-  if (R.mostGoals?.v) out.push({ key: 'mostGoals', label: 'Najwięcej goli w meczu', value: R.mostGoals.v, detail: `${R.mostGoals.score} z ${R.mostGoals.oppName}, ${R.mostGoals.date}` });
-  if (R.upset) out.push({ key: 'upset', label: 'Największa niespodzianka', value: R.upset.score, detail: `${R.upset.oppName}, ${R.upset.date} (oczekiwane ${String(R.upset.v).replace('.', ',')} pkt)` });
+  if (R.bigWin) out.push({ key: 'bigWin', label: 'Najwyższe zwycięstwo', value: R.bigWin.score, detail: `${R.bigWin.oppName}, ${dDate(R.bigWin.date)}` });
+  if (R.bigLoss) out.push({ key: 'bigLoss', label: 'Najwyższa porażka', value: R.bigLoss.score, detail: `${R.bigLoss.oppName}, ${dDate(R.bigLoss.date)}` });
+  if (R.winRun?.v) out.push({ key: 'winRun', label: 'Najdłuższa seria zwycięstw', value: R.winRun.v, detail: `${nameOf(R.winRun.clubId)}, do ${dDate(R.winRun.to)}` });
+  if (R.unbeaten?.v) out.push({ key: 'unbeaten', label: 'Najdłuższa seria bez porażki', value: R.unbeaten.v, detail: `${nameOf(R.unbeaten.clubId)}, do ${dDate(R.unbeaten.to)}` });
+  if (R.leagueUnbeaten?.v) out.push({ key: 'leagueUnbeaten', label: 'Najdłuższa seria bez porażki w lidze', value: R.leagueUnbeaten.v, detail: `${nameOf(R.leagueUnbeaten.clubId)}, do ${dDate(R.leagueUnbeaten.to)}` });
+  if (R.cleanRun?.v) out.push({ key: 'cleanRun', label: 'Najdłuższa seria bez straconego gola', value: R.cleanRun.v, detail: `${nameOf(R.cleanRun.clubId)}, do ${dDate(R.cleanRun.to)}` });
+  if (R.mostGoals?.v) out.push({ key: 'mostGoals', label: 'Najwięcej goli w meczu', value: R.mostGoals.v, detail: `${R.mostGoals.score} z ${R.mostGoals.oppName}, ${dDate(R.mostGoals.date)}` });
+  if (R.upset) out.push({ key: 'upset', label: 'Największa niespodzianka', value: R.upset.score, detail: `${R.upset.oppName}, ${dDate(R.upset.date)} (oczekiwane ${String(R.upset.v).replace('.', ',')} pkt)` });
   if (R.bestPpm) out.push({ key: 'bestPpm', label: 'Najlepszy sezon (punkty na mecz w lidze)', value: String(R.bestPpm.v).replace('.', ','), detail: `${nameOf(R.bestPpm.clubId)}, ${R.bestPpm.season}` });
   const now = game.date;
   const longest = C.stints.map((s) => ({ s, d: daysBetween(s.from, s.to ?? now) })).sort((a, b) => b.d - a.d)[0];

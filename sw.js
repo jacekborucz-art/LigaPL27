@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-ff8377abef';
+const VERSION = 'v0.3-91c42f2f08';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -186,7 +186,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', '6b44c875ab'],
+  ['./src/app.js', 'fa5d5a53ea'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '4c60c06da6'],
   ['./src/career/assistantReport.js', '019bb0029e'],
@@ -195,7 +195,7 @@ const FILES = [
   ['./src/career/board.js', '427b9241b5'],
   ['./src/career/boardRequests.js', 'c412b89b00'],
   ['./src/career/careerSystem.js', '09e8703917'],
-  ['./src/career/coachCareer.js', 'ed5e991d78'],
+  ['./src/career/coachCareer.js', '1b6aeea20e'],
   ['./src/career/coachMarket.js', 'c244a909ee'],
   ['./src/career/coaches.js', '041155fd9c'],
   ['./src/career/editor.js', '55bf72be1c'],
@@ -205,7 +205,7 @@ const FILES = [
   ['./src/career/foreignMarket.js', 'de8611d4a2'],
   ['./src/career/foreignPool.js', 'df311e562f'],
   ['./src/career/infrastructure.js', 'd64aff3a8f'],
-  ['./src/career/jobMarket.js', '3d11918736'],
+  ['./src/career/jobMarket.js', 'baf5c575b8'],
   ['./src/career/leagueNews.js', '5f8f30a71c'],
   ['./src/career/loans.js', '6ff6e21d87'],
   ['./src/career/mindset.js', 'b8a1c39ce7'],
@@ -341,7 +341,7 @@ const FILES = [
   ['./src/ui/assistantReportView.js', 'ad1ef0c14d'],
   ['./src/ui/badges.js', 'b7a51128d4'],
   ['./src/ui/boardRequestsView.js', '14afde7d17'],
-  ['./src/ui/careerView.js', '1495497a21'],
+  ['./src/ui/careerView.js', '823345518a'],
   ['./src/ui/clubView.js', 'd798bb6b4f'],
   ['./src/ui/competitionsView.js', '0383bb8e91'],
   ['./src/ui/contextMenu.js', '5590f7bc7f'],

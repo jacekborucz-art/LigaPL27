@@ -29,6 +29,24 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 20, 2026, profil B, kontrola jakości kariery trenera (v1.19 Beta)
+Zrobione:
+- Sprawdzenie w Chromium (1600 i 390 px): rezygnacja, wszystkie zakładki bez klubu, Dalej przez 60 i 120 dni,
+  aplikacja i wycofanie, oferta agenta i przyjęcie (powrót zwykłych widoków), odznaka z prawdziwego zdarzenia
+  (trener miesiąca 1 kwietnia), okno raz, Do gabloty, ponowne wczytanie; stare zapisy bez kariery.
+- Poprawki: daty w rekordach po polsku (było 2026-07-26), zasięg bez ułamka, liczba sezonów w nagłówku i tabeli
+  liczy sezony, nie wiersze (zmiana klubu w sezonie), odejście z klubu zamyka decyzje dawnego klubu w Poczcie
+  (oferty za zawodników, sztab, sponsorzy: blokowały Dalej albo pozwalały decydować za AI), wycofanie aplikacji
+  nie kasuje oferty agenta z kilkoma klubami, Pulpit bez klubu: karencja zamiast szansy przy dawnym klubie, przycisk
+  oferty bez podwójnego „Oferta pracy”, komunikat zakładki Klub znika po zmianie zakładki. Test w `tests/jobMarket.test.mjs`.
+Decyzje i pułapki:
+- `docs/kariera-trenera.md` rozdz. 8: wynik akcji w `state.kMsg`, potwierdzenie rezygnacji `state.crResign`
+  (dawne `jobMsg`, `jobConfirm` nie istnieją).
+- `save-feb.json` w scratchpadzie ma 241 nierozegranych meczów z przeszłości (sztuczny zapis), nie błąd kariery.
+Zostało / dalej:
+- Balans do decyzji właściciela: trener z reputacją 47 po rezygnacji z Widzewa dostaje od razu wysoką szansę
+  w klubach Ekstraklasy (zasięg 78) i ofertę agenta z Ekstraklasy po 60 dniach.
+
 ## Nov 20, 2026, profil B, kariera trenera: logika (gałąź robocza, bez scalenia z main), commity 5ff18cf..(ten) (v1.19 Beta)
 Zrobione:
 - `src/career/coachCareer.js`: reputacja z wydarzeń (punkty x nasycenie x próg ligi, kary, forma miesiąca zamiast
