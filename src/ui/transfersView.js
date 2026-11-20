@@ -29,13 +29,14 @@ import { playerStatsHtml } from './playerStatsView.js';
 import { moraleLabel } from '../career/morale.js';
 import { checkUserPre } from '../career/preContracts.js';
 import { DOMESTIC } from '../config/calendar2026.js';
+import { renderSkauting } from './scoutingView.js'; // zakładka Skauting
 import { isPoolContracted, poolClubLabel, poolSellerClub, REGION_FILTERS, regionOf } from '../career/foreignPool.js'; // zawodnicy z zagranicy
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size = 20) => (clubById(id) ? crestHtml(clubById(id), { size, clubsById }) : '');
 const groupOf = (p) => GROUP[p.pos] ?? 'MID';
 // Finanse i Zarząd są w zakładce Klub (src/ui/klubView.js); funkcje widoków eksportowane stąd
-export const TF_TABS = [['rynek', 'Rynek'], ['oferty', 'Oferty'], ['wtoku', 'W toku'], ['kontrakty', 'Kontrakty']];
+export const TF_TABS = [['rynek', 'Rynek'], ['oferty', 'Oferty'], ['wtoku', 'W toku'], ['kontrakty', 'Kontrakty'], ['skauting', 'Skauting']];
 const LISTS = [['transfer', 'Lista transferowa'], ['loan', 'Do wypożyczenia'], ['free', 'Wolni'], ['abroad', 'Z zagranicy'], ['search', 'Wyszukaj']];
 const POS_FILTERS = [['all', 'Wszyscy'], ['GK', 'Bramkarze'], ['DEF', 'Obrońcy'], ['MID', 'Pomocnicy'], ['ATT', 'Napastnicy']];
 export const isTransferAction = (act) => typeof act === 'string' && act.startsWith('tf-');
@@ -652,10 +653,11 @@ function fansPanel(game) {
 // ------------------------------------------------------------ Wejście
 export function renderTransfers(game, ui = {}) {
   const tab = TF_TABS.some(([k]) => k === ui.tfTab) ? ui.tfTab : 'rynek';
-  const tabs = `<div class="subtabs" role="tablist">${TF_TABS.map(([k, l]) => `<button role="tab" data-act="tf-tab" data-t="${k}" aria-selected="${tab === k}">${l}</button>`).join('')}</div>`;
+  const tabs = `<div class="subtabs${TF_TABS.length === 5 ? ' subtabs--5' : ''}" role="tablist">${TF_TABS.map(([k, l]) => `<button role="tab" data-act="tf-tab" data-t="${k}" aria-selected="${tab === k}">${l}</button>`).join('')}</div>`;
   const p = ui.tfPlayer && game.world.players[ui.tfPlayer];
   let body;
-  if (p && (tab === 'rynek' || tab === 'kontrakty' || tab === 'oferty' || tab === 'wtoku')) body = playerCard(game, p, ui);
+  if (p && (tab === 'rynek' || tab === 'kontrakty' || tab === 'oferty' || tab === 'wtoku' || tab === 'skauting')) body = playerCard(game, p, ui);
+  else if (tab === 'skauting') body = renderSkauting(game, ui);
   else if (tab === 'oferty') body = offersView(game);
   else if (tab === 'wtoku') body = dealsView(game, ui);
   else if (tab === 'kontrakty') body = contractsView(game, ui);

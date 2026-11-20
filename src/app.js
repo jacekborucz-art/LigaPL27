@@ -57,6 +57,8 @@ import { playerStatsHtml } from './ui/playerStatsView.js';
 import { renderClubView, hasClubView } from './ui/clubView.js';
 import { renderTransfers, handleTransferAction, isTransferAction, transferCardHtml } from './ui/transfersView.js';
 import { renderClubHub, handleClubAction, isClubAction } from './ui/klubView.js';
+import { skUiAction, setOrderField } from './ui/scoutingView.js'; // Skauting (Transfery): stan ekranu
+import { startMission, cancelMission, hireScout, fireScout, watchCandidate, markCandidatesSeen } from './career/scoutOps.js';
 // Kariera i rynek pracy: okno odblokowania odznak i akcje job-* (docs: Klub > Kariera)
 import { mountUnlocks } from './ui/careerView.js';
 import { sysNavHtml, sysHeaderBtn, sysDialogHtml } from './ui/sysMenu.js';
@@ -1659,6 +1661,72 @@ app.addEventListener('click', (ev) => {
   return dispatchAct(el);
 });
 
+// ===== Skauting: akcje sk-* (blok do scalenia z gałęzią logiki; widok w src/ui/scoutingView.js, komunikat w state.skMsg) =====
+// Akcje interfejsowe (zakładki, arkusz zlecenia, filtry) obsługuje skUiAction; akcje logiki wołają src/career/scoutOps.js.
+let skOpener = null; // przycisk, który otworzył arkusz zlecenia: fokus wraca na niego po zamknięciu
+const skSel = (ds) => `.sk-sheet [data-act="${ds.act}"]${ds.k ? `[data-k="${CSS.escape(ds.k)}"]` : ''}${ds.v !== undefined ? `[data-v="${CSS.escape(String(ds.v))}"]` : ''}`;
+async function skautingAction(act, el) {
+  const g = state.game; const ds = el.dataset;
+  const scroll = app.querySelector('.sk-sheet__body')?.scrollTop ?? 0;
+  const inSheet = !!el.closest?.('.sk-sheet');
+  const note = (r) => { state.skMsg = r?.text || null; };
+  let needSave = false;
+  if (act === 'sk-tab' && state.skTab === 'kandydaci' && ds.t !== 'kandydaci') needSave = markCandidatesSeen(g)?.ok ?? false; // opuszczenie raportu = przeczytany
+  const ui = skUiAction(g, state, act, ds);
+  if (ui) {
+    if (act === 'sk-open-order' || act === 'sk-repeat') skOpener = { act: 'sk-open-order', scout: ds.scout, free: ds.free, region: ds.region };
+    Object.assign(state, ui.ui);
+  } else if (act === 'sk-start') {
+    const r = startMission(g, state.skOrder);
+    note(r);
+    if (r?.ok) { Object.assign(state, { skSheet: false, skOrder: null, skTab: 'misje' }); needSave = true; }
+  } else if (act === 'sk-cancel') { const r = cancelMission(g, ds.id); note(r); state.skAsk = null; needSave = !!r?.ok; }
+  else if (act === 'sk-hire') { const r = hireScout(g, ds.id, 'permanent'); note(r); if (r?.ok) state.skTab = 'misje'; needSave = !!r?.ok; }
+  else if (act === 'sk-fire') { const r = fireScout(g, ds.id); note(r); state.skAsk = null; needSave = !!r?.ok; }
+  else if (act === 'sk-watch') { const r = watchCandidate(g, ds.id, ds.on === '1'); note(r); needSave = !!r?.ok; }
+  else if (act === 'sk-seen') { const r = markCandidatesSeen(g); note(r); needSave = !!r?.ok; }
+  else return;
+  if (needSave) await save();
+  render();
+  const body = app.querySelector('.sk-sheet__body');
+  if (body && inSheet) body.scrollTop = scroll; // arkusz po zmianie pola zostaje w tym samym miejscu
+  if (inSheet && act !== 'sk-close-order') app.querySelector(skSel({ act, k: ds.k, v: ds.v }))?.focus({ preventScroll: true });
+  if (act === 'sk-open-order' || act === 'sk-repeat') app.querySelector('#sk-sh-t')?.focus({ preventScroll: true });
+  if (act === 'sk-close-order' || (act === 'sk-start' && !state.skSheet)) {
+    const o = skOpener; skOpener = null;
+    const sel = o ? `[data-act="sk-open-order"]${o.scout ? `[data-scout="${CSS.escape(o.scout)}"]` : ''}${o.free ? `[data-free="${CSS.escape(o.free)}"]` : ''}${o.region ? `[data-region="${CSS.escape(o.region)}"]` : ''}` : null;
+    (sel && app.querySelector(sel))?.focus?.({ preventScroll: true });
+  }
+}
+// Pola arkusza zlecenia (data-sk-f) i filtry wolnych skautów (INPUT i SELECT nie przechodzą przez dispatchAct)
+app.addEventListener('change', (ev) => {
+  const t = ev.target;
+  if (!state.game || !t.matches) return;
+  if (t.matches('[data-sk-f]') && state.skOrder) {
+    const scroll = app.querySelector('.sk-sheet__body')?.scrollTop ?? 0;
+    state.skOrder = setOrderField(state.skOrder, t.dataset.skF, t.value);
+    render();
+    const body = app.querySelector('.sk-sheet__body'); if (body) body.scrollTop = scroll;
+    app.querySelector(`.sk-sheet [data-sk-f="${CSS.escape(t.dataset.skF)}"]`)?.focus({ preventScroll: true });
+  } else if (t.matches('[data-sk-sort]')) {
+    state.skFilter = { ...(state.skFilter ?? {}), sort: t.value }; render(); app.querySelector('[data-sk-sort]')?.focus({ preventScroll: true });
+  } else if (t.matches('[data-sk-reach]')) {
+    state.skFilter = { ...(state.skFilter ?? {}), reach: t.checked }; render(); app.querySelector('[data-sk-reach]')?.focus({ preventScroll: true });
+  }
+});
+// Arkusz zlecenia: Esc zamyka, Tab krąży po polach arkusza
+app.addEventListener('keydown', (ev) => {
+  const sheet = state.skSheet && app.querySelector('.sk-sheet');
+  if (!sheet) return;
+  if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); skautingAction('sk-close-order', { dataset: { act: 'sk-close-order' } }); return; }
+  if (ev.key !== 'Tab') return;
+  const f = [...sheet.querySelectorAll('button:not(:disabled), select, input, [tabindex="-1"]#sk-sh-t')].filter((x) => x.offsetParent !== null || x === document.activeElement);
+  if (!f.length) return;
+  const i = f.indexOf(document.activeElement);
+  if (ev.shiftKey && i <= 0) { ev.preventDefault(); f[f.length - 1].focus(); } else if (!ev.shiftKey && i === f.length - 1) { ev.preventDefault(); f[0].focus(); }
+});
+// ===== koniec bloku Skauting =====
+
 /**
  * Wykonuje akcję data-act. el: przycisk albo { dataset } z menu kontekstowego.
  * root: miejsce, z którego handlery czytają pola formularzy (null = tylko wartości z dataset).
@@ -1700,6 +1768,7 @@ async function dispatchAct(el, { root = app } = {}) {
     if (act === 'career-unlocks-seen' && el.dataset.go) window.scrollTo({ top: 0 });
     return;
   }
+  if (act?.startsWith('sk-') && state.game) { await skautingAction(act, el); return; } // Skauting (blok „Skauting: akcje sk-*”)
   if (isTransferAction(act) && state.game) {
     const r = handleTransferAction(state.game, act, el.dataset, root);
     Object.assign(state, r.ui ?? {});
