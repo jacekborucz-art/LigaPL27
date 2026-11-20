@@ -108,6 +108,14 @@ test('Tryb offline: każdy plik gry jest na liście sw.js (uruchom npm run sw po
   assert.deepEqual(missing, []);
 });
 
+test('Tryb offline: sw.js to poprawny JavaScript bez znaczników konfliktu scalania (inaczej service worker nie działa)', async () => {
+  const fs = await import('node:fs');
+  const sw = fs.readFileSync('sw.js', 'utf8');
+  assert.ok(!/^(<{7}|={7}|>{7})/m.test(sw), 'znaczniki konfliktu w sw.js: usuń je i uruchom npm run sw');
+  assert.doesNotThrow(() => new Function(sw)); // tylko kompilacja, bez uruchamiania
+  assert.equal(sw.match(/^const VERSION = /gm)?.length, 1);
+});
+
 test('Tryb offline: skróty plików w sw.js zgadzają się z zawartością (inaczej urządzenia nie dostaną zmiany)', async () => {
   const fs = await import('node:fs');
   const crypto = await import('node:crypto');
