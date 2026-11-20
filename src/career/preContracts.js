@@ -153,10 +153,11 @@ function addOffer(game, p, o, date, out) {
 }
 
 /** Braki klubu na przyszły sezon: grupy pozycji z liczbą zawodników z kontraktem po Jun 30 poniżej celu. */
-export function nextSeasonNeeds(game, clubId) {
+export function nextSeasonNeeds(game, clubId, preByClub = null) {
   const n = { GK: 0, DEF: 0, MID: 0, ATT: 0 };
   for (const p of squadOf(game.world, clubId)) if (!p.loan && p.contract?.until > SEASON_END && !p.preContract) n[groupOf(p)]++;
-  for (const p of Object.values(game.world.players)) if (p.preContract?.club === clubId) n[groupOf(p)]++;
+  // preByClub: zawodnicy z prekontraktem według klubu (aiPreProposals liczy raz zamiast skanu wszystkich dla każdego klubu)
+  for (const p of preByClub ? (preByClub.get(clubId) ?? []) : Object.values(game.world.players)) if (p.preContract?.club === clubId) n[groupOf(p)]++;
   return Object.keys(n).map((g) => ({ g, missing: SQUAD_TARGETS[g].target - n[g] })).filter((x) => x.missing > 0).sort((a, b) => b.missing - a.missing);
 }
 
@@ -175,8 +176,16 @@ export function aiPreProposals(game, date) {
   const openCount = new Map();
   for (const o of P.offers) if (o.status === 'open') openCount.set(o.pid, (openCount.get(o.pid) ?? 0) + 1);
   const rng = new Rng(`prekontrakt-ai:${game.seed}:${date}`);
+  // Prekontrakty według klubu (pętla niżej ich nie zmienia: addOffer składa tylko propozycje)
+  const preByClub = new Map();
+  for (const p of Object.values(W.players)) {
+    const cl = p.preContract?.club;
+    if (cl == null) continue;
+    if (!preByClub.has(cl)) preByClub.set(cl, []);
+    preByClub.get(cl).push(p);
+  }
   for (const c of rng.shuffle(CLUBS_PL.filter((x) => isAi(game, x.id) && x.tier <= 4))) {
-    const need = nextSeasonNeeds(game, c.id)[0];
+    const need = nextSeasonNeeds(game, c.id, preByClub)[0];
     if (!need) continue;
     const rep = clubReputation(c);
     const cands = pool.filter((p) => p.clubId !== c.id && groupOf(p) === need.g && !offered.has(`${p.id}:${c.id}`) && (openCount.get(p.id) ?? 0) < 2 && clubById(p.clubId)?.parent !== c.id && c.parent !== p.clubId

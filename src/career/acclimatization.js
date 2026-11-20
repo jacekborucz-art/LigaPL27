@@ -69,7 +69,9 @@ registerDailySystem({
     if (!game.world) return {};
     const messages = [];
     const yesterday = addDays(date, -1);
-    for (const p of Object.values(game.world.players)) {
+    const W = game.world.players;
+    for (const id in W) { // for-in: ta sama kolejność co Object.values, bez kopii wszystkich zawodników co dzień
+      const p = W[id];
       if (p.lastMove && p.clubId && p.acclimFor !== p.lastMove) startAcclim(game, p, p.lastMove);
       if (!p.acclim) continue;
       if (p.acclim.club !== p.clubId) { delete p.acclim; continue; }

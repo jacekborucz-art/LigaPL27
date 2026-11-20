@@ -388,10 +388,18 @@ function aiPostMatchTalk(game, f, clubId, s, res, squad, played) {
 
 /** Porażki z rzędu klubu włącznie z bieżącym meczem (bez sparingów; rozstrzygnięcie jak moodResult). */
 function lossStreakOf(game, clubId, f) {
-  const past = (game.fixtures || []).filter((x) => x !== f && x.played && x.result && x.comp !== 'friendly' && (x.home === clubId || x.away === clubId) && x.date <= f.date)
-    .sort((a, b) => b.date.localeCompare(a.date));
+  // Jedno przejście bez sortowania (wcześniej filtr i sortowanie wszystkich meczów przy każdej porażce), ten sam wynik:
+  // porażki nowsze od ostatniego meczu bez porażki; przy tej samej dacie liczy się kolejność w terminarzu (sort stabilny)
+  let stopDate = ''; let stopIdx = -1; const losses = [];
+  const all = game.fixtures || [];
+  for (let i = 0; i < all.length; i++) {
+    const x = all[i];
+    if (x === f || !x.played || !x.result || x.comp === 'friendly' || (x.home !== clubId && x.away !== clubId) || x.date > f.date) continue;
+    if (moodResult(x, x.home === clubId ? 0 : 1) === 'L') losses.push(x.date, i);
+    else if (x.date > stopDate) { stopDate = x.date; stopIdx = i; }
+  }
   let n = 1;
-  for (const x of past) { if (moodResult(x, x.home === clubId ? 0 : 1) !== 'L') break; n++; }
+  for (let k = 0; k < losses.length; k += 2) if (stopIdx < 0 || losses[k] > stopDate || (losses[k] === stopDate && losses[k + 1] < stopIdx)) n++;
   return n;
 }
 
@@ -701,7 +709,10 @@ registerDailySystem({
     const leaders = new Set();
     if (monday) for (const [cid, c] of Object.entries(game.world.clubs)) if (c.squad.some((id) => game.world.players[id]?.persona === 'Lider')) leaders.add(cid);
     const sharpCut = addDays(date, -4); // ostrość spada po 4 dniach bez meczu
-    for (const p of Object.values(game.world.players)) {
+    const W = game.world.players;
+    // for-in zamiast Object.values: ta sama kolejność, bez kopii 4000 zawodników (słownik) co dzień
+    for (const id in W) {
+      const p = W[id];
       if (p.injuryDays > 0) {
         p.injuryDays--;
         if (p.injuryDays === 0) {

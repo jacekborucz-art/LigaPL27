@@ -4,7 +4,7 @@
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
 <<<<<<< HEAD
 <<<<<<< HEAD
-const VERSION = 'v0.3-6bd60a84c8';
+const VERSION = 'v0.3-b740a5cf7e';
 =======
 const VERSION = 'v0.3-62876db151';
 >>>>>>> main
@@ -196,7 +196,7 @@ const FILES = [
   ['./assets/icons/icon.svg', '59f03f0390'],
   ['./src/app.js', '431f88b6bf'],
   ['./src/career/academy.js', '6429b69237'],
-  ['./src/career/acclimatization.js', '4c60c06da6'],
+  ['./src/career/acclimatization.js', '3cd6d72f9f'],
   ['./src/career/assistantReport.js', 'db514a2a68'],
   ['./src/career/attention.js', '22c71f439f'],
   ['./src/career/authority.js', '7cceeaaf58'],
@@ -204,7 +204,7 @@ const FILES = [
   ['./src/career/boardRequests.js', 'c412b89b00'],
   ['./src/career/careerSystem.js', '2f18d524af'],
   ['./src/career/coachCareer.js', '1b6aeea20e'],
-  ['./src/career/coachMarket.js', 'c244a909ee'],
+  ['./src/career/coachMarket.js', '5b7ab28585'],
   ['./src/career/coaches.js', '041155fd9c'],
   ['./src/career/editor.js', '21fad9923e'],
   ['./src/career/fans.js', '329e0cfdc9'],
@@ -214,7 +214,7 @@ const FILES = [
   ['./src/career/foreignPool.js', '8299f31a45'],
   ['./src/career/infrastructure.js', 'd64aff3a8f'],
   ['./src/career/jobMarket.js', 'baf5c575b8'],
-  ['./src/career/leagueNews.js', '5f8f30a71c'],
+  ['./src/career/leagueNews.js', '4652647fb3'],
   ['./src/career/loans.js', '6ff6e21d87'],
   ['./src/career/mindset.js', '5654596582'],
   ['./src/career/morale.js', '1c7d0eb69f'],
@@ -224,7 +224,7 @@ const FILES = [
   ['./src/career/owners.js', '881a7a1333'],
   ['./src/career/personality.js', 'f490724de6'],
   ['./src/career/postMatchReport.js', 'd8bb4cab6b'],
-  ['./src/career/preContracts.js', '8c71401605'],
+  ['./src/career/preContracts.js', '140671807a'],
   ['./src/career/prizes.js', 'eed7f4e394'],
   ['./src/career/referees.js', 'e6a9ed319a'],
   ['./src/career/reputation.js', 'c89eb66b85'],
@@ -306,7 +306,7 @@ const FILES = [
   ['./src/season/nationalSystem.js', '56b1056ddd'],
   ['./src/season/rollover.js', '85540d1eaa'],
   ['./src/season/schedule.js', 'a608f6730f'],
-  ['./src/season/season.js', '1422bcddec'],
+  ['./src/season/season.js', 'a178c1f033'],
   ['./src/season/standings.js', 'b3bdff91e2'],
   ['./src/season/superCupEU.js', 'f728d6d300'],
   ['./src/season/suspension.js', '7671748aa6'],

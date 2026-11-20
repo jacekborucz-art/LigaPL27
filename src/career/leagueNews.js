@@ -46,11 +46,24 @@ export function leagueNewsDay(game, date) {
       `${e.name} (${e.pos}) przechodzi z ${from} do ${to}. Kwota odstępnego: ${fmtZl(e.fee)}.`));
   }
   // Koszmarne kontuzje u rywali
-  for (const p of Object.values(game.world?.players ?? {})) {
-    const inj = p.injury;
-    if (!inj || !p.clubId || p.clubId === me || (p.injuryDays ?? 0) < NEWS.injuryDays || !inj.since || inj.since < since) continue;
+  const W = game.world?.players ?? {};
+  // Szybkie sprawdzenie przez kadry i akademie (każdy zawodnik z klubem jest w jednej z nich): pełny przegląd
+  // wszystkich zawodników (kolejność wiadomości jak dotąd) tylko w dni, w których jest świeża długa kontuzja
+  const news = (p) => {
+    const inj = p?.injury;
+    if (!inj || !p.clubId || p.clubId === me || (p.injuryDays ?? 0) < NEWS.injuryDays || !inj.since || inj.since < since) return false;
     const t = tierOf(p.clubId);
-    if (!inScope(t, my, p.clubId, me) || (t < my && (p.rep ?? 0) < NEWS.injuryRepHigher)) continue;
+    return inScope(t, my, p.clubId, me) && !(t < my && (p.rep ?? 0) < NEWS.injuryRepHigher);
+  };
+  let any = false;
+  for (const [cid, c] of Object.entries(game.world?.clubs ?? {})) {
+    if (cid === me || !inScope(tierOf(cid), my, cid, me)) continue;
+    if (c.squad?.some((id) => news(W[id])) || c.academy?.some((id) => news(W[id]))) { any = true; break; }
+  }
+  if (any) for (const id in W) { // for-in: ta sama kolejność co Object.values, bez kopii wszystkich zawodników
+    const p = W[id];
+    if ((p.injuryDays ?? 0) < NEWS.injuryDays || !news(p)) continue;
+    const inj = p.injury;
     const months = Math.round(p.injuryDays / 30);
     out.push(media(date, `news-uraz:${p.id}:${inj.since}`, `${nameOf(p.clubId)}: ${p.name} wypada na długo`,
       `${p.name} (${p.pos}) doznał poważnej kontuzji${inj.name ? ` (${inj.name})` : ''}. Przerwa potrwa około ${months} ${months === 1 ? 'miesiąca' : 'miesięcy'}.`));

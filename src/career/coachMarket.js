@@ -145,7 +145,16 @@ function tablesFor(game) {
   const by = new Map(ALL_LEAGUE_COMPS.map((c) => [c, []]));
   for (const f of game.fixtures) by.get(f.comp)?.push(f);
   for (const comp of ALL_LEAGUE_COMPS) t[comp] = standings(by.get(comp), compClubIds(comp));
+  // Mecze ligi według rozgrywek dla coachPressure (bez filtrowania całego terminarza dla każdego klubu); ważne,
+  // dopóki terminarz jest tą samą tablicą o tej samej długości
+  t[BY_COMP] = { src: game.fixtures, len: game.fixtures.length, by };
   return t;
+}
+const BY_COMP = Symbol('meczeLigi');
+/** Mecze do przeglądu presji: lista rozgrywek z tablesFor albo cały terminarz (ten sam filtr niżej). */
+function leagueFixtures(game, tables, comp) {
+  const x = tables?.[BY_COMP];
+  return x && x.src === game.fixtures && x.len === game.fixtures.length && x.by.has(comp) ? x.by.get(comp) : game.fixtures;
 }
 
 const resOf = (f, id) => { const [a, b] = f.result.score; const me = f.home === id ? a : b; const op = f.home === id ? b : a; return me > op ? 'W' : me < op ? 'L' : 'D'; };
@@ -165,7 +174,7 @@ export function coachPressure(game, clubId, tables, date, p = coachOf(game, club
   const dropFrom = size - (club.tier >= 3 ? 4 : 3) + 1;
   const goal = seasonGoalFor(club);
   const target = Math.max(1, goal.target - (o.ambicja - 10) * K.ambitionShift);
-  const lf = game.fixtures.filter((f) => f.comp === comp && f.played && (f.home === clubId || f.away === clubId)).sort((a, b) => a.date.localeCompare(b.date));
+  const lf = leagueFixtures(game, tables, comp).filter((f) => f.comp === comp && f.played && (f.home === clubId || f.away === clubId)).sort((a, b) => a.date.localeCompare(b.date));
   const played = lf.length;
   const total = (size - 1) * 2;
   const conf = Math.min(1, played / K.conf);
