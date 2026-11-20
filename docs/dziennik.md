@@ -54,6 +54,8 @@ Zrobione:
   wyjazdu zgodny z zasadą (w pierwszych 2 dniach wraca połowa kosztów; UI mówił, że nic nie wraca), karta „Wolne
   miejsce” mówi o pełnym sztabie (było „limit pozwala na jeszcze 2 skautów”, a zatrudnić się nie dało), pytanie
   „Zwolnić skauta (imię)?”, raport w poczcie nie obiecuje listy obserwowanych.
+- sw.js miał znaczniki konfliktu scalania od 85a4f32 / f021d91 (błąd składni: service worker nie działał, telefony nie
+  dostawały zmian). Usunięte w 96ff881; nowy test w `tests/core.test.mjs` sprawdza, że sw.js się kompiluje.
 Decyzje i pułapki:
 - Test „Pełny sezon ... poniżej 15 s” w pełnym `npm test` (pliki równolegle na 4 rdzeniach) dalej bywa ponad 15 s;
   sam przechodzi. Dalsze przyspieszenie wymaga pracy w silniku (pickXI, trening AI, recovery).
