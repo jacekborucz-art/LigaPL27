@@ -5,7 +5,7 @@ import { esc, fmtDate, fmtDay } from './dom.js';
 import { kpi, panel, meter } from './transfersView.js';
 import {
   REQ, REQ_TYPES, VERDICT_LABELS, ensureRequests, requestStatus, amountPresets, askBoard, appealVeto, appealStatus,
-  wageRatio, lowerGoal, zl,
+  wageRatio, lowerGoal, zl, placeAt,
 } from '../career/boardRequests.js';
 import { clubById } from '../data/clubs_pl.js';
 
@@ -53,7 +53,7 @@ function typeCard(game, type, c) {
 function condsPanel(R) {
   const open = R.conds.filter((x) => x.status === 'open');
   if (!open.length) return '';
-  const rows = open.map((x) => `<li><span>${esc(`${REQ_TYPES[x.type].label}: ${zl(x.amount)}${x.type === 'wage' ? ' tygodniowo' : ''}`)}</span><small>${esc(`jeśli ${fmtDate(x.by)} drużyna będzie na ${x.top}. miejscu lub wyżej`)}</small></li>`).join('');
+  const rows = open.map((x) => `<li><span>${esc(`${REQ_TYPES[x.type].label}: ${zl(x.amount)}${x.type === 'wage' ? ' tygodniowo' : ''}`)}</span><small>${esc(`jeśli ${fmtDate(x.by)} drużyna będzie ${placeAt(x.top)}`)}</small></li>`).join('');
   return panel('Warunki zarządu', 'warn', `<ul class="br-list">${rows}</ul>`, { count: open.length, cls: 'br-conds' });
 }
 

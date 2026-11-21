@@ -15,7 +15,8 @@ import { payLevel } from '../data/finanse_klubow.js';
 import { squadOf } from '../world/worldGen.js';
 import { standings } from '../season/standings.js';
 import { GROUP } from './squad.js';
-import { ensureBoard, tablePos, seasonGoalFor } from './board.js';
+import { ensureBoard, tablePos, lastSeasonPos, seasonGoalFor } from './board.js';
+import { SEASON_YEAR } from '../config/calendar2026.js';
 import { ownerOf } from './owners.js';
 import { wageBill, book, spendable } from './finance.js';
 import { marketWage, estimateValue, MAX_YEARS, yearsLabel } from './negotiation.js';
@@ -393,12 +394,13 @@ export function askBoard(game, type, amount = 0, date = game.date) {
     const d28 = addDaysIso(date, 28); // pierwszy dzień miesiąca, nie wcześniej niż za 4 tygodnie
     const by = d28.endsWith('-01') ? d28 : nextMonthStart(d28);
     const sum = type === 'wage' ? r100(amount * share) : r10k(amount * share);
-    const cond = { id: `${date}:${type}`, date, type, amount: sum, top, by, status: 'open' };
+    const cond = { id: `${date}:${type}`, date, type, amount: sum, top, by, status: 'open', season: SEASON_YEAR };
     R.conds.unshift(cond); R.conds.length = Math.min(R.conds.length, 12);
     entry.cond = { top, by, amount: sum };
     subject = `Warunek zarządu: ${label}`;
-    body = `zarząd nie zwiększy teraz budżetu. Jeśli ${fmtDate(by)} drużyna będzie na ${top}. miejscu lub wyżej, dostanie Pan ${zl(sum)}${type === 'wage' ? ' tygodniowo' : ''}.`;
-    entry.text = `Warunek: ${top}. miejsce lub wyżej ${fmtDate(by)}, wtedy ${zl(sum)}.`;
+    const after = condSeasonEnds(game, by) ? ' (jeśli sezon skończy się wcześniej, liczy się miejsce na koniec sezonu)' : '';
+    body = `zarząd nie zwiększy teraz budżetu. Jeśli ${fmtDate(by)} drużyna będzie ${placeAt(top)}${after}, dostanie Pan ${zl(sum)}${type === 'wage' ? ' tygodniowo' : ''}.`;
+    entry.text = `Warunek: ${placeGoal(top)} ${fmtDate(by)}, wtedy ${zl(sum)}.`;
   } else {
     subject = `Odmowa zarządu: ${label}`;
     const why = note ? [] : reasons(game, sc, type, amount);
@@ -418,6 +420,27 @@ function requestStatusAfter(e) {
   return addDaysIso(e.date, days);
 }
 
+// Teksty warunku: „1. miejsce” zamiast „1. miejsce lub wyżej”
+export const placeGoal = (top) => (top <= 1 ? '1. miejsce' : `${top}. miejsce lub wyżej`);
+export const placeAt = (top) => (top <= 1 ? 'na 1. miejscu' : `na ${top}. miejscu lub wyżej`);
+const condSeasonEnds = (game, by) => by >= `${SEASON_YEAR + 1}-07-01`;
+const condSeasonOf = (c) => c.season ?? (Number(c.date.slice(0, 4)) - (c.date.slice(5, 7) < '07' ? 1 : 0));
+
+/**
+ * Miejsce do rozliczenia warunku. Warunek z poprzedniego sezonu (termin wypadł po zmianie sezonu): miejsce na koniec
+ * tamtego sezonu z archiwum, nie z nowej, pustej tabeli (błąd: mistrz dostawał „15. miejsce”). Warunek z bieżącego
+ * sezonu: tabela, ale dopiero po 4 meczach (wcześniej rozliczenie czeka). Zwraca { pos, final } albo null (czekaj).
+ */
+function condPosition(game, cond) {
+  if (condSeasonOf(cond) < SEASON_YEAR) {
+    const last = lastSeasonPos(game, game.clubId);
+    return last ? { pos: last.pos, final: true } : { pos: null, final: true };
+  }
+  const t = tablePos(game, game.clubId);
+  if (!t.pos || t.played < 4) return null;
+  return { pos: t.pos, final: false };
+}
+
 /** Comiesięczne rozliczenie warunków (1. dnia miesiąca, po ocenie zarządu). */
 export function checkConditions(game, date, { push = true } = {}) {
   const R = game.board?.requests;
@@ -425,7 +448,9 @@ export function checkConditions(game, date, { push = true } = {}) {
   const out = [];
   for (const cond of R.conds) {
     if (cond.status !== 'open' || date < cond.by) continue;
-    const t = tablePos(game, game.clubId);
+    const t = condPosition(game, cond);
+    if (!t) continue; // za mało meczów w nowym sezonie: rozliczenie 1. dnia kolejnego miesiąca
+    const where = t.final ? `zakończyła sezon na ${t.pos}. miejscu` : `jest na ${t.pos}. miejscu`;
     const label = REQ_TYPES[cond.type].short;
     const per = cond.type === 'wage' ? ' tygodniowo' : '';
     if (t.pos && t.pos <= cond.top) {
@@ -434,13 +459,14 @@ export function checkConditions(game, date, { push = true } = {}) {
       if (ok) {
         cond.status = 'met';
         const change = applyGrant(game, game.clubId, cond.type, cond.amount);
-        out.push(letter(game, date, `warunek:${cond.id}`, `Warunek spełniony: ${label}`, `drużyna jest na ${t.pos}. miejscu, więc zarząd dotrzymuje słowa: ${label} rośnie o ${zl(cond.amount)}${per}. ${change}`, 'important', push));
+        out.push(letter(game, date, `warunek:${cond.id}`, `Zarząd dotrzymuje słowa: ${label}`, `umawialiśmy się na ${placeGoal(cond.top)}, a drużyna ${where}. Zarząd dotrzymuje słowa: ${label} rośnie o ${zl(cond.amount)}${per}. ${change}`, 'important', push));
         continue;
       }
     }
     cond.status = 'failed';
     game.board.trust = Math.round(clamp(game.board.trust - 1, 0, 100));
-    out.push(letter(game, date, `warunek:${cond.id}`, `Warunek niespełniony: ${label}`, `warunkiem było co najwyżej ${cond.top}. miejsce w tabeli, a drużyna jest ${t.pos ? `na ${t.pos}. miejscu` : 'poza czołówką'}. Zarząd nie zwiększa budżetu (${zl(cond.amount)}${per}). Zaufanie zarządu: ${game.board.trust} na 100 (-1).`, 'info', push));
+    const placeTxt = t.pos ? where : 'nie zajęła wymaganego miejsca';
+    out.push(letter(game, date, `warunek:${cond.id}`, `Bez podwyżki od zarządu: ${label}`, `umawialiśmy się na ${placeGoal(cond.top)}, a drużyna ${placeTxt}. Dlatego zarząd nie zwiększa budżetu (${zl(cond.amount)}${per}). Zaufanie zarządu: ${game.board.trust} na 100 (-1).`, 'info', push));
   }
   return out;
 }

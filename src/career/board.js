@@ -77,6 +77,24 @@ function tablePos(game, clubId) {
   return { pos: row?.pos ?? null, played: row?.played ?? 0, size: t.length };
 }
 
+/**
+ * Miejsce klubu na koniec poprzedniego sezonu z archiwum (po zmianie sezonu bieżąca tabela jest pusta).
+ * Szuka we wszystkich ligach, bo po awansie albo spadku klub gra już gdzie indziej. Zwraca { pos, tier, season } albo null.
+ */
+function lastSeasonPos(game, clubId) {
+  const last = game.archive?.at(-1);
+  if (!last) return null;
+  for (const t of [1, 2, 3]) {
+    const i = (last.tables?.[t] ?? []).findIndex((r) => r.id === clubId);
+    if (i >= 0) return { pos: i + 1, tier: t, season: last.season };
+  }
+  for (const rows of Object.values(last.l3 ?? {})) {
+    const i = rows.findIndex((r) => r.id === clubId);
+    if (i >= 0) return { pos: i + 1, tier: 4, season: last.season };
+  }
+  return null;
+}
+
 export const trustLabel = (t) => (t >= 75 ? 'Pełne zaufanie' : t >= 55 ? 'Zadowolony' : t >= 40 ? 'Cierpliwy' : t >= 25 ? 'Zaniepokojony' : 'Na krawędzi');
 
 /**
@@ -132,4 +150,4 @@ export function jobOffers(game, date, afterFiring) {
   return list.map((x) => ({ clubId: x.c.id, name: x.c.name, league: leagueLabel(x.c) }));
 }
 
-export { tablePos, COMPETITIONS };
+export { tablePos, lastSeasonPos, COMPETITIONS };

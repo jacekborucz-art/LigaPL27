@@ -29,6 +29,20 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 21, 2026, profil A (chmura), warunek zarządu po zmianie sezonu (v1.22 Beta)
+Zrobione:
+- Błąd: warunek zarządu (np. budżet płac za 1. miejsce) z terminem po 1 lipca rozliczał się z nowej, pustej tabeli,
+  więc mistrz dostawał „drużyna jest na 15. miejscu”. Teraz warunek z poprzedniego sezonu bierze miejsce na koniec
+  sezonu z archiwum (`lastSeasonPos` w `src/career/board.js`), a w nowym sezonie rozliczenie czeka do 4 meczów.
+- Teksty: „Bez podwyżki od zarządu” / „Zarząd dotrzymuje słowa”, „umawialiśmy się na 1. miejsce, a drużyna
+  zakończyła sezon na X. miejscu”; bez „co najwyżej” i bez „1. miejsce lub wyżej”. Warunek ma pole `season`.
+- Test regresji w `tests/boardRequests.test.mjs`.
+Decyzje i pułapki:
+- Sprawdzone pozostałe miejsca z tabelą na starcie sezonu (ocena zarządu, kibice, sponsorzy, presja, cel w trakcie
+  sezonu, historia trenera): mają próg meczów albo archiwum.
+Zostało / dalej:
+- Do decyzji właściciela: v1.23 czy w v1.22.
+
 ## Nov 21, 2026, agent (worktree, gałąź do scalenia), negocjacje klubów AI i klocki decyzji zawodnika (v1.21.1 Beta)
 Zrobione:
 - Ukryty atrybut klubu AI „Negocjacje” 1-20 (`src/career/clubNegotiation.js`, zapis `game.clubNeg`, leniwe losowanie):

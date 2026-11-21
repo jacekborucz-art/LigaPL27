@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-2ad2bc7fbc';
+const VERSION = 'v0.3-d6881866ec';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -192,8 +192,8 @@ const FILES = [
   ['./src/career/assistantReport.js', 'db514a2a68'],
   ['./src/career/attention.js', '22c71f439f'],
   ['./src/career/authority.js', '7cceeaaf58'],
-  ['./src/career/board.js', '427b9241b5'],
-  ['./src/career/boardRequests.js', 'c412b89b00'],
+  ['./src/career/board.js', '9ed1587a78'],
+  ['./src/career/boardRequests.js', '23dafece26'],
   ['./src/career/careerSystem.js', '2f18d524af'],
   ['./src/career/clubNegotiation.js', 'dfb1601480'],
   ['./src/career/coachCareer.js', '1b6aeea20e'],
@@ -350,7 +350,7 @@ const FILES = [
   ['./src/ui/arrowsView.js', 'de09da93ff'],
   ['./src/ui/assistantReportView.js', 'ad1ef0c14d'],
   ['./src/ui/badges.js', 'b7a51128d4'],
-  ['./src/ui/boardRequestsView.js', '14afde7d17'],
+  ['./src/ui/boardRequestsView.js', '2a5beaea4b'],
   ['./src/ui/careerView.js', '823345518a'],
   ['./src/ui/clubView.js', 'd798bb6b4f'],
   ['./src/ui/competitionsView.js', 'c0c1ca400f'],

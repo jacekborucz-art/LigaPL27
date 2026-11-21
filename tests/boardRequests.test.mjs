@@ -16,6 +16,8 @@ import { aiNegotiate } from '../src/career/negotiation.js';
 import { negotiationLimits } from '../src/ui/transfersView.js';
 import { startNegotiation, handleNegotiationAction, renderNegotiation } from '../src/ui/negotiationView.js';
 import { boardRequestsPanel, handleBoardAction } from '../src/ui/boardRequestsView.js';
+import { SEASON_YEAR } from '../src/config/calendar2026.js';
+import { LEAGUE_COMPS } from '../src/season/leagueComps.js';
 import { renderClubHub } from '../src/ui/klubView.js';
 import { Rng } from '../src/core/rng.js';
 import '../src/season/dailySystems.js';
@@ -167,6 +169,11 @@ test('Warunek: spełniony daje pieniądze, niespełniony kosztuje punkt zaufania
   const c = g.finance.clubs.widzew;
   const R = ensureRequests(g);
   const tb = c.transferBudget;
+  // Rozliczenie po co najmniej 4 meczach sezonu (wcześniej czeka): 4 kolejki ligi rozegrane remisem
+  const comp = g.fixtures.find((x) => (x.home === 'widzew' || x.away === 'widzew') && LEAGUE_COMPS.includes(x.comp)).comp;
+  const lf = g.fixtures.filter((f) => f.comp === comp);
+  const rounds = [...new Set(lf.map((f) => f.round))].sort((a, b) => a - b).slice(0, 4);
+  for (const f of lf) if (rounds.includes(f.round)) { f.played = true; f.result = { score: [1, 1] }; }
   R.conds.push({ id: 'a', date: '2026-07-05', type: 'transfer', amount: 500000, top: 18, by: '2026-08-01', status: 'open' });
   R.conds.push({ id: 'b', date: '2026-07-05', type: 'transfer', amount: 700000, top: 0, by: '2026-08-01', status: 'open' });
   R.conds.push({ id: 'c', date: '2026-07-05', type: 'transfer', amount: 900000, top: 18, by: '2026-09-01', status: 'open' });
@@ -314,4 +321,32 @@ test('Stałe: limity częstotliwości zgodne ze specyfikacją', () => {
   assert.equal(REQ.PER_MONTH, 3);
   assert.equal(REQ.AFTER_NO_DAYS, 60);
   assert.equal(REQ.AFTER_YES_DAYS, 90);
+});
+
+test('Warunek z poprzedniego sezonu: liczy się miejsce na koniec sezonu z archiwum, nie nowa pusta tabela', () => {
+  const g = fresh();
+  const R = ensureRequests(g);
+  const c = g.finance.clubs[g.clubId];
+  const wb = c.wageBudget;
+  // Mistrz poprzedniego sezonu; bieżąca tabela bez meczów (dawniej: „drużyna jest na 15. miejscu”)
+  g.archive = [{ season: '2025/26', tables: { 1: [{ id: g.clubId, pts: 80, gd: 40 }, { id: 'legia', pts: 70, gd: 20 }], 2: [], 3: [] }, l3: {} }];
+  R.conds.push({ id: 'old', date: `${SEASON_YEAR}-06-05`, season: SEASON_YEAR - 1, type: 'wage', amount: 1000, top: 1, by: `${SEASON_YEAR}-07-01`, status: 'open' });
+  R.conds.push({ id: 'oldFail', date: `${SEASON_YEAR}-05-20`, type: 'transfer', amount: 500000, top: 1, by: `${SEASON_YEAR}-07-01`, status: 'open' }); // stary zapis bez pola season
+  g.archive[0].tables[1].reverse(); // klub gracza na 2. miejscu
+  const msgs = checkConditions(g, `${SEASON_YEAR}-07-01`, { push: false });
+  assert.equal(msgs.length, 2);
+  assert.ok(msgs.every((m) => /zakończyła sezon na 2\. miejscu/.test(m.body) && /umawialiśmy się na 1\. miejsce/.test(m.body)), msgs.map((m) => m.body).join('\n'));
+  assert.ok(msgs.every((m) => !/Warunek niespełniony|co najwyżej|15\. miejsc/.test(`${m.subject} ${m.body}`)));
+  assert.equal(c.wageBudget, wb);
+  // Mistrz: warunek spełniony
+  g.archive[0].tables[1].reverse();
+  R.conds.push({ id: 'win', date: `${SEASON_YEAR}-06-10`, season: SEASON_YEAR - 1, type: 'transfer', amount: 300000, top: 1, by: `${SEASON_YEAR}-07-01`, status: 'open' });
+  const ok = checkConditions(g, `${SEASON_YEAR}-07-01`, { push: false });
+  assert.equal(ok.length, 1);
+  assert.match(ok[0].subject, /Zarząd dotrzymuje słowa/);
+  assert.match(ok[0].body, /zakończyła sezon na 1\. miejscu/);
+  // Warunek z bieżącego sezonu przed 4 meczami: czeka, nie przepada
+  R.conds.push({ id: 'now', date: `${SEASON_YEAR}-07-02`, season: SEASON_YEAR, type: 'transfer', amount: 300000, top: 3, by: `${SEASON_YEAR}-07-01`, status: 'open' });
+  assert.equal(checkConditions(g, `${SEASON_YEAR}-07-01`, { push: false }).length, 0);
+  assert.equal(R.conds.at(-1).status, 'open');
 });
