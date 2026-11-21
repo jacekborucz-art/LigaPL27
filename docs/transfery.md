@@ -345,6 +345,12 @@ podobnie (110-150 na sezon). Kluby AI z ujemnym saldem: 0. Do obserwacji: trzeci
 o ok. 0,1 OVR we wszystkich pięciu ziarnach (pierwsze dwa sezony bez zmian); pierwsza wersja bez kary za licytację
 dawała 28 przegranych propozycji w sezonie i 11,51 po pierwszym sezonie.
 
+Zmiany od v1.21.1 Beta (docs/negocjacje.md, rozdz. 15 i 16): szum użyteczności 0,107 (było 0,08), szansa zgody
+`clamp(0,787 + 0,4 (U - U_odniesienia), 0,5; 0,92)`, nowe klocki oceny (miasto i rodzina, stabilność klubu,
+pierwszeństwo oferty), kara licytacji w `aiBuy` losowa `max(0; 0,8 - 0,05 (N - 10) + N(0; 0,6))` OVR zamiast 1,2,
+jedna poprawka propozycji w ciemno dla klubu AI i gracza po cudzej propozycji, podwyżka klubu AI przy „chce zmian”
+z atrybutu Negocjacje.
+
 ## Rotacja wolnych zawodników (Nov 14, 2026)
 
 1. dnia każdego miesiąca wolny zawodnik, który długo nie znajduje klubu, może zniknąć z rynku (koniec kariery, gra za granicą albo w niższej lidze) [SZAC]: pierwsze 2 miesiące bez zmian, potem 8 % i +5 % za każdy kolejny miesiąc (najwyżej 45 %), zawodnicy 30+ x1,5, weterani 32+ po pół roku co najmniej 15 %. Na jego miejsce od razu pojawia się nowy, losowy wolny zawodnik (za zawodnika z puli zagranicznej: nowy z puli, za pozostałych: zwykły wolny), dopóki na rynku jest mniej niż 150 wolnych. Na każdej grupie pozycji zawsze zostaje kilku wolnych (bramkarze 8, obrońcy i pomocnicy 14, napastnicy 10), bo kluby AI uzupełniają nimi braki w kadrze. Kluby AI z brakiem w kadrze wybierają najpierw najlepszego z wolnych, na których je stać (`aiBuy`).

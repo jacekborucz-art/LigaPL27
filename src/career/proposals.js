@@ -5,6 +5,9 @@
 // użyteczności z prekontraktów (offerUtility, src/career/preContracts.js) i odpowiada: zgoda (transakcja od testów
 // medycznych), odmowa, wybrał inny klub albo chce zmian (gracz: ostatnia runda rozmów, klub AI: podnosi pensję
 // w budżecie albo rezygnuje). Odstępne propozycji w toku jest zarezerwowane (pendingFees). Stan: game.market.pending.
+// Licytacja w ciemno (docs/negocjacje.md, rozdz. 15): oferty są tajne, kwoty zna tylko zawodnik. Gdy inny klub złoży
+// propozycję, klub z wcześniejszą propozycją może ją raz poprawić, nie znając cudzej kwoty: klub AI wg potrzeby,
+// atrybutu Negocjacje (clubNegotiation.js), budżetu i losu (blindRaise), gracz sam (improveUserProposal, +4/8/12 %).
 // Wszystkie liczby [SZAC].
 
 import { Rng, clamp } from '../core/rng.js';
@@ -13,9 +16,14 @@ import { addDays } from '../core/gameLoop.js';
 import { clubById } from '../data/clubs_pl.js';
 import { DOMESTIC } from '../config/calendar2026.js';
 import { clubReputation } from './reputation.js';
-import { relationWith } from './negotiation.js';
+import { relationWith, formatZl } from './negotiation.js';
 import { offerUtility } from './preContracts.js';
-import { spendable } from './finance.js';
+import { clubStability } from './offerFactors.js'; // klocki decyzji zawodnika
+import { clubNegotiation, negLevers, NEG, Q10 } from './clubNegotiation.js'; // ukryty atrybut Negocjacje klubów AI
+import { boardCaps, contractIssues } from './boardRequests.js';
+import { squadDeficits, GROUP } from './squad.js';
+import { squadOf } from '../world/worldGen.js';
+import { spendable, wageRoom } from './finance.js';
 import { canSign, squadCount } from './squadLimit.js';
 import { startDeal, hasOpenDeal, pendingFees, stat, expectedRegistration } from './transferDeals.js';
 import { isPoolContracted, poolSellerClub } from './foreignPool.js';
@@ -24,12 +32,13 @@ import { fmtDate } from '../ui/dom.js';
 
 export const THINK = {
   base: 3, min: -1, max: 2, // namysł 3 dni + RNG od -1 do +2 (2-5 dni)
-  noise: 0.08, // szum użyteczności (jak w prekontraktach)
-  accept: 0.78, slope: 0.4, pMin: 0.5, pMax: 0.92, // szansa zgody = clamp(0,78 + 0,4 x (U - U_odniesienia), 0,5; 0,92)
+  noise: 0.107, // szum użyteczności: przy 11 000 zł wobec 10 000 zł (reszta równa) lepsza oferta wygrywa ok. 73 % (było 0,08: 80 %)
+  accept: 0.787, slope: 0.4, pMin: 0.5, pMax: 0.92, // szansa zgody = clamp(0,787 + 0,4 x (U - U_odniesienia), 0,5; 0,92); 0,78 przed nowymi klockami
   changes: 0.6, // bez zgody: 60 % „chce zmian”, 40 % odmowa
   wantMin: 0.08, wantMax: 0.18, // „chce zmian”: pensja wyżej o 8-18 %
   lastRoundDays: 2, // termin na ostatnią rundę rozmów gracza
-  aiRaise: 0.1, // klub AI przy „chce zmian”: pensja +10 %, jeśli mieści się w budżecie
+  aiRaise: 0.1, // klub AI bez atrybutu przy „chce zmian”: pensja +10 % (z atrybutem jak druga runda aiNegotiate)
+  improve: [4, 8, 12], // gracz: jedna poprawka propozycji po cudzej propozycji (pensja +4, 8 albo 12 %)
   refuseLockDays: 14, // po odmowie zawodnik nie rozmawia z tym klubem 2 tygodnie
   freeRepGap: 15, freeStepDown: 0.4, // odniesienie wolnego zawodnika: klub o reputacji +15, minus 0,4 x gotowość do zejścia niżej
   listed: -0.2, unhappy: -0.3, // odniesienie zawodnika z klubem: wystawiony na listę, niezadowolony albo prosi o transfer
@@ -74,12 +83,14 @@ const stateOf = (p) => (p.clubId ? 'club' : isPoolContracted(p) ? 'pool' : 'free
 // ------------------------------------------------------------ Złożenie propozycji
 /**
  * Propozycja klubu dla zawodnika po udanych rozmowach. opts: { playerId, to, fee, contract, kind ('transfer'|'free'),
- * date, maxWage (klub AI: budżet pensji na drugą rundę), sale (oferta klubu AI za zawodnika gracza: id oferty) }.
+ * date, maxWage (klub AI: budżet pensji na drugą rundę), maxTotal (próg zarządu: roczny koszt kontraktu),
+ * demand (orientacyjne żądanie z rozmów: limit poprawki w ciemno), sale (oferta klubu AI za zawodnika gracza: id oferty) }.
+ * Kluby z wcześniejszymi propozycjami dowiadują się tylko, że zawodnik rozważa inną (bez klubu i kwoty).
  * Zwraca propozycję albo null (zawodnik zajęty albo ten klub już złożył propozycję).
  */
 export function makeProposal(game, opts) {
   ensureProposals(game);
-  const { playerId, to, fee = 0, contract, kind = 'transfer', maxWage = null, sale = null } = opts;
+  const { playerId, to, fee = 0, contract, kind = 'transfer', maxWage = null, maxTotal = null, demand = null, sale = null } = opts;
   const date = opts.date ?? game.date;
   const p = game.world.players[playerId];
   if (!p || !to || hasOpenDeal(game, playerId) || p.preContract) return null;
@@ -97,11 +108,88 @@ export function makeProposal(game, opts) {
   const x = {
     id: `n${++M.pendingSeq}-${playerId}`, pid: playerId, name: p.name, pos: p.pos, to, user: to === game.clubId,
     from: p.clubId ?? null, fromState: stateOf(p), fee, contract, kind, date, decide, needsWindow,
-    maxWage, sale, status: 'open', deadline: null, want: null, end: null,
+    maxWage, maxTotal, demand, sale, status: 'open', deadline: null, want: null, end: null,
   };
   M.pending.push(x);
   stat(game, x.user ? 'propsUser' : 'props');
+  for (const y of mine) if (y.status === 'open') rivalArrived(game, y, date);
   return x;
+}
+
+// ------------------------------------------------------------ Licytacja w ciemno
+/**
+ * Inny klub złożył propozycję zawodnikowi, który rozważa propozycję y. Klub y wie tylko tyle (bez klubu i kwoty).
+ * Klub AI od razu decyduje o jednej poprawce (blindRaise), gracz dostaje list i może raz poprawić (improveUserProposal).
+ */
+function rivalArrived(game, y, date) {
+  y.rivals = (y.rivals ?? 0) + 1;
+  if (!y.user) { blindRaise(game, y, date); return; }
+  if (y.rivals > 1 || y.improved || y.to !== game.clubId) return; // jeden list na propozycję
+  const msg = createMessage({ date, key: `namysl-rywal:${y.pid}:${y.id}`, category: 'transfers', from: `Agent zawodnika ${y.name}`, priority: 'important',
+    subject: `${y.name} rozważa też inną propozycję`,
+    body: `${y.name} dostał propozycję innego klubu. Nie zdradzę, którego ani na jakich warunkach. Odpowie do ${fmtDate(thinkingUntil(game, y.pid) ?? y.decide)}. Jeśli chcesz, możesz raz poprawić pensję w swojej propozycji (Transfery, W toku).`,
+    refs: { kind: 'proposal', pid: y.pid, propId: y.id } });
+  game.inbox = addMessages(game.inbox ?? [], [msg]).inbox;
+}
+
+/** Roczny koszt kontraktu w progach zarządu (boardRequests.js contractAnnual). */
+const annual = (c) => c.wage * 52 + ((c.signOn ?? 0) + (c.agentFee ?? 0)) / Math.max(1, c.years ?? 1);
+
+/**
+ * Klub AI raz poprawia propozycję w ciemno. Szansa: 0,35 + 0,3 przy braku w kadrze + 0,3 x (q - q10)
+ * (atrybut Negocjacje), wielkość 4-12 % pensji, najwyżej (1 + 0,1q²) x orientacyjne żądanie, budżet pensji
+ * i próg zarządu z rozmów. Ziarno: gra, zawodnik, klub, data. Zwraca true, gdy poprawił.
+ */
+export function blindRaise(game, y, date = game.date) {
+  if (y.user || y.bumpTried || y.status !== 'open') return false;
+  y.bumpTried = true;
+  const p = game.world.players[y.pid];
+  const old = y.contract?.wage ?? 0;
+  if (!p || !old || !game.world.clubs[y.to]) return false;
+  const lv = negLevers(clubNegotiation(game, y.to));
+  const rng = new Rng(`przebicie:${game.seed}:${y.pid}:${y.to}:${date}`);
+  const g = GROUP[p.pos] ?? 'MID';
+  const need = squadDeficits(squadOf(game.world, y.to)).some((n) => n.scope === 'squad' && (n.group === g || n.group === 'ALL'));
+  const B = NEG.bump;
+  if (!rng.chance(clamp(B.base + (need ? B.need : 0) + B.q * (lv.q - Q10), 0.05, 0.95))) return false;
+  let wage = old * (1 + B.min + (B.max - B.min) * rng.next());
+  if (y.demand) wage = Math.min(wage, lv.cap * y.demand);
+  if (y.maxWage != null) wage = Math.min(wage, y.maxWage);
+  wage = Math.floor(wage / 100) * 100;
+  const c = { ...y.contract, wage };
+  if (y.maxTotal && annual(c) > y.maxTotal) c.wage = Math.floor((y.maxTotal - ((c.signOn ?? 0) + (c.agentFee ?? 0)) / Math.max(1, c.years ?? 1)) / 52 / 100) * 100;
+  if (c.wage < old * 1.02) return false; // za mała poprawka (limit atrybutu albo budżetu)
+  y.contract = c;
+  y.bumped = true;
+  stat(game, 'propsBump');
+  return true;
+}
+
+/** Czy gracz może poprawić propozycję: zawodnik dostał po niej propozycję innego klubu, jedna poprawka. */
+export const canImprove = (game, x) => !!x && x.user && x.to === game.clubId && x.status === 'open' && (x.rivals ?? 0) > 0 && !x.improved;
+
+/**
+ * Gracz raz poprawia swoją propozycję (pensja +4, 8 albo 12 %) w tych samych granicach co w rozmowach: wolne miejsce
+ * w budżecie płac i progi zarządu. Nie zna kwoty innego klubu. Zwraca { ok, text }.
+ */
+export function improveUserProposal(game, propId, pct, date = game.date) {
+  const x = (game.market?.pending ?? []).find((y) => y.id === propId);
+  if (!canImprove(game, x)) return { ok: false, text: 'Tej propozycji nie można już poprawić.' };
+  const k = Number(pct);
+  if (!THINK.improve.includes(k)) return { ok: false, text: 'Nieznana poprawka.' };
+  const p = game.world.players[x.pid];
+  const old = x.contract?.wage ?? 0;
+  const c = { ...x.contract, wage: Math.max(old + 50, Math.round((old * (1 + k / 100)) / 50) * 50) };
+  const room = wageRoom(game.finance, game.world, game.clubId);
+  if (c.wage > room) return { ok: false, text: `Pensja ${formatZl(c.wage)} przekracza wolne miejsce w budżecie płac (${formatZl(room)} tygodniowo).` };
+  // Progi zarządu dotyczące pensji (pensja i roczny koszt); długość i premie zostały zatwierdzone w rozmowach
+  const issues = p ? contractIssues(boardCaps(game, game.clubId, p, 'sign'), c).filter((i) => i.code === 'wage' || i.code === 'total') : [];
+  if (issues.length) return { ok: false, text: `Zarząd nie zatwierdzi tej pensji: ${issues.map((i) => i.text).join(' ')}` };
+  x.contract = c;
+  x.improved = true;
+  x.improvedOn = date;
+  stat(game, 'propsUserImprove');
+  return { ok: true, text: `Poprawiono propozycję dla ${x.name}: pensja ${formatZl(c.wage)} tygodniowo zamiast ${formatZl(old)}. Odpowie do ${fmtDate(thinkingUntil(game, x.pid) ?? x.decide)}.` };
 }
 
 /**
@@ -143,11 +231,18 @@ function close(x, status, date, extra = {}) {
 }
 
 /** Widok oferty dla offerUtility (preContracts.js). Premia za podpis rozłożona na tygodnie kontraktu. */
-function offerView(game, p, x) {
+function offerView(game, p, x, first = false) {
   const c = clubById(x.to) ?? { prestige: 3, tier: 1, L: 11 };
   const ct = x.contract ?? {};
   const wage = (ct.wage ?? 0) + (ct.signOn ?? 0) / Math.max(52, (ct.years ?? 2) * 52);
-  return { wage, rep: clubReputation(c), L: c.L, prestige: c.prestige, tier: c.tier, europe: inEurope(game, x.to), foreign: false };
+  return { wage, rep: clubReputation(c), L: c.L, prestige: c.prestige, tier: c.tier, europe: inEurope(game, x.to), foreign: false, region: c.region, stab: clubStability(game, x.to), first };
+}
+/** Kolejność złożenia propozycji (numer z id „n<seq>-<zawodnik>”). */
+const seqOf = (x) => Number.parseInt(String(x.id).slice(1), 10) || 0;
+/** Najwcześniej złożona propozycja z kilku (klocek „Pierwszeństwo oferty”), przy jednej: null. */
+export function earliestOf(list) {
+  if (list.length < 2) return null;
+  return list.reduce((a, b) => (b.date < a.date || (b.date === a.date && seqOf(b) < seqOf(a)) ? b : a));
 }
 const inEurope = (game, id) => !!id && (game.fixtures ?? []).some((f) => f.comp === 'uefa' && (f.home === id || f.away === id));
 
@@ -164,7 +259,8 @@ export function referenceUtility(game, p, rng) {
     return u - THINK.freeStepDown * Math.max(p.stepDown ?? 0, p.stepDownFree ?? 0);
   }
   const c = st === 'pool' ? poolSellerClub(p) : clubById(p.clubId) ?? { prestige: 3, tier: 2, L: 10 };
-  const own = { wage: p.contract?.wage ?? 0, rep: clubReputation(c), L: c.L ?? p.abroad?.league ?? 10, prestige: c.prestige, tier: c.tier, europe: st === 'club' && inEurope(game, p.clubId), foreign: false, own: true };
+  const own = { wage: p.contract?.wage ?? 0, rep: clubReputation(c), L: c.L ?? p.abroad?.league ?? 10, prestige: c.prestige, tier: c.tier, europe: st === 'club' && inEurope(game, p.clubId), foreign: false, own: true,
+    ...(st === 'club' ? { region: c.region, stab: clubStability(game, p.clubId) } : {}) };
   const trust = st === 'club' ? relationWith(p, p.clubId).trust : 50;
   let u = offerUtility(p, own, { trust, noise: rng.gauss(0, THINK.noise) });
   if (game.market?.listed?.[p.id] || game.market?.userListed?.[p.id]) u += THINK.listed;
@@ -202,6 +298,23 @@ function letter(game, x, kind, subject, body, priority = 'important') {
 }
 const concerned = (game, x) => x.user || (x.from && x.from === game.clubId);
 
+/** Szansa zgody na propozycję o użyteczności u wobec odniesienia ref. */
+export const acceptChance = (u, ref) => clamp(THINK.accept + THINK.slope * (u - ref), THINK.pMin, THINK.pMax);
+/** Podwyżka klubu AI przy „chce zmian”: jak druga runda aiNegotiate. */
+export const aiRaiseMul = (game, clubId) => (game.world?.clubs?.[clubId] && clubId !== game.clubId ? negLevers(clubNegotiation(game, clubId)).raise : 1 + THINK.aiRaise);
+
+/**
+ * Ocena propozycji w dniu decyzji (bez skutków): odniesienie i lista od najlepszej { x, u }.
+ * Kolejność losowań: odniesienie, potem propozycje w kolejności listy (tools/negocjacje-fair.mjs używa tej samej).
+ */
+export function weighProposals(game, p, list, rng) {
+  const ref = referenceUtility(game, p, rng);
+  const first = earliestOf(list);
+  const scored = list.map((x) => ({ x, u: offerUtility(p, offerView(game, p, x, x === first), { noise: rng.gauss(0, THINK.noise) }) }))
+    .sort((a, b) => b.u - a.u || a.x.id.localeCompare(b.x.id));
+  return { ref, scored };
+}
+
 /** Odpowiedź zawodnika na propozycje (wszystkie otwarte w dniu decyzji). */
 function decidePlayer(game, pid, date, out) {
   const P = game.market.pending;
@@ -218,17 +331,15 @@ function decidePlayer(game, pid, date, out) {
   }
   if (!list.length || !p) return;
   const rng = new Rng(`namysl-decyzja:${game.seed}:${pid}:${date}`);
-  const ref = referenceUtility(game, p, rng);
-  const scored = list.map((x) => ({ x, u: offerUtility(p, offerView(game, p, x), { noise: rng.gauss(0, THINK.noise) }) }))
-    .sort((a, b) => b.u - a.u || a.x.id.localeCompare(b.x.id));
+  const { ref, scored } = weighProposals(game, p, list, rng);
   for (const { x, u } of scored) x.u = Math.round(u * 100) / 100;
   for (const { x, u } of scored) {
-    const pYes = clamp(THINK.accept + THINK.slope * (u - ref), THINK.pMin, THINK.pMax);
+    const pYes = acceptChance(u, ref);
     const r = rng.next();
     let ans = r < pYes ? 'yes' : r < pYes + (1 - pYes) * THINK.changes ? 'changes' : 'no';
     if (ans === 'changes' && !x.user) {
-      // Klub AI: jak druga runda aiNegotiate, pensja +10 % w budżecie albo rezygnacja
-      const wage = Math.round(((x.contract?.wage ?? 0) * (1 + THINK.aiRaise)) / 100) * 100;
+      // Klub AI: jak druga runda aiNegotiate (podwyżka z atrybutu Negocjacje), w budżecie albo rezygnacja
+      const wage = Math.round(((x.contract?.wage ?? 0) * aiRaiseMul(game, x.to)) / 100) * 100;
       if (x.maxWage == null || wage <= x.maxWage) { x.contract = { ...x.contract, wage }; x.raised = true; ans = 'yes'; } else ans = 'no';
     }
     if (ans === 'yes') {

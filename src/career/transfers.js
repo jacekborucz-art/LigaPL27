@@ -26,6 +26,7 @@ import { ensureForeignPool, isPoolContracted, foreignAskingPrice, poolSellerClub
 import { onOfferRejected, onUserRejected } from './moveWish.js';
 import { effectiveAsk } from './mindset.js';
 import { makeProposal, proposalsFor, resolveNow } from './proposals.js'; // namysł zawodnika przed podpisem (docs/transfery.md, rozdz. 10)
+import { clubNegotiation, contestPenalty } from './clubNegotiation.js'; // ukryty atrybut Negocjacje klubów AI (docs/negocjacje.md, rozdz. 15)
 import { fmtDate } from '../ui/dom.js';
 
 export { SEASON_END };
@@ -337,20 +338,29 @@ function aiBuy(game, club, date, rng, log) {
   // Przy braku w kadrze także pensja w zasięgu budżetu płac (inaczej rozmowy z najlepszym upadają co tydzień)
   const asks = (x) => (x.p.contract?.wage ?? effectiveAsk(x.p, club.tier, payLevel(club))) <= Math.max(500, room) * 1.1;
   // Zawodnik, który już rozważa propozycje (gracza albo innych klubów AI), jest mniej atrakcyjny: klub woli cel bez
-  // licytacji (kara 1,2 OVR za każdą propozycję w toku [SZAC]); bez tego kilka klubów brało tego samego wolnego
+  // licytacji. Kara za każdą propozycję w toku: max(0; 0,8 - 0,05 x (Negocjacje - 10) + N(0; 0,6)) OVR, ziarno: gra,
+  // zawodnik, klub, data (clubNegotiation.js) [SZAC]; bez kary kilka klubów brało tego samego wolnego
   const contested = new Map();
   for (const x of game.market.pending ?? []) if (x.status === 'open' || x.status === 'changes') contested.set(x.pid, (contested.get(x.pid) ?? 0) + 1);
-  const score = (x) => x.p.ovr - x.fee / 5e6 - 1.2 * (contested.get(x.p.id) ?? 0);
+  const penOf = new Map();
+  const pen = (id) => {
+    const n = contested.get(id);
+    if (!n) return 0;
+    if (!penOf.has(id)) penOf.set(id, n * contestPenalty(game, id, club.id, date));
+    return penOf.get(id);
+  };
+  const score = (x) => x.p.ovr - x.fee / 5e6 - pen(x.p.id);
   const rank = (a, b) => score(b) - score(a);
   // Brak w kadrze: najpierw najlepsi z tych, na których klub stać (wcześniej drodzy wolni wypierali tanich z ośmiu kandydatów)
   const ordered = needs.length ? [...pool.filter(asks).sort(rank).slice(0, 8), ...pool.filter((x) => !asks(x)).sort(rank).slice(0, 3)]
     : pool.sort(rank).slice(0, 5);
   // Brak w kadrze: po nieudanych rozmowach z pierwszym kandydatem klub próbuje z kolejnymi (do trzech w tygodniu)
   const willing = ordered.filter((x) => playerWillingness(game, x.p, club.id).verdict !== 'odmowa').slice(0, needs.length ? 3 : 1);
-  let pick = null; let neg = null;
+  let pick = null; let neg = null; let caps = null;
+  const nego = clubNegotiation(game, club.id);
   for (const x of willing) {
-    const caps = boardCaps(game, club.id, x.p, 'sign', cb);
-    neg = aiNegotiate({ kind: 'sign', player: { ...x.p, contract: x.p.contract ?? { wage: effectiveAsk(x.p, club.tier, payLevel(club)), until: date } }, club: { ...club, name: club.name }, fromClub: x.p.clubId ? clubById(x.p.clubId) : isPoolContracted(x.p) ? poolSellerClub(x.p) : null, date, rng, budget: { wage: Math.min(Math.max(500, room), caps.wage), maxYears: caps.years, total: caps.total } });
+    caps = boardCaps(game, club.id, x.p, 'sign', cb);
+    neg = aiNegotiate({ kind: 'sign', player: { ...x.p, contract: x.p.contract ?? { wage: effectiveAsk(x.p, club.tier, payLevel(club)), until: date } }, club: { ...club, name: club.name }, fromClub: x.p.clubId ? clubById(x.p.clubId) : isPoolContracted(x.p) ? poolSellerClub(x.p) : null, date, rng, budget: { wage: Math.min(Math.max(500, room), caps.wage), maxYears: caps.years, total: caps.total }, neg: nego });
     if (neg.result === 'signed') { pick = x; break; }
   }
   if (!pick) return null;
@@ -358,7 +368,7 @@ function aiBuy(game, club, date, rng, log) {
   if (p.clubId && firstRefusal(game, p, club.id, pick.fee, date, neg.contract).blocked) return null; // prawo pierwokupu (loans.js)
   // Propozycja dla zawodnika: namysł 2-5 dni, potem transakcja (proposals.js, transferDeals.js). Budżet pensji
   // zostaje w propozycji na drugą rundę, gdy zawodnik zechce zmian
-  const prop = makeProposal(game, { playerId: p.id, to: club.id, fee: pick.fee, contract: neg.contract, kind: pick.fee || p.clubId ? 'transfer' : 'free', date, maxWage: Math.min(Math.max(500, room), boardCaps(game, club.id, p, 'sign', cb).wage) });
+  const prop = makeProposal(game, { playerId: p.id, to: club.id, fee: pick.fee, contract: neg.contract, kind: pick.fee || p.clubId ? 'transfer' : 'free', date, maxWage: Math.min(Math.max(500, room), caps.wage), maxTotal: caps.total, demand: neg.demand });
   if (prop) log.push(prop);
   return prop;
 }
@@ -468,12 +478,12 @@ export function answerIncoming(game, offerId, action) {
   if (o.pre && p.preContract?.club === o.from) return ok(startDeal(game, { playerId: p.id, to: o.from, fee: o.fee, contract: { ...p.preContract.contract, signedOn: game.date }, kind: 'transfer', early: true }));
   const caps = boardCaps(game, o.from, p, 'sign');
   const maxWage = Math.min(caps.wage, Math.max(p.contract.wage * 1.6, wageRoom(game.finance, game.world, o.from) + p.contract.wage));
-  const neg = aiNegotiate({ kind: 'sign', player: p, club: buyer, fromClub: clubById(game.clubId), date: game.date, rng, budget: { wage: maxWage, maxYears: caps.years, total: caps.total } });
+  const neg = aiNegotiate({ kind: 'sign', player: p, club: buyer, fromClub: clubById(game.clubId), date: game.date, rng, budget: { wage: maxWage, maxYears: caps.years, total: caps.total }, neg: clubNegotiation(game, o.from) });
   if (neg.result !== 'signed') { o.status = 'failed'; return { text: `${p.name} nie dogadał się z ${buyer.name}. Zostaje w klubie.` }; }
   const rofr = firstRefusal(game, p, o.from, o.fee, game.date, neg.contract); // prawo pierwokupu klubu, w którym był wypożyczony (loans.js)
   if (rofr.blocked) { o.status = 'accepted'; return { text: rofr.text ?? `${p.name}: transfer czeka na decyzję klubu z prawem pierwokupu.`, sold: !!rofr.matched }; }
   // Propozycja klubu AI dla zawodnika: namysł 2-5 dni (proposals.js), potem testy medyczne i zgłoszenie
-  const prop = makeProposal(game, { playerId: p.id, to: o.from, fee: o.fee, contract: neg.contract, kind: 'transfer', maxWage, sale: o.id });
+  const prop = makeProposal(game, { playerId: p.id, to: o.from, fee: o.fee, contract: neg.contract, kind: 'transfer', maxWage, maxTotal: caps.total, demand: neg.demand, sale: o.id });
   if (!prop) { o.status = 'failed'; return { text: `${p.name} jest już w trakcie innej transakcji.` }; }
   o.status = 'accepted'; o.prop = prop.id;
   if (prop.decide <= game.date) { resolveNow(game, p.id); return { text: `Porozumienie z ${buyer.name} w sprawie ${p.name} (${fmtZl(o.fee)}). To ostatni dzień okna: zawodnik odpowiedział od razu, sprawdź pocztę.`, deal: true }; }

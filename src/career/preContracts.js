@@ -14,8 +14,8 @@ import { SEASON_END, SEASON_YEAR } from '../config/calendar2026.js';
 import { squadOf } from '../world/worldGen.js';
 import { GROUP, SQUAD_TARGETS } from './squad.js';
 import { clubReputation } from './reputation.js';
-import { personalityOf, computeMindset, elementPrefs } from './personality.js';
-import { marketWage, expectedRole, relationWith, monthsBetween, ROLE_RANK, addDays } from './negotiation.js';
+import { marketWage, relationWith, monthsBetween, addDays } from './negotiation.js';
+import { scoreOffer, abroadWish, clubStability } from './offerFactors.js'; // klocki decyzji zawodnika
 import { boardCaps } from './boardRequests.js';
 import { squadLimitOf, isExempt } from './squadLimit.js';
 import { book, spendable } from './finance.js';
@@ -87,33 +87,16 @@ export function checkUserPre(game, p, date = game.date) {
 }
 
 // ------------------------------------------------------------ Użyteczność ofert
-const ambW = (t) => clamp(1 + 0.05 * (t.ambition - 10), 0.3, 1.7);
-/** Chęć wyjazdu za granicę 0-1 z charakteru i nastawienia. */
-export function abroadWish(p) {
-  const { traits: t } = personalityOf(p);
-  const m = computeMindset(p, t, {});
-  if (m.key === 'zagranica') return 1;
-  return clamp(0.5 + 0.05 * (t.ambition - 10) + 0.03 * (t.risk - 10) - 0.05 * (t.homeTies - 10), 0, 1);
-}
+export { abroadWish };
 
 /**
- * Użyteczność oferty dla zawodnika. o: { wage, rep, L?, tier?, europe, foreign, own }.
- * U = moneyW ln(wage/wageRef) + 0,03 (rep klubu - rep zawodnika) ambW + 0,25 roleW (rola - 2) + 0,3 Europa
- *     + (zagranica ? 0,5 chęć wyjazdu) + (własny klub ? 0,04 (lojalność - 10) + 0,004 (zaufanie - 50)) + szum.
+ * Użyteczność oferty dla zawodnika: suma klocków decyzji (src/career/offerFactors.js) plus szum.
+ * o: { wage, rep, L?, tier?, prestige?, europe, foreign, own, region?, stab?, first? }.
+ * Dawny wzór (pieniądze, prestiż, rola, Europa, zagranica, lojalność) bez zmiany liczb, nowe klocki: miasto i rodzina,
+ * stabilność klubu, pierwszeństwo oferty (każdy najwyżej ±0,3).
  */
-export function offerUtility(p, o, { trust = 50, noise = 0 } = {}) {
-  const { traits: t } = personalityOf(p);
-  const m = computeMindset(p, t, { clubForeign: !!o.foreign });
-  const pr = elementPrefs(t, m.key, p);
-  const wageRef = Math.max(500, p.contract?.wage ?? p.askWage ?? 1000);
-  const role = expectedRole(p, { L: o.L, prestige: o.prestige ?? 5, tier: o.tier ?? 1, rep: o.rep }, t);
-  let u = pr.moneyW * Math.log(Math.max(100, o.wage) / wageRef)
-    + 0.03 * (o.rep - (p.rep ?? 30)) * ambW(t)
-    + 0.25 * pr.roleW * ((ROLE_RANK[role] ?? 2) - 2)
-    + (o.europe ? 0.3 : 0)
-    + (o.foreign ? 0.5 * abroadWish(p) : 0)
-    + (o.own ? 0.04 * (t.loyalty - 10) + 0.004 * (trust - 50) : 0);
-  return u + noise;
+export function offerUtility(p, o, { trust = 50, noise = 0, only = null } = {}) {
+  return scoreOffer(p, o, { trust, only }).u + noise;
 }
 
 /** Próg podpisu: 0,6 - 0,08 x miesiące od 1 stycznia - 0,4 x D (nastawienie, src/career/mindset.js). */
@@ -124,15 +107,15 @@ export function signThreshold(date, D = 0) {
 
 const inEurope = (game, id) => (game.fixtures ?? []).some((f) => f.comp === 'uefa' && (f.home === id || f.away === id));
 
-function offerView(game, o) {
-  if (o.foreign) return { wage: o.wage, rep: o.foreign.repU ?? o.foreign.rep + 25, L: o.foreign.L ?? 12, tier: 1, europe: false, foreign: true };
+function offerView(game, o, first = false) {
+  if (o.foreign) return { wage: o.wage, rep: o.foreign.repU ?? o.foreign.rep + 25, L: o.foreign.L ?? 12, tier: 1, europe: false, foreign: true, first };
   const c = clubById(o.to);
-  return { wage: o.wage, rep: clubReputation(c), L: c.L, prestige: c.prestige, tier: c.tier, europe: inEurope(game, c.id), foreign: false };
+  return { wage: o.wage, rep: clubReputation(c), L: c.L, prestige: c.prestige, tier: c.tier, europe: inEurope(game, c.id), foreign: false, region: c.region, stab: clubStability(game, c.id), first };
 }
 
 function ownView(game, p) {
   const c = clubById(p.clubId);
-  return { wage: p.contract?.wage ?? 0, rep: clubReputation(c), L: c.L, prestige: c.prestige, tier: c.tier, europe: inEurope(game, c.id), foreign: false, own: true };
+  return { wage: p.contract?.wage ?? 0, rep: clubReputation(c), L: c.L, prestige: c.prestige, tier: c.tier, europe: inEurope(game, c.id), foreign: false, own: true, region: c.region, stab: clubStability(game, c.id) };
 }
 
 // ------------------------------------------------------------ Propozycje klubów AI i zagranicy
@@ -243,9 +226,11 @@ export function preDecisions(game, date) {
     const ownOffer = !p.renewRefused && (p.clubId === game.clubId || aiWouldRenew(game, p));
     const own = ownOffer ? offerUtility(p, ownView(game, p), { trust, noise: rng.gauss(0, 0.08) }) : -Infinity;
     let best = null; let bestU = -Infinity;
+    // Pierwszeństwo oferty: najwcześniej złożona z kilku (klocek „first”, offerFactors.js)
+    const earliest = offers.length > 1 ? offers.reduce((a, b) => (b.date < a.date ? b : a)) : null;
     for (const o of offers) {
       if (o.to && (!game.world.clubs[o.to] || !(clubById(o.to)?.tier <= 4))) { o.status = 'expired'; continue; }
-      const u = offerUtility(p, offerView(game, o), { noise: rng.gauss(0, 0.08) });
+      const u = offerUtility(p, offerView(game, o, o === earliest && offers.some((x) => x.date > o.date)), { noise: rng.gauss(0, 0.08) });
       o.u = Math.round(u * 100) / 100;
       if (u > bestU) { best = o; bestU = u; }
     }

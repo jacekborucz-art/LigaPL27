@@ -8,12 +8,13 @@ import { clubById } from '../data/clubs_pl.js';
 import { GROUP } from '../career/squad.js';
 import { esc, fmtDate } from './dom.js';
 import { fmtZl, windowOf } from '../career/transfers.js';
+import { formatZl } from '../career/negotiation.js';
 import { dealOf, openDeals, dealStages, expectedRegistration, buyerName, STAGE_LABELS, FAIL_LABELS, STAGE_I, cancelDeal } from '../career/transferDeals.js';
 import { canApproach, checkUserPre, preOpensOn, earlyPrice, earlyBuy, userPreContracts, PRE } from '../career/preContracts.js';
 import { reactToWish, WISH_ACTIONS } from '../career/moveWish.js';
 import { squadOf } from '../world/worldGen.js';
 import { anyClub } from '../season/season.js';
-import { proposalsFor, userProposal, thinkingUntil, withdrawProposal } from '../career/proposals.js'; // namysł zawodnika (docs/transfery.md, rozdz. 10)
+import { proposalsFor, userProposal, thinkingUntil, withdrawProposal, canImprove, improveUserProposal, THINK } from '../career/proposals.js'; // namysł zawodnika (docs/transfery.md, rozdz. 10)
 
 const posBadge = (p) => `<span class="pos" data-g="${GROUP[p.pos] ?? 'MID'}">${esc(p.pos)}</span>`;
 const tag = (txt, k = 'info') => `<span class="tf-tag" data-k="${k}">${esc(txt)}</span>`;
@@ -43,14 +44,17 @@ function propRow(game, x) {
   const p = game.world.players[x.pid];
   const sale = !x.user;
   const route = sale ? `oferta ${clubName(x.to)}` : x.from ? `z ${clubName(x.from)}` : x.fromState === 'pool' ? `z ${p?.abroad?.club ?? 'zagranicy'}` : 'wolny zawodnik';
-  const terms = `${fmtZl(x.contract?.wage ?? 0)} tygodniowo${x.fee ? `, odstępne ${fmtZl(x.fee)}` : ''}`;
+  const terms = `${formatZl(x.contract?.wage ?? 0)} tygodniowo${x.fee ? `, odstępne ${fmtZl(x.fee)}` : ''}`; // pensja dokładnie: poprawka 4-12 % musi być widoczna
   let meta; let act = '';
   if (x.status === 'changes') {
     meta = `Chce zmian w kontrakcie: pensja ${fmtZl(x.want?.wage ?? 0)} tygodniowo. Ostatnia runda rozmów do ${fmtDate(x.deadline)}.`;
     act = `<div class="td-acts"><button class="btn btn--primary btn--sm" data-act="tf-lastround" data-id="${esc(x.pid)}">Ostatnia runda rozmów</button></div>`;
   } else if (x.status === 'open') {
     meta = `Rozważa ${sale ? 'ofertę' : 'oferty'}, odpowie do ${fmtDate(thinkingUntil(game, x.pid) ?? x.decide)}.`;
-    if (x.user) act = `<div class="td-acts"><button class="btn btn--quiet btn--sm" data-act="tf-prop-cancel" data-d="${esc(x.id)}">Wycofaj propozycję</button></div>`;
+    // Licytacja w ciemno: inny klub złożył propozycję po twojej (bez klubu i kwoty), jedna poprawka pensji
+    if (x.user && (x.rivals ?? 0) > 0) meta += x.improved ? ' Rozważa też inną propozycję. Swoją już poprawiłeś.' : ' Rozważa też propozycję innego klubu. Możesz raz poprawić pensję.';
+    const raise = canImprove(game, x) ? THINK.improve.map((k) => `<button class="btn btn--primary btn--sm" data-act="tf-prop-raise" data-d="${esc(x.id)}" data-k="${k}">Pensja +${k} %</button>`).join('') : '';
+    if (x.user) act = `<div class="td-acts">${raise}<button class="btn btn--quiet btn--sm" data-act="tf-prop-cancel" data-d="${esc(x.id)}">Wycofaj propozycję</button></div>`;
   } else meta = `Odpowiedź ${fmtDate(x.end?.date ?? x.date)}: ${PROP_END[x.status] ?? x.status}${x.status === 'lost' && x.end?.winner ? ` (${clubName(x.end.winner)})` : ''}.`;
   return `<li class="td-deal" data-state="${x.status === 'accepted' ? 'ok' : x.status === 'open' || x.status === 'changes' ? 'open' : 'fail'}"${p ? ` data-pid="${esc(p.id)}"` : ''}>
     <div class="td-deal__head">${p ? posBadge(p) : ''}<span class="td-deal__who"><b>${p ? cardLink(p) : esc(x.name)}</b><em>${esc(route)}</em></span><b class="td-deal__fee">${esc(terms)}</b></div>
@@ -189,6 +193,7 @@ export function handleDealAction(game, act, ds = {}) {
   switch (act) {
     case 'tf-deal-cancel': { const r = cancelDeal(game, ds.d); return { ui: { tfMsg: r.text }, save: r.ok }; }
     case 'tf-prop-cancel': { const r = withdrawProposal(game, ds.d); return { ui: { tfMsg: r.text }, save: r.ok }; }
+    case 'tf-prop-raise': { const r = improveUserProposal(game, ds.d, ds.k); return { ui: { tfMsg: r.text }, save: r.ok }; } // jedna poprawka w ciemno
     case 'tf-early': { const r = earlyBuy(game, ds.id); return { ui: { tfMsg: r.text }, save: r.ok }; }
     case 'tf-wish': {
       const r = reactToWish(game, ds.id, ds.a);
