@@ -29,6 +29,35 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 21, 2026, agent (worktree, gałąź do scalenia), negocjacje klubów AI i klocki decyzji zawodnika (v1.21.1 Beta)
+Zrobione:
+- Ukryty atrybut klubu AI „Negocjacje” 1-20 (`src/career/clubNegotiation.js`, zapis `game.clubNeg`, leniwe losowanie):
+  średnia wg ligi (11,5 / 10,5 / 9 / 8), prestiż ±1, 1 lipca powrót do średniej i zmiany dyrektorów (najwyżej 3 na ligę,
+  częściej po zwolnieniu trenera i spadku), wiadomość w Mediach tylko z ligi gracza, bez wartości. Nigdzie w UI.
+- `aiNegotiate(..., neg)`: pierwsza oferta, podwyżka w 2. rundzie i limit poprawki w ciemno z atrybutu (skala 0,6 po
+  kalibracji); zakupy AI i oferty AI za zawodników gracza. Podwyżka w 2. rundzie teraz też w progach zarządu.
+- Licytacja w ciemno (`proposals.js`): po cudzej propozycji klub AI raz poprawia swoją (4-12 %, bez znajomości kwoty),
+  gracz dostaje list agenta i w W toku przyciski „Pensja +4/8/12 %” (raz, limity jak w rozmowach). Pensja w wierszu
+  propozycji dokładnie (`formatZl`).
+- Kara licytacji w `aiBuy` losowa: `max(0; 0,8 - 0,05 (N - 10) + N(0; 0,6))` OVR zamiast 1,2.
+- Klocki decyzji zawodnika (`src/career/offerFactors.js`): dawny wzór bez zmian liczb (test regresji) plus miasto
+  i rodzina, stabilność klubu, pierwszeństwo oferty (każdy ±0,3). Szum wyboru 0,107 (11 000 vs 10 000 zł: ok. 73 %),
+  `THINK.accept` 0,787.
+- Pomiar `tools/negocjacje-fair.mjs`: N 1-5 47,9 %, N 9-11 50,3 %, N 16-20 52,4 % wygranych licytacji z przeciętnym
+  negocjatorem, różnica przepłat do 1,33 pp. OVR top14 Ekstraklasy: dryf najwyżej 0,05. Perf: sezon 9,8 s (przed 11,3 s).
+- Testy: `tests/offerFactors.test.mjs` (12), poprawiony test „chce zmian” w `tests/proposals.test.mjs`.
+  Docs: negocjacje.md rozdz. 9, 14, nowe 15 i 16; transfery.md rozdz. 10; funkcje.md (3 nowe linie, 1 poprawiona).
+Decyzje i pułapki:
+- Później wejdzie dyrektor sportowy w sztabie (gracz i AI) z co najmniej 4 atrybutami, w tym Negocjacje; jego atrybut
+  zastąpi ukryty atrybut przez jedną funkcję `clubNegotiation(game, clubId)` (docs/kolejka.md).
+- Stabilność klubu liczona względem mediany wszystkich klubów w danym dniu: stała granica (3,5 miesiąca) przesuwała
+  ocenę w dół w drugiej połowie sezonu i zmniejszała liczbę prekontraktów o ok. 14 %.
+- `negotiation.js` (otwarcie rozmów) nadal czyta nieistniejące `player.homeRegion`: nastawienie „Chce wrócić do domu”
+  działa w ocenie ofert, ale nie w samych rozmowach (do decyzji właściciela).
+Zostało / dalej:
+- Do decyzji: skala 0,6, szansa poprawki AI (0,35 + 0,3 przy braku), „wybrał inny klub” prawie 2 razy częściej niż
+  przed zmianą (licytacje częstsze przy niższej karze i większym szumie).
+
 ## Nov 20, 2026, profil A (chmura), plan: negocjacje AI i dyrektor sportowy (v1.21.1 Beta)
 Zrobione:
 - Decyzja właściciela: kluby AI dostaną ukryty, losowy atrybut „Negocjacje” (1-20, losowany co jakiś czas),

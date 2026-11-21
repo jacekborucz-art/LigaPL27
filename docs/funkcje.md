@@ -1,6 +1,6 @@
 # Spis funkcji gry (LigaPL27)
 
-Stan na Nov 20, 2026, wersja gry v1.21.1 Beta. Ten plik odpowiada na jedno pytanie: czy dana funkcja już jest w grze.
+Stan na Nov 21, 2026, wersja gry v1.22 Beta. Ten plik odpowiada na jedno pytanie: czy dana funkcja już jest w grze.
 
 ## Jak korzystać
 
@@ -177,7 +177,10 @@ Zakładki: Rynek, Oferty, W toku, Kontrakty, Skauting.
 - **Transfer jako proces**: porozumienie klubów, warunki osobiste, testy medyczne, podpis; Transfery, W toku; `career/transferDeals.js`, `ui/transferDealsView.js`; dok. `transfery.md` rozdz. 1.
 - **Oferty**: oferty kupna i przedłużenia, przyjęcie, odrzucenie, Żądaj więcej; Transfery, Oferty; `career/transfers.js`, `career/transferSystem.js`.
 - **Negocjacje kontraktów**: pensja, długość, premie, bluff, ustępstwa, odejście od stołu, zależne od charakteru zawodnika i agenta; okno negocjacji; `career/negotiation.js`, `ui/negotiationView.js`; dok. `negocjacje.md`.
-- **Namysł zawodnika przed podpisem**: udane rozmowy (gracz i kluby AI, wolni i zawodnicy z klubem) to propozycja; zawodnik namyśla się 2-5 dni (z klubem najpóźniej do końca okna), w tym czasie inne kluby mogą przebić, potem wybiera najlepszą: zgoda, odmowa, inny klub albo „chce zmian” (ostatnia runda w 2 dni); Transfery, W toku, Poczta; `career/proposals.js`, `ui/negotiationView.js`; dok. `transfery.md` rozdz. 10, `negocjacje.md` rozdz. 14; od v1.21 Beta.
+- **Namysł zawodnika przed podpisem**: udane rozmowy (gracz i kluby AI, wolni i zawodnicy z klubem) to propozycja; zawodnik namyśla się 2-5 dni (z klubem najpóźniej do końca okna), w tym czasie inne kluby mogą przebić, potem wybiera najlepszą: zgoda, odmowa, inny klub albo „chce zmian” (ostatnia runda w 2 dni); Transfery, W toku, Poczta; `career/proposals.js`, `ui/negotiationView.js`; dok. `transfery.md` rozdz. 10, `negocjacje.md` rozdz. 14; od v1.21 Beta; szum wyboru i szansa zgody od v1.21.1 Beta (rozdz. 16).
+- **Licytacja w ciemno**: oferty są tajne (kwoty zna tylko zawodnik); gdy inny klub złoży propozycję, klub z wcześniejszą propozycją może ją raz poprawić bez znajomości cudzej kwoty: klub AI wg potrzeby, atrybutu Negocjacje, budżetu i losu, gracz sam (list od agenta „rozważa też inną propozycję”, przyciski „Pensja +4/8/12 %” w W toku, limity jak w rozmowach); Transfery, W toku, Poczta; `career/proposals.js`, `ui/transferDealsView.js`; dok. `negocjacje.md` rozdz. 15; od v1.21.1 Beta.
+- **Negocjacje klubów AI (ukryty atrybut)**: każdy klub AI ma ukryty atrybut Negocjacje 1-20 (udaje dyrektora sportowego; średnia wg ligi, co sezon mała zmiana, czasem nowy dyrektor z krótką wiadomością w Mediach dla ligi gracza); wpływa na pierwszą ofertę, podwyżkę w drugiej rundzie, poprawkę w ciemno i chęć licytowania; nigdy nie widać go w grze; `career/clubNegotiation.js`, `career/negotiation.js` (`aiNegotiate`), pomiar `tools/negocjacje-fair.mjs`; dok. `negocjacje.md` rozdz. 15; od v1.21.1 Beta.
+- **Klocki decyzji zawodnika**: ocena oferty jako suma czynników (pieniądze, prestiż, rola, Europa, zagranica, lojalność, miasto i rodzina, stabilność klubu, pierwszeństwo oferty), łatwa do rozbudowy; prekontrakty i namysł; `career/offerFactors.js`; dok. `negocjacje.md` rozdz. 16; od v1.21.1 Beta.
 - **Kontrakty**: lista kontraktów z przedłużaniem, zwalnianiem (rozwiązanie), osłoną przed limitem kadry; Transfery, Kontrakty; `ui/transfersView.js`; dok. `transfery.md`.
 - **Prekontrakty**: umowa od 1 lipca z zawodnikiem, któremu kończy się kontrakt (od 1 stycznia), także oferowana przez inne kluby; Transfery; `career/preContracts.js`; dok. `transfery.md` rozdz. 2.
 - **Nastawienie do zejścia niżej (D)**: gotowość zawodnika do zmiany klubu na słabszy; Transfery; `career/mindset.js`; dok. `transfery.md` rozdz. 3.

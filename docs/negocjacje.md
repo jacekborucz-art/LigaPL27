@@ -284,9 +284,9 @@ Po udanych rozmowach: przedłużenie +3 morale i +5 zaufania, podpisanie +2 mora
 `aiNegotiate({ kind, player, club, fromClub, date, rng, budget })` używa tej samej sesji w trybie `ai`:
 
 1. Otwarcie jak u gracza (te same odmowy i blokady, ta sama `willingnessToJoin`).
-2. Oferta rynkowa: 97 % orientacyjnego żądania (nie więcej niż budżet), długość wg wieku (do 23: 4 lata, do 29: 3, do 32: 2, potem 1), oczekiwana rola, premia za gola wg pozycji, prowizja 7 %.
+2. Oferta rynkowa: 97 % orientacyjnego żądania (nie więcej niż budżet), długość wg wieku (do 23: 4 lata, do 29: 3, do 32: 2, potem 1), oczekiwana rola, premia za gola wg pozycji, prowizja 7 %. Klub AI z atrybutem Negocjacje (zakupy, oferty za zawodników gracza): 0,949-0,979 zamiast 97 % (rozdz. 15).
 3. Zawodnik odpowiada akceptacją albo kontrofertą (bez blefu, żądań i ultimatum). Ustępstwo jednorazowe 0,7 rozpiętości.
-4. Klub przyjmuje kontrofertę, jeśli mieści się w budżecie pensji i premii; inaczej podnosi pensję o 10 %. Druga runda jest ostateczna.
+4. Klub przyjmuje kontrofertę, jeśli mieści się w budżecie pensji i premii; inaczej podnosi pensję o 10 % (z atrybutem: 7,5-12,3 %, rozdz. 15), zawsze w progach zarządu. Druga runda jest ostateczna.
 
 Wynik: `{ result: 'signed'|'failed'|'refused', rounds <= 2, contract, outcome }`. Fiasko AI też blokuje rozmowy z tym klubem, więc rynek jest spójny.
 
@@ -422,5 +422,143 @@ zawodnik) to propozycja, nie podpis. Pełny opis z liczbami: docs/transfery.md, 
   stawia ultimatum z pensją wyżej o 8-18 % [SZAC], `maxRounds = 1`. Oferta co najmniej tak dobra (albo „Przyjmij te
   warunki”) to podpis od razu, bez kolejnego namysłu; słabsza oferta albo „Zakończ rozmowy” po ofercie kończy rozmowy
   ze zwykłymi skutkami fiaska (rozdz. 7). Bez odpowiedzi w terminie propozycja wygasa.
-- Klub AI w tej samej sytuacji: pensja +10 % w budżecie albo rezygnacja (rozdz. 9).
+- Klub AI w tej samej sytuacji: pensja +10 % w budżecie albo rezygnacja (rozdz. 9; z atrybutem Negocjacje jak druga runda, rozdz. 15).
+- Od v1.21.1 Beta: licytacja w ciemno (rozdz. 15.3) i klocki decyzji zawodnika z nowym szumem i szansą zgody (rozdz. 16).
 - Prekontrakty, przedłużenia, wypożyczenia i działania zarządu przy limicie kadry bez zmian.
+
+## 15. Negocjacje klubów AI: atrybut i licytacja w ciemno (Nov 21, 2026, v1.21.1 Beta)
+
+Decyzja właściciela: oferty są tajne (kwoty zna tylko zawodnik; ani gracz, ani klub AI nie wiedzą, kto ile dał,
+wiedzą tylko, że zawodnik rozważa inne oferty). Gracz negocjuje sam; klub AI ma los plus ukryty atrybut Negocjacje.
+AI ma równe szanse z graczem, najwyżej ledwo odczuwalnie większe. Bez sufitów i suwaków trudności.
+Kod: `src/career/clubNegotiation.js`, `src/career/negotiation.js` (`aiNegotiate`), `src/career/proposals.js`
+(`blindRaise`, `improveUserProposal`), `src/career/transfers.js` (`aiBuy`). Testy: `tests/offerFactors.test.mjs`.
+Pomiar: `node tools/negocjacje-fair.mjs [próby na ziarno] [ziarna] [skala]`. Wszystkie liczby [SZAC].
+
+### 15.1 Atrybut Negocjacje (1-20)
+
+- Udaje dyrektora sportowego klubu AI. Jedyny punkt odczytu: `clubNegotiation(game, clubId)`. Później zastąpi go
+  atrybut Negocjacje prawdziwego dyrektora sportowego w sztabie (co najmniej 4 atrybuty, docs/kolejka.md), bez
+  przerabiania rozmów. Atrybutu nie widać nigdzie w grze (UI, listy, raporty).
+- Zapis `game.clubNeg = { [klub]: { n, y (sezon), d (numer dyrektora) } }`. Stary zapis i nowa gra: leniwe losowanie
+  przy pierwszym odczycie, ziarno `negInit:<seed>:<klub>:<sezon>`.
+- Start: rozkład normalny obcięty do 1-20 (odrzucanie), odchylenie 3, średnia wg ligi: Ekstraklasa 11,5; 1 Liga 10,5;
+  2 Liga 9; III liga 8; IV liga 7; prestiż 1-10 przesuwa średnią o -1 do +1.
+- 1 lipca (`negSeason` w `rolloverSeason`, po zmianie lig): `n = round(n + 0,25 x (średnia - n) + N(0; 1,2))`, 1-20,
+  ziarno `negYr:<seed>:<klub>:<sezon>`.
+- Zmiana dyrektora (nowe losowanie, ziarno `negDir`): Ekstraklasa 12 %, 1 Liga 10 %, 2 Liga 8 %, III liga 7 % na sezon;
+  25 % po zwolnieniu trenera w sezonie (wpisy `game.coachLog`: wyniki, kibice, po sezonie) albo po spadku. Najwyżej
+  3 zmiany na ligę (grupę III ligi) w sezonie. Wiadomość „<klub>: nowy dyrektor sportowy” (Media, priorytet info, klucz
+  `dyrektor:`) tylko z ligi gracza (`mailFilter.js`), bez wartości atrybutu.
+
+### 15.2 Rozmowy klubu AI (`aiNegotiate`, parametr `neg`)
+
+`q = 9/19 + 0,6 x ((N - 1)/19 - 9/19)`: wzory z planu, przeskalowane wokół N = 10 (skala 0,6 po kalibracji, rozdz. 15.5).
+
+| Dźwignia | Wzór | N 1 | N 10 | N 20 |
+|---|---|---|---|---|
+| pierwsza oferta (x orientacyjne żądanie) | 0,94 + 0,05 q | 0,949 | 0,964 | 0,979 |
+| podwyżka w 2. rundzie i przy „chce zmian” | 1,06 + 0,08 q | 1,075 | 1,098 | 1,123 |
+| limit poprawki w ciemno (x żądanie) | 1,00 + 0,10 q² | 1,004 | 1,022 | 1,062 |
+
+- Dawne stałe (0,97 i +10 %) przy N = 10 zostają prawie bez zmian. Bez atrybutu (`neg = null`: klub gracza w rozmowach
+  automatycznych, opcje wypożyczeń, przedłużenia AI, sprzedaż przy limicie kadry) dawne stałe.
+- Atrybut działa przy zakupach klubów AI (`aiBuy`) i ofertach klubów AI za zawodników gracza (`answerIncoming`).
+- Budżet pensji i progi zarządu (`budget.wage`, `total`, `maxYears`) zawsze twardym limitem; poprawka: podwyżka w drugiej
+  rundzie też przechodzi przez `fit` (wcześniej mogła przekroczyć roczny koszt kontraktu).
+- `aiNegotiate` zwraca też `demand` (orientacyjne żądanie), zapisane w propozycji do limitu poprawki w ciemno.
+
+### 15.3 Licytacja w ciemno
+
+- Gdy inny klub (gracz albo AI) złoży propozycję zawodnikowi, który rozważa wcześniejszą propozycję, właściciel
+  wcześniejszej dowiaduje się tylko tyle: zawodnik rozważa inną propozycję (bez klubu i kwoty).
+- Klub AI raz decyduje o poprawce (`blindRaise`, ziarno `przebicie:<seed>:<zawodnik>:<klub>:<data>`): szansa
+  `0,35 + 0,3 (brak w kadrze na tej pozycji) + 0,3 x (q - q10)`, 5-95 %; poprawka 4-12 % pensji, najwyżej limit z tabeli,
+  budżet pensji z rozmów i roczny koszt kontraktu z progów zarządu; poniżej +2 % nie ma poprawki. Kwota rywala nie
+  wchodzi do decyzji (test: ta sama decyzja przy różnych kwotach rywala).
+- Gracz dostaje list „<zawodnik> rozważa też inną propozycję” (agent, bez klubu i warunków) i w Transfery, W toku może raz
+  poprawić pensję: „Pensja +4 %”, „+8 %”, „+12 %” (zaokrąglenie do 50 zł). Limity jak w rozmowach: wolne miejsce
+  w budżecie płac i progi zarządu dla pensji i rocznego kosztu. Wcześniej gracz mógł tylko wycofać propozycję i zacząć
+  rozmowy od nowa. Równe zasady: poprawka przysługuje temu, kto złożył propozycję przed rywalem, gracz i AI tak samo.
+- Poprawka nie wywołuje kolejnej poprawki rywala; druga cudza propozycja nie daje drugiej poprawki.
+
+### 15.4 Kara licytacji przy wyborze celu (`aiBuy`)
+
+Dawna stała kara 1,2 OVR za każdą propozycję w toku zastąpiona losową:
+`max(0; 0,8 - 0,05 x (N - 10) + N(0; 0,6))` OVR za propozycję, ziarno `licytacja:<seed>:<zawodnik>:<klub>:<data>`
+(średnio ok. 0,84 przy N = 10, mniej u lepszego negocjatora). Próba z bazą 1,1 dała podobny wynik
+(OVR Ekstraklasy w 3. sezonie 11,72 wobec 11,76), więc zostaje 0,8 z planu.
+
+### 15.5 Kalibracja (Nov 21, 2026)
+
+Pomiar sprawiedliwości (`node tools/negocjacje-fair.mjs 30000 5,7,9`): ten sam klub, zawodnik, budżet i progi zarządu,
+różni je tylko sposób rozmów; losowa kolejność propozycji, poprawka w ciemno dla wcześniejszej, decyzja zawodnika jak
+w grze. Autopilot A: przeciętny negocjator (N = 10). Przepłata: pensja / orientacyjne żądanie - 1.
+
+| N klubu AI | Licytacje | Wygrane AI | Przepłata AI | Przepłata autopilota | Różnica |
+|---|---|---|---|---|---|
+| 1-5 | 22 138 | 47,9 % | -1,9 % | -0,6 % | -1,33 pp |
+| 6-8 | 13 414 | 49,7 % | -1,0 % | -0,6 % | -0,39 pp |
+| 9-11 | 13 203 | 50,3 % | -0,6 % | -0,6 % | 0,01 pp |
+| 12-15 | 17 766 | 50,8 % | 0,0 % | -0,4 % | 0,42 pp |
+| 16-20 | 22 372 | 52,4 % | 0,8 % | -0,4 % | 1,17 pp |
+| razem | 88 893 | 50,3 % | | | |
+
+Autopilot B (dawne AI: 0,97, +10 %, bez poprawki): 47,7 / 48,6 / 49,9 / 50,0 / 51,9 %, razem 49,7 %.
+Bez skali (wzory z planu wprost) N 1-5 wygrywało 45,7 %, a N 16-20 53,8 %; skala 0,7 dawała 47,4 % i 52,6 %, ale
+różnicę przepłat -1,67 pp przy N 1-5.
+
+Transfery (`node tools/transfery-kalibracja.mjs widzew <ziarno> 3`, ziarna 5, 7, 9), OVR top14 Ekstraklasy po sezonach
+2026/27, 2027/28, 2028/29:
+
+| Ziarno | Przed (main) | Po |
+|---|---|---|
+| 5 | 11,57 / 11,70 / 11,69 | 11,57 / 11,69 / 11,80 |
+| 7 | 11,62 / 11,77 / 11,75 | 11,62 / 11,65 / 11,67 |
+| 9 | 11,66 / 11,85 / 11,74 | 11,62 / 11,84 / 11,77 |
+| średnio | 11,62 / 11,77 / 11,73 | 11,60 / 11,73 / 11,75 |
+
+Dryf najwyżej 0,05 (cel < 0,3); trzeci sezon wyżej o 0,02, więc spadek o ok. 0,1 po namyśle (rozdz. 14) zniwelowany
+tylko w małej części. Propozycje klubów AI w 3 sezonach: 752 wobec 702, zgoda wobec odmowy 93,2 % wobec 94,8 %,
+„wybrał inny klub” 93 wobec 48 (licytacje częstsze), poprawki w ciemno 28, prekontrakty 1650 wobec 1719 (-4 %).
+Kluby AI z ujemnym saldem: 0. `node tools/multiseason.mjs widzew 5 3` bez błędów.
+
+## 16. Klocki decyzji zawodnika (Nov 21, 2026, v1.21.1 Beta)
+
+Początek pakietu „Psychika zawodnika”. Kod: `src/career/offerFactors.js` (`OFFER_FACTORS`, `scoreOffer`), z niego
+korzysta `offerUtility` (prekontrakty, namysł przed podpisem, `referenceUtility`). Oferta to suma czynników
+`weight(zawodnik, cechy, preferencje, mindset) x value(zawodnik, oferta, kontekst)` plus szum u wywołującego.
+Te same czynniki działają dla gracza i klubów AI.
+
+| Czynnik | Waga | Wartość | Zakres |
+|---|---|---|---|
+| Pieniądze | moneyW | ln(pensja / pensja odniesienia) | bez limitu |
+| Prestiż klubu | 1 + 0,05 (ambicja - 10) | 0,03 (rep klubu - rep zawodnika) | dawny |
+| Rola | 0,25 roleW | ranga roli - 2 | dawny |
+| Europa | 0,3 | gra w pucharach 0/1 | dawny |
+| Zagranica | 0,5 | chęć wyjazdu 0-1 | dawny |
+| Lojalność | 1 | własny klub: 0,04 (lojalność - 10) + 0,004 (zaufanie - 50) | dawny |
+| Miasto i rodzina | 0,02 (przywiązanie - 10), +0,1 przy „Chce wrócić do domu” | klub z regionu rodzinnego 0/1 | ±0,3 |
+| Stabilność klubu | 0,3 x (lęk przed niepewnością - 4) / 16 | -1..1 | ±0,3 |
+| Pierwszeństwo oferty | 0,05 x (1 + 0,1 (cierpliwość - 10)), 0-0,1 | najwcześniejsza z kilku 0/1 | ±0,3 |
+
+- Dawne składniki przeniesione bez zmiany liczb: test regresji porównuje z kopią dawnego wzoru (ponad 2000 par
+  zawodnik i oferta, wynik identyczny co do bitu).
+- Region rodzinny (`homeRegionOf`): polski zawodnik, region klubu z danych (`clubs_pl.js`) pierwszego klubu w historii
+  (wychowanek albo klub, w którym zaczynał w grze). Zagraniczny, bez klubu i bez historii: brak, czynnik 0.
+  Nastawienie „Chce wrócić do domu” (dotąd martwe w ocenie oferty) dodaje 0,1 do wagi, gdy zawodnik gra poza regionem
+  rodzinnym, a oferta jest z tego regionu (nie przy pozostaniu).
+- Stabilność (`clubStability`): zapas gotówki w miesiącach kosztów względem mediany wszystkich klubów w tym dniu
+  (`ln(zapas / mediana) / ln 4`; mediana spada w sezonie z ok. 2,3 do ok. 1 miesiąca) plus 0,1 bez zmiany trenera
+  w ostatnich 12 miesiącach, -0,3 za każdą zmianę (najwyżej 2). Średnio ok. 0.
+- Pierwszeństwo: propozycja złożona najwcześniej spośród rozważanych (data, potem kolejność złożenia); w prekontraktach
+  najwcześniejsza oferta, gdy są późniejsze.
+- Szum wyboru `THINK.noise` 0,08 -> 0,107: przy 11 000 zł wobec 10 000 zł (reszta równa) lepsza oferta wygrywa ok. 73 %
+  (dawniej ok. 80 %). Szansa zgody `THINK.accept` 0,78 -> 0,787, żeby średnia szansa zgody została jak dawniej
+  (0,806 na 15 000 propozycjach klubów AI). Szum prekontraktów (0,08) bez zmian.
+- Nie zrobione: `negotiation.js` (otwarcie rozmów) nadal szuka `player.homeRegion`, którego nie ma w danych, więc
+  nastawienie „Chce wrócić do domu” w samych rozmowach dalej się nie włącza (zmiana balansu rozmów, do decyzji).
+
+Jak dodać klocek: obiekt na końcu `OFFER_FACTORS` (`id`, `label`, `cap: 0.3`, `weight`, `value`, opcjonalnie `why`),
+`value` zwraca 0 przy braku danych, dane klubu dopisuje widok oferty u wywołującego (`offerView` w `preContracts.js`
+i `proposals.js`, `referenceUtility`), potem przekalibrować `THINK.accept` i dopisać test w `tests/offerFactors.test.mjs`.

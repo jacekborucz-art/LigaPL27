@@ -8,8 +8,16 @@ import { clubById } from '../data/clubs_pl.js';
 const userTier = (game) => game.leagueState?.tiers?.[game.clubId] ?? clubById(game.clubId)?.tier ?? 4;
 const UEFA_BIG = /wygrywa|ćwierćfinał|półfinał|, finał\./; // trofeum albo awans od ćwierćfinału w górę
 
+/** Klub z tej samej ligi co klub gracza (III liga: ta sama grupa). Trener bez klubu: nie. */
+function sameLeague(game, id) {
+  const c = clubById(id); const u = clubById(game.clubId);
+  if (!c || !u || id === game.clubId) return false;
+  return userTier(game) === c.tier && (c.tier !== 4 || c.group === u.group);
+}
+
 /** Czy wiadomość m ma trafić do skrzynki gracza. */
 export function mailRelevant(game, m) {
+  if (m && String(m.key ?? '').startsWith('dyrektor:')) return sameLeague(game, String(m.key).split(':')[1]); // nowy dyrektor sportowy (clubNegotiation.js)
   if (!m || m.category !== 'competitions') return true;
   if (m.priority !== 'info' || m.actions?.length) return true; // dotyczy klubu gracza albo czeka na decyzję
   const [kind, a, b] = String(m.key ?? '').split(':');

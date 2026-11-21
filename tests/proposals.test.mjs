@@ -12,7 +12,7 @@ import { marketWeek } from '../src/career/transfers.js';
 import { dealOf, pendingFees } from '../src/career/transferDeals.js';
 import {
   THINK, thinkDays, makeProposal, submitUserProposal, proposalsFor, userProposal, thinkingUntil, proposalsDay,
-  finishLastRound, withdrawProposal,
+  finishLastRound, withdrawProposal, aiRaiseMul,
 } from '../src/career/proposals.js';
 import { startNegotiation, handleNegotiationAction, renderNegotiation } from '../src/ui/negotiationView.js';
 import { handleTransferAction, renderTransfers } from '../src/ui/transfersView.js';
@@ -195,7 +195,7 @@ test('Klub AI przy „chce zmian” podnosi pensję w budżecie albo rezygnuje',
   const last = ok.decide > no.decide ? ok.decide : no.decide;
   withThink(CHANGES, () => { while (g.date < last) step(g); });
   assert.equal(ok.status, 'accepted');
-  assert.equal(ok.contract.wage, 4400);
+  assert.equal(ok.contract.wage, Math.round((4000 * aiRaiseMul(g, 'lech')) / 100) * 100); // podwyżka z atrybutu Negocjacje (1,06-1,14)
   assert.equal(no.status, 'rejected');
 });
 

@@ -40,6 +40,7 @@ import { fmtDate } from '../ui/dom.js';
 import { archivePlayerSeason, archiveSeasonMatches, syncSpell } from './history.js';
 import { reputationSeasonEnd, applyClubRep } from '../career/reputationSystem.js'; // docs/reputacja.md
 import { pruneSuspWhy } from './suspension.js';
+import { negSeason } from '../career/clubNegotiation.js'; // ukryty atrybut Negocjacje klubów AI (docs/negocjacje.md, rozdz. 15)
 
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
 const fmtCoef = (x) => (Math.round(x * 1000) / 1000).toFixed(3).replace('.', ',');
@@ -281,6 +282,8 @@ export function rolloverSeason(game) {
   setSeasonYear(year, { windows: seasonWindows(year), polishEurope });
   applyLeagueState(game);
   applyClubRep(game);
+  // Negocjacje klubów AI: powrót do średniej nowej ligi i zmiany dyrektorów (po zwolnieniu trenera i spadku częściej)
+  const negMsgs = negSeason(game, year, { relegated: new Set(Object.values(moves.relegated ?? {}).flat()), date: newStart });
   // Powroty z wypożyczeń kończących się 30 czerwca i z udziałem klubów spadających do IV ligi; obowiązek albo opcja
   // wykupu zamienia wypożyczenie w transfer (src/career/loans.js). Wypożyczenia na rok trwają dalej.
   const loansBack = returnLoansAtRollover(game, oldEnd, newStart);
@@ -400,6 +403,7 @@ export function rolloverSeason(game) {
   if (uid && !fired) msgs.push(createMessage({ date: newStart, key: `kadra-lato:${year}`, category: 'staff', from: 'Dyrektor sportowy', priority: 'important', subject: `Kadra przed sezonem ${SEASON}: ${sq} zawodników`, body: `${squadLines.join('\n\n') || 'Bez zmian w kadrze.'}${sq < 22 ? '\n\nKadra liczy mniej niż 22 zawodników. Uzupełnij ją w zakładce Transfery (wolni zawodnicy są dostępni od razu).' : ''}` }));
   const fin = uid ? F.clubs[uid] : null;
   msgs.push(...careerMsgs);
+  msgs.push(...negMsgs); // nowy dyrektor sportowy w klubie z ligi gracza (bez wartości atrybutu)
   if (fired) {
     // Zwolnienie po sezonie: trener bez klubu (rynek pracy, src/career/jobMarket.js), klub prowadzi AI
     msgs.push(...coachFired(game, newStart, { inSeason: false, dropped: droppedOut }));

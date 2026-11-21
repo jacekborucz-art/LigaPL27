@@ -6,6 +6,7 @@
 //
 // Jednostki: pensja tygodniowa w zł, premie i klauzule w zł, daty ISO 'YYYY-MM-DD'.
 
+import { negLevers } from './clubNegotiation.js'; // atrybut Negocjacje klubów AI (docs/negocjacje.md, rozdz. 15)
 import { Rng, clamp } from '../core/rng.js';
 import { willingnessToJoin, clubReputation } from './reputation.js';
 import { GROUP } from './squad.js';
@@ -822,9 +823,11 @@ export function applyPromiseCheck(player, clubId, dateIso, minutesShare) {
  * Klub AI negocjuje tą samą logiką w trybie uproszczonym: oferta rynkowa, ewentualnie przyjęcie kontroferty
  * mieszczącej się w budżecie. Zawsze najwyżej 2 rundy.
  * budget: { wage (maks. pensja tygodniowa), signOn, maxYears, total (maks. koszt całego kontraktu: progi zarządu) }.
- * Zwraca { result: 'signed'|'failed'|'refused', rounds, contract, outcome, reason? }.
+ * neg: atrybut Negocjacje klubu AI 1-20 (clubNegotiation.js): pierwsza oferta (0,94 + 0,05q) x orientacyjne żądanie,
+ * podwyżka w drugiej rundzie x (1,06 + 0,08q); bez atrybutu (null) dawne 0,97 i 1,10. Budżet zawsze twardym limitem.
+ * Zwraca { result: 'signed'|'failed'|'refused', rounds, contract, outcome, demand (orientacyjne żądanie), reason? }.
  */
-export function aiNegotiate({ kind = 'sign', player, club, fromClub = null, date, rng, ctx = {}, budget = {} }) {
+export function aiNegotiate({ kind = 'sign', player, club, fromClub = null, date, rng, ctx = {}, budget = {}, neg = null }) {
   const r = openNegotiation({ kind, player, club, fromClub, date, rng, ctx, mode: 'ai' });
   if (!r.ok) return { result: 'refused', rounds: 0, reason: r.reason, contract: null, outcome: r.outcome ?? null };
   const s = r.session;
@@ -832,7 +835,9 @@ export function aiNegotiate({ kind = 'sign', player, club, fromClub = null, date
   const maxWage = budget.wage ?? Infinity;
   const maxSignOn = budget.signOn ?? (Number.isFinite(maxWage) ? maxWage * 10 : Infinity);
   const age = player.age ?? 25;
-  const wage = Math.min(maxWage, roundTo(d.publicDemand * 0.97, 100));
+  // neg: ukryty atrybut Negocjacje klubu AI (clubNegotiation.js); null = dawne stałe 0,97 i +10 %
+  const lv = negLevers(neg);
+  const wage = Math.min(maxWage, roundTo(d.publicDemand * lv.open, 100));
   const goalBonus = { ATT: 0.1, MID: 0.06, DEF: 0.04, GK: 0 }[GROUP[player.pos] || 'MID'];
   // Progi zarządu (src/career/boardRequests.js): długość z wieku i koszt całego kontraktu
   const fit = (o) => {
@@ -853,7 +858,7 @@ export function aiNegotiate({ kind = 'sign', player, club, fromClub = null, date
   if (resp.type !== 'accept' && s.status === 'open') {
     const c = resp.counter;
     if (c && c.wage <= maxWage && c.signOn <= maxSignOn) resp = s.propose(fit(c));
-    else s.propose({ ...offer, wage: Math.min(maxWage, roundTo(offer.wage * 1.1, 100)) });
+    else s.propose(fit({ ...offer, wage: Math.min(maxWage, roundTo(offer.wage * lv.raise, 100)) })); // progi zarządu zawsze twardym limitem
   }
-  return { result: s.status === 'accepted' ? 'signed' : 'failed', rounds: d.st.round, contract: s.contract, outcome: s.outcome() };
+  return { result: s.status === 'accepted' ? 'signed' : 'failed', rounds: d.st.round, contract: s.contract, outcome: s.outcome(), demand: d.publicDemand };
 }
