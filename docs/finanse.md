@@ -374,3 +374,14 @@ Stadion, baza treningowa i akademia mają poziomy 1-10 (pełny opis, skala, źr�
 - inwestycje gracza: 20 % udziału klubu na start, reszta w ratach co miesiąc (`infra`, „Inwestycje w obiekty”); miasto i bogaty właściciel dokładają według typu właściciela [SZAC];
 - kluby AI kierują połowę corocznej kwoty `invest` (rozdz. 3.4) na projekty: licencja, baza, akademia, stadion (tylko przy zapełnieniu od 92 %), nie wyżej niż poziom 8 [SZAC];
 - licencja (Ekstraklasa: stadion od 4 i 4 500 miejsc, baza od 3, akademia od 3; 1 Liga: stadion od 3, akademia od 2; 2 Liga: stadion od 2): sezon na rozpoczęcie inwestycji, potem kara 1 mln zł (`fines`) [SZAC].
+
+
+## Rozliczenie warunku zarządu (Nov 21, 2026, v1.23 Beta)
+
+`condFinal` w `src/career/boardRequests.js`, liczby [SZAC] (`COND`):
+- Cel osiągnięty: pełna kwota; budżet płac najwyżej do wskaźnika płac 80 % przychodów (ponad to dopłata właściciela
+  ze skarbca albo część kwoty). Brak pieniędzy: list z gratulacjami i wyjaśnieniem, zaufanie bez zmian.
+- Zabrakło do 2 miejsc: szansa części kwoty (35-65 %) `0,4 + 0,04 (cierpliwość - 10) - 0,03 (temperament - 10)
+  - 0,02 (ambicja - 10) + 0,004 (zaufanie - 50) - 0,15 (brak miejsc - 1)`, od 0,05 do 0,85; bez pieniędzy: cierpliwy
+  właściciel bez kary, porywczy -1 zaufania.
+- Daleko od celu: bez pieniędzy, zaufanie -1 (porywczy właściciel przy 5+ miejscach: -2).

@@ -184,7 +184,7 @@ test('Warunek: spełniony daje pieniądze, niespełniony kosztuje punkt zaufania
   assert.equal(R.conds[1].status, 'failed');
   assert.equal(R.conds[2].status, 'open');
   assert.equal(c.transferBudget, tb + 500000);
-  assert.equal(g.board.trust, trust - 1);
+  assert.ok([trust - 1, trust - 2].includes(g.board.trust)); // daleko od celu: -1, porywczy właściciel -2
   assert.ok(msgs.every((m) => m.from === 'Zarząd klubu' && noDash(m.body)));
 });
 
@@ -337,7 +337,9 @@ test('Warunek z poprzedniego sezonu: liczy się miejsce na koniec sezonu z archi
   assert.equal(msgs.length, 2);
   assert.ok(msgs.every((m) => /zakończyła sezon na 2\. miejscu/.test(m.body) && /umawialiśmy się na 1\. miejsce/.test(m.body)), msgs.map((m) => m.body).join('\n'));
   assert.ok(msgs.every((m) => !/Warunek niespełniony|co najwyżej|15\. miejsc/.test(`${m.subject} ${m.body}`)));
-  assert.equal(c.wageBudget, wb);
+  // 2. miejsce przy umowie na 1.: zabrakło niewiele, więc część kwoty albo wyrozumiałość (zależnie od właściciela)
+  assert.ok(msgs.every((m) => /Zabrakło niewiele/.test(m.body)));
+  assert.ok(c.wageBudget >= wb && c.wageBudget < wb + 1000);
   // Mistrz: warunek spełniony
   g.archive[0].tables[1].reverse();
   R.conds.push({ id: 'win', date: `${SEASON_YEAR}-06-10`, season: SEASON_YEAR - 1, type: 'transfer', amount: 300000, top: 1, by: `${SEASON_YEAR}-07-01`, status: 'open' });
@@ -349,4 +351,40 @@ test('Warunek z poprzedniego sezonu: liczy się miejsce na koniec sezonu z archi
   R.conds.push({ id: 'now', date: `${SEASON_YEAR}-07-02`, season: SEASON_YEAR, type: 'transfer', amount: 300000, top: 3, by: `${SEASON_YEAR}-07-01`, status: 'open' });
   assert.equal(checkConditions(g, `${SEASON_YEAR}-07-01`, { push: false }).length, 0);
   assert.equal(R.conds.at(-1).status, 'open');
+});
+
+test('Warunek: spełniony przy płacach na granicy przychodów daje część kwoty albo uczciwe wyjaśnienie, bez kary', () => {
+  const g = fresh();
+  const R = ensureRequests(g);
+  const c = g.finance.clubs[g.clubId];
+  g.archive = [{ season: '2025/26', tables: { 1: [{ id: g.clubId, pts: 80, gd: 40 }], 2: [], 3: [] }, l3: {} }];
+  const huge = 50 * c.wageBudget; // kwota ponad możliwości klubu
+  R.conds.push({ id: 'w', date: `${SEASON_YEAR}-06-05`, season: SEASON_YEAR - 1, type: 'wage', amount: huge, top: 1, by: `${SEASON_YEAR}-07-01`, status: 'open' });
+  const trust = g.board.trust; const wb = c.wageBudget;
+  const [m] = checkConditions(g, `${SEASON_YEAR}-07-01`, { push: false });
+  assert.match(m.body, /zakończyła sezon na 1\. miejscu/);
+  assert.match(m.body, /Gratulujemy/);
+  assert.ok(!/Bez podwyżki/.test(m.subject), m.subject);
+  assert.equal(g.board.trust, trust, 'spełniony warunek nie kosztuje zaufania');
+  assert.ok(c.wageBudget < wb + huge);
+});
+
+test('Warunek: blisko celu reakcja zależy od właściciela i losu, daleko od celu zawsze bez pieniędzy', () => {
+  let partial = 0; let none = 0;
+  for (let i = 0; i < 40; i++) {
+    const g = fresh();
+    const R = ensureRequests(g);
+    g.archive = [{ season: '2025/26', tables: { 1: [{ id: 'legia', pts: 80, gd: 40 }, { id: g.clubId, pts: 78, gd: 30 }], 2: [], 3: [] }, l3: {} }];
+    R.conds.push({ id: `n${i}`, date: `${SEASON_YEAR}-06-05`, season: SEASON_YEAR - 1, type: 'transfer', amount: 1000000, top: 1, by: `${SEASON_YEAR}-07-01`, status: 'open' });
+    const [m] = checkConditions(g, `${SEASON_YEAR}-07-01`, { push: false });
+    if (/Część obiecanej kwoty/.test(m.subject)) partial++; else none++;
+  }
+  assert.ok(partial > 0 && none > 0, `część ${partial}, nic ${none}`);
+  const g = fresh();
+  const R = ensureRequests(g);
+  const rows = [{ id: 'legia' }, { id: 'lech' }, { id: 'rakow' }, { id: 'pogon-szczecin' }, { id: 'gornik-zabrze' }, { id: 'jagiellonia' }, { id: g.clubId }].map((r) => ({ ...r, pts: 50, gd: 0 }));
+  g.archive = [{ season: '2025/26', tables: { 1: rows, 2: [], 3: [] }, l3: {} }];
+  R.conds.push({ id: 'far', date: `${SEASON_YEAR}-06-05`, season: SEASON_YEAR - 1, type: 'transfer', amount: 1000000, top: 1, by: `${SEASON_YEAR}-07-01`, status: 'open' });
+  const [m] = checkConditions(g, `${SEASON_YEAR}-07-01`, { push: false });
+  assert.match(m.body, /daleko od celu/);
 });

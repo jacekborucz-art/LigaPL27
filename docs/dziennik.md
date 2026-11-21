@@ -29,6 +29,16 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 21, 2026, profil A (chmura), dyrektor sportowy i warunek zarządu (v1.23 Beta)
+Zrobione:
+- Scalony dyrektor sportowy (27f2aae): opis w `docs/dyrektor-sportowy.md`.
+- Błąd: spełniony warunek budżetu płac (1. miejsce) dawał list „Bez podwyżki” z karą -1, gdy płace przekraczały 80 %
+  przychodów, a właściciel nie dopłacił. Teraz reakcja zarządu zależy od wyniku i właściciela (`condFinal`, opis
+  w `docs/finanse.md`): cel = pieniądze w granicach finansów albo uczciwe wyjaśnienie bez kary; blisko celu = część
+  kwoty albo wyrozumiałość (cechy właściciela, zaufanie, los); daleko = bez pieniędzy.
+Zostało / dalej:
+- Do decyzji z raportu dyrektora: NEG dyrektora gracza bez efektu dla gracza, podbieranie dyrektorów przez AI.
+
 ## Nov 21, 2026, agent (worktree, gałąź do scalenia), dyrektor sportowy w sztabie (v1.23 Beta)
 Zrobione:
 - Dyrektor sportowy jako osoba w każdym klubie z kadrą (gracz i AI): rola `dyrektor`, osobny slot poza limitem

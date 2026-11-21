@@ -524,6 +524,66 @@ function condPosition(game, cond) {
   return { pos: t.pos, final: false };
 }
 
+/**
+ * Kwota, którą zarząd może dziś przyznać: budżet płac tylko do wskaźnika płac W_MAX (ponad to dopłata właściciela
+ * ze skarbca albo część kwoty). Zwraca { amount, capped, owner }.
+ */
+function affordable(game, type, amount, date) {
+  if (type !== 'wage') return { amount, capped: false, owner: false };
+  const c = game.finance.clubs[game.clubId];
+  const base = Math.max(wageBill(game.world, game.clubId), c.wageBudget);
+  if (wageRatio(game, game.clubId, base + amount) <= REQ.W_MAX) return { amount, capped: false, owner: false };
+  if (ownerCover(game, 'wage', amount, date)) return { amount, capped: false, owner: true };
+  const room = r100(Math.max(0, (REQ.W_MAX * wageRevenue(c)) / 52 - base));
+  return { amount: Math.min(amount, room), capped: true, owner: false };
+}
+
+// Reakcja zarządu na warunek: zależy od tego, jak blisko celu była drużyna, i od właściciela (cierpliwość,
+// temperament, ambicja) oraz zaufania; los z ziarna warunku. Absurdy (spełniony warunek bez pieniędzy, kara za
+// 2. miejsce przy umowie na 1.) są rzadkie i zawsze wyjaśnione w liście [SZAC].
+export const COND = { nearMiss: 2, partBase: 0.4, partMin: 0.05, partMax: 0.85, shareMin: 0.35, shareMax: 0.65 };
+function condFinal(game, cond, t, date, { label, per, where, push }) {
+  const o = ownerOf(game, game.clubId) ?? {};
+  const tr = (k) => (o[k] ?? 10) - 10;
+  const trust = game.board.trust;
+  const rng = new Rng(`warunek:${game.seed}:${cond.id}:${date}`);
+  const goal = `umawialiśmy się na ${placeGoal(cond.top)}`;
+  const grant = (amount) => { const change = applyGrant(game, game.clubId, cond.type, amount); return change; };
+  const money = (a) => `${zl(a)}${per}`;
+  // Cel osiągnięty: zarząd płaci, najwyżej tyle, na ile pozwalają finanse
+  if (t.pos && t.pos <= cond.top) {
+    const f = affordable(game, cond.type, cond.amount, date);
+    cond.status = 'met';
+    if (!f.capped) return letter(game, date, `warunek:${cond.id}`, `Zarząd dotrzymuje słowa: ${label}`, `${goal}, a drużyna ${where}. ${f.owner ? 'Właściciel dopłaca ze swoich pieniędzy, bo przychody klubu na to nie wystarczają. ' : ''}${label[0].toUpperCase()}${label.slice(1)} rośnie o ${money(cond.amount)}. ${grant(cond.amount)}`, 'important', push);
+    if (f.amount > 0) return letter(game, date, `warunek:${cond.id}`, `Zarząd dotrzymuje słowa, w granicach finansów: ${label}`, `${goal}, a drużyna ${where}. Gratulujemy. Pełna kwota (${money(cond.amount)}) podniosłaby płace ponad ${Math.round(REQ.W_MAX * 100)} % przychodów klubu, więc ${label} rośnie o ${money(f.amount)}. ${grant(f.amount)}`, 'important', push);
+    cond.status = 'met-nomoney';
+    return letter(game, date, `warunek:${cond.id}`, `Warunek spełniony, ale bez pieniędzy: ${label}`, `${goal}, a drużyna ${where}. Gratulujemy. Płace klubu są już na granicy ${Math.round(REQ.W_MAX * 100)} % przychodów, a właściciel nie dołoży z własnych środków, więc dziś nie podniesiemy budżetu (${money(cond.amount)}). Wrócimy do tematu, gdy wzrosną przychody. Zaufanie zarządu bez zmian.`, 'important', push);
+  }
+  const miss = t.pos ? t.pos - cond.top : 99;
+  // Niewiele zabrakło: część kwoty albo wyrozumiałość, zależnie od właściciela i zaufania
+  if (miss <= COND.nearMiss) {
+    const p = clamp(COND.partBase + 0.04 * tr('cierpliwosc') - 0.03 * tr('temperament') - 0.02 * tr('ambicja') + 0.004 * (trust - 50) - 0.15 * (miss - 1), COND.partMin, COND.partMax);
+    if (rng.chance(p)) {
+      const share = COND.shareMin + rng.next() * (COND.shareMax - COND.shareMin);
+      const f = affordable(game, cond.type, (cond.type === 'wage' ? r100 : r10k)(cond.amount * share), date);
+      if (f.amount > 0) {
+        cond.status = 'partial';
+        return letter(game, date, `warunek:${cond.id}`, `Część obiecanej kwoty: ${label}`, `${goal}, a drużyna ${where}. Zabrakło niewiele, a sezon oceniamy dobrze, więc zarząd przyznaje część kwoty: ${label} rośnie o ${money(f.amount)} (zamiast ${money(cond.amount)}). ${grant(f.amount)}`, 'important', push);
+      }
+    }
+    cond.status = 'failed';
+    const lenient = tr('cierpliwosc') - tr('temperament') >= 0;
+    if (!lenient) game.board.trust = Math.round(clamp(trust - 1, 0, 100));
+    return letter(game, date, `warunek:${cond.id}`, `Bez podwyżki od zarządu: ${label}`, `${goal}, a drużyna ${where}. Zabrakło niewiele, ale umowa była jasna, więc budżet zostaje bez zmian (${money(cond.amount)}). ${lenient ? 'Doceniamy wynik, zaufanie zarządu bez zmian.' : `Zaufanie zarządu: ${game.board.trust} na 100 (-1).`}`, 'info', push);
+  }
+  // Daleko od celu
+  cond.status = 'failed';
+  const harsh = tr('temperament') >= 5 && miss >= 5 ? 2 : 1;
+  game.board.trust = Math.round(clamp(trust - harsh, 0, 100));
+  const placeTxt = t.pos ? where : 'nie zajęła wymaganego miejsca';
+  return letter(game, date, `warunek:${cond.id}`, `Bez podwyżki od zarządu: ${label}`, `${goal}, a drużyna ${placeTxt}, daleko od celu. Zarząd nie zwiększa budżetu (${money(cond.amount)}). Zaufanie zarządu: ${game.board.trust} na 100 (-${harsh}).`, 'info', push);
+}
+
 /** Comiesięczne rozliczenie warunków (1. dnia miesiąca, po ocenie zarządu). */
 export function checkConditions(game, date, { push = true } = {}) {
   const R = game.board?.requests;
@@ -536,20 +596,8 @@ export function checkConditions(game, date, { push = true } = {}) {
     const where = t.final ? `zakończyła sezon na ${t.pos}. miejscu` : `jest na ${t.pos}. miejscu`;
     const label = REQ_TYPES[cond.type].short;
     const per = cond.type === 'wage' ? ' tygodniowo' : '';
-    if (t.pos && t.pos <= cond.top) {
-      let ok = true;
-      if (cond.type === 'wage' && wageRatio(game, game.clubId, Math.max(wageBill(game.world, game.clubId), game.finance.clubs[game.clubId].wageBudget) + cond.amount) > REQ.W_MAX) ok = !!ownerCover(game, 'wage', cond.amount, date);
-      if (ok) {
-        cond.status = 'met';
-        const change = applyGrant(game, game.clubId, cond.type, cond.amount);
-        out.push(letter(game, date, `warunek:${cond.id}`, `Zarząd dotrzymuje słowa: ${label}`, `umawialiśmy się na ${placeGoal(cond.top)}, a drużyna ${where}. Zarząd dotrzymuje słowa: ${label} rośnie o ${zl(cond.amount)}${per}. ${change}`, 'important', push));
-        continue;
-      }
-    }
-    cond.status = 'failed';
-    game.board.trust = Math.round(clamp(game.board.trust - 1, 0, 100));
-    const placeTxt = t.pos ? where : 'nie zajęła wymaganego miejsca';
-    out.push(letter(game, date, `warunek:${cond.id}`, `Bez podwyżki od zarządu: ${label}`, `umawialiśmy się na ${placeGoal(cond.top)}, a drużyna ${placeTxt}. Dlatego zarząd nie zwiększa budżetu (${zl(cond.amount)}${per}). Zaufanie zarządu: ${game.board.trust} na 100 (-1).`, 'info', push));
+    const fin = condFinal(game, cond, t, date, { label, per, where, push });
+    out.push(fin);
   }
   return out;
 }
