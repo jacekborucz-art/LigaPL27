@@ -26,6 +26,7 @@ import { windowOf, fmtZl } from './transfers.js';
 import { hasOpenDeal, stat } from './transferDeals.js';
 
 export const WISH = {
+  baseLow: 0.0008, // 1 Liga i niżej: osobna baza (decyzja właściciela: 60-85 próśb na sezon we wszystkich ligach)
   base: 0.0012, // spec 0,003; kalibracja do 15-25 próśb w Ekstraklasie na sezon (tools/transfery-kalibracja.mjs); 0,0008 przed pamięcią (wishMemory.js)
   cap: 0.08, quietDays: 28, withdraw: 0.3, recentDays: 180, talkDays: 14,
   morale: { open: -1, list: 2, promise: 1, refuse: -3, broken: -2.5, calmed: 1, talkFail: -1 },
@@ -61,7 +62,7 @@ export function monthlyHazard(p, ctx) {
   const fAge = age >= 21 && age <= 27 ? 1.5 : age >= 31 ? 0.5 : 1;
   const fTrait = Math.max(0, 1 + 0.08 * (t.ambition - 10)) * Math.max(0, 1 - 0.05 * (t.loyalty - 10)) * (p.unhappy ? 2 : 1);
   const fMonth = [6, 7, 8, 1, 2].includes(ctx.month) ? 2 : 0.5;
-  let h = WISH.base * fRep * fBench * fStall * fAge * fTrait * fMonth;
+  let h = ((ctx.tier ?? 1) >= 2 ? WISH.baseLow : WISH.base) * fRep * fBench * fStall * fAge * fTrait * fMonth;
   if (p.lastMove && ctx.date && daysBetween(p.lastMove, ctx.date) < WISH.recentDays) h *= 0.2;
   h *= hazardMemFactor(p, ctx.date); // fSpokój x fPamięć, czekanie na okno, rozczarowany w oknie x2 (wishMemory.js)
   return clamp(h, 0, WISH.cap);
@@ -234,7 +235,7 @@ export function requestsMonth(game, date) {
       moodMonth(game, p, date, ym);
       if (hasOpenDeal(game, p.id)) continue;
       const share = n ? (p.season?.min ?? 0) / (n * 90) : 1;
-      const h = monthlyHazard(p, { clubRep, share, games: n, month, date });
+      const h = monthlyHazard(p, { clubRep, share, games: n, month, date, tier: c.tier });
       if (h > 0 && new Rng(`prosba-transfer:${game.seed}:${p.id}:${ym}`).chance(h)) out.push(...openWish(game, p, date, 'hazard'));
     }
   }

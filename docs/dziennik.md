@@ -29,6 +29,16 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 21, 2026, profil A (chmura), prośby o transfer w niższych ligach (v1.23 Beta)
+Zrobione:
+- Scalona pamięć prośby o transfer (`src/career/wishMemory.js`, 7c7eb19).
+- Osobna baza ryzyka prośby dla 1 Ligi i niżej (`WISH.baseLow` 0,0008, Ekstraklasa 0,0012): średnio 73 prośby
+  na sezon we wszystkich ligach (cel właściciela 60-85), Ekstraklasa bez zmian.
+Decyzje i pułapki:
+- Właściciel: kluby AI zostają przy uspokojeniu podwyżką ok. 30 %; wersja zostaje v1.23 Beta.
+Zostało / dalej:
+- Brak.
+
 ## Nov 21, 2026, agent (worktree, gałąź do scalenia), pamięć prośby o transfer (v1.23 Beta)
 Zrobione:
 - Koniec pętli „przedłużenie z podwyżką, oferta, prośba, podwyżka”: zawodnik pamięta odrzucone oferty i podwyżki

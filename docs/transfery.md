@@ -187,6 +187,11 @@ rozczarowanych po odrzuconej ofercie, 4-13 pogodzeń, 0-3 eskalacje, w klubach A
 uspokoiły, i 16-27, które nie uspokoiły (zawodnik trafia na listę transferową). Prośby z ryzyka w niższych ligach
 rosną (base 0,0012), siła lig bez dryfu.
 
+Osobna baza dla 1 Ligi i niżej (Nov 21, 2026, decyzja właściciela: 60-85 próśb na sezon we wszystkich ligach):
+`baseLow = 0,0008` (Ekstraklasa zostaje 0,0012). Kalibracja, ziarna 5, 7, 9, trzy sezony, wszystkie ligi
+(Ekstraklasa): 81 (23), 69 (9), 75 (23); 97 (19), 58 (16), 69 (19); 73 (20), 66 (11), 69 (19). Średnio 73 na sezon,
+OVR top14 Ekstraklasy 11,56-11,85, bez dryfu.
+
 Kupcy z zagranicy: ligi z `src/data/kluby_uefa.json` o sile >= Ekstraklasa - 0,5 (L >= 11,5) oraz rynki pieniężne
 (Turcja z większą wagą, Arabia Saudyjska, MLS). Kupiec to zawsze prawdziwy klub o sile bliskiej poziomowi
 zawodnika: z `kluby_uefa.json` (czołówka) i z `src/data/kluby_swiat.js` (ok. 950 klubów średniego i niższego
