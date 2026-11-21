@@ -29,6 +29,14 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 21, 2026, profil A (chmura), wersja v1.23 Beta
+Zrobione:
+- Wersja v1.23 Beta (decyzja właściciela): poprawki warunku zarządu po zmianie sezonu i akademii z datapacku.
+Decyzje i pułapki:
+- Akademia z datapacku: tylko nowa kariera, bez migracji trwających karier (decyzja właściciela).
+Zostało / dalej:
+- Otwarte pytania o negocjacje AI: szansa poprawki w ciemno (0,35), „chce wrócić do domu” w samych rozmowach.
+
 ## Nov 21, 2026, profil A (chmura), datapack: dorośli w akademii (v1.22 Beta)
 Zrobione:
 - Błąd: datapack zmienia dane zawodnika, a nie jego miejsce w klubie, więc prawdziwy 32-latek wpisany na miejsce

@@ -1,6 +1,6 @@
 # Spis funkcji gry (LigaPL27)
 
-Stan na Nov 21, 2026, wersja gry v1.22 Beta. Ten plik odpowiada na jedno pytanie: czy dana funkcja już jest w grze.
+Stan na Nov 21, 2026, wersja gry v1.23 Beta. Ten plik odpowiada na jedno pytanie: czy dana funkcja już jest w grze.
 
 ## Jak korzystać
 
