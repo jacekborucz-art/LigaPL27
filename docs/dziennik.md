@@ -29,6 +29,26 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 21, 2026, agent (worktree, gałąź do scalenia), sprzeciw i rotacja dyrektorów sportowych (v1.23 Beta)
+Zrobione:
+- Sprzeciw dyrektora klubu gracza (`docs/dyrektor-sportowy.md` rozdz. 9): kupno z odstępnym (przepłata od 25 % wobec
+  wyceny dyrektora z błędem RYN) i sprzedaż (od 25 % poniżej wartości), szansa z różnicy i KAD, jeden rzut na
+  zawodnika w pół sezonu, bez cudzych ofert, weto zarządu ma pierwszeństwo. Decyzje: wycofuję się, renegocjacja
+  (NEG, 5-15 %, porażka: druga strona przy swojej kwocie, 8 % zrywa), nalegam (zaufanie -1/-2/-3, historia
+  `game.board.requests.dirLog`, panel w Klub, Zarząd). Okno w karcie zawodnika i w Ofertach (`tf-dir`), list z decyzją
+  przy ofercie z poczty (`dirObjection` w `careerSystem.js`). Kod: `director.js`, `transfers.js` (`answerDirector`).
+- Rotacja (`src/career/directorRotation.js`, rozdz. 10): podebrania przez kluby AI (zasady sztabu, blokada zarządu 50 %),
+  rezygnacje 2,5 %, zwolnienia przez właściciela 2 % na klub w sezonie, listy do gracza, liczniki `game.staff.dirRot`.
+  Na sezon średnio 4,3 podebrania, 3,1 rezygnacji, 3,2 zwolnienia (rozdz. 11).
+- Wakat w klubie AI (`aiDirectorWeek`): dyrektor na poziomie ligi (ponad średnią + 1 bez przewagi).
+- Testy: `tests/directorObjection.test.mjs` (8); `tests/transferDeals.test.mjs`: oferta z zagranicy z `dirOk`.
+Decyzje i pułapki:
+- W październiku okno jest zamknięte: sprzeciw przy kupnie sprawdzony w przeglądarce na zapisie z lutego.
+- `staffMarket.js` nadal CRLF; nowe eksporty: `toPool`, `removePerson`, `dropDirector`, `aiWage`, `poachBlocker`,
+  `ownerLetter`, `closeHist`, `logDirectorMove`.
+Zostało / dalej (do decyzji właściciela):
+- Sprzeciw przy bardzo drogim kontrakcie (pensja) niewdrożony; Negocjacje dyrektorów Ekstraklasy +0,9 po 3 sezonach.
+
 ## Nov 21, 2026, profil A (chmura), dyrektor sportowy i warunek zarządu (v1.23 Beta)
 Zrobione:
 - Scalony dyrektor sportowy (27f2aae): opis w `docs/dyrektor-sportowy.md`.

@@ -12,6 +12,7 @@ import { runDecision } from '../src/core/decisions.js';
 import { SEASON } from '../src/config/calendar2026.js';
 import { applySeasonState } from '../src/season/rollover.js';
 import '../src/season/dailySystems.js';
+import { rotationStats } from '../src/career/directorRotation.js';
 
 const clubId = process.argv[2] ?? 'widzew'; const seed = Number(process.argv[3] ?? 5); const seasons = Number(process.argv[4] ?? 2);
 applySeasonState({});
@@ -59,6 +60,8 @@ while (g.date < end) {
       const negT = [1, 2, 3, 4].map((t) => { const xs = CLUBS_PL.filter((x) => x.tier === t && g.world.clubs[x.id]).map((x) => g.staff.people[g.staff.dir[x.id]]?.a?.NEG).filter((v) => v != null); return xs.length ? (xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(2) : '-'; });
       const vac = CLUBS_PL.filter((x) => x.tier <= 4 && g.world.clubs[x.id] && !g.staff.dir[x.id]).length;
       console.log(`   dyrektorzy: NEG wg ligi ${negT.join(' / ')}, wakaty ${vac}, wolnych dyrektorów ${g.staff.dirPool?.length ?? 0}`);
+      const r = rotationStats(g, Number(before.slice(0, 4))); // rotacja poza 1 lipca (src/career/directorRotation.js)
+      console.log(`   zmiany dyrektorów poza 1 lipca: podebrania ${r.poach} (prób ${r.poachTry}), rezygnacje ${r.resign}, zwolnienia przez właściciela ${r.fire}, razem ${r.poach + r.resign + r.fire}`);
     }
     snapTiers();
     t0 = performance.now();

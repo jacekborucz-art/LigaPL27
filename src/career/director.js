@@ -11,6 +11,9 @@
 import { Rng, clamp } from '../core/rng.js';
 import { registerMailHook } from '../core/gameLoop.js';
 import { directorOf, personAttr, STAFF_MARKET, halfKeyOf } from './staffMarket.js';
+import { clubById } from '../data/clubs_pl.js';
+import { marketValue } from '../world/playerGen.js';
+import { askingPriceMultiplier } from './reputation.js';
 
 export const DIR = {
   // Widełki pensji dla gracza: połowa szerokości x (25 % przy RYN 1, 15 % przy 10, 6 % przy 20, liniowo pomiędzy);
@@ -127,3 +130,110 @@ export const kadEscalation = (game, clubId) => DIR.kad.esc * (directorAttr(game,
 
 /** Mnożnik premii za podpis i prowizji w ofertach klubu AI: 1 - 0,10 (KAD - 10) / 10 (od 1,09 do 0,90). */
 export const kadFeeMul = (game, clubId) => 1 - DIR.kad.fee * (directorAttr(game, clubId, 'KAD') - 10) / 10;
+
+// ------------------------------------------------------------ Sprzeciw dyrektora wobec transakcji trenera
+
+export const OBJ = {
+  thr: 0.25, // próg: kupno o ponad 25 % drożej niż uczciwa cena, sprzedaż o ponad 25 % poniżej wartości
+  p0: 0.1, slope: 1.4, pMax: 0.9, // szansa na progu 10 %, +14 pp na każde 10 % ponad próg, najwyżej 90 %
+  kad: [0.5, 0.05], // x (0,5 + 0,05 KAD): KAD 1 x0,55, KAD 10 x1, KAD 20 x1,5 (najwyżej 95 %)
+  // Renegocjacja: szansa 45 % + 3 pp na punkt NEG ponad 10 (15-80 %), zmiana kwoty 5-15 % (lepszy negocjator
+  // bliżej 15 %), po porażce druga strona zostaje przy swojej kwocie, rzadko (8 %) wycofuje się z rozmów
+  reneg: { base: 0.45, neg: 0.03, min: 0.15, max: 0.8, r: [0.05, 0.15], sd: 0.25, quit: 0.08 },
+  trust: [[1, 3], [0.5, 2], [0, 1]], // nalegam: zaufanie zarządu -1, przy różnicy od 50 % -2, od 100 % -3
+  log: 20, // historia sprzeciwów (game.board.requests.dirLog)
+};
+
+const roundFee = (x) => (x >= 100000 ? Math.round(x / 10000) * 10000 : Math.max(1000, Math.round(x / 1000) * 1000));
+
+/**
+ * Uczciwa cena zawodnika według dyrektora klubu gracza (jego wycena z błędem RYN, ten sam mechanizm co w klubach AI).
+ * Kupno: cena, jakiej spodziewa się po klubie sprzedającym (wartość x 1,45 albo x 1,08 z listy, x reputacja), czyli
+ * wzór ceny wywoławczej bez błędu sprzedającego; sprzedaż: wartość rynkowa w lidze klubu gracza. Bez cudzych ofert.
+ */
+export function directorFairPrice(game, p, kind = 'buy', date = game?.date) {
+  const clubId = game.clubId;
+  const err = rynMul(game, clubId, p.id, 'ocena');
+  if (kind === 'sell') return roundFee(marketValue(p, { tier: clubById(clubId)?.tier ?? 1, date }) * err);
+  const listed = game.market?.listed?.[p.id];
+  const mul = listed ? (listed.kind === 'release' ? 0.4 : 1.08) : 1.45;
+  return roundFee(marketValue(p, { tier: clubById(p.clubId)?.tier ?? 1, date }) * mul * askingPriceMultiplier(p.rep ?? 30) * err);
+}
+
+/** Różnica ceny wobec wyceny dyrektora: kupno fee / ref - 1 (przepłata), sprzedaż 1 - fee / ref (poniżej wartości). */
+export const objectionGap = (kind, fee, ref) => (kind === 'buy' ? fee / ref - 1 : 1 - fee / ref);
+
+/** Szansa sprzeciwu przy danej różnicy i atrybucie KAD (0 poniżej progu). */
+export function objectionChance(gap, kad = 10) {
+  if (!(gap > OBJ.thr)) return 0;
+  return Math.min(0.95, clamp(OBJ.p0 + OBJ.slope * (gap - OBJ.thr), 0, OBJ.pMax) * (OBJ.kad[0] + OBJ.kad[1] * clamp(kad, 1, 20)));
+}
+
+/**
+ * Czy dyrektor klubu gracza sprzeciwia się transakcji trenera. kind: 'buy' (kupno z odstępnym) | 'sell' (sprzedaż).
+ * Jeden rzut na zawodnika, rodzaj i dyrektora w pół sezonu: szansa rośnie z różnicą, więc zmiana kwoty o złotówkę nie
+ * losuje od nowa. Wakat i gra bez stanu sztabu: brak sprzeciwu (zostaje weto zarządu). Zwraca opis albo null.
+ */
+export function directorObjection(game, p, fee, kind = 'buy') {
+  const clubId = game?.clubId;
+  if (!p || !(fee > 0) || !clubId || !tracked(game, clubId)) return null;
+  const d = directorOf(game, clubId);
+  if (!d) return null;
+  const ref = directorFairPrice(game, p, kind);
+  const gap = objectionGap(kind, fee, ref);
+  const chance = objectionChance(gap, directorAttr(game, clubId, 'KAD'));
+  if (!chance) return null;
+  const u = new Rng(`dyrektor-sprzeciw:${game.seed}:${kind}:${p.id}:${d.id}:${halfKeyOf(game.date)}`).next();
+  if (u >= chance) return null;
+  return { kind, pid: p.id, fee, ref, gap: Math.round(gap * 1000) / 1000, dir: d.id, name: d.name, date: game.date };
+}
+
+/** Tekst sprzeciwu (uzasadnienie dyrektora, bez cudzych ofert). zl: formatowanie kwot. */
+export function objectionText(game, obj, zl) {
+  const p = game.world?.players?.[obj.pid];
+  const who = p?.name ?? 'zawodnik';
+  const z = Math.round(obj.gap * 100);
+  return obj.kind === 'buy'
+    ? `Trenerze, według mnie ${who} jest wart ok. ${zl(obj.ref)}. Płacimy ${zl(obj.fee)}, czyli o ${z} % za dużo.`
+    : `Trenerze, według mnie ${who} jest wart ok. ${zl(obj.ref)}. Sprzedajemy go za ${zl(obj.fee)}, czyli o ${z} % poniżej jego wartości.`;
+}
+
+/**
+ * Renegocjacja dyrektora (Negocjacje + los): kupno niższe odstępne, sprzedaż wyższe, o 5-15 %. Zwraca
+ * { ok: true, fee, r } albo { ok: false, quit } (quit: druga strona wycofuje się z rozmów).
+ */
+export function directorRenegotiate(game, obj) {
+  const R = OBJ.reneg;
+  const neg = directorAttr(game, game.clubId, 'NEG');
+  const rng = new Rng(`dyrektor-renegocjacja:${game.seed}:${obj.kind}:${obj.pid}:${obj.fee}:${obj.dir}:${game.date}`);
+  const chance = clamp(R.base + R.neg * (neg - 10), R.min, R.max);
+  if (!rng.chance(chance)) return { ok: false, quit: rng.chance(R.quit), chance };
+  const x = clamp(0.5 + R.neg * (neg - 10) + rng.gauss(0, R.sd), 0, 1);
+  const r = R.r[0] + (R.r[1] - R.r[0]) * x;
+  const fee = roundFee(obj.kind === 'buy' ? obj.fee * (1 - r) : obj.fee * (1 + r));
+  return { ok: true, fee, r: Math.abs(fee / obj.fee - 1), chance };
+}
+
+/** Kara zaufania za „nalegam” (różnica od 50 %: -2, od 100 %: -3). */
+export const insistPenalty = (gap) => OBJ.trust.find(([g]) => gap >= g)?.[1] ?? 1;
+
+/**
+ * Zapis sprzeciwu w historii zarządu (game.board.requests.dirLog, najnowsze pierwsze) i kara zaufania przy „nalegam”.
+ * action: 'back' | 'reneg' | 'insist'. Zwraca { entry, dTrust }.
+ */
+export function logObjection(game, obj, action, { result = null, fee = obj.fee } = {}) {
+  const B = game.board;
+  let dTrust = 0;
+  if (action === 'insist' && B) {
+    dTrust = -insistPenalty(obj.gap);
+    B.trust = Math.round(clamp((B.trust ?? 50) + dTrust, 0, 100));
+  }
+  const p = game.world?.players?.[obj.pid];
+  const entry = { date: game.date, kind: obj.kind, pid: obj.pid, name: p?.name ?? obj.pid, fee, asked: obj.fee, ref: obj.ref, gap: obj.gap, dir: obj.name, action, result, trust: dTrust };
+  if (B) {
+    B.requests ??= {};
+    const L = (B.requests.dirLog ??= []);
+    L.unshift(entry); L.length = Math.min(L.length, OBJ.log);
+  }
+  return { entry, dTrust };
+}

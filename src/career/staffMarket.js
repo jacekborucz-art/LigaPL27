@@ -507,7 +507,7 @@ export function ensureStaffFinance(game) {
   }
 }
 
-function closeHist(p, date, why) {
+export function closeHist(p, date, why) {
   if (!p.club) return;
   p.hist = [{ club: p.club, from: p.since ?? null, to: date, why }, ...(p.hist ?? [])].slice(0, 4);
 }
@@ -522,7 +522,7 @@ function detach(S, p, from = p.club) {
 /** Lista wolnych osoby: dyrektorzy mają własną (S.dirPool), reszta sztabu S.pool. */
 const poolOf = (S, p) => (isDirector(p) ? (S.dirPool ??= []) : S.pool);
 
-function toPool(game, p, date, why) {
+export function toPool(game, p, date, why) {
   const S = game.staff;
   const from = p.club;
   closeHist(p, date, why);
@@ -534,7 +534,7 @@ function toPool(game, p, date, why) {
   if (from && S.clubs[from]) { syncStaff(game, from, date); updatePay(game, from); }
 }
 
-function removePerson(S, p) {
+export function removePerson(S, p) {
   detach(S, p);
   S.pool = S.pool.filter((id) => id !== p.id);
   if (S.dirPool) S.dirPool = S.dirPool.filter((id) => id !== p.id);
@@ -694,7 +694,7 @@ function pickDirector(game, S, clubId, rng, date) {
 }
 
 /** Klub AI zwalnia dyrektora (odprawa) albo dyrektor odchodzi po umowie; osoba trafia na listę wolnych dyrektorów. */
-function dropDirector(game, S, clubId, date, { pay = true, why = 'zmiana dyrektora' } = {}) {
+export function dropDirector(game, S, clubId, date, { pay = true, why = 'zmiana dyrektora' } = {}) {
   const p = directorOf(game, clubId);
   if (!p) return;
   const cost = pay ? severanceOf(p, date) : 0;
@@ -797,7 +797,7 @@ function aiDirectorWeek(game, date) {
       const wage = aiWage(game, id, p, date);
       if (wage > room) continue;
       const seen = seenQuality(game, p, id).v;
-      const score = seen - K.ai.over * Math.max(0, seen - target);
+      const score = Math.min(seen, target + 1); // dyrektor na poziomie ligi: lepszy niż średnia ligi + 1 nie daje przewagi (bez dryfu Negocjacji przy wakatach z rotacji, directorRotation.js)
       if (score > bestScore) { bestScore = score; best = { p, wage }; }
     }
     if (!best) {
@@ -812,7 +812,7 @@ function aiDirectorWeek(game, date) {
 }
 
 /** List zarządu do gracza w sprawie dyrektora sportowego. */
-function ownerLetter(game, date, key, subject, body) {
+export function ownerLetter(game, date, key, subject, body) {
   return createMessage({ date, key, category: 'board', from: 'Zarząd klubu', priority: 'important', subject, body: `Panie Trenerze, ${body}\n\nZarząd klubu.` });
 }
 
@@ -1047,7 +1047,7 @@ export function clubAppeal(game, pid, clubId = game.clubId) {
 // ------------------------------------------------------------ Podbieranie: limity
 
 /** Czy klub może złożyć ofertę osobie zatrudnionej w innym klubie (limity podbierania). Zwraca powód albo null. */
-function poachBlocker(game, S, clubId, p, date) {
+export function poachBlocker(game, S, clubId, p, date) {
   const P = K.poach;
   if (p.since && daysBetween(p.since, date) < P.contractDays) return 'locked';
   const ban = S.poach.ban[`${clubId}:${p.id}`];
@@ -1298,6 +1298,7 @@ export function decideDay(game, date) {
   for (const pid of due) {
     const p = S.people[pid];
     const offers = S.offers.filter((o) => o.pid === pid);
+    const msg = p && isDirector(p) ? boardMsg : staffMsg; // dyrektor sportowy: listy od zarządu klubu
     delete S.decide[pid];
     S.offers = S.offers.filter((o) => o.pid !== pid);
     const block = S.block[pid]; delete S.block[pid];
@@ -1336,6 +1337,7 @@ export function decideDay(game, date) {
         joinClub(game, p, o.club, { wage: o.wage, until: o.until, date, why, lead: o.lead });
         syncStaff(game, from, date); updatePay(game, from);
         moved = true;
+        if (isDirector(p)) logDirectorMove(game, { date, kind: 'poach', pid, name: p.name, from, to: o.club, why: broke ? 'zerwanie umowy' : 'podebranie' });
         if (from === game.clubId) {
           messages.push(msg(date, `sztab-odchodzi:${pid}:${date}`, 'important', `${p.name} odchodzi do ${nameOf(o.club)}`,
             broke ? `${p.name} (${lower(roleName(p.role))}) zerwał umowę mimo naszej blokady i przechodzi do ${nameOf(o.club)}. Klub otrzymuje karę ${fmtZlM(money)}.`
@@ -1380,6 +1382,23 @@ export function decideDay(game, date) {
 }
 
 const msg = (date, key, priority, subject, body) => createMessage({ date, key, category: 'staff', from: 'Kierownik drużyny', priority, subject, body });
+const staffMsg = msg;
+const boardMsg = (date, key, priority, subject, body) => createMessage({ date, key, category: 'board', from: 'Zarząd klubu', priority, subject, body });
+
+/**
+ * Zmiana dyrektora sportowego poza 1 lipca (podebranie, rezygnacja, zwolnienie przez właściciela; directorRotation.js):
+ * historia S.dirLog (najnowsze pierwsze, najwyżej 80) i liczniki S.dirRot[sezon] do kalibracji.
+ */
+export function logDirectorMove(game, e) {
+  const S = game.staff;
+  if (!S) return;
+  const y = +e.date.slice(0, 4) - (+e.date.slice(5, 7) >= 7 ? 0 : 1);
+  const R = ((S.dirRot ??= {})[y] ??= { poachTry: 0, poach: 0, resign: 0, fire: 0 });
+  R[e.kind] = (R[e.kind] ?? 0) + 1;
+  if (e.kind === 'poachTry') return;
+  (S.dirLog ??= []).unshift(e);
+  S.dirLog.length = Math.min(S.dirLog.length, 80);
+}
 
 // ------------------------------------------------------------ Kluby AI
 
@@ -1389,7 +1408,7 @@ function aiTarget(game, clubId) {
 }
 
 /** Pensja oferty klubu AI: oczekiwania, płacowość i zasobność właściciela. */
-function aiWage(game, clubId, p, date) {
+export function aiWage(game, clubId, p, date) {
   const w0 = expectedWage(p, date, { club: clubId });
   const pay = Number(payLevel(clubById(clubId) ?? clubId)) || 1;
   const z = ownerOf(game, clubId)?.zasobnosc ?? 10;

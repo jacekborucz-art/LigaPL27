@@ -19,7 +19,7 @@ import { COMPETITIONS } from '../config/competitions.js';
 import { createFinance, financeDay, book, matchIncome, attendanceFill, uefaPrize, stadiumCapacity, meritTv, clubPlan, FIN } from './finance.js';
 import { bookCupPrize, bookUefaWinner, uefaSolidarity } from './prizes.js'; // nagrody PP, UEFA (docs/finanse.md)
 import './sponsors.js'; // umowy sponsorskie (docs/finanse.md, Sponsorzy)
-import { createMarket, marketWeek, answerIncoming, aiRenewals, inWindow, windowOf, fmtZl, SEASON_END } from './transfers.js';
+import { createMarket, marketWeek, answerIncoming, answerDirector, pendingObjection, aiRenewals, inWindow, windowOf, fmtZl, SEASON_END } from './transfers.js';
 import { ensureBoard, boardMonth, seasonGoalFor, trustLabel } from './board.js';
 import './squadLimitSystem.js'; // limit kadry i nacisk zarządu (docs/limit-kadry.md)
 import './boardRequests.js'; // prośby do zarządu, warunki i budżety klubów AI (docs/finanse.md)
@@ -29,6 +29,7 @@ import { ensureLoans } from './loans.js'; // wypożyczenia: systemy dnia i stare
 import { ensureTransferState } from './transferSystem.js'; // transakcje w toku, prekontrakty, prośby o transfer, zagranica (docs/transfery.md)
 import { foreignOfferMessage } from './foreignMarket.js';
 import { ensureStaff } from './staffMarket.js'; // sztab: zatrudnianie i zwalnianie, pensje sztabu (docs/sztab.md)
+import './directorRotation.js'; // rotacja dyrektorów sportowych poza 1 lipca (docs/dyrektor-sportowy.md, rozdz. 10)
 import './scoutOps.js'; // skauting zagraniczny: skauci, misje, kandydaci (docs/skauting.md)
 import { ensureCareerHistory, careerScan, careerMonth, careerPress, careerLeave, boardStartTrust } from './coachCareer.js'; // kariera trenera (docs/kariera-trenera.md)
 import { ensureJob, coachFired, jobAccepted, jobDeclined, unsolicitedOffers, offerMessage as jobOfferMessage } from './jobMarket.js'; // rynek pracy trenera
@@ -120,9 +121,35 @@ function offerMessage(game, o, date) {
   });
 }
 
+/** List dyrektora sportowego ze sprzeciwem wobec transakcji (decyzja trenera, docs/dyrektor-sportowy.md, rozdz. 9). */
+export function objectionMessage(game, key, text, { tried = false } = {}) {
+  const x = game.market.dirObj?.[key];
+  const verb = x?.kind === 'buy' ? 'płacimy' : 'sprzedaję';
+  return createMessage({
+    date: game.date, key: `sprzeciw:${key}:${game.date}:${tried ? 2 : 1}`, category: 'transfers', from: directorFrom(game), priority: 'important',
+    subject: `Sprzeciw dyrektora sportowego: ${game.world.players[x?.pid]?.name ?? 'transfer'}`,
+    body: tried ? text : `${text} Proponuję się wycofać albo pozwolić mi renegocjować kwotę. Jeśli Pan nalega, transakcja pójdzie dalej, ale zarząd będzie o tym wiedział (zaufanie zarządu spadnie). Decyzja tylko dziś.`,
+    actions: [...(tried ? [] : [{ id: 'reneg', label: 'Niech dyrektor renegocjuje' }]), { id: 'insist', label: `Nalegam: ${verb}` }, { id: 'back', label: 'Wycofuję się' }],
+    refs: { kind: 'dirObjection', key }, optional: true,
+  });
+}
+
+registerDecision('dirObjection', (game, m, action) => {
+  const key = m.refs.key;
+  const sellId = key.startsWith('sell:') ? key.slice(5) : null;
+  const r = answerDirector(game, key, action);
+  const o = sellId ? game.market.offers.find((x) => x.id === sellId) : null;
+  if (r.tried && pendingObjection(game, key)) return [objectionMessage(game, key, r.text, { tried: true })];
+  const out = [createMessage({ date: game.date, category: 'transfers', from: directorFrom(game), priority: 'info', subject: 'Decyzja po sprzeciwie dyrektora', body: r.text })];
+  // Wycofanie przy sprzedaży: list z ofertą znów czeka na decyzję (ten sam klucz, więc bez nowej wiadomości)
+  if (r.reopen && o?.status === 'open') game.inbox = (game.inbox ?? []).map((x) => (x.refs?.kind === 'incomingOffer' && x.refs.offerId === o.id ? { ...x, resolved: false, chosen: null } : x));
+  return out;
+});
+
 registerDecision('incomingOffer', (game, m, action) => {
   const r = answerIncoming(game, m.refs.offerId, action);
   const o = game.market.offers.find((x) => x.id === m.refs.offerId);
+  if (r.director) return [objectionMessage(game, r.key, r.text)];
   const out = [createMessage({ date: game.date, category: 'transfers', from: directorFrom(game), priority: 'info', subject: 'Odpowiedź na ofertę', body: r.text })];
   if (r.reopen && o?.foreign) { out.push(foreignOfferMessage(game, o, game.date)); return out; }
   if (r.reopen && o) out.push(offerMessage(game, o, game.date));

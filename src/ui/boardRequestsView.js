@@ -80,6 +80,22 @@ function vetoPanel(game, R) {
   return panel('Weta zarządu', 'bad', `<p class="tf-p__txt">Odwołanie: raz na zawodnika w oknie, najwyżej ${REQ.APPEALS_PER_SEASON} w sezonie. Zgoda kosztuje 3 punkty zaufania, odmowa 5.</p><ol class="br-log">${rows}</ol>`, { cls: 'br-vetoes' });
 }
 
+/** Sprzeciwy dyrektora sportowego wobec transakcji trenera i decyzje (docs/dyrektor-sportowy.md, rozdz. 9). */
+function objectionsPanel(R) {
+  const list = (R.dirLog ?? []).slice(0, 6);
+  if (!list.length) return '';
+  const what = (e) => (e.action === 'insist' ? [`Nalegałeś (zaufanie ${e.trust})`, 'bad']
+    : e.action === 'back' ? ['Wycofałeś się', 'info']
+      : e.result === 'ok' ? [`Renegocjacja: ${zl(e.fee)}`, 'good'] : e.result === 'quit' ? ['Renegocjacja: zerwane rozmowy', 'bad'] : ['Renegocjacja bez zmian', 'warn']);
+  const rows = list.map((e) => {
+    const [label, tone] = what(e);
+    const gap = `${Math.round((e.gap ?? 0) * 100)} %`;
+    const info = e.kind === 'buy' ? `Kupno za ${zl(e.asked)}, wycena dyrektora ${zl(e.ref)} (przepłata ${gap})` : `Sprzedaż za ${zl(e.asked)}, wycena dyrektora ${zl(e.ref)} (${gap} poniżej)`;
+    return `<li data-k="${tone}"><time>${esc(shortDate(e.date))}</time><span><b>${esc(e.name)}</b><small>${esc(info)}</small></span><span class="tf-tag" data-k="${tone}">${esc(label)}</span></li>`;
+  }).join('');
+  return panel('Sprzeciwy dyrektora sportowego', 'warn', `<p class="tf-p__txt">Nalegasz wbrew dyrektorowi: zaufanie zarządu spada o 1, przy dużej różnicy o 2 lub 3.</p><ol class="br-log">${rows}</ol>`, { cls: 'br-dirobj' });
+}
+
 function historyPanel(R) {
   const rows = R.log.slice(0, 10).map((e) => `<li data-k="${e.verdict}"><time>${esc(shortDate(e.date))}</time><span><b>${esc(REQ_TYPES[e.type].label)}</b>${e.amount ? ` <small>${esc(`${zl(e.amount)}${e.type === 'wage' ? ' tygodniowo' : ''}`)}</small>` : ''}<small>${esc(e.text ?? '')}</small></span><span class="tf-tag" data-k="${VERDICT_TONE[e.verdict]}">${esc(VERDICT_LABELS[e.verdict])}</span></li>`).join('');
   return panel('Odpowiedzi zarządu', 'misc', rows ? `<ol class="br-log">${rows}</ol>` : '<p class="tf-p__txt">Nie było jeszcze próśb.</p>', { cls: 'br-hist' });
@@ -108,6 +124,7 @@ export function boardRequestsPanel(game, ui = {}) {
     ${panel('Prośby do zarządu', 'info', `${intro}${kpis}<ul class="br-types">${types}</ul>`, { cls: 'br-main' })}
     ${condsPanel(R)}
     ${vetoPanel(game, R)}
+    ${objectionsPanel(R)}
     ${historyPanel(R)}
   </aside>`;
 }
