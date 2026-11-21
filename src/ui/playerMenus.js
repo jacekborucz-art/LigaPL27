@@ -76,6 +76,8 @@ export const NAV = {
   card: (id, own) => ({ steps: [{ act: 'tab', tab: 'transfery', sub: own ? 'kontrakty' : 'rynek' }, { act: 'tf-open', id }], focus: '[data-act="tf-close"]' }),
   // Raport asystenta o zawodniku (src/ui/assistantReportView.js): otwiera się w bieżącej zakładce, „Wróć” wraca na ekran
   assistant: (id) => ({ steps: [{ act: 'arep', id }], focus: '[data-act="arepback"]' }),
+  // Karta zawodnika w okienku (ta sama co po kliknięciu nazwiska w Transferach), bez zmiany ekranu
+  pcard: (id) => ({ steps: [{ act: 'pcard', id }], focus: 'dialog.tf-pcard' }),
 };
 const withSteps = (nav, extra, more = {}) => ({ ...nav, steps: [...nav.steps, ...extra], ...more });
 
@@ -379,7 +381,9 @@ export function playerMenu(game, pid, { view, ui = {}, why = null, lineup = null
     case 'training': {
       const inEditor = ui.trPlayer === p.id;
       const tr = trainingItems(p, { inEditor }).map((x) => (x.label === 'Ustawienia treningu' ? { ...x, primary: true } : x));
-      items = [...tr, ui.trTab === 'rozwoj' ? null : item('Raport rozwoju', NAV.report(), { hint: 'Kto rośnie, a kto spada' }), SEP, profile, report, talk, contractSub];
+      // Profil w okienku (atrybuty, pozycje, statystyki, kontrakt): trener zostaje w Treningu
+      const profileModal = item('Profil zawodnika', NAV.pcard(p.id), { hint: 'Atrybuty, pozycje, statystyki, kontrakt w okienku' });
+      items = [...tr, ui.trTab === 'rozwoj' ? null : item('Raport rozwoju', NAV.report(), { hint: 'Kto rośnie, a kto spada' }), SEP, profileModal, report, talk, contractSub];
       break;
     }
     case 'transfers': {

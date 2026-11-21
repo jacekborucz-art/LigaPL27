@@ -499,8 +499,9 @@ function playerEditor(game, p) {
   const hist = (t.ovrHist ?? []).map((v) => num(v)).join(', ');
   const term = legsTerm(t) + overloadTerm(t);
   const lbl = acwrLabel(sum.acwr);
-  return `<section class="panel tr-editor tr-editor--player">
-    <div class="tr-editor__head" data-pid="${esc(p.id)}"><h3><span class="pos" data-g="${GROUP[p.pos]}">${esc(p.pos)}</span> ${esc(p.name)}</h3><button class="btn btn--quiet tr-mini" data-act="tr-pback">Wróć do listy</button></div>
+  // data-pid na całym panelu: prawy przycisk w dowolnym miejscu otwiera menu zawodnika (raport, profil, kontrakt...)
+  return `<section class="panel tr-editor tr-editor--player" data-pid="${esc(p.id)}">
+    <div class="tr-editor__head"><h3><span class="pos" data-g="${GROUP[p.pos]}">${esc(p.pos)}</span> ${esc(p.name)}</h3><button class="btn btn--quiet tr-mini" data-act="tr-pback">Wróć do listy</button></div>
     <p class="muted">${esc(POS_NAMES[p.pos])}, ${age} lat, OVR ${num(p.ovr)}${p.injuryDays > 0 ? `, uraz: ${p.injuryDays} dni` : ''}</p>
     <div class="tr-pgrid"><div class="tr-pcol">
     <dl class="tr-dl tr-dl--boxed">

@@ -29,6 +29,15 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 21, 2026, profil A (chmura), menu zawodnika w Treningu (v1.23 Beta)
+Zrobione:
+- Trening > Zawodnicy: prawy przycisk działa na całym panelu zawodnika (wcześniej tylko na nazwisku).
+- „Profil zawodnika” z menu w Treningu otwiera kartę w okienku (ta sama co w Transferach: atrybuty, pozycje,
+  statystyki, kontrakt), bez przejścia do Kadry. Akcja `pcard` w `src/app.js`, `NAV.pcard` w `playerMenus.js`.
+- Okienko karty działa w Transferach i Treningu; zmiana zakładki je zamyka.
+Zostało / dalej:
+- Do decyzji właściciela: profil w okienku także w innych widokach (Pulpit, Skład i taktyka, Rozmowy).
+
 ## Nov 21, 2026, profil A (chmura), wersja v1.23 Beta
 Zrobione:
 - Wersja v1.23 Beta (decyzja właściciela): poprawki warunku zarządu po zmianie sezonu i akademii z datapacku.

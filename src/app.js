@@ -603,14 +603,18 @@ function renderTab(tab, g, club) {
   if (tab === 'pulpit' && state.todo) { const res = buildWeeklyTodo(g); noteTodoSeen(g, res); return renderTodo(res, state); }
   if (tab === 'pulpit') return state.fx ? renderFixtures(g, state.fx) : renderDashboard(g, club);
   if (tab === 'poczta') return renderMail(g);
-  if (tab === 'trening') return renderTraining(g, state);
-  if (tab !== 'transfery') state.tfCard = null; // karta w okienku tylko w Transferach
+  // Karta zawodnika w okienku: Transfery (nazwisko) i Trening (menu pod prawym przyciskiem)
+  const withCard = (html) => {
+    const cp = state.tfCard && g.world.players[state.tfCard];
+    if (!cp) { state.tfCard = null; return html; }
+    queueMicrotask(mountTfCard); // po wstawieniu HTML: okno modalne na telefonie, pływające na PC
+    return html + transferCardHtml(g, cp, { wide: matchMedia(WIDE_CARD).matches });
+  };
+  if (tab === 'trening') return withCard(renderTraining(g, state));
+  if (tab !== 'transfery') state.tfCard = null;
   if (tab === 'transfery') {
     if (state.ng) return renderNegotiation(g, state.ng);
-    const cp = state.tfCard && g.world.players[state.tfCard];
-    if (!cp) { state.tfCard = null; return renderTransfers(g, state); }
-    queueMicrotask(mountTfCard); // po wstawieniu HTML: okno modalne na telefonie, pływające na PC
-    return renderTransfers(g, state) + transferCardHtml(g, cp, { wide: matchMedia(WIDE_CARD).matches });
+    return withCard(renderTransfers(g, state));
   }
   if (tab === 'klub') return renderClubHub(g, state);
   if (tab === 'rozgrywki') return renderCompetitions(g, { comp: state.cComp ?? compOfClub(club) ?? 'ekstraklasa', view: state.cView, round: state.cRound, filter: state.uFilter, draw: state.uDraw, rank: state.uRank, rankCc: state.uRankCc, rankAll: state.uRankAll });
@@ -1650,7 +1654,7 @@ function mountTfCard() {
   (d.querySelector('.tcard__name') ?? d.querySelector('.tdet__x'))?.focus({ preventScroll: true });
 }
 app.addEventListener('cancel', (ev) => { if (ev.target.matches?.('dialog.tf-pcard')) { ev.preventDefault(); closeTfCard(); } });
-app.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && state.tfCard && state.tab === 'transfery') { ev.preventDefault(); ev.stopPropagation(); closeTfCard(); } });
+app.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && state.tfCard && (state.tab === 'transfery' || state.tab === 'trening')) { ev.preventDefault(); ev.stopPropagation(); closeTfCard(); } });
 
 app.addEventListener('click', (ev) => {
   // Nazwisko w Transferach działa jak link: otwiera kartę w okienku zamiast karty transferowej
@@ -1894,7 +1898,7 @@ async function dispatchAct(el, { root = app } = {}) {
       await new Promise((r) => setTimeout(r, matchMedia('(prefers-reduced-motion: reduce)').matches ? 150 : 450)); // podpis widoczny przed generowaniem świata
       await newGame(nc.slot, nc.clubId, profileOf(nc));
     }
-    if (act === 'tab') { state.tab = el.dataset.tab; state.kMsg = null; state.crResign = false; state.ma = null; state.mailOpen = null; state.playerOpen = null; state.repOpen = null; state.fx = null; state.todo = null; state.extPlayer = null; state.extClub = null; if (el.dataset.sub) { if (state.tab === 'klub') state.kTab = el.dataset.sub; else state.tfTab = el.dataset.sub; } else if (state.tab === 'klub' && state.game && isUnemployed(state.game)) state.kTab = 'kariera'; render(); }
+    if (act === 'tab') { state.tab = el.dataset.tab; state.kMsg = null; state.crResign = false; state.ma = null; state.mailOpen = null; state.playerOpen = null; state.repOpen = null; state.fx = null; state.todo = null; state.extPlayer = null; state.extClub = null; state.tfCard = null; if (el.dataset.sub) { if (state.tab === 'klub') state.kTab = el.dataset.sub; else state.tfTab = el.dataset.sub; } else if (state.tab === 'klub' && state.game && isUnemployed(state.game)) state.kTab = 'kariera'; render(); }
     // Terminarz i wyniki (Pulpit > Pokaż wszystko): sezon, rozgrywki, miejsce meczu
     if (act === 'fixtures') { state.tab = 'pulpit'; state.fx = { season: null, comp: 'all', venue: 'all' }; render(); window.scrollTo({ top: 0 }); app.querySelector('.fxs h2')?.setAttribute('tabindex', '-1'); app.querySelector('.fxs h2')?.focus({ preventScroll: true }); }
     if (act === 'fxback') { state.fx = null; render(); app.querySelector('[data-act="fixtures"]')?.focus(); }
@@ -1970,6 +1974,7 @@ async function dispatchAct(el, { root = app } = {}) {
     if (act === 'rzview') { state.rzView = el.dataset.v === 'squad' ? 'squad' : 'match'; state.playerOpen = null; render(); }
     if (act === 'squadback') { state.playerOpen = null; render(); }
     if (act === 'arep') { state.repOpen = el.dataset.id; render(); window.scrollTo({ top: 0 }); }
+    if (act === 'pcard') openTfCard(el.dataset.id, null); // karta zawodnika w okienku (menu pod prawym przyciskiem)
     if (act === 'arepback') { state.repOpen = null; render(); }
     // Raport ogólny o drużynie: na prośbę trenera (co 14 dni) i otwarcie z poczty
     if (act === 'trep-req') { const r = requestTeamReport(g); state.trepMsg = r.ok ? 'Sztab przygotował nowy raport.' : r.msg; if (r.ok) state.trepSel = 0; if (r.ok) await save(); render(); }
