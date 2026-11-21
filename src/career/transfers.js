@@ -27,6 +27,7 @@ import { onOfferRejected, onUserRejected } from './moveWish.js';
 import { effectiveAsk } from './mindset.js';
 import { makeProposal, proposalsFor, resolveNow } from './proposals.js'; // namysł zawodnika przed podpisem (docs/transfery.md, rozdz. 10)
 import { clubNegotiation, contestPenalty } from './clubNegotiation.js'; // ukryty atrybut Negocjacje klubów AI (docs/negocjacje.md, rozdz. 15)
+import { rynMul, kadFeeMul, sieWeight, weightedOrder } from './director.js'; // dyrektor sportowy: rynek, kadra, sieć (docs/dyrektor-sportowy.md)
 import { fmtDate } from '../ui/dom.js';
 
 export { SEASON_END };
@@ -84,7 +85,8 @@ export function askingPrice(game, p) {
   const listed = game.market.listed[p.id];
   const value = marketValue(p, { tier: clubTier(p.clubId), date: game.date });
   const mul = listed ? (listed.kind === 'release' ? 0.4 : 1.08) : 1.45;
-  let price = listed?.price ?? round(value * mul * askingPriceMultiplier(p.rep ?? 30)); // price: prośba o transfer (moveWish.js)
+  // Znajomość rynku dyrektora klubu (RYN): błąd wyceny bez przesunięcia, stały w pół sezonu (director.js)
+  let price = listed?.price ?? round(value * mul * askingPriceMultiplier(p.rep ?? 30) * rynMul(game, p.clubId, p.id, 'cena')); // price: prośba o transfer (moveWish.js)
   if (notForSale(game, p) && p.contract?.clause) price = p.contract.clause;
   return price;
 }
@@ -349,7 +351,8 @@ function aiBuy(game, club, date, rng, log) {
     if (!penOf.has(id)) penOf.set(id, n * contestPenalty(game, id, club.id, date));
     return penOf.get(id);
   };
-  const score = (x) => x.p.ovr - x.fee / 5e6 - pen(x.p.id);
+  // Kupujący ocenia cenę z błędem (Znajomość rynku dyrektora, bez przesunięcia): przepłaca albo trafia okazję
+  const score = (x) => x.p.ovr - (x.fee * rynMul(game, club.id, x.p.id, 'ocena')) / 5e6 - pen(x.p.id);
   const rank = (a, b) => score(b) - score(a);
   // Brak w kadrze: najpierw najlepsi z tych, na których klub stać (wcześniej drodzy wolni wypierali tanich z ośmiu kandydatów)
   const ordered = needs.length ? [...pool.filter(asks).sort(rank).slice(0, 8), ...pool.filter((x) => !asks(x)).sort(rank).slice(0, 3)]
@@ -358,9 +361,10 @@ function aiBuy(game, club, date, rng, log) {
   const willing = ordered.filter((x) => playerWillingness(game, x.p, club.id).verdict !== 'odmowa').slice(0, needs.length ? 3 : 1);
   let pick = null; let neg = null; let caps = null;
   const nego = clubNegotiation(game, club.id);
+  const feeMul = kadFeeMul(game, club.id); // premie za podpis i prowizje: Zarządzanie kadrą i płacami dyrektora
   for (const x of willing) {
     caps = boardCaps(game, club.id, x.p, 'sign', cb);
-    neg = aiNegotiate({ kind: 'sign', player: { ...x.p, contract: x.p.contract ?? { wage: effectiveAsk(x.p, club.tier, payLevel(club)), until: date } }, club: { ...club, name: club.name }, fromClub: x.p.clubId ? clubById(x.p.clubId) : isPoolContracted(x.p) ? poolSellerClub(x.p) : null, date, rng, budget: { wage: Math.min(Math.max(500, room), caps.wage), maxYears: caps.years, total: caps.total }, neg: nego });
+    neg = aiNegotiate({ kind: 'sign', player: { ...x.p, contract: x.p.contract ?? { wage: effectiveAsk(x.p, club.tier, payLevel(club)), until: date } }, club: { ...club, name: club.name }, fromClub: x.p.clubId ? clubById(x.p.clubId) : isPoolContracted(x.p) ? poolSellerClub(x.p) : null, date, rng, budget: { wage: Math.min(Math.max(500, room), caps.wage), maxYears: caps.years, total: caps.total }, neg: nego, feeMul });
     if (neg.result === 'signed') { pick = x; break; }
   }
   if (!pick) return null;
@@ -432,7 +436,8 @@ export function marketWeek(game, date) {
   // (wcześniej przy zajętym zawodniku wybierał od razu innego) [SZAC]
   const since = addDaysIso(date, -7);
   const retry = new Set((game.market.pending ?? []).filter((x) => !x.user && x.end && x.end.date >= since && ['lost', 'rejected', 'expired'].includes(x.status)).map((x) => x.to));
-  for (const c of rng.shuffle(CLUBS_PL.filter((x) => x.id !== game.clubId && game.world.clubs[x.id]))) {
+  // Kolejność klubów: losowanie z wagą sieci kontaktów dyrektora (exp(0,04 (SIE - 10)), zero-sum, director.js)
+  for (const c of weightedOrder(rng, CLUBS_PL.filter((x) => x.id !== game.clubId && game.world.clubs[x.id]), (x) => sieWeight(game, x.id))) {
     // Brak w kadrze (np. bramkarz po powrocie z wypożyczenia): klub szuka co tydzień, inaczej co ok. 2,5 tygodnia
     const gap = squadDeficits(squadOf(game.world, c.id)).some((n) => n.scope === 'squad');
     // III liga kupuje rzadziej (ok. co 5 tygodni) i tanio (mały budżet), docs/iii-liga.md
@@ -480,7 +485,7 @@ export function answerIncoming(game, offerId, action) {
   if (o.pre && p.preContract?.club === o.from) return ok(startDeal(game, { playerId: p.id, to: o.from, fee: o.fee, contract: { ...p.preContract.contract, signedOn: game.date }, kind: 'transfer', early: true }));
   const caps = boardCaps(game, o.from, p, 'sign');
   const maxWage = Math.min(caps.wage, Math.max(p.contract.wage * 1.6, wageRoom(game.finance, game.world, o.from) + p.contract.wage));
-  const neg = aiNegotiate({ kind: 'sign', player: p, club: buyer, fromClub: clubById(game.clubId), date: game.date, rng, budget: { wage: maxWage, maxYears: caps.years, total: caps.total }, neg: clubNegotiation(game, o.from) });
+  const neg = aiNegotiate({ kind: 'sign', player: p, club: buyer, fromClub: clubById(game.clubId), date: game.date, rng, budget: { wage: maxWage, maxYears: caps.years, total: caps.total }, neg: clubNegotiation(game, o.from), feeMul: kadFeeMul(game, o.from) });
   if (neg.result !== 'signed') { o.status = 'failed'; return { text: `${p.name} nie dogadał się z ${buyer.name}. Zostaje w klubie.` }; }
   const rofr = firstRefusal(game, p, o.from, o.fee, game.date, neg.contract); // prawo pierwokupu klubu, w którym był wypożyczony (loans.js)
   if (rofr.blocked) { o.status = 'accepted'; return { text: rofr.text ?? `${p.name}: transfer czeka na decyzję klubu z prawem pierwokupu.`, sold: !!rofr.matched }; }
@@ -508,7 +513,8 @@ export function aiRenewals(game, date) {
     for (const p of squad) {
       if (p.contract?.until !== SEASON_END || p.renewRefused || p.retiring || p.ovr < cutoff - 0.3 || p.age >= 34 || p.loan || p.preContract || p.transfer) continue;
       const caps = boardCaps(game, c.id, p, 'renew', cb ??= clubBoardData(game, c.id));
-      const r = aiNegotiate({ kind: 'renew', player: p, club: c, date, rng, budget: { wage: Math.min(p.contract.wage * 1.35, caps.wage), maxYears: caps.years, total: caps.total } });
+      // Dyrektor sportowy klubu: Negocjacje i Zarządzanie kadrą (premie, prowizje), docs/dyrektor-sportowy.md
+      const r = aiNegotiate({ kind: 'renew', player: p, club: c, date, rng, budget: { wage: Math.min(p.contract.wage * 1.35, caps.wage), maxYears: caps.years, total: caps.total }, neg: clubNegotiation(game, c.id), feeMul: kadFeeMul(game, c.id) });
       if (r.result === 'signed') { p.contract = { ...r.contract, signedOn: date }; p.wage = p.contract.wage; renewed++; } else p.renewRefused = true;
     }
   }

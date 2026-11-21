@@ -24,7 +24,7 @@ import '../src/season/dailySystems.js';
 import {
   STAFF_MARKET as K, ensureStaff, combineQ, personQ, expectedWage, staffLimit, staffBudget, makeOffer, decideDay, fireStaff,
   severanceOf, refreshPool, listFreeStaff, offerUtility, offerHint, clubAppeal, rosterOf, syncStaff, renewStaff, contractUntil,
-  staffSummary, seasonStats, aiStaffWeek, halfKeyOf, computeLimit, aiRenewals, staffPlan,
+  staffSummary, seasonStats, aiStaffWeek, halfKeyOf, computeLimit, aiRenewals, staffPlan, directorOf,
 } from '../src/career/staffMarket.js';
 
 const CLUB = 'widzew';
@@ -100,7 +100,7 @@ test('Finanse pierwszego dnia neutralne: koszty klubu + pensje sztabu = dawne ko
     if (c.log.some((x) => x.kind === 'ops' && x.date.startsWith(m))) continue;
     const old = (p.ops - (p.upkeepBase ?? 0)) / 12;
     assert.ok(Math.abs((out.ops ?? 0) + (out.staff ?? 0) - old) <= 1000, `${id}: ${(out.ops ?? 0) + (out.staff ?? 0)} vs ${old}`);
-    assert.equal(c.staffPay, rosterOf(g, id).reduce((s, x) => s + x.wage, 0));
+    assert.equal(c.staffPay, rosterOf(g, id).reduce((s, x) => s + x.wage, 0) + (directorOf(g, id)?.wage ?? 0)); // dyrektor sportowy w pensjach sztabu
   }
 });
 

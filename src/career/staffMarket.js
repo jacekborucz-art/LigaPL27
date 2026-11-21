@@ -18,11 +18,12 @@ import { Rng, clamp, hashString } from '../core/rng.js';
 import { registerDailySystem, addDays } from '../core/gameLoop.js';
 import { createMessage } from '../core/inbox.js';
 import { registerDecision } from '../core/decisions.js';
-import { clubById } from '../data/clubs_pl.js';
+import { clubById, CLUBS_PL } from '../data/clubs_pl.js';
 import { NATIONALITIES, randomName } from '../data/names.js';
 import { payLevel } from '../data/finanse_klubow.js';
-import { STAFF_ROLES } from '../training/config.js';
+import { STAFF_ROLES, DIRECTOR_ROLE, DIRECTOR_NAME } from '../training/config.js';
 import { generateStaffFor, staffLabel, roleAttrKeys, ensurePersonAttrs, attrsAround, qFromAttrs, ensureScoutReg } from '../training/staff.js';
+import { NEG, negMean, negDraw } from './clubNegotiation.js'; // atrybut Negocjacje: losowanie dyrektorów (docs/dyrektor-sportowy.md)
 import { ensureTraining, daysBetween } from '../training/state.js';
 import { clubPlan, book } from './finance.js';
 import { clubReputation } from './reputation.js';
@@ -40,10 +41,18 @@ export const STAFF_MARKET = {
   // Oczekiwana pensja (zł / mies.): 10 000 x R[rola] x 1,25^(q - 10) x (obcokrajowiec 1,2) x okres bez pracy
   wage: {
     base: 10000, growth: 1.25, foreign: 1.2, min: 800, idleFree: 60, idlePerMonth: 0.04, idleMin: 0.75,
-    R: { asystent: 1, fizyczny: 0.7, bramkarze: 0.7, analityk: 0.55, mlodziez: 0.5, kierownik: 0.45, fizjoterapeuta: 0.6, skaut: 0.4 },
+    R: { asystent: 1, fizyczny: 0.7, bramkarze: 0.7, analityk: 0.55, mlodziez: 0.5, kierownik: 0.45, fizjoterapeuta: 0.6, skaut: 0.4, dyrektor: 0.9 },
   },
   // Wakat: obowiązki przejmuje trener i reszta sztabu (jakość roli)
-  vacantQ: { asystent: 4, fizyczny: 3, bramkarze: 3, mlodziez: 3, analityk: 2, kierownik: 2, fizjoterapeuta: 3, skaut: 2 },
+  vacantQ: { asystent: 4, fizyczny: 3, bramkarze: 3, mlodziez: 3, analityk: 2, kierownik: 2, fizjoterapeuta: 3, skaut: 2, dyrektor: 5 },
+  // Dyrektor sportowy (docs/dyrektor-sportowy.md): 1 osoba na klub, poza limitem osób, pensja w budżecie sztabu.
+  // Oczekiwana pensja x mnożnik ligi klubu (Ekstraklasa q 10 ok. 9 tys. zł / mies., q 17 ok. 43 tys.), wakat: zarząd (5)
+  director: {
+    league: { 1: 1, 2: 0.72, 3: 0.5, 4: 0.38 },
+    spread: 2.5, age: [38, 62], // migracja i nowe osoby: NEG z dawnego atrybutu klubu, pozostałe NEG + N(0; 2,5)
+    pool: { size: 14, min: 12, max: 16, leave: 0.25, idleDays: 60, foreign: 0.05, tiers: [[0.15, 1], [0.2, 2], [0.25, 3], [0.4, 4]] },
+    match: 1, // 1 lipca: kandydat z listy wolnych, gdy Negocjacje różnią się od losowania o najwyżej 1
+  },
   // Pomocnicy w roli: q_ef = q1 + min(2, 0,10 (q2 - 6) + 0,05 (q3 - 6) + 0,025 (q4 - 6)); kierownik tylko q1
   help: [0.10, 0.05, 0.025], helpMax: 2, helpFrom: 6,
   // Najwięcej osób w roli według ligi (1 Ekstraklasa ... 4 III liga); skaut w III lidze niedostępny
@@ -117,6 +126,8 @@ export const STAFF_REASONS = {
   poachBan: 'Ten klub niedawno próbował zatrudnić tę osobę. Kolejna próba za kilka miesięcy.',
   poachCap: 'W tej rundzie było już dość prób zatrudnienia tej osoby.',
   role: 'Ta rola nie jest dostępna w tej lidze.',
+  dirPending: 'Twoja oferta dla dyrektora sportowego już czeka na decyzję.',
+  dirOwner: 'O dyrektorze sportowym decyduje zarząd klubu. Możesz poprosić zarząd o zmianę (Klub, Zarząd).',
 };
 
 const K = STAFF_MARKET;
@@ -126,7 +137,9 @@ const tierOf = (clubId) => clamp(clubById(clubId)?.tier ?? 4, 1, 4);
 const nameOf = (clubId) => clubById(clubId)?.name ?? clubId;
 const seasonYear = (game) => game.seasonYear ?? 2026;
 const isMonday = (date) => new Date(`${date}T12:00:00Z`).getUTCDay() === 1;
-const roleName = (role) => STAFF_ROLES[role]?.name ?? role;
+const roleName = (role) => (role === DIRECTOR_ROLE ? DIRECTOR_NAME : STAFF_ROLES[role]?.name ?? role);
+/** Dyrektor sportowy (osobny slot, docs/dyrektor-sportowy.md). */
+export const isDirector = (p) => p?.role === DIRECTOR_ROLE;
 const lower = (s) => s.charAt(0).toLowerCase() + s.slice(1);
 const fmtZlM = (v) => `${(Math.round(v / 100) / 10).toLocaleString('pl-PL')} tys. zł`;
 const coachKey = (c) => (c ? c.id ?? c.name ?? null : null);
@@ -136,10 +149,14 @@ export const halfKeyOf = (date) => { const y = +date.slice(0, 4); return +date.s
 
 // ------------------------------------------------------------ Wzory (czyste)
 
-/** Oczekiwana pensja (zł / mies.): jakość, rola, narodowość, okres bez pracy (opcjonalnie). */
-export function expectedWage(p, date = null, { idle = true } = {}) {
+/**
+ * Oczekiwana pensja (zł / mies.): jakość, rola, narodowość, okres bez pracy (opcjonalnie). Dyrektor sportowy: x mnożnik
+ * ligi klubu (club: klub, w którym ma pracować; bez klubu jak w Ekstraklasie).
+ */
+export function expectedWage(p, date = null, { idle = true, club = null } = {}) {
   const W = K.wage;
   let w = W.base * (W.R[p.role] ?? 0.5) * W.growth ** ((p.q ?? 10) - 10) * (isForeign(p) ? W.foreign : 1) * scoutRegionPremium(p);
+  if (isDirector(p) && club) w *= K.director.league[tierOf(club)] ?? 1;
   if (idle && p.free && date && !p.club) {
     const d = daysBetween(p.free, date);
     if (d > W.idleFree) w *= Math.max(W.idleMin, 1 - W.idlePerMonth * (d - W.idleFree) / 30);
@@ -301,6 +318,8 @@ export function typicalStaffCost(game, clubId) {
   const q0 = typicalQ(clubId);
   let sum = 0;
   for (const { role, k } of staffPlan(clubId, limit)) sum += expectedWage({ role, q: clamp(Math.round(q0 - (k > 1 ? 2 : 0)), 1, 20), nat: 'POL' }) * payMul(clubId);
+  // Dyrektor sportowy: typowa jakość = średnia atrybutu Negocjacje w lidze klubu
+  sum += expectedWage({ role: DIRECTOR_ROLE, q: clamp(Math.round(negMean(clubId)), 1, 20), nat: 'POL' }, null, { club: clubId }) * payMul(clubId);
   return Math.round(sum * 12 / 1000) * 1000;
 }
 
@@ -354,10 +373,23 @@ export function syncStaff(game, clubId, date = game.date) {
   if (adapting) { if (!S.adapting.includes(clubId)) S.adapting.push(clubId); } else if (S.adapting.includes(clubId)) S.adapting = S.adapting.filter((x) => x !== clubId);
 }
 
+/** Dyrektor sportowy klubu (osoba) albo null (wakat, klub bez stanu sztabu). */
+export function directorOf(game, clubId) {
+  const S = game?.staff;
+  const id = S?.dir?.[clubId];
+  const p = id ? S.people[id] : null;
+  return p && p.club === clubId ? p : null;
+}
+
+/** Pensje klubu (zł / mies.): osoby sztabu i dyrektor sportowy (jego pensja też idzie z budżetu sztabu). */
+export function clubStaffPay(game, clubId) {
+  return rosterOf(game, clubId).reduce((s, p) => s + (p.wage ?? 0), 0) + (directorOf(game, clubId)?.wage ?? 0);
+}
+
 /** Pensje sztabu klubu (miesięcznie) do finansów. */
 function updatePay(game, clubId) {
   const c = game.finance?.clubs?.[clubId];
-  if (c) c.staffPay = rosterOf(game, clubId).reduce((s, p) => s + (p.wage ?? 0), 0);
+  if (c) c.staffPay = clubStaffPay(game, clubId);
 }
 
 /** Kontrakty sztabu na start (migracja): 30 czerwca 2027-2029, w niższych ligach głównie rok. */
@@ -443,6 +475,9 @@ export function ensureStaff(game) {
   for (const id of Object.keys(game.world.clubs)) if (!S.clubs[id]) { buildClub(game, S, id, date); added.push(id); }
   if (fresh) for (let i = 0; i < K.pool.size; i++) addPoolPerson(game, S, `start:${i}`, date);
   for (const id of added) syncStaff(game, id, date);
+  // Dyrektorzy sportowi (docs/dyrektor-sportowy.md): klub bez dyrektora (nowa gra, stary zapis, awans) dostaje osobę
+  // z dawnego atrybutu Negocjacje (game.clubNeg) albo z tego samego losowania; lista wolnych dyrektorów
+  ensureDirectors(game, date);
   // Nowy sezon (po rollover): wygasłe kontrakty, wiek, rozwój, limity
   if (S.year !== seasonYear(game)) staffNewSeason(game, date);
   ensureStaffFinance(game);
@@ -455,13 +490,13 @@ export function ensureStaffFinance(game) {
   if (!S || !F?.clubs) return;
   for (const [id, c] of Object.entries(F.clubs)) {
     if (!c.plan || c.plan.staffOn || !S.clubs[id]) continue;
-    let actual = rosterOf(game, id).reduce((s, p) => s + (p.wage ?? 0), 0);
+    let actual = clubStaffPay(game, id);
     // Migracja: sztab droższy niż 60 % kosztów klubu (rezerwy, małe kluby) pracuje za mniej (część etatu), żeby
     // pierwszy dzień był neutralny finansowo
     const cap0 = (c.plan.ops ?? 0) * K.migrateCap / 12;
     if (S.based[id] == null && actual > cap0 && actual > 0) {
-      for (const p of rosterOf(game, id)) p.wage = Math.max(K.wage.min, r100(p.wage * cap0 / actual));
-      actual = rosterOf(game, id).reduce((s, p) => s + (p.wage ?? 0), 0);
+      for (const p of [...rosterOf(game, id), directorOf(game, id)].filter(Boolean)) p.wage = Math.max(K.wage.min, r100(p.wage * cap0 / actual));
+      actual = clubStaffPay(game, id);
     }
     // Nowy sezon: połowa z kosztu typowego sztabu, połowa z rzeczywistych pensji (zmiana stopniowa, bez skoku)
     const base = S.based[id] == null ? actual * 12 : (typicalStaffCost(game, id) + actual * 12) / 2;
@@ -478,33 +513,363 @@ function closeHist(p, date, why) {
 }
 
 /** Osoba odchodzi z klubu do puli wolnych (bez odprawy: tę księguje wołający). */
+/** Odpięcie osoby od klubu (sztab albo slot dyrektora), bez zmian w samej osobie. */
+function detach(S, p, from = p.club) {
+  if (!from) return;
+  if (isDirector(p)) { if (S.dir?.[from] === p.id) delete S.dir[from]; } else S.clubs[from] = (S.clubs[from] ?? []).filter((id) => id !== p.id);
+}
+
+/** Lista wolnych osoby: dyrektorzy mają własną (S.dirPool), reszta sztabu S.pool. */
+const poolOf = (S, p) => (isDirector(p) ? (S.dirPool ??= []) : S.pool);
+
 function toPool(game, p, date, why) {
   const S = game.staff;
   const from = p.club;
   closeHist(p, date, why);
-  if (from) S.clubs[from] = (S.clubs[from] ?? []).filter((id) => id !== p.id);
+  detach(S, p, from);
   Object.assign(p, { club: null, wage: 0, until: null, free: date, coach: null, adapt: null, signed: null, lead: false, demoted: null });
   delete S.block[p.id];
-  if (!S.pool.includes(p.id)) S.pool.push(p.id);
+  const pool = poolOf(S, p);
+  if (!pool.includes(p.id)) pool.push(p.id);
   if (from && S.clubs[from]) { syncStaff(game, from, date); updatePay(game, from); }
 }
 
 function removePerson(S, p) {
-  if (p.club) S.clubs[p.club] = (S.clubs[p.club] ?? []).filter((id) => id !== p.id);
+  detach(S, p);
   S.pool = S.pool.filter((id) => id !== p.id);
+  if (S.dirPool) S.dirPool = S.dirPool.filter((id) => id !== p.id);
   S.offers = S.offers.filter((o) => o.pid !== p.id);
   delete S.decide[p.id]; delete S.block[p.id];
   delete S.people[p.id];
 }
 
 function dissolveClub(game, S, clubId, date) {
-  for (const p of rosterOf(game, clubId)) {
+  const d = directorOf(game, clubId);
+  for (const p of [...rosterOf(game, clubId), ...(d ? [d] : [])]) {
     closeHist(p, date, 'rozwiązanie klubu');
     Object.assign(p, { club: null, wage: 0, until: null, free: date, coach: null, adapt: null, signed: null, lead: false, demoted: null });
-    S.pool.push(p.id);
+    poolOf(S, p).push(p.id);
   }
   delete S.clubs[clubId]; delete S.limit[clubId];
+  if (S.dir) delete S.dir[clubId];
+  if (S.dirInit) delete S.dirInit[clubId];
   S.offers = S.offers.filter((o) => o.club !== clubId);
+}
+
+// ------------------------------------------------------------ Dyrektor sportowy (docs/dyrektor-sportowy.md)
+
+/**
+ * Nowy dyrektor (nie dopisany do stanu): Negocjacje = neg, pozostałe atrybuty NEG + N(0; 2,5) (korelacja z
+ * negocjacjami), jakość = średnia. Deterministycznie z klucza. opts: { neg, nat, age, free }.
+ */
+function makeDirector(game, S, key, opts = {}) {
+  const D = K.director;
+  const rng = new Rng(`dyrektor-osoba:${game.seed}:${key}`);
+  const nats = K.foreignNats.filter((c) => NATIONALITIES.includes(c));
+  const nat = opts.nat ?? (rng.chance(D.pool.foreign) ? nats[rng.int(0, nats.length - 1)] : 'POL');
+  const nm = randomName(NATIONALITIES.includes(nat) ? nat : 'POL', rng);
+  const neg = clamp(Math.round(opts.neg ?? 10), 1, 20);
+  const a = { NEG: neg };
+  for (const k of ['RYN', 'SIE', 'KAD']) a[k] = clamp(Math.round(neg + rng.gauss(0, D.spread)), 1, 20);
+  const id = newPersonId(S);
+  return { id, name: `${nm.first} ${nm.last}`, nat, age: opts.age ?? rng.int(D.age[0], D.age[1]), role: DIRECTOR_ROLE, q: qFromAttrs(a), a, wage: 0, until: null, since: null, club: null, free: opts.free ?? game.date ?? null, coach: null, adapt: null, pl: nat === 'POL', lead: false, demoted: null, hist: [] };
+}
+
+/** Rok końca sezonu dla daty (lipiec-grudzień: następny rok). */
+const endYearOf = (date) => +date.slice(0, 4) + (+date.slice(5, 7) >= 7 ? 1 : 0);
+
+/** Dyrektor obejmuje stanowisko bez oferty (migracja, decyzja zarządu klubu AI 1 lipca). */
+function appointDirector(game, S, p, clubId, date, { years, why = 'zatrudnienie', since = date } = {}) {
+  S.dirPool = (S.dirPool ?? []).filter((id) => id !== p.id);
+  S.offers = S.offers.filter((o) => o.pid !== p.id); delete S.decide[p.id];
+  const wage = Math.max(K.wage.min, r100(expectedWage(p, date, { club: clubId, idle: false }) * payMul(clubId)));
+  if (p.club) closeHist(p, date, why);
+  Object.assign(p, { club: clubId, wage, until: `${endYearOf(date) + Math.max(0, (years ?? 1) - 1)}-06-30`, since, free: null, signed: since === date ? date : null, coach: null, lead: true, demoted: null, adapt: null });
+  p.pl = true;
+  S.dir[clubId] = p.id;
+  updatePay(game, clubId);
+  return p;
+}
+
+/** Negocjacje klubu przed dyrektorem (dawny atrybut game.clubNeg albo to samo leniwe losowanie co clubNegotiation). */
+function legacyNeg(game, clubId) {
+  const e = game.clubNeg?.[clubId];
+  if (e && typeof e.n === 'number') return e.n;
+  const y = seasonYear(game);
+  const n = negDraw(new Rng(`negInit:${game.seed}:${clubId}:${y}`), negMean(clubId));
+  game.clubNeg ??= {};
+  game.clubNeg[clubId] = { n, y, d: 1 }; // zapas (docs/negocjacje.md rozdz. 15)
+  return n;
+}
+
+/**
+ * Każdy klub z kadrą (Ekstraklasa do III ligi) ma dyrektora sportowego: migracja starego zapisu, nowa gra, awans
+ * z IV ligi. Negocjacje = dawny atrybut klubu (rozkład bez zmian), umowa 1-3 lata, pensja ze wzoru sztabu. Klub
+ * z planem finansów już po migracji sztabu dostaje pensję dyrektora także w budżecie (pierwszy dzień neutralny).
+ * Lista wolnych dyrektorów (12-16 osób) przy pierwszym wywołaniu. Wakat po odejściu dyrektora zostaje wakatem.
+ */
+export function ensureDirectors(game, date = game.date ?? '2026-07-01') {
+  const S = game?.staff;
+  if (!S || !game.world?.clubs) return;
+  S.dir ??= {}; S.dirPool ??= []; S.dirInit ??= {};
+  for (const id of Object.keys(game.world.clubs)) {
+    if (S.dirInit[id] || !clubById(id) || (clubById(id).tier ?? 5) > 4) continue;
+    S.dirInit[id] = true;
+    if (directorOf(game, id)) continue;
+    const rng = new Rng(`dyrektor-start:${game.seed}:${id}`);
+    const p = makeDirector(game, S, `start:${id}`, { neg: legacyNeg(game, id), nat: 'POL' });
+    S.people[p.id] = p;
+    appointDirector(game, S, p, id, date, { years: rng.int(1, 3), since: addDays(date, -365) });
+    const plan = game.finance?.clubs?.[id]?.plan;
+    if (plan?.staffOn) plan.staffBase = Math.round((plan.staffBase ?? 0) + p.wage * 12); // budżet sztabu z pensją dyrektora
+  }
+  if (!S.dirV) {
+    S.dirV = 1;
+    for (let i = 0; S.dirPool.length < K.director.pool.size && i < 40; i++) addDirectorToPool(game, S, `start:${i}`, date);
+  }
+}
+
+/** Edytor i datapack: klub z wakatem dostaje nowego dyrektora (atrybuty nadpisze plik). Zwraca osobę albo null. */
+export function ensureEditorDirector(game, clubId) {
+  const S = game?.staff;
+  if (!S || !game.world?.clubs?.[clubId]) return null;
+  ensureDirectors(game);
+  const cur = directorOf(game, clubId);
+  if (cur) return cur;
+  const p = makeDirector(game, S, `edytor:${clubId}:${game.date}`, { neg: Math.round(negMean(clubId)), nat: 'POL' });
+  S.people[p.id] = p;
+  return appointDirector(game, S, p, clubId, game.date ?? '2026-07-01', { years: 2 });
+}
+
+/** Nowy wolny dyrektor: poziom z udziału lig (Negocjacje wokół średniej ligi), wolny od 0-150 dni. */
+function addDirectorToPool(game, S, key, date) {
+  const rng = new Rng(`dyrektor-pula:${game.seed}:${key}`);
+  const r = rng.next(); let acc = 0; let tier = 4;
+  for (const [share, t] of K.director.pool.tiers) { acc += share; if (r < acc) { tier = t; break; } }
+  const p = makeDirector(game, S, `pula:${key}`, { neg: negDraw(rng, NEG.mean[tier]), free: addDays(date, -rng.int(0, 150)) });
+  S.people[p.id] = p; S.dirPool.push(p.id);
+  return p;
+}
+
+/** 1 czerwca i 1 stycznia: ok. 25 % wolnych dyrektorów od 60+ dni odchodzi, lista wraca do 12-16 osób. */
+export function refreshDirectorPool(game, date) {
+  const S = game.staff; const P = K.director.pool;
+  S.dirPool ??= [];
+  const keep = [];
+  for (const id of S.dirPool) {
+    const p = S.people[id];
+    if (!p || p.club) continue;
+    const idle = p.free ? daysBetween(p.free, date) : 999;
+    if (idle >= P.idleDays && !S.decide[id] && new Rng(`dyrektor-odswiez:${game.seed}:${date}:${id}`).chance(P.leave)) { delete S.people[id]; continue; }
+    keep.push(id);
+  }
+  S.dirPool = keep;
+  if (S.dirPool.length > P.max) {
+    const order = S.dirPool.map((id) => S.people[id]).filter((p) => !S.decide[p.id]).sort((a, b) => (a.free ?? '').localeCompare(b.free ?? '') || b.age - a.age);
+    const drop = new Set(order.slice(0, S.dirPool.length - P.max).map((p) => p.id));
+    for (const id of drop) delete S.people[id];
+    S.dirPool = S.dirPool.filter((id) => !drop.has(id));
+  }
+  for (let i = 0; S.dirPool.length < P.size && i < 40; i++) addDirectorToPool(game, S, `${date}:${i}`, date);
+  S.last.dirRefresh = date;
+}
+
+/**
+ * Kandydat na dyrektora klubu AI: Negocjacje z losowania wokół średniej ligi (to samo ziarno co dawna „zmiana
+ * dyrektora”), wolny dyrektor z listy, gdy jego Negocjacje różnią się o najwyżej 1, inaczej nowa osoba.
+ */
+function pickDirector(game, S, clubId, rng, date) {
+  const n = negDraw(rng, negMean(clubId));
+  let best = null; let gap = Infinity;
+  for (const id of S.dirPool ?? []) {
+    const p = S.people[id];
+    if (!p || p.club || S.decide[id] || p.age + 1 >= K.pool.noRenewAge) continue;
+    const g = Math.abs((p.a?.NEG ?? p.q) - n);
+    if (g <= K.director.match && (g < gap || (g === gap && p.id < best.id))) { best = p; gap = g; }
+  }
+  if (best) return best;
+  const p = makeDirector(game, S, `nowy:${clubId}:${date}`, { neg: n });
+  S.people[p.id] = p;
+  return p;
+}
+
+/** Klub AI zwalnia dyrektora (odprawa) albo dyrektor odchodzi po umowie; osoba trafia na listę wolnych dyrektorów. */
+function dropDirector(game, S, clubId, date, { pay = true, why = 'zmiana dyrektora' } = {}) {
+  const p = directorOf(game, clubId);
+  if (!p) return;
+  const cost = pay ? severanceOf(p, date) : 0;
+  if (cost && game.finance?.clubs?.[clubId]) book(game.finance, clubId, date, 'out', 'release', cost, `Odprawa dla dyrektora sportowego (${p.name})`);
+  toPool(game, p, date, why);
+  updatePay(game, clubId);
+}
+
+/** Zwolnienia trenerów klubów AI w sezonie (wpisy game.coachLog od from do to, bez odejść i zastępstw). */
+function firedCoachClubs(game, from, to) {
+  const out = new Set();
+  for (const e of game.coachLog ?? []) if (e.date >= from && e.date < to && ['wyniki', 'kibice', 'po sezonie'].includes(e.why)) out.add(e.club);
+  return out;
+}
+
+/**
+ * 1 lipca (rolloverSeason przez negSeason, po zmianie lig): zmiany dyrektorów w klubach AI. Szanse jak dawniej
+ * (Ekstraklasa 12 %, 1 Liga 10 %, 2 Liga 8 %, III liga 7 %, po zwolnieniu trenera albo spadku 25 %, najwyżej 3 na ligę):
+ * zwolniony (odprawa) trafia na listę wolnych, klub bierze wolnego dyrektora albo nowego. Umowa kończąca się 30 czerwca:
+ * przedłużenie (65+: nowy dyrektor). Zarząd nie zwalnia dyrektora klubu gracza. Wiadomość w Mediach (tylko liga gracza).
+ * Zapas: game.clubNeg[klub] = { n (Negocjacje dyrektora), y, d (numer dyrektora) }.
+ */
+export function directorSeason(game, year, { relegated = new Set(), date = `${year}-07-01` } = {}) {
+  const S = game.staff;
+  if (!S) return [];
+  ensureDirectors(game, date);
+  S.dirYear ??= {};
+  const fired = firedCoachClubs(game, `${year - 1}-07-01`, date);
+  const ids = CLUBS_PL.filter((c) => game.world?.clubs?.[c.id] && c.tier <= 4).map((c) => c.id);
+  const changes = new Map();
+  const msgs = [];
+  const end = `${year}-06-30`;
+  const order = new Rng(`negSeason:${game.seed}:${year}`).shuffle(ids);
+  for (const id of order) {
+    if ((S.dirYear[id] ?? 0) >= year) continue;
+    S.dirYear[id] = year;
+    const t = tierOf(id);
+    const league = `${t}:${t === 4 ? clubById(id)?.group ?? '' : ''}`;
+    const rng = new Rng(`negYr:${game.seed}:${id}:${year}`);
+    const p = fired.has(id) || relegated.has(id) ? NEG.shock : NEG.director[t];
+    const cur = directorOf(game, id);
+    game.clubNeg ??= {};
+    const neg0 = game.clubNeg[id] ?? { n: cur?.a?.NEG ?? K.vacantQ.dyrektor, y: year, d: 1 };
+    const change = rng.chance(p) && (changes.get(league) ?? 0) < NEG.maxChanges;
+    const expiring = !!cur?.until && cur.until <= end;
+    let fresh = null;
+    if (!cur || change || (expiring && cur.age + 1 >= K.pool.noRenewAge)) {
+      if (change) changes.set(league, (changes.get(league) ?? 0) + 1);
+      if (cur) dropDirector(game, S, id, date, { pay: !expiring, why: expiring ? 'koniec umowy' : 'zmiana dyrektora' });
+      fresh = pickDirector(game, S, id, new Rng(`negDir:${game.seed}:${id}:${year}`), date);
+      appointDirector(game, S, fresh, id, date, { years: t === 1 ? 2 : rng.int(1, 2) });
+    } else if (expiring) {
+      cur.wage = Math.max(K.wage.min, r100(expectedWage(cur, date, { club: id, idle: false }) * payMul(id)));
+      cur.until = `${year + (t === 1 ? 2 : rng.int(1, 2))}-06-30`;
+      updatePay(game, id);
+    }
+    const now = directorOf(game, id);
+    game.clubNeg[id] = { n: now?.a?.NEG ?? K.vacantQ.dyrektor, y: year, d: (neg0.d ?? 1) + (fresh ? 1 : 0) };
+    if (fresh && id === game.clubId) msgs.push(ownerLetter(game, date, `dyrektor-zarzad:${id}:${year}`, `Zarząd zmienia dyrektora sportowego: ${fresh.name}`,
+      `zarząd ${cur && !expiring ? `rozstał się z dyrektorem sportowym ${cur.name}` : cur ? `nie przedłużył umowy z dyrektorem sportowym ${cur.name}` : 'obsadził stanowisko dyrektora sportowego'}. Nowym dyrektorem sportowym jest ${fresh.name} (umowa do ${fmtDate(fresh.until)}). Atrybuty: Trening, Sztab.`));
+    else if (fresh) {
+      const name = clubById(id)?.name ?? id;
+      msgs.push(createMessage({ date, key: `dyrektor:${id}:${year}`, category: 'media', from: 'Media', priority: 'info',
+        subject: `${name}: nowy dyrektor sportowy`,
+        body: `${name} ma nowego dyrektora sportowego: ${fresh.name}. To on poprowadzi rozmowy z zawodnikami w letnim oknie transferowym.` }));
+    }
+  }
+  // Lista wolnych dyrektorów najwyżej 16: po zmianach odchodzą najdłużej wolni (zwolnieni dziś zostają)
+  const P = K.director.pool;
+  if (S.dirPool.length > P.max) {
+    const order = S.dirPool.map((id) => S.people[id]).filter((x) => x && !S.decide[x.id] && x.free !== date).sort((a, b) => (a.free ?? '').localeCompare(b.free ?? '') || b.age - a.age);
+    const drop = new Set(order.slice(0, S.dirPool.length - P.max).map((x) => x.id));
+    for (const id of drop) delete S.people[id];
+    S.dirPool = S.dirPool.filter((id) => !drop.has(id));
+  }
+  return msgs;
+}
+
+/**
+ * Poniedziałek: klub AI bez dyrektora (dyrektor przeszedł do innego klubu) składa ofertę wolnemu dyrektorowi
+ * (te same zasady co gracz: oferta wiąże, decyzja po 2-3 dniach). Brak kandydata: nowa osoba na liście wolnych.
+ */
+function aiDirectorWeek(game, date) {
+  const S = game.staff;
+  const out = [];
+  for (const id of Object.keys(S.dirInit ?? {})) {
+    if (!game.world.clubs[id] || directorOf(game, id)) continue;
+    if (id === game.clubId) { // klub gracza: zarząd sam wybiera dyrektora z listy wolnych
+      const r = ownerReplaceDirector(game, id, date);
+      if (r.fresh) out.push(ownerLetter(game, date, `dyrektor-zarzad:${id}:${date}`, `Nowy dyrektor sportowy: ${r.fresh.name}`, `zarząd zatrudnił nowego dyrektora sportowego: ${r.fresh.name} (umowa do ${fmtDate(r.fresh.until)}). Atrybuty: Trening, Sztab.`));
+      continue;
+    }
+    if (S.offers.some((o) => o.club === id && o.role === DIRECTOR_ROLE)) continue;
+    const target = negMean(id);
+    const room = budgetRoomFor(game, id, DIRECTOR_ROLE);
+    let best = null; let bestScore = -Infinity;
+    for (const pid of S.dirPool ?? []) {
+      const p = S.people[pid];
+      if (!p || p.club || S.cool[`${id}:${pid}`] > date || S.offers.filter((o) => o.pid === pid).length >= K.offer.perPerson) continue;
+      const wage = aiWage(game, id, p, date);
+      if (wage > room) continue;
+      const seen = seenQuality(game, p, id).v;
+      const score = seen - K.ai.over * Math.max(0, seen - target);
+      if (score > bestScore) { bestScore = score; best = { p, wage }; }
+    }
+    if (!best) {
+      if (S.dirPool.length >= K.director.pool.max) continue; // lista pełna: klub czeka na kolejny tydzień
+      const p = makeDirector(game, S, `ai:${id}:${date}`, { neg: negDraw(new Rng(`dyrektor-ai:${game.seed}:${id}:${date}`), target), free: date });
+      S.people[p.id] = p; S.dirPool.push(p.id);
+      best = { p, wage: Math.min(aiWage(game, id, p, date), Math.max(K.wage.min, r100(room))) };
+    }
+    makeOffer(game, { pid: best.p.id, wage: best.wage, years: tierOf(id) === 1 ? 2 : 1, clubId: id, date });
+  }
+  return out;
+}
+
+/** List zarządu do gracza w sprawie dyrektora sportowego. */
+function ownerLetter(game, date, key, subject, body) {
+  return createMessage({ date, key, category: 'board', from: 'Zarząd klubu', priority: 'important', subject, body: `Panie Trenerze, ${body}\n\nZarząd klubu.` });
+}
+
+/**
+ * Zarząd (właściciel) zmienia dyrektora sportowego klubu: obecny odchodzi z odprawą (z kasy klubu), nowy z listy
+ * wolnych dyrektorów: najlepszy w zasięgu budżetu sztabu (z błędem oceny i losem), bez kandydata w budżecie nowa osoba
+ * wokół średniej ligi. candidate: dyrektor wskazany przez gracza (prośba do zarządu): zarząd zatrudnia go z szansą
+ * 75 %, gdy mieści się w budżecie. Zwraca { old, fresh, cost, candidate: 'ok' | 'budget' | 'refused' | 'gone' | null }.
+ */
+export function ownerReplaceDirector(game, clubId, date = game.date, { candidate = null, why = 'decyzja zarządu' } = {}) {
+  const S = game.staff;
+  ensureDirectors(game, date);
+  const cur = directorOf(game, clubId);
+  const oldWage = cur?.wage ?? 0;
+  const cost = cur ? severanceOf(cur, date) : 0;
+  if (cur) {
+    if (cost && game.finance?.clubs?.[clubId]) book(game.finance, clubId, date, 'out', 'release', cost, `Odprawa dla dyrektora sportowego (${cur.name})`);
+    seasonStats(S, game).fires++;
+    toPool(game, cur, date, why);
+  }
+  const room = budgetRoomFor(game, clubId, DIRECTOR_ROLE);
+  const wageFor = (p) => Math.max(K.wage.min, r100(expectedWage(p, date, { club: clubId, idle: false }) * payMul(clubId)));
+  const rng = new Rng(`dyrektor-zarzad:${game.seed}:${clubId}:${date}`);
+  const free = (S.dirPool ?? []).map((id) => S.people[id]).filter((p) => p && !p.club && p !== cur && !S.decide[p.id] && p.age + 1 < K.pool.noRenewAge);
+  let fresh = null; let cand = null;
+  if (candidate) {
+    const c = free.find((p) => p.id === candidate);
+    cand = !c ? 'gone' : wageFor(c) > Math.max(room, oldWage) ? 'budget' : rng.chance(0.75) ? 'ok' : 'refused';
+    if (cand === 'ok') fresh = c;
+  }
+  if (!fresh) {
+    let best = -Infinity;
+    for (const p of free) {
+      if (wageFor(p) > Math.max(room, oldWage)) continue;
+      const s = seenQuality(game, p, clubId).v + rng.gauss(0, 1.5);
+      if (s > best) { best = s; fresh = p; }
+    }
+  }
+  if (!fresh) { fresh = makeDirector(game, S, `zarzad:${clubId}:${date}`, { neg: negDraw(rng, negMean(clubId)) }); S.people[fresh.id] = fresh; }
+  appointDirector(game, S, fresh, clubId, date, { years: tierOf(clubId) === 1 ? 2 : rng.int(1, 2) });
+  seasonStats(S, game).hires++;
+  return { old: cur, fresh, cost, candidate: cand };
+}
+
+/** List od dyrektora sportowego klubu gracza (raz na klub): kim jest i w czym jest mocny. */
+function directorIntro(game, date) {
+  const S = game.staff;
+  const p = directorOf(game, game.clubId);
+  if (!p || S.dirIntro === game.clubId) return [];
+  S.dirIntro = game.clubId;
+  const names = { NEG: 'negocjacjach', RYN: 'znajomości rynku', SIE: 'sieci kontaktów', KAD: 'zarządzaniu kadrą i płacami' };
+  const best = Object.entries(p.a ?? {}).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? 'RYN';
+  return [createMessage({
+    date, key: `dyrektor-intro:${game.clubId}:${p.id}`, category: 'staff', from: `${p.name}, dyrektor sportowy`, priority: 'info',
+    subject: `Dyrektor sportowy: ${p.name}`,
+    body: `Dzień dobry, trenerze. Jestem dyrektorem sportowym klubu (umowa do ${fmtDate(p.until)}). Rozmowy z zawodnikami prowadzi pan sam, a ja podpowiem, przy jakiej pensji zawodnik prawdopodobnie się zgodzi, poszukam klubów dla wypożyczanych i pomogę w sporach z trenerem rezerw. Najmocniejszy jestem w ${names[best]}.\n\nSzczegóły: Trening, Sztab.`,
+  })];
 }
 
 // ------------------------------------------------------------ Limity i budżet
@@ -522,7 +887,7 @@ function limitInfo(game, clubId) {
   const S = game.staff;
   const limit = S?.limit?.[clubId] ?? computeLimit(game, clubId);
   const ppl = rosterOf(game, clubId);
-  const pend = S ? pendingOf(S, clubId) : [];
+  const pend = S ? pendingOf(S, clubId).filter((o) => o.role !== DIRECTOR_ROLE) : []; // dyrektor poza limitem osób
   const roles = {};
   for (const role of STAFF_ROLE_IDS) {
     const pp = pend.filter((o) => o.role === role).length;
@@ -534,7 +899,7 @@ function limitInfo(game, clubId) {
 /** Wolne miejsce w budżecie na ofertę w roli: wakat w roli rdzenia pozwala przekroczyć budżet o 20 % (gracz i AI). */
 export function budgetRoomFor(game, clubId, role) {
   const B = staffBudget(game, clubId);
-  const core = CORE.includes(role) && !rosterOf(game, clubId).some((p) => p.role === role);
+  const core = role === DIRECTOR_ROLE ? !directorOf(game, clubId) : CORE.includes(role) && !rosterOf(game, clubId).some((p) => p.role === role);
   return B.room + (core ? Math.round(B.budget * K.budget.coreVacancy) : 0);
 }
 
@@ -542,7 +907,7 @@ export function budgetRoomFor(game, clubId, role) {
 export function staffBudget(game, clubId = game.clubId) {
   const S = game.staff;
   const c = game.finance?.clubs?.[clubId];
-  const pay = rosterOf(game, clubId).reduce((s, p) => s + (p.wage ?? 0), 0);
+  const pay = clubStaffPay(game, clubId);
   const base = c?.plan?.staffOn ? (c.plan.staffBase ?? pay * 12) : pay * 12;
   const o = ownerOf(game, clubId);
   const budget = Math.round(base / 12 * (K.budget.base + K.budget.wealth * ((o?.zasobnosc ?? 10) - 10)) / 100) * 100;
@@ -592,7 +957,7 @@ export function acceptThreshold(p, date) {
 export function offerUtility(game, p, offer, date, rng = null) {
   const U = K.util;
   const parts = {};
-  const w0 = expectedWage(p, date);
+  const w0 = expectedWage(p, date, { club: offer.club });
   parts.money = U.money * Math.log(Math.max(1, offer.wage) / w0);
   const club = clubById(offer.club);
   const rep = club ? clubReputation(club) : 30;
@@ -641,7 +1006,7 @@ export function offerHint(game, args = {}) {
   const aq = game.training?.staff?.[clubId]?.asystent?.q ?? 10;
   const prec = precOfQ(aq);
   const weak = prec === 'vague';
-  const w0 = expectedWage(p, date);
+  const w0 = expectedWage(p, date, { club: clubId });
   const wage = args.wage ?? w0;
   const lv = (key, reasons) => ({ level: key, ...HINT_LEVELS[key], reasons, weak });
   if (wage < K.offer.minShare * w0) return lv('odrzuci', ['pensja dużo poniżej jego oczekiwań']);
@@ -718,7 +1083,7 @@ export function makeOffer(game, args = {}) {
   const p = S.people[args.pid];
   if (!p) return res('none');
   const years = Math.round(args.years ?? 2);
-  const wage = r100(args.wage ?? expectedWage(p, date));
+  const wage = r100(args.wage ?? expectedWage(p, date, { club: clubId }));
   const why = offerBlocker(game, S, p, clubId, date, years, wage);
   if (why === 'low') seasonStats(S, game).rejected++;
   if (why) return res(why);
@@ -748,17 +1113,26 @@ export function makeOffer(game, args = {}) {
 /** Powód, dla którego klub nie może złożyć oferty (klucz STAFF_REASONS), albo null. Bez zmian w stanie gry. */
 function offerBlocker(game, S, p, clubId, date, years, wage) {
   if (!game.world.clubs[clubId] || !clubById(clubId)) return 'club';
+  if (isDirector(p) && clubId === game.clubId) return 'dirOwner'; // dyrektora klubu gracza wybiera zarząd
   if (p.club === clubId) return 'own';
   if (p.signed && daysBetween(p.signed, date) < K.offer.lockDays) return 'locked';
   if (p.club) { const b = poachBlocker(game, S, clubId, p, date); if (b) return b; }
   if (!(years >= 1 && years <= 3) && !(years === 0 && +date.slice(5, 7) < 7)) return 'years';
-  if (wage < K.offer.minShare * expectedWage(p, date)) return 'low';
+  if (wage < K.offer.minShare * expectedWage(p, date, { club: clubId })) return 'low';
   const mine = S.offers.filter((o) => o.pid === p.id);
   if (mine.some((o) => o.club === clubId)) return 'dup';
   if (mine.length >= K.offer.perPerson) return 'many';
   const user = clubId === game.clubId;
+  if (isDirector(p)) {
+    // Dyrektor sportowy: osobny slot poza limitem osób; nowy zastępuje obecnego (odprawa przy zatrudnieniu)
+    if (pendingOf(S, clubId).some((o) => o.role === DIRECTOR_ROLE)) return 'dirPending';
+    const cool = S.cool[`${clubId}:${p.id}`];
+    if (cool && cool > date) return 'cool';
+    if (wage - (directorOf(game, clubId)?.wage ?? 0) > budgetRoomFor(game, clubId, p.role)) return 'budget';
+    return null;
+  }
   const maxPend = user ? K.offer.userMax : ([6, 7, 12, 1].includes(+date.slice(5, 7)) ? K.offer.aiMaxWindow : K.offer.aiMax);
-  if (pendingOf(S, clubId).length >= maxPend) return 'pending';
+  if (pendingOf(S, clubId).filter((o) => o.role !== DIRECTOR_ROLE).length >= maxPend) return 'pending';
   const L = limitInfo(game, clubId);
   const R = L.roles[p.role];
   if (!R.max) return 'role';
@@ -779,7 +1153,7 @@ export function checkOffer(game, args = {}) {
   const clubId = args.clubId ?? game.clubId;
   const date = args.date ?? game.date;
   const p = S?.people?.[args.pid];
-  const reason = !p ? 'none' : offerBlocker(game, S, p, clubId, date, Math.round(args.years ?? 2), r100(args.wage ?? expectedWage(p, date))) ?? 'ok';
+  const reason = !p ? 'none' : offerBlocker(game, S, p, clubId, date, Math.round(args.years ?? 2), r100(args.wage ?? expectedWage(p, date, { club: clubId }))) ?? 'ok';
   return { ok: reason === 'ok', reason, text: STAFF_REASONS[reason] ?? reason };
 }
 
@@ -822,6 +1196,25 @@ function joinClub(game, p, clubId, { wage, until, date, why = 'zatrudnienie', co
   const S = game.staff; const st = seasonStats(S, game);
   if (p.club) closeHist(p, date, why);
   S.pool = S.pool.filter((id) => id !== p.id);
+  if (isDirector(p)) {
+    // Dyrektor sportowy: nowy zastępuje obecnego (odprawa jak przy zwolnieniu, poprzedni na listę wolnych)
+    S.dirPool = (S.dirPool ?? []).filter((id) => id !== p.id);
+    const old = directorOf(game, clubId);
+    if (old && old !== p) {
+      const cost = severanceOf(old, date);
+      if (game.finance?.clubs?.[clubId] && cost) book(game.finance, clubId, date, 'out', 'release', cost, `Odprawa dla dyrektora sportowego (${old.name})`);
+      st.fires++;
+      toPool(game, old, date, 'zmiana dyrektora');
+    }
+    Object.assign(p, { club: clubId, wage, until, since: date, free: null, signed: date, coach: null, lead: true, demoted: null });
+    const pen = p.pl ? 0 : adaptPenalty(p.nat);
+    p.adapt = pen ? { to: addDays(date, K.adapt.days), pen } : null;
+    p.pl = true;
+    (S.dir ??= {})[clubId] = p.id;
+    st.hires++;
+    updatePay(game, clubId);
+    return;
+  }
   // Obietnica roli lidera: dotychczasowy lider słabszy od nowej osoby zostaje pomocnikiem (niezadowolony)
   if (lead) {
     for (const x of rosterOf(game, clubId)) {
@@ -848,6 +1241,8 @@ export function fireStaff(game, pid, { date = game.date, clubId = game.clubId, w
   const p = S?.people?.[pid];
   if (!p) return { ok: false, reason: 'none', text: STAFF_REASONS.none, cost: 0 };
   if (p.club !== clubId) return { ok: false, reason: 'notMine', text: STAFF_REASONS.notMine, cost: 0 };
+  // Dyrektor sportowy klubu gracza: decyduje zarząd (prośba w Klub, Zarząd), trener go nie zwalnia
+  if (isDirector(p) && clubId === game.clubId) return { ok: false, reason: 'dirOwner', text: STAFF_REASONS.dirOwner, cost: 0 };
   const cost = severanceOf(p, date);
   if (game.finance?.clubs?.[clubId] && cost) book(game.finance, clubId, date, 'out', 'release', cost, `Odprawa dla członka sztabu (${p.name})`);
   seasonStats(S, game).fires++;
@@ -873,11 +1268,12 @@ export function renewStaff(game, args = {}) {
   const res = (reason, text = STAFF_REASONS[reason]) => ({ ok: reason === 'ok', reason, text });
   if (!p) return res('none');
   if (p.club !== clubId) return res('notMine');
+  if (isDirector(p) && clubId === game.clubId) return res('dirOwner'); // umowę dyrektora przedłuża zarząd (1 lipca)
   if (!canRenew(p, date)) return res('early');
   const cool = S.cool[`${clubId}:${p.id}:renew`];
   if (cool && cool > date) return res('cool');
   const years = clamp(Math.round(args.years ?? 1), 1, 3);
-  const wage = r100(args.wage ?? expectedWage(p, date));
+  const wage = r100(args.wage ?? expectedWage(p, date, { club: clubId }));
   if (wage - p.wage > staffBudget(game, clubId).room) return res('budget');
   if (p.age >= K.pool.noRenewAge) return res('refused', `${p.name} kończy pracę w zawodzie po sezonie.`);
   const rng = new Rng(`sztab-przedluz:${game.seed}:${p.id}:${date}`);
@@ -936,7 +1332,7 @@ export function decideDay(game, date) {
         if (game.finance?.clubs?.[o.club]) book(game.finance, o.club, date, 'out', 'staffComp', money, label);
         if (game.finance?.clubs?.[from]) book(game.finance, from, date, 'in', 'staffComp', money, label);
         st.poached[kind]++; if (broke) st.broke++;
-        S.clubs[from] = (S.clubs[from] ?? []).filter((id) => id !== p.id);
+        detach(S, p, from);
         joinClub(game, p, o.club, { wage: o.wage, until: o.until, date, why, lead: o.lead });
         syncStaff(game, from, date); updatePay(game, from);
         moved = true;
@@ -958,7 +1354,7 @@ export function decideDay(game, date) {
       const o = best.o;
       joinClub(game, p, o.club, { wage: o.wage, until: o.until, date, lead: o.lead });
       moved = true;
-      if (o.club === game.clubId) messages.push(msg(date, `sztab-decyzja:${pid}:${date}`, 'important', `${p.name} przyjmuje ofertę`, `${p.name} przyjmuje ofertę: ${lower(roleName(p.role))} (${o.lead ? 'lider w roli' : 'pomocnik'}) do ${fmtDate(o.until)}, ${fmtZlM(o.wage)} miesięcznie.${p.adapt ? ' Przez pierwsze 3 miesiące będzie się aklimatyzował i pracował nieco słabiej.' : ''}`));
+      if (o.club === game.clubId) messages.push(msg(date, `sztab-decyzja:${pid}:${date}`, 'important', `${p.name} przyjmuje ofertę`, `${p.name} przyjmuje ofertę: ${lower(roleName(p.role))}${isDirector(p) ? '' :` (${o.lead ? 'lider w roli' : 'pomocnik'})`} do ${fmtDate(o.until)}, ${fmtZlM(o.wage)} miesięcznie.${p.adapt ? ' Przez pierwsze 3 miesiące będzie się aklimatyzował i pracował nieco słabiej.' : ''}`));
     }
     if (moved) {
       if (userOffer && best.o.club !== game.clubId) messages.push(msg(date, `sztab-decyzja:${pid}:${date}`, 'info', `${p.name} wybrał inny klub`, `${p.name} wybrał ofertę klubu ${nameOf(best.o.club)}.`));
@@ -994,7 +1390,7 @@ function aiTarget(game, clubId) {
 
 /** Pensja oferty klubu AI: oczekiwania, płacowość i zasobność właściciela. */
 function aiWage(game, clubId, p, date) {
-  const w0 = expectedWage(p, date);
+  const w0 = expectedWage(p, date, { club: clubId });
   const pay = Number(payLevel(clubById(clubId) ?? clubId)) || 1;
   const z = ownerOf(game, clubId)?.zasobnosc ?? 10;
   return r100(clamp(w0 * (0.9 + 0.1 * pay) * (1 + 0.01 * (z - 10)), 0.85 * w0, 1.3 * w0));
@@ -1007,7 +1403,7 @@ function buildIndex(game, date) {
   const nOff = {};
   for (const o of S.offers) nOff[o.pid] = (nOff[o.pid] ?? 0) + 1;
   for (const p of Object.values(S.people)) {
-    if ((nOff[p.id] ?? 0) >= K.offer.perPerson) continue;
+    if (isDirector(p) || (nOff[p.id] ?? 0) >= K.offer.perPerson) continue; // dyrektorzy: aiDirectorWeek
     if (p.signed && daysBetween(p.signed, date) < K.offer.lockDays) continue;
     (p.club ? employed : free)[p.role] ??= [];
     (p.club ? employed : free)[p.role].push(p);
@@ -1293,8 +1689,8 @@ function adaptationDay(game, date) {
 /** 1 maja: kończące się kontrakty sztabu gracza (akcje w poczcie, nie zatrzymują dni). */
 function expiringNotice(game, date) {
   const end = `${date.slice(0, 4)}-06-30`;
-  return rosterOf(game, game.clubId).filter((p) => p.until === end).map((p) => {
-    const w = expectedWage(p, date);
+  return rosterOf(game, game.clubId).filter((p) => p.until === end).map((p) => { // dyrektor sportowy: umowę przedłuża zarząd
+    const w = expectedWage(p, date, { club: game.clubId });
     return createMessage({
       date, key: `sztab-koniec:${p.id}:${end}`, category: 'staff', from: 'Kierownik drużyny', priority: 'info', optional: true,
       subject: `Kończy się umowa: ${p.name}`,
@@ -1323,7 +1719,7 @@ export function listFreeStaff(game, filters = {}) {
   if (!S) return [];
   const date = game.date;
   const rows = [];
-  for (const id of S.pool) {
+  for (const id of [...S.pool, ...(S.dirPool ?? [])]) {
     const p = S.people[id];
     if (!p || p.club) continue;
     if (filters.role && p.role !== filters.role) continue;
@@ -1331,7 +1727,7 @@ export function listFreeStaff(game, filters = {}) {
     if (filters.foreign === false && isForeign(p)) continue;
     const q = seenQuality(game, p, game.clubId);
     if (filters.minQ != null && q.v < filters.minQ) continue;
-    const w = expectedWage(p, date);
+    const w = expectedWage(p, date, { club: game.clubId });
     if (filters.maxWage != null && w * 0.9 > filters.maxWage) continue;
     const offers = S.offers.filter((o) => o.pid === id);
     if (filters.noOffers && offers.length) continue;
@@ -1354,8 +1750,9 @@ export function listClubStaff(game, filters = {}) {
   if (!S) return [];
   const date = game.date;
   const rows = [];
-  for (const [clubId, ids] of Object.entries(S.clubs)) {
+  for (const [clubId, ids0] of Object.entries(S.clubs)) {
     if (clubId === game.clubId || !game.world.clubs[clubId]) continue;
+    const ids = S.dir?.[clubId] ? [...ids0, S.dir[clubId]] : ids0; // dyrektor sportowy klubu też do podebrania
     for (const id of ids) {
       const p = S.people[id];
       if (!p) continue;
@@ -1364,7 +1761,7 @@ export function listClubStaff(game, filters = {}) {
       if (filters.foreign === false && isForeign(p)) continue;
       const q = seenQuality(game, p, game.clubId);
       if (filters.minQ != null && q.v < filters.minQ) continue;
-      const w = expectedWage(p, date);
+      const w = expectedWage(p, date, { club: game.clubId });
       if (filters.maxWage != null && w * 0.9 > filters.maxWage) continue;
       const offers = S.offers.filter((o) => o.pid === id);
       if (filters.noOffers && offers.length) continue;
@@ -1393,6 +1790,10 @@ export function staffSummary(game, clubId = game.clubId) {
     const people = rosterOf(game, clubId).filter((p) => p.role === role).sort((a, b) => b.q - a.q).map((p) => ({ ...p, qNow: r1(personQ(p, game.date)), canRenew: canRenew(p, game.date), severance: severanceOf(p, game.date) }));
     roles[role] = { name: roleName(role), q: view[role]?.q ?? K.vacantQ[role], vacant: !people.length, max: L.roles[role].max, people };
   }
+  // Dyrektor sportowy: osobny slot (max 1, poza limitem osób); wakat: zarząd (jakość wakatu)
+  const d = directorOf(game, clubId);
+  const dp = d ? [{ ...d, qNow: r1(personQ(d, game.date)), canRenew: canRenew(d, game.date), severance: severanceOf(d, game.date) }] : [];
+  roles[DIRECTOR_ROLE] = { name: DIRECTOR_NAME, q: d ? d.q : K.vacantQ[DIRECTOR_ROLE], vacant: !d, max: 1, people: dp, outside: true };
   return { limit: L.limit, used: L.used, staff: L.staff, pending: L.pending, pay: B.pay, budget: B.budget, room: B.room, roles };
 }
 
@@ -1416,6 +1817,10 @@ export function staffMarketDay(game, date) {
   if (isMonday(date)) messages.push(...aiStaffWeek(game, date));
   if (date.endsWith('-06-01')) aiRenewals(game, date);
   if (date.endsWith('-05-01') && game.world.clubs[game.clubId]) messages.push(...expiringNotice(game, date));
+  // Dyrektorzy sportowi: lista wolnych (1 czerwca, 1 stycznia), wakaty w klubach AI (poniedziałek), list do gracza
+  if ((date.endsWith('-06-01') || date.endsWith('-01-01')) && S.last.dirRefresh !== date) refreshDirectorPool(game, date);
+  if (isMonday(date)) messages.push(...aiDirectorWeek(game, date));
+  if (game.clubId && game.world.clubs[game.clubId] && S.dirIntro !== game.clubId) messages.push(...directorIntro(game, date));
   if (S.outbox?.length) { messages.push(...S.outbox); S.outbox = []; }
   return messages;
 }

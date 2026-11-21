@@ -163,42 +163,64 @@ test('Atrybut Negocjacje: rozkład wg ligi (średnia, rozrzut, 1-20) i determini
   assert.equal(a.clubNeg.lech.n, clubNegotiation(a, 'lech'));
 });
 
-test('Atrybut Negocjacje: 1 lipca powrót do średniej i zmiany dyrektorów (najwyżej 3 na ligę), list tylko z ligi gracza', () => {
+test('Atrybut Negocjacje: 1 lipca zmiany dyrektorów jako osób (najwyżej 3 na ligę), list tylko z ligi gracza', () => {
+  // Od v1.23 Beta zmiana dyrektora idzie przez osobę: zwolniony na listę wolnych, klub bierze wolnego albo nowego
+  // (staffMarket.js directorSeason, docs/dyrektor-sportowy.md). O dyrektorze klubu gracza też decyduje zarząd.
   const g = newGame('widzew', 83);
-  for (const c of CLUBS_PL) if (g.world.clubs[c.id]) clubNegotiation(g, c.id);
-  const before = Object.fromEntries(Object.entries(g.clubNeg).map(([k, v]) => [k, { ...v }]));
-  const twin = JSON.parse(JSON.stringify({ seed: g.seed, clubNeg: g.clubNeg, coachLog: g.coachLog ?? [] }));
+  const dirOf = (x, id) => x.staff.dir[id];
+  const before = Object.fromEntries(Object.keys(g.staff.dir).map((id) => [id, dirOf(g, id)]));
+  const twin = structuredClone(g);
   const msgs = negSeason(g, 2027, { relegated: new Set(['radomiak']) });
-  const twinGame = { ...twin, world: g.world, clubId: g.clubId };
-  negSeason(twinGame, 2027, { relegated: new Set(['radomiak']) });
-  assert.deepEqual(twinGame.clubNeg, g.clubNeg); // determinizm
-  let changed = 0; let dirs = 0; const perLeague = {};
-  for (const [id, e] of Object.entries(g.clubNeg)) {
+  negSeason(twin, 2027, { relegated: new Set(['radomiak']) });
+  assert.deepEqual(twin.staff.dir, g.staff.dir); // determinizm
+  assert.deepEqual(twin.clubNeg, g.clubNeg);
+  let dirs = 0; const perLeague = {};
+  for (const [id, pid] of Object.entries(before)) {
+    const now = dirOf(g, id);
+    assert.ok(now, `${id} ma dyrektora`);
+    const e = g.clubNeg[id];
+    assert.equal(e.n, g.staff.people[now].a.NEG, 'zapas clubNeg = Negocjacje dyrektora');
     assert.ok(e.n >= 1 && e.n <= 20 && e.y === 2027);
-    if (e.n !== before[id].n) changed++;
-    if (e.d > before[id].d) { dirs++; const k = `${clubById(id).tier}:${clubById(id).tier === 4 ? clubById(id).group : ''}`; perLeague[k] = (perLeague[k] ?? 0) + 1; }
+    if (now !== pid) {
+      dirs++;
+      const k = `${clubById(id).tier}:${clubById(id).tier === 4 ? clubById(id).group : ''}`; perLeague[k] = (perLeague[k] ?? 0) + 1;
+      const old = g.staff.people[pid];
+      // Zwolniony dyrektor na liście wolnych albo już w innym klubie (klub bierze wolnego dyrektora z listy)
+      assert.ok(old && old.hist[0]?.club === id && (g.staff.dirPool.includes(pid) || (old.club && old.club !== id && g.staff.dir[old.club] === pid)), 'zwolniony dyrektor');
+    }
   }
-  assert.ok(changed > 10, `zmiany ${changed}`);
+  // Klub gracza: zarząd zmienia dyrektora jak w klubach AI, z listem do gracza (kategoria Zarząd)
+  if (dirOf(g, 'widzew') !== before.widzew) assert.ok(msgs.some((m) => m.key === 'dyrektor-zarzad:widzew:2027' && m.category === 'board'));
   assert.ok(dirs >= 1 && Object.values(perLeague).every((x) => x <= NEG.maxChanges), JSON.stringify(perLeague));
   // Drugi raz w tym samym sezonie bez zmian
-  const snap = JSON.stringify(g.clubNeg);
+  const snap = JSON.stringify(g.staff.dir);
   negSeason(g, 2027);
-  assert.equal(JSON.stringify(g.clubNeg), snap);
+  assert.equal(JSON.stringify(g.staff.dir), snap);
   // Listy bez wartości atrybutu; filtr poczty przepuszcza tylko ligę gracza (Widzew: Ekstraklasa)
-  for (const m of msgs) {
+  for (const m of msgs.filter((x) => x.key.startsWith('dyrektor:'))) {
     assert.ok(!/\d/.test(m.body.replaceAll(clubById(m.key.split(":")[1]).name, "")), m.body); // bez liczb (wartości atrybutu)
     const id = m.key.split(':')[1];
     assert.equal(mailRelevant(g, m), clubById(id).tier === 1 && id !== g.clubId);
   }
 });
 
-test('Stary zapis bez game.clubNeg: leniwe losowanie, dzień gry działa', () => {
+test('Stary zapis bez dyrektorów: osoba z game.clubNeg (NEG = dawny atrybut), budżet sztabu neutralny, dzień gry działa', () => {
   const g = newGame('widzew', 84, '2026-07-14');
-  delete g.clubNeg;
+  // Zapis sprzed dyrektorów: bez osób i bez list, dawny atrybut w game.clubNeg
+  for (const pid of [...Object.values(g.staff.dir), ...g.staff.dirPool]) delete g.staff.people[pid];
+  for (const k of ['dir', 'dirPool', 'dirInit', 'dirV', 'dirIntro', 'dirYear']) delete g.staff[k];
+  g.clubNeg.rakow = { n: 17, y: 2026, d: 1 };
+  const c = g.finance.clubs.rakow;
+  c.staffPay = Object.values(g.staff.people).filter((p) => p.club === 'rakow').reduce((s, p) => s + p.wage, 0);
+  const base0 = c.plan.staffBase; const pay0 = c.staffPay;
   processDay(g);
-  const n = clubNegotiation(g, 'rakow');
-  assert.ok(n >= 1 && n <= 20);
-  assert.equal(g.clubNeg.rakow.n, n);
+  const pid = g.staff.dir.rakow;
+  const d = g.staff.people[pid];
+  assert.ok(d && d.role === 'dyrektor' && d.club === 'rakow');
+  assert.equal(d.a.NEG, 17);
+  assert.equal(clubNegotiation(g, 'rakow'), 17);
+  assert.equal(c.staffPay - pay0, d.wage);
+  assert.equal(c.plan.staffBase - base0, d.wage * 12, 'pensja dyrektora także w budżecie sztabu (pierwszy dzień neutralny)');
 });
 
 test('Dźwignie rozmów: N = 10 blisko dawnych stałych, lepszy negocjator otwiera wyżej i ma wyższy limit przebicia', () => {

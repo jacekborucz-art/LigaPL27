@@ -29,10 +29,10 @@ import { INJURY_TYPES } from '../engine/match/constants.js';
 import { GAME_VERSION } from '../config/version.js';
 import { coachOf, COACH_KEYS, COACH_ATTRS, COACH_STYLES } from './coaches.js';
 import { ownerOf, OWNER_KEYS } from './owners.js';
-import { rosterOf, syncStaff, STAFF_ROLE_IDS } from './staffMarket.js';
+import { rosterOf, syncStaff, STAFF_ROLE_IDS, directorOf, ensureEditorDirector } from './staffMarket.js';
 import { roleAttrKeys, ensurePersonAttrs, shiftPersonQ, qFromAttrs, migrateScoutAttrs } from '../training/staff.js';
 import { SCOUT_REGION } from './scoutRegions.js';
-import { ROLE_ATTRS } from '../training/config.js';
+import { ROLE_ATTRS, DIRECTOR_ROLE } from '../training/config.js';
 import { completeTransfer, editorRelease } from './transfers.js';
 import { computeNorm, REF_ATTRS } from './referees.js';
 import { genPlayer } from '../world/playerGen.js';
@@ -48,7 +48,9 @@ export const PACK_TYPE = 'ligapl27-datapack';
 //   4  v1.19 Beta: najwięksi rywale klubu (rivals: { id klubu: intensywność 0-3 }, 0 = bez rywalizacji); tylko nowe pole
 //   5  v1.20 Beta: skaut z 5 atrybutami (DOS, OCE, RYN, SIE, CHA zamiast POT, OCU, RYN) i regionami
 //      (reg: { region: 1-20 }, najwyżej 3, docs/skauting.md); plik v4 przelicza stare atrybuty skauta (MIGRATE[4])
-export const PACK_V = 5;
+//   6  v1.23 Beta: dyrektor sportowy w sekcji staff (rola 'dyrektor', najwyżej 1 osoba, atrybuty NEG, RYN, SIE, KAD,
+//      docs/dyrektor-sportowy.md); tylko nowa rola, plik v5 wczytuje się bez zmian
+export const PACK_V = 6;
 export const PACK_V_MIN = 1;
 export const SCOUT_REG_MAX = 3; // regionów na skauta w pliku
 /** Skaut w pliku v1-v4: stare atrybuty (POT, OCU, RYN) na 5 nowych; odchylenia sieci i charakteru z imienia osoby. */
@@ -73,6 +75,7 @@ const MIGRATE = {
   2: (d) => d, // wersja 3 tylko dodaje atrybuty sztabu (bez nich działa sama jakość)
   3: (d) => d, // wersja 4 tylko dodaje rywali klubu
   4: (d) => ({ ...d, clubs: migrateScoutClubs(d.clubs) }), // wersja 5: skaut z 5 atrybutami i regionami
+  5: (d) => d, // wersja 6 tylko dodaje dyrektora sportowego w sekcji staff
 };
 export const LIMITS = {
   name: 40, short: 5, stadium: 60,
@@ -436,7 +439,8 @@ export function checkStaff(src, { form = false } = {}) {
   const value = {}; const errors = {};
   if (!isObj(src)) return { value, errors: { staff: 'Sztab: zły format.' } };
   for (const [role, list] of Object.entries(src)) {
-    if (!STAFF_ROLE_IDS.includes(role) || !Array.isArray(list) || list.length > 12) { errors.staff = 'Sztab: zły wpis roli.'; continue; }
+    // Dyrektor sportowy (datapack v6): najwyżej jedna osoba
+    if (!(STAFF_ROLE_IDS.includes(role) || role === DIRECTOR_ROLE) || !Array.isArray(list) || list.length > (role === DIRECTOR_ROLE ? 1 : 12)) { errors.staff = 'Sztab: zły wpis roli.'; continue; }
     value[role] = list.map((o, i) => {
       const v = {};
       if (!isObj(o)) { errors[`${role}.${i}`] = 'Sztab: zły wpis osoby.'; return v; }
@@ -477,7 +481,8 @@ export function peopleValues(game, id) {
   const co = id === game.clubId ? null : coachOf(game, id);
   const ow = ownerOf(game, id);
   let staff = null;
-  for (const p of rosterOf(game, id)) ((staff ??= {})[p.role] ??= []).push({ name: p.name, age: p.age, q: p.q, ...(p.a ? { a: { ...p.a } } : {}), ...(p.role === 'skaut' && p.reg ? { reg: { ...p.reg } } : {}) });
+  const dir = directorOf(game, id); // dyrektor sportowy (datapack v6)
+  for (const p of [...rosterOf(game, id), ...(dir ? [dir] : [])]) ((staff ??= {})[p.role] ??= []).push({ name: p.name, age: p.age, q: p.q, ...(p.a ? { a: { ...p.a } } : {}), ...(p.role === 'skaut' && p.reg ? { reg: { ...p.reg } } : {}) });
   return {
     coach: co ? { name: co.name, age: co.age, style: co.style, a: { ...co.a } } : null,
     owner: ow ? { name: ow.name, ...Object.fromEntries(OWNER_KEYS.map((k) => [k, ow[k]])) } : null,
@@ -523,7 +528,8 @@ export function editStaff(game, id, v) {
   const roster = rosterOf(game, id);
   let n = 0;
   for (const [role, list] of Object.entries(v)) {
-    const ppl = roster.filter((p) => p.role === role);
+    // Dyrektor sportowy: klub z wakatem dostaje nową osobę z pliku (datapack v6)
+    const ppl = role === DIRECTOR_ROLE ? [list.length ? directorOf(game, id) ?? ensureEditorDirector(game, id) : null].filter(Boolean) : roster.filter((p) => p.role === role);
     list.forEach((o, i) => {
       const p = ppl[i];
       if (!p) return;

@@ -22,6 +22,7 @@ import { boardCaps, clubBoardData, feeIssues, checkUserFee } from './boardReques
 import { spellsOf, syncSpell } from '../season/history.js';
 import { completeTransfer, playerWillingness, askingPrice, notForSale, windowOf, fmtZl, breaksMinimum as breaksMinimumShared } from './transfers.js';
 import { fmtDate } from '../ui/dom.js';
+import { directorAttr, directorWho, sieStep } from './director.js'; // dyrektor sportowy: sieć kontaktów, podpis (docs/dyrektor-sportowy.md)
 
 export { isLoanedOut };
 
@@ -328,12 +329,14 @@ export function askLoanOffers(game, playerId, raw = {}) {
   const block = loanBlockers(game, p, null, terms);
   if (block) return { ok: false, text: block };
   const asks = (game.market.loanAsks ??= {});
-  if (asks[p.id]) return { ok: false, text: `Dyrektor sportowy już szuka klubu dla ${p.name}.` };
+  if (asks[p.id]) return { ok: false, text: `${directorWho(game)} już szuka klubu dla ${p.name}.` };
   const rng = new Rng(`wyp-oferty:${game.seed}:${p.id}:${weekOf(game.date)}`);
-  let due = addDays(game.date, rng.int(1, 3));
+  // Sieć kontaktów dyrektora: co 6 punktów od 10 dzień szybciej i jedna propozycja więcej (wakat: wolniej), director.js
+  const step = sieStep(directorAttr(game, game.clubId, 'SIE'));
+  let due = addDays(game.date, clamp(rng.int(1, 3) - step, 1, 4));
   if (due > w.to) due = w.to;
-  asks[p.id] = { terms, date: game.date, due };
-  return { ok: true, text: `Dyrektor sportowy szuka klubu dla ${p.name}. Propozycje przyjdą najpóźniej ${fmtDate(due)}.` };
+  asks[p.id] = { terms, date: game.date, due, step };
+  return { ok: true, text: `${directorWho(game)} szuka klubu dla ${p.name}. Propozycje przyjdą najpóźniej ${fmtDate(due)}.` };
 }
 export function cancelLoanAsk(game, playerId) {
   delete game.market.loanAsks?.[playerId];
@@ -806,7 +809,8 @@ function loansDay(game, date) {
     const p = game.world.players[pid];
     if (!p || p.clubId !== game.clubId || p.loan) continue;
     const terms = loanTerms(game, p, a.terms, date);
-    const props = windowOf(date) ? loanProposals(game, p, terms, date, new Rng(`wyp-oferty:${game.seed}:${pid}:${weekOf(a.date)}`), new Rng(`wyp-n:${game.seed}:${pid}:${weekOf(a.date)}`).int(1, 3)) : [];
+    const n = clamp(new Rng(`wyp-n:${game.seed}:${pid}:${weekOf(a.date)}`).int(1, 3) + (a.step ?? 0), 1, 5); // sieć kontaktów dyrektora
+    const props = windowOf(date) ? loanProposals(game, p, terms, date, new Rng(`wyp-oferty:${game.seed}:${pid}:${weekOf(a.date)}`), n) : [];
     if (!props.length) {
       out.push(msg(date, { key: `wyp-brak:${pid}:${date}`, subject: `Brak chętnych na wypożyczenie ${p.name}`, body: `Żaden klub nie zgłosił się po ${p.name} na tych warunkach. Spróbuj z niższą częścią pensji albo bez opcji i obowiązku wykupu.`, priority: 'important' }));
       continue;

@@ -113,6 +113,7 @@ Pole `q` (sama jakość, pliki v1 i v2) jest dozwolone, ale przy obecnym `a` gra
 | `kierownik` | `DOK` dokumenty i terminy, `ORG` organizacja klubu, `LOG` logistyka |
 | `fizjoterapeuta` | `LEC` leczenie urazów, `REH` rehabilitacja, `PRF` profilaktyka |
 | `skaut` | `DOS` doświadczenie, `OCE` ocena zawodnika, `RYN` wiedza o rynku, `SIE` sieć kontaktów, `CHA` ocena charakteru |
+| `dyrektor` | `NEG` negocjacje, `RYN` znajomość rynku, `SIE` sieć kontaktów, `KAD` zarządzanie kadrą i płacami (4 atrybuty, najwyżej 1 osoba, od wersji 6) |
 
 Skaut ma też regiony `reg`: `{ "region": poziom 1-20 }`, najwyżej 3, klucze: `balkany`, `srodkowa`, `skandynawia`,
 `iberia`, `zachodnia`, `wschodnia`, `afrykaZach`, `afrykaPln`, `amerykaPd`, `amerykaPln`, `azja`, `bliskiWschod`
@@ -122,7 +123,9 @@ Atrybut nieznany w danej roli (np. `REG` u asystenta) odrzuca cały plik. Wpływ
 motorycznego z wynikami w rozwoju młodych: `MTR` wyżej, `OBC` niżej, jeśli drużyna miała dużo urazów).
 Role: `asystent` (asystent trenera), `fizyczny` (trener przygotowania fizycznego), `bramkarze` (trener bramkarzy),
 `mlodziez` (trener młodzieży), `analityk` (analityk wideo i danych), `kierownik` (kierownik drużyny),
-`fizjoterapeuta`, `skaut`.
+`fizjoterapeuta`, `skaut`, `dyrektor` (dyrektor sportowy, jedna osoba, `docs/dyrektor-sportowy.md`).
+Dyrektor sportowy: Negocjacje z opinii o transferach klubu (dobre transfery, dobre kontrakty), Znajomość rynku z trafności
+zakupów, Sieć kontaktów z liczby i zasięgu transakcji, Zarządzanie kadrą z porządku w kadrze i płacach.
 Liczba osób w roli musi być taka sama jak w `baza.json` (najwyżej 12): gra podmienia i-tą osobę roli, nadmiar
 pomija, a brakujące osoby zostają wylosowane. Prawdziwy sztab ma więcej osób? Wybierz najważniejsze.
 Ma mniej? Pozostałe wpisy zostaw z `baza.json` bez zmian.
@@ -257,7 +260,7 @@ grać, i dodaj uwagę dla agenta 2.
 ### 4.4 Trener, właściciel, sztab
 
 Opisane w rozdziale 3.2. Style trenera: `O`, `S`, `P`. Role sztabu: `asystent`, `fizyczny`, `bramkarze`, `mlodziez`,
-`analityk`, `kierownik`, `fizjoterapeuta`, `skaut`.
+`analityk`, `kierownik`, `fizjoterapeuta`, `skaut`, `dyrektor` (od wersji 6).
 
 ### 4.5 Kontuzje (`injury.name`, zakres dni jak w grze)
 
@@ -372,7 +375,7 @@ Zbierz dla każdego klubu:
    pragmatyczny) z krótkim uzasadnieniem.
 4. Właściciela albo prezesa, który decyduje o klubie: kto to, jak zarządza (cierpliwość wobec trenerów, ambicje,
    zasobność, reakcje na media). Opis faktów, bez liczb.
-5. Sztab w rolach: asystent, fizyczny, bramkarze, mlodziez, analityk, kierownik, fizjoterapeuta, skaut.
+5. Sztab w rolach: asystent, fizyczny, bramkarze, mlodziez, analityk, kierownik, fizjoterapeuta, skaut, dyrektor.
    Imię i nazwisko i wiek, jeśli dostępne, oraz krótki opis mocnych i słabych stron w pracy (do atrybutów roli
    z rozdziału 3.2, np. fizjoterapeuta znany z szybkich powrotów po zerwanych więzadłach: rehabilitacja).
 6. Kadrę pierwszej drużyny: każdy zawodnik z pełną datą urodzenia, narodowością (reprezentacja), pozycją główną

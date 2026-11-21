@@ -437,9 +437,11 @@ Pomiar: `node tools/negocjacje-fair.mjs [próby na ziarno] [ziarna] [skala]`. Ws
 
 ### 15.1 Atrybut Negocjacje (1-20)
 
-- Udaje dyrektora sportowego klubu AI. Jedyny punkt odczytu: `clubNegotiation(game, clubId)`. Później zastąpi go
-  atrybut Negocjacje prawdziwego dyrektora sportowego w sztabie (co najmniej 4 atrybuty, docs/kolejka.md), bez
-  przerabiania rozmów. Atrybutu nie widać nigdzie w grze (UI, listy, raporty).
+- Od v1.23 Beta (Nov 21, 2026) to atrybut Negocjacje dyrektora sportowego klubu (osoba w sztabie, 4 atrybuty,
+  `docs/dyrektor-sportowy.md`); wakat: 5. Jedyny punkt odczytu bez zmian: `clubNegotiation(game, clubId)`.
+  Rozkład po migracji dokładnie dawny (NEG = `game.clubNeg[klub].n`). Poniższe losowanie i zmiany 1 lipca działają
+  dalej dla gry bez stanu sztabu (narzędzia, testy bez świata); w grze zmiany dyrektora idą przez osobę
+  (`directorSeason`, dawne szanse i limit 3 na ligę), a dawny dryf co sezon zastąpił rozwój osoby.
 - Zapis `game.clubNeg = { [klub]: { n, y (sezon), d (numer dyrektora) } }`. Stary zapis i nowa gra: leniwe losowanie
   przy pierwszym odczycie, ziarno `negInit:<seed>:<klub>:<sezon>`.
 - Start: rozkład normalny obcięty do 1-20 (odrzucanie), odchylenie 3, średnia wg ligi: Ekstraklasa 11,5; 1 Liga 10,5;
@@ -462,7 +464,8 @@ Pomiar: `node tools/negocjacje-fair.mjs [próby na ziarno] [ziarna] [skala]`. Ws
 | limit poprawki w ciemno (x żądanie) | 1,00 + 0,10 q² | 1,004 | 1,022 | 1,062 |
 
 - Dawne stałe (0,97 i +10 %) przy N = 10 zostają prawie bez zmian. Bez atrybutu (`neg = null`: klub gracza w rozmowach
-  automatycznych, opcje wypożyczeń, przedłużenia AI, sprzedaż przy limicie kadry) dawne stałe.
+  automatycznych, opcje wypożyczeń, sprzedaż przy limicie kadry) dawne stałe. Przedłużenia AI od v1.23 Beta z atrybutem
+  dyrektora, a `feeMul` (Zarządzanie kadrą dyrektora) mnoży prowizję i górną granicę premii za podpis.
 - Atrybut działa przy zakupach klubów AI (`aiBuy`) i ofertach klubów AI za zawodników gracza (`answerIncoming`).
 - Budżet pensji i progi zarządu (`budget.wage`, `total`, `maxYears`) zawsze twardym limitem; poprawka: podwyżka w drugiej
   rundzie też przechodzi przez `fit` (wcześniej mogła przekroczyć roczny koszt kontraktu).

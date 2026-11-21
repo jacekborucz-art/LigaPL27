@@ -29,6 +29,35 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 21, 2026, agent (worktree, gałąź do scalenia), dyrektor sportowy w sztabie (v1.23 Beta)
+Zrobione:
+- Dyrektor sportowy jako osoba w każdym klubie z kadrą (gracz i AI): rola `dyrektor`, osobny slot poza limitem
+  osób, pensja w budżecie sztabu, 4 atrybuty NEG, RYN, SIE, KAD (`ROLE_ATTRS.dyrektor`). Stan w `game.staff`
+  (`dir`, `dirPool`, `dirInit`, `dirYear`, `dirIntro`), wpływ atrybutów w nowym `src/career/director.js`.
+- Migracja: NEG = dawny `game.clubNeg[klub].n` (rozkład dokładnie dawny), `clubNegotiation` czyta dyrektora (wakat 5),
+  `staffBase` += pensja dyrektora (pierwszy dzień neutralny). `negSeason` woła `directorSeason` (zmiany przez osoby,
+  dawne szanse i limit 3 na ligę, zwolniony na listę wolnych), lista 12-16 wolnych dyrektorów.
+- Efekty: RYN błąd wyceny AI (`askingPrice`, `aiBuy`) i widełki pensji w rozmowach gracza (`hidden.minOwn`, pokrycie
+  ok. 90 %); SIE wypożyczenia gracza i kolejność AI w `marketWeek` (waga 0,025 po kalibracji); KAD spór z trenerem
+  rezerw i `feeMul` w `aiNegotiate` (zakupy, oferty, przedłużenia AI z NEG).
+- Decyzja właściciela w trakcie pracy: o dyrektorze klubu gracza decyduje zarząd. Gracz tylko prosi o zmianę
+  (nowa prośba `director` w `boardRequests.js`, `directorScore`, opcjonalny kandydat, list z powodem odmowy).
+  Karta w Trening, Sztab tylko do podglądu; rynek dyrektorów do podglądu; zarząd zmienia dyrektora 1 lipca jak AI
+  i sam obsadza wakat (list).
+- Listy „Dyrektor sportowy” podpisane imieniem dyrektora (wakat: Zarząd), `registerMailHook` w `gameLoop.js`.
+- Datapack v6 (rola `dyrektor` w `staff`), edytor, `tools/check-datapack.mjs`; `tools/negocjacje-fair.mjs` z tabelami
+  NEG, KAD, SIE, razem i RYN; `tools/transfery-kalibracja.mjs` pokazuje NEG dyrektorów wg ligi.
+- Testy: `tests/director.test.mjs` (12), poprawki w offerFactors, staffMarket, staffView, staffAttrs, reserves,
+  boardRequests, scoutOps. Dokumentacja: `docs/dyrektor-sportowy.md` (kalibracja w rozdz. 7).
+Decyzje i pułapki:
+- `src/career/staffMarket.js` ma końce linii CRLF (zachowane).
+- Cykl importów `clubNegotiation` <-> `staffMarket` (tylko wywołania w funkcjach); `negSeason` nie woła `ensureStaff`,
+  bo w czasie rollover `staffNewSeason` jeszcze nie przeszedł.
+- Widełki: obcięcie b do ±x z planu dawałoby prawie 100 % pokrycia, więc sd = x / 1,645 i obcięcie ±1,5x.
+Zostało / dalej (do decyzji właściciela):
+- NEG dyrektora gracza nic graczowi nie daje; błąd wyceny przy RYN 10 to 12,9 %; kluby AI nie podbierają dyrektorów;
+  progi prośby o zmianę dyrektora (S 10, kandydat 75 %) bez symulacji wielu sezonów.
+
 ## Nov 21, 2026, profil A (chmura), prośby o transfer w niższych ligach (v1.23 Beta)
 Zrobione:
 - Scalona pamięć prośby o transfer (`src/career/wishMemory.js`, 7c7eb19).

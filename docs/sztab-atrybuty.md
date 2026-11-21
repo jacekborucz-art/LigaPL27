@@ -42,6 +42,10 @@ Wdrożone Nov 19, 2026 (v1.19 Beta). Wcześniej osoba sztabu miała jedną jako�
 | | RYN wiedza o rynku | ocena zawodników z zagranicy (waga 0,3), przedział ceny i pensji, trafność chęci przyjścia w raporcie |
 | | SIE sieć kontaktów | liczba kandydatów, praca poza znanymi regionami (zastępuje część znajomości regionu) |
 | | CHA ocena charakteru | trafność oceny adaptacji kandydata w raporcie |
+| Dyrektor sportowy (4 atrybuty od v1.23 Beta, `docs/dyrektor-sportowy.md`) | NEG negocjacje | rozmowy klubów AI z zawodnikami (gracz negocjuje sam) |
+| | RYN znajomość rynku | kluby AI: błąd wyceny bez przesunięcia; gracz: widełki pensji w rozmowach |
+| | SIE sieć kontaktów | szukanie klubu na wypożyczenie, kolejność klubów AI na rynku |
+| | KAD zarządzanie kadrą i płacami | spór z trenerem rezerw, premie i prowizje w ofertach AI, przedłużenia AI |
 
 Bez zmian (ogólna jakość): asystent jako trener tymczasowy, liczba spraw zgłaszanych przez członka sztabu na liście
 „Do zrobienia”, wakaty (wakat ma wszystkie atrybuty równe jakości wakatu).

@@ -23,7 +23,7 @@ import { proficiency } from '../engine/positions.js';
 import { COACH_KEYS, COACH_ATTRS, COACH_STYLES } from '../career/coaches.js';
 import { OWNER_KEYS } from '../career/owners.js';
 import { STAFF_ROLE_ORDER } from '../career/staffMarket.js';
-import { STAFF_ROLES, ROLE_ATTRS } from '../training/config.js';
+import { STAFF_ROLES, ROLE_ATTRS, DIRECTOR_ROLE, DIRECTOR_NAME } from '../training/config.js';
 import { roleAttrKeys, qFromAttrs } from '../training/staff.js';
 import { crestHtml } from './crest.js';
 import { esc } from './dom.js';
@@ -265,12 +265,12 @@ function peopleForms(game, ed, id) {
   }
   if (cur.staff) {
     const { v, e } = sec('staff');
-    const rows = STAFF_ROLE_ORDER.filter((r) => v[r]?.length).map((role) => v[role].map((p, i) => {
+    const rows = [DIRECTOR_ROLE, ...STAFF_ROLE_ORDER].filter((r) => v[r]?.length).map((role) => v[role].map((p, i) => {
       const k = `ed-st-${role}-${i}`; const er = (f) => e[`${role}.${i}.${f}`];
       // Atrybuty roli (docs/sztab-atrybuty.md); jakość to ich średnia, liczona przez grę
       const keys = roleAttrKeys(role);
       const q = keys.length && p.a ? qFromAttrs(Object.fromEntries(keys.map((x) => [x, Number(String(p.a[x] ?? '').replace(',', '.')) || p.q || 10]))) : p.q;
-      return `<div class="ed-staff"><span class="ed-staff__role">${esc(STAFF_ROLES[role]?.name ?? role)} <small>jakość ${esc(q ?? '')}</small></span>
+      return `<div class="ed-staff"><span class="ed-staff__role">${esc(role === DIRECTOR_ROLE ? DIRECTOR_NAME : STAFF_ROLES[role]?.name ?? role)} <small>jakość ${esc(q ?? '')}</small></span>
         <label class="ed-staff__f ed-staff__name"><span>Imię i nazwisko</span>${textIn(`${k}-name`, p.name, { max: LIMITS.name, err: er('name') })}</label>
         <label class="ed-staff__f"><span>Wiek</span>${numIn(`${k}-age`, p.age, er('age'), PERSON_AGE)}</label>
         ${keys.map((x) => `<label class="ed-staff__f" title="${esc(ROLE_ATTRS[role][x].text)}"><span>${esc(ROLE_ATTRS[role][x].name)}</span>${numIn(`${k}-a-${x}`, p.a?.[x] ?? p.q, er(`a.${x}`))}</label>`).join('')}</div>`;

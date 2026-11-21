@@ -344,6 +344,7 @@ export function openNegotiation(opts) {
   let willScore;
   let target;
   let publicDemand;
+  let lev = 0; let levRival = 0; let levOwn = 0; // przedłużenie: siła przetargowa i jej część z oferty konkurencji
   if (kind === 'sign') {
     const from = fromClub ?? { prestige: 0, rep: clamp(rep - 5, 0, 100), tier: club.tier ?? 1 };
     // Wolny zawodnik długo bez klubu obniża żądanie (D_free, src/career/mindset.js): max(0,6 rynku, rynek x (1 - 0,45 D_free))
@@ -387,11 +388,12 @@ export function openNegotiation(opts) {
     // Siła przetargowa: forma, reputacja wobec klubu, minuty, oferta z innego klubu, końcówka kontraktu. [SZAC]
     const rating = ctx.avgRating ?? player.season?.rating ?? 6.7;
     const share = ctx.minutesShare ?? player.minutesShare ?? 0.6;
-    let lev = 0.25 * clamp((rating - 6.7) / 0.6, -1, 1.5)
+    lev = 0.25 * clamp((rating - 6.7) / 0.6, -1, 1.5)
       + 0.2 * clamp((rep - clubRep + 20) / 20, -1, 1.5)
       + 0.25 * clamp((share - 0.5) * 2, -1, 1)
       + (monthsLeft < 6 ? 0.2 : 0);
-    if (rival) lev += 0.25 * clamp((rival.rep - clubRep) / 15 + 0.5, 0, 1.5);
+    if (rival) { levRival = 0.25 * clamp((rival.rep - clubRep) / 15 + 0.5, 0, 1.5); lev += levRival; }
+    levOwn = clamp(lev - levRival, -0.5, 1.5); // bez oferty konkurencji
     lev = clamp(lev, -0.5, 1.5);
     const baseWage = Math.max(curWage, mWage * 0.9);
     publicDemand = roundTo(baseWage * (1.05 + 0.3 * Math.max(0, lev)), 100);
@@ -401,10 +403,12 @@ export function openNegotiation(opts) {
   // Wspólne mnożniki oczekiwań. [SZAC]
   target *= (1 + 0.015 * (t.greed - 10)) * prefs.wageMul * (1 + 0.06 * broken) * (1 + 0.002 * grudge);
   target *= 1 + rng.gauss(0, 0.04); // szum: ta sama oferta nie działa tak samo na dwóch podobnych zawodników
+  let targetOwn = kind === 'renew' && rival ? target * (1.05 + 0.3 * levOwn) / (1.05 + 0.3 * lev) : target; // bez oferty konkurencji
   if (kind === 'renew' || fromClub) {
     // Przy przedłużeniu i transferze rzadko kto schodzi z pensji; starsi godzą się na obniżkę. Wolny zawodnik bez progu. [SZAC]
     const floor = age >= 32 || mindset.key === 'spokojnaKoncowka' ? 0.8 : kind === 'renew' ? 0.97 : 0.95;
     target = Math.max(target, curWage * floor);
+    targetOwn = Math.max(targetOwn, curWage * floor);
   }
   let minF = 0.84 + 0.008 * (t.greed - 10)
     + (willScore < 0.45 ? 0.05 : willScore >= 0.7 ? -0.03 : 0)
@@ -412,6 +416,8 @@ export function openNegotiation(opts) {
     + (rival ? 0.04 : 0) + rng.gauss(0, 0.02);
   minF = clamp(minF, 0.72, 0.97);
   let min = target * minF;
+  // Minimum z własnego żądania zawodnika, bez ofert konkurencji: podstawa widełek dyrektora sportowego (director.js)
+  const minOwn = targetOwn * clamp(minF - (rival ? 0.04 : 0), 0.72, 0.97);
   if (rival) {
     const attract = clamp(1 + (rival.rep - clubRep) / 80, 0.75, 1.3); // lepszy klub konkurencji podnosi minimum [SZAC]
     min = Math.max(min, rival.wage * attract * 0.97);
@@ -437,7 +443,7 @@ export function openNegotiation(opts) {
     pRel: ctx.relegationRisk ?? 0.15, value: estimateValue(player),
     windowEnd: ctx.windowEnd || null, seasonEnd: ctx.seasonEnd || seasonEndOf(date),
     rival, publicDemand: Math.round(publicDemand),
-    hidden: { target: Math.round(target), min: Math.round(min), anchor: Math.round(anchor), maxRounds },
+    hidden: { target: Math.round(target), min: Math.round(min), minOwn: Math.round(minOwn), anchor: Math.round(anchor), maxRounds },
     st: {
       status: 'open', round: 0, mood: Math.round(mood * 10) / 10, ask: Math.round(anchor), offended: 0,
       prevWeq: null, lastCounter: null, ultimatum: null, claim: null, concBoost: 0,
@@ -832,13 +838,14 @@ export function applyPromiseCheck(player, clubId, dateIso, minutesShare) {
  * podwyżka w drugiej rundzie x (1,06 + 0,08q); bez atrybutu (null) dawne 0,97 i 1,10. Budżet zawsze twardym limitem.
  * Zwraca { result: 'signed'|'failed'|'refused', rounds, contract, outcome, demand (orientacyjne żądanie), reason? }.
  */
-export function aiNegotiate({ kind = 'sign', player, club, fromClub = null, date, rng, ctx = {}, budget = {}, neg = null }) {
+export function aiNegotiate({ kind = 'sign', player, club, fromClub = null, date, rng, ctx = {}, budget = {}, neg = null, feeMul = 1 }) {
   const r = openNegotiation({ kind, player, club, fromClub, date, rng, ctx, mode: 'ai' });
   if (!r.ok) return { result: 'refused', rounds: 0, reason: r.reason, contract: null, outcome: r.outcome ?? null };
   const s = r.session;
   const d = s.d;
   const maxWage = budget.wage ?? Infinity;
-  const maxSignOn = budget.signOn ?? (Number.isFinite(maxWage) ? maxWage * 10 : Infinity);
+  // feeMul: Zarządzanie kadrą i płacami dyrektora (director.js kadFeeMul): premia za podpis i prowizja agenta
+  const maxSignOn = (budget.signOn ?? (Number.isFinite(maxWage) ? maxWage * 10 : Infinity)) * feeMul;
   const age = player.age ?? 25;
   // neg: ukryty atrybut Negocjacje klubu AI (clubNegotiation.js); null = dawne stałe 0,97 i +10 %
   const lv = negLevers(neg);
@@ -857,7 +864,7 @@ export function aiNegotiate({ kind = 'sign', player, club, fromClub = null, date
     years: age <= 23 ? 4 : age <= 29 ? 3 : age <= 32 ? 2 : 1,
     role: d.roleExp,
     bonus: { goal: roundTo(wage * goalBonus, 100), app: roundTo(wage * 0.02, 50) },
-    agentFee: roundTo(0.07 * wage * 52, 1000), // rynkowy standard prowizji
+    agentFee: roundTo(0.07 * wage * 52 * feeMul, 1000), // rynkowy standard prowizji (x Zarządzanie kadrą dyrektora)
   });
   let resp = s.propose(offer);
   if (resp.type !== 'accept' && s.status === 'open') {

@@ -1,5 +1,6 @@
 // Kariera w pętli dni (etap 9): finanse, rynek transferowy, oferty, zarząd, praca trenera.
 import { attendanceModifier } from './fans.js';
+import { directorFrom } from './director.js'; // podpis dyrektora sportowego klubu gracza (docs/dyrektor-sportowy.md)
 import { ensureCoaches } from './coaches.js';
 import { registerDailySystem } from '../core/gameLoop.js';
 import { createMessage } from '../core/inbox.js';
@@ -122,7 +123,7 @@ function offerMessage(game, o, date) {
 registerDecision('incomingOffer', (game, m, action) => {
   const r = answerIncoming(game, m.refs.offerId, action);
   const o = game.market.offers.find((x) => x.id === m.refs.offerId);
-  const out = [createMessage({ date: game.date, category: 'transfers', from: 'Dyrektor sportowy', priority: 'info', subject: 'Odpowiedź na ofertę', body: r.text })];
+  const out = [createMessage({ date: game.date, category: 'transfers', from: directorFrom(game), priority: 'info', subject: 'Odpowiedź na ofertę', body: r.text })];
   if (r.reopen && o?.foreign) { out.push(foreignOfferMessage(game, o, game.date)); return out; }
   if (r.reopen && o) out.push(offerMessage(game, o, game.date));
   return out;

@@ -463,7 +463,7 @@ test('Edytor i datapack v5: plik v4 ze starymi atrybutami skauta wczytuje się, 
   const id = 'legia';
   const sk = peopleValues(g, id).staff.skaut;
   assert.ok(sk?.length && sk[0].reg && Object.keys(sk[0].a).length === 5);
-  assert.equal(PACK_V, 5);
+  assert.ok(PACK_V >= 5); // v6: dyrektor sportowy (docs/dyrektor-sportowy.md)
   const v4 = { type: 'ligapl27-datapack', v: 4, seed: 1, clubs: { [id]: { staff: { skaut: [{ name: 'Jan Skaut', age: 50, a: { POT: 14, OCU: 11, RYN: 11 } }] } } }, players: {} };
   const pk = parsePack(JSON.stringify(v4));
   const a = pk.clubs[id].staff.skaut[0].a;

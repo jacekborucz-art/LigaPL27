@@ -11,7 +11,7 @@ import { createTactics } from '../src/engine/lineup.js';
 import { ensureTraining } from '../src/training/index.js';
 import { ensureCareer } from '../src/career/careerSystem.js';
 import { ensureReferees } from '../src/career/referees.js';
-import { rosterOf } from '../src/career/staffMarket.js';
+import { rosterOf, directorOf } from '../src/career/staffMarket.js';
 import { roleAttrKeys } from '../src/training/staff.js';
 import { CLUBS_PL } from '../src/data/clubs_pl.js';
 import { CLUBS_L3 } from '../src/data/clubs_l3.js';
@@ -90,7 +90,7 @@ game.world = generateWorld(seed);
 game.tactics = createTactics(squadOf(game.world, clubId), { benchSize: 9 });
 ensureTraining(game); ensureCareer(game); ensureReferees(game);
 const base = structuredClone(game.world.players);
-const baseStaff = Object.fromEntries(Object.keys(game.world.clubs).map((id) => [id, countRoles(rosterOf(game, id))]));
+const baseStaff = Object.fromEntries(Object.keys(game.world.clubs).map((id) => [id, countRoles([...rosterOf(game, id), ...(directorOf(game, id) ? [directorOf(game, id)] : [])])]));  // z dyrektorem sportowym (datapack v6)
 const r = importPack(game, pack);
 restoreOriginals();
 if (r.clubsSkipped) errors.push(`Nieznane identyfikatory klubów (pominięte przez grę): ${r.clubsSkipped}.`);

@@ -12,6 +12,7 @@
 // wymuszenie = eskalacja do dyrektora sportowego (szansa z autorytetu i zaufania zarządu, koszt zaufania).
 
 import { Rng, clamp } from '../core/rng.js';
+import { directorFrom, kadEscalation } from './director.js'; // dyrektor sportowy: podpis i Zarządzanie kadrą (docs/dyrektor-sportowy.md)
 import { registerDailySystem, addDays } from '../core/gameLoop.js';
 import { createMessage, addMessages } from '../core/inbox.js';
 import { CLUBS_PL, clubById } from '../data/clubs_pl.js';
@@ -43,7 +44,8 @@ export const RSV = {
   refuseImportant: 0.6, refuseLate: 0.3, forcePenalty: 0.2, forceEveryDays: 30, forcePenaltyDays: 14, refuseCap: 0.95, // [SZAC]
   // Awaria (decyzja właściciela z Nov 17, 2026): próg i limity powołań bez zgody trenera rezerw
   emergencyH: 48, emergencyGk: 2, emergencyTotal: 18, emFieldMax: 5, emAcadField: 2, academyAge: 17,
-  // Eskalacja do dyrektora sportowego: szansa 35 + 0,4 x autorytet + 0,2 x zaufanie zarządu (10-90 %)
+  // Eskalacja do dyrektora sportowego: szansa 35 + 0,4 x autorytet + 0,2 x zaufanie zarządu + 1,5 x (KAD dyrektora - 10)
+  // (10-90 %, docs/dyrektor-sportowy.md)
   escBase: 35, escAuth: 0.4, escTrust: 0.2, escMin: 10, escMax: 90, escCostOk: 2, escCostNo: 4,
   // Nastrój trenera rezerw 0-100 (start 50): awaria -3, zatwierdzona eskalacja -5, +1 co poniedziałek do 50;
   // poniżej 50 każdy punkt to +0,5 pp szansy odmowy [SZAC]
@@ -542,7 +544,7 @@ function inform(game, chk, out) {
   const body = ok
     ? `${p.name} ${chk.kind === 'up' ? 'jest do twojej dyspozycji' : 'zagra w rezerwach'} w meczu ${match}.${out.warnings?.length ? `\n\n${reasonsText(out.warnings)}` : ''}${out.refill ? `\n\nRezerwy dostają bramkarza z akademii: ${game.world.players[out.refill]?.name ?? ''}.` : ''}`
     : `${p.name}, mecz ${match}: ${out.reason}${out.hard ? '' : '\n\nMożesz poprosić dyrektora sportowego o rozstrzygnięcie (najwyżej raz na 30 dni).'}`;
-  const msg = createMessage({ date: game.date, key: `rezerwy:${p.id}:${f?.id ?? ''}:${out.status}:${game.date}:${out.forced ? 'esk' : ''}`, category: 'staff', from: out.forced || out.escalation ? 'Dyrektor sportowy' : 'Trener rezerw', priority: 'info', subject: `${what}: ${ok ? 'zgoda' : 'odmowa'} (${p.name})`, body });
+  const msg = createMessage({ date: game.date, key: `rezerwy:${p.id}:${f?.id ?? ''}:${out.status}:${game.date}:${out.forced ? 'esk' : ''}`, category: 'staff', from: out.forced || out.escalation ? directorFrom(game) : 'Trener rezerw', priority: 'info', subject: `${what}: ${ok ? 'zgoda' : 'odmowa'} (${p.name})`, body });
   game.inbox = addMessages(game.inbox ?? [], [msg]).inbox;
 }
 
@@ -583,7 +585,7 @@ export function escalationChance(game, parent) {
   const user = parent === game.clubId;
   const auth = user ? Math.round(100 * (game.authority?.club === game.clubId ? game.authority.v ?? 0.5 : 0.5)) : 50;
   const trust = user ? (game.board?.trust ?? 60) : 50;
-  return clamp(RSV.escBase + RSV.escAuth * auth + RSV.escTrust * trust, RSV.escMin, RSV.escMax) / 100;
+  return clamp(RSV.escBase + RSV.escAuth * auth + RSV.escTrust * trust + 100 * kadEscalation(game, parent), RSV.escMin, RSV.escMax) / 100;
 }
 
 /**

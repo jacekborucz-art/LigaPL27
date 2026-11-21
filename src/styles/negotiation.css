@@ -95,3 +95,6 @@
   .ng-body { grid-template-columns: minmax(0, 1.15fr) minmax(360px, 1fr); align-items: start; }
   .ng-msg { max-width: 78%; }
 }
+
+/* Podpowiedź dyrektora sportowego (widełki pensji, docs/dyrektor-sportowy.md) */
+.ng-dir { margin: 0 0 var(--space-3); padding: var(--space-2) var(--space-3); border-left: 3px solid var(--accent); border-radius: var(--radius-s); background: var(--surface-stripe); font-size: var(--step--1); overflow-wrap: anywhere; }

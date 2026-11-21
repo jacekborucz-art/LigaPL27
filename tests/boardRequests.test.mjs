@@ -300,7 +300,7 @@ test('Panel próśb: prawa kolumna, presety kwot, historia, bez długich myślni
   g.date = '2026-07-10';
   let html = boardRequestsPanel(g, {});
   assert.match(html, /^<aside class="klub-side br">/);
-  assert.equal((html.match(/data-act="br-ask"/g) ?? []).length, 3 * 4 + 1);
+  assert.equal((html.match(/data-act="br-ask"/g) ?? []).length, 3 * 4 + 1 + 1); // + zmiana dyrektora sportowego (docs/dyrektor-sportowy.md)
   assert.ok(noDash(html) && !html.includes('undefined') && !html.includes('NaN'));
   const amount = html.match(/data-act="br-ask" data-t="transfer" data-a="(\d+)"/)[1];
   const r = handleBoardAction(g, 'br-ask', { t: 'transfer', a: amount }, null);
