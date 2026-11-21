@@ -7,6 +7,7 @@ import { reputationLabel } from '../career/reputation.js';
 import { moraleLabel } from '../career/morale.js';
 import { AGENT_TYPES, TRAIT_LABELS } from '../career/personality.js';
 import { formatZl } from '../career/negotiation.js';
+import { wishStateText } from '../career/wishMemory.js'; // nastrój po odrzuconej ofercie i podwyżce (docs/transfery.md, rozdz. 4)
 import { esc, fmtDate } from './dom.js';
 import { formChartHtml, formHistory, formBand, moraleChartHtml } from './formChart.js';
 import { positionMapHtml } from './positionMap.js';
@@ -275,6 +276,7 @@ export function renderPlayerProfile(p, opts = {}) {
         <h3>Stan</h3>
         <ul class="plain-list">
           ${foreign ? '' : `<li><span class="k">Morale</span><span>${esc(moraleLabel(p.morale))}</span></li>`}
+          ${(() => { const t = !foreign && opts.date ? wishStateText(p, opts.date, fmtDate) : null; return t ? `<li><span class="k">Plany</span><span>${esc(t)}</span></li>` : ''; })()}
           ${foreign ? '' : `<li><span class="k">Świeżość</span><span>${Math.round(p.fresh ?? 95)}%</span></li>
           <li><span class="k">Ostrość</span><span>${Math.round(p.sharp ?? 70)}%</span></li>`}
           <li><span class="k">Zdrowie</span><span>${p.injuryDays > 0 ? `Kontuzja, ok. ${p.injuryDays} dni` : 'Zdrowy'}</span></li>

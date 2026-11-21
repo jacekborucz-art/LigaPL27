@@ -123,9 +123,12 @@ export function playerTagList(game, p, opts = {}) {
     const n = buy + loan + rofr;
     if (n) add('of', `O${n}`, `Oferty do decyzji: ${[buy && `kupno ${buy}`, loan && `wypożyczenie ${loan}`, rofr && `prawo pierwokupu ${rofr}`].filter(Boolean).join(', ')}`);
   }
-  // 6. Chce odejść (src/career/moveWish.js): u innych klubów tylko oficjalna prośba
+  // 6. Chce odejść (src/career/moveWish.js): u innych klubów tylko oficjalna prośba; rozczarowany tylko u gracza (wishMemory.js)
   const official = p.moveWish?.stage === 'oficjalna' || (!p.moveWish && p.transferRequest);
-  if (official || (own && p.moveWish)) add('mw', '!', `Chce odejść (${official ? 'oficjalna prośba o transfer' : 'cicha prośba przez agenta'})`, true);
+  const waits = own && p.moveWish?.promise && !p.moveWish.promise.broken; // stan „czeka”: obietnica zgody na transfer
+  if (waits) add('mw', '!', `Czeka do okna: obiecałeś zgodę na transfer (do ${fmtDate(p.moveWish.promise.until)})`, true);
+  else if (official || (own && p.moveWish)) add('mw', '!', `Chce odejść (${official ? 'oficjalna prośba o transfer' : 'cicha prośba przez agenta'})`, true);
+  else if (own && p.wishMemory?.mood === 'rozczarowany') add('mr', '?', `Rozczarowany, ale zostaje: klub odrzucił ofertę za niego${p.wishMemory.waitUntil > date ? `. Czeka do okna ${fmtDate(p.wishMemory.waitUntil)}` : ''}`, true);
   // 7. Jedna żółta kartka od pauzy; pauza tylko w innej klasie (rezerwy: w meczach drużyny może grać)
   const ya = oneYellowAway(p, tier);
   if (ya.length) add('y1', 'Ż', `Jedna żółta kartka od pauzy: ${ya.map(([k, n]) => `${LEAGUE_CLASS_KEYS.includes(k) ? 'liga' : YC_NAMES[k]} (${n} ${plural(n, 'żółta', 'żółte', 'żółtych')})`).join(', ')}`, true);

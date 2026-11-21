@@ -4,7 +4,7 @@
 // Kontrakt z zawodnikiem negocjuje ekran rozmów (src/ui/negotiationView.js) albo aiNegotiate. Udane rozmowy to
 // propozycja dla zawodnika, który namyśla się 2-5 dni (src/career/proposals.js), potem transakcja (transferDeals.js).
 
-import { Rng, clamp } from '../core/rng.js';
+import { Rng } from '../core/rng.js';
 import { addMessages } from '../core/inbox.js';
 import { CLUBS_PL, clubById } from '../data/clubs_pl.js';
 import { l3GroupFor } from '../season/leagues.js';
@@ -462,8 +462,10 @@ export function answerIncoming(game, offerId, action) {
     const r = onUserRejected(game, p, { buyerRep, fee: o.fee, foreignWage: o.foreign?.wage ?? 0, date: game.date });
     if (r.messages.length) game.inbox = addMessages(game.inbox ?? [], r.messages).inbox;
     if (r.broken) return { text: `Odrzucono ofertę ${buyer.name}. ${p.name} przypomina twoją obietnicę i jest wściekły. Oficjalnie prosi o transfer.` };
-    const more = r.messages.length ? ` ${p.name} poprosił agenta o rozmowę o odejściu.` : '';
-    if (buyerRep > clubReputation(clubById(game.clubId)) + 10 && p.persona === 'Ambitny') { p.morale = clamp((p.morale ?? 12) - 2, 1, 20); return { text: `Odrzucono ofertę ${buyer.name}. ${p.name} jest rozczarowany.${more}` }; }
+    // Reakcja zawodnika z jednego rzutu (src/career/wishMemory.js): cicha prośba, rozczarowany albo spokojny
+    const more = r.messages.length ? ` ${p.name} poprosił agenta o rozmowę o odejściu.`
+      : r.state === 'rozczarowany' ? ` ${p.name} jest rozczarowany, ale zostaje.${p.wishMemory?.waitUntil > game.date ? ' Mówi, że poczeka do następnego okna.' : ''}`
+        : r.state === 'spokojny' ? ` ${p.name} przyjmuje decyzję spokojnie.` : '';
     return { text: `Odrzucono ofertę ${buyer.name} za ${p.name}.${more}` };
   }
   if (action === 'more') {

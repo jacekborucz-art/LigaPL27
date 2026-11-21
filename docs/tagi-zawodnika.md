@@ -16,7 +16,7 @@ Pełny kwadrat: sprawa pilna. Obrys: sprawa drugorzędna.
 | 3 | K | Powołanie do reprezentacji (z U21), data powrotu | zielony (murawa) |
 | 4 | TR, PK | Transfer w toku (etap, wstrzymanie gry po testach), przedkontrakt (klub i data) | fioletowy |
 | 5 | O1 | Oferty do decyzji gracza: kupno, wypożyczenie, prawo pierwokupu (otwarte, niewygasłe) | niebieski |
-| 6 | ! | Chce odejść: cicha albo oficjalna prośba | obrys czerwony |
+| 6 | !, ? | Chce odejść: cicha albo oficjalna prośba, „Czeka do okna” przy obietnicy zgody na transfer; „?” rozczarowany, ale zostaje (tylko u gracza, `p.wishMemory`) | obrys czerwony; „?” obrys żółty |
 | 7 | Ż | Jedna żółta kartka od pauzy (liga klasy klubu, Puchar Polski, UEFA; progi z `config/competitions.js`) | obrys żółty |
 | 7 | P1 | Pauza tylko w innej klasie ligowej (rezerwy): w meczach drużyny może grać | obrys żółty |
 | 8 | T, W | Lista transferowa, lista wypożyczeń (u gracza: szukanie klubu albo propozycje) | bursztynowy, śliwkowy |

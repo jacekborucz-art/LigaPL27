@@ -212,7 +212,7 @@ export function startNegotiation(game, opts = {}) {
   const r = openNegotiation({ kind, player, club, fromClub, date: game.date, rng, mode: 'player', ctx });
   if (!r.ok) {
     let save = false;
-    if (r.outcome) { applyOutcome(player, r.outcome); save = true; }
+    if (r.outcome) { applyOutcome(player, r.outcome, { seed: game.seed }); save = true; }
     return { ok: false, reason: r.reason, text: r.text, speaker: r.speaker, until: r.until ?? null, save };
   }
   const s = r.session;
@@ -355,7 +355,10 @@ function finish(game, ng) {
   const player = game.world.players[ng.playerId];
   // Propozycja (podpisanie bez prekontraktu i bez ostatniej rundy): morale +2 dopiero, gdy zawodnik się zgodzi (proposals.js)
   const proposal = ng.kind === 'sign' && !ng.pre && !ng.lastRound && outcome?.accepted;
-  if (outcome && player) applyOutcome(player, proposal ? { ...outcome, moraleDelta: 0 } : outcome);
+  const hadWish = !!player?.moveWish;
+  if (outcome && player) applyOutcome(player, proposal ? { ...outcome, moraleDelta: 0 } : outcome, { seed: game.seed });
+  // Podwyżka przy prośbie o transfer: uspokaja tylko z pewną szansą (src/career/wishMemory.js)
+  ng.wishAfter = hadWish && outcome?.accepted && ng.kind === 'renew' ? (player.moveWish ? 'stays' : 'calmed') : null;
   ng.counter = null;
   ng.counterType = null;
   ng.demand = null;
@@ -553,8 +556,10 @@ function outcomePanel(ng) {
     // Propozycja: zawodnik namyśla się 2-5 dni (proposals.js); app.js dopisuje ng.done.proposal z datą decyzji
     const prop = ng.kind === 'sign' && !ng.pre && !ng.lastRound;
     const pr = ng.done.proposal;
+    const wish = ng.wishAfter === 'stays' ? ' Mimo podwyżki zawodnik nadal myśli o odejściu: prośba o transfer trwa.'
+      : ng.wishAfter === 'calmed' ? ' Podwyżka go przekonała: zostaje i nie prosi już o transfer.' : '';
     const note = ng.kind === 'renew'
-      ? 'Nowy kontrakt obowiązuje od dziś. Zawodnik pamięta obietnicę roli.'
+      ? `Nowy kontrakt obowiązuje od dziś. Zawodnik pamięta obietnicę roli.${wish}`
       : ng.pre ? 'Zawodnik zgodził się na warunki. Umowa zacznie obowiązywać 1 lipca, do tego czasu gra w swoim klubie.'
         : ng.lastRound ? 'Zawodnik przyjął warunki i podpisał kontrakt. Teraz testy medyczne i zgłoszenie (Transfery, W toku).'
           : pr?.decide > ng.date ? `Propozycja złożona, zawodnik odpowie ok. ${fmtDate(pr.decide)}. Do tego czasu może rozważać oferty innych klubów. Odpowiedź przyjdzie w poczcie.`

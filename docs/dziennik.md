@@ -29,6 +29,31 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 21, 2026, agent (worktree, gałąź do scalenia), pamięć prośby o transfer (v1.23 Beta)
+Zrobione:
+- Koniec pętli „przedłużenie z podwyżką, oferta, prośba, podwyżka”: zawodnik pamięta odrzucone oferty i podwyżki
+  (`p.wishMemory`, nowy moduł `src/career/wishMemory.js`). Odrzucona oferta to jeden rzut najwyżej raz na 30 dni:
+  cicha prośba, rozczarowany (zostaje, morale -2, bez listu) albo spokojny (4-8 miesięcy, kolejne oferty x0,5).
+- Czas spokoju po nowym kontrakcie (D z lojalności, cierpliwości, ambicji; po podwyżce wymuszonej prośbą D x q),
+  pamięć odmów w 12 miesiącach, skok reputacji, „poczekam do lata” (ostatnie 10 dni okna), oferta marzeń z urazą,
+  gaśnięcie rozczarowania co miesiąc. Ryzyko miesięczne mnoży fSpokój i fPamięć.
+- Podwyżka przy prośbie uspokaja z szansą 0,1-0,85 (druga w 12 miesiącach x0,5); rozmowa ma częściowy sukces
+  (cicha prośba zamienia się w rozczarowanie) i +0,1 do 60 dni po podwyżce; obietnica wygasa bez kary po oknie bez
+  oferty (zawodnik rozczarowany, list). Kluby AI: ten sam rzut przy podwyżce, porażka = lista transferowa.
+- UI: linia „Plany” w profilu, panel „Plany zawodnika” w karcie transferowej, znacznik „?” w Kadrze, rozczarowani
+  na liście próśb w W toku, wynik rozmów mówi, czy podwyżka przekonała, odpowiedź po odrzuceniu oferty mówi o stanie.
+- Kalibracja: WISH.base 0,0008 -> 0,0012 (Ekstraklasa śr. 18,8 prośby na sezon), tabela w `transfery.md` rozdz. 4.
+  Testy `tests/wishMemory.test.mjs` (12).
+Decyzje i pułapki:
+- `applyOutcome(player, out, { seed })`: przedłużenie woła `noteRenewal` (nie kasuje już prośby bez rzutu).
+- Czas spokoju liczy też kontrakty z datą podpisu (przedłużenia AI, transfery), kontrakty startowe nie.
+- Dawny człon -0,15 za świeży kontrakt usunięty z `rejectTriggerP` (zastąpił go fSpokój). Usunięte -2 morale dla
+  „Ambitny” przy odrzuceniu oferty w `transfers.js` (zastąpił je stan rozczarowany).
+- Eskalacja w 30 dniach: tylko rozczarowany przechodzi w cichą prośbę; spokojny zostaje spokojny.
+Zostało / dalej:
+- Do decyzji: w klubach AI podwyżka uspokaja ok. 30 % (wg wzoru), reszta trafia na listę; prośby w niższych ligach
+  wzrosły (base 0,0012). Ewentualnie osobny base dla lig 2-4.
+
 ## Nov 21, 2026, profil A (chmura), menu zawodnika w Treningu (v1.23 Beta)
 Zrobione:
 - Trening > Zawodnicy: prawy przycisk działa na całym panelu zawodnika (wcześniej tylko na nazwisku).

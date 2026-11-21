@@ -92,7 +92,7 @@ Zakładki: Zawodnicy, Skład i taktyka, Rezerwy, Rozmowy, Raport ogólny.
 - **Rozmowa przez asystenta**: asystent rozmawia ze wszystkimi czekającymi, efekt zależy od jego umiejętności motywowania i losu; Kadra, Rozmowy, „Poproś asystenta”; `career/teamTalks.js`; od v1.17 Beta.
 - **Autorytet trenera**: kafel autorytetu; trener, który nie rozmawia, traci wpływ w szatni; Kadra, Rozmowy; `career/authority.js`; dok. `bierna-gra.md`.
 - **Uwaga trenera**: zawodnicy, którzy jej potrzebują (wrażliwi, rzadko grający), przypominają się; Kadra, Rozmowy; `career/attention.js`; dok. `bierna-gra.md`.
-- **Prośba o transfer i chęć odejścia**: zawodnik zgłasza prośbę po odrzuceniu oferty lub długim braku gry; Poczta, Rozmowy; `career/moveWish.js`; dok. `transfery.md` rozdz. 4.
+- **Prośba o transfer i chęć odejścia**: zawodnik zgłasza prośbę po odrzuceniu oferty lub długim braku gry; po odrzuconej ofercie jeden rzut (prosi, rozczarowany ale zostaje, spokojny), pamięć odmów i podwyżek, czas spokoju po nowym kontrakcie, oferta marzeń, „poczekam do lata”, obietnica do końca okna, podwyżka uspokaja tylko z pewną szansą; stan w profilu („Plany”), karcie transferowej i znacznik „?” w Kadrze; Poczta, Rozmowy, Transfery; `career/moveWish.js`, `career/wishMemory.js`; dok. `transfery.md` rozdz. 4; pamięć od v1.23 Beta.
 
 ### 3.5 Raport ogólny
 

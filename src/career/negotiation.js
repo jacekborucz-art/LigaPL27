@@ -13,6 +13,7 @@ import { GROUP } from './squad.js';
 import { personalityOf, computeMindset, elementPrefs, AGENT_TYPES } from './personality.js';
 import { pickLine } from './negotiationLines.js';
 import { payLevel, EUR_PLN } from '../data/finanse_klubow.js';
+import { noteRenewal } from './wishMemory.js'; // pamięć prośby o transfer po przedłużeniu
 
 /** Wartość rynkowa: EUR przy OVR 10 w Ekstraklasie i nachylenie po OVR (docs/finanse.md 3.2). [SZAC] */
 export const VALUE_BASE_EUR = 250000;
@@ -740,8 +741,9 @@ export class NegotiationSession {
 /**
  * Zapisuje skutki w zawodniku (mutuje): relacja z klubem (zaufanie, uraza z wygaszaniem, blokada, historia),
  * morale, renewRefused (czytane przez squad.js), transferRequest + unhappy, nowy kontrakt (tylko przedłużenie).
+ * opts.seed: ziarno gry do rzutu uspokojenia po podwyżce przy prośbie o transfer (src/career/wishMemory.js).
  */
-export function applyOutcome(player, out) {
+export function applyOutcome(player, out, opts = {}) {
   if (!out) return player;
   const rel = relationWith(player, out.clubId);
   rel.grudge = Math.round((currentGrudge(rel, out.date) + (out.grudgeAdd || 0)) * 10) / 10;
@@ -757,8 +759,11 @@ export function applyOutcome(player, out) {
   // Nowy kontrakt od razu tylko przy przedłużeniu. Przy podpisaniu zawodnik zostaje na starym kontrakcie do zgłoszenia
   // (kontrakt przenosi moduł transferów; wcześniej rozmowy nadpisywały go już przy porozumieniu)
   if (out.accepted && out.contract && out.kind === 'renew') {
+    const oldWage = player.contract?.wage ?? 0;
     player.contract = { ...out.contract, bonus: { ...out.contract.bonus }, promise: { ...out.contract.promise } };
-    player.renewRefused = false; delete player.moveWish; player.transferRequest = false; // nowy kontrakt kończy prośbę o transfer
+    player.renewRefused = false;
+    // Nowy kontrakt: czas spokoju; przy prośbie o transfer podwyżka uspokaja tylko z pewną szansą (wishMemory.js)
+    noteRenewal(player, out.date ?? out.contract.signed, { oldWage, newWage: out.contract.wage ?? 0, seed: opts.seed ?? '' });
   }
   return player;
 }

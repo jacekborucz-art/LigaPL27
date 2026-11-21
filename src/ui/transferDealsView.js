@@ -12,6 +12,7 @@ import { formatZl } from '../career/negotiation.js';
 import { dealOf, openDeals, dealStages, expectedRegistration, buyerName, STAGE_LABELS, FAIL_LABELS, STAGE_I, cancelDeal } from '../career/transferDeals.js';
 import { canApproach, checkUserPre, preOpensOn, earlyPrice, earlyBuy, userPreContracts, PRE } from '../career/preContracts.js';
 import { reactToWish, WISH_ACTIONS } from '../career/moveWish.js';
+import { wishStateText } from '../career/wishMemory.js';
 import { squadOf } from '../world/worldGen.js';
 import { anyClub } from '../season/season.js';
 import { proposalsFor, userProposal, thinkingUntil, withdrawProposal, canImprove, improveUserProposal, THINK } from '../career/proposals.js'; // namysł zawodnika (docs/transfery.md, rozdz. 10)
@@ -31,7 +32,9 @@ export function dealTags(game, p) {
   const d = dealOf(game, p.id);
   if (d) out.push(tag(d.from === p.clubId && d.to !== game.clubId ? `odchodzi: ${STAGE_LABELS[d.stage].toLowerCase()}` : `transfer w toku: ${STAGE_LABELS[d.stage].toLowerCase()}`, 'info'));
   if (p.preContract) out.push(tag(`porozumienie z ${preClubName(p.preContract)} od ${fmtDate(p.preContract.start)}`, p.clubId === game.clubId ? 'bad' : 'misc'));
-  if (p.moveWish && !p.transferRequest) out.push(tag('chce odejść', 'warn'));
+  if (p.moveWish?.promise && !p.moveWish.promise.broken) out.push(tag('czeka do okna', 'warn'));
+  else if (p.moveWish && !p.transferRequest) out.push(tag('chce odejść', 'warn'));
+  else if (!p.moveWish && p.clubId === game.clubId && p.wishMemory?.mood === 'rozczarowany') out.push(tag('rozczarowany, zostaje', 'warn'));
   if (!d && proposalsFor(game, p.id).length) out.push(tag(`rozważa ofertę, odpowie do ${fmtDate(thinkingUntil(game, p.id))}`, 'info'));
   return out.join('');
 }
@@ -122,7 +125,11 @@ export function dealsView(game, ui = {}) {
   const preOut = squadOf(game.world, game.clubId).filter((p) => p.preContract);
   const wishes = squadOf(game.world, game.clubId).filter((p) => p.moveWish);
   const preList = (ps, dir) => ps.length ? `<ul class="tf-mini">${ps.map((p) => `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${cardLink(p)}<em>${esc(dir === 'in' ? `z ${clubName(p.clubId)}` : `do ${preClubName(p.preContract)}`)}</em></span><small>od ${esc(fmtDate(p.preContract.start))}</small></button></li>`).join('')}</ul>` : '';
-  const wishList = wishes.length ? `<ul class="tf-mini">${wishes.map((p) => `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${cardLink(p)}<em>${esc(p.moveWish.stage === 'oficjalna' ? 'oficjalna prośba o transfer' : 'agent sygnalizuje chęć odejścia')}</em></span><small data-k="${p.moveWish.stage === 'oficjalna' ? 'bad' : 'warn'}">od ${esc(fmtDate(p.moveWish.since))}</small></button></li>`).join('')}</ul>`
+  const sad = squadOf(game.world, game.clubId).filter((p) => !p.moveWish && p.wishMemory?.mood === 'rozczarowany'); // zostaje, ale pamięta (wishMemory.js)
+  const wishLabel = (W) => (W.promise && !W.promise.broken ? `czeka do okna (do ${fmtDate(W.promise.until)})` : W.stage === 'oficjalna' ? 'oficjalna prośba o transfer' : 'agent sygnalizuje chęć odejścia');
+  const wishRows = wishes.map((p) => `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${cardLink(p)}<em>${esc(wishLabel(p.moveWish))}</em></span><small data-k="${p.moveWish.stage === 'oficjalna' ? 'bad' : 'warn'}">od ${esc(fmtDate(p.moveWish.since))}</small></button></li>`).join('');
+  const sadRows = sad.map((p) => `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${cardLink(p)}<em>rozczarowany, ale zostaje</em></span><small data-k="warn">od ${esc(fmtDate(p.wishMemory.moodSince ?? game.date))}</small></button></li>`).join('');
+  const wishList = wishes.length || sad.length ? `<ul class="tf-mini">${wishRows}${sadRows}</ul>${wishes.length ? '' : '<p class="tf-p__txt">Nikt nie prosi o transfer.</p>'}`
     : '<p class="tf-p__txt">Nikt nie prosi o transfer.</p>';
   const msg = ui.tfMsg ? `<p class="notice">${esc(ui.tfMsg)}</p>` : '';
   return `${msg}<div class="td-view">
@@ -149,12 +156,17 @@ export function ownDealPanels(game, p, ui = {}) {
   if (props.length) out.push(panel('Rozważa ofertę', 'warn', `<ul class="td-deals">${props.map((x) => propRow(game, x)).join('')}</ul>`));
   if (p.preContract) out.push(panel('Umowa od 1 lipca', 'bad', `<p class="tf-p__txt">${esc(p.name)} podpisał umowę z ${esc(preClubName(p.preContract))} od ${esc(fmtDate(p.preContract.start))}. Do tego dnia jest twoim zawodnikiem. Przedłużenie nie jest już możliwe.</p>`));
   const W = p.moveWish;
+  const plan = wishStateText(p, game.date, fmtDate); // rozczarowany, spokojny, czeka do okna, podwyżka (wishMemory.js)
+  if (!W && plan) out.push(panel('Plany zawodnika', p.wishMemory?.mood === 'rozczarowany' ? 'warn' : 'info', `<p class="tf-p__txt">${esc(plan)}.</p>`));
   if (W) {
     const official = W.stage === 'oficjalna';
-    const txt = official ? `${p.name} oficjalnie prosi o transfer (od ${fmtDate(W.official ?? W.since)}).` : `Agent daje znać, że ${p.name} chce odejść. Bez reakcji po 4 tygodniach prośba stanie się oficjalna.`;
+    const waits = W.promise && !W.promise.broken; // stan „czeka”: obietnica zgody na transfer
+    const txt = waits ? `${p.name} czeka na ofertę, na którą się zgodziłeś. Jeśli do końca okna nie przyjdzie, zostanie, ale będzie rozczarowany.`
+      : official ? `${p.name} oficjalnie prosi o transfer (od ${fmtDate(W.official ?? W.since)}).` : `Agent daje znać, że ${p.name} chce odejść. Bez reakcji po 4 tygodniach prośba stanie się oficjalna.`;
+    const extra = plan && (W.promise || W.raised || p.wishMemory?.lastRaise) ? `<p class="tf-p__txt">${esc(plan)}.</p>` : '';
     const reacted = W.reacted ? `<p class="tf-p__txt">Twoja reakcja: ${esc({ list: 'lista transferowa', promise: `obietnica zgody na ofertę od ${fmtZl(W.promise?.minFee ?? 0)}${W.promise?.broken ? ' (złamana)' : ''}`, refuse: 'odmowa', ignore: 'brak' }[W.reacted] ?? W.reacted)}.</p>` : '';
     const acts = ['list', 'promise', 'talk', 'raise', 'refuse'].filter((a) => !(a === 'list' && game.market.userListed[p.id]) && !(a === 'promise' && W.promise) && !(a === 'refuse' && W.reacted === 'refuse') && !(a === 'raise' && (p.renewRefused || p.loan)));
-    out.push(panel('Prośba o transfer', official ? 'bad' : 'warn', `<p class="tf-p__txt">${esc(txt)}</p>${reacted}<div class="td-acts">${acts.map((a, i) => `<button class="btn ${i === 0 ? 'btn--primary' : 'btn--quiet'} btn--sm" data-act="tf-wish" data-id="${esc(p.id)}" data-a="${a}">${esc(WISH_ACTIONS[a])}</button>`).join('')}</div>`));
+    out.push(panel('Prośba o transfer', official ? 'bad' : 'warn', `<p class="tf-p__txt">${esc(txt)}</p>${reacted}${extra}<div class="td-acts">${acts.map((a, i) => `<button class="btn ${i === 0 ? 'btn--primary' : 'btn--quiet'} btn--sm" data-act="tf-wish" data-id="${esc(p.id)}" data-a="${a}">${esc(WISH_ACTIONS[a])}</button>`).join('')}</div>`));
   }
   return out.join('');
 }
