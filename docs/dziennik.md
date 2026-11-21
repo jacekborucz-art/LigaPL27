@@ -29,6 +29,18 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 21, 2026, profil A (chmura), datapack: dorośli w akademii (v1.22 Beta)
+Zrobione:
+- Błąd: datapack zmienia dane zawodnika, a nie jego miejsce w klubie, więc prawdziwy 32-latek wpisany na miejsce
+  juniora (`<klub>-a1` ... `-a7`) zostawał w akademii. Teraz po wczytaniu zawodnik od 19 lat przechodzi do pierwszej
+  drużyny (kontrakt rynkowy 3 lata, 30+ 2, 33+ 1), przy pełnej kadrze (32) do wolnych (`fixAcademyAges`).
+- Podsumowanie importu podaje liczbę przeniesionych; `tools/check-datapack.mjs` ostrzega; opis w `docs/edytor.md`,
+  `docs/datapack/agenci.md`, `docs/funkcje.md`. Test w `tests/editor.test.mjs`.
+Decyzje i pułapki:
+- Granica 19 lat jak na koniec sezonu (`processAcademy` w rollover.js).
+Zostało / dalej:
+- Już wczytane kariery: poprawka działa przy kolejnym wczytaniu datapacku (nowa kariera); w trwającej karierze 19+ z akademii wyjdą 1 lipca.
+
 ## Nov 21, 2026, profil A (chmura), warunek zarządu po zmianie sezonu (v1.22 Beta)
 Zrobione:
 - Błąd: warunek zarządu (np. budżet płac za 1. miejsce) z terminem po 1 lipca rozliczał się z nowej, pustej tabeli,

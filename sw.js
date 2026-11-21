@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-d6881866ec';
+const VERSION = 'v0.3-955ea44e3b';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -199,7 +199,7 @@ const FILES = [
   ['./src/career/coachCareer.js', '1b6aeea20e'],
   ['./src/career/coachMarket.js', '5b7ab28585'],
   ['./src/career/coaches.js', '041155fd9c'],
-  ['./src/career/editor.js', '21fad9923e'],
+  ['./src/career/editor.js', '95a9ce79f6'],
   ['./src/career/fans.js', '329e0cfdc9'],
   ['./src/career/fansSystem.js', 'ced36b7dd1'],
   ['./src/career/finance.js', 'b4eb190068'],

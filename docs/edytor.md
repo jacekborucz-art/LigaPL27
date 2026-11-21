@@ -100,6 +100,7 @@ Eksport zawsze zapisuje najnowszą wersję i numer wersji gry (pole `game`, np. 
 | 5 | v1.20 Beta | skaut z 5 atrybutami (`DOS`, `OCE`, `RYN`, `SIE`, `CHA` zamiast `POT`, `OCU`, `RYN`) i regionami (`reg`: { region: 1-20 }, najwyżej 3, docs/skauting.md); `MIGRATE[4]` przelicza stare atrybuty skauta (jakość bez zmian), datapack zapisany w grze tak samo |
 - Nieznane klucze są pomijane. Zła wartość znanego pola (typ albo zakres jak w tabeli walidacji; liczby muszą być liczbami JSON) odrzuca cały plik z nazwą klubu lub zawodnika i pola.
 - Kluby: stosowane zawsze (identyfikatory klubów są wspólne dla wszystkich gier), nieznane identyfikatory pomijane.
+- Akademia: zawodnik od 19 lat na miejscu juniora (`<klub>-a1` ... `-a7`) po wczytaniu przechodzi do pierwszej drużyny (kontrakt rynkowy: 3 lata, 30+ 2 lata, 33+ rok), a przy pełnej kadrze (32) do wolnych (`fixAcademyAges` w `src/career/editor.js`). Kontrola `tools/check-datapack.mjs` ostrzega o takich wpisach.
 - Zawodnicy: tylko gdy `seed` pliku = ziarno gry, bo zawodnicy są losowani z ziarna świata. W innym świecie: „Zawodnicy pominięci: inny świat gry”. Zawodników, których już nie ma w grze, edytor pomija; datę urodzenia poza zakresem wieku też.
 - Zmiany łączą się z datapackiem gry, gra zapisuje się od razu, a edytor pokazuje podsumowanie (ile klubów i zawodników zastosowano i pominięto).
 

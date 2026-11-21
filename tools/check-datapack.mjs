@@ -144,6 +144,7 @@ for (const id of [...Object.keys(pack.players), ...newIds]) {
   if (p.pos === 'BR' && ['WYK', 'DRY'].some((k) => (p.attr[k] ?? 0) > 12)) why.push('bramkarz z wykończeniem albo dryblingiem powyżej 12');
   const age = ageAt(p, GAME_START);
   if (age < 15 || age > 45) why.push(`wiek ${age} poza zakresem 15-45 na ${GAME_START}`);
+  if (/-a\d+$/.test(id) && age >= 19) why.push(`miejsce akademii, a wiek ${age} (juniorzy do 18 lat; gra przeniesie go do pierwszej drużyny albo do wolnych)`);
   if (why.length && notes++ < 60) warnings.push(`Zawodnik ${id} (${p.name}): ${why.join('; ')}.`);
 }
 if (notes > 60) warnings.push(`... i jeszcze ${notes - 60} zawodników z uwagami.`);

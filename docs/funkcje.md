@@ -262,7 +262,7 @@ Zakładki: Pulpit, Tydzień, Obozy, Sparingi, Zawodnicy, Obciążenia, Sztab, Ro
 - **Edytor klubów**: nazwa, skrót, barwy, stadion, pojemność, finanse, własny herb (obrazek w datapacku), trener, sztab i właściciel z atrybutami, rywale; Opcje, Edytor, Kluby; `career/editor.js`, `ui/editorView.js`; dok. `edytor.md`.
 - **Edytor zawodników**: dane i atrybuty, boisko z pozycją główną i dodatkowymi (dopasowanie w procentach), kontuzja z rodzajem i dniami, narodowość z listy FIFA, wolni zawodnicy do kadry i z kadry (limit 21-32), nowi wolni z całego świata; Opcje, Edytor, Zawodnicy; `career/editor.js`, `ui/editorView.js`; dok. `edytor.md`.
 - **Edytor sędziów**: edycja puli sędziów; Opcje, Edytor, Sędziowie; `career/editor.js`; dok. `edytor.md`.
-- **Datapack**: pełny eksport (wszystkie kluby i zawodnicy) i import, wersje pliku v1 do v4 (starsze wczytują się bez błędu), walidacja; Opcje, Edytor, Datapack; `career/editor.js`; dok. `edytor.md`, `datapack/agenci.md`, `datapack/wzor.json`; kontrola pliku `tools/check-datapack.mjs`.
+- **Datapack**: pełny eksport (wszystkie kluby i zawodnicy) i import, wersje pliku v1 do v4 (starsze wczytują się bez błędu), walidacja; Opcje, Edytor, Datapack; `career/editor.js`; dok. `edytor.md`, `datapack/agenci.md`, `datapack/wzor.json`; kontrola pliku `tools/check-datapack.mjs`; dorosły zawodnik na miejscu akademii po wczytaniu przechodzi do pierwszej drużyny (od v1.22 Beta).
 - **Instrukcja zbierania datapacku dla agentów AI**: złoty wzorzec i opis procesu; dok. `datapack/agenci.md`; od v1.19 Beta.
 
 ## 13. PWA i działanie offline

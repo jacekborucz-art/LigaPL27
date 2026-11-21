@@ -147,7 +147,8 @@ Identyfikator z `baza.json`, w tym z sekcji `players`. Pole `club` mówi, w jaki
 
 Zasady sekcji:
 - Nie dodawaj `team`, gdy zawodnik zostaje w swoim klubie z bazy.
-- Przy juniorach z akademii (`-a1` ... `-a7`) nigdy nie dodawaj `team`.
+- Przy juniorach z akademii (`-a1` ... `-a7`) nigdy nie dodawaj `team`. Na miejsca akademii tylko juniorzy do 18 lat:
+  starszego gra po wczytaniu przeniesie do pierwszej drużyny albo, przy pełnej kadrze, do wolnych.
 - Gra najpierw wykonuje wszystkie zwolnienia (`team: null`), a dopiero potem dołączenia, więc zwolnienie i
   transfer do tego samego klubu mieszczą się w jednym pliku. Limit 21-32 jest pilnowany w każdym kroku:
   zmiana ponad limit jest pomijana.

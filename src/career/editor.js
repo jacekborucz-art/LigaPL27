@@ -17,7 +17,8 @@ import { setCrestsHidden } from '../data/clubNames.js';
 import { rivalKey, setRivalOverrides, baseRivalry, listedRivalsOf } from '../data/kibice.js';
 import { NAT_NAMES, EU } from '../data/names.js';
 import { ATTRS, POS_NAMES, VARIANTS, ovrAt } from '../data/attributes.js';
-import { clubFinanceData } from '../data/finanse_klubow.js';
+import { clubFinanceData, payLevel } from '../data/finanse_klubow.js';
+import { marketWage } from './negotiation.js';
 import { offsetsFor } from '../training/development.js';
 import { ageAt } from '../training/state.js';
 import { marketValue } from '../world/playerGen.js';
@@ -914,7 +915,7 @@ export function importPack(game, pack) {
   // Najpierw zawodnicy świata gry (zwolnienia z kadry robią miejsce), potem nowi zawodnicy z edytora
   const ids = Object.keys(pack.players);
   if (ids.length && pack.seed !== game.seed) { out.otherWorld = true; out.playersSkipped = ids.length; }
-  else importWorldPlayers(game, pack, ids, out);
+  else { importWorldPlayers(game, pack, ids, out); fixAcademyAges(game, out); }
   // Nowi zawodnicy z edytora: w każdym świecie gry (już obecni w grze: bez zmian)
   for (const [id, v] of Object.entries(pack.created ?? {})) {
     if (game.world?.players?.[id] || !game.market) continue;
@@ -952,6 +953,35 @@ function importWorldPlayers(game, pack, ids, out) {
   for (const [id, team] of joins) if (joinFromFree(game, id, team)) out.squadSkipped++;
 }
 
+/**
+ * Akademia po datapacku: na miejscu juniora (<klub>-a1 ... -a7) może stać dorosły zawodnik (np. 32-latek), bo plik
+ * zmienia dane, a nie miejsce w klubie. Zawodnik od ACADEMY_AGE lat przechodzi do pierwszej drużyny (kontrakt
+ * rynkowy, 3 lata, 30+: 2 lata, 33+: rok), a gdy kadra jest pełna (EDIT_SQUAD.max), zostaje wolnym zawodnikiem.
+ * Ta sama granica co na koniec sezonu (src/season/rollover.js: 19-latkowie opuszczają akademię).
+ */
+export const ACADEMY_AGE = 19;
+function fixAcademyAges(game, out) {
+  out.academyUp = 0; out.academyFree = 0;
+  const W = game.world;
+  for (const [cid, club] of Object.entries(W?.clubs ?? {})) {
+    const c = clubObj(cid);
+    for (const id of [...(club.academy ?? [])]) {
+      const p = W.players[id];
+      if (!p || (p.age ?? 0) < ACADEMY_AGE) continue;
+      club.academy = club.academy.filter((x) => x !== id);
+      p.clubId = cid;
+      if (club.squad.length < EDIT_SQUAD.max) {
+        club.squad.push(id); p.squad = 'A';
+        const years = p.age >= 33 ? 1 : p.age >= 30 ? 2 : 3;
+        p.contract = { wage: marketWage(p.ovr, Math.min(4, c?.tier ?? 3), false, payLevel(c)), until: `${seasonEndYear(game.date) + years - 1}-06-30`, clause: 0, signedOn: game.date };
+        p.wage = p.contract.wage;
+        out.academyUp++;
+      } else { editorRelease(game, id); out.academyFree++; }
+      recordTeam(game, id);
+    }
+  }
+}
+
 /** Polskie podsumowanie importu. */
 export function importSummary(r) {
   const parts = [`Kluby: zastosowano ${r.clubs}${r.clubsSkipped ? `, pominięto ${r.clubsSkipped} (nieznane)` : ''}.`];
@@ -959,6 +989,7 @@ export function importSummary(r) {
   else parts.push(`Zawodnicy: zastosowano ${r.players}${r.playersSkipped ? `, pominięto ${r.playersSkipped} (brak w tej grze)` : ''}.`);
   if (r.created) parts.push(`Nowi zawodnicy: ${r.created}.`);
   if (r.refs) parts.push(`Sędziowie: ${r.refs}.`);
+  if (r.academyUp || r.academyFree) parts.push(`Dorośli zawodnicy z miejsc akademii: ${r.academyUp ?? 0} do pierwszej drużyny${r.academyFree ? `, ${r.academyFree} do wolnych (pełna kadra)` : ''}.`);
   if (r.squadSkipped) parts.push(`Zmiany kadry pominięte przez limit ${EDIT_SQUAD.min}-${EDIT_SQUAD.max} zawodników: ${r.squadSkipped}.`);
   return parts.join(' ');
 }

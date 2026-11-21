@@ -12,7 +12,7 @@ import { capacityOf } from '../src/career/infrastructure.js';
 import { ovrAt } from '../src/data/attributes.js';
 import { offsetsFor } from '../src/training/development.js';
 import {
-  applyPack, restoreOriginals, checkClub, checkPlayer, editClub, editPlayer, exportPack, parsePack, importPack,
+  applyPack, restoreOriginals, checkClub, checkPlayer, editClub, editPlayer, exportPack, parsePack, importPack, importSummary,
   packFileName, resetClub, clearPack, PACK_TYPE, PACK_V,
   peopleValues, checkCoach, checkOwner, checkStaff, editCoach, editOwner, editStaff,
   EDIT_SQUAD, squadSize, releaseToFree, joinFromFree, checkNewPlayer, createFreePlayer, checkReferee, editReferee, refValues,
@@ -517,4 +517,27 @@ test('Złoty wzorzec datapacku (docs/datapack/wzor.json) wczytuje się w całoś
   assert.equal(squadSize(g, 'legia'), EDIT_SQUAD.max);
   assert.equal(g.world.players['legia-8'].injuryDays, 24);
   restoreOriginals();
+});
+
+test('Datapack: dorosły zawodnik na miejscu akademii przechodzi do pierwszej drużyny albo do wolnych', () => {
+  const g = structuredClone(G);
+  const acad = g.world.clubs.legia.academy;
+  const [a1, a2] = acad;
+  const squadBefore = g.world.clubs.legia.squad.length;
+  const pack = { type: PACK_TYPE, v: PACK_V, seed: g.seed, clubs: {}, players: {
+    [a1]: { first: 'Jan', last: 'Weteran', birthDate: '1994-03-01' }, // 32 lata
+    [a2]: { first: 'Adam', last: 'Junior', birthDate: '2009-05-01' }, // 17 lat: zostaje w akademii
+  } };
+  const r = importPack(g, parsePack(JSON.stringify(pack)));
+  restoreOriginals();
+  const C = g.world.clubs.legia;
+  assert.ok(!C.academy.includes(a1), '32-latek nie może zostać w akademii');
+  assert.ok(C.academy.includes(a2));
+  assert.ok(C.squad.includes(a1));
+  assert.equal(C.squad.length, squadBefore + 1);
+  const p = g.world.players[a1];
+  assert.equal(p.clubId, 'legia');
+  assert.ok(p.contract?.wage > 0 && p.contract.until === '2028-06-30'); // 30+: 2 lata
+  assert.equal(r.academyUp, 1);
+  assert.match(importSummary(r), /Dorośli zawodnicy z miejsc akademii: 1 do pierwszej drużyny/);
 });
