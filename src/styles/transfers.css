@@ -412,3 +412,20 @@
 .xl td.fp-nat { white-space: nowrap; }
 .fp-free { color: var(--tf-good); font-weight: 600; }
 .tf-facts b .fp-fact { font-size: var(--step-0); }
+
+/* Sprzeciw dyrektora sportowego (src/ui/transfersView.js objectionPanel): uwaga, nie błąd, więc bursztyn */
+.tf-dirobj { --c: var(--tf-warn); grid-column: 1 / -1; display: grid; gap: var(--space-2); margin: 0 0 var(--space-2); padding: 12px 14px; border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--c) 9%, var(--surface)); border: 1px solid color-mix(in srgb, var(--c) 35%, var(--line)); border-left: 4px solid var(--c); }
+.tf-dirobj p { margin: 0; }
+.tf-dirobj__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.tf-dirobj__head b { font: 700 var(--step-0)/1.2 var(--font-display); color: color-mix(in srgb, var(--c) 45%, var(--text)); }
+.tf-dirobj__head span { font-size: var(--step--1); color: var(--text-muted); }
+.tf-dirobj__txt { line-height: 1.45; }
+.tf-dirobj__nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0; }
+.tf-dirobj__nums div { min-width: 0; padding: 6px 8px; border-radius: var(--radius-s); background: var(--surface); border: 1px solid color-mix(in srgb, var(--c) 20%, var(--line)); }
+.tf-dirobj__nums dt { font-size: var(--step--1); color: var(--text-muted); overflow-wrap: anywhere; }
+.tf-dirobj__nums dd { margin: 0; font: 700 var(--step-0)/1.2 var(--font-display); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tf-dirobj__nums div:last-child dd { color: color-mix(in srgb, var(--c) 50%, var(--text)); }
+.tf-dirobj .tf-btns { grid-column: auto; justify-content: flex-start; }
+.tf-dirobj .btn { white-space: normal; text-align: left; }
+.tf-incoming--obj { border-left-color: var(--tf-warn); }

@@ -27,7 +27,7 @@ import { onOfferRejected, onUserRejected } from './moveWish.js';
 import { effectiveAsk } from './mindset.js';
 import { makeProposal, proposalsFor, resolveNow } from './proposals.js'; // namysł zawodnika przed podpisem (docs/transfery.md, rozdz. 10)
 import { clubNegotiation, contestPenalty } from './clubNegotiation.js'; // ukryty atrybut Negocjacje klubów AI (docs/negocjacje.md, rozdz. 15)
-import { rynMul, kadFeeMul, sieWeight, weightedOrder } from './director.js'; // dyrektor sportowy: rynek, kadra, sieć (docs/dyrektor-sportowy.md)
+import { rynMul, kadFeeMul, sieWeight, weightedOrder, directorObjection, objectionText, directorRenegotiate, logObjection, insistPenalty, directorWho } from './director.js'; // dyrektor sportowy: rynek, kadra, sieć (docs/dyrektor-sportowy.md)
 import { fmtDate } from '../ui/dom.js';
 
 export { SEASON_END };
@@ -116,10 +116,12 @@ export function playerWillingness(game, p, toClubId = game.clubId, offerWage = n
 
 // ------------------------------------------------------------ Oferty gracza dla klubów AI
 /**
- * Oferta odstępnego za zawodnika klubu AI. Zwraca { result: 'accept'|'counter'|'reject', price, counter?, text }.
- * Po trzech odrzuceniach klub zrywa rozmowy na 14 dni.
+ * Oferta odstępnego za zawodnika klubu AI. Zwraca { result: 'accept'|'counter'|'reject'|'director', price, counter?, text }.
+ * Po trzech odrzuceniach klub zrywa rozmowy na 14 dni. 'director': klub przyjąłby ofertę, ale dyrektor sportowy klubu
+ * gracza sprzeciwia się przepłacie (objection, decyzja trenera w answerDirector; docs/dyrektor-sportowy.md, rozdz. 9).
+ * opts: { dirOk: decyzja po sprzeciwie (bez ponownego sprzeciwu), agreed: kwota uzgodniona przez dyrektora (klub ją przyjmuje) }.
  */
-export function offerForPlayer(game, playerId, fee) {
+export function offerForPlayer(game, playerId, fee, opts = {}) {
   const p = game.world.players[playerId];
   const date = game.date;
   if (isPoolContracted(p)) return offerForForeign(game, playerId, fee); // klub zagraniczny (foreignPool.js)
@@ -142,6 +144,16 @@ export function offerForPlayer(game, playerId, fee) {
   if (notForSale(game, p) && !p.contract?.clause) return { result: 'reject', text: `${seller.name}: zawodnik nie jest na sprzedaż.` };
   let price = askingPrice(game, p);
   if (breaksMinimum(game, p)) price = round(price * 1.3);
+  if (opts.agreed) price = Math.min(price, fee); // kwota wynegocjowana przez dyrektora sportowego
+  // Sprzeciw dyrektora sportowego przy wyraźnej przepłacie (weto zarządu ma pierwszeństwo, bez dublowania)
+  if (fee >= price && !opts.dirOk) {
+    const obj = directorObjection(game, p, fee, 'buy');
+    if (obj) {
+      (game.market.dirObj ??= {})[`buy:${p.id}`] = { ...obj, seller: p.clubId, warn: board.warn ?? null };
+      return { result: 'director', price, objection: obj, text: objectionText(game, obj, fmtZl) };
+    }
+  }
+  if (opts.dirOk) delete game.market.dirObj?.[`buy:${p.id}`];
   t.rounds++; t.date = date;
   game.market.talks[playerId] = t;
   if (fee >= price) { t.accepted = fee; return { result: 'accept', price, text: `${seller.name} przyjmuje ofertę ${fmtZl(fee)}. Możesz rozmawiać z zawodnikiem o kontrakcie.${board.warn ? ` ${board.warn}` : ''}` }; }
@@ -478,6 +490,15 @@ export function answerIncoming(game, offerId, action) {
     o.status = 'withdrawn';
     return { text: `${buyer.name} wycofuje ofertę za ${p.name}.` };
   }
+  // Sprzeciw dyrektora sportowego: sprzedaż wyraźnie poniżej wartości (decyzja trenera w answerDirector)
+  if (!o.pre && !o.dirOk) {
+    const obj = directorObjection(game, p, o.fee, 'sell');
+    if (obj) {
+      (game.market.dirObj ??= {})[`sell:${o.id}`] = { ...obj, offerId: o.id };
+      return { director: true, key: `sell:${o.id}`, objection: obj, text: objectionText(game, obj, fmtZl) };
+    }
+  }
+  delete game.market.dirObj?.[`sell:${o.id}`];
   // Przyjęcie: transakcja w toku (porozumienie, warunki osobiste, testy medyczne, zgłoszenie; src/career/transferDeals.js)
   const ok = (d) => { o.status = 'accepted'; o.deal = d?.id ?? null; return { text: `Porozumienie z ${buyer.name} w sprawie ${p.name} (${fmtZl(o.fee)}). Teraz warunki osobiste i testy medyczne. Do zgłoszenia zawodnik zostaje w klubie.`, deal: true }; };
   if (o.foreign) return ok(startDeal(game, { playerId: p.id, to: null, fee: o.fee, kind: 'abroad', foreign: o.foreign, needsTerms: true }));
@@ -495,6 +516,82 @@ export function answerIncoming(game, offerId, action) {
   o.status = 'accepted'; o.prop = prop.id;
   if (prop.decide <= game.date) { resolveNow(game, p.id); return { text: `Porozumienie z ${buyer.name} w sprawie ${p.name} (${fmtZl(o.fee)}). To ostatni dzień okna: zawodnik odpowiedział od razu, sprawdź pocztę.`, deal: true }; }
   return { text: `Porozumienie z ${buyer.name} w sprawie ${p.name} (${fmtZl(o.fee)}). Zawodnik rozważa warunki osobiste i odpowie do ${fmtDate(prop.decide)}. Potem testy medyczne. Do zgłoszenia zawodnik zostaje w klubie.`, deal: true };
+}
+
+// ------------------------------------------------------------ Sprzeciw dyrektora sportowego: decyzja trenera
+/** Sprzeciw w toku (z dzisiaj) dla klucza buy:<zawodnik> albo sell:<oferta>; starszy jest usuwany. */
+export function pendingObjection(game, key) {
+  const x = game.market?.dirObj?.[key];
+  if (!x) return null;
+  if (x.date !== game.date) { delete game.market.dirObj[key]; return null; }
+  return x;
+}
+
+/**
+ * Decyzja trenera po sprzeciwie dyrektora (docs/dyrektor-sportowy.md, rozdz. 9). key: buy:<zawodnik> | sell:<oferta>.
+ * action: 'back' (wycofuję się), 'reneg' (dyrektor renegocjuje: kwota lepsza o 5-15 % albo druga strona zostaje przy
+ * swojej, rzadko się wycofuje), 'insist' (transakcja idzie dalej, zaufanie zarządu -1, przy dużej różnicy więcej).
+ * Zwraca { text, ok, done (sprawa zamknięta), tried (po nieudanej renegocjacji), deal, sold, reopen }.
+ */
+export function answerDirector(game, key, action) {
+  const obj = pendingObjection(game, key);
+  if (!obj) return { ok: false, done: true, reopen: key.startsWith('sell:'), text: key.startsWith('sell:') ? 'Ta sprawa jest już nieaktualna. Oferta czeka na twoją odpowiedź.' : 'Ta sprawa jest już nieaktualna. Złóż ofertę jeszcze raz.' };
+  const p = game.world.players[obj.pid];
+  const who = directorWho(game);
+  const buy = obj.kind === 'buy';
+  const o = buy ? null : game.market.offers.find((x) => x.id === obj.offerId);
+  const other = buy ? clubById(obj.seller)?.name ?? 'Klub' : o ? offerBuyerName(o) : 'Kupiec';
+  const close = () => { delete game.market.dirObj[key]; };
+  if (!buy && (!o || o.status !== 'open')) { close(); return { ok: false, done: true, text: 'Oferta jest już nieaktualna.' }; }
+  if (action === 'back') {
+    logObjection(game, obj, 'back');
+    close();
+    return buy
+      ? { ok: true, done: true, text: `Wycofujesz ofertę za ${p.name}. ${who} uważa, że to rozsądna decyzja.` }
+      : { ok: true, done: true, reopen: true, text: `Nie przyjmujesz oferty ${other} za ${p.name}. Oferta czeka na odpowiedź do ${fmtDate(o.expires)}.` };
+  }
+  if (action === 'insist') {
+    const { dTrust } = logObjection(game, obj, 'insist');
+    close();
+    const tail = ` Zaufanie zarządu: ${game.board?.trust ?? 50} na 100 (${dTrust}).`;
+    if (buy) {
+      const r = offerForPlayer(game, obj.pid, obj.fee, { dirOk: true });
+      return { ...r, ok: r.result === 'accept', done: true, text: `Nalegasz mimo sprzeciwu dyrektora. ${r.text}${tail}` };
+    }
+    o.dirOk = true;
+    const r = answerIncoming(game, o.id, 'accept');
+    return { ...r, ok: true, done: true, text: `Nalegasz mimo sprzeciwu dyrektora. ${r.text}${tail}` };
+  }
+  if (action !== 'reneg' || obj.tried) return { ok: false, text: 'Nieznana decyzja.' };
+  const r = directorRenegotiate(game, obj);
+  if (r.ok && !buy && !o.foreign && r.fee > spendable(game.finance, o.from) - pendingFees(game, o.from)) Object.assign(r, { ok: false, quit: false }); // kupca nie stać
+  if (r.ok) {
+    logObjection(game, obj, 'reneg', { result: 'ok', fee: r.fee });
+    close();
+    const pct = `${Math.round(r.r * 100)} %`;
+    if (buy) {
+      const a = offerForPlayer(game, obj.pid, r.fee, { dirOk: true, agreed: true });
+      return { ...a, ok: a.result === 'accept', done: true, text: `${who} wynegocjował ${fmtZl(r.fee)} zamiast ${fmtZl(obj.fee)} (o ${pct} mniej). ${a.text}` };
+    }
+    o.fee = r.fee; o.dirOk = true;
+    const a = answerIncoming(game, o.id, 'accept');
+    return { ...a, ok: true, done: true, text: `${who} wynegocjował ${fmtZl(r.fee)} zamiast ${fmtZl(obj.fee)} (o ${pct} więcej). ${a.text}` };
+  }
+  if (r.quit) {
+    logObjection(game, obj, 'reneg', { result: 'quit' });
+    close();
+    if (buy) {
+      const t = game.market.talks[obj.pid] ?? { rounds: 0 };
+      t.until = addDaysIso(game.date, 14); t.rounds = 0; delete t.counter;
+      game.market.talks[obj.pid] = t;
+      return { ok: false, done: true, text: `${other} nie zgodził się na niższą kwotę i zrywa rozmowy o ${p.name}. Spróbuj za 2 tygodnie.` };
+    }
+    o.status = 'withdrawn';
+    return { ok: false, done: true, text: `${other} nie zgodził się podnieść kwoty i wycofuje ofertę za ${p.name}.` };
+  }
+  logObjection(game, obj, 'reneg', { result: 'fail' });
+  obj.tried = true;
+  return { ok: false, tried: true, text: `${other} nie zmienia zdania i zostaje przy kwocie ${fmtZl(obj.fee)}. Możesz się wycofać albo nalegać (zaufanie zarządu -${insistPenalty(obj.gap)}).` };
 }
 
 /** Nazwa kupca z oferty (klub z Polski albo z zagranicy). */

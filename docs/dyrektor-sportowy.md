@@ -9,7 +9,8 @@ Negocjacji `clubNegotiation` w `src/career/clubNegotiation.js`. Testy: `tests/di
 
 Historia decyzji: kolejka zadań (Nov 20, 2026), burza mózgów trzech ekspertów (ekonomista, matematyk, analityk
 kodu, Nov 21, 2026), plan właściciela (Nov 21, 2026), zmiana właściciela tego samego dnia: o dyrektorze decyduje
-zarząd klubu, trener może tylko poprosić o zmianę.
+zarząd klubu, trener może tylko poprosić o zmianę. Druga decyzja właściciela (Nov 21, 2026): dyrektor może się
+sprzeciwić transakcji trenera (rozdz. 9) i dyrektorzy zmieniają się także w trakcie sezonu (rozdz. 10).
 
 ## 1. Zasady
 
@@ -90,8 +91,9 @@ w `transfers.js`) dostają teraz Negocjacje i Zarządzanie kadrą (wcześniej da
 - Dawny dryf atrybutu co sezon (powrót do średniej z szumem) zastąpił rozwój osoby jak u reszty sztabu (do 45 lat
   szansa +1 jakości, od 60 lat spadek).
 - Wakat w trakcie sezonu: w poniedziałek klub AI składa ofertę wolnemu dyrektorowi (oferta wiąże, decyzja po 2-3
-  dniach); w klubie gracza zarząd sam zatrudnia dyrektora z listy wolnych (`ownerReplaceDirector`) i wysyła list.
-- Kluby AI nie podbierają dyrektorów. Do decyzji (rozdz. 8).
+  dniach; od rozdz. 10 klub szuka dyrektora na poziomie ligi: ocena powyżej średniej ligi + 1 nie daje przewagi, bez
+  dryfu Negocjacji w górę przy częstszych wakatach); w klubie gracza zarząd sam zatrudnia dyrektora z listy wolnych (`ownerReplaceDirector`) i wysyła list.
+- Poza 1 lipca: podebrania przez kluby AI, rezygnacje i zwolnienia przez właściciela, bardzo rzadko (rozdz. 10).
 
 ## 4. Klub gracza: prośba do zarządu o zmianę dyrektora
 
@@ -186,8 +188,113 @@ Transfery: `node tools/transfery-kalibracja.mjs widzew <ziarno> 3`, OVR top14 Ek
 
 ## 8. Do decyzji właściciela
 
-- Negocjacje dyrektora gracza nie działają dla gracza (gracz negocjuje sam), a podnoszą jakość i pensję. Propozycja:
-  NEG gracza w warunkach propozycji wypożyczeń albo w szansie podniesienia oferty klubu AI („Poproś o więcej”).
+- Negocjacje dyrektora gracza: od rozdz. 9 działają przy renegocjacji po sprzeciwie (kupno i sprzedaż).
 - Błąd wyceny przy RYN 10 nie jest zerowy (12,9 %), więc ceny pojedynczych zawodników różnią się od dawnych.
-- Kluby AI nie podbierają dyrektorów; czy mają (rzadko, jak sztab)?
+- Kluby AI podbierają dyrektorów od rozdz. 10 (decyzja właściciela Nov 21, 2026).
+- Sprzeciw dyrektora przy bardzo drogim kontrakcie (pensja) nie jest wdrożony: kontrakt pilnuje weto zarządu.
+- Rotacja podnosi Negocjacje dyrektorów Ekstraklasy o ok. 0,9 po 3 sezonach (rozdz. 11): zostawić (duże kluby
+  przyciągają lepszych dyrektorów) czy ograniczyć podebrania?
+- Po nieudanej renegocjacji „nalegam” kosztuje tyle samo zaufania co bez niej (renegocjacja jest więc zwykle
+  pierwszym wyborem; ryzyko: druga strona może zerwać rozmowy).
 - Progi prośby o zmianę dyrektora (zgoda od S 10, szansa kandydata 75 %) bez symulacji wielu sezonów.
+
+## 9. Sprzeciw dyrektora wobec transakcji trenera (klub gracza)
+
+Decyzja właściciela Nov 21, 2026. Kod: `directorObjection`, `directorFairPrice`, `directorRenegotiate`,
+`logObjection` w `src/career/director.js`; przebieg w `offerForPlayer`, `answerIncoming` i `answerDirector`
+(`src/career/transfers.js`); okno w karcie zawodnika i w Ofertach (`objectionPanel`, `src/ui/transfersView.js`,
+akcja `tf-dir`); list z decyzją (`objectionMessage`, decyzja `dirObjection` w `src/career/careerSystem.js`); historia
+w Klub, Zarząd („Sprzeciwy dyrektora sportowego”, `game.board.requests.dirLog`, 20 wpisów). Kluby AI: dyrektor AI
+negocjuje sam (rozdz. 2), bez sprzeciwu. Testy: `tests/directorObjection.test.mjs`.
+
+- Kiedy: kupno z odstępnym od klubu z Polski (gdy klub sprzedający przyjąłby ofertę) i sprzedaż zawodnika (przyjęcie
+  oferty klubu z Polski albo z zagranicy, bez oferty z umową od 1 lipca). Kupno z zagranicy zostaje zadaniem skauta,
+  wypożyczenia i kontrakty bez sprzeciwu.
+- Kolejność: weto zarządu ma pierwszeństwo (kwota ponad progi zarządu: tylko weto, bez sprzeciwu), więc nic się nie
+  dubluje. Wakat i gra bez stanu sztabu: bez sprzeciwu.
+- Wycena dyrektora (z błędem Znajomości rynku, ten sam mnożnik `rynMul` co w klubach AI, bez cudzych ofert):
+  kupno: uczciwa cena = wartość rynkowa w lidze sprzedającego x 1,45 (x 1,08 z listy transferowej, x 0,4 przy
+  rozwiązaniu) x reputacja, czyli wzór ceny klubu bez błędu sprzedającego; sprzedaż: wartość rynkowa w lidze gracza.
+- Różnica: kupno kwota / wycena - 1, sprzedaż 1 - kwota / wycena. Sprzeciw możliwy od 25 %. Szansa
+  (0,10 + 1,4 x (różnica - 0,25)), najwyżej 90 %, x (0,5 + 0,05 KAD) (KAD 1 x0,55, KAD 10 x1, KAD 20 x1,5), najwyżej 95 %.
+  Jeden rzut na zawodnika, rodzaj i dyrektora w pół sezonu: zmiana kwoty nie losuje od nowa.
+- Uzasadnienie: „Trenerze, według mnie X jest wart ok. Y. Płacimy Z, czyli o N % za dużo.” (sprzedaż: „Sprzedajemy go
+  za Z, czyli o N % poniżej jego wartości.”).
+- Decyzje trenera (tylko tego dnia):
+  - wycofuję się: kupno bez oferty, sprzedaż: oferta dalej czeka na odpowiedź; bez kary;
+  - renegocjacja (Negocjacje + los): szansa 45 % + 3 pp na punkt NEG ponad 10 (15-80 %), kwota lepsza o 5-15 % (lepszy
+    negocjator bliżej 15 %); kupno: klub przyjmuje niższe odstępne; sprzedaż: kupiec płaci więcej, jeśli go stać.
+    Porażka: druga strona zostaje przy swojej kwocie (trener wybiera dalej: wycofuję się albo nalegam), w 8 % zrywa
+    rozmowy (kupno: klub nie rozmawia 14 dni; sprzedaż: kupiec wycofuje ofertę);
+  - nalegam: transakcja idzie dalej, zaufanie zarządu -1, przy różnicy od 50 % -2, od 100 % -3, wpis w historii.
+- Ekran: panel „Sprzeciw dyrektora sportowego” zamiast formularza oferty (kupno) albo przy ofercie w Ofertach
+  (sprzedaż), z wyceną, kwotą, różnicą i trzema przyciskami; przy przyjęciu oferty z poczty list dyrektora z trzema
+  decyzjami (po nieudanej renegocjacji drugi list z dwiema).
+
+Pomiar (Nov 21, 2026, ziarno 31, dyrektorzy 18 klubów Ekstraklasy jako klub gracza, zawodnicy Ekstraklasy i 1 Ligi,
+poza wetem zarządu):
+
+| Kwota | Sprzeciw |
+| --- | --- |
+| cena klubu | 2,4 % |
+| cena x 1,2 | 12,2 % |
+| cena x 1,5 | 41,9 % |
+| cena x 2 | 80,4 % |
+| sprzedaż za 0,85 / 1,0 wartości | 1,6 % / 0,2 % |
+| sprzedaż za 0,5 wartości | 46,2 % |
+
+## 10. Rotacja dyrektorów w trakcie sezonu (gracz i kluby AI)
+
+Decyzja właściciela Nov 21, 2026. Kod: `src/career/directorRotation.js` (system dnia, poniedziałek, po rynku sztabu),
+licznik i historia `logDirectorMove` w `src/career/staffMarket.js` (`game.staff.dirRot[sezon]`, `game.staff.dirLog`).
+Testy: `tests/directorObjection.test.mjs`. Zmiany 1 lipca (rozdz. 3) bez zmian.
+
+- Rezygnacja: 2,5 % na sezon na klub (1 - 0,975^(1/52) na tydzień), nie w pierwszych 90 dniach. Powody: lepsza oferta
+  poza polską ligą, konflikt z zarządem, rodzina, emerytura (od 60 lat, waga 3). Konflikt: lista wolnych dyrektorów;
+  pozostałe: osoba odchodzi z polskiej piłki. Bez odprawy. Klub gracza: list dyrektora „Dyrektor sportowy rezygnuje”;
+  wakat obsadza zarząd w kolejny poniedziałek jak dotąd (list „Nowy dyrektor sportowy”). Kluby AI: Media (liga gracza).
+- Zwolnienie przez właściciela bez prośby trenera: 2 % na sezon na klub, nie w pierwszych 180 dniach. Powody: konflikt,
+  oszczędności (dwa razy częściej przy ujemnym saldzie), słaby rynek transferowy (częściej przy niskiej Znajomości
+  rynku). Odprawa z kasy klubu, zwolniony na listę wolnych. Klub gracza: zarząd od razu zatrudnia następcę
+  (`ownerReplaceDirector`) i pisze list z powodem; klub AI: wakat do poniedziałku, Media (liga gracza).
+- Podebranie: w tygodniach w miesiącach okien (czerwiec-sierpień, grudzień-luty) z szansą 30 % jeden klub AI
+  (Ekstraklasa do 2 Ligi) z dyrektorem słabszym niż przeciętny w jego lidze szuka dyrektora w klubie o co najmniej
+  15 punktów reputacji niższym (także w klubie gracza): kandydat lepszy od obecnego o 2 i nie słabszy od średniej
+  ligi, najbliżej poziomu ligi (jak przy sztabie: bez przepłacania), pensja co najmniej o 15 % wyższa, w budżecie
+  sztabu. Zasady jak podbieranie sztabu: limity prób (pierwsze 6 miesięcy umowy bez prób, 1 próba na osobę w pół
+  sezonu, 2 na klub gracza, limity krajowe), osoba decyduje po 2-3 dniach (`decideDay`), zarząd obecnego klubu
+  zgadza się (rekompensata 3 pensje) albo blokuje (50 %, wtedy osoba może zerwać umowę i klub dostaje karę). Klub
+  gracza: decyduje zarząd, gracz dostaje list o ofercie i o decyzji dyrektora (nadawca Zarząd klubu); po odejściu
+  wakat obsadza zarząd.
+
+Kalibracja (`node tools/transfery-kalibracja.mjs widzew <ziarno> 3`, zmiany poza 1 lipca na sezon: podebrania,
+rezygnacje, zwolnienia przez właściciela): wyniki w rozdz. 11.
+
+## 11. Kalibracja rozdz. 9 i 10 (Nov 21, 2026)
+
+`node tools/transfery-kalibracja.mjs widzew <ziarno> 3`, OVR top14 Ekstraklasy po sezonach 2026/27, 2027/28, 2028/29
+(przed: stan sprzed rozdz. 9 i 10):
+
+| Ziarno | Przed | Po |
+| --- | --- | --- |
+| 5 | 11,64 / 11,83 / 11,84 | 11,64 / 11,81 / 11,73 |
+| 7 | 11,49 / 11,52 / 11,69 | 11,60 / 11,70 / 11,89 |
+| 9 | 11,64 / 11,83 / 11,88 | 11,62 / 11,80 / 11,83 |
+| średnio | 11,59 / 11,73 / 11,80 | 11,62 / 11,77 / 11,82 |
+
+Zmiany dyrektorów poza 1 lipca na sezon (9 sezonów, ok. 126 klubów z kadrą):
+
+| Ziarno | Podebrania (próby) | Rezygnacje | Zwolnienia przez właściciela | Razem |
+| --- | --- | --- | --- | --- |
+| 5 | 3 (5) / 6 (9) / 5 (5) | 6 / 2 / 2 | 4 / 1 / 3 | 13 / 9 / 10 |
+| 7 | 1 (3) / 5 (9) / 4 (5) | 4 / 4 / 2 | 4 / 2 / 1 | 9 / 11 / 7 |
+| 9 | 6 (8) / 4 (5) / 5 (8) | 3 / 4 / 1 | 3 / 4 / 7 | 12 / 12 / 13 |
+| średnio | 4,3 | 3,1 | 3,2 | 10,7 |
+
+- Oczekiwane: rezygnacje 2,5 % x 126 = 3,2, zwolnienia 2 % x 126 = 2,5 (powyżej, bo zwolniony dyrektor klubu AI
+  bywa zastąpiony w tym samym sezonie i znów losuje). Do tego zmiany 1 lipca jak dotąd (rozdz. 3).
+- Kluby AI z ujemnym saldem: 0. Wakaty na koniec sezonu: 0. `node tools/multiseason.mjs widzew 5 3`: bez błędów.
+  `npm run perf`: sezon 11,6-12,4 s wobec 12,3 s (szum pomiaru).
+- Negocjacje dyrektorów Ekstraklasy po 3 sezonach: średnio 12,7 (przed 11,8): podebrania przenoszą lepszych dyrektorów
+  wyżej. Wakat klub AI obsadza dyrektorem na poziomie ligi (rozdz. 3), co ogranicza wzrost (bez tego 12,9). OVR bez
+  dryfu. Do decyzji właściciela (rozdz. 8).

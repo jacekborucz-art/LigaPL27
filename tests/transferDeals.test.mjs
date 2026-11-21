@@ -298,7 +298,7 @@ test('Kupcy z zagranicy: ligi co najmniej Ekstraklasa - 0,5 i rynki pieniężne;
 test('Sprzedaż za granicę: oferta w Ofertach, przyjęcie, zawodnik wyjeżdża (p.abroad), klub dostaje pieniądze', () => {
   const g = newGame('widzew', 54, '2026-07-07');
   const p = squadOf(g.world, 'widzew').sort((a, b) => b.ovr - a.ovr)[4];
-  g.market.offers.unshift({ id: 'of-z', kind: 'incoming', playerId: p.id, from: null, foreign: { country: 'TUR', countryName: 'Turcja', name: 'klub z ligi tureckiej', clubId: null, rep: 43, repU: 68, wage: p.contract.wage * 2 }, fee: 2e6, status: 'open', date: g.date, expires: addDays(g.date, 6) });
+  g.market.offers.unshift({ id: 'of-z', kind: 'incoming', playerId: p.id, from: null, foreign: { country: 'TUR', countryName: 'Turcja', name: 'klub z ligi tureckiej', clubId: null, rep: 43, repU: 68, wage: p.contract.wage * 2 }, fee: 2e6, status: 'open', date: g.date, expires: addDays(g.date, 6), dirOk: true }); // dirOk: bez sprzeciwu dyrektora (tests/directorObjection.test.mjs)
   const html = renderTransfers(g, { tfTab: 'oferty' });
   assert.match(html, /klub z ligi tureckiej/);
   const r = answerIncoming(g, 'of-z', 'accept');

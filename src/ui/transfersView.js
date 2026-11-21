@@ -12,8 +12,9 @@ import { repHtml } from './squadView.js'; // reputacja z trendem (docs/reputacja
 import { RENEW_WINDOW_MONTHS } from '../career/negotiation.js';
 import {
   marketLists, searchPlayers, askingPrice, notForSale, playerWillingness, offerForPlayer, answerIncoming, loanIn,
-  releaseCost, releasePlayer, inWindow, windowOf, fmtZl, recentlyMoved,
+  releaseCost, releasePlayer, inWindow, windowOf, fmtZl, recentlyMoved, answerDirector, pendingObjection, offerBuyerName,
 } from '../career/transfers.js';
+import { objectionText, insistPenalty } from '../career/director.js'; // sprzeciw dyrektora sportowego (docs/dyrektor-sportowy.md, rozdz. 9)
 import { spendable, wageRoom, wageBill, monthSummary, seasonSummary, FIN_LABELS } from '../career/finance.js';
 import { trustLabel, tablePos } from '../career/board.js';
 import { fansSummary } from '../career/fans.js';
@@ -310,6 +311,29 @@ function cardHead(game, p, extra = '') {
     ${scoutHidden(game, p) ? `<b class="tf-ch__ovr tf-ch__ovr--eye"><small>OVR</small>${scoutEye()}</b>` : `<b class="tf-ch__ovr" title="Ocena ogólna 1-20"><small>OVR</small>${ovrTxt(p)}</b>`}
   </header>`;
 }
+/**
+ * Sprzeciw dyrektora sportowego w miejscu zatwierdzania transakcji: uzasadnienie (wycena dyrektora, bez cudzych ofert)
+ * i trzy decyzje trenera: renegocjacja (po nieudanej już niedostępna), nalegam, wycofuję się. key: buy:<id> | sell:<oferta>.
+ */
+export function objectionPanel(game, key, obj) {
+  const buy = obj.kind === 'buy';
+  const o = buy ? null : game.market.offers.find((x) => x.id === obj.offerId);
+  const other = buy ? clubById(obj.seller)?.name ?? 'Klub' : o ? offerBuyerName(o) : 'Kupiec';
+  const pen = insistPenalty(obj.gap);
+  const btn = (a, label, cls = 'btn--quiet') => `<button class="btn ${cls} btn--sm" data-act="tf-dir" data-k="${esc(key)}" data-a="${a}">${esc(label)}</button>`;
+  return `<div class="tf-dirobj" role="alert" data-k="${buy ? 'buy' : 'sell'}">
+    <p class="tf-dirobj__head"><b>Sprzeciw dyrektora sportowego</b><span>${esc(obj.name)}</span></p>
+    <p class="tf-dirobj__txt">${esc(objectionText(game, obj, fmtZl))}${obj.tried ? ` ${esc(`${other} nie zmienia zdania i zostaje przy swojej kwocie.`)}` : ''}</p>
+    <dl class="tf-dirobj__nums">
+      <div><dt>Wycena dyrektora</dt><dd>${esc(fmtZl(obj.ref))}</dd></div>
+      <div><dt>${buy ? 'Twoja oferta' : esc(`Oferta: ${other}`)}</dt><dd>${esc(fmtZl(obj.fee))}</dd></div>
+      <div><dt>${buy ? 'Przepłata' : 'Poniżej wartości'}</dt><dd>${Math.round(obj.gap * 100)} %</dd></div>
+    </dl>
+    <div class="tf-btns">${obj.tried ? '' : btn('reneg', 'Niech dyrektor renegocjuje', 'btn--primary')}${btn('insist', `Nalegam: ${buy ? 'płacimy' : 'sprzedaję za'} ${fmtZl(obj.fee)}`)}${btn('back', buy ? 'Wycofuję ofertę' : 'Nie sprzedaję teraz')}</div>
+    <p class="hint">${obj.tried ? '' : esc(`Renegocjacja: dyrektor spróbuje ${buy ? 'obniżyć' : 'podnieść'} kwotę o 5-15 %, szansa zależy od jego negocjacji. Przy porażce ${other} zostaje przy swojej kwocie, rzadko zrywa rozmowy. `)}Nalegam: transakcja idzie dalej, zaufanie zarządu -${pen}. Decyzja tylko dziś.</p>
+  </div>`;
+}
+
 const fact = (k, v, m = '') => `<li${m ? ` data-m="${m}"` : ''}><small>${esc(k)}</small><b>${v}</b></li>`;
 
 function playerCard(game, p, ui) {
@@ -329,6 +353,7 @@ function playerCard(game, p, ui) {
   if (free) actions.push(`<p class="tf-p__txt">Wolny zawodnik: bez odstępnego, rozmawiasz od razu o kontrakcie.</p><button class="btn btn--primary" data-act="tf-negotiate" data-id="${esc(p.id)}">Rozmawiaj o kontrakcie</button>`);
   else if (p.loan) actions.push(`<p class="tf-p__txt">Wypożyczony z ${esc(clubById(p.loan.from)?.name ?? '')} do ${esc(fmtDate(p.loan.until))}. Klub wypożyczający nie może go sprzedać ani wypożyczyć dalej; o transferze porozmawiasz po jego powrocie.</p>`);
   else if (talk?.accepted) actions.push(`<p class="notice">Klub przyjął ofertę ${fmtZl(talk.accepted)}.</p><button class="btn btn--primary" data-act="tf-negotiate" data-id="${esc(p.id)}">Rozmawiaj z zawodnikiem</button>`);
+  else if (!nfs && pendingObjection(game, `buy:${p.id}`)) actions.push(objectionPanel(game, `buy:${p.id}`, pendingObjection(game, `buy:${p.id}`)));
   else if (!nfs) {
     actions.push(`<div class="tf-offer"><label>Oferta odstępnego (zł)<input id="tfFee" type="number" min="0" step="10000" value="${talk?.counter ?? Math.round(price * 0.9 / 10000) * 10000}"></label>
       <button class="btn btn--primary" data-act="tf-offer" data-id="${esc(p.id)}" ${open ? '' : 'disabled'}>Złóż ofertę</button></div>
@@ -505,10 +530,11 @@ function offersView(game) {
     const who = o.foreign ? o.foreign.name : clubById(o.from).name;
     const whom = p ? `${p.pos} ${p.name}` : 'zawodnika';
     const what = o.foreign ? `${o.foreign.countryName ?? o.foreign.country}: chce ${whom}, pensja ok. ${fmtZl(o.foreign.wage)} tygodniowo` : o.pre ? `chce ${whom} już teraz (umowa od 1 lipca)` : `chce ${whom}`;
-    return `<li class="tf-incoming" data-pid="${esc(o.playerId)}">
+    const obj = pendingObjection(game, `sell:${o.id}`); // sprzeciw dyrektora sportowego przy sprzedaży
+    return `<li class="tf-incoming${obj ? ' tf-incoming--obj' : ''}" data-pid="${esc(o.playerId)}">
       <div class="tf-incoming__who">${o.foreign ? '<span class="td-flag" aria-hidden="true"></span>' : crest(o.from, 32)}<div><b>${esc(who)}</b><span>${esc(what)}</span></div></div>
       <div class="tf-incoming__fee"><b>${fmtZl(o.fee)}</b><small>ważna do ${esc(fmtDate(o.expires))}${p ? `, wartość ${fmtZl(p.value)}` : ''}</small></div>
-      <span class="tf-btns"><button class="btn btn--primary btn--sm" data-act="tf-answer" data-o="${esc(o.id)}" data-a="accept">Przyjmij</button>${o.raised || o.pre ? '' : `<button class="btn btn--quiet btn--sm" data-act="tf-answer" data-o="${esc(o.id)}" data-a="more">Żądaj więcej</button>`}<button class="btn btn--quiet btn--sm" data-act="tf-answer" data-o="${esc(o.id)}" data-a="reject">Odrzuć</button></span>
+      ${obj ? objectionPanel(game, `sell:${o.id}`, obj) : `<span class="tf-btns"><button class="btn btn--primary btn--sm" data-act="tf-answer" data-o="${esc(o.id)}" data-a="accept">Przyjmij</button>${o.raised || o.pre ? '' : `<button class="btn btn--quiet btn--sm" data-act="tf-answer" data-o="${esc(o.id)}" data-a="more">Żądaj więcej</button>`}<button class="btn btn--quiet btn--sm" data-act="tf-answer" data-o="${esc(o.id)}" data-a="reject">Odrzuć</button></span>`}
     </li>`;
   }).join('')}</ul>` : '<p class="tf-p__txt">Brak ofert. Kluby składają je w oknie transferowym, częściej za zawodników z listy transferowej.</p>';
   const talks = mine.length ? `<ul class="tf-mini">${mine.map(({ p, t }) => {
@@ -713,7 +739,7 @@ export function handleTransferAction(game, act, ds = {}, root = null) {
     case 'tf-offer': {
       const fee = Number(val('#tfFee', ds.fee)) || 0;
       const r = offerForPlayer(game, p.id, fee);
-      return { ui: { tfMsg: r.text }, save: true };
+      return { ui: { tfMsg: r.result === 'director' ? null : r.text }, save: true }; // sprzeciw dyrektora: panel w karcie
     }
     case 'tf-loan': return loanInAction(game, p, ds, root); // warunki wypożyczenia: src/ui/loansView.js
     case 'tf-negotiate': {
@@ -759,7 +785,16 @@ export function handleTransferAction(game, act, ds = {}, root = null) {
     }
     case 'tf-answer': {
       const r = answerIncoming(game, ds.o, ds.a);
+      if (r.director) return { ui: { tfMsg: null }, save: true }; // sprzeciw dyrektora: panel przy ofercie
       return { ui: { tfMsg: r.text }, save: true, resolveOffer: ds.o, squadChanged: !!r.sold, note: r.text };
+    }
+    case 'tf-dir': { // decyzja po sprzeciwie dyrektora sportowego (src/career/transfers.js answerDirector)
+      const key = String(ds.k ?? '');
+      const r = answerDirector(game, key, ds.a);
+      if (!r.tried) game.inbox = (game.inbox ?? []).map((m) => (m.refs?.kind === 'dirObjection' && m.refs.key === key && !m.resolved ? { ...m, read: true, resolved: true } : m));
+      const offerId = key.startsWith('sell:') ? key.slice(5) : null;
+      const closed = offerId && game.market.offers.find((x) => x.id === offerId)?.status !== 'open';
+      return { ui: { tfMsg: r.text }, save: true, ...(closed ? { resolveOffer: offerId } : {}), squadChanged: !!r.sold, note: r.text };
     }
     default: return handleDealAction(game, act, ds) ?? { ui: {} };
   }
