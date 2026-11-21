@@ -347,7 +347,10 @@ export function playerMenu(game, pid, { view, ui = {}, why = null, lineup = null
   if (!own) return { ...head, items: tidy(otherItems(game, p, { view, ui })) };
 
   const academy = !!game.world.clubs?.[game.clubId]?.academy?.includes(p.id);
-  const profile = item('Profil zawodnika', NAV.profile(p.id), { primary: view === 'squad', hint: 'Atrybuty, stan, kontrakt, charakter' });
+  // Trening i Pulpit: profil w okienku (atrybuty, pozycje, statystyki, kontrakt), trener zostaje na swoim ekranie
+  const profile = ['training', 'dashboard'].includes(view)
+    ? item('Profil zawodnika', NAV.pcard(p.id), { hint: 'Atrybuty, pozycje, statystyki, kontrakt w okienku' })
+    : item('Profil zawodnika', NAV.profile(p.id), { primary: view === 'squad', hint: 'Atrybuty, stan, kontrakt, charakter' });
   const stats = item('Statystyki i historia', NAV.stats(p.id), { hint: 'Mecze, gole, asysty i oceny w rozgrywkach, kluby' });
   const report = ui.repOpen === p.id ? null : item('Raport asystenta', NAV.assistant(p.id), { hint: 'Ukryte cechy, stan, zalecenia' });
   if (academy) {
@@ -381,9 +384,7 @@ export function playerMenu(game, pid, { view, ui = {}, why = null, lineup = null
     case 'training': {
       const inEditor = ui.trPlayer === p.id;
       const tr = trainingItems(p, { inEditor }).map((x) => (x.label === 'Ustawienia treningu' ? { ...x, primary: true } : x));
-      // Profil w okienku (atrybuty, pozycje, statystyki, kontrakt): trener zostaje w Treningu
-      const profileModal = item('Profil zawodnika', NAV.pcard(p.id), { hint: 'Atrybuty, pozycje, statystyki, kontrakt w okienku' });
-      items = [...tr, ui.trTab === 'rozwoj' ? null : item('Raport rozwoju', NAV.report(), { hint: 'Kto rośnie, a kto spada' }), SEP, profileModal, report, talk, contractSub];
+      items = [...tr, ui.trTab === 'rozwoj' ? null : item('Raport rozwoju', NAV.report(), { hint: 'Kto rośnie, a kto spada' }), SEP, profile, report, talk, contractSub];
       break;
     }
     case 'transfers': {

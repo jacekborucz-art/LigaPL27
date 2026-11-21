@@ -600,16 +600,16 @@ function renderTab(tab, g, club) {
     if (tab === 'kadra' || tab === 'transfery' || tab === 'trening' || (tab === 'klub' && state.kTab !== 'kariera')) return unemployedNotice(g, tab);
     if (tab === 'pulpit' && !state.fx) return renderJoblessDashboard(g, club);
   }
-  if (tab === 'pulpit' && state.todo) { const res = buildWeeklyTodo(g); noteTodoSeen(g, res); return renderTodo(res, state); }
-  if (tab === 'pulpit') return state.fx ? renderFixtures(g, state.fx) : renderDashboard(g, club);
-  if (tab === 'poczta') return renderMail(g);
-  // Karta zawodnika w okienku: Transfery (nazwisko) i Trening (menu pod prawym przyciskiem)
+  // Karta zawodnika w okienku: Transfery (nazwisko) i Trening i Pulpit (menu pod prawym przyciskiem)
   const withCard = (html) => {
     const cp = state.tfCard && g.world.players[state.tfCard];
     if (!cp) { state.tfCard = null; return html; }
     queueMicrotask(mountTfCard); // po wstawieniu HTML: okno modalne na telefonie, pływające na PC
     return html + transferCardHtml(g, cp, { wide: matchMedia(WIDE_CARD).matches });
   };
+  if (tab === 'pulpit' && state.todo) { const res = buildWeeklyTodo(g); noteTodoSeen(g, res); return renderTodo(res, state); }
+  if (tab === 'pulpit') return state.fx ? renderFixtures(g, state.fx) : withCard(renderDashboard(g, club));
+  if (tab === 'poczta') return renderMail(g);
   if (tab === 'trening') return withCard(renderTraining(g, state));
   if (tab !== 'transfery') state.tfCard = null;
   if (tab === 'transfery') {
@@ -1654,7 +1654,7 @@ function mountTfCard() {
   (d.querySelector('.tcard__name') ?? d.querySelector('.tdet__x'))?.focus({ preventScroll: true });
 }
 app.addEventListener('cancel', (ev) => { if (ev.target.matches?.('dialog.tf-pcard')) { ev.preventDefault(); closeTfCard(); } });
-app.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && state.tfCard && (state.tab === 'transfery' || state.tab === 'trening')) { ev.preventDefault(); ev.stopPropagation(); closeTfCard(); } });
+app.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && state.tfCard && ['transfery', 'trening', 'pulpit'].includes(state.tab)) { ev.preventDefault(); ev.stopPropagation(); closeTfCard(); } });
 
 app.addEventListener('click', (ev) => {
   // Nazwisko w Transferach działa jak link: otwiera kartę w okienku zamiast karty transferowej

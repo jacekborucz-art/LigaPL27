@@ -36,7 +36,7 @@ Zrobione:
   statystyki, kontrakt), bez przejścia do Kadry. Akcja `pcard` w `src/app.js`, `NAV.pcard` w `playerMenus.js`.
 - Okienko karty działa w Transferach i Treningu; zmiana zakładki je zamyka.
 Zostało / dalej:
-- Do decyzji właściciela: profil w okienku także w innych widokach (Pulpit, Skład i taktyka, Rozmowy).
+- Pulpit: „Profil zawodnika” z menu też w okienku (prośba właściciela). Skład i taktyka ma kartę „Atrybuty” na ekranie.
 
 ## Nov 21, 2026, profil A (chmura), wersja v1.23 Beta
 Zrobione:
