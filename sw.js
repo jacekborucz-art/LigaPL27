@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-9dbee8bbda';
+const VERSION = 'v0.3-488084fcd9';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -211,8 +211,8 @@ const FILES = [
   ['./src/career/loans.js', '6ff6e21d87'],
   ['./src/career/mindset.js', '5654596582'],
   ['./src/career/morale.js', '1c7d0eb69f'],
-  ['./src/career/moveWish.js', '83a156f749'],
-  ['./src/career/negotiation.js', '73d81951b0'],
+  ['./src/career/moveWish.js', 'bffe77ded7'],
+  ['./src/career/negotiation.js', '07371f5b98'],
   ['./src/career/negotiationLines.js', 'cc97d8137f'],
   ['./src/career/offerFactors.js', 'fa80be89e3'],
   ['./src/career/owners.js', '881a7a1333'],
@@ -240,8 +240,9 @@ const FILES = [
   ['./src/career/threat.js', 'bd519d5790'],
   ['./src/career/transferDeals.js', 'f577739259'],
   ['./src/career/transferSystem.js', 'a671fa42a7'],
-  ['./src/career/transfers.js', '17a3f50627'],
+  ['./src/career/transfers.js', '8e34caccfe'],
   ['./src/career/weeklyTodo.js', 'c5096fc54c'],
+  ['./src/career/wishMemory.js', '26061765e6'],
   ['./src/config/calendar2026.js', '472a17ae89'],
   ['./src/config/competitions.js', '1ba35856b2'],
   ['./src/config/version.js', 'ecd3a4b86a'],
@@ -312,7 +313,7 @@ const FILES = [
   ['./src/season/uefa.js', '750aef61b1'],
   ['./src/season/uefaCoef.js', 'e978b7d220'],
   ['./src/season/worldNations.js', '6003d36e12'],
-  ['./src/styles/app.css', '3267ce7441'],
+  ['./src/styles/app.css', '2efc98ab90'],
   ['./src/styles/assistant.css', 'a1dd04f875'],
   ['./src/styles/base.css', 'f2fee58203'],
   ['./src/styles/club.css', '6615e08e49'],
@@ -371,19 +372,19 @@ const FILES = [
   ['./src/ui/matchdayView.js', '4826993af0'],
   ['./src/ui/menuView.js', 'a5ede751c2'],
   ['./src/ui/nationalView.js', '92d610d773'],
-  ['./src/ui/negotiationView.js', '50fc7bfe08'],
+  ['./src/ui/negotiationView.js', '31fc30f72a'],
   ['./src/ui/playerCard.js', '6864228807'],
   ['./src/ui/playerInstrView.js', '9e2555a798'],
   ['./src/ui/playerMenus.js', '572dde4d5d'],
   ['./src/ui/playerStatsView.js', '00e99b6845'],
-  ['./src/ui/playerTags.js', '4e80b7acce'],
+  ['./src/ui/playerTags.js', 'ccf10ebf2f'],
   ['./src/ui/positionMap.js', 'ef2c032d52'],
   ['./src/ui/postMatchView.js', 'acdba6d632'],
   ['./src/ui/reservesView.js', '0768b9e72d'],
   ['./src/ui/scoutMask.js', '6b18a0fc37'],
   ['./src/ui/scoutingView.js', '83ec057eb1'],
   ['./src/ui/sponsorsView.js', '93ea7f72b4'],
-  ['./src/ui/squadView.js', '2a5f1e977d'],
+  ['./src/ui/squadView.js', 'ba12dbeaec'],
   ['./src/ui/staffView.js', 'e81a09aea9'],
   ['./src/ui/sysMenu.js', 'fc1677717f'],
   ['./src/ui/tacticsArrows.js', '79ec9ea7a0'],
@@ -394,7 +395,7 @@ const FILES = [
   ['./src/ui/teamReportView.js', 'c01abc57b6'],
   ['./src/ui/todoView.js', 'bd4d7aa1c4'],
   ['./src/ui/trainingView.js', '65ae2cbea9'],
-  ['./src/ui/transferDealsView.js', 'a92be2dddd'],
+  ['./src/ui/transferDealsView.js', 'd1c8751239'],
   ['./src/ui/transfersView.js', 'afe884ca73'],
   ['./src/world/ephemeral.js', '216b6bcdd9'],
   ['./src/world/playerGen.js', '7033b8b243'],

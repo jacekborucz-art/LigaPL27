@@ -102,28 +102,90 @@ Poniedziałki, `p.stepDown` w zakresie 0-1:
 
 ## 4. Prośby o transfer i kupcy z zagranicy
 
-Prośba (`p.moveWish`) powstaje:
-- po odrzuceniu oferty klubu o reputacji co najmniej o 10 wyższej albo oferty z zagranicy z pensją >= 1,5 obecnej:
-  `P = 0,25 + 0,03 (ambicja - 10) + 0,02 (ego - 10) - 0,03 (lojalność - 10) + (rep zawodnika - rep klubu > 15 ? 0,15 : 0)
-  + (21-27 lat ? 0,1 : 0) - (kontrakt podpisany < 6 miesięcy temu ? 0,15 : 0)`. Zawodnik klubu AI dowiaduje się
-  o odrzuconej ofercie z zagranicy w 50 % przypadków [SZAC];
-- z ryzyka miesięcznego (1. dnia miesiąca, `Rng('prosba-transfer:${seed}:${pid}:${YYYY-MM}')`):
-  `h = base x f_rep x f_ławka x f_odmowa x f_wiek x f_charakter x f_miesiąc` (najwyżej 0,08), f_rep = 1 + max(0,
-  rep zawodnika - rep klubu - 10)/10, f_ławka 2,5 (udział minut < 0,35 przy >= 6 meczach), f_odmowa 3 (odmówił
-  przedłużenia), f_wiek 1,5 (21-27) albo 0,5 (31+), f_charakter = (1 + 0,08 (ambicja - 10)) (1 - 0,05 (lojalność - 10))
-  x (niezadowolony ? 2 : 1), f_miesiąc 2 (Jun-Aug, Jan-Feb) albo 0,5; 0 przy prekontrakcie, x0,2 po transferze
-  w ostatnich 180 dniach. Spec podaje base = 0,003; po kalibracji base = 0,0008, bo większość próśb pochodzi
-  z odrzuconych ofert.
+Prośba (`p.moveWish`) powstaje po odrzuconej ofercie (jeden rzut z pamięcią, niżej) albo z ryzyka miesięcznego.
+Od Nov 21, 2026 zawodnik pamięta odrzucone oferty i podwyżki (`p.wishMemory`, `src/career/wishMemory.js`), więc
+nie ma pętli „podwyżka = reset, oferta = nowa prośba”. Wszystkie liczby [SZAC].
+
+Pamięć zawodnika: `p.wishMemory = { rejects: [daty], lastRoll, lastRaise, raises: [daty], lastTalk, calmUntil, mood,
+moodSince, dream, grudge, waitUntil, settle: { from, months, forced } }`. Stary zapis bez pola: brak wspomnień
+(wszystkie czynniki 1), pole powstaje przy pierwszej odrzuconej ofercie albo przedłużeniu.
+Stany: spokojny (przyjął odmowę), rozczarowany (zostaje, ale pamięta: bez listu, morale -2, dopisek w karcie),
+cicha i oficjalna prośba (jak wcześniej), czeka (obietnica zgody na transfer).
+
+Odrzucona oferta (klub o reputacji co najmniej o 10 wyższej albo oferta z zagranicy z pensją >= 1,5 obecnej;
+zawodnik klubu AI dowiaduje się o odrzuconej ofercie z zagranicy w 50 % przypadków):
+- jeden rzut `u` (`Rng('prosba-odrzucenie:${seed}:${pid}:${data}')`): `u < Pc` cicha prośba; `u < Pc + Pr`
+  rozczarowany; reszta spokojny na 4-8 miesięcy (`calmUntil`, kolejne oferty x0,5 do Pc). Najwyżej jeden rzut na
+  zawodnika na 30 dni; kolejna oferta w tym czasie tylko eskaluje stan: rozczarowany prosi po cichu o transfer,
+  spokojny zostaje spokojny. Rozczarowany nie uspokaja się od kolejnej odmowy;
+- `Pc = clamp(P0 x fSpokój x fPamięć x fSkok x fPora, 0, 0,65)`, `P0 = 0,25 + 0,03 (ambicja - 10) + 0,02 (ego - 10)
+  - 0,03 (lojalność - 10) + (rep zawodnika - rep klubu > 15 ? 0,15 : 0) + (21-27 lat ? 0,1 : 0)` (dawny człon -0,15
+  za świeży kontrakt zastąpił fSpokój);
+- `Pr = clamp(0,30 + 0,02 (ambicja - 10) + 0,015 (ego - 10) - 0,02 (lojalność - 10), 0,1, 0,5) x (1 - Pc)`;
+- czas spokoju po nowym kontrakcie: `D = clamp(9 + 0,5 (lojalność - 10) + 0,3 (cierpliwość - 10) - 0,4 (ambicja - 10),
+  4, 14)` miesięcy; po podwyżce wymuszonej prośbą `D x q`, `q = clamp(0,6 + 0,04 (chciwość - 10) - 0,05 (ambicja - 10),
+  0,25, 1,1)`, najmniej 2 miesiące. `fSpokój = 1 - 0,8 x max(0, 1 - m/D)`, m = miesiące od kontraktu (tuż po
+  podpisie 0,2, po D miesiącach 1). Liczy się każdy kontrakt z datą podpisu (przedłużenie gracza i AI, transfer),
+  kontrakty startowe nie;
+- pamięć: `n` = odrzucone oferty w 12 miesiącach (starsze niż 6 miesięcy z wagą 1/2), `k = 0,04 (ambicja - 10)
+  + 0,03 (ego - 10) - 0,04 (lojalność - 10) - 0,02 (cierpliwość - 10)`, `fPamięć = clamp(1 + n k, 0,3, 2)`: ambitnego
+  kolejne odmowy złoszczą, lojalnego uspokajają;
+- skok: `fSkok = clamp(0,5 + (rep kupca - rep klubu)/30, 0,4, 1,6) x (pensja >= 1,5 obecnej ? 1,2 : 1)`;
+- pora („poczekam do lata”): oferta w ostatnich 10 dniach okna: `fPora = 0,6`, `Pr x1,5`; rozczarowany dostaje
+  `waitUntil` = otwarcie następnego okna (do tego dnia bez prośby z ryzyka, potem w oknie ryzyko x2);
+- oferta marzeń (24-29 lat, kupiec >= rep klubu + 25, pierwsza taka): `fSpokój = max(fSpokój, 0,8)`, `fSkok x1,3`.
+  Odrzucenie zapisuje `dream` i urazę (+10 do urazy w relacji z klubem, `negotiation.js`, wygasa z połową co
+  `GRUDGE_HALF_LIFE_DAYS`, obniża chęć przedłużenia). Kolejna oferta tego poziomu działa z wagą 0,7
+  (`fSpokój >= 0,56`, `fSkok x1,21`).
+
+Ryzyko miesięczne (1. dnia miesiąca, `Rng('prosba-transfer:${seed}:${pid}:${YYYY-MM}')`):
+`h = base x f_rep x f_ławka x f_odmowa x f_wiek x f_charakter x f_miesiąc x fSpokój x fPamięć x f_nastrój`
+(najwyżej 0,08), f_rep = 1 + max(0, rep zawodnika - rep klubu - 10)/10, f_ławka 2,5 (udział minut < 0,35 przy >= 6
+meczach), f_odmowa 3 (odmówił przedłużenia), f_wiek 1,5 (21-27) albo 0,5 (31+), f_charakter = (1 + 0,08 (ambicja - 10))
+(1 - 0,05 (lojalność - 10)) x (niezadowolony ? 2 : 1), f_miesiąc 2 (Jun-Aug, Jan-Feb) albo 0,5, f_nastrój: 0 przed
+`waitUntil`, 2 dla rozczarowanego w oknie transferowym; 0 przy prekontrakcie, x0,2 po transferze w ostatnich 180 dniach.
+Spec podaje base = 0,003; kalibracja: 0,0008 bez pamięci, od pamięci 0,0012 (niżej).
+Rozczarowany co miesiąc godzi się z klubem z szansą `clamp(0,25 + 0,02 (lojalność - 10) + 0,02 (cierpliwość - 10)
+- 0,02 (ambicja - 10), 0,05, 0,6)`; spokój mija z `calmUntil`.
 
 Przebieg: etap cichy (agent daje znać, morale -1), po 4 tygodniach bez reakcji oficjalna prośba
-(`p.transferRequest = true`). Reakcje gracza (list w poczcie i karta zawodnika): lista transferowa (morale +2),
-obietnica zgody na ofertę większego klubu od wartości zawodnika (złamana: morale -2,5, zaufanie -20, licznik złamanych
-obietnic jak przy obietnicy roli), podwyżka (rozmowy o przedłużeniu z bonusem +0,15 do chęci pozostania, także przed
-oknem 18 miesięcy), rozmowa (`pCalm = 0,35 + 0,03 (lojalność - 10) - 0,03 (ambicja - 10) + 0,004 (zaufanie - 50)`,
-raz na 14 dni), odmowa (morale -3, przy oficjalnej prośbie modyfikator gry -0,15). Po zamkniętym oknie bez oferty
-zawodnik odpuszcza z szansą 30 % w miesiącu. Kluby AI: 60 % lista transferowa (0,95 wartości), 30 % podwyżka
-i przedłużenie, 10 % nic (zawodnik niezadowolony). Integracja z rozmowami z Kadry jest uproszczona: reakcja
+(`p.transferRequest = true`). Reakcje gracza (list w poczcie i karta zawodnika):
+- lista transferowa (morale +2), bez zmian;
+- obietnica zgody na ofertę większego klubu od wartości zawodnika: stan „czeka” (bez rzutów i ryzyka) do końca
+  najbliższego okna (w ostatnich 10 dniach okna: do końca następnego). Brak oferty >= kwoty do końca okna: obietnica
+  wygasa bez kary, zawodnik zostaje rozczarowany (list „zostaje po oknie bez oferty”). Odrzucenie oferty >= kwoty od
+  większego klubu: złamana obietnica (morale -2,5, zaufanie -20, licznik złamanych obietnic jak przy obietnicy roli);
+- podwyżka (rozmowy o przedłużeniu z bonusem +0,15 do chęci pozostania, także przed oknem 18 miesięcy). Podpisany
+  kontrakt uspokaja z szansą `clamp(0,3 + 0,05 (chciwość - 10) - 0,04 (ambicja - 10) + 0,15 x wzrost pensji / 20 %,
+  0,1, 0,85)`, druga podwyżka w 12 miesiącach x0,5 (chciwy, chciwość >= 14: x0,7), `Rng('prosba-podwyzka:...')`.
+  Sukces: prośba znika, spokój `D x q`; porażka: prośba trwa, podwyżka zapisana (wynik rozmów to mówi);
+- rozmowa: `pCalm = 0,35 + 0,03 (lojalność - 10) - 0,03 (ambicja - 10) + 0,004 (zaufanie - 50)` (+0,1 do 60 dni po
+  podwyżce), raz na 14 dni. Sukces: prośba znika; częściowy sukces (kolejne 50 % szansy sukcesu, tylko cicha prośba):
+  zawodnik wycofuje prośbę, ale jest rozczarowany; inaczej morale -1;
+- odmowa (morale -3, przy oficjalnej prośbie modyfikator gry -0,15).
+Po zamkniętym oknie bez oferty zawodnik odpuszcza prośbę z szansą 30 % w miesiącu. Kluby AI: 60 % lista
+transferowa (0,95 wartości), 30 % podwyżka i przedłużenie przez ten sam rzut uspokojenia (porażka: lista
+transferowa), 10 % nic (zawodnik niezadowolony). Integracja z rozmowami z Kadry jest uproszczona: reakcja
 „Porozmawiaj” liczy się jako rozmowa trenera (licznik uwagi, src/career/attention.js), ale ma własny limit 14 dni.
+
+Czytelność: profil zawodnika (Kadra, linia „Plany”) i karta w Transferach (panel „Plany zawodnika”) pokazują stan:
+„Rozczarowany, ale zostaje”, „Spokojny do <data>”, „Czeka do okna”, „Ostatnio dostał podwyżkę”. Kadra: znacznik
+„?” (rozczarowany, tylko u gracza), „!” z podpowiedzią „Czeka do okna” przy obietnicy. Transfery, W toku: lista
+próśb z rozczarowanymi. Odpowiedź po odrzuceniu oferty mówi, czy zawodnik prosi, jest rozczarowany, czy spokojny.
+
+Kalibracja (Nov 21, 2026, `node tools/transfery-kalibracja.mjs widzew <ziarno> 3`, prośby w Ekstraklasie na sezon,
+w nawiasie wszystkie ligi; przed zmianą base 0,0008 bez pamięci, po zmianie base 0,0012):
+
+| Ziarno | Przed: 26/27, 27/28, 28/29 | Po: 26/27, 27/28, 28/29 | OVR top14 Ekstraklasy na koniec, przed / po |
+|--------|----------------------------|-------------------------|---------------------------------------------|
+| 5 | 25 (89), 21 (77), 20 (81) | 23 (119), 10 (105), 26 (104) | 11,80 / 11,82 |
+| 7 | 22 (100), 21 (84), 16 (75) | 21 (126), 18 (96), 15 (87) | 11,67 / 11,64 |
+| 9 | 23 (81), 22 (86), 25 (73) | 21 (97), 16 (87), 19 (85) | 11,77 / 11,80 |
+
+Średnio 18,8 prośby w Ekstraklasie na sezon (przed 21,7). Na sezon (wszystkie ligi) ok. 15-30 spokojnych i 5-17
+rozczarowanych po odrzuconej ofercie, 4-13 pogodzeń, 0-3 eskalacje, w klubach AI ok. 4-11 podwyżek, które
+uspokoiły, i 16-27, które nie uspokoiły (zawodnik trafia na listę transferową). Prośby z ryzyka w niższych ligach
+rosną (base 0,0012), siła lig bez dryfu.
 
 Kupcy z zagranicy: ligi z `src/data/kluby_uefa.json` o sile >= Ekstraklasa - 0,5 (L >= 11,5) oraz rynki pieniężne
 (Turcja z większą wagą, Arabia Saudyjska, MLS). Kupiec to zawsze prawdziwy klub o sile bliskiej poziomowi

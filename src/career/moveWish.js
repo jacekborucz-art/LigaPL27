@@ -4,24 +4,29 @@
 // tygodniach bez reakcji 'oficjalna' (p.transferRequest = true). Reakcje gracza: lista transferowa, obietnica zgody
 // na dobrą ofertę, podwyżka (przedłużenie z bonusem do chęci pozostania), rozmowa, odmowa.
 // Kluby AI: 60 % lista transferowa (0,95 wartości), 30 % podwyżka i przedłużenie, 10 % nic. Liczby [SZAC].
+// Pamięć (src/career/wishMemory.js): odrzucona oferta to jeden rzut (cicha prośba, rozczarowany, spokojny),
+// najwyżej raz na 30 dni; czas spokoju po nowym kontrakcie, pamięć odmów, oferta marzeń, „poczekam do lata”.
 
 import { Rng, clamp } from '../core/rng.js';
 import { createMessage } from '../core/inbox.js';
+import { fmtDate } from '../ui/dom.js';
 import { registerDecision } from '../core/decisions.js';
-import { addDays } from '../core/gameLoop.js';
 import { CLUBS_PL, clubById } from '../data/clubs_pl.js';
 import { squadOf } from '../world/worldGen.js';
 import { clubReputation } from './reputation.js';
 import { personalityOf } from './personality.js';
-import { relationWith, aiNegotiate, monthsBetween } from './negotiation.js';
+import { relationWith, aiNegotiate, currentGrudge } from './negotiation.js';
+import {
+  MEM, memOf, ensureMem, rejectOdds, noteReject, canRoll, hazardMemFactor, reconcileChance, noteRenewal,
+  talkRaiseBonus, nextWindowOpen, nextWindowEnd, lateInWindow, addMonths,
+} from './wishMemory.js';
 import { boardCaps } from './boardRequests.js';
 import { noteAttention } from './attention.js';
 import { windowOf, fmtZl } from './transfers.js';
 import { hasOpenDeal, stat } from './transferDeals.js';
-import { DOMESTIC, GAME_START } from '../config/calendar2026.js';
 
 export const WISH = {
-  base: 0.0008, // spec 0,003; kalibracja do 15-25 próśb w Ekstraklasie na sezon (tools/transfery-kalibracja.mjs)
+  base: 0.0012, // spec 0,003; kalibracja do 15-25 próśb w Ekstraklasie na sezon (tools/transfery-kalibracja.mjs); 0,0008 przed pamięcią (wishMemory.js)
   cap: 0.08, quietDays: 28, withdraw: 0.3, recentDays: 180, talkDays: 14,
   morale: { open: -1, list: 2, promise: 1, refuse: -3, broken: -2.5, calmed: 1, talkFail: -1 },
   ai: { list: 0.6, renew: 0.3 }, // reszta: klub ignoruje prośbę
@@ -34,12 +39,15 @@ const repOfClub = (id) => (clubById(id) ? clubReputation(clubById(id)) : 35);
 const traitsOf = (p) => personalityOf(p).traits;
 
 // ------------------------------------------------------------ Wzory
-/** Szansa prośby po odrzuconej ofercie. ctx: { clubRep, contractSignedRecently }. */
-export function rejectTriggerP(p, { clubRep, recentContract = false }) {
+/**
+ * P0: bazowa szansa cichej prośby po odrzuconej ofercie (bez dawnego członu -0,15 za świeży kontrakt: czas spokoju
+ * liczy teraz fSpokój w wishMemory.js). ctx: { clubRep }.
+ */
+export function rejectTriggerP(p, { clubRep }) {
   const t = traitsOf(p);
   const age = p.age ?? 25;
   return clamp(0.25 + 0.03 * (t.ambition - 10) + 0.02 * (t.ego - 10) - 0.03 * (t.loyalty - 10)
-    + ((p.rep ?? 30) - clubRep > 15 ? 0.15 : 0) + (age >= 21 && age <= 27 ? 0.1 : 0) - (recentContract ? 0.15 : 0), 0, 1);
+    + ((p.rep ?? 30) - clubRep > 15 ? 0.15 : 0) + (age >= 21 && age <= 27 ? 0.1 : 0), 0, 1);
 }
 
 /** Miesięczne ryzyko prośby (hazard). ctx: { clubRep, share, games, month, date }. */
@@ -55,13 +63,14 @@ export function monthlyHazard(p, ctx) {
   const fMonth = [6, 7, 8, 1, 2].includes(ctx.month) ? 2 : 0.5;
   let h = WISH.base * fRep * fBench * fStall * fAge * fTrait * fMonth;
   if (p.lastMove && ctx.date && daysBetween(p.lastMove, ctx.date) < WISH.recentDays) h *= 0.2;
+  h *= hazardMemFactor(p, ctx.date); // fSpokój x fPamięć, czekanie na okno, rozczarowany w oknie x2 (wishMemory.js)
   return clamp(h, 0, WISH.cap);
 }
 
-/** Szansa uspokojenia zawodnika rozmową. */
-export function calmChance(p, trust = 50) {
+/** Szansa uspokojenia zawodnika rozmową (+0,1 do 60 dni po podwyżce, gdy podana data). */
+export function calmChance(p, trust = 50, date = null) {
   const t = traitsOf(p);
-  return clamp(0.35 + 0.03 * (t.loyalty - 10) - 0.03 * (t.ambition - 10) + 0.004 * (trust - 50), 0.05, 0.9);
+  return clamp(0.35 + 0.03 * (t.loyalty - 10) - 0.03 * (t.ambition - 10) + 0.004 * (trust - 50) + (date ? talkRaiseBonus(p, date) : 0), 0.05, 0.9);
 }
 
 // ------------------------------------------------------------ Otwarcie i zamknięcie
@@ -82,6 +91,7 @@ function wishLetter(game, p, date) {
 export function openWish(game, p, date, why = 'hazard') {
   if (!p || p.moveWish || p.preContract || hasOpenDeal(game, p.id) || !p.clubId) return [];
   p.moveWish = { stage: 'cicha', since: date, why, club: p.clubId };
+  if (p.wishMemory) { const m = p.wishMemory; delete m.mood; delete m.moodSince; delete m.calmUntil; delete m.waitUntil; }
   p.morale = clamp((p.morale ?? 12) + WISH.morale.open, 1, 20);
   stat(game, 'requests');
   stat(game, `requests_${why}`);
@@ -106,7 +116,13 @@ function aiReact(game, p, date) {
     const c = clubById(p.clubId);
     const caps = boardCaps(game, c.id, p, 'renew');
     const neg = aiNegotiate({ kind: 'renew', player: { ...p, renewRefused: false }, club: c, date, rng: rng.fork('renew'), ctx: { stayBonus: WISH.stayBonus, forceRenew: true }, budget: { wage: Math.min(p.contract.wage * 1.5, caps.wage), maxYears: caps.years, total: caps.total } });
-    if (neg.result === 'signed') { p.contract = { ...neg.contract, signedOn: date }; p.wage = p.contract.wage; p.renewRefused = false; clearWish(p); return; }
+    if (neg.result === 'signed') {
+      const oldWage = p.contract.wage ?? 0;
+      p.contract = { ...neg.contract, signedOn: date }; p.wage = p.contract.wage; p.renewRefused = false;
+      // Ten sam rzut uspokojenia co u gracza: podwyżka nie zeruje prośby na pewno (wishMemory.js)
+      if (noteRenewal(p, date, { oldWage, newWage: p.contract.wage, seed: game.seed }).calmed) { stat(game, 'raiseCalmed'); return; }
+      stat(game, 'raiseFailed');
+    }
     listForSale(game, p, date); W.reacted = 'list'; return;
   }
   W.reacted = 'ignore';
@@ -119,25 +135,79 @@ function listForSale(game, p, date) {
 
 // ------------------------------------------------------------ Zdarzenie: odrzucona oferta
 /**
- * Klub (gracza albo AI) odrzucił ofertę. Prośba możliwa, gdy kupiec ma reputację >= klub + 10 albo oferuje
- * z zagranicy pensję >= 1,5 obecnej. ctx: { buyerRep, foreignWage, date }. Zwraca wiadomości.
+ * Klub (gracza albo AI) odrzucił ofertę. Liczy się, gdy kupiec ma reputację >= klub + 10 albo oferuje z zagranicy
+ * pensję >= 1,5 obecnej. Jeden rzut (najwyżej raz na 30 dni): u < Pc: cicha prośba; u < Pc + Pr: rozczarowany,
+ * ale zostaje (morale -2, bez listu); reszta: spokojny (4-8 miesięcy, kolejne oferty x0,5). W ciągu 30 dni od rzutu
+ * kolejna oferta tylko eskaluje stan: rozczarowany prosi po cichu o transfer. Oferta marzeń (24-29 lat, kupiec
+ * >= klub + 25) przebija czas spokoju i zostawia urazę. ctx: { buyerRep, foreignWage, date }.
+ * Zwraca { state: null|'cicha'|'rozczarowany'|'spokojny'|'prosba', messages }.
  */
-export function onOfferRejected(game, p, { buyerRep = 0, foreignWage = 0, date = game.date } = {}) {
-  if (!p?.clubId || p.moveWish || p.preContract || p.loan) return [];
+export function offerRejected(game, p, { buyerRep = 0, foreignWage = 0, date = game.date } = {}) {
+  const none = { state: null, messages: [] };
+  if (!p?.clubId || p.preContract || p.loan) return none;
   const clubRep = repOfClub(p.clubId);
-  const big = buyerRep >= clubRep + 10 || (foreignWage && foreignWage >= 1.5 * (p.contract?.wage ?? Infinity));
-  if (!big) return [];
-  const recent = !!p.contract?.signedOn && p.contract.signedOn !== GAME_START && monthsBetween(p.contract.signedOn, date) < 6; // kontrakty startowe się nie liczą
-  const P = rejectTriggerP(p, { clubRep, recentContract: recent });
-  if (!new Rng(`prosba-odrzucenie:${game.seed}:${p.id}:${date}`).chance(P)) return [];
-  return openWish(game, p, date, 'oferta');
+  const wageJump = !!foreignWage && foreignWage >= 1.5 * (p.contract?.wage ?? Infinity);
+  if (buyerRep < clubRep + 10 && !wageJump) return none;
+  if (p.moveWish) { noteReject(p, date); return { state: 'prosba', messages: [] }; }
+  const mem0 = memOf(p);
+  if (!canRoll(p, date)) { // w ciągu 30 dni od rzutu: tylko eskalacja istniejącego stanu
+    noteReject(p, date);
+    if (mem0.mood === 'rozczarowany') {
+      stat(game, 'escalated');
+      const messages = openWish(game, p, date, 'oferta');
+      return { state: p.moveWish ? 'cicha' : 'rozczarowany', messages };
+    }
+    return { state: mem0.mood ?? null, messages: [] };
+  }
+  const odds = rejectOdds(p, { P0: rejectTriggerP(p, { clubRep }), buyerRep, clubRep, wageJump, date });
+  noteReject(p, date); // po policzeniu szans: pamięć liczy wcześniejsze odmowy
+  const mem = ensureMem(p);
+  mem.lastRoll = date;
+  if (odds.dream) { // przepadła oferta marzeń: zawodnik pamięta i ma urazę do klubu (rozmowy o przedłużeniu)
+    mem.dream = date; mem.grudge = date;
+    const rel = relationWith(p, p.clubId);
+    rel.grudge = Math.round((currentGrudge(rel, date) + MEM.dream.grudge) * 10) / 10; rel.grudgeDate = date;
+    p.relations = { ...(p.relations || {}), [p.clubId]: rel };
+    stat(game, 'dream');
+  }
+  const rng = new Rng(`prosba-odrzucenie:${game.seed}:${p.id}:${date}`);
+  const u = rng.next();
+  if (u < odds.Pc) {
+    const messages = openWish(game, p, date, 'oferta');
+    if (p.moveWish) return { state: 'cicha', messages };
+  }
+  if (u < odds.Pc + odds.Pr || mem.mood === 'rozczarowany') { // rozczarowany nie uspokaja się od kolejnej odmowy
+    if (mem.mood !== 'rozczarowany') { mem.moodSince = date; p.morale = clamp((p.morale ?? 12) + MEM.moodMorale, 1, 20); stat(game, 'disappointed'); }
+    mem.mood = 'rozczarowany'; delete mem.calmUntil;
+    if (odds.late) mem.waitUntil = nextWindowOpen(date); // „poczekam do lata”
+    return { state: 'rozczarowany', messages: [] };
+  }
+  mem.mood = 'spokojny'; mem.moodSince = date;
+  mem.calmUntil = addMonths(date, rng.int(MEM.calmMonths[0], MEM.calmMonths[1]));
+  delete mem.waitUntil;
+  stat(game, 'calm');
+  return { state: 'spokojny', messages: [] };
 }
+
+/** Jak offerRejected, zwraca same wiadomości (dla klubów AI i starych wywołań). */
+export function onOfferRejected(game, p, ctx = {}) { return offerRejected(game, p, ctx).messages; }
 
 // ------------------------------------------------------------ Miesiąc i tydzień
 function clubGames(game) {
   const n = {};
   for (const f of game.fixtures ?? []) if (f.played) { n[f.home] = (n[f.home] ?? 0) + 1; n[f.away] = (n[f.away] ?? 0) + 1; }
   return n;
+}
+
+/** Nastrój bez prośby: spokój mija, rozczarowany godzi się z klubem (szansa w miesiącu z charakteru). */
+function moodMonth(game, p, date, ym) {
+  const m = p.wishMemory;
+  if (!m?.mood) return;
+  if (m.mood === 'spokojny' && !(m.calmUntil > date)) { delete m.mood; delete m.moodSince; delete m.calmUntil; return; }
+  if (m.mood === 'rozczarowany' && m.moodSince < date && new Rng(`prosba-pogodzenie:${game.seed}:${p.id}:${ym}`).chance(reconcileChance(p))) {
+    delete m.mood; delete m.moodSince; delete m.waitUntil;
+    stat(game, 'reconciled');
+  }
 }
 
 /** 1. dnia miesiąca: nowe prośby z ryzyka miesięcznego i wycofanie próśb po zamkniętym oknie. */
@@ -161,6 +231,7 @@ export function requestsMonth(game, date) {
         }
         continue;
       }
+      moodMonth(game, p, date, ym);
       if (hasOpenDeal(game, p.id)) continue;
       const share = n ? (p.season?.min ?? 0) / (n * 90) : 1;
       const h = monthlyHazard(p, { clubRep, share, games: n, month, date });
@@ -180,6 +251,16 @@ export function requestsWeek(game, date) {
       const W = p.moveWish;
       if (!W) continue;
       if (W.club !== p.clubId) { clearWish(p); continue; }
+      // Obietnica bez oferty do końca okna wygasa bez kary: zawodnik zostaje, ale jest rozczarowany
+      if (W.promise && !W.promise.broken && date > W.promise.until) {
+        const mine = p.clubId === game.clubId;
+        clearWish(p); p.unhappy = false;
+        const m = ensureMem(p);
+        m.mood = 'rozczarowany'; m.moodSince = date; delete m.calmUntil; delete m.waitUntil;
+        stat(game, 'promiseExpired');
+        if (mine) out.push(msg(date, { key: `prosba-obietnica-koniec:${p.id}:${W.since}`, priority: 'info', from: `Agent zawodnika ${p.name}`, subject: `${p.name} zostaje po oknie bez oferty`, body: `Okno transferowe minęło i nie przyszła oferta, na którą się umawialiście. Obietnica wygasła. ${p.name} zostaje w klubie, ale jest rozczarowany i w następnym oknie znów może myśleć o odejściu.`, refs: { kind: 'moveWishInfo', pid: p.id } }));
+        continue;
+      }
       if (W.stage === 'oficjalna') p.transferRequest = true; // po końcu sezonu flaga jest zerowana, prośba trwa
       if (W.stage === 'cicha' && !W.reacted && daysBetween(W.since, date) >= WISH.quietDays) {
         W.stage = 'oficjalna'; W.official = date; p.transferRequest = true; p.unhappy = true;
@@ -193,12 +274,6 @@ export function requestsWeek(game, date) {
 
 // ------------------------------------------------------------ Reakcje gracza
 export const WISH_ACTIONS = { list: 'Wystaw na listę', promise: 'Obiecaj zgodę na dobrą ofertę', talk: 'Porozmawiaj', refuse: 'Odmów', raise: 'Zaproponuj podwyżkę' };
-
-/** Najbliższy koniec okna (dla obietnicy). */
-function nextWindowEnd(date) {
-  const w = (DOMESTIC.transferWindows ?? []).find((x) => x.to >= date);
-  return w?.to ?? addDays(date, 120);
-}
 
 /**
  * Reakcja gracza na prośbę: 'list' | 'promise' | 'talk' | 'refuse' | 'raise'. Zwraca { ok, text, negotiate? }.
@@ -219,18 +294,28 @@ export function reactToWish(game, pid, action, date = game.date) {
       return { ok: true, text: `${p.name} jest na liście transferowej za ${fmtZl(game.market.userListed[p.id])}. Zawodnik docenia uczciwość (morale +${M.list}).` };
     }
     case 'promise': {
-      W.reacted = 'promise'; W.promise = { minFee: round(p.value ?? 0), until: nextWindowEnd(date), since: date };
+      W.reacted = 'promise'; // stan „czeka”: bez rzutów i ryzyka do końca okna (w ostatnich 10 dniach: następnego)
+      W.promise = { minFee: round(p.value ?? 0), until: nextWindowEnd(lateInWindow(date) ? nextWindowOpen(date) : date), since: date };
       mor(M.promise);
-      return { ok: true, text: `Obiecałeś zgodę na ofertę większego klubu od ${fmtZl(W.promise.minFee)} (do ${W.promise.until}). Złamana obietnica mocno uderzy w zaufanie.` };
+      return { ok: true, text: `Obiecałeś zgodę na ofertę większego klubu od ${fmtZl(W.promise.minFee)} (do ${fmtDate(W.promise.until)}). Złamana obietnica mocno uderzy w zaufanie.` };
     }
     case 'talk': {
       if (W.talked && daysBetween(W.talked, date) < WISH.talkDays) return { ok: false, text: `Rozmawiałeś z ${p.name} niedawno. Kolejna rozmowa za ${WISH.talkDays - daysBetween(W.talked, date)} dni.` };
       W.talked = date;
       noteAttention(p, date);
+      ensureMem(p).lastTalk = date;
       const trust = relationWith(p, game.clubId).trust;
-      if (new Rng(`prosba-rozmowa:${game.seed}:${p.id}:${date}`).chance(calmChance(p, trust))) {
+      const cc = calmChance(p, trust, date); // +0,1 do 60 dni po podwyżce
+      const u = new Rng(`prosba-rozmowa:${game.seed}:${p.id}:${date}`).next();
+      if (u < cc) {
         clearWish(p); p.unhappy = false; mor(M.calmed);
         return { ok: true, text: `${p.name} dał się przekonać. Zostaje i nie prosi już o transfer.` };
+      }
+      if (W.stage === 'cicha' && u < cc * 1.5) { // częściowy sukces: zostaje, ale jest rozczarowany
+        clearWish(p);
+        const m = ensureMem(p);
+        m.mood = 'rozczarowany'; m.moodSince = date; delete m.calmUntil;
+        return { ok: true, text: `${p.name} wycofuje prośbę i zostaje, ale jest rozczarowany. W następnym oknie znów może myśleć o odejściu.` };
       }
       mor(M.talkFail);
       return { ok: true, text: `${p.name} wysłuchał, ale nie zmienił zdania.` };
@@ -250,7 +335,7 @@ export function reactToWish(game, pid, action, date = game.date) {
 
 /**
  * Gracz odrzucił ofertę za zawodnika z prośbą: złamana obietnica (oferta >= obiecanej kwoty od większego klubu)
- * i zdarzenie prośby. Zwraca { broken, messages }.
+ * i zdarzenie prośby (offerRejected). Zwraca { broken, messages, state }.
  */
 export function onUserRejected(game, p, { buyerRep = 0, fee = 0, foreignWage = 0, date = game.date } = {}) {
   const W = p.moveWish;
@@ -261,9 +346,10 @@ export function onUserRejected(game, p, { buyerRep = 0, fee = 0, foreignWage = 0
     rel.brokenPromises++; rel.trust = clamp(rel.trust - 20, 0, 100);
     p.relations = { ...(p.relations || {}), [p.clubId]: rel };
     p.unhappy = true; p.transferRequest = true; W.stage = 'oficjalna';
-    return { broken: true, messages: [] };
+    return { broken: true, messages: [], state: 'oficjalna' };
   }
-  return { broken: false, messages: onOfferRejected(game, p, { buyerRep, foreignWage, date }) };
+  const r = offerRejected(game, p, { buyerRep, foreignWage, date });
+  return { broken: false, messages: r.messages, state: r.state };
 }
 
 registerDecision('moveWish', (game, m, action) => {

@@ -1200,7 +1200,7 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 .tg[data-k="tr"], .tg[data-k="pk"] { --tg: #6B4FB0; }
 .tg[data-k="of"] { --tg: #2D6A8F; }
 .tg[data-k="mw"] { --tg: var(--bad-text); }
-.tg[data-k="y1"], .tg[data-k="s2"], .tg[data-k="kw"], .tg[data-k="z"] { --tg: var(--warn-text); }
+.tg[data-k="y1"], .tg[data-k="s2"], .tg[data-k="kw"], .tg[data-k="z"], .tg[data-k="mr"] { --tg: var(--warn-text); }
 .tg[data-k="tl"] { --tg: var(--led); --tg-ink: #14211A; }
 .tg[data-k="ll"], .tg[data-k="li"], .tg[data-k="lo"] { --tg: var(--pa-fix); }
 .tg-more { --tg: color-mix(in srgb, var(--text-muted) 22%, transparent); --tg-ink: var(--text); font-weight: 600; }
@@ -1213,12 +1213,12 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
   :root:not([data-theme="light"]) .tg[data-k="nt"] { --tg: #2E8A4E; }
   :root:not([data-theme="light"]) .tg[data-k="tr"], :root:not([data-theme="light"]) .tg[data-k="pk"] { --tg: #8F74D6; --tg-ink: #14211A; }
   :root:not([data-theme="light"]) .tg[data-k="of"] { --tg: #4A8FC4; --tg-ink: #0E1A14; }
-  :root:not([data-theme="light"]) .tg:is([data-k="ll"], [data-k="li"], [data-k="lo"], [data-k="mw"], [data-k="y1"], [data-k="s2"], [data-k="kw"], [data-k="z"]) { --tg-ink: #14211A; }
+  :root:not([data-theme="light"]) .tg:is([data-k="ll"], [data-k="li"], [data-k="lo"], [data-k="mw"], [data-k="mr"], [data-k="y1"], [data-k="s2"], [data-k="kw"], [data-k="z"]) { --tg-ink: #14211A; }
 }
 :root[data-theme="dark"] .tg[data-k="nt"] { --tg: #2E8A4E; }
 :root[data-theme="dark"] .tg[data-k="tr"], :root[data-theme="dark"] .tg[data-k="pk"] { --tg: #8F74D6; --tg-ink: #14211A; }
 :root[data-theme="dark"] .tg[data-k="of"] { --tg: #4A8FC4; --tg-ink: #0E1A14; }
-:root[data-theme="dark"] .tg:is([data-k="ll"], [data-k="li"], [data-k="lo"], [data-k="mw"], [data-k="y1"], [data-k="s2"], [data-k="kw"], [data-k="z"]) { --tg-ink: #14211A; }
+:root[data-theme="dark"] .tg:is([data-k="ll"], [data-k="li"], [data-k="lo"], [data-k="mw"], [data-k="mr"], [data-k="y1"], [data-k="s2"], [data-k="kw"], [data-k="z"]) { --tg-ink: #14211A; }
 /* Przegląd: nazwisko i znaczniki w jednej linii, nazwisko skraca się wielokropkiem */
 .sq__nl { display: flex; align-items: center; min-width: 0; }
 .sq__nl b { min-width: 0; }
