@@ -320,6 +320,7 @@ Kod: `src/career/boardRequests.js` (logika, system dnia `boardRequests`, order 5
 | Większy budżet płac | +10, +25, +50 % tygodniowego budżetu płac albo dowolna | jak wyżej | `wageBudget` rośnie |
 | Przesunięcie do budżetu płac | 10, 25, 50 % budżetu transferowego (min. 100 tys. zł) | zawsze | 1 mln zł budżetu transferowego daje 1 mln / 104 zł tygodniowo w płacach; zgoda zawsze, gdy wskaźnik płac po przesunięciu mieści się w 80 % |
 | Niższy cel sezonu | o jeden poziom (np. puchary -> środek tabeli) | raz w sezonie, przed 1 listopada | nowy cel w `game.board.goal` |
+| Zmiana dyrektora sportowego (v1.23 Beta) | bez kwoty, opcjonalnie kandydat z listy wolnych dyrektorów | gdy klub ma dyrektora | zarząd zwalnia dyrektora (odprawa z kasy klubu) i zatrudnia nowego; własna punktacja `directorScore`, zgoda od S 10, `docs/dyrektor-sportowy.md` rozdz. 4 |
 
 Częstotliwość: najwyżej jedna prośba w tygodniu i trzy w miesiącu kalendarzowym; ta sama sprawa najwcześniej po 30 dniach, po odmowie po 60, po zgodzie (pełnej albo częściowej) po 90. Budżety po zmianie sezonu liczy od nowa `initClub`, więc przyznane kwoty obowiązują do końca sezonu.
 

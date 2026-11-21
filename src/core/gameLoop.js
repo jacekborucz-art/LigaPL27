@@ -16,6 +16,12 @@ export function registerDailySystem(system) {
   systems.sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
 }
 
+const mailHooks = [];
+/** Poprawka wiadomości dnia przed dodaniem do skrzynki: fn(state, messages) (np. podpis dyrektora sportowego). */
+export function registerMailHook(fn) {
+  if (!mailHooks.includes(fn)) mailHooks.push(fn);
+}
+
 export function unregisterDailySystem(id) {
   const i = systems.findIndex((s) => s.id === id);
   if (i >= 0) systems.splice(i, 1);
@@ -69,6 +75,7 @@ export function processDay(state, date = state.date) {
   } finally {
     if (lastClub !== undefined && state.clubId == null) state.clubId = lastClub;
   }
+  for (const h of mailHooks) h(state, messages);
   // Wiadomości usunięte przez gracza (i przez porządki) nie wracają, nawet gdy system wyśle je ponownie
   const gone = new Set(state.inboxGone ?? []);
   const { inbox, added } = addMessages(state.inbox || [], messages.filter((m) => (!m.key || !gone.has(m.key)) && mailRelevant(state, m)));

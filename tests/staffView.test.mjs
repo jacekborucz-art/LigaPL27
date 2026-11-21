@@ -48,7 +48,7 @@ test('Sztab: trzy widoki, pasek stanu z limitem i pensjami, karty ról z osobami
   assert.match(moj, /Sztab <b>\d+\/\d+<\/b>/);
   assert.match(moj, /Pensje <b>/);
   for (const t of ['Mój sztab', 'Rynek sztabu', 'Oferty w toku', 'Asystent trenera', 'Fizjoterapeuta', 'Skaut', 'Kierownik drużyny', 'Raport asystenta o drużynie', 'Limit i budżet', 'Najbliższe umowy']) assert.ok(moj.includes(t), t);
-  assert.ok((moj.match(/class="st-person"/g) ?? []).length === rosterOf(g, CLUB).length, 'każda osoba sztabu ma wiersz');
+  assert.ok((moj.match(/class="st-person"/g) ?? []).length === rosterOf(g, CLUB).length + (g.staff.dir?.[CLUB] ? 1 : 0), 'każda osoba sztabu (i dyrektor sportowy) ma wiersz');
   assert.match(moj, /data-act="st-fire-ask"/);
   assert.match(moj, /<span class="st-share" data-k="good"[^>]*>lider<\/span>/);
   assert.match(moj, /role="tablist" aria-label="Sztab"/);
@@ -204,7 +204,7 @@ test('Zwolnienie: okno z odprawą i skutkiem, Nie zwalniaj zamyka; przedłużeni
 test('Podbieranie: karta osoby z innego klubu pokazuje klub, umowę i rekompensatę; osoba bez klubu też działa', () => {
   const g = fresh();
   const ui = { trTab: 'sztab', trStaff: 'rynek', trStaffF: { poach: true } };
-  const row = marketRows(g, ui).find((r) => r.club && !r.blocked);
+  const row = marketRows(g, ui).find((r) => r.club && !r.blocked && r.role !== 'dyrektor'); // dyrektora wybiera zarząd (tylko podgląd)
   step(g, ui, 'st-open', { id: row.id });
   const html = renderTraining(g, ui);
   assert.match(html, /class="tr-card st-poach"/);

@@ -8,6 +8,7 @@
 // najwyżej raz na 30 dni; czas spokoju po nowym kontrakcie, pamięć odmów, oferta marzeń, „poczekam do lata”.
 
 import { Rng, clamp } from '../core/rng.js';
+import { directorFrom } from './director.js'; // podpis dyrektora sportowego klubu gracza (docs/dyrektor-sportowy.md)
 import { createMessage } from '../core/inbox.js';
 import { fmtDate } from '../ui/dom.js';
 import { registerDecision } from '../core/decisions.js';
@@ -355,5 +356,5 @@ export function onUserRejected(game, p, { buyerRep = 0, fee = 0, foreignWage = 0
 
 registerDecision('moveWish', (game, m, action) => {
   const r = reactToWish(game, m.refs.pid, action);
-  return [createMessage({ date: game.date, category: 'players', from: 'Dyrektor sportowy', priority: 'info', subject: 'Prośba o transfer', body: r.text || 'Bez zmian.' })];
+  return [createMessage({ date: game.date, category: 'players', from: directorFrom(game), priority: 'info', subject: 'Prośba o transfer', body: r.text || 'Bez zmian.' })];
 });

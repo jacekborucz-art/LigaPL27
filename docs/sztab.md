@@ -10,7 +10,8 @@ Wszystkie funkcje z `src/career/staffMarket.js`. Każda sama woła `ensureStaff(
 | Funkcja | Zwraca / robi |
 |---|---|
 | `staffSummary(game, clubId?)` | `{ limit, used, staff, pending, pay, budget, room, roles: { rola: { name, q, vacant, max, people: [{ ...osoba, qNow, canRenew, severance }] } } }`; `max: 0` = rola niedostępna w lidze (skaut w III lidze: ukryć) |
-| `STAFF_ROLE_ORDER` | kolejność ról w UI: asystent, fizyczny, bramkarze, mlodziez, analityk, fizjoterapeuta, skaut, kierownik |
+| `STAFF_ROLE_ORDER` | kolejność ról w UI: asystent, fizyczny, bramkarze, mlodziez, analityk, fizjoterapeuta, skaut, kierownik (dyrektor sportowy osobno, rozdz. 5a) |
+| `directorOf(game, clubId)` | dyrektor sportowy klubu (osoba) albo null (wakat); `clubStaffPay` pensje sztabu z dyrektorem |
 | `rosterOf(game, clubId)` | osoby sztabu klubu (też rywala, tylko do odczytu) |
 | `staffLimit(game, clubId?)` | `{ limit, staff, pending, used, free, roles: { rola: { n, max, pending } } }` (oferty w toku wliczone) |
 | `staffBudget(game, clubId?)` | `{ budget, pay, pending, room }` w zł miesięcznie; `budgetRoomFor(game, clubId, rola)` uwzględnia zgodę zarządu na +20 % przy wakacie w rdzeniu |
@@ -135,6 +136,17 @@ nie działa). Wyniki z Nov 16, 2026 [SZAC]:
 - Kliknięcia `st-*` w `handleStaffAction` (wołane z `dispatchAct`), pola `data-st-field` w listenerze `change`
   (`handleStaffField`, pensja odświeża tylko podgląd oferty), Esc zamyka okno zwolnienia, strzałki przełączają zakładki.
 - Do zrobienia: wakat w rdzeniu otwiera rynek z filtrem roli (`st-find`).
+
+## 5a. Dyrektor sportowy (Nov 21, 2026, v1.23 Beta)
+
+Rola `dyrektor`: 1 osoba na klub, osobny slot poza limitem osób (`staffLimit` go nie liczy, oferta dla dyrektora nie
+zajmuje miejsca), pensja w budżecie sztabu (`clubStaffPay`, `staffBudget`), 4 atrybuty NEG, RYN, SIE, KAD.
+Stan: `game.staff.dir[klub]` (id osoby), `dirPool` (12-16 wolnych), `dirInit`, `dirYear`, `dirIntro`. Te same
+funkcje co sztab dla klubów AI: `makeOffer` (nowy dyrektor zastępuje obecnego, odprawa), podbieranie,
+`listFreeStaff` i `listClubStaff` (rola `dyrektor`), `staffSummary().roles.dyrektor` (`max: 1`, `outside: true`).
+W klubie gracza decyduje zarząd: `fireStaff`, `renewStaff` i `makeOffer` dla dyrektora zwracają `dirOwner`, zmiana
+przez prośbę do zarządu (`askBoard(game, 'director')`, `ownerReplaceDirector`).
+Oczekiwana pensja x mnożnik ligi klubu (`expectedWage(p, date, { club })`). Opis i liczby: `docs/dyrektor-sportowy.md`.
 
 ## 6. Otwarte sprawy
 

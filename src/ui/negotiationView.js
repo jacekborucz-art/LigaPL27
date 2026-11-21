@@ -20,6 +20,7 @@ import { Rng, clamp } from '../core/rng.js';
 import { contractIssues, recordVeto, appealStatus, appealVeto, boardCaps } from '../career/boardRequests.js';
 import { esc, fmtDate } from './dom.js';
 import { scoutHidden } from '../career/scoutOps.js'; // kandydat skauta: bez OVR (ocenę zna skaut)
+import { directorWageHint } from '../career/director.js'; // widełki dyrektora sportowego (docs/dyrektor-sportowy.md)
 
 export const isNegotiationAction = (act) => typeof act === 'string' && act.startsWith('ng-');
 
@@ -227,6 +228,8 @@ export function startNegotiation(game, opts = {}) {
     log: [],
     counter: null, counterType: null, demand: null,
     error: null, notice: null, done: null, veto: null, lastRound: lastRound?.propId ?? null, lastUntil: lastRound?.until ?? null,
+    // Widełki dyrektora sportowego (Znajomość rynku): z minimum zawodnika bez cudzych ofert, tylko informacja
+    dirHint: directorWageHint(game, { playerId, min: s.d.hidden.minOwn ?? s.d.hidden.min }),
   };
   if (lastRound?.want) {
     // Ostatnia runda: zawodnik chce zmian i stawia ultimatum (jedna oferta: porozumienie albo koniec rozmów)
@@ -485,6 +488,14 @@ function numField(name, label, value, { step = 100, hint = '' } = {}) {
   </div>`;
 }
 
+/** Podpowiedź dyrektora sportowego: przedział pensji, przy którym zawodnik prawdopodobnie się zgodzi. */
+function dirHintHtml(ng) {
+  const h = ng.dirHint;
+  if (!h) return '';
+  const who = h.name ? `Dyrektor sportowy (${h.name})` : 'Zarząd (brak dyrektora sportowego)';
+  return `<p class="ng-dir" data-ng-dir><b>${esc(who)}:</b> zawodnik zgodzi się prawdopodobnie przy ${esc(formatZl(h.lo).replace(/\s*zł$/, ''))}-${esc(formatZl(h.hi))} tygodniowo (cała oferta, licząc premie i prowizję). To szacunek, nie obietnica.</p>`;
+}
+
 function offerForm(ng, view) {
   const d = ng.draft;
   const L = ng.limits;
@@ -500,6 +511,7 @@ function offerForm(ng, view) {
   return `<section class="panel ng-offer" aria-label="Twoja oferta">
     <h3>Twoja oferta</h3>
     <p class="ng-limits">Limit klubu: ${esc(lim)}.</p>
+    ${dirHintHtml(ng)}
     ${L.board ? `<p class="ng-limits ng-limits--board">${esc(boardLine(L.board))}</p>` : ''}
     <div class="ng-form" data-ng-form role="group" aria-label="Warunki oferty">
       <div class="ng-field ng-field--wage">

@@ -1,15 +1,15 @@
-// Ukryty atrybut klubu AI „Negocjacje” 1-20 (docs/negocjacje.md, rozdz. 15). Udaje dyrektora sportowego, który
-// prowadzi rozmowy z zawodnikami: pierwsza oferta, podwyżka w drugiej rundzie, poprawka propozycji w ciemno
-// i chęć licytowania się o zawodnika, który rozważa inne oferty. Gracz negocjuje sam, więc jego klub atrybutu nie ma.
-// Atrybutu nigdy nie pokazujemy w UI. Jedynym punktem odczytu jest clubNegotiation(game, clubId): później zastąpi go
-// atrybut Negocjacje prawdziwego dyrektora sportowego (docs/kolejka.md, „Dyrektor sportowy w sztabie”).
-// Zapis: game.clubNeg = { [clubId]: { n, y (sezon), d (numer dyrektora) } }; stary zapis: leniwe losowanie.
-// Wszystkie liczby [SZAC].
+// Atrybut klubu „Negocjacje” 1-20 (docs/negocjacje.md, rozdz. 15): pierwsza oferta, podwyżka w drugiej rundzie,
+// poprawka propozycji w ciemno i chęć licytowania się o zawodnika, który rozważa inne oferty. Gracz negocjuje sam.
+// Od v1.23 Beta to atrybut Negocjacje dyrektora sportowego klubu (osoba w sztabie, src/career/staffMarket.js,
+// docs/dyrektor-sportowy.md); wakat: 5 (zarząd). Jedynym punktem odczytu zostaje clubNegotiation(game, clubId).
+// Zapas: game.clubNeg = { [clubId]: { n, y (sezon), d (numer dyrektora) } }; gra bez stanu sztabu (narzędzia, testy
+// bez świata) i kluby IV ligi: dawne leniwe losowanie. Wszystkie liczby [SZAC].
 
 import { Rng, clamp } from '../core/rng.js';
 import { createMessage } from '../core/inbox.js';
 import { CLUBS_PL, clubById } from '../data/clubs_pl.js';
 import { SEASON_YEAR } from '../config/calendar2026.js';
+import { ensureDirectors, directorOf, directorSeason, personAttr, STAFF_MARKET } from './staffMarket.js'; // dyrektor sportowy (docs/dyrektor-sportowy.md)
 
 export const NEG = {
   mean: { 1: 11.5, 2: 10.5, 3: 9, 4: 8, 5: 7 }, // średnia wg poziomu ligi (1 Ekstraklasa ... 5 IV liga)
@@ -37,7 +37,7 @@ export function negMean(clubId) {
 }
 
 /** Losowanie z rozkładu normalnego obciętego do 1-20 (odrzucanie, w ostateczności przycięcie). */
-function draw(rng, mean) {
+export function negDraw(rng, mean) {
   for (let i = 0; i < 20; i++) {
     const x = rng.gauss(mean, NEG.sd);
     if (x >= 0.5 && x < 20.5) return Math.round(x);
@@ -58,13 +58,28 @@ function ensure(game) {
  */
 export function clubNegotiation(game, clubId) {
   if (!game || !clubId) return 10;
+  const d = directorNeg(game, clubId);
+  if (d != null) return d;
   const S = ensure(game);
   let e = S[clubId];
   if (!e) {
     const y = seasonYear(game);
-    e = S[clubId] = { n: draw(new Rng(`negInit:${game.seed}:${clubId}:${y}`), negMean(clubId)), y, d: 1 };
+    e = S[clubId] = { n: negDraw(new Rng(`negInit:${game.seed}:${clubId}:${y}`), negMean(clubId)), y, d: 1 };
   }
   return e.n;
+}
+
+/**
+ * Negocjacje dyrektora sportowego klubu z kadrą (adaptacja obcokrajowca obniża atrybut), wakat: 5 (zarząd).
+ * null: gra bez stanu sztabu albo klub bez kadry (wtedy dawne losowanie).
+ */
+function directorNeg(game, clubId) {
+  const S = game.staff;
+  if (!S || !game.world?.clubs?.[clubId] || (clubById(clubId)?.tier ?? 5) > 4) return null;
+  if (!S.dirInit?.[clubId]) ensureDirectors(game);
+  if (!S.dirInit?.[clubId]) return null;
+  const p = directorOf(game, clubId);
+  return p ? personAttr(p, 'NEG', game.date) : STAFF_MARKET.vacantQ.dyrektor;
 }
 
 /** q 0-1 z atrybutu, przeskalowane wokół N = 10 (NEG.scale). */
@@ -102,6 +117,8 @@ function firedClubs(game, from, to) {
  * spadkowiczów. Zwraca wiadomości o zmianie dyrektora (mailFilter przepuszcza tylko ligę gracza), bez wartości.
  */
 export function negSeason(game, year, { relegated = new Set(), date = `${year}-07-01` } = {}) {
+  // Dyrektorzy sportowi jako osoby: zmiany przez rynek dyrektorów (staffMarket.js directorSeason)
+  if (game.staff && game.world?.clubs) return directorSeason(game, year, { relegated, date });
   const S = ensure(game);
   const fired = firedClubs(game, `${year - 1}-07-01`, date);
   const ids = CLUBS_PL.filter((c) => game.world?.clubs?.[c.id]).map((c) => c.id);
@@ -119,7 +136,7 @@ export function negSeason(game, year, { relegated = new Set(), date = `${year}-0
     const p = fired.has(id) || relegated.has(id) ? NEG.shock : NEG.director[t];
     if (rng.chance(p) && (changes.get(league) ?? 0) < NEG.maxChanges) {
       changes.set(league, (changes.get(league) ?? 0) + 1);
-      e.n = draw(new Rng(`negDir:${game.seed}:${id}:${year}`), mean);
+      e.n = negDraw(new Rng(`negDir:${game.seed}:${id}:${year}`), mean);
       e.d = (e.d ?? 1) + 1;
       if (id !== game.clubId) {
         const name = clubById(id)?.name ?? id;

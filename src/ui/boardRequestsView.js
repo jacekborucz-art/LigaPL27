@@ -8,6 +8,7 @@ import {
   wageRatio, lowerGoal, zl, placeAt,
 } from '../career/boardRequests.js';
 import { clubById } from '../data/clubs_pl.js';
+import { directorOf, listFreeStaff } from '../career/staffMarket.js'; // dyrektor sportowy (docs/dyrektor-sportowy.md)
 
 const VERDICT_TONE = { yes: 'good', partial: 'info', cond: 'warn', no: 'bad' };
 const shortDate = (iso) => fmtDay(iso);
@@ -21,7 +22,11 @@ function typeCard(game, type, c) {
   if (type === 'transfer') { now = `Teraz: ${zl(c.transferBudget)}`; help = 'W oknie transferowym albo do 30 dni przed nim. Zgoda na ponad 20 % budżetu podnosi cel sezonu o jedno miejsce.'; }
   else if (type === 'wage') { now = `Teraz: ${zl(c.wageBudget)} tygodniowo`; help = 'Zarząd patrzy na wskaźnik płac: powyżej 80 % przychodów zgodzi się tylko bogaty właściciel, który dopłaci.'; }
   else if (type === 'shift') { now = `1 mln zł transferów = ${zl(1e6 / REQ.WAGE_WEEKS_PER_ZL)} tygodniowo w płacach`; help = 'Zgoda zawsze, gdy płace po przesunięciu zmieszczą się w 80 % przychodów.'; }
-  else {
+  else if (type === 'director') {
+    const d = game.staff ? directorOf(game, game.clubId) : null;
+    now = d ? `Teraz: ${d.name} (jakość ${d.q}), umowa do ${fmtDate(d.until)}` : 'Teraz: wakat, zarząd szuka dyrektora';
+    help = 'Decyduje zarząd: zaufanie, wyniki, ocena obecnego dyrektora (słaby: łatwiej), staż, odprawa i charakter właściciela. Możesz wskazać kandydata z listy wolnych dyrektorów.';
+  } else {
     const club = clubById(game.clubId);
     const lower = lowerGoal(club?.tier ?? 1, game.board.goal?.target ?? 15);
     now = `Teraz: ${game.board.goal?.text ?? ''}`;
@@ -33,6 +38,12 @@ function typeCard(game, type, c) {
   const dis = st.ok ? '' : ' disabled';
   let actions;
   if (type === 'goal') actions = `<div class="br-presets"><button class="btn btn--quiet btn--sm" data-act="br-ask" data-t="goal"${dis}>Poproś o niższy cel</button></div>`;
+  else if (type === 'director') {
+    const free = game.staff ? listFreeStaff(game, { role: 'dyrektor' }) : [];
+    const q = (r) => (r.q.prec === 'exact' ? String(r.q.lo) : r.q.prec === 'approx' ? `${r.q.lo}-${r.q.hi}` : r.q.label.toLowerCase());
+    actions = `<div class="br-custom"><label for="brDir">Kandydat (opcjonalnie)</label><select id="brDir"><option value="">Zarząd wybierze sam</option>${free.map((r) => `<option value="${esc(r.id)}">${esc(`${r.name}, jakość ${q(r)}, oczekuje ${zl(r.wage.mid)} / mies.`)}</option>`).join('')}</select>
+      <button class="btn btn--quiet btn--sm" data-act="br-ask" data-t="director" data-custom="1"${dis}>Poproś o zmianę dyrektora</button></div>`;
+  }
   else {
     const presets = amountPresets(game, type);
     const label = type === 'shift' ? 'Kwota z budżetu transferowego (zł)' : type === 'wage' ? 'Inna kwota (zł tygodniowo)' : 'Inna kwota (zł)';
@@ -105,6 +116,11 @@ export function boardRequestsPanel(game, ui = {}) {
 export function handleBoardAction(game, act, ds = {}, root = null) {
   if (act === 'br-ask') {
     const type = ds.t;
+    if (type === 'director') {
+      const candidate = root?.querySelector?.('#brDir')?.value || ds.cand || null;
+      const r = askBoard(game, 'director', 0, game.date, { candidate });
+      return { ui: { kMsg: r.text }, save: r.ok };
+    }
     const field = ds.custom ? root?.querySelector?.(`#brAmt-${type}`)?.value : null;
     const amount = Number(String(field ?? ds.a ?? 0).replace(/\s/g, '').replace(',', '.')) || 0;
     const r = askBoard(game, type, amount, game.date);

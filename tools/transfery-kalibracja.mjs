@@ -54,6 +54,12 @@ while (g.date < end) {
     console.log(`== ${before} (${Math.round(performance.now() - t0)} ms) AI-AI: ${c.aiAi} (z udziałem EK ${c.aiAiEk}), wolni: ${c.free}, za granicę z EK: ${c.abroadEk} (z klubu gracza ${c.abroadUser}), prekontrakty z EK: ${c.preEk}`);
     console.log(`   statystyki: ${JSON.stringify(st)}`);
     console.log(`   OVR top14: ${avg(1)} ${avg(2)} ${avg(3)}, kluby AI z ujemnym saldem: ${neg}, wolnych: ${g.market.free.length}`);
+    // Dyrektorzy sportowi (docs/dyrektor-sportowy.md): Negocjacje średnio wg ligi, wakaty, lista wolnych
+    if (g.staff?.dir) {
+      const negT = [1, 2, 3, 4].map((t) => { const xs = CLUBS_PL.filter((x) => x.tier === t && g.world.clubs[x.id]).map((x) => g.staff.people[g.staff.dir[x.id]]?.a?.NEG).filter((v) => v != null); return xs.length ? (xs.reduce((a, b) => a + b, 0) / xs.length).toFixed(2) : '-'; });
+      const vac = CLUBS_PL.filter((x) => x.tier <= 4 && g.world.clubs[x.id] && !g.staff.dir[x.id]).length;
+      console.log(`   dyrektorzy: NEG wg ligi ${negT.join(' / ')}, wakaty ${vac}, wolnych dyrektorów ${g.staff.dirPool?.length ?? 0}`);
+    }
     snapTiers();
     t0 = performance.now();
   }

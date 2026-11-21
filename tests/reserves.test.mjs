@@ -363,6 +363,11 @@ test('Eskalacja do dyrektora sportowego: tylko po odmowie, szansa z autorytetu i
   const g = newGame('legia');
   g.board = { trust: 60 };
   g.authority = { v: 0.7, club: 'legia' };
+  // Zarządzanie kadrą dyrektora sportowego: +1,5 pp na punkt ponad 10 (docs/dyrektor-sportowy.md)
+  const dir = g.staff.people[g.staff.dir.legia];
+  dir.a.KAD = 14;
+  assert.equal(Math.round(escalationChance(g, 'legia') * 1000), (35 + 28 + 12 + 6) * 10);
+  dir.a.KAD = 10;
   assert.equal(escalationChance(g, 'legia'), (35 + 28 + 12) / 100);
   g.authority.v = 0; g.board.trust = 0;
   assert.equal(escalationChance(g, 'legia'), 0.35);

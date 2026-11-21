@@ -193,7 +193,19 @@ export const ROLE_ATTRS = {
     SIE: { name: 'Sieć kontaktów', text: 'Liczba kandydatów, dostęp do zawodników z kontraktem, praca poza znanymi regionami' },
     CHA: { name: 'Ocena charakteru', text: 'Trafność oceny adaptacji kandydata w Polsce' },
   },
+  // Dyrektor sportowy (docs/dyrektor-sportowy.md): jedna osoba na klub, poza limitem osób sztabu i poza STAFF_ROLES
+  // (nie ma widoku w game.training.staff). Każdy atrybut działa jako odchylenie od 10 (10 = dawne zachowanie gry).
+  dyrektor: {
+    NEG: { name: 'Negocjacje', text: 'Rozmowy klubów AI z zawodnikami: pierwsza oferta, podwyżka, poprawka w ciemno, chęć licytacji. Gracz rozmawia sam' },
+    RYN: { name: 'Znajomość rynku', text: 'Kluby AI: trafność cen. Gracz: widełki pensji zawodnika w rozmowach (węższe przy lepszym dyrektorze)' },
+    SIE: { name: 'Sieć kontaktów', text: 'Szybsze i liczniejsze propozycje wypożyczeń, pierwszeństwo klubu AI na rynku krajowym' },
+    KAD: { name: 'Zarządzanie kadrą i płacami', text: 'Spór z trenerem rezerw, przedłużenia w klubach AI, premie za podpis i prowizje w ofertach AI' },
+  },
 };
+
+/** Dyrektor sportowy: rola poza STAFF_ROLES (osobny slot, docs/dyrektor-sportowy.md). */
+export const DIRECTOR_ROLE = 'dyrektor';
+export const DIRECTOR_NAME = 'Dyrektor sportowy';
 
 export const staffMul = {
   dev: (q) => 0.85 + 0.015 * q,

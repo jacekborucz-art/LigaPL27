@@ -20,6 +20,7 @@ import { relationWith, formatZl } from './negotiation.js';
 import { offerUtility } from './preContracts.js';
 import { clubStability } from './offerFactors.js'; // klocki decyzji zawodnika
 import { clubNegotiation, negLevers, NEG, Q10 } from './clubNegotiation.js'; // ukryty atrybut Negocjacje klubów AI
+import { directorFrom } from './director.js'; // podpis dyrektora sportowego klubu gracza (docs/dyrektor-sportowy.md)
 import { boardCaps, contractIssues } from './boardRequests.js';
 import { squadDeficits, GROUP } from './squad.js';
 import { squadOf } from '../world/worldGen.js';
@@ -292,7 +293,7 @@ const INVALID_TEXT = {
 /** Listy dla gracza (tylko jego propozycje i sprzedaż jego zawodników). */
 function letter(game, x, kind, subject, body, priority = 'important') {
   const p = game.world.players[x.pid];
-  const fromName = x.sale ? 'Dyrektor sportowy' : `Agent zawodnika ${p?.name ?? x.name}`;
+  const fromName = x.sale ? directorFrom(game) : `Agent zawodnika ${p?.name ?? x.name}`;
   return createMessage({ date: game.date, key: `namysl${kind === 'changes' ? '-zmiany' : ''}:${x.pid}:${x.id}:${kind}`, category: 'transfers', from: fromName, priority, subject, body,
     refs: { kind: 'proposal', pid: x.pid, propId: x.id, ...(kind === 'changes' ? { lastRound: true } : {}) } });
 }
