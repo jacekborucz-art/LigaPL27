@@ -212,9 +212,11 @@ test('Trener, sztab i właściciel klubu: edycja, walidacja, datapack i wczytani
   assert.ok(editOwner(g, id, checkOwner({ name: 'Pan Prezes', cierpliwosc: 20 }).value) >= 1);
   assert.equal(g.owners[id].name, 'Pan Prezes');
   const role = Object.keys(cur.staff)[0];
-  assert.ok(editStaff(g, id, checkStaff({ [role]: [{ name: 'Adam Sztabowy', q: 20 }] }).value) >= 1);
+  const top = role === 'fizjoterapeuta' || role === 'dyrektor' ? 20 : 12; // skala roli (sztab 1-12, docs/sztab-atrybuty.md)
+  assert.ok(checkStaff({ [role]: [{ q: top + 1 }] }).errors[`${role}.0.q`], 'jakość ponad skalę roli odrzucona');
+  assert.ok(editStaff(g, id, checkStaff({ [role]: [{ name: 'Adam Sztabowy', q: top }] }).value) >= 1);
   const person = Object.values(g.staff.people).find((p) => p.club === id && p.role === role && p.name === 'Adam Sztabowy');
-  assert.ok(person && person.q === 20);
+  assert.ok(person && person.q === top);
   assert.equal(g.training.staff[id][role].name !== undefined, true, 'widok sztabu przeliczony');
   const file = JSON.stringify(exportPack(g));
   const pk = parsePack(file);
@@ -224,7 +226,7 @@ test('Trener, sztab i właściciel klubu: edycja, walidacja, datapack i wczytani
   importPack(friend, pk);
   assert.equal(coachOf(friend, id).name, 'Jan Trener');
   assert.equal(ownerOf(friend, id).cierpliwosc, 20);
-  assert.ok(Object.values(friend.staff.people).some((p) => p.club === id && p.name === 'Adam Sztabowy' && p.q === 20));
+  assert.ok(Object.values(friend.staff.people).some((p) => p.club === id && p.name === 'Adam Sztabowy' && p.q === top));
   // Pełny datapack niesie ludzi wszystkich klubów i wczytuje się bez błędów
   const full = parsePack(JSON.stringify(exportPack(g, new Date(), { full: true })));
   assert.equal(full.clubs[id].owner.name, 'Pan Prezes');

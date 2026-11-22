@@ -29,6 +29,32 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 22, 2026, agent (worktree, gałąź do scalenia), Zarząd klubu, rozmowa z prezesem, sztab 1-12 (v1.23 Beta)
+Zrobione:
+- Klub, Zarząd: panel „Zarząd klubu” na wolnym miejscu pod oceną zarządu (PC: cała szerokość pod Kibicami i Karierą,
+  telefon: po Karierze): karta właściciela i prezesa (typ, opis, 5 cech z paskami) i dyrektora (jakość, umowa, pensja,
+  staż, 4 atrybuty), tylko podgląd (`boardPeoplePanel` w `src/ui/boardRequestsView.js`, `boardView(game, { extra })`).
+- Prośba „Poproś o zmianę dyrektora”, przycisk „Poproś o zmianę” otwiera rozmowę z prezesem (`src/career/presidentQuiz.js`,
+  okno `src/ui/presidentQuizView.js`, `<dialog id="pqDlg">` w `app.js`, akcje `pq-*`): 4-5 pytań z `src/data/prezesQuiz.js`,
+  dane z 6-12 miesięcy (wyniki, przepłaty, sprzeciwy, wypożyczenia), ton z cech, reakcje, kłamstwo kosztuje. Decyzja:
+  S + 0,8 Q, zgoda od 10, warunkowa od 6 (ocena po 182 dniach, `reviewDirector`, `R.dirReview`), odmowa; Q <= -6: -1
+  zaufania. Esc przed decyzją = prośba niezłożona. Teksty redaktora poprawione (odmiana, nazwiska w mianowniku, `reactionElse`).
+- Sztab 1-12 (wszystkie role poza fizjoterapeutą i dyrektorem): generowanie, lista wolnych, wolni skauci, rozwój, migracja
+  (`game.staff.attrs = 3`), edytor i datapack v7 (`MIGRATE[6]`). Efekty, progi i pensje na skali 1-20 przez `staffEff`
+  (12 = dawne 17), widok `game.training.staff` na skali efektów (`qs` do pokazania). Pomiar: `docs/sztab.md` rozdz. 7.
+- Wartości sztabu w liczbach całkowitych (Trening, Sztab: jakość roli i „Atrybuty roli”, raport drużyny, edytor; karta
+  trenera AI w widoku klubu już bez ułamków).
+- Testy: `tests/presidentQuiz.test.mjs` (9), `tests/staffCap.test.mjs` (6), poprawki w staffMarket, staffAttrs, scoutOps,
+  editor, director, weeklyTodo.
+Decyzje i pułapki:
+- Prośba „przytnij do 12” wdrożona jako przeliczenie x 11/16 z przycięciem (samo przycięcie dałoby 12 prawie całej
+  Ekstraklasie i zmieniłoby efekty); do potwierdzenia przez właściciela.
+- Kod ról sztabu czytający osoby (`p.q`, `p.a`) jest na skali 1-12, a widok i efekty na 1-20: nowy kod liczący efekt
+  z osoby musi użyć `staffEff(rola, wartość)`.
+- `staffMarket.js` i `tests/staffMarket.test.mjs` nadal CRLF, `tests/editor.test.mjs` mieszane końce linii.
+Zostało / dalej:
+- Do decyzji: przeliczenie zamiast przycięcia; progi decyzji po rozmowie (10 / 6, 0,8 Q) bez symulacji wielu próśb.
+
 ## Nov 21, 2026, agent (worktree, gałąź do scalenia), sprzeciw i rotacja dyrektorów sportowych (v1.23 Beta)
 Zrobione:
 - Sprzeciw dyrektora klubu gracza (`docs/dyrektor-sportowy.md` rozdz. 9): kupno z odstępnym (przepłata od 25 % wobec

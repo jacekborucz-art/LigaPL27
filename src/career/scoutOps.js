@@ -22,6 +22,7 @@ import { ATTRS, OFF } from '../data/attributes.js';
 import { SQUAD_LAYOUT, squadOf } from '../world/worldGen.js';
 import { marketValue } from '../world/playerGen.js';
 import { attrsAround } from '../training/staff.js';
+import { staffEff, staffRescale } from '../training/config.js'; // skala skauta 1-12, efekty na skali 1-20 (docs/sztab-atrybuty.md)
 import { daysBetween } from '../training/state.js';
 import { SCOUT_REGIONS, SCOUT_REGION, SCOUT_REGION_KEYS, scoutRegionsFor, regionBand, bestRegion, REGION_POPULARITY } from './scoutRegions.js';
 import { ensureStaff, rosterOf, syncStaff, expectedWage, makeOffer, fireStaff, checkOffer, roleCap, staffLimit } from './staffMarket.js';
@@ -66,7 +67,9 @@ const fmtK = (v) => (v >= 1e6 ? `${(v / 1e6).toFixed(v >= 1e7 ? 1 : 2).replace('
 const isMonday = (date) => new Date(`${date}T12:00:00Z`).getUTCDay() === 1;
 const seasonKey = (date) => { const y = +date.slice(0, 4); return String(+date.slice(5, 7) >= 7 ? y : y - 1); };
 const tierOf = (clubId) => clubById(clubId)?.tier ?? 4;
-const A = (p, k) => p?.a?.[k] ?? p?.q ?? 10;
+// Atrybut i jakość skauta na skali efektów 1-20 (osoba ma skalę 1-12, 12 działa jak dawne 17)
+const A = (p, k) => (p ? staffEff('skaut', p.a?.[k] ?? p.q ?? 10) : 10);
+const QE = (p) => staffEff('skaut', p?.q ?? 10);
 const lowerFirst = (s) => s.charAt(0).toLowerCase() + s.slice(1);
 
 // ------------------------------------------------------------ Wzory (czyste)
@@ -128,7 +131,7 @@ const repNeed = (q) => 4.5 * q - 2;
  */
 export function freelanceFee(game, p, weeks, clubId = game.clubId) {
   const w = expectedWage(p, game.date);
-  const low = clubRep(clubId) < repNeed(p.q) - SCOUT.rep.freeGap;
+  const low = clubRep(clubId) < repNeed(QE(p)) - SCOUT.rep.freeGap;
   return r100(SCOUT.fee.mul * w * weeks / 4.3 * (low ? SCOUT.fee.low : 1));
 }
 
@@ -139,7 +142,7 @@ const clubRep = (clubId) => { const c = clubById(clubId); return c ? clubReputat
 /** Leniwa inicjalizacja game.scoutOps (stary zapis: raz, lista wolnych skautów z dnia wczytania). */
 export function ensureScoutOps(game) {
   if (!game?.world) return null;
-  if (!game.staff) ensureStaff(game);
+  ensureStaff(game); // także przeliczenie skali sztabu w starych zapisach przed tworzeniem nowych skautów
   if (!game.staff) return null;
   let S = game.scoutOps;
   if (!S || S.v !== 1) S = game.scoutOps = { v: 1, seq: 0, pool: [], refresh: null, missions: [], cands: {}, aiIdx: {}, ai: {}, stats: {}, outbox: [] };
@@ -168,7 +171,7 @@ function makeFreeScout(game, rng, date, weights, { specialist = false, initial =
   St.seq = (St.seq ?? 0) + 1;
   const id = `st:${St.seq}`;
   const P = SCOUT.pool;
-  const q = clamp(Math.round(rng.gauss(P.qMean, P.qSd)), P.qMin, P.qMax);
+  const q = staffRescale('skaut', clamp(Math.round(rng.gauss(P.qMean, P.qSd)), P.qMin, P.qMax)); // losowanie na skali 1-20, osoba 1-12
   const region = rng.weighted(SCOUT_REGION_KEYS, (k) => (weights[k] ?? 1) * (REGION_POPULARITY[k] ?? 1));
   const R = SCOUT_REGION[region];
   const natRegion = R.nats.filter(hasNamePool);
@@ -328,7 +331,7 @@ function scoutBusy(game, p, date) {
 }
 
 /** Elita (q 16+) nie pracuje dla klubów z renomą poniżej 45. */
-const eliteRefuses = (p, clubId) => p.q >= SCOUT.rep.eliteQ && clubRep(clubId) < SCOUT.rep.eliteRep;
+const eliteRefuses = (p, clubId) => QE(p) >= SCOUT.rep.eliteQ && clubRep(clubId) < SCOUT.rep.eliteRep;
 
 /** Pełna wycena zlecenia (wspólna dla gracza i AI): { ok, text, cost, fee, returnDate, chance, expected, reasons, calc }. */
 function quote(game, raw, clubId, { ai = false } = {}) {
@@ -402,7 +405,7 @@ function createMission(game, q, clubId) {
   const m = {
     id, club: clubId, scoutId: p.id, scoutName: p.name, freelance, region: o.region, pos: o.pos, ageFrom: o.ageFrom, ageTo: o.ageTo,
     level: o.level, maxFee: o.maxFee, maxWage: o.maxWage, contract: o.contract, weeks: o.weeks, start: date, end, status: 'w toku',
-    cost: q.cost, fee: q.fee, pct: freelance ? commissionPct(p.q) : null, key: orderKey(o),
+    cost: q.cost, fee: q.fee, pct: freelance ? commissionPct(QE(p)) : null, key: orderKey(o),
     calc: { s: r3(calc.s), k: r3(calc.k), a: r3(calc.a), R: r3(calc.R), K: calc.K, D: r3(calc.D), lambda: r3(calc.lambda), sat: calc.sat, c: r3(calc.cEff), pot: calc.target.pot != null ? r3(calc.target.pot) : null },
     events: [{ date, kind: 'wyjazd', text: `Wyjazd: ${SCOUT_REGION[o.region].label}.` }], result: null,
   };
@@ -818,7 +821,7 @@ function aiMissionsWeek(game, date) {
     S.ai[c.id] = period;
     const rng = new Rng(`skauting-ai:${game.seed}:${c.id}:${period}`);
     if (!rng.chance(SCOUT.ai.chance[c.tier] ?? 0)) continue;
-    const scouts = clubScouts(game, c.id).filter((p) => p.q >= SCOUT.ai.minQ && !scoutBusy(game, p, date)).sort((a, b) => b.q - a.q || a.id.localeCompare(b.id));
+    const scouts = clubScouts(game, c.id).filter((p) => QE(p) >= SCOUT.ai.minQ && !scoutBusy(game, p, date)).sort((a, b) => b.q - a.q || a.id.localeCompare(b.id));
     const p = scouts[0];
     if (!p) continue;
     const region = bestRegion(p.reg)?.[0] ?? rng.pick(SCOUT_REGION_KEYS);
@@ -908,7 +911,7 @@ export function hireScout(game, freeScoutId, mode = 'permanent') {
 function permanentCheck(game, p, clubId = game.clubId) {
   if (!roleCap(clubId, 'skaut')) return { ok: false, text: 'W tej lidze klub nie zatrudnia skautów na stałe. Możesz wziąć skauta na zlecenie.' };
   if (eliteRefuses(p, clubId)) return { ok: false, text: `${p.name} pracuje tylko dla klubów z renomą co najmniej ${SCOUT.rep.eliteRep}.` };
-  if (p.q >= SCOUT.rep.permQ && clubRep(clubId) < repNeed(p.q)) return { ok: false, text: `Na stałe ${p.name} wybiera kluby z większą renomą (ok. ${Math.round(repNeed(p.q))}, nasza ${Math.round(clubRep(clubId))}).` };
+  if (QE(p) >= SCOUT.rep.permQ && clubRep(clubId) < repNeed(QE(p))) return { ok: false, text: `Na stałe ${p.name} wybiera kluby z większą renomą (ok. ${Math.round(repNeed(QE(p)))}, nasza ${Math.round(clubRep(clubId))}).` };
   const c = checkOffer(game, { pid: p.id, wage: expectedWage(p, game.date), years: 2, clubId });
   return c.ok ? { ok: true, text: 'Możesz złożyć ofertę.' } : { ok: false, text: c.text };
 }
@@ -942,7 +945,7 @@ export function markCandidatesSeen(game) {
 // ------------------------------------------------------------ Dane dla UI
 
 const regionsOf = (p) => Object.entries(p.reg ?? {}).filter(([k]) => SCOUT_REGION[k]).sort((a, b) => b[1] - a[1]).map(([key, level]) => ({ key, label: SCOUT_REGION[key].label, level, band: regionBand(level) }));
-const attrsOf = (p) => Object.fromEntries(Object.entries(LC).map(([K, k]) => [k, A(p, K)]));
+const attrsOf = (p) => Object.fromEntries(Object.entries(LC).map(([K, k]) => [k, p.a?.[K] ?? p.q ?? 10])); // do widoku: skala skauta 1-12
 
 function scoutStatus(p, date) {
   if (p.mission && p.away && date < p.away) return { status: 'w podróży', busyUntil: p.away };
@@ -991,7 +994,7 @@ export function scoutingView(game) {
     const missionOk = missionCheck(game, p);
     return {
       id: p.id, name: p.name, nat: p.nat, age: p.age, attrs: attrsOf(p), regions: regionsOf(p), wageMonthly: expectedWage(p, date),
-      missionFees: Object.fromEntries(SCOUT.weeks.map((w) => [w, freelanceFee(game, p, w)])), commissionPct: commissionPct(p.q),
+      missionFees: Object.fromEntries(SCOUT.weeks.map((w) => [w, freelanceFee(game, p, w)])), commissionPct: commissionPct(QE(p)),
       permanentOk: permanentCheck(game, p), missionOk,
     };
   });
@@ -1013,7 +1016,7 @@ function missionCheck(game, p) {
   if (act.some((m) => m.freelance)) return { ok: false, text: 'Jedna misja na zlecenie naraz.' };
   const cap = Math.min(SCOUT.maxActive, clubScouts(game, game.clubId).length + 1);
   if (act.length >= cap) return { ok: false, text: `Najwięcej misji naraz: ${cap}.` };
-  const low = clubRep(game.clubId) < repNeed(p.q) - SCOUT.rep.freeGap;
+  const low = clubRep(game.clubId) < repNeed(QE(p)) - SCOUT.rep.freeGap;
   return { ok: true, text: low ? 'Na zlecenie: klub poniżej jego oczekiwań, opłata o 30 % wyższa.' : 'Na zlecenie: opłata z góry i prowizja przy podpisaniu.' };
 }
 

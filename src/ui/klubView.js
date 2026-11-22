@@ -6,7 +6,7 @@ import { esc } from './dom.js';
 import { financeView, boardView } from './transfersView.js';
 import { sponsorsView, handleSponsorAction } from './sponsorsView.js';
 import { infraView, handleInfraAction } from './infraView.js';
-import { boardRequestsPanel, handleBoardAction } from './boardRequestsView.js';
+import { boardRequestsPanel, boardPeoplePanel, handleBoardAction } from './boardRequestsView.js';
 import { renderCareer as careerPanel } from './careerView.js'; // Kariera: panel trenera, gablota, rynek pracy
 
 export const KLUB_TABS = [['finanse', 'Finanse'], ['sponsorzy', 'Sponsorzy'], ['infrastruktura', 'Infrastruktura'], ['zarzad', 'Zarząd'], ['kariera', 'Kariera']];
@@ -17,7 +17,7 @@ export function renderClubHub(game, ui = {}) {
   let body;
   if (tab === 'sponsorzy') body = sponsorsView(game, ui);
   else if (tab === 'infrastruktura') body = infraView(game, ui);
-  else if (tab === 'zarzad') body = `<div class="klub-cols"><div class="klub-main">${boardView(game)}</div>${boardRequestsPanel(game, ui)}</div>`;
+  else if (tab === 'zarzad') body = `<div class="klub-cols"><div class="klub-main">${boardView(game, { extra: boardPeoplePanel(game) })}</div>${boardRequestsPanel(game, ui)}</div>`;
   else if (tab === 'kariera') body = careerPanel(game, ui);
   else body = financeView(game);
   const msg = ui.kMsg ? `<p class="tf-msg" role="status">${esc(ui.kMsg)}</p>` : '';

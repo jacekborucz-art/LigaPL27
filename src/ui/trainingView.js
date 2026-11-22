@@ -13,11 +13,11 @@ import {
   ensureTraining, attachTraining, weekPlan, setSession, removeSession, setRestDay, resetDay, resetWeek,
   teamCohesion, sessionPreview, loadSummary, acwrLabel, staffOf, staffLabel, PHASES, ROLE_LABELS, dayContext,
 } from '../training/index.js';
-import { SESSIONS, INTENSITY, INT_ORDER, ACCENTS, LOAD_LEVELS, STAFF_ROLES, PROGRAMS, MODES, staffMul, COH, ROLE_ATTRS } from '../training/config.js';
+import { SESSIONS, INTENSITY, INT_ORDER, ACCENTS, LOAD_LEVELS, STAFF_ROLES, PROGRAMS, MODES, staffMul, COH, ROLE_ATTRS, staffShown, staffCap } from '../training/config.js';
 import { mondayOf, ageAt } from '../training/state.js';
 import { squadOf, academyOf } from '../world/worldGen.js';
 import { academyCapOf } from '../career/infrastructure.js'; // miejsca w akademii według poziomu
-import { reportPrecision, staffA } from '../training/staff.js';
+import { reportPrecision, staffA, staffShownQ } from '../training/staff.js';
 import { formatZl } from '../career/negotiation.js';
 import { clubById, CLUBS_PL } from '../data/clubs_pl.js';
 import { CAMP, FRIENDLY } from '../training/config.js';
@@ -300,12 +300,15 @@ function dashCohesion(game) {
 
 function dashStaff(game) {
   const st = staffOf(game, game.clubId);
-  const list = Object.entries(STAFF_ROLES).map(([k, r]) => ({ k, r, s: st[k] ?? { q: 10, name: 'Brak' } }));
-  const avg = list.reduce((a, x) => a + x.s.q, 0) / list.length;
-  const weak = list.filter((x) => x.s.q < 8);
-  const body = `<ul class="tr-bars tr-bars--staff">${list.map(({ r, s }) => `<li><span>${esc(r.name)}<small>${esc(s.vacant ? 'wakat' : s.name ?? '')}</small></span>${meter(s.q, 20, s.q >= 14 ? 'ok' : s.q >= 8 ? 'mid' : 'bad')}<b>${Number.isInteger(s.q) ? s.q : num(s.q, 1)}</b></li>`).join('')}</ul>
+  // Jakość roli na skali roli (1-12, fizjoterapeuta 1-20), zaokrąglona; słabe ogniwo: dawne 8 na skali efektów
+  const list = Object.entries(STAFF_ROLES).map(([k, r]) => { const s = st[k] ?? { q: 10, name: 'Brak' }; return { k, r, s, v: staffShownQ(game, game.clubId, k), max: staffCap(k) }; });
+  const small = list.filter((x) => x.max === 12);
+  const avg = small.reduce((a, x) => a + x.v, 0) / Math.max(1, small.length);
+  const weak = list.filter((x) => (x.s.q ?? 10) < 8);
+  const band = (x) => { const e = x.s.q ?? 10; return e >= 14 ? 'ok' : e >= 8 ? 'mid' : 'bad'; };
+  const body = `<ul class="tr-bars tr-bars--staff">${list.map((x) => `<li><span>${esc(x.r.name)}<small>${esc(x.s.vacant ? 'wakat' : x.s.name ?? '')}</small></span>${meter(x.v, x.max, band(x))}<b>${Math.round(x.v)}</b></li>`).join('')}</ul>
     ${weak.length ? `<p class="tr-flag" data-t="warn">Słabe ogniwo: ${esc(weak.map((x) => x.r.name.toLowerCase()).join(', '))}.</p>` : ''}`;
-  return card('info', 'Sztab', body, { badge: `średnio ${num(avg, 1)} / 20`, foot: tabBtn('sztab', 'Sztab') });
+  return card('info', 'Sztab', body, { badge: `średnio ${num(avg, 1)} / 12`, foot: tabBtn('sztab', 'Sztab') });
 }
 
 function dashDev(game) {
@@ -578,9 +581,8 @@ function staffTab(game, ui = {}) {
     fizjoterapeuta: () => `przerwa po urazie x${num(staffMul.heal(A('fizjoterapeuta', 'LEC')), 2)}, po ciężkim urazie x${num(staffMul.heal(A('fizjoterapeuta', 'REH')), 2)}, ryzyko urazu na treningu x${num(staffMul.physio(A('fizjoterapeuta', 'PRF')), 2)}`,
     skaut: () => `ocena potencjału zawodników innych klubów: ${PREC[reportPrecision(A('skaut', 'OCE'))].replace(/y$/, 'a')}, z zagranicy także wiedza o rynku; wyjazdy za granicę w Transfery, Skauting`,
   };
-  const qTxt = (q) => (Number.isInteger(q) ? String(q) : num(q, 1));
-  // Atrybuty roli (lider i pomocnicy razem, jak jakość roli)
-  const attrs = (k) => (ROLE_ATTRS[k] ? `<p class="muted">Atrybuty roli: ${Object.entries(ROLE_ATTRS[k]).map(([a, d]) => `${esc(d.name.toLowerCase())} ${esc(qTxt(A(k, a)))}`).join(', ')}</p>` : '');
+  // Atrybuty roli (lider i pomocnicy razem, jak jakość roli): na skali roli (1-12, fizjoterapeuta 1-20), w liczbach całkowitych
+  const attrs = (k) => (ROLE_ATTRS[k] ? `<p class="muted">Atrybuty roli: ${Object.entries(ROLE_ATTRS[k]).map(([a, d]) => `${esc(d.name.toLowerCase())} ${Math.round(staffShown(k, A(k, a)))}`).join(', ')}</p>` : '');
   return renderStaff(game, ui, { effect: (k, q) => eff[k]?.(q) ?? STAFF_ROLES[k]?.effect ?? '', attrs, footer: reportSetting(game) });
 }
 

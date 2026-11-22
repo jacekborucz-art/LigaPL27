@@ -46,6 +46,9 @@ export const REQ = {
   // Zmiana dyrektora sportowego: zgoda od S >= 10 (przeciętny dyrektor przy zaufaniu 60: ok. pół na pół); słaby dyrektor łatwiej (2,5 pkt na punkt jakości poniżej 10),
   // świeży (do 12 miesięcy) trudniej, niecierpliwy i porywczy właściciel łatwiej, odprawa wobec wolnych pieniędzy
   DIR_YES: 10, DIR_Q: 2.5, DIR_FRESH: -10, DIR_FRESH_DAYS: 365, DIR_PATIENCE: 1, DIR_TEMPER: 0.5,
+  // Rozmowa z prezesem (src/career/presidentQuiz.js): S = punktacja + 0,8 x wynik quizu Q; zgoda od 10, zgoda
+  // warunkowa od 6 (ponowna ocena po 182 dniach bez nowej prośby), Q <= -6: dodatkowo -1 zaufania
+  DIR_QUIZ: 0.8, DIR_COND: 6, DIR_BAD_Q: -6, DIR_REVIEW_DAYS: 182,
 };
 export const VETO = {
   SQUAD_X: 1.5, SQUAD_X_RICH: 1.8, MARKET_X: 1.3, RENEW_X: 1.15, // pensja: najwyższa w kadrze, rynkowa, obecna
@@ -62,7 +65,7 @@ export const REQ_TYPES = {
   wage: { label: 'Większy budżet płac', short: 'budżet płac', gen: 'budżetu płac' },
   shift: { label: 'Przesunięcie do budżetu płac', short: 'przesunięcie pieniędzy do płac' },
   goal: { label: 'Niższy cel sezonu', short: 'niższy cel sezonu' },
-  director: { label: 'Zmiana dyrektora sportowego', short: 'zmiana dyrektora sportowego' },
+  director: { label: 'Poproś o zmianę dyrektora', hist: 'Zmiana dyrektora sportowego', short: 'zmiana dyrektora sportowego' },
 };
 export const VERDICT_LABELS = { yes: 'Zgoda', partial: 'Częściowa zgoda', cond: 'Zgoda warunkowa', no: 'Odmowa' };
 
@@ -237,6 +240,7 @@ export function requestStatus(game, type, date = game.date) {
   }
   if (type === 'shift' && (c?.transferBudget ?? 0) < 100000) return { ok: false, from: null, text: 'Budżet transferowy jest za mały na przesunięcie (minimum 100 tys. zł).' };
   if (type === 'director' && game.staff && !directorOf(game, game.clubId)) return { ok: false, from: null, text: 'Klub nie ma teraz dyrektora sportowego: zarząd szuka go sam.' };
+  if (type === 'director' && R.dirReview && R.dirReview.due > date) return { ok: false, from: R.dirReview.due, text: 'Zarząd dał dyrektorowi pół roku i sam wróci do sprawy.' };
   if (type === 'goal') {
     const season = seasonOf(date);
     if (R.goalSeason === season) return { ok: false, from: `${season + 1}-07-01`, text: 'Cel sezonu można obniżyć raz w sezonie.' };
@@ -452,7 +456,11 @@ export function directorScore(game, date = game.date, { noRand = false } = {}) {
   return { S: Math.round(S * 10) / 10, parts, d, cost, pos: t, goal };
 }
 
-function askDirectorChange(game, date, { candidate = null } = {}) {
+/**
+ * Prośba o zmianę dyrektora. opts.quiz: wynik rozmowy z prezesem { Q } (presidentQuiz.js): S + 0,8 Q, zgoda od 10,
+ * zgoda warunkowa od 6 (ponowna ocena po pół roku), odmowa; Q <= -6 dodatkowo -1 zaufania. Bez rozmowy: zgoda albo odmowa.
+ */
+function askDirectorChange(game, date, { candidate = null, quiz = null } = {}) {
   const R = ensureRequests(game);
   const B = game.board;
   const c = game.finance?.clubs?.[game.clubId];
@@ -460,15 +468,25 @@ function askDirectorChange(game, date, { candidate = null } = {}) {
   const st = requestStatus(game, 'director', date);
   if (!st.ok) return { ok: false, text: `${st.text}${st.from ? ` Najbliższy termin: ${fmtDate(st.from)}.` : ''}` };
   const sc = directorScore(game, date);
-  const verdict = sc.S >= REQ.DIR_YES ? 'yes' : 'no';
+  const Q = quiz && Number.isFinite(quiz.Q) ? quiz.Q : null;
+  const S = Math.round((sc.S + (Q == null ? 0 : REQ.DIR_QUIZ * Q)) * 10) / 10;
+  const verdict = S >= REQ.DIR_YES ? 'yes' : Q != null && S >= REQ.DIR_COND ? 'cond' : 'no';
   const trust0 = B.trust;
   let dTrust = 0;
   if (B.trust < 35 || (sc.pos.played >= 4 && sc.pos.pos && sc.pos.pos >= (B.goal?.target ?? 99) + 4)) dTrust -= 2;
   if (verdict === 'no') dTrust -= 1;
+  if (Q != null && Q <= REQ.DIR_BAD_Q) dTrust -= 1; // zła rozmowa z prezesem
   B.trust = Math.round(clamp(B.trust + dTrust, 0, 100));
-  const entry = { id: `${date}:director`, date, type: 'director', amount: 0, verdict, granted: 0, S: sc.S, trust: B.trust - trust0 };
+  const entry = { id: `${date}:director`, date, type: 'director', amount: 0, verdict, granted: 0, S, trust: B.trust - trust0 };
+  if (Q != null) entry.Q = Q;
   let subject; let body;
-  if (verdict === 'yes') {
+  if (verdict === 'cond') {
+    const due = addDaysIso(date, REQ.DIR_REVIEW_DAYS);
+    R.dirReview = { date, due, Q, candidate: candidate || null, dir: sc.d?.id ?? null };
+    subject = 'Zarząd: decyzja w sprawie dyrektora sportowego za pół roku';
+    body = `zarząd daje dyrektorowi sportowemu jeszcze pół roku${sc.d?.name ? ` (${sc.d.name})` : ''}. ${fmtDate(due)} ocenimy wyniki i pracę pionu sportowego: jeśli nie będzie poprawy, zmienimy dyrektora. Do tego czasu nowej prośby w tej sprawie nie przyjmiemy.`.replace('  ', ' ');
+    entry.text = `Ocena dyrektora ${fmtDate(due)}.`;
+  } else if (verdict === 'yes') {
     const old = sc.d;
     const r = ownerReplaceDirector(game, game.clubId, date, { candidate, why: 'decyzja zarządu (prośba trenera)' });
     const candTxt = { budget: ' Pańskiego kandydata nie zatrudnimy: jego oczekiwania przekraczają budżet sztabu.', refused: ' Pańskiego kandydata rozważyliśmy, ale wybraliśmy inną osobę.', gone: ' Pański kandydat nie jest już dostępny.', ok: ' Zatrudniamy Pańskiego kandydata.' }[r.candidate] ?? '';
@@ -486,16 +504,55 @@ function askDirectorChange(game, date, { candidate = null } = {}) {
       owner: 'właściciel ceni spokój i nie zmienia ludzi pochopnie',
     };
     const why = Object.entries(sc.parts).filter(([k, v]) => v < -2 && txt[k]).sort((a, b) => a[1] - b[1]).slice(0, 2).map(([k]) => txt[k]);
+    if (Q != null && Q < 0) why.unshift('rozmowa z prezesem nie przekonała zarządu');
+    if (why.length > 2) why.length = 2;
     subject = 'Odmowa zarządu: zmiana dyrektora sportowego';
     body = `zarząd nie zgadza się teraz na zmianę dyrektora sportowego ${sc.d?.name ?? ''}.${why.length ? ` Powody: ${why.join('; ')}.` : ''}`.replace(' .', '.');
     entry.text = why.length ? `Powód: ${why[0]}.` : 'Bez uzasadnienia w liście.';
   }
-  const next = requestStatusAfter(entry);
-  body += ` Do tej sprawy wrócimy najwcześniej ${fmtDate(next)}.`;
+  if (verdict !== 'cond') {
+    if (verdict === 'yes') delete R.dirReview;
+    const next = requestStatusAfter(entry);
+    body += ` Do tej sprawy wrócimy najwcześniej ${fmtDate(next)}.`;
+  }
   if (dTrust) body += ` Zaufanie zarządu: ${B.trust} na 100 (${dTrust}).`;
   R.log.unshift(entry); R.log.length = Math.min(R.log.length, 30);
   letter(game, date, `prosba:${entry.id}`, subject, body);
-  return { ok: true, verdict, granted: 0, entry, text: `${VERDICT_LABELS[verdict]}. ${entry.text}` };
+  return { ok: true, verdict, granted: 0, entry, S, text: `${VERDICT_LABELS[verdict]}. ${entry.text}` };
+}
+
+/**
+ * Zgoda warunkowa na zmianę dyrektora: ponowna ocena po pół roku (system dnia, bez nowej prośby trenera).
+ * S = punktacja z dnia oceny (z losem) + 0,8 Q z rozmowy; od 10 zarząd zmienia dyrektora, niżej dyrektor zostaje.
+ * Inny dyrektor w klubie (odszedł, zwolniony): ocena odpada. Zwraca listy (push: od razu do poczty).
+ */
+export function reviewDirector(game, date, { push = true } = {}) {
+  const R = game.board?.requests;
+  const rv = R?.dirReview;
+  if (!rv || date < rv.due) return [];
+  delete R.dirReview;
+  const d = game.staff ? directorOf(game, game.clubId) : null;
+  if (!d || (rv.dir && d.id !== rv.dir)) return [];
+  const sc = directorScore(game, date);
+  const S = Math.round((sc.S + REQ.DIR_QUIZ * (rv.Q ?? 0)) * 10) / 10;
+  const yes = S >= REQ.DIR_YES;
+  const entry = { id: `${date}:director:review`, date, type: 'director', amount: 0, verdict: yes ? 'yes' : 'no', granted: 0, S, trust: 0, review: true };
+  let subject; let body;
+  if (yes) {
+    const r = ownerReplaceDirector(game, game.clubId, date, { candidate: rv.candidate, why: 'decyzja zarządu (ocena po pół roku)' });
+    const candTxt = { budget: ' Pańskiego kandydata nie zatrudnimy: jego oczekiwania przekraczają budżet sztabu.', refused: ' Pańskiego kandydata rozważyliśmy, ale wybraliśmy inną osobę.', gone: ' Pański kandydat nie jest już dostępny.', ok: ' Zatrudniamy Pańskiego kandydata.' }[r.candidate] ?? '';
+    subject = `Zarząd po ocenie: nowy dyrektor sportowy ${r.fresh.name}`;
+    body = `minęło pół roku i poprawy nie widzimy. ${d.name} odchodzi z klubu (odprawa ${zl(r.cost)} z kasy klubu).${candTxt} Nowym dyrektorem sportowym jest ${r.fresh.name} (umowa do ${fmtDate(r.fresh.until)}, ${zl(r.fresh.wage)} miesięcznie).`;
+    entry.text = `Po ocenie nowy dyrektor: ${r.fresh.name}.`;
+    entry.dir = r.fresh.id;
+  } else {
+    subject = 'Zarząd po ocenie: dyrektor sportowy zostaje';
+    body = `minęło pół roku. Zarząd ocenił pracę pionu sportowego i ${d.name} zostaje na stanowisku dyrektora sportowego.`;
+    entry.text = 'Po ocenie dyrektor zostaje.';
+  }
+  body += ` Do tej sprawy wrócimy najwcześniej ${fmtDate(requestStatusAfter(entry))}.`;
+  R.log.unshift(entry); R.log.length = Math.min(R.log.length, 30);
+  return [letter(game, date, `prosba:${entry.id}`, subject, body, 'important', push)];
 }
 
 function requestStatusAfter(e) {
@@ -809,6 +866,7 @@ registerDailySystem({
   run(game, date) {
     if (!game.world || !game.season || !game.finance || !game.board) return {};
     const messages = date.endsWith('-01') ? checkConditions(game, date, { push: false }) : [];
+    if (game.board.requests?.dirReview) messages.push(...reviewDirector(game, date, { push: false }));
     if (date.endsWith('-07-02') || date.endsWith('-01-02')) aiBudgetRequests(game, date);
     return { messages };
   },

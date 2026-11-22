@@ -12,12 +12,12 @@ import { NAT_NAMES } from '../data/names.js';
 import { clamp } from '../core/rng.js';
 import { daysBetween } from '../training/state.js';
 import { staffLabel, roleAttrKeys } from '../training/staff.js';
-import { ROLE_ATTRS, DIRECTOR_ROLE } from '../training/config.js';
+import { ROLE_ATTRS, DIRECTOR_ROLE, staffCap, isCappedRole, STAFF_EFF } from '../training/config.js';
 import { hintHalfWidth, sieStep, DIR } from '../career/director.js';
 import {
   STAFF_MARKET as K, STAFF_ROLE_ORDER, staffSummary, staffBudget, budgetRoomFor, listFreeStaff, listClubStaff, seenQuality,
   expectedWage, offerHint, clubAppeal, makeOffer, checkOffer, pendingOffers, fireStaff, renewStaff, canRenew, combineQ,
-  contractUntil, rosterOf, directorOf,
+  contractUntil, rosterOf, directorOf, helperShare, tooWeakHelper,
 } from '../career/staffMarket.js';
 
 export const isStaffAction = (act) => typeof act === 'string' && act.startsWith('st-');
@@ -34,11 +34,13 @@ const MARKET_ROLES = [...STAFF_ROLE_ORDER, DIRECTOR_ROLE];
 const isDir = (role) => role === DIRECTOR_ROLE;
 
 const num = (v, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toFixed(d).replace('.', ',');
-const qTxt = (q) => (Number.isInteger(q) ? String(q) : num(q, 1));
+// Jakość i atrybuty w liczbach całkowitych (skala roli: 1-12, fizjoterapeuta i dyrektor 1-20)
+const qTxt = (q) => String(Math.round(q));
 /** Kwota w tysiącach: „17,5 tys. zł”. */
 const kzl = (v) => `${(Math.round(v / 100) / 10).toLocaleString('pl-PL')} tys. zł`;
 const kNum = (v) => (Math.round(v / 100) / 10).toLocaleString('pl-PL');
-const tone = (q) => (q >= 14 ? 'good' : q >= 8 ? 'info' : 'warn');
+// Kolor jakości na skali roli: 1-12 od 10 dobry, od 6 średni (dawne 14 i 8 na skali 1-20)
+const tone = (q, role = null) => (isCappedRole(role ?? 'asystent') ? (q >= 10 ? 'good' : q >= 6 ? 'info' : 'warn') : (q >= 14 ? 'good' : q >= 8 ? 'info' : 'warn'));
 const natName = (nat) => NAT_NAMES[nat] ?? nat ?? '';
 const clubName = (id) => clubById(id)?.name ?? id ?? '';
 const crest = (id, size = 20) => { const c = clubById(id); return c ? crestHtml(c, { size }) : ''; };
@@ -128,13 +130,13 @@ function subTabs(sub, sum, free, pend, date) {
 function ownAttrs(p) {
   const keys = roleAttrKeys(p.role);
   if (!keys.length || !p.a) return '';
-  return `<ul class="st-oattr" aria-label="Atrybuty">${keys.map((k) => `<li data-t="${tone(p.a[k])}" title="${esc(ROLE_ATTRS[p.role][k].text)}"><span>${esc(ROLE_ATTRS[p.role][k].name)}</span><b>${p.a[k]}</b></li>`).join('')}</ul>`;
+  return `<ul class="st-oattr" aria-label="Atrybuty">${keys.map((k) => `<li data-t="${tone(p.a[k], p.role)}" title="${esc(ROLE_ATTRS[p.role][k].text)}"><span>${esc(ROLE_ATTRS[p.role][k].name)}</span><b>${p.a[k]}</b></li>`).join('')}</ul>`;
 }
 
 function personRow(game, p, i, role, ui) {
   const date = game.date;
   const adapting = p.adapt && date < p.adapt.to;
-  const share = i === 0 ? { k: 'good', t: 'lider' } : p.q < 7 ? { k: 'warn', t: 'nic nie daje' } : { k: 'info', t: `pomaga +${num(K.help[i - 1] ? K.help[i - 1] * Math.max(0, p.qNow - K.helpFrom) : 0, 1)}` };
+  const share = i === 0 ? { k: 'good', t: 'lider' } : tooWeakHelper(p.role, p.q) ? { k: 'warn', t: 'nic nie daje' } : { k: 'info', t: `pomaga +${num(helperShare(p.role, p.qNow, i), 1)}` };
   const left = p.until ? daysBetween(date, p.until) : 999;
   const untilK = left < 30 ? 'bad' : left < 90 ? 'warn' : '';
   const renewFrom = p.until ? `${+p.until.slice(0, 4)}-01-01` : null;
@@ -146,10 +148,10 @@ function personRow(game, p, i, role, ui) {
   const ask = ui.trStaffAsk === p.id ? fireAsk(game, p, role) : '';
   const renewForm = ui.trStaffOffer?.renew && ui.trStaffOffer.pid === p.id ? renewPanel(game, p, ui.trStaffOffer) : '';
   return `<li class="st-person" data-id="${esc(p.id)}">
-    <span class="st-q" data-t="${tone(p.qNow)}" title="Jakość ${esc(staffLabel(p.qNow).toLowerCase())}">${esc(qTxt(adapting ? Math.round(p.qNow) : p.q))}${adapting ? `<small>(${p.q})</small>` : ''}</span>
+    <span class="st-q" data-t="${tone(p.qNow, p.role)}" title="Jakość ${esc(staffLabel(p.qNow, p.role).toLowerCase())}">${esc(qTxt(adapting ? Math.round(p.qNow) : p.q))}${adapting ? `<small>(${p.q})</small>` : ''}</span>
     <div class="st-who">
       <p class="st-who__nm"><b>${esc(p.name)}</b> <span class="st-nat" title="${esc(natName(p.nat))}">${esc(p.nat ?? '')}</span>
-        ${isDir(p.role) ? '' : `<span class="st-share" data-k="${share.k}"${share.k === 'warn' ? ' title="Pomocnik słabszy niż 7 nie podnosi jakości roli. Warto rozważyć zwolnienie."' : ''}>${esc(share.t)}</span>`}${p.demoted ? ' <span class="st-share" data-k="warn" title="Stracił rolę lidera i chętniej odejdzie">niezadowolony</span>' : ''}</p>
+        ${isDir(p.role) ? '' : `<span class="st-share" data-k="${share.k}"${share.k === 'warn' ? ` title="Pomocnik słabszy niż ${isCappedRole(p.role) ? 5 : 7} nie podnosi jakości roli. Warto rozważyć zwolnienie."` : ''}>${esc(share.t)}</span>`}${p.demoted ? ' <span class="st-share" data-k="warn" title="Stracił rolę lidera i chętniej odejdzie">niezadowolony</span>' : ''}</p>
       <p class="st-meta">${p.age} l., ${esc(kzl(p.wage))} / mies., <span class="st-until"${untilK ? ` data-k="${untilK}"` : ''}>umowa do ${esc(fmtDate(p.until))}</span></p>
       ${ownAttrs(p)}
       ${adaptHtml}
@@ -229,9 +231,9 @@ function directorCard(game, role, ui) {
     : `<p class="st-vacant">Wakat: zarząd szuka nowego dyrektora, do tego czasu obowiązki przejmuje sam (jakość ${esc(qTxt(role.q))}). Widełki w rozmowach są szersze, a kluby na wypożyczenie szuka się wolniej.</p>`;
   // O dyrektorze decyduje zarząd: gracz może tylko poprosić o zmianę (Klub, Zarząd) i obejrzeć listę wolnych dyrektorów
   const btn = `${p ? '<button class="btn btn--sm st-find" data-act="tab" data-tab="klub" data-sub="zarzad">Poproś zarząd o zmianę dyrektora</button>' : ''}<button class="btn btn--quiet btn--sm" data-act="st-find" data-role="${DIRECTOR_ROLE}">Wolni dyrektorzy (podgląd)</button>`;
-  return `<section class="tr-card tr-staffcard st-role st-dir" data-t="${p ? tone(role.q) : 'warn'}" id="st-role-${DIRECTOR_ROLE}" aria-labelledby="st-role-${DIRECTOR_ROLE}-h" data-wide>
+  return `<section class="tr-card tr-staffcard st-role st-dir" data-t="${p ? tone(role.q, DIRECTOR_ROLE) : 'warn'}" id="st-role-${DIRECTOR_ROLE}" aria-labelledby="st-role-${DIRECTOR_ROLE}-h" data-wide>
     <header class="st-role__head"><h3 class="st-h" id="st-role-${DIRECTOR_ROLE}-h">${esc(role.name)}</h3>
-      <span class="st-role__q"><b>${esc(qTxt(role.q))}</b><small>${p ? esc(staffLabel(role.q).toLowerCase()) : 'wakat'}</small></span></header>
+      <span class="st-role__q"><b>${esc(qTxt(role.q))}</b><small>${p ? esc(staffLabel(role.q, DIRECTOR_ROLE).toLowerCase()) : 'wakat'}</small></span></header>
     <p class="st-role__seats">Zatrudnia i zwalnia zarząd klubu. Poza limitem osób sztabu, pensja z budżetu sztabu.</p>
     ${people}
     ${eff}
@@ -245,7 +247,7 @@ function roleCard(game, k, role, sum, opts, ui) {
   const roleFull = L.n + pendRole >= L.max;
   const staffFull = sum.used >= sum.limit;
   const q = role.q;
-  const t = role.vacant ? 'warn' : tone(q);
+  const t = role.vacant ? 'warn' : tone(q, k);
   const seats = `${L.n} z ${L.max} ${L.max === 1 ? 'miejsca' : 'miejsc'}${pendRole ? `, oferty: ${pendRole}` : ''}`;
   const why = roleFull ? `Rola pełna: ${L.n + pendRole} z ${L.max} w tej lidze` : staffFull ? `Sztab pełny: ${sum.used} z ${sum.limit} osób` : '';
   const people = role.vacant
@@ -256,7 +258,7 @@ function roleCard(game, k, role, sum, opts, ui) {
     : `<button class="btn btn--quiet btn--sm" data-act="st-find" data-role="${k}"${why ? ` disabled title="${esc(why)}"` : ''}>Dodaj ${esc(ROLE_ACC[k])}</button>`;
   return `<section class="tr-card tr-staffcard st-role" data-t="${t}" id="st-role-${k}" aria-labelledby="st-role-${k}-h"${role.people.length >= 3 ? ' data-wide' : ''}>
     <header class="st-role__head"><h3 class="st-h" id="st-role-${k}-h">${esc(role.name)}</h3>
-      <span class="st-role__q"><b>${esc(qTxt(q))}</b><small>${role.vacant ? 'wakat' : esc(staffLabel(q).toLowerCase())}</small></span></header>
+      <span class="st-role__q"><b>${esc(qTxt(q))}</b><small>${role.vacant ? 'wakat' : esc(staffLabel(q, k).toLowerCase())}</small></span></header>
     <p class="st-role__seats">${esc(seats)}</p>
     <p class="st-eff">${esc(opts.effect?.(k, q) ?? '')}</p>
     ${!role.vacant && opts.attrs ? opts.attrs(k) : ''}
@@ -286,7 +288,7 @@ function sideMine(game, sum, B, roles) {
 }
 
 const howItWorks = () => `<details class="st-how"><summary>Jak to działa</summary>
-  <p>W roli może pracować kilka osób. Najlepszy prowadzi, pomocnicy z jakością 7 i więcej podnoszą łączny wynik (najwyżej o 2).</p>
+  <p>W roli może pracować kilka osób. Najlepszy prowadzi, pomocnicy z jakością 5 i więcej (fizjoterapeuci: 7 i więcej) podnoszą łączny wynik, najwyżej do 12. Skala jakości: 1-12, 12 to najlepsi w Polsce; fizjoterapeuci i dyrektorzy sportowi 1-20.</p>
   <p>Oferta wiąże do decyzji kandydata (2-3 dni). Kandydat wybiera najkorzystniejszą ofertę, a po decyzji nie przyjmuje kolejnych.</p>
   <p>Obcokrajowiec przez pierwsze 3 miesiące pracuje nieco słabiej. Zwolnienie kosztuje od 2 do 6 pensji odprawy.</p>
   <p>Osobę z innego klubu można podebrać: jej klub zgadza się (rekompensata 3 pensje) albo blokuje. Przy blokadzie osoba może zerwać umowę, a wtedy płacisz karę: 3 pensje i do połowy więcej.</p>
@@ -298,7 +300,7 @@ function aside(inner) {
 }
 
 function mineView(game, sum, B, opts, ui) {
-  const tip = readTip() ? '' : `<p class="notice st-tip" role="status">Sztab to nie tylko jeden człowiek na rolę. Dodatkowi pomocnicy z jakością 7 i więcej podnoszą łączny wynik. <button class="btn btn--quiet btn--sm" data-act="st-tip-close">Rozumiem</button></p>`;
+  const tip = readTip() ? '' : `<p class="notice st-tip" role="status">Sztab to nie tylko jeden człowiek na rolę. Dodatkowi pomocnicy z jakością 5 i więcej podnoszą łączny wynik. <button class="btn btn--quiet btn--sm" data-act="st-tip-close">Rozumiem</button></p>`;
   const cards = directorCard(game, sum.roles[DIRECTOR_ROLE], ui) + STAFF_ROLE_ORDER.filter((k) => sum.roles[k]?.max).map((k) => roleCard(game, k, sum.roles[k], sum, opts, ui)).join('');
   return `<div class="st-grid"><div class="st-main">${tip}<div class="st-roles">${cards}</div></div>${aside(sideMine(game, sum, B, sum.roles))}</div>`;
 }
@@ -327,7 +329,7 @@ function marketTable(game, rows, s) {
   const body = rows.map((r) => `<tr${r.blocked ? ' class="st-busy"' : ''}>
     <th scope="row" class="xl__nm st-nm"><button class="st-link" data-act="st-open" data-id="${esc(r.id)}">${esc(r.name)}</button></th>
     <td class="st-l">${esc(ROLE_SHORT[r.role])}</td><td class="st-l">${esc(natName(r.nat))}</td><td>${r.age}</td>
-    <td><b class="st-qv" data-t="${tone(r.q.v)}">${esc(seenTxt(r.q))}</b></td><td>${esc(wageRange(r.wage))}</td>
+    <td><b class="st-qv" data-t="${tone(r.q.v, r.role)}">${esc(seenTxt(r.q))}</b></td><td>${esc(wageRange(r.wage))}</td>
     <td class="st-l">${statusTag(game, r)}</td>
     <td><button class="btn btn--quiet btn--sm" data-act="st-open" data-id="${esc(r.id)}" aria-label="${esc(`${isDir(r.role) ? 'Podgląd' : r.club ? 'Podbij' : 'Oferta'}: ${r.name}`)}"${r.blocked ? ' disabled' : ''}>${isDir(r.role) ? 'Podgląd' : r.club ? 'Podbij' : 'Oferta'}</button></td></tr>`).join('');
   const precTitle = 'Jakość widziana przez twojego asystenta: liczba, przedział albo słowo, zależnie od jego klasy.';
@@ -338,7 +340,7 @@ function marketTable(game, rows, s) {
 
 function marketCards(game, rows) {
   return `<ul class="st-cards">${rows.map((r) => `<li><button class="st-pcard${r.blocked ? ' st-busy' : ''}" data-act="st-open" data-id="${esc(r.id)}" aria-label="${esc(`${r.name}, ${ROLE_SHORT[r.role]}`)}">
-    <span class="st-q" data-t="${tone(r.q.v)}">${esc(seenTxt(r.q))}</span>
+    <span class="st-q" data-t="${tone(r.q.v, r.role)}">${esc(seenTxt(r.q))}</span>
     <span class="st-pcard__body"><span class="st-pcard__top"><b>${esc(r.name)}</b><small>${esc(ROLE_SHORT[r.role])}</small></span>
       <span class="st-meta">${esc(r.nat ?? '')}, ${r.age} l., oczekuje ${esc(wageRange(r.wage))}</span>
       <span class="st-pcard__tags">${statusTag(game, r)}</span></span></button></li>`).join('')}</ul>`;
@@ -367,7 +369,8 @@ function filtersHtml(game, f) {
         <label class="st-check"><input type="checkbox" data-st-field="poach" id="st-f-poach"${f.poach ? ' checked' : ''}> Pracują w klubach</label>
         <span class="st-note">Podbieranie kosztuje rekompensatę 3 pensji.</span>
       </div>
-      ${aq < 14 ? `<p class="st-note">Twój asystent ocenia kandydatów ${aq >= 8 ? 'z dokładnością do 2 punktów' : 'tylko ogólnie'}, więc filtr jakości może kogoś pominąć.</p>` : ''}
+      ${aq < 14 ? `<p class="st-note">Twój asystent ocenia kandydatów ${aq >= 8 ? 'z dokładnością do 1 punktu (fizjoterapeutów i dyrektorów do 2)' : 'tylko ogólnie'}, więc filtr jakości może kogoś pominąć.</p>` : ''}
+      <p class="st-note">Skala jakości: 1-12 (12 to najlepsi w Polsce), fizjoterapeuci i dyrektorzy sportowi 1-20.</p>
     </div></details>`;
 }
 
@@ -405,7 +408,7 @@ function personAttrs(game, p, v) {
   const keys = roleAttrKeys(p.role);
   if (!keys.length) return null;
   const shift = v - (p.q ?? v);
-  return keys.map((k) => [ROLE_ATTRS[p.role][k].name, clamp(Math.round((p.a?.[k] ?? p.q ?? v) + shift), 1, 20), ROLE_ATTRS[p.role][k].text]);
+  return keys.map((k) => [ROLE_ATTRS[p.role][k].name, clamp(Math.round((p.a?.[k] ?? p.q ?? v) + shift), 1, staffCap(p.role)), ROLE_ATTRS[p.role][k].text]);
 }
 
 function offerState(game, p, ui, seen) {
@@ -479,13 +482,14 @@ function personCard(game, pid, sum, B, ui) {
   const curDir = isDir(p.role) ? directorOf(game, game.clubId) : null;
   const delta = isDir(p.role) ? `O zatrudnieniu dyrektora sportowego decyduje zarząd klubu${curDir ? ` (dziś: ${curDir.name})` : ''}. Możesz wskazać tę osobę jako kandydata w prośbie o zmianę dyrektora (Klub, Zarząd).`
     : !role?.max ? 'Ta rola nie jest dostępna w twojej lidze.'
-    : isLead ? `${role.name}: ${num(cur, 1)} -> ${num(next, 1)}${qs.length ? ' (nowy lider, obecny zostaje pomocnikiem)' : ''}.`
-      : v < 7 ? `${role.name}: nic nie doda (jakość poniżej 7).` : `${role.name}: ${num(cur, 1)} -> ${num(next, 1)} (zostanie pomocnikiem, +${num(next - cur, 1)}).`;
+    : isLead ? `${role.name}: ${qTxt(cur)} -> ${qTxt(next)}${qs.length ? ' (nowy lider, obecny zostaje pomocnikiem)' : ''}.`
+      : tooWeakHelper(p.role, v) ? `${role.name}: nic nie doda (jakość poniżej ${isCappedRole(p.role) ? 5 : 7}).` : `${role.name}: ${qTxt(cur)} -> ${qTxt(next)} (zostanie pomocnikiem, +${num(next - cur, 1)}).`;
   const attrs = personAttrs(game, p, v);
+  const cap = staffCap(p.role); const aw = isCappedRole(p.role) ? 1 : 2; // skala roli i szerokość przedziału
   const precWord = { exact: 'dokładnie', approx: 'w przybliżeniu', vague: 'ogólnie' }[seen.prec];
   const attrHtml = attrs
-    ? attrs.map(([l, x, tip]) => `<div class="st-attr" title="${esc(tip)}"><span>${esc(l)}</span><b>${seen.prec === 'exact' ? x : seen.prec === 'approx' ? `${Math.max(1, x - 2)}-${Math.min(20, x + 2)}` : esc(staffLabel(x).toLowerCase())}</b><span class="tr-meter" aria-hidden="true"><i style="width:${pct(x, 20)}%"></i></span></div>`).join('')
-    : `<div class="st-attr"><span>Mocne strony</span><b>${esc(staffLabel(Math.round(v)).toLowerCase())}</b><span class="tr-meter" aria-hidden="true"><i style="width:${pct(v, 20)}%"></i></span></div>`;
+    ? attrs.map(([l, x, tip]) => `<div class="st-attr" title="${esc(tip)}"><span>${esc(l)}</span><b>${seen.prec === 'exact' ? x : seen.prec === 'approx' ? `${Math.max(1, x - aw)}-${Math.min(cap, x + aw)}` : esc(staffLabel(x, p.role).toLowerCase())}</b><span class="tr-meter" aria-hidden="true"><i style="width:${pct(x, cap)}%"></i></span></div>`).join('')
+    : `<div class="st-attr"><span>Mocne strony</span><b>${esc(staffLabel(Math.round(v), p.role).toLowerCase())}</b><span class="tr-meter" aria-hidden="true"><i style="width:${pct(v, cap)}%"></i></span></div>`;
   const hist = (p.hist ?? []).slice(0, 4).map((h) => `${clubName(h.club)} (${h.from ? h.from.slice(0, 4) : '?'}-${h.to ? h.to.slice(0, 4) : '?'})`).join(', ');
   const winter = +date.slice(5, 7) < 7;
   const yearsOpts = [...(winter ? [0] : []), 1, 2, 3];
@@ -500,8 +504,8 @@ function personCard(game, pid, sum, B, ui) {
   return `<div class="st-card">
     <p><button class="btn btn--quiet btn--sm" data-act="st-back">Wróć do listy</button></p>
     <div class="st-grid"><div class="st-main">
-      <section class="tr-card st-ch" data-t="${tone(seen.v)}">
-        <div class="st-ch__top"><span class="st-q" data-t="${tone(seen.v)}" title="Jakość widziana przez asystenta">${esc(seenTxt(seen))}</span>
+      <section class="tr-card st-ch" data-t="${tone(seen.v, p.role)}">
+        <div class="st-ch__top"><span class="st-q" data-t="${tone(seen.v, p.role)}" title="Jakość widziana przez asystenta">${esc(seenTxt(seen))}</span>
           <div><h3 class="st-h st-ch__nm">${p.club ? `${crest(p.club, 24)} ` : ''}${esc(p.name)}</h3>
           <p class="st-meta">${esc(MARKET_ROLES.includes(p.role) ? (role?.name ?? ROLE_SHORT[p.role]) : p.role)}, ${esc(natName(p.nat))}, ${p.age} lat${foreign ? ' <span class="st-tag" data-k="misc">adaptacja 3 mies.</span>' : ''}</p></div></div>
         <dl class="st-facts">
@@ -513,7 +517,7 @@ function personCard(game, pid, sum, B, ui) {
       </section>
       <section class="tr-card" data-t="info"><h3 class="st-h">Atrybuty <small>(twój asystent ocenia ${esc(precWord)})</small></h3><div class="st-attrs">${attrHtml}</div></section>
       <section class="tr-card st-delta" data-t="good"><h3 class="st-h">Co się zmieni w twoim sztabie</h3><p>${esc(delta)}</p></section>
-      ${foreign ? `<section class="tr-card st-adapt" data-t="misc"><h3 class="st-h">Adaptacja</h3><p>Pierwsze 3 miesiące (do ${esc(fmtDate(addDaysIso(date, K.adapt.days + 3)))}) pracuje jak jakość ${esc(qTxt(Math.max(1, Math.round(v) - K.adapt.pen)))} zamiast ${esc(qTxt(Math.round(v)))}, potem pełna jakość.</p></section>` : ''}
+      ${foreign ? `<section class="tr-card st-adapt" data-t="misc"><h3 class="st-h">Adaptacja</h3><p>Pierwsze 3 miesiące (do ${esc(fmtDate(addDaysIso(date, K.adapt.days + 3)))}) pracuje jak jakość ${esc(qTxt(Math.max(1, Math.round(v) - (isCappedRole(p.role) ? Math.round(K.adapt.pen / STAFF_EFF) : K.adapt.pen))))} zamiast ${esc(qTxt(Math.round(v)))}, potem pełna jakość.</p></section>` : ''}
       <section class="tr-card st-interest" data-t="${appeal?.k ?? 'info'}"><h3 class="st-h">Zainteresowanie naszym klubem</h3>
         <p>Klub jest dla niego: <b>${esc(appeal?.word ?? 'w porządku')}</b> (${esc(appeal?.reason ?? '')}).</p>
         <p>${offers ? `Rozważa oferty: ${offers}${decideOn ? `, decyzja ${esc(fmtDate(decideOn))}. Możesz dołączyć do dnia decyzji.` : '.'}` : 'Nie rozważa teraz żadnej oferty. Decyzja 2-3 dni po pierwszej ofercie.'}</p></section>

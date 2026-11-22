@@ -2,25 +2,25 @@
 // Sama dana, bez logiki gry. Prezes zadaje 4-5 pytań wylosowanych z puli, trener wybiera jedną z odpowiedzi.
 //
 // ------------------------------------------------------------ Placeholdery w `ask` (skąd brać wartość)
-// Gra podstawia {nazwa} w tekście pytania. Gdy pytanie ma `needs`, a któregoś z danych brak, pytanie nie jest losowane.
+// Gra podstawia {nazwa} w tekście pytania. Imiona i nazwiska tylko w mianowniku (gra ich nie odmienia). Gdy pytanie ma `needs`, a któregoś z danych brak, pytanie nie jest losowane.
 export const PLACEHOLDERS = {
   miejsce: 'obecne miejsce w tabeli ligi klubu gracza: tablePos(game, game.clubId).pos',
   cel: 'cel sezonu: game.board.goal.target (miejsce), tekst gotowy: placeGoal(target) z boardRequests.js',
-  punkty: 'punkty z ostatnich {mecze} meczów ligowych klubu gracza (z game.fixtures, wyniki z okresu)',
+  punkty: 'punkty z ostatnich {mecze} meczów ligowych klubu gracza z okresu, z rzeczownikiem: „21 punktów” (historia meczów i terminarz)',
   mecze: 'liczba meczów ligowych w okresie (najwyżej 20, razem z {okres}), z tej samej puli co {punkty}',
   bilans: 'bilans zwycięstw, remisów i porażek z okresu, tekst „7 zwycięstw, 3 remisy, 4 porażki”',
-  okres: 'długość okresu w miesiącach, 6 lub więcej, ale nie dłużej niż staż trenera w klubie, np. „6 miesięcy”',
+  okres: 'długość okresu w miesiącach (6-12, nie dłużej niż staż trenera w klubie), w dopełniaczu: „6 miesięcy” („w ciągu ostatnich {okres}”)',
   dyrektor: 'imię i nazwisko dyrektora sportowego: directorOf(game, game.clubId).name',
   staz: 'ile dyrektor pracuje w klubie: daysBetween(directorOf(...).since, game.date), tekst „2 lata” albo „8 miesięcy”',
-  przeplata: 'liczba transferów dyrektora z okresu, w których klub przepłacił o ponad próg (OBJ.thr, 25 %): wpisy game.board.requests.dirLog z kind „buy” (gap > OBJ.thr), lub zakupy trenera ocenione drożej niż directorFairPrice',
+  przeplata: 'liczba zakupów z okresu przepłaconych mimo sprzeciwu dyrektora (wpisy game.board.requests.dirLog z kind „buy”, bez „wycofuję się” i zerwanych rozmów)',
   przeplataKwota: 'suma przepłat z {przeplata} w zł, tekst przez zl() z boardRequests.js: suma (fee - ref) po wpisach dirLog',
-  sprzeciwy: 'liczba sprzeciwów dyrektora wobec transakcji trenera w okresie: wpisy game.board.requests.dirLog (data w okresie)',
-  naleganie: 'ile z {sprzeciwy} trener przełamał („nalegam”): wpisy dirLog z action „insist”',
-  wypozyczenia: 'liczba wypożyczeń załatwionych przez dyrektora w okresie (listy dyrektora, askLoanOffers), do doprecyzowania w kodzie',
+  sprzeciwy: 'ile razy dyrektor sprzeciwił się transakcji trenera w okresie (dirLog), tekst „raz”, „3 razy”',
+  naleganie: 'ile z tych sprzeciwów trener przełamał („nalegam”), tekst „ani razu”, „raz”, „2 razy”',
+  wypozyczenia: 'wypożyczenia zawodników klubu do innych klubów w okresie (game.market.history, kind „loan”), tekst „3 wypożyczenia”',
   odprawa: 'odprawa dyrektora w zł: severanceOf(directorOf(...), game.date), tekst przez zl()',
   pensjaNowego: 'oczekiwana pensja nowego dyrektora w zł miesięcznie: wzór z docs/dyrektor-sportowy.md rozdz. 4 (10 000 x 0,9 x 1,25^(q - 10) x mnożnik ligi), tekst przez zl()',
   zaufanie: 'zaufanie zarządu do trenera 0-100: game.board.trust',
-  trener: 'nazwisko trenera gracza (game.coachName albo nazwa profilu kariery, do ustalenia w kodzie)',
+  trener: 'imię i nazwisko trenera gracza (game.manager.profile)',
   klub: 'nazwa klubu gracza: clubById(game.clubId).name',
 };
 
@@ -31,9 +31,9 @@ export const NEEDS = {
   table: 'tabela ligi (rozegrane co najmniej 4 mecze, jak w directorScore) i miejsce klubu',
   goal: 'cel sezonu (game.board.goal)',
   form6m: 'wyniki ligowe z co najmniej 6 miesięcy pracy trenera: {punkty}, {mecze}, {bilans}, {okres}',
-  overpay6m: 'co najmniej jeden zakup z przepłatą w okresie (dirLog) albo wycena dyrektora z directorFairPrice',
+  overpay6m: 'co najmniej jeden zakup z przepłatą mimo sprzeciwu dyrektora w okresie (dirLog)',
   objections6m: 'co najmniej jeden sprzeciw dyrektora w okresie (dirLog)',
-  loans6m: 'co najmniej jedno wypożyczenie załatwione przez dyrektora w okresie',
+  loans6m: 'co najmniej jedno wypożyczenie zawodnika klubu w okresie',
   director: 'dyrektor sportowy w klubie (nie wakat)',
   trust: 'game.board.trust',
 };
@@ -94,15 +94,16 @@ export const CATEGORIES = {
 };
 
 // ------------------------------------------------------------ Pytania
-// Pola: id, cat, ask { calm, hot, biz }, needs [], when [], answers [{ text, score, traits?, cond?, reaction }].
+// Pola: id, cat, ask { calm, hot, biz }, needs [], when [], answers [{ text, score, traits?, cond?, reaction, reactionElse? }].
+// reactionElse: reakcja prezesa, gdy warunek cond jest fałszywy (trener mija się z prawdą).
 export const QUESTIONS = [
   // ---------- powody zmiany (5)
   {
     id: 'powod-glowny', cat: 'powody',
     ask: {
-      calm: 'Panie Trenerze, proszę powiedzieć wprost: co jest nie tak z dyrektorem {dyrektor}?',
+      calm: 'Panie Trenerze, proszę powiedzieć wprost: co jest nie tak z naszym dyrektorem sportowym?',
       hot: 'Panie Trenerze, chce pan zwolnić człowieka. Niech pan powie, za co.',
-      biz: 'Panie Trenerze, proszę o konkretny powód biznesowy zmiany dyrektora {dyrektor}.',
+      biz: 'Panie Trenerze, proszę o konkretny powód biznesowy zmiany dyrektora sportowego.',
     },
     needs: ['director'],
     answers: [
@@ -115,16 +116,16 @@ export const QUESTIONS = [
   {
     id: 'powod-przyklad', cat: 'powody',
     ask: {
-      calm: 'Gdyby miał pan wskazać jedną decyzję dyrektora {dyrektor}, która pana zawiodła, jaka by to była?',
+      calm: 'Gdyby miał pan wskazać jedną decyzję dyrektora, która pana zawiodła, jaka by to była?',
       hot: 'Jedna decyzja, Panie Trenerze. Jedna, która pana wkurzyła. Słucham.',
-      biz: 'Proszę o jeden przykład decyzji dyrektora {dyrektor}, która zaszkodziła klubowi.',
+      biz: 'Proszę o jeden przykład decyzji dyrektora, która zaszkodziła klubowi.',
     },
     needs: ['director'],
     answers: [
       { text: 'Kupno zawodnika, którego nie potrzebowaliśmy, kosztem pozycji, na której brakowało nam ludzi.', score: 2, reaction: 'To jest sensowny zarzut, zanotowałem.' },
       { text: 'Długie negocjacje, przez które straciliśmy kandydata na rzecz rywala.', score: 1, reaction: 'Rynek nie czeka, zgoda.' },
       { text: 'Trudno wskazać jedną, to raczej ogólne wrażenie.', score: -2, reaction: 'Ogólne wrażenie nie zmienia umów.' },
-      { text: 'Wszystkie. Nic mu się nie udało.', score: -3, traits: { temperament: 0.5 }, reaction: 'Skoro wszystkie, to pytanie, kto go wybrał. Nas obu.' },
+      { text: 'Wszystkie. Nic mu się nie udało.', score: -3, traits: { temperament: 0.5 }, reaction: 'Skoro wszystkie, to błąd popełnił też ten, kto go zatrudnił. Czyli my.' },
     ],
   },
   {
@@ -147,7 +148,7 @@ export const QUESTIONS = [
     ask: {
       calm: 'Dyrektor {dyrektor} nie jest, delikatnie mówiąc, rynkową gwiazdą. Czy to jest sedno problemu?',
       hot: 'Dyrektor {dyrektor} to nie jest najlepszy fachowiec, wiem o tym. Czy właśnie to pana boli?',
-      biz: 'Nasza ocena dyrektora {dyrektor} jest przeciętna. Czy zgadza się pan z tą oceną?',
+      biz: 'Nasza ocena pracy dyrektora jest przeciętna. Czy zgadza się pan z tą oceną?',
     },
     needs: ['director'], when: ['directorWeak'],
     answers: [
@@ -161,8 +162,8 @@ export const QUESTIONS = [
     id: 'powod-nowy-dyrektor-mocny', cat: 'powody',
     ask: {
       calm: 'Dyrektor {dyrektor} ma w środowisku dobrą opinię. Co pan wie takiego, czego my nie wiemy?',
-      hot: 'Wszyscy chwalą dyrektora {dyrektor}, a pan chce go wyrzucić. Co pan ukrywa?',
-      biz: 'Rynek wysoko ocenia dyrektora {dyrektor}. Jaki jest pański argument za zmianą?',
+      hot: 'Wszyscy chwalą naszego dyrektora, a pan chce go wyrzucić. Co pan ukrywa?',
+      biz: 'Dyrektor {dyrektor} ma na rynku wysoką ocenę. Jaki jest pański argument za zmianą?',
     },
     needs: ['director'], when: ['directorStrong'],
     answers: [
@@ -183,8 +184,8 @@ export const QUESTIONS = [
     },
     needs: ['table', 'goal'],
     answers: [
-      { text: 'Jesteśmy na dobrej drodze, wyniki są w normie.', score: 2, cond: { is: 'aboveGoal', else: -3 }, reaction: 'Zgadza się, tabela mówi to samo.' },
-      { text: 'Jesteśmy za nisko i biorę za to odpowiedzialność, ale kadra też ma swoje braki.', score: 2, cond: { is: 'belowGoal', else: -1 }, reaction: 'Szczerość, nawet gdy boli.' },
+      { text: 'Jesteśmy na dobrej drodze, wyniki są w normie.', score: 2, cond: { is: 'aboveGoal', else: -3 }, reaction: 'Zgadza się, tabela mówi to samo.', reactionElse: 'Tabela mówi coś innego, Panie Trenerze. Nie lubię, gdy ktoś koloryzuje.' },
+      { text: 'Jesteśmy za nisko i biorę za to odpowiedzialność, ale kadra też ma swoje braki.', score: 2, cond: { is: 'belowGoal', else: -1 }, reaction: 'Szczerość, nawet gdy boli.', reactionElse: 'Za nisko? Jesteśmy tam, gdzie mieliśmy być. Skąd ta skromność?' },
       { text: 'Tabela nie oddaje naszej gry, mamy pecha.', score: -2, reaction: 'Pech nie jest planem.' },
       { text: 'Gdyby nie transfery, byłoby lepiej.', score: -1, traits: { temperament: 0.5 }, reaction: 'Czyli zrzuca pan to na kogoś?' },
     ],
@@ -192,14 +193,14 @@ export const QUESTIONS = [
   {
     id: 'wyniki-bilans', cat: 'wyniki',
     ask: {
-      calm: 'Przez ostatnie {okres} zdobyliśmy {punkty} punktów w {mecze} meczach, bilans: {bilans}. Czy to pana zdaniem wynik na miarę klubu?',
-      hot: '{punkty} punktów w {mecze} meczach przez {okres}. {bilans}. Pan to nazywa dobrym wynikiem?',
-      biz: 'Okres {okres}: {punkty} pkt w {mecze} meczach ({bilans}). Proszę o komentarz do tej średniej.',
+      calm: 'Przez ostatnie {okres} zdobyliśmy {punkty} w {mecze} meczach ligowych, bilans: {bilans}. Czy to pana zdaniem wynik na miarę klubu?',
+      hot: '{punkty} w {mecze} meczach przez {okres}. {bilans}. Pan to nazywa dobrym wynikiem?',
+      biz: 'Ostatnie {okres}: {punkty} w {mecze} meczach ligowych ({bilans}). Proszę o komentarz do tej średniej.',
     },
     needs: ['form6m'],
     answers: [
-      { text: 'Tak, to solidna średnia i drużyna się rozwija.', score: 2, cond: { is: 'goodForm', else: -3 }, reaction: 'Liczby się zgadzają, dziękuję.' },
-      { text: 'Nie, to za mało. Wiemy, gdzie tracimy punkty i nad tym pracujemy.', score: 2, cond: { is: 'badForm', else: 0 }, reaction: 'Lubię, gdy trener zna swoje problemy.' },
+      { text: 'Tak, to solidna średnia i drużyna się rozwija.', score: 2, cond: { is: 'goodForm', else: -3 }, reaction: 'Liczby się zgadzają, dziękuję.', reactionElse: 'Liczby mówią co innego. Proszę nie upiększać.' },
+      { text: 'Nie, to za mało. Wiemy, gdzie tracimy punkty i nad tym pracujemy.', score: 2, cond: { is: 'badForm', else: 0 }, reaction: 'Lubię, gdy trener zna swoje problemy.', reactionElse: 'Aż tak źle nie jest, ale cenię samokrytykę.' },
       { text: 'Średnia jest do przyjęcia, ale w kadrze brakuje jakości.', score: 1, reaction: 'To już rozmowa o kadrze, wrócimy do niej.' },
       { text: 'Punkty nie mówią wszystkiego, liczy się styl.', score: -2, traits: { ambicja: -0.5 }, reaction: 'Styl nie wisi w tabeli.' },
     ],
@@ -228,8 +229,8 @@ export const QUESTIONS = [
     },
     needs: ['goal', 'table'],
     answers: [
-      { text: 'Tak, jesteśmy w grze i jestem spokojny.', score: 2, cond: { is: 'aboveGoal', else: -3 }, reaction: 'Tabela popiera pana słowa.' },
-      { text: 'Będzie trudno, ale nadal realny, jeśli wzmocnimy konkretne pozycje.', score: 1, cond: { is: 'belowGoal', else: 0 }, reaction: 'Konkret mi się podoba.' },
+      { text: 'Tak, jesteśmy w grze i jestem spokojny.', score: 2, cond: { is: 'aboveGoal', else: -3 }, reaction: 'Tabela popiera pana słowa.', reactionElse: 'Spokojny? Przy tym miejscu w tabeli ja spokojny nie jestem.' },
+      { text: 'Będzie trudno, ale nadal realny, jeśli wzmocnimy konkretne pozycje.', score: 1, cond: { is: 'belowGoal', else: 0 }, reaction: 'Konkret mi się podoba.', reactionElse: 'Trudno? Idziemy zgodnie z planem. Skąd te obawy?' },
       { text: 'Szczerze: nie, cel był zawyżony.', score: -1, traits: { ambicja: -1 }, reaction: 'Ambitnemu prezesowi takich słów się nie mówi.' },
       { text: 'Cel zależy od transferów, to nie moja decyzja.', score: -2, reaction: 'Proszę nie chować się za innymi.' },
     ],
@@ -254,14 +255,14 @@ export const QUESTIONS = [
   {
     id: 'transfery-przeplata', cat: 'transfery',
     ask: {
-      calm: 'W ostatnich {okres} klub przepłacił w {przeplata} transferach, łącznie o {przeplataKwota}. Czy to pański zarzut wobec dyrektora?',
-      hot: 'Przepłacone transfery: {przeplata}, razem {przeplataKwota}! To pan rządzi na rynku czy dyrektor?',
-      biz: 'Analiza transakcji z {okres}: {przeplata} z przepłatą, łączna nadwyżka {przeplataKwota}. Kto ją zatwierdził?',
+      calm: 'W ciągu ostatnich {okres} klub przepłacił za zawodników łącznie {przeplataKwota} (liczba takich transferów: {przeplata}). Czy to pański zarzut wobec dyrektora?',
+      hot: 'Przepłacone transfery: {przeplata}, razem {przeplataKwota} ponad wycenę! To pan rządzi na rynku czy dyrektor?',
+      biz: 'Analiza transakcji z ostatnich {okres}: przepłacone transfery {przeplata}, łączna nadwyżka {przeplataKwota}. Kto je zatwierdził?',
     },
     needs: ['overpay6m', 'director'],
     answers: [
-      { text: 'Część z tych transferów to była moja prośba, dyrektor ostrzegał, ale ja nalegałem.', score: 2, cond: { is: 'hadObjections', else: -3 }, reaction: 'Rzadko słyszę takie przyznanie. Szanuję.' },
-      { text: 'Tak, dyrektor źle wyceniał zawodników i płacił za dużo.', score: -2, cond: { is: 'hadOverpay', else: -3 }, reaction: 'Sprawdziłem: to też była pańska prośba. Proszę uważać.' },
+      { text: 'Część z tych transferów to była moja prośba, dyrektor ostrzegał, ale ja nalegałem.', score: 2, cond: { is: 'hadObjections', else: -3 }, reaction: 'Rzadko słyszę takie przyznanie. Szanuję.', reactionElse: 'Dyrektor nie zgłaszał sprzeciwu, sprawdziłem. Proszę nie wymyślać.' },
+      { text: 'Tak, dyrektor źle wyceniał zawodników i płacił za dużo.', score: -2, cond: { is: 'hadOverpay', else: -3 }, reaction: 'Sprawdziłem: to była pańska prośba, dyrektor ostrzegał. Proszę uważać.' },
       { text: 'Na rynku nie ma tanich zawodników, ceny rosną wszędzie.', score: -1, reaction: 'Inne kluby jakoś sobie radzą.' },
       { text: 'Na wszystko był plan, to przemyślane inwestycje.', score: 0, traits: { zasobnosc: 0.5 }, reaction: 'Zobaczymy, czy się zwrócą.' },
     ],
@@ -269,9 +270,9 @@ export const QUESTIONS = [
   {
     id: 'transfery-sprzeciwy', cat: 'transfery',
     ask: {
-      calm: 'Dyrektor {dyrektor} sprzeciwił się pańskim transakcjom {sprzeciwy} razy w ostatnich {okres}, przełamał je pan {naleganie} razy. Co pan o tym myśli?',
-      hot: 'Dyrektor mówił „nie” {sprzeciwy} razy, a pan {naleganie} razy zrobił po swojemu. Dlaczego?',
-      biz: 'Sprzeciwy dyrektora: {sprzeciwy}, przełamane przez pana: {naleganie}. Jak pan to uzasadnia?',
+      calm: 'W ciągu ostatnich {okres} dyrektor {dyrektor} sprzeciwił się pańskim transakcjom {sprzeciwy}, a pan postawił na swoim {naleganie}. Co pan o tym myśli?',
+      hot: 'Dyrektor mówił „nie” {sprzeciwy}, a pan zrobił po swojemu {naleganie}. Dlaczego?',
+      biz: 'Sprzeciwy dyrektora w ostatnich miesiącach: {sprzeciwy}. Przełamane przez pana: {naleganie}. Jak pan to uzasadnia?',
     },
     needs: ['objections6m', 'director'],
     when: ['hadObjections'],
@@ -279,7 +280,7 @@ export const QUESTIONS = [
       { text: 'Dyrektor patrzy na ceny, ja na potrzeby drużyny. Nalegałem tam, gdzie jakość była warta ceny.', score: 1, reaction: 'Rozsądne, choć ryzykowne.' },
       { text: 'Dyrektor miał rację w kilku sprawach, następnym razem będę go częściej słuchać.', score: 2, traits: { cierpliwosc: -0.5 }, reaction: 'Dobrze, że to pan mówi, nie ja.' },
       { text: 'Dyrektor się czepia, a ja wiem lepiej, kogo potrzebuję.', score: -2, reaction: 'Takie podejście kosztuje klub pieniądze.' },
-      { text: 'Gdyby nie moje nalegania, drużyna byłaby słabsza.', score: -1, cond: { is: 'goodForm', else: -3 }, reaction: 'Wyniki mówią co innego.' },
+      { text: 'Gdyby nie moje nalegania, drużyna byłaby słabsza.', score: -1, cond: { is: 'goodForm', else: -3 }, reaction: 'Wyniki są niezłe, ale to jeszcze nie dowód.', reactionElse: 'Wyniki mówią co innego.' },
     ],
   },
   {
@@ -300,16 +301,16 @@ export const QUESTIONS = [
   {
     id: 'transfery-wypozyczenia', cat: 'transfery',
     ask: {
-      calm: 'Dyrektor załatwił w ostatnich {okres} {wypozyczenia} wypożyczeń. Czy to było dla drużyny coś warte?',
-      hot: '{wypozyczenia} wypożyczeń od dyrektora. Pomogły czy tylko zajmują miejsce w kadrze?',
-      biz: 'W okresie {okres} dyrektor przeprowadził {wypozyczenia} wypożyczeń. Proszę o ocenę wartości dla zespołu.',
+      calm: 'W ciągu ostatnich {okres} dyrektor wypożyczył naszych zawodników do innych klubów, razem {wypozyczenia}. Czy to było dla drużyny coś warte?',
+      hot: 'Dyrektor załatwił {wypozyczenia} naszych zawodników. Pomogło to drużynie czy tylko zrobiło miejsce w kadrze?',
+      biz: 'Ostatnie {okres}: dyrektor przeprowadził {wypozyczenia} zawodników klubu. Proszę o ocenę wartości dla zespołu.',
     },
     needs: ['loans6m', 'director'],
     answers: [
-      { text: 'Tak, kilku z nich gra regularnie i wzmocniło zespół. To mocna strona dyrektora.', score: 1, cond: { is: 'hadLoans', else: -2 }, reaction: 'Czyli dyrektor ma też zalety.' },
+      { text: 'Tak, młodzi grają regularnie i wrócą lepsi, a w kadrze zrobiło się miejsce. To mocna strona dyrektora.', score: 1, cond: { is: 'hadLoans', else: -2 }, reaction: 'Czyli dyrektor ma też zalety.', reactionElse: 'Jakie wypożyczenia? Nikogo nie wypożyczyliśmy.' },
       { text: 'Średnio, było kilka trafionych, kilka nie.', score: 0, reaction: 'Uczciwie.' },
       { text: 'Nie, wypożyczenia to prowizorka, potrzebuję stałych wzmocnień.', score: 0, traits: { zasobnosc: 0.5 }, reaction: 'Stałe wzmocnienia kosztują.' },
-      { text: 'Nie wiem, nie śledziłem tego.', score: -2, reaction: 'Trener powinien wiedzieć, kto gra w jego klubie.' },
+      { text: 'Nie wiem, nie śledziłem tego.', score: -2, reaction: 'Trener powinien wiedzieć, co się dzieje z jego zawodnikami.' },
     ],
   },
   {
@@ -317,12 +318,12 @@ export const QUESTIONS = [
     ask: {
       calm: 'Czy dyrektor {dyrektor} w ogóle znajduje zawodników, których pan chce?',
       hot: 'Czy dyrektor w ogóle słucha, kogo pan chce? Bo mówi się różnie.',
-      biz: 'Jak ocenia pan skuteczność dyrektora {dyrektor} w realizacji pańskich celów transferowych?',
+      biz: 'Jak ocenia pan skuteczność dyrektora w realizacji pańskich celów transferowych?',
     },
     needs: ['director'],
     answers: [
       { text: 'Przynosi dobre opcje, ale bywa, że rynek jest szybszy niż my.', score: 1, reaction: 'To problem nie tylko nasz.' },
-      { text: 'Rzadko, a gdy już, to na ostatnią chwilę.', score: 1, cond: { is: 'directorWeak', else: -1 }, reaction: 'Tak to wygląda z mojej strony też.' },
+      { text: 'Rzadko, a gdy już, to na ostatnią chwilę.', score: 1, cond: { is: 'directorWeak', else: -1 }, reaction: 'Tak to wygląda z mojej strony też.', reactionElse: 'Z mojej strony wygląda to zupełnie inaczej.' },
       { text: 'Znajduje, ale po cenach, które mnie przerażają.', score: 0, reaction: 'Ceny to osobny temat.' },
       { text: 'Nie ufam jego ocenie zawodników.', score: -1, reaction: 'Ostre słowa.' },
     ],
@@ -332,13 +333,13 @@ export const QUESTIONS = [
   {
     id: 'finanse-odprawa', cat: 'finanse',
     ask: {
-      calm: 'Odprawa dla dyrektora {dyrektor} wyniesie {odprawa}. Czy pana zdaniem warto?',
+      calm: 'Odprawa dla dyrektora wyniesie {odprawa}. Czy pana zdaniem warto?',
       hot: 'Mamy zapłacić {odprawa} człowiekowi, który odejdzie. Za co ten wydatek?',
-      biz: 'Koszt odprawy dyrektora {dyrektor}: {odprawa}. Proszę o uzasadnienie zwrotu z tej decyzji.',
+      biz: 'Koszt odprawy dyrektora: {odprawa}. Proszę o uzasadnienie zwrotu z tej decyzji.',
     },
     needs: ['director'],
     answers: [
-      { text: 'Tak, zmiana zwróci się w lepszych transferach, a odprawa to jednorazowy koszt.', score: 2, traits: { zasobnosc: 0.5 }, cond: { is: 'richClub', else: 0 }, reaction: 'Liczę, że ma pan rację.' },
+      { text: 'Tak, zmiana zwróci się w lepszych transferach, a odprawa to jednorazowy koszt.', score: 2, traits: { zasobnosc: 0.5 }, cond: { is: 'richClub', else: 0 }, reaction: 'Liczę, że ma pan rację.', reactionElse: 'Jednorazowy, ale dziś nas na niego nie stać.' },
       { text: 'Rozumiem, że to kosztuje, i nie będę nalegał, jeśli klub nie ma pieniędzy.', score: 1, traits: { zasobnosc: -0.5 }, reaction: 'Doceniam rozsądek.' },
       { text: 'To nie mój problem, pieniądze to sprawa zarządu.', score: -2, reaction: 'Panie Trenerze, to nasze wspólne pieniądze.' },
       { text: 'Możemy zapłacić z budżetu transferowego, kupię mniej zawodników.', score: -1, cond: { is: 'richClub', else: 1 }, reaction: 'Nie tego oczekuję, ale zapamiętam gotowość.' },
@@ -386,7 +387,7 @@ export const QUESTIONS = [
       { text: 'Tak, jeśli ma plan i uczciwie pracuje. Doświadczenie to nie wszystko.', score: 1, traits: { zasobnosc: -0.5 }, reaction: 'Praktyczne podejście.' },
       { text: 'Nie, wolę zapłacić więcej za jakość.', score: 0, traits: { zasobnosc: 0.5 }, reaction: 'Jakość kosztuje, wiem.' },
       { text: 'Zależy, kogo zarząd wybierze, ufam państwa osądowi.', score: 2, reaction: 'Dobrze, że ufa pan zarządowi.' },
-      { text: 'Tylko nie ktoś gorszy od obecnego.', score: -2, cond: { is: 'directorWeak', else: 1 }, reaction: 'Z tym nie będzie problemu, jeśli jest jak mówię.' },
+      { text: 'Tylko nie ktoś gorszy od obecnego.', score: -2, cond: { is: 'directorWeak', else: 1 }, reaction: 'Gorszego od obecnego trudno będzie znaleźć, Panie Trenerze.', reactionElse: 'Rozumiem, poprzeczka wisi wysoko.' },
     ],
   },
 
@@ -394,9 +395,9 @@ export const QUESTIONS = [
   {
     id: 'lojalnosc-konflikt', cat: 'lojalnosc',
     ask: {
-      calm: 'Czy między panem a dyrektorem {dyrektor} doszło do konfliktu osobistego?',
+      calm: 'Czy między panem a dyrektorem doszło do konfliktu osobistego?',
       hot: 'Pokłócił się pan z dyrektorem? Mów pan szczerze, bo wolę usłyszeć to od pana.',
-      biz: 'Czy współpraca z dyrektorem {dyrektor} jest obciążona konfliktem personalnym?',
+      biz: 'Czy współpraca z dyrektorem jest obciążona konfliktem personalnym?',
     },
     needs: ['director'],
     answers: [
@@ -411,7 +412,7 @@ export const QUESTIONS = [
     ask: {
       calm: 'Gdyby dyrektor stanął tu obok pana, co by o panu powiedział?',
       hot: 'Dyrektor mówi, że to pan jest problemem. Co pan na to?',
-      biz: 'Jaka byłaby wersja dyrektora {dyrektor} tej sytuacji? Proszę przedstawić ją uczciwie.',
+      biz: 'Jak tę sytuację przedstawiłby sam dyrektor? Proszę przedstawić ją uczciwie.',
     },
     needs: ['director'],
     answers: [
@@ -542,7 +543,7 @@ export const QUESTIONS = [
       { text: 'Zasługi dzielimy po równo, błędy także. Jestem częścią tego, co się dzieje.', score: 3, reaction: 'Tak powinien mówić lider.' },
       { text: 'Dobre wyniki to moja zasługa, słabe to wina dyrektora.', score: -3, reaction: 'To bardzo wygodny rachunek.' },
       { text: 'Wyniki mają wielu ojców, nie rozdzielam tego.', score: 0, reaction: 'Dyplomatycznie.' },
-      { text: 'Gdy wyniki są dobre, nie ma o czym mówić.', score: -1, cond: { is: 'goodForm', else: -3 }, reaction: 'Sprawdzę, czy to prawda. Tabela mówi co innego.' },
+      { text: 'Gdy wyniki są dobre, nie ma o czym mówić.', score: -1, cond: { is: 'goodForm', else: -3 }, reaction: 'Dobre wyniki to nie powód, żeby nie rozmawiać.', reactionElse: 'Dobre? Tabela mówi co innego.' },
     ],
   },
   {
@@ -569,10 +570,10 @@ export const QUESTIONS = [
     },
     needs: ['form6m'],
     answers: [
-      { text: 'Tak, bo problemy ze współpracą mam od dawna, wyniki ich nie zmieniają.', score: 1, cond: { is: 'hadObjections', else: -1 }, reaction: 'Jeśli to prawda, to rozumiem.' },
+      { text: 'Tak, bo problemy ze współpracą mam od dawna, wyniki ich nie zmieniają.', score: 1, cond: { is: 'hadObjections', else: -1 }, reaction: 'Widzę to też w sprzeciwach dyrektora. Rozumiem.', reactionElse: 'Od dawna? Nie widzę żadnego śladu tych problemów.' },
       { text: 'Nie, wniosek jest efektem złej serii.', score: -1, reaction: 'Szczerze, ale to nie jest dobry powód.' },
       { text: 'Wyniki są tylko dodatkowym argumentem.', score: 1, reaction: 'Dobrze, że nie jedynym.' },
-      { text: 'Gdyby wygrywali, nie przyszedłbym.', score: -2, reaction: 'To znaczy, że decyzja zależy od nastroju tabeli.' },
+      { text: 'Gdybyśmy wygrywali, nie przyszedłbym.', score: -2, reaction: 'To znaczy, że decyzja zależy od nastroju tabeli.' },
     ],
   },
   {
@@ -622,7 +623,7 @@ export const QUESTIONS = [
   },
 ];
 
-// ------------------------------------------------------------ Zasady użycia [SZAC]
+// ------------------------------------------------------------ Zasady użycia [SZAC] (wdrożone: src/career/presidentQuiz.js)
 // Liczba pytań: 4 gdy brakuje danych (krótki staż, brak sprzeciwów), 5 gdy dostępne są dane z co najmniej 6 miesięcy.
 //   Pierwsze pytanie zawsze z kategorii „powody”, ostatnie zawsze z „haczyk”, reszta z puli bez powtórzeń i bez dwóch
 //   pytań z tej samej kategorii pod rząd. Wybór deterministyczny z ziarna (gra, data, klub), jak w talkDialog.js.
@@ -639,6 +640,8 @@ export const QUESTIONS = [
 // Ograniczenie: nie więcej niż +-12 punktów S z samego quizu (0,8 x 15), więc dobry quiz nie uratuje beznadziejnej prośby
 //   (np. cierpliwy właściciel, świetny dyrektor), a zły nie przekreśli oczywistej zmiany (np. dyrektor 4, wyniki daleko poniżej celu).
 // Zaufanie zarządu: Q <= -6 odejmuje dodatkowo 1 (jak „odmowa”), Q >= +8 nie zmienia zaufania.
+// Zgoda warunkowa (wdrożenie): zarząd sam ocenia sprawę po 182 dniach (S z dnia oceny + 0,8 Q z rozmowy, zgoda od 10),
+//   do tego czasu nie przyjmuje nowej prośby o zmianę dyrektora; inny dyrektor w klubie: ocena odpada.
 
 // ------------------------------------------------------------ Teksty końcowe prezesa
 export const VERDICT_TEXTS = {

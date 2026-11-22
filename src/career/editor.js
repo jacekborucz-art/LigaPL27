@@ -32,7 +32,7 @@ import { ownerOf, OWNER_KEYS } from './owners.js';
 import { rosterOf, syncStaff, STAFF_ROLE_IDS, directorOf, ensureEditorDirector } from './staffMarket.js';
 import { roleAttrKeys, ensurePersonAttrs, shiftPersonQ, qFromAttrs, migrateScoutAttrs } from '../training/staff.js';
 import { SCOUT_REGION } from './scoutRegions.js';
-import { ROLE_ATTRS, DIRECTOR_ROLE } from '../training/config.js';
+import { ROLE_ATTRS, DIRECTOR_ROLE, staffCap, isCappedRole, staffRescale } from '../training/config.js';
 import { completeTransfer, editorRelease } from './transfers.js';
 import { computeNorm, REF_ATTRS } from './referees.js';
 import { genPlayer } from '../world/playerGen.js';
@@ -50,7 +50,9 @@ export const PACK_TYPE = 'ligapl27-datapack';
 //      (reg: { region: 1-20 }, najwyżej 3, docs/skauting.md); plik v4 przelicza stare atrybuty skauta (MIGRATE[4])
 //   6  v1.23 Beta: dyrektor sportowy w sekcji staff (rola 'dyrektor', najwyżej 1 osoba, atrybuty NEG, RYN, SIE, KAD,
 //      docs/dyrektor-sportowy.md); tylko nowa rola, plik v5 wczytuje się bez zmian
-export const PACK_V = 6;
+//   7  v1.23 Beta: sztab poza fizjoterapeutą i dyrektorem na skali 1-12 (q i atrybuty, docs/sztab-atrybuty.md);
+//      plik v1-v6: wartości tych ról przeliczone ze skali 1-20 (x 11/16, 17 -> 12) i przycięte do 12 (MIGRATE[6])
+export const PACK_V = 7;
 export const PACK_V_MIN = 1;
 export const SCOUT_REG_MAX = 3; // regionów na skauta w pliku
 /** Skaut w pliku v1-v4: stare atrybuty (POT, OCU, RYN) na 5 nowych; odchylenia sieci i charakteru z imienia osoby. */
@@ -76,7 +78,25 @@ const MIGRATE = {
   3: (d) => d, // wersja 4 tylko dodaje rywali klubu
   4: (d) => ({ ...d, clubs: migrateScoutClubs(d.clubs) }), // wersja 5: skaut z 5 atrybutami i regionami
   5: (d) => d, // wersja 6 tylko dodaje dyrektora sportowego w sekcji staff
+  6: (d) => ({ ...d, clubs: rescaleStaffClubs(d.clubs) }), // wersja 7: sztab na skali 1-12
 };
+/** Sekcja klubów pliku v1-v6: jakość i atrybuty sztabu (poza fizjoterapeutą i dyrektorem) na skali 1-12. */
+export function rescaleStaffClubs(clubs) {
+  if (!isObj(clubs)) return clubs;
+  const one = (role, o) => {
+    if (!isObj(o) || !isCappedRole(role)) return o;
+    const out = { ...o };
+    if (typeof o.q === 'number') out.q = staffRescale(role, o.q);
+    if (isObj(o.a)) out.a = Object.fromEntries(Object.entries(o.a).map(([k, x]) => [k, typeof x === 'number' ? staffRescale(role, x) : x]));
+    return out;
+  };
+  const out = {};
+  for (const [id, c] of Object.entries(clubs)) {
+    if (!isObj(c) || !isObj(c.staff)) { out[id] = c; continue; }
+    out[id] = { ...c, staff: Object.fromEntries(Object.entries(c.staff).map(([role, list]) => [role, Array.isArray(list) ? list.map((o) => one(role, o)) : list])) };
+  }
+  return out;
+}
 export const LIMITS = {
   name: 40, short: 5, stadium: 60,
   capMin: 500, capMax: 100000,
@@ -398,11 +418,11 @@ export const OWNER_LABELS = { cierpliwosc: 'Cierpliwość', ambicja: 'Ambicja', 
 export const PERSON_AGE = { min: 18, max: 85 };
 const COACH_LABELS = Object.fromEntries(COACH_KEYS.map((k) => [k, COACH_ATTRS[k].name]));
 
-function attrs1to20(src, keys, labels, form, errors, prefix) {
+function attrs1to20(src, keys, labels, form, errors, prefix, max = 20) {
   const a = {};
   for (const k of keys) {
     if (src[k] === undefined) continue;
-    const r = num(src[k], { label: labels[k], min: 1, max: 20, form });
+    const r = num(src[k], { label: labels[k], min: 1, max, form });
     if (r.err) errors[`${prefix}${k}`] = r.err; else a[k] = r.v;
   }
   return a;
@@ -447,15 +467,17 @@ export function checkStaff(src, { form = false } = {}) {
       const put = (k, r) => { if (r.err) errors[`${role}.${i}.${k}`] = r.err; else v[k] = r.v; };
       if (o.name !== undefined) put('name', personName(o.name));
       if (o.age !== undefined) put('age', personAge(o.age, form));
-      if (o.q !== undefined) put('q', num(o.q, { label: 'Jakość', min: 1, max: 20, form }));
-      // Atrybuty roli (datapack v3, docs/sztab-atrybuty.md): każdy 1-20, tylko klucze tej roli
+      // Skala roli (datapack v7): 1-12, fizjoterapeuta i dyrektor sportowy 1-20
+      const cap = staffCap(role);
+      if (o.q !== undefined) put('q', num(o.q, { label: 'Jakość', min: 1, max: cap, form }));
+      // Atrybuty roli (datapack v3, docs/sztab-atrybuty.md): każdy 1-12 (fizjoterapeuta, dyrektor 1-20), tylko klucze tej roli
       if (o.a !== undefined) {
         if (!isObj(o.a)) errors[`${role}.${i}.a`] = 'Atrybuty sztabu: oczekiwano listy wartości.';
         else {
           const keys = roleAttrKeys(role);
           const bad = Object.keys(o.a).find((k) => !keys.includes(k));
           if (bad) errors[`${role}.${i}.a`] = `Atrybuty sztabu: nieznany atrybut ${String(bad).slice(0, 6)} w roli ${role}.`;
-          else v.a = attrs1to20(o.a, keys, Object.fromEntries(keys.map((k) => [k, ROLE_ATTRS[role][k].name])), form, errors, `${role}.${i}.a.`);
+          else v.a = attrs1to20(o.a, keys, Object.fromEntries(keys.map((k) => [k, ROLE_ATTRS[role][k].name])), form, errors, `${role}.${i}.a.`, cap);
         }
       }
       // Regiony skauta (datapack v5): nieznany region, poziom spoza 1-20 albo więcej niż 3 regiony odrzucają wpis

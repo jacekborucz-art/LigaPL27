@@ -311,7 +311,7 @@ test('Wypożyczenia: lepsza sieć kontaktów szybciej i więcej propozycji (waka
 });
 
 test('Datapack v6: dyrektor w sekcji staff (NEG, RYN, SIE, KAD), walidacja, wczytanie w innej grze', () => {
-  assert.equal(PACK_V, 6);
+  assert.ok(PACK_V >= 6); // v7: sztab na skali 1-12 (dyrektor bez zmian, 1-20)
   const g = fresh();
   const pv = peopleValues(g, 'legia');
   assert.equal(pv.staff.dyrektor.length, 1);

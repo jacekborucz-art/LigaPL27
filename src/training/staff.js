@@ -7,12 +7,16 @@
 import { Rng, clamp } from '../core/rng.js';
 import { clubById } from '../data/clubs_pl.js';
 import { randomName } from '../data/names.js';
-import { STAFF_ROLES, staffMul, ROLE_ATTRS } from './config.js';
+import { STAFF_ROLES, staffMul, ROLE_ATTRS, staffCap, isCappedRole, staffShown, staffRescale, STAFF_EFF } from './config.js';
 import { scoutRegionsFor } from '../career/scoutRegions.js';
 
 export const ROLE_IDS = Object.keys(STAFF_ROLES);
 
-/** Jakość sztabu na start: 3 + 1.3 * prestiż + premia ligi + szum. Legia ok. 17, mały klub 2 Ligi ok. 5. [SZAC] */
+/**
+ * Jakość sztabu na start: 3 + 1.3 * prestiż + premia ligi + szum. Legia ok. 17, mały klub 2 Ligi ok. 5. [SZAC]
+ * Skala efektów 1-20 (widok game.training.staff); osoby sztabu dostają ją przeliczoną na skalę roli (1-12,
+ * staffRescale w career/staffMarket.js buildClub).
+ */
 export function generateStaffFor(game, clubId) {
   const club = clubById(clubId);
   const parent = club?.parent ? clubById(club.parent) : null;
@@ -60,23 +64,28 @@ export function qFromAttrs(a) {
 
 /**
  * Atrybuty wokół jakości q (deterministycznie z klucza): odchylenia sumują się do zera, więc średnia to dokładnie q
- * (gdy żaden atrybut nie trafi w granicę 1 albo 20). Profil osoby: mocna i słabsza strona, rozrzut do 3 punktów [SZAC].
+ * (gdy żaden atrybut nie trafi w granicę 1 albo najwyższej wartości roli). Profil osoby: mocna i słabsza strona,
+ * rozrzut do 3 punktów (role ze skalą 1-12: do 2 punktów, odchylenie 1,8 / 1,45) [SZAC].
  */
-export function attrsAround(q, role, key) {
+export function attrsAround(q, role, key, { legacy = false } = {}) {
   const keys = roleAttrKeys(role);
   if (!keys.length) return {};
+  const small = isCappedRole(role) && !legacy; // legacy: stary zapis na skali 1-20 (przed przeliczeniem, rescalePerson)
+  const cap = small ? staffCap(role) : 20;
+  const sd = small ? 1.8 / STAFF_EFF : 1.8;
+  const dMax = small ? 2 : 3;
   const rng = new Rng(`sztab-atrybuty-osoby:${key}`);
-  const base = clamp(Math.round(q), 1, 20);
-  const d = keys.map(() => clamp(Math.round(rng.gauss(0, 1.8)), Math.max(-3, 1 - base), Math.min(3, 20 - base)));
-  // Suma odchyleń do zera: różnicę rozkładamy po kolei (w granicach 1-20)
+  const base = clamp(Math.round(q), 1, cap);
+  const d = keys.map(() => clamp(Math.round(rng.gauss(0, sd)), Math.max(-dMax, 1 - base), Math.min(dMax, cap - base)));
+  // Suma odchyleń do zera: różnicę rozkładamy po kolei (w granicach 1 - najwyższa wartość roli)
   let diff = d.reduce((s, x) => s + x, 0);
   for (let i = 0; diff !== 0 && i < 40; i++) {
     const k = i % d.length;
     const step = diff > 0 ? -1 : 1;
-    if (base + d[k] + step < 1 || base + d[k] + step > 20) continue;
+    if (base + d[k] + step < 1 || base + d[k] + step > cap) continue;
     d[k] += step; diff += step;
   }
-  return Object.fromEntries(keys.map((k, i) => [k, clamp(base + d[i], 1, 20)]));
+  return Object.fromEntries(keys.map((k, i) => [k, clamp(base + d[i], 1, cap)]));
 }
 
 /**
@@ -115,32 +124,66 @@ export function ensureScoutReg(p, key) {
   return p;
 }
 
-/** Uzupełnia atrybuty osoby (stare zapisy, nowe osoby) i ustawia q jako ich średnią. */
-export function ensurePersonAttrs(p, key) {
+/** Uzupełnia atrybuty osoby (stare zapisy, nowe osoby) i ustawia q jako ich średnią (w granicach skali roli; legacy: 1-20). */
+export function ensurePersonAttrs(p, key, { legacy = false } = {}) {
   const keys = roleAttrKeys(p.role);
   if (!keys.length) return p;
   if (p.role === 'skaut' && p.a && (typeof p.a.POT === 'number' || typeof p.a.OCU === 'number')) p.a = migrateScoutAttrs(p.a, p.q, p.age, key);
   ensureScoutReg(p, key);
-  if (!p.a || keys.some((k) => typeof p.a[k] !== 'number')) p.a = { ...attrsAround(p.q ?? 10, p.role, key), ...(p.a ?? {}) };
+  if (!p.a || keys.some((k) => typeof p.a[k] !== 'number')) p.a = { ...attrsAround(p.q ?? 10, p.role, key, { legacy }), ...(p.a ?? {}) };
   for (const k of Object.keys(p.a)) if (!keys.includes(k)) delete p.a[k];
+  const cap = legacy ? 20 : staffCap(p.role);
+  for (const k of keys) p.a[k] = clamp(p.a[k], 1, cap);
   p.q = qFromAttrs(p.a);
+  return p;
+}
+
+/**
+ * Stara osoba sztabu (zapis sprzed skali 1-12) na skalę roli: każdy atrybut przeliczony (x 11/16, 17 -> 12,
+ * zaokrąglenie), wyżej przycięty do 12, jakość znów średnią. Fizjoterapeuta i dyrektor bez zmian. Efekty w grze
+ * (skala 1-20 przez staffEff) zostają takie same z dokładnością do zaokrąglenia.
+ */
+export function rescalePerson(p) {
+  if (!p || !isCappedRole(p.role)) return p;
+  const keys = roleAttrKeys(p.role);
+  if (p.a && keys.length) {
+    for (const k of keys) if (typeof p.a[k] === 'number') p.a[k] = staffRescale(p.role, p.a[k]);
+    p.q = qFromAttrs(p.a);
+  } else if (typeof p.q === 'number') p.q = staffRescale(p.role, p.q);
   return p;
 }
 
 /** Zmiana jakości osoby (edytor, stary datapack): wszystkie atrybuty przesunięte o tyle samo, profil zostaje. */
 export function shiftPersonQ(p, q) {
   const keys = roleAttrKeys(p.role);
+  const cap = staffCap(p.role);
+  q = clamp(q, 1, cap);
   if (!keys.length || !p.a) { p.q = q; return p; }
   for (let i = 0; i < 3 && qFromAttrs(p.a) !== q; i++) {
     const d = q - qFromAttrs(p.a);
-    for (const k of keys) p.a[k] = clamp(p.a[k] + d, 1, 20);
+    for (const k of keys) p.a[k] = clamp(p.a[k] + d, 1, cap);
   }
   p.q = qFromAttrs(p.a);
   return p;
 }
 
-export function staffLabel(q) {
-  return q >= 17 ? 'Klasa światowa' : q >= 14 ? 'Bardzo dobry' : q >= 11 ? 'Dobry' : q >= 8 ? 'Przeciętny' : q >= 5 ? 'Słaby' : 'Bardzo słaby';
+/**
+ * Słowna ocena jakości na skali roli. Role ze skalą 1-12 (bez roli: też ta skala): 10+ bardzo dobry (najlepsze
+ * sztaby w Polsce), 8+ dobry, 6+ przeciętny, 4+ słaby. Fizjoterapeuta i dyrektor sportowy (1-20): dawne progi.
+ */
+export function staffLabel(q, role = null) {
+  if (role === 'fizjoterapeuta' || role === 'dyrektor') return q >= 17 ? 'Klasa światowa' : q >= 14 ? 'Bardzo dobry' : q >= 11 ? 'Dobry' : q >= 8 ? 'Przeciętny' : q >= 5 ? 'Słaby' : 'Bardzo słaby';
+  return q >= 10 ? 'Bardzo dobry' : q >= 8 ? 'Dobry' : q >= 6 ? 'Przeciętny' : q >= 4 ? 'Słaby' : 'Bardzo słaby';
+}
+
+/** Słowna ocena roli z wartości na skali efektów (widok game.training.staff, staffA). */
+export const staffLabelEff = (e, role) => staffLabel(staffShown(role, e), role);
+
+/** Jakość roli w klubie na skali roli (1-12, fizjoterapeuta 1-20) do pokazania graczowi, z jedną cyfrą po przecinku. */
+export function staffShownQ(game, clubId, role) {
+  const s = staffOf(game, clubId)[role];
+  if (typeof s?.qs === 'number') return s.qs;
+  return Math.round(staffShown(role, s?.q ?? 10) * 10) / 10;
 }
 
 // Fizjoterapeuta (src/career/staffMarket.js): klub bez tej roli w widoku (stary zapis przed migracją) jak wakat

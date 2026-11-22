@@ -156,3 +156,34 @@ Oczekiwana pensja x mnożnik ligi klubu (`expectedWage(p, date, { club })`). Opi
 - `keepCaretaker` (asystent zostaje trenerem na stałe) nie zwalnia roli w sztabie.
 - Skaut nie wpływa na ocenę zawodników przez kluby AI (AI zna prawdziwe wartości, jak dotąd); kluby AI wysyłają
   skautów na misje za granicę tymi samymi wzorami co gracz (`docs/skauting.md`, rozdz. 8).
+
+## 7. Skala 1-12 (Nov 22, 2026, v1.23 Beta)
+
+Decyzja właściciela: role poza fizjoterapeutą i dyrektorem sportowym mają atrybuty i jakość najwyżej 12. Opis zasad:
+`docs/sztab-atrybuty.md`, rozdział „Skala 1-12”. Liczby w tym dokumencie (rozdz. 2-4) są na dawnej skali 1-20
+(skala efektów): jakość osoby 1-12 przelicza się na nią przez `staffEff` (12 = 17, 9 = 12,6, 5 = 6,8).
+
+- Limit „pomocnik słabszy niż 7 nic nie daje” na skali 1-12: słabszy niż 5. Przedział oceny kandydata: ±1 (fizjoterapeuci
+  i dyrektorzy ±2). Etykiety: od 10 bardzo dobry, od 8 dobry, od 6 przeciętny, od 4 słaby.
+- Pomiar (ziarno 5, widzew, 3 sezony; „przed” = stan przed zmianą, „bez przeskalowania” = wariant pomiarowy, w którym
+  efekty liczą się wprost z jakości 1-12, bez `staffEff`) [SZAC]:
+
+| `node tools/multiseason.mjs widzew 5 3 trening` | 2026/27 | 2027/28 | 2028/29 |
+| --- | --- | --- | --- |
+| OVR top14 EK / 1L / 2L, przed | 11,67 / 10,20 / 8,63 | 11,82 / 10,33 / 8,88 | 11,83 / 10,35 / 8,98 |
+| po (skala 1-12, efekty przeskalowane) | 11,72 / 10,26 / 8,51 | 11,86 / 10,31 / 8,82 | 11,98 / 10,52 / 8,89 |
+| bez przeskalowania | 11,65 / 10,26 / 8,56 | 11,69 / 10,45 / 8,73 | 11,82 / 10,40 / 8,97 |
+| rozwój młodych do 21 lat, 1. sezon, L1 / L2 / L3 / L4: przed | 0,84 / 0,74 / 0,65 / 0,59 | | |
+| po | 0,85 / 0,72 / 0,64 / 0,59 | | |
+| bez przeskalowania | 0,70 / 0,65 / 0,58 / 0,53 | | |
+| pensje sztabu Ekstraklasy (tys. zł / mies.): przed / po / bez przeskalowania | 3692 / 3665 / 1771 | | |
+
+  `node tools/multiseason.mjs widzew 5 3` i `node tools/transfery-kalibracja.mjs widzew 5 3` (te same liczby): OVR top14
+  przed 11,64 / 11,81 / 11,73, po 11,63 / 11,72 / 11,84, bez przeskalowania 11,63 / 11,78 / 11,69; kluby z ujemnym
+  saldem: 0.
+- Wniosek: bez przeskalowania efektów rozwój młodych spada o 10-17 %, sztab Ekstraklasy kosztuje o połowę mniej
+  (pensja za 12 byłaby jak dawniej za 12, a nie za 17), raporty nigdy nie są dokładne (próg 14 nieosiągalny), a urazy
+  na treningu rosną. Dlatego efekty, progi i pensje liczą się na skali 1-20 (`staffEff`): średni rozwój i siła
+  zawodników jak dotąd (różnice w granicach losu między sezonami), pensja za 12 to najwyższa pensja w Polsce.
+- `npm run perf`: sezon 11,6-11,8 s (przed 12,1-12,5 s na tym samym komputerze), system `staffMarket` ok. +20 ms na sezon.
+
