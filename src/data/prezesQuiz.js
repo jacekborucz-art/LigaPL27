@@ -640,7 +640,7 @@ export const QUESTIONS = [
 // Ograniczenie: nie więcej niż +-12 punktów S z samego quizu (0,8 x 15), więc dobry quiz nie uratuje beznadziejnej prośby
 //   (np. cierpliwy właściciel, świetny dyrektor), a zły nie przekreśli oczywistej zmiany (np. dyrektor 4, wyniki daleko poniżej celu).
 // Zaufanie zarządu: Q <= -6 odejmuje dodatkowo 1 (jak „odmowa”), Q >= +8 nie zmienia zaufania.
-// Zgoda warunkowa (wdrożenie): zarząd sam ocenia sprawę po 182 dniach (S z dnia oceny + 0,8 Q z rozmowy, zgoda od 10),
+// Zgoda warunkowa (wdrożenie): zarząd sam ocenia sprawę po 182 dniach (S z dnia oceny + 1,5 Q z rozmowy, zgoda od 10),
 //   do tego czasu nie przyjmuje nowej prośby o zmianę dyrektora; inny dyrektor w klubie: ocena odpada.
 
 // ------------------------------------------------------------ Teksty końcowe prezesa

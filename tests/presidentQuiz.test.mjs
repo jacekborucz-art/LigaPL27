@@ -185,16 +185,18 @@ test('Determinizm: ta sama gra, data i liczba próśb dają te same pytania i ko
   assert.ok(diff >= 1);
 });
 
-test('Decyzja: S = punktacja + 0,8 Q; zgoda od 10, warunkowa od 6, odmowa; zły quiz -1 zaufania', () => {
-  const g = fresh();
+test('Decyzja: S = punktacja + 1,5 Q; zgoda od 10, warunkowa od 6, odmowa; zły quiz -1 zaufania', () => {
+  // Zaufanie 40: punktacja bez rozmowy niska, więc progi sprawdza sam wynik rozmowy (nie sito złej rozmowy)
+  const fresh40 = () => { const x = fresh(); x.board.trust = 40; return x; };
+  const g = fresh40();
   const S0 = directorScore(g, g.date).S;
   const qFor = (S) => Math.ceil(((S - S0) / REQ.DIR_QUIZ) * 100) / 100;
   // Zgoda: zarząd zmienia dyrektora
-  const y = fresh(); const d0 = directorOf(y, y.clubId).id;
+  const y = fresh40(); const d0 = directorOf(y, y.clubId).id;
   const ry = askBoard(y, 'director', 0, y.date, { quiz: { Q: qFor(12) } });
   assert.equal(ry.verdict, 'yes'); assert.notEqual(directorOf(y, y.clubId).id, d0);
   // Zgoda warunkowa: ocena za pół roku, do tego czasu bez nowej prośby
-  const c = fresh(); const dc = directorOf(c, c.clubId).id;
+  const c = fresh40(); const dc = directorOf(c, c.clubId).id;
   const rc = askBoard(c, 'director', 0, c.date, { quiz: { Q: qFor(8) } });
   assert.equal(rc.verdict, 'cond');
   assert.equal(directorOf(c, c.clubId).id, dc, 'dyrektor zostaje na razie');
@@ -204,11 +206,11 @@ test('Decyzja: S = punktacja + 0,8 Q; zgoda od 10, warunkowa od 6, odmowa; zły 
   assert.ok(c.inbox.some((m) => /pół roku/.test(m.body)));
   // Odmowa przy złym quizie: zaufanie -1 więcej niż przy zwykłej odmowie
   const qNo = Math.min(-6, qFor(2)); // odmowa i zły quiz
-  const n1 = fresh(); const t1 = n1.board.trust; const rn1 = askBoard(n1, 'director', 0, n1.date, { quiz: { Q: qNo } });
-  const n2 = fresh(); n2.board.trust = t1; const t2 = n2.board.trust; const rn2 = askBoard(n2, 'director', 0, n2.date, { quiz: { Q: -5.9 } });
+  const n1 = fresh40(); const t1 = n1.board.trust; const rn1 = askBoard(n1, 'director', 0, n1.date, { quiz: { Q: qNo } });
+  const n2 = fresh40(); n2.board.trust = t1; const t2 = n2.board.trust; const rn2 = askBoard(n2, 'director', 0, n2.date, { quiz: { Q: -5.9 } });
   assert.equal(rn1.verdict, 'no');
   if (rn2.verdict === 'no') assert.equal((t1 - n1.board.trust) - (t2 - n2.board.trust), 1);
-  const n3 = fresh(); const t3 = n3.board.trust; const rn3 = askBoard(n3, 'director', 0, n3.date);
+  const n3 = fresh40(); const t3 = n3.board.trust; const rn3 = askBoard(n3, 'director', 0, n3.date);
   assert.equal(rn3.verdict === 'no' ? (t1 - n1.board.trust) - (t3 - n3.board.trust) : 1, 1, 'bez rozmowy: bez dodatkowej kary');
   assert.ok(n1.inbox.some((m) => /rozmowa z prezesem nie przekonała zarządu/.test(m.body)));
 });
@@ -248,4 +250,18 @@ test('Cała rozmowa: dobre odpowiedzi dają wyższe Q niż złe, decyzja w tonie
   assert.equal(finishQuiz(g, good).result.failed, true);
   const again = startQuiz(g, {});
   assert.equal(again.ok, false);
+});
+
+test('Rozmowa jako sito: bardzo zła rozmowa zawsze odmowa, zła najwyżej warunkowa, dobra ratuje słabą prośbę', () => {
+  const g = fresh();
+  g.board.trust = 99; // sytuacja klubu bardzo dobra: bez rozmowy zarząd by się zgodził
+  const S0 = directorScore(g, g.date, { noRand: true }).S;
+  assert.ok(S0 + 5 >= REQ.DIR_YES + 8, `S0 ${S0}`);
+  const vbad = structuredClone(g); assert.equal(askBoard(vbad, 'director', 0, vbad.date, { quiz: { Q: REQ.DIR_VERY_BAD_Q } }).verdict, 'no');
+  const bad = structuredClone(g); assert.equal(askBoard(bad, 'director', 0, bad.date, { quiz: { Q: REQ.DIR_BAD_Q } }).verdict, 'cond');
+  // Słaba sytuacja klubu, przekonująca rozmowa: zgoda warunkowa zamiast odmowy
+  const w = fresh(); w.board.trust = 45;
+  const Sw = directorScore(w, w.date).S;
+  const good = REQ.DIR_GOOD_Q;
+  if (Sw + REQ.DIR_QUIZ * good < REQ.DIR_COND && Sw + REQ.DIR_QUIZ * good >= REQ.DIR_COND - 6) assert.equal(askBoard(w, 'director', 0, w.date, { quiz: { Q: good } }).verdict, 'cond');
 });

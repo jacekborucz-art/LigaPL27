@@ -3,7 +3,7 @@
 // „powody”, ostatnie podchwytliwe, reszta bez powtórzeń i bez dwóch pytań z tej samej kategorii pod rząd. Pula pytań:
 // src/data/prezesQuiz.js. Pytanie z danymi (tabela, wyniki z okresu, przepłaty, sprzeciwy, wypożyczenia) wchodzi do
 // losowania tylko wtedy, gdy dane są dostępne. Odpowiedź z warunkiem `cond`: prezes zna liczby, więc kłamstwo kosztuje.
-// Wynik quizu Q (suma punktów i modyfikatorów cech właściciela) dokłada 0,8 Q do punktacji zarządu (directorScore):
+// Wynik quizu Q (suma punktów i modyfikatorów cech właściciela) dokłada 1,5 Q do punktacji zarządu (directorScore):
 // zgoda od 10, zgoda warunkowa (ponowna ocena po pół roku) od 6, niżej odmowa; Q <= -6 kosztuje dodatkowo 1 punkt
 // zaufania. Wybór pytań i kolejność odpowiedzi deterministyczne (ziarno gry, data, klub, liczba próśb). Liczby [SZAC].
 
@@ -20,7 +20,7 @@ import { compOfClub } from '../season/leagueComps.js';
 import { ensureHistory, historySeasons } from '../season/history.js';
 
 export const PQ = {
-  mul: 0.8, // S = S_baza + 0,8 Q + los (los jak w directorScore)
+  mul: 1.5, // S = S_baza + 1,5 Q + los (los jak w directorScore)
   yes: 10, cond: 6, // zgoda od 10, zgoda warunkowa od 6
   badQ: -6, // zły quiz: dodatkowo -1 zaufania
   months: 6, maxMonths: 12, minMatches: 5, maxMatches: 20, // okres danych: od 6 do 12 miesięcy pracy trenera

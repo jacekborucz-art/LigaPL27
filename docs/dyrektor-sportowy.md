@@ -324,13 +324,14 @@ decyzja w `src/career/boardRequests.js` (`askDirectorChange`, `reviewDirector`).
   właściciel), spokojny. Po każdej odpowiedzi krótka reakcja prezesa; odpowiedź z warunkiem (`cond`), który się nie
   zgadza z danymi, dostaje punkty `else` i inną reakcję (`reactionElse`): prezes zna tabelę i liczby.
 - Wynik Q = suma punktów odpowiedzi i modyfikatorów cech właściciela (`v x clamp((cecha - 10) / 5, -1, 1)`).
-  Decyzja: S = punktacja zarządu (`directorScore`, z losem jak dotąd) + 0,8 Q [SZAC]:
+  Decyzja: S = punktacja zarządu (`directorScore`, z losem jak dotąd) + 1,5 Q [SZAC] (od Nov 22, 2026; wcześniej 0,8):
   zgoda od 10 (dalej jak dotąd: odprawa, nowy dyrektor, kandydat gracza z szansą 75 %), zgoda warunkowa od 6, niżej
-  odmowa. Q <= -6 kosztuje dodatkowo 1 punkt zaufania; odmowa po złej rozmowie podaje powód „rozmowa z prezesem nie
+  odmowa. Rozmowa jako sito: Q <= -6 daje najwyżej zgodę warunkową, Q <= -10 zawsze odmowę, Q >= 8 podnosi
+  odmowę do zgody warunkowej, gdy S >= 0 (stałe `DIR_VERY_BAD_Q`, `DIR_GOOD_Q`). Q <= -6 kosztuje dodatkowo 1 punkt zaufania; odmowa po złej rozmowie podaje powód „rozmowa z prezesem nie
   przekonała zarządu”.
 - Zgoda warunkowa (prosta wersja): list zarządu, `game.board.requests.dirReview = { date, due, Q, candidate, dir }`,
   przez 182 dni nowej prośby o zmianę dyrektora nie ma („Zarząd dał dyrektorowi pół roku i sam wróci do sprawy”).
-  W dniu oceny (system dnia `boardRequests`) zarząd liczy S z tego dnia + 0,8 Q z rozmowy: od 10 zmienia dyrektora
+  W dniu oceny (system dnia `boardRequests`) zarząd liczy S z tego dnia + 1,5 Q z rozmowy: od 10 zmienia dyrektora
   (kandydat gracza jak przy zgodzie), niżej dyrektor zostaje; w obu przypadkach list i wpis w historii. Gdy dyrektor
   w międzyczasie odszedł, ocena odpada.
 - Okno: telefon i PC, Esc, krzyżyk albo „Anuluj prośbę” przed decyzją zamykają rozmowę bez prośby (gra bez zmian).

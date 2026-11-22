@@ -46,9 +46,12 @@ export const REQ = {
   // Zmiana dyrektora sportowego: zgoda od S >= 10 (przeciętny dyrektor przy zaufaniu 60: ok. pół na pół); słaby dyrektor łatwiej (2,5 pkt na punkt jakości poniżej 10),
   // świeży (do 12 miesięcy) trudniej, niecierpliwy i porywczy właściciel łatwiej, odprawa wobec wolnych pieniędzy
   DIR_YES: 10, DIR_Q: 2.5, DIR_FRESH: -10, DIR_FRESH_DAYS: 365, DIR_PATIENCE: 1, DIR_TEMPER: 0.5,
-  // Rozmowa z prezesem (src/career/presidentQuiz.js): S = punktacja + 0,8 x wynik quizu Q; zgoda od 10, zgoda
+  // Rozmowa z prezesem (src/career/presidentQuiz.js): S = punktacja + 1,5 x wynik quizu Q; zgoda od 10, zgoda
   // warunkowa od 6 (ponowna ocena po 182 dniach bez nowej prośby), Q <= -6: dodatkowo -1 zaufania
-  DIR_QUIZ: 0.8, DIR_COND: 6, DIR_BAD_Q: -6, DIR_REVIEW_DAYS: 182,
+  DIR_QUIZ: 1.5, DIR_COND: 6, DIR_BAD_Q: -6, DIR_REVIEW_DAYS: 182,
+  // Rozmowa jako sito (Nov 22, 2026, prośba właściciela „podrasuj”): zła rozmowa (Q <= -6) daje najwyżej zgodę
+  // warunkową, bardzo zła (Q <= -10) zawsze odmowę; dobra rozmowa (Q >= 8) ratuje prośbę o jeden stopień
+  DIR_VERY_BAD_Q: -10, DIR_GOOD_Q: 8,
 };
 export const VETO = {
   SQUAD_X: 1.5, SQUAD_X_RICH: 1.8, MARKET_X: 1.3, RENEW_X: 1.15, // pensja: najwyższa w kadrze, rynkowa, obecna
@@ -457,7 +460,7 @@ export function directorScore(game, date = game.date, { noRand = false } = {}) {
 }
 
 /**
- * Prośba o zmianę dyrektora. opts.quiz: wynik rozmowy z prezesem { Q } (presidentQuiz.js): S + 0,8 Q, zgoda od 10,
+ * Prośba o zmianę dyrektora. opts.quiz: wynik rozmowy z prezesem { Q } (presidentQuiz.js): S + 1,5 Q, zgoda od 10,
  * zgoda warunkowa od 6 (ponowna ocena po pół roku), odmowa; Q <= -6 dodatkowo -1 zaufania. Bez rozmowy: zgoda albo odmowa.
  */
 function askDirectorChange(game, date, { candidate = null, quiz = null } = {}) {
@@ -470,7 +473,12 @@ function askDirectorChange(game, date, { candidate = null, quiz = null } = {}) {
   const sc = directorScore(game, date);
   const Q = quiz && Number.isFinite(quiz.Q) ? quiz.Q : null;
   const S = Math.round((sc.S + (Q == null ? 0 : REQ.DIR_QUIZ * Q)) * 10) / 10;
-  const verdict = S >= REQ.DIR_YES ? 'yes' : Q != null && S >= REQ.DIR_COND ? 'cond' : 'no';
+  let verdict = S >= REQ.DIR_YES ? 'yes' : Q != null && S >= REQ.DIR_COND ? 'cond' : 'no';
+  if (Q != null) {
+    if (Q <= REQ.DIR_VERY_BAD_Q) verdict = 'no'; // prezes nie dał się przekonać, nawet przy dobrej sytuacji klubu
+    else if (Q <= REQ.DIR_BAD_Q && verdict === 'yes') verdict = 'cond';
+    else if (Q >= REQ.DIR_GOOD_Q && verdict === 'no' && S >= REQ.DIR_COND - 6) verdict = 'cond'; // przekonująca rozmowa
+  }
   const trust0 = B.trust;
   let dTrust = 0;
   if (B.trust < 35 || (sc.pos.played >= 4 && sc.pos.pos && sc.pos.pos >= (B.goal?.target ?? 99) + 4)) dTrust -= 2;
@@ -523,7 +531,7 @@ function askDirectorChange(game, date, { candidate = null, quiz = null } = {}) {
 
 /**
  * Zgoda warunkowa na zmianę dyrektora: ponowna ocena po pół roku (system dnia, bez nowej prośby trenera).
- * S = punktacja z dnia oceny (z losem) + 0,8 Q z rozmowy; od 10 zarząd zmienia dyrektora, niżej dyrektor zostaje.
+ * S = punktacja z dnia oceny (z losem) + 1,5 Q z rozmowy; od 10 zarząd zmienia dyrektora, niżej dyrektor zostaje.
  * Inny dyrektor w klubie (odszedł, zwolniony): ocena odpada. Zwraca listy (push: od razu do poczty).
  */
 export function reviewDirector(game, date, { push = true } = {}) {

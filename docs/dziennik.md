@@ -29,6 +29,18 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 22, 2026, profil A (chmura), rozmowa z prezesem waży więcej (v1.23 Beta)
+Zrobione:
+- Scalony panel Zarządu, quiz prezesa, sztab do 12 (2480dd1).
+- Rozmowa z prezesem waży więcej: S = punktacja + 1,5 Q (było 0,8) i działa jak sito: Q <= -6 najwyżej zgoda
+  warunkowa, Q <= -10 zawsze odmowa, Q >= 8 podnosi odmowę do zgody warunkowej (gdy S >= 0). Opis w
+  `docs/dyrektor-sportowy.md`, test w `tests/presidentQuiz.test.mjs`.
+Decyzje i pułapki:
+- Właściciel: „podrasuj trochę”; wcześniej przy zaufaniu 99 zarząd zgadzał się nawet po słabej rozmowie.
+- Commity zostają z adresem jacekborucz@gmail.com mimo komunikatu hooka o „Unverified” (decyzja właściciela).
+Zostało / dalej:
+- Do decyzji: przeliczenie starego sztabu x 11/16 zamiast samego przycięcia do 12.
+
 ## Nov 22, 2026, agent (worktree, gałąź do scalenia), Zarząd klubu, rozmowa z prezesem, sztab 1-12 (v1.23 Beta)
 Zrobione:
 - Klub, Zarząd: panel „Zarząd klubu” na wolnym miejscu pod oceną zarządu (PC: cała szerokość pod Kibicami i Karierą,
