@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-7a8a43b4c0';
+const VERSION = 'v0.3-24b34fc3a2';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -267,6 +267,7 @@ const FILES = [
   ['./src/data/kluby_uefa.json', 'e579c6760e'],
   ['./src/data/names.js', 'dc6269c5ae'],
   ['./src/data/playerInstructions.js', 'c83822cb91'],
+  ['./src/data/prezesQuiz.js', '3870d91fe6'],
   ['./src/data/ranking_uefa.json', '5fb827a754'],
   ['./src/data/reprezentacje.json', '551a9d5bdd'],
   ['./src/data/reprezentacje_swiat.json', '29c3c96adf'],
