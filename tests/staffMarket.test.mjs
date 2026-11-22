@@ -16,7 +16,7 @@ import { runDecision } from '../src/core/decisions.js';
 import { applySeasonState } from '../src/season/rollover.js';
 import { ensureTraining, staffOf, monthlyDevelopment } from '../src/training/index.js';
 import { generateStaffFor, healDays } from '../src/training/staff.js';
-import { STAFF_ROLES } from '../src/training/config.js';
+import { STAFF_ROLES, staffRescale, staffShown } from '../src/training/config.js';
 import { scoutLine } from '../src/career/assistantReport.js';
 import { buildTeamReport } from '../src/career/teamReport.js';
 import { renderTraining } from '../src/ui/trainingView.js';
@@ -65,9 +65,10 @@ test('Migracja: liderzy ról z dotychczasowego sztabu (imię i jakość), widok 
     for (const r of ['asystent', 'fizyczny', 'bramkarze', 'mlodziez', 'analityk', 'kierownik']) {
       const list = ros.filter((p) => p.role === r).sort((a, b) => b.q - a.q);
       assert.equal(list[0].name, st[r].name, `${id} ${r}`);
-      assert.equal(list[0].q, st[r].q, `${id} ${r}`);
-      if (list.length === 1) assert.equal(old.training.staff[id][r].q, st[r].q, `${id} ${r}: bez pomocników jakość bez zmian`);
-      else assert.ok(old.training.staff[id][r].q >= st[r].q, `${id} ${r}: pomocnik nie obniża jakości`);
+      // Osoba na skali roli (1-12), widok w grze na skali efektów: ta sama jakość z dokładnością do zaokrąglenia
+      assert.equal(list[0].q, staffRescale(r, st[r].q), `${id} ${r}`);
+      if (list.length === 1) assert.ok(Math.abs(old.training.staff[id][r].q - Math.min(17, st[r].q)) <= 0.75, `${id} ${r}: bez pomocników jakość bez zmian`);
+      else assert.ok(old.training.staff[id][r].q >= Math.min(17, st[r].q) - 0.75, `${id} ${r}: pomocnik nie obniża jakości`);
     }
     for (const r of Object.keys(STAFF_ROLES)) assert.ok(old.training.staff[id][r] && old.training.staff[id][r].q >= 1, `${id} ${r}`);
   }
@@ -105,14 +106,17 @@ test('Finanse pierwszego dnia neutralne: koszty klubu + pensje sztabu = dawne ko
 });
 
 test('Jakość efektywna: 15 + 12 = 15,6, pomocnik słabszy niż 7 nic nie daje, najwyżej +2, kierownik tylko lider, wakat', () => {
-  assert.equal(combineQ([15, 12], 'asystent'), 15.6);
-  assert.equal(combineQ([17, 15, 14], 'asystent'), 18.3);
-  assert.equal(combineQ([15, 6], 'analityk'), 15);
-  assert.equal(combineQ([12, 20, 20, 20], 'asystent'), 20);
-  assert.equal(combineQ([10, 18, 18, 18], 'fizyczny'), 19.9);
-  assert.equal(combineQ([13, 19, 19, 19], 'fizyczny'), 20);
+  // Skala 1-20 (fizjoterapeuta): dawne wzory bez zmian
+  assert.equal(combineQ([15, 12], 'fizjoterapeuta'), 15.6);
+  assert.equal(combineQ([17, 15, 14], 'fizjoterapeuta'), 18.3);
+  assert.equal(combineQ([15, 6], 'fizjoterapeuta'), 15);
+  assert.equal(combineQ([12, 20, 20, 20], 'fizjoterapeuta'), 20);
+  // Skala 1-12 (pozostałe role): ten sam wzór na skali efektów, wynik najwyżej 12
+  assert.equal(combineQ([12, 12, 12, 12], 'asystent'), 12);
+  assert.equal(combineQ([9, 8], 'asystent'), 9.4); // 12,6 + 0,1 x (11,2 - 6) = 13,1 na skali efektów
+  assert.equal(combineQ([9, 5], 'analityk'), 9); // pomocnik 5 (dawne 6,8) prawie nic nie daje
   assert.equal(combineQ([12, 11], 'kierownik'), 12);
-  assert.equal(combineQ([], 'asystent'), K.vacantQ.asystent);
+  assert.equal(combineQ([], 'asystent'), Math.round(staffShown('asystent', K.vacantQ.asystent) * 10) / 10);
   // Widok: wakat ma wszystkie pola, rozwój i raport drużyny działają na klubie z wakatami
   const g = fresh();
   for (const p of rosterOf(g, CLUB).filter((x) => x.role === 'bramkarze' || x.role === 'analityk')) fireStaff(g, p.id);
@@ -124,15 +128,19 @@ test('Jakość efektywna: 15 + 12 = 15,6, pomocnik słabszy niż 7 nic nie daje,
 });
 
 test('Oczekiwana pensja: rola, jakość, obcokrajowiec, okres bez pracy (najmniej 75 %)', () => {
-  const p = { role: 'asystent', q: 10, nat: 'POL' };
-  assert.equal(expectedWage(p), 10000);
-  assert.equal(expectedWage({ ...p, q: 13 }), 19500);
-  assert.equal(expectedWage({ ...p, nat: 'ESP' }), 12000);
+  const p = { role: 'fizjoterapeuta', q: 10, nat: 'POL' }; // skala 1-20: 10 000 x 0,6
+  assert.equal(expectedWage(p), 6000);
+  assert.equal(expectedWage({ ...p, q: 13 }), 11700);
+  assert.equal(expectedWage({ ...p, nat: 'ESP' }), 7200);
   assert.ok(expectedWage({ ...p, role: 'kierownik' }) < expectedWage({ ...p, role: 'fizyczny' }));
   const idle = { ...p, free: '2026-01-01' };
-  assert.ok(expectedWage(idle, '2026-02-15') === 10000);
-  assert.ok(expectedWage(idle, '2026-06-01') < 10000);
-  assert.equal(expectedWage(idle, '2028-01-01'), 7500);
+  assert.ok(expectedWage(idle, '2026-02-15') === 6000);
+  assert.ok(expectedWage(idle, '2026-06-01') < 6000);
+  assert.equal(expectedWage(idle, '2028-01-01'), 4500);
+  // Skala 1-12: jakość 12 płacona jak dawne 17 (najwyższa pensja asystenta w Polsce), 1 jak 1
+  assert.equal(expectedWage({ role: 'asystent', q: 12, nat: 'POL' }), 47700);
+  assert.equal(expectedWage({ role: 'asystent', q: 1, nat: 'POL' }), Math.round(10000 * 1.25 ** -9 / 100) * 100);
+  assert.ok(expectedWage({ role: 'asystent', q: 9, nat: 'POL' }) > 15000 && expectedWage({ role: 'asystent', q: 9, nat: 'POL' }) < 20000);
 });
 
 test('Okno decyzji 2-3 dni, oferta wiążąca, po decyzji koniec ofert, odmowa daje 14 dni przerwy', () => {
@@ -317,15 +325,15 @@ test('Adaptacja: obcokrajowiec przez 3 miesiące pracuje słabiej (16 jak 14 na 
   makeRoom(g, CLUB, 2);
   const cand = freeOf(g, 'analityk', (p) => p.nat !== 'POL' && !p.pl)[0] ?? freeOf(g, 'asystent', (p) => p.nat !== 'POL')[0];
   assert.ok(cand, 'jest obcokrajowiec na liście');
-  cand.q = 17; // zostanie liderem
+  cand.q = 12; // zostanie liderem (skala 1-12: kara adaptacji 2 / 1,45 punktu)
   const r = makeOffer(g, { pid: cand.id, wage: expectedWage(cand, g.date) * 1.3, years: 2, lead: true });
   assert.ok(r.ok, r.text);
   runDecisions(g, g.date, r.decideOn);
   assert.equal(cand.club, CLUB);
   const d0 = cand.since;
-  assert.equal(personQ(cand, d0), 15);
-  assert.equal(personQ(cand, addDays(d0, 45)), 16);
-  assert.equal(personQ(cand, addDays(d0, 90)), 17);
+  assert.ok(Math.abs(personQ(cand, d0) - 10.625) < 1e-9);
+  assert.ok(Math.abs(personQ(cand, addDays(d0, 45)) - 11.3125) < 1e-9);
+  assert.equal(personQ(cand, addDays(d0, 90)), 12);
   assert.ok(g.staff.adapting.includes(CLUB));
   g.date = addDays(d0, 91); processDay(g);
   assert.ok(!g.staff.adapting.includes(CLUB) && cand.adapt === null);
@@ -337,7 +345,7 @@ test('Obietnica roli lidera: nowy lepszy lider degraduje dotychczasowego (niezad
   makeRoom(g, CLUB, 2);
   const old = rosterOf(g, CLUB).filter((p) => p.role === 'bramkarze').sort((a, b) => b.q - a.q)[0];
   const cand = freeOf(g, 'bramkarze').sort((a, b) => b.q - a.q)[0];
-  cand.q = Math.max(cand.q, old.q + 2);
+  old.q = Math.min(old.q, 9); cand.q = old.q + 2; // skala 1-12
   const uBefore = offerUtility(g, old, { club: CLUB, wage: old.wage, years: 1 }, g.date).u;
   const r = makeOffer(g, { pid: cand.id, wage: expectedWage(cand, g.date) * 1.3, years: 2, lead: true });
   assert.ok(r.ok, r.text);

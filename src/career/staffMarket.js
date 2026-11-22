@@ -21,8 +21,8 @@ import { registerDecision } from '../core/decisions.js';
 import { clubById, CLUBS_PL } from '../data/clubs_pl.js';
 import { NATIONALITIES, randomName } from '../data/names.js';
 import { payLevel } from '../data/finanse_klubow.js';
-import { STAFF_ROLES, DIRECTOR_ROLE, DIRECTOR_NAME } from '../training/config.js';
-import { generateStaffFor, staffLabel, roleAttrKeys, ensurePersonAttrs, attrsAround, qFromAttrs, ensureScoutReg } from '../training/staff.js';
+import { STAFF_ROLES, DIRECTOR_ROLE, DIRECTOR_NAME, STAFF_EFF, staffEff, staffShown, staffRescale, staffCap, isCappedRole } from '../training/config.js';
+import { generateStaffFor, staffLabel, roleAttrKeys, ensurePersonAttrs, attrsAround, qFromAttrs, ensureScoutReg, rescalePerson } from '../training/staff.js';
 import { NEG, negMean, negDraw } from './clubNegotiation.js'; // atrybut Negocjacje: losowanie dyrektorów (docs/dyrektor-sportowy.md)
 import { ensureTraining, daysBetween } from '../training/state.js';
 import { clubPlan, book } from './finance.js';
@@ -155,7 +155,8 @@ export const halfKeyOf = (date) => { const y = +date.slice(0, 4); return +date.s
  */
 export function expectedWage(p, date = null, { idle = true, club = null } = {}) {
   const W = K.wage;
-  let w = W.base * (W.R[p.role] ?? 0.5) * W.growth ** ((p.q ?? 10) - 10) * (isForeign(p) ? W.foreign : 1) * scoutRegionPremium(p);
+  // Jakość na skali efektów (role 1-12: 12 jak dawne 17), więc pensja za jakość 12 jest najwyższa w Polsce jak dotąd
+  let w = W.base * (W.R[p.role] ?? 0.5) * W.growth ** (staffEff(p.role, p.q ?? 10) - 10) * (isForeign(p) ? W.foreign : 1) * scoutRegionPremium(p);
   if (isDirector(p) && club) w *= K.director.league[tierOf(club)] ?? 1;
   if (idle && p.free && date && !p.club) {
     const d = daysBetween(p.free, date);
@@ -175,7 +176,7 @@ export function scoutRegionPremium(p) {
 export function personQ(p, date = null) {
   if (!p.adapt || !date || date >= p.adapt.to) return p.q;
   const left = daysBetween(date, p.adapt.to);
-  return Math.max(1, p.q - p.adapt.pen * Math.min(1, left / K.adapt.days));
+  return Math.max(1, p.q - adaptPen(p) * Math.min(1, left / K.adapt.days));
 }
 
 /** Atrybut osoby w danym dniu (adaptacja jak przy jakości). Osoba bez atrybutów: jej jakość. */
@@ -183,11 +184,14 @@ export function personAttr(p, key, date = null) {
   const v = p.a?.[key] ?? p.q;
   if (!p.adapt || !date || date >= p.adapt.to) return v;
   const left = daysBetween(date, p.adapt.to);
-  return Math.max(1, v - p.adapt.pen * Math.min(1, left / K.adapt.days));
+  return Math.max(1, v - adaptPen(p) * Math.min(1, left / K.adapt.days));
 }
 
+/** Kara adaptacji na skali roli: 2 punkty skali 1-20 (role 1-12: 2 / 1,45, czyli ok. 1,4 punktu). */
+const adaptPen = (p) => (isCappedRole(p.role) ? p.adapt.pen / STAFF_EFF : p.adapt.pen);
+
 /** Jakość efektywna roli z jakości osób (najlepszy prowadzi, pozostali pomagają z malejącą wagą). */
-export function combineQ(qs, role) {
+function combineEff(qs, role) {
   if (!qs.length) return K.vacantQ[role] ?? 3;
   const s = [...qs].sort((a, b) => b - a);
   if (role === 'kierownik') return r1(Math.min(20, s[0]));
@@ -195,6 +199,24 @@ export function combineQ(qs, role) {
   for (let i = 1; i < s.length && i <= K.help.length; i++) h += K.help[i - 1] * Math.max(0, s[i] - K.helpFrom);
   return r1(Math.min(20, s[0] + Math.min(K.helpMax, h)));
 }
+
+/**
+ * Jakość roli na skali roli (1-12, fizjoterapeuta 1-20) z jakości osób na tej skali: wzór liczony na skali efektów
+ * (lider i pomocnicy jak dotąd), wynik przeliczony z powrotem i najwyżej 12. Wakat: jakość wakatu na skali roli.
+ */
+export function combineQ(qs, role) {
+  return r1(staffShown(role, combineEff(qs.map((q) => staffEff(role, q)), role)));
+}
+
+/** Wkład pomocnika w jakość roli na skali roli (np. „pomaga +0,4”): i-ty w kolejności (1 = pierwszy pomocnik). */
+export function helperShare(role, q, i) {
+  const w = K.help[i - 1] ?? 0;
+  const e = w * Math.max(0, staffEff(role, q) - K.helpFrom);
+  return isCappedRole(role) ? e / STAFF_EFF : e;
+}
+
+/** Czy osoba jest za słaba, żeby pomagać w roli (dawne 7 na skali 1-20, w rolach 1-12 ok. 5). */
+export const tooWeakHelper = (role, q) => staffEff(role, q) < K.ai.helperMinQ;
 
 /** Kara adaptacji na start (obcokrajowiec bez pracy w Polsce): 2 punkty jakości, 3 miesiące. */
 export const adaptPenalty = (nat) => (!nat || nat === 'POL' ? 0 : K.adapt.pen);
@@ -237,7 +259,8 @@ function makePerson(game, S, key, opts = {}) {
   const nats = K.foreignNats.filter((c) => NATIONALITIES.includes(c));
   const nat = opts.nat ?? (foreign ? nats[rng.int(0, nats.length - 1)] : 'POL');
   const nm = randomName(NATIONALITIES.includes(nat) ? nat : 'POL', rng);
-  const q = clamp(Math.round((opts.mean ?? 8.5) + (foreign ? K.pool.foreignBonus : 0) + rng.gauss(0, K.pool.sd)), 1, 19);
+  // Losowanie na skali 1-20 (poziomy puli jak dotąd), potem skala roli (1-12 poza fizjoterapeutą)
+  const q = staffRescale(role, clamp(Math.round((opts.mean ?? 8.5) + (foreign ? K.pool.foreignBonus : 0) + rng.gauss(0, K.pool.sd)), 1, 19));
   const age = opts.age ?? (role === 'asystent' || role === 'analityk' || role === 'skaut' ? rng.int(28, 58) : rng.int(32, 64));
   const id = newPersonId(S);
   const p = { id, name: `${nm.first} ${nm.last}`, nat, age, role, q, a: attrsAround(q, role, `${game.seed}:${id}`), wage: 0, until: null, since: null, club: null, free: opts.free ?? game.date ?? null, coach: null, adapt: null, pl: nat === 'POL', lead: false, demoted: null, hist: [] };
@@ -301,7 +324,7 @@ export function staffPlan(clubId, limit) {
   return out;
 }
 
-/** Jakość typowa sztabu klubu (ten sam wzór co generator: 3 + 1,3 prestiżu + premia ligi). */
+/** Jakość typowa sztabu klubu na skali efektów 1-20 (ten sam wzór co generator: 3 + 1,3 prestiżu + premia ligi). */
 function typicalQ(clubId) {
   const club = clubById(clubId);
   const parent = club?.parent ? clubById(club.parent) : null;
@@ -317,7 +340,7 @@ export function typicalStaffCost(game, clubId) {
   const limit = S?.limit?.[clubId] ?? computeLimit(game, clubId);
   const q0 = typicalQ(clubId);
   let sum = 0;
-  for (const { role, k } of staffPlan(clubId, limit)) sum += expectedWage({ role, q: clamp(Math.round(q0 - (k > 1 ? 2 : 0)), 1, 20), nat: 'POL' }) * payMul(clubId);
+  for (const { role, k } of staffPlan(clubId, limit)) sum += expectedWage({ role, q: staffRescale(role, clamp(Math.round(q0 - (k > 1 ? 2 : 0)), 1, 20)), nat: 'POL' }) * payMul(clubId);
   // Dyrektor sportowy: typowa jakość = średnia atrybutu Negocjacje w lidze klubu
   sum += expectedWage({ role: DIRECTOR_ROLE, q: clamp(Math.round(negMean(clubId)), 1, 20), nat: 'POL' }, null, { club: clubId }) * payMul(clubId);
   return Math.round(sum * 12 / 1000) * 1000;
@@ -349,22 +372,24 @@ export function syncStaff(game, clubId, date = game.date) {
   let adapting = false;
   for (const role of STAFF_ROLE_IDS) {
     const list = ppl.filter((p) => p.role === role);
-    if (!list.length) { view[role] = { name: null, q: K.vacantQ[role] ?? 3, age: null, vacant: true }; continue; }
+    if (!list.length) { const vq = K.vacantQ[role] ?? 3; view[role] = { name: null, q: vq, qs: r1(staffShown(role, vq)), age: null, vacant: true }; continue; }
     let lead = list[0]; let lq = -1;
     const qs = [];
     for (const p of list) {
       const q = personQ(p, date);
       if (p.adapt && date < p.adapt.to) adapting = true;
-      qs.push(q);
+      qs.push(staffEff(role, q));
       if (q > lq) { lead = p; lq = q; }
     }
-    const o = { name: lead.name, q: combineQ(qs, role), age: lead.age };
+    // Widok na skali efektów 1-20 (staffA, staffQ, staffMul: dawne wzory), qs: jakość roli na skali roli (do pokazania)
+    const o = { name: lead.name, q: combineEff(qs, role), age: lead.age };
+    o.qs = r1(staffShown(role, o.q));
     // Atrybuty roli: ten sam wzór co jakość (lider i pomocnicy, adaptacja obcokrajowca obniża wszystkie atrybuty),
     // zapisane jako odchylenie od jakości roli (d), więc atrybut = q + d (training/staff.js staffA)
     const keys = roleAttrKeys(role);
     if (keys.length) {
       o.d = {};
-      for (const k of keys) { const x = r1(combineQ(list.map((p) => personAttr(p, k, date)), role) - o.q); if (x) o.d[k] = x; }
+      for (const k of keys) { const x = r1(combineEff(list.map((p) => staffEff(role, personAttr(p, k, date))), role) - o.q); if (x) o.d[k] = x; }
     }
     if (list.length > 1) o.n = list.length;
     view[role] = o;
@@ -412,7 +437,8 @@ function buildClub(game, S, clubId, date) {
   const since = addDays(date, -365);
   const add = (role, src, k) => {
     const rng = new Rng(`sztab-start:${game.seed}:${clubId}:${role}:${k}`);
-    const p = { id: newPersonId(S), name: src.name, nat: 'POL', age: src.age ?? rng.int(31, 62), role, q: clamp(Math.round(src.q ?? 10), 1, 20), wage: 0, until: startUntil(rng, t, date), since, club: clubId, free: null, coach: null, adapt: null, pl: true, lead: k === 1, demoted: null, hist: [] };
+    // src.q: skala efektów 1-20 (widok treningu, generator), osoba dostaje skalę roli (1-12 poza fizjoterapeutą)
+    const p = { id: newPersonId(S), name: src.name, nat: 'POL', age: src.age ?? rng.int(31, 62), role, q: staffRescale(role, clamp(Math.round(src.q ?? 10), 1, 20)), wage: 0, until: startUntil(rng, t, date), since, club: clubId, free: null, coach: null, adapt: null, pl: true, lead: k === 1, demoted: null, hist: [] };
     ensurePersonAttrs(p, `${game.seed}:${p.id}`); // atrybuty roli wokół jakości (średnia = jakość)
     p.wage = Math.max(K.wage.min, r100(expectedWage(p) * pm));
     S.people[p.id] = p; ids.push(p.id);
@@ -435,7 +461,7 @@ function buildClub(game, S, clubId, date) {
       add(role, src, 1);
     } else {
       const lead = ids.map((id) => S.people[id]).find((p) => p.role === role);
-      const q1 = lead?.q ?? typicalQ(clubId);
+      const q1 = lead ? staffEff(role, lead.q) : typicalQ(clubId);
       const rng = new Rng(`sztab-start:${game.seed}:${clubId}:${role}:${k}`);
       const q = clamp(Math.min(q1 - 1, Math.round(q1 - 2 + rng.gauss(0, 1.5))), 1, 20);
       const n = randomName('POL', rng);
@@ -463,10 +489,17 @@ export function ensureStaff(game) {
   S.block ??= {}; S.adapting ??= []; S.based ??= {}; S.cool ??= {}; S.stats ??= {}; S.poach ??= { ban: {}, tried: {}, userHalf: {} };
   // Atrybuty osób sztabu (stare zapisy, raz): wokół dotychczasowej jakości, średnia = jakość, więc efekty bez skoku.
   // Wersja 2 (skauting, docs/skauting.md): skaut z 3 na 5 atrybutów i regiony, jakość bez zmian
-  if ((S.attrs ?? 0) < 2) {
-    for (const p of Object.values(S.people)) ensurePersonAttrs(p, `${game.seed}:${p.id}`);
-    S.attrs = 2;
-    if (!fresh) for (const id of Object.keys(S.clubs)) if (game.world.clubs[id]) syncStaff(game, id, date);
+  // Wersja 3 (v1.23 Beta, docs/sztab-atrybuty.md): role poza fizjoterapeutą i dyrektorem na skali 1-12 (przeliczenie
+  // x 11/16 i przycięcie do 12, jakość znów średnią); widok klubów liczony od nowa, więc efekty zostają jak były
+  if (fresh) S.attrs = 3;
+  if ((S.attrs ?? 0) < 3) {
+    const legacy = (S.attrs ?? 0) < 2;
+    for (const p of Object.values(S.people)) {
+      if (legacy) ensurePersonAttrs(p, `${game.seed}:${p.id}`, { legacy: true });
+      rescalePerson(p);
+    }
+    S.attrs = 3;
+    for (const id of Object.keys(S.clubs)) if (game.world.clubs[id]) syncStaff(game, id, date);
   }
   // Kluby rozwiązane (spadek do IV ligi): sztab do puli
   for (const id of Object.keys(S.clubs)) if (!game.world.clubs[id]) dissolveClub(game, S, id, date);
@@ -923,12 +956,16 @@ const precOfQ = (q) => (q >= 14 ? 'exact' : q >= 8 ? 'approx' : 'vague');
 /** Jakość widziana przez klub (asystent ocenia z błędem, stałym dla pary klub-osoba). */
 export function seenQuality(game, p, clubId = game.clubId) {
   const aq = game.training?.staff?.[clubId]?.asystent?.q ?? 10;
-  if (p.club === clubId) return { v: p.q, lo: p.q, hi: p.q, prec: 'exact', label: staffLabel(p.q) };
-  const sd = judgeSd(aq);
-  const v = clamp(p.q + new Rng(`sztab-ocena:${game.seed}:${clubId}:${p.id}`).gauss(0, sd), 1, 20);
+  if (p.club === clubId) return { v: p.q, lo: p.q, hi: p.q, prec: 'exact', label: staffLabel(p.q, p.role) };
+  // Błąd i przedział na skali roli (1-12: błąd / 1,45, przedział +-1 zamiast +-2)
+  const small = isCappedRole(p.role);
+  const cap = staffCap(p.role);
+  const sd = judgeSd(aq) / (small ? STAFF_EFF : 1);
+  const v = clamp(p.q + new Rng(`sztab-ocena:${game.seed}:${clubId}:${p.id}`).gauss(0, sd), 1, cap);
   const prec = precOfQ(aq);
   const c = Math.round(v);
-  return { v: r1(v), lo: clamp(c - (prec === 'exact' ? 0 : 2), 1, 20), hi: clamp(c + (prec === 'exact' ? 0 : 2), 1, 20), prec, label: staffLabel(c) };
+  const w = prec === 'exact' ? 0 : small ? 1 : 2;
+  return { v: r1(v), lo: clamp(c - w, 1, cap), hi: clamp(c + w, 1, cap), prec, label: staffLabel(c, p.role) };
 }
 
 // ------------------------------------------------------------ Użyteczność oferty
@@ -961,7 +998,7 @@ export function offerUtility(game, p, offer, date, rng = null) {
   parts.money = U.money * Math.log(Math.max(1, offer.wage) / w0);
   const club = clubById(offer.club);
   const rep = club ? clubReputation(club) : 30;
-  parts.prestige = clamp(U.prestige * (rep - (U.rcel0 + U.rcelQ * p.q)), U.prestigeMin, U.prestigeMax);
+  parts.prestige = clamp(U.prestige * (rep - (U.rcel0 + U.rcelQ * staffEff(p.role, p.q))), U.prestigeMin, U.prestigeMax);
   const rank = rankIn(game, offer.club, p);
   const stay = offer.club === p.club;
   const lead = stay ? rank === 1 : !!offer.lead && rank === 1;
@@ -1040,7 +1077,7 @@ export function clubAppeal(game, pid, clubId = game.clubId) {
   if (!p) return null;
   const U = K.util;
   const rep = clubReputation(clubById(clubId) ?? { rep: 30 });
-  const v = clamp(U.prestige * (rep - (U.rcel0 + U.rcelQ * p.q)), U.prestigeMin, U.prestigeMax);
+  const v = clamp(U.prestige * (rep - (U.rcel0 + U.rcelQ * staffEff(p.role, p.q))), U.prestigeMin, U.prestigeMax);
   return v > 0.2 ? { word: 'atrakcyjny', k: 'good', reason: 'klub wyżej niż jego poziom' } : v > -0.25 ? { word: 'w porządku', k: 'info', reason: 'klub na jego poziomie' } : { word: 'poniżej jego poziomu', k: 'warn', reason: 'liczy na lepszy klub' };
 }
 
@@ -1160,7 +1197,7 @@ export function checkOffer(game, args = {}) {
 /** Klub AI blokuje odejście ważnej osoby (lider bez zastępcy w roli) częściej niż pomocnika. */
 function aiBlocks(game, p, date) {
   const others = rosterOf(game, p.club).filter((x) => x.id !== p.id && x.role === p.role);
-  const important = rankIn(game, p.club, p) === 1 && !others.some((x) => x.q >= p.q - 2);
+  const important = rankIn(game, p.club, p) === 1 && !others.some((x) => staffEff(x.role, x.q) >= staffEff(p.role, p.q) - 2);
   return new Rng(`sztab-blok:${game.seed}:${p.id}:${date}`).chance(important ? K.poach.blockImportant : K.poach.blockOther);
 }
 
@@ -1402,10 +1439,12 @@ export function logDirectorMove(game, e) {
 
 // ------------------------------------------------------------ Kluby AI
 
-/** Docelowa jakość sztabu klubu AI (poziom klubu, ambicja właściciela). */
-function aiTarget(game, clubId) {
+/** Docelowa jakość sztabu klubu AI (poziom klubu, ambicja właściciela) na skali efektów 1-20. */
+function aiTargetEff(game, clubId) {
   return typicalQ(clubId) + 0.1 * ((ownerOf(game, clubId)?.ambicja ?? 10) - 10);
 }
+/** Docelowa jakość osoby w roli na skali roli (1-12 poza fizjoterapeutą). */
+const aiTarget = (game, clubId, role) => staffShown(role, aiTargetEff(game, clubId));
 
 /** Pensja oferty klubu AI: oczekiwania, płacowość i zasobność właściciela. */
 export function aiWage(game, clubId, p, date) {
@@ -1438,12 +1477,12 @@ function aiNeed(game, clubId, target) {
   // Słaby lider w roli rdzenia: lepszy kandydat zostaje liderem, dotychczasowy pomaga (jeśli rola ma miejsce)
   for (const role of ['asystent', 'fizyczny', 'bramkarze', 'kierownik']) {
     const R = L.roles[role];
-    if (R.n && R.n + R.pending < R.max && (view[role]?.q ?? 10) < target - K.ai.weak) return { role, minQ: Math.round(view[role].q) + 2 };
+    if (R.n && R.n + R.pending < R.max && (view[role]?.q ?? 10) < target - K.ai.weak) return { role, minQ: staffShown(role, Math.round(view[role].q) + 2) };
   }
   for (const { role, k } of staffPlan(clubId, L.limit)) {
     const R = L.roles[role];
     if (R.n + R.pending >= k || R.n + R.pending >= R.max) continue;
-    return { role, minQ: k > 1 ? K.ai.helperMinQ : 1, helper: k > 1 };
+    return { role, minQ: k > 1 ? staffShown(role, K.ai.helperMinQ) : 1, helper: k > 1 };
   }
   return null;
 }
@@ -1477,9 +1516,9 @@ function aiMakeRoom(game, clubId, date) {
 function aiReview(game, clubId, date, index) {
   const S = game.staff; const P = K.poach;
   aiMakeRoom(game, clubId, date);
-  const target = aiTarget(game, clubId);
-  const need = aiNeed(game, clubId, target);
+  const need = aiNeed(game, clubId, aiTargetEff(game, clubId)); // skala efektów (widok roli)
   if (!need) return null;
+  const target = aiTarget(game, clubId, need.role); // skala roli (osoby)
   const room = budgetRoomFor(game, clubId, need.role);
   const repMe = clubReputation(clubById(clubId));
   const leadQ = game.training?.staff?.[clubId]?.[need.role]?.vacant ? 0 : rosterOf(game, clubId).filter((x) => x.role === need.role).reduce((m, x) => Math.max(m, x.q), 0);
@@ -1549,7 +1588,7 @@ export function aiRenewals(game, date) {
     if (clubId === game.clubId || !game.world.clubs[clubId]) continue;
     const ppl = rosterOf(game, clubId);
     const limit = S.limit[clubId] ?? computeLimit(game, clubId);
-    const target = aiTarget(game, clubId);
+    const target = aiTargetEff(game, clubId);
     // Kolejność ważności: miejsca planu (lider roli przed pomocnikiem, lepszy przed słabszym)
     const order = [];
     const byRole = {};
@@ -1570,8 +1609,8 @@ export function aiRenewals(game, date) {
     order.forEach((p, i) => {
       if (p.until !== end) return;
       const helper = rankIn(game, clubId, p) > 1;
-      if (i >= limit || p.age >= K.pool.noRenewAge || (helper && p.q < K.ai.helperMinQ) || !roleCap(clubId, p.role)) return;
-      if (!helper && p.q < target - K.ai.weak && CORE.includes(p.role)) return; // słaby lider: klub szuka lepszego
+      if (i >= limit || p.age >= K.pool.noRenewAge || (helper && tooWeakHelper(p.role, p.q)) || !roleCap(clubId, p.role)) return;
+      if (!helper && staffEff(p.role, p.q) < target - K.ai.weak && CORE.includes(p.role)) return; // słaby lider: klub szuka lepszego
       renew(p);
     });
     // Minimum ligi (III liga od 4 osób): gdy po wygaśnięciu umów zostałoby mniej osób, klub przedłuża kolejne
@@ -1605,9 +1644,9 @@ export function staffOnCoachHire(game, clubId, coach, date) {
     toPool(game, p, date, 'odejście z trenerem');
   }
   if (!rng.chance(A.coachBring[tierOf(clubId)] ?? 0)) return;
-  const target = aiTarget(game, clubId);
+  const target = aiTargetEff(game, clubId); // skala efektów: okno od -1 do +2 jak dotąd
   const nat = coach.nat && coach.nat !== 'POL' ? coach.nat : null;
-  const pool = S.pool.map((id) => S.people[id]).filter((p) => p && p.role === 'asystent' && p.q >= target - 1 && p.q <= target + 2 && !S.decide[p.id]);
+  const pool = S.pool.map((id) => S.people[id]).filter((p) => p && p.role === 'asystent' && staffEff(p.role, p.q) >= target - 1 && staffEff(p.role, p.q) <= target + 2 && !S.decide[p.id]);
   const byQ = (a, b) => b.q - a.q || a.id.localeCompare(b.id);
   let p = pool.filter((x) => !nat || x.nat === nat).sort(byQ)[0] ?? (nat ? null : pool.sort(byQ)[0]);
   if (!p) {
@@ -1671,14 +1710,17 @@ export function staffNewSeason(game, date) {
     p.age = (p.age ?? 45) + 1;
     const rng = new Rng(`sztab-rozwoj:${game.seed}:${p.id}:${y}`);
     // Rozwój i spadek: zmiana atrybutów (razem 3 punkty, czyli jakość o 1 jak dotąd): jeden obszar o 2, drugi o 1
-    const step = p.age <= D.upAge && rng.chance(D.up) ? 1 : p.age >= D.downAge && rng.chance(D.down) ? -1 : 0;
+    // Role 1-12: szansa / 1,45, bo punkt skali 1-12 to 1,45 dawnego punktu (tempo zmian jak dotąd), najwyżej 12
+    const dm = isCappedRole(p.role) ? 1 / STAFF_EFF : 1;
+    const cap = staffCap(p.role);
+    const step = p.age <= D.upAge && rng.chance(D.up * dm) ? 1 : p.age >= D.downAge && rng.chance(D.down * dm) ? -1 : 0;
     if (step) {
       ensurePersonAttrs(p, `${game.seed}:${p.id}`);
-      const keys = roleAttrKeys(p.role).filter((k) => (step > 0 ? p.a[k] < 20 : p.a[k] > 1));
+      const keys = roleAttrKeys(p.role).filter((k) => (step > 0 ? p.a[k] < cap : p.a[k] > 1));
       const order = keys.map((k) => [k, rng.next()]).sort((x, y) => x[1] - y[1]).map((x) => x[0]);
-      if (order[0]) p.a[order[0]] = clamp(p.a[order[0]] + 2 * step, 1, 20);
-      if (order[1]) p.a[order[1]] = clamp(p.a[order[1]] + step, 1, 20);
-      p.q = order.length ? qFromAttrs(p.a) : clamp(p.q + step, 1, 20);
+      if (order[0]) p.a[order[0]] = clamp(p.a[order[0]] + 2 * step, 1, cap);
+      if (order[1]) p.a[order[1]] = clamp(p.a[order[1]] + step, 1, cap);
+      p.q = order.length ? qFromAttrs(p.a) : clamp(p.q + step, 1, cap);
     }
     if (p.club && p.until && p.until < date) { st.expired++; toPool(game, p, date, 'koniec umowy'); }
     if (p.age >= P.retire && !p.club) { st.retired++; removePerson(S, p); }
@@ -1807,7 +1849,7 @@ export function staffSummary(game, clubId = game.clubId) {
   const roles = {};
   for (const role of STAFF_ROLE_IDS) {
     const people = rosterOf(game, clubId).filter((p) => p.role === role).sort((a, b) => b.q - a.q).map((p) => ({ ...p, qNow: r1(personQ(p, game.date)), canRenew: canRenew(p, game.date), severance: severanceOf(p, game.date) }));
-    roles[role] = { name: roleName(role), q: view[role]?.q ?? K.vacantQ[role], vacant: !people.length, max: L.roles[role].max, people };
+    roles[role] = { name: roleName(role), q: view[role]?.qs ?? r1(staffShown(role, view[role]?.q ?? K.vacantQ[role])), vacant: !people.length, max: L.roles[role].max, people };
   }
   // Dyrektor sportowy: osobny slot (max 1, poza limitem osób); wakat: zarząd (jakość wakatu)
   const d = directorOf(game, clubId);

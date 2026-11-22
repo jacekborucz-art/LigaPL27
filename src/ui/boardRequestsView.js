@@ -9,6 +9,55 @@ import {
 } from '../career/boardRequests.js';
 import { clubById } from '../data/clubs_pl.js';
 import { directorOf, listFreeStaff } from '../career/staffMarket.js'; // dyrektor sportowy (docs/dyrektor-sportowy.md)
+import { ownerOf, ownerBlurb, OWNER_KEYS, OWNER_TYPES } from '../career/owners.js';
+import { startQuiz, tenureText } from '../career/presidentQuiz.js';
+import { ROLE_ATTRS, DIRECTOR_ROLE } from '../training/config.js';
+import { staffLabel } from '../training/staff.js';
+import { NAT_NAMES } from '../data/names.js';
+
+// ------------------------------------------------------------ Zarząd klubu: właściciel i dyrektor sportowy (podgląd)
+const OWNER_TRAITS = { cierpliwosc: ['Cierpliwość', 'Ile czasu daje trenerowi przy słabych wynikach'], ambicja: ['Ambicja', 'Jak wysoko stawia cele'], temperament: ['Temperament', 'Porywczość: krótkie serie porażek ważą więcej'], media: ['Media', 'Wrażliwość na kibiców i media'], zasobnosc: ['Zasobność', 'Pieniądze właściciela: dopłaty i odprawy'] };
+const toneOf = (v) => (v >= 14 ? 'good' : v >= 8 ? 'info' : 'warn');
+const attrRow = (label, v, tip) => `<li title="${esc(tip)}"><span>${esc(label)}</span>${meter((v / 20) * 100, toneOf(v))}<b>${esc(String(Math.round(v)))}</b></li>`;
+
+function ownerCard(game) {
+  const o = game.world?.clubs?.[game.clubId] ? ownerOf(game, game.clubId) : null;
+  if (!o) return '<article class="brp-card" data-k="owner"><h4>Właściciel</h4><p class="brp-empty">Brak danych o właścicielu klubu.</p></article>';
+  const type = OWNER_TYPES[o.type]?.label ?? '';
+  return `<article class="brp-card" data-k="owner" aria-labelledby="brp-owner">
+    <header class="brp-head"><span class="brp-role">Właściciel i prezes</span><h4 id="brp-owner">${esc(o.name)}</h4>${type ? `<small>${esc(type)}</small>` : ''}</header>
+    <p class="brp-blurb">${esc(ownerBlurb(o))}</p>
+    <ul class="brp-attrs" aria-label="Cechy właściciela, skala 1 do 20">${OWNER_KEYS.map((k) => attrRow(OWNER_TRAITS[k][0], o[k] ?? 10, OWNER_TRAITS[k][1])).join('')}</ul>
+  </article>`;
+}
+
+function directorPanelCard(game) {
+  const d = game.staff ? directorOf(game, game.clubId) : null;
+  if (!d) {
+    return `<article class="brp-card" data-k="dir" aria-labelledby="brp-dir"><header class="brp-head"><span class="brp-role">Dyrektor sportowy</span><h4 id="brp-dir">Wakat</h4></header>
+      <p class="brp-empty">${game.staff ? 'Klub nie ma teraz dyrektora sportowego. Obowiązki przejmuje zarząd, który sam szuka nowej osoby.' : 'Brak danych o dyrektorze sportowym.'}</p></article>`;
+  }
+  const A = ROLE_ATTRS[DIRECTOR_ROLE];
+  const nat = d.nat && d.nat !== 'POL' ? `, ${NAT_NAMES[d.nat] ?? d.nat}` : '';
+  const facts = [
+    ['Jakość', `${d.q}, ${staffLabel(d.q, DIRECTOR_ROLE).toLowerCase()}`],
+    ['Umowa do', fmtDate(d.until)],
+    ['Pensja', `${zl(d.wage ?? 0)} / mies.`],
+    ['W klubie', d.since ? `od ${fmtDate(d.since)} (${tenureText(d.since, game.date)})` : 'od niedawna'],
+  ];
+  return `<article class="brp-card" data-k="dir" aria-labelledby="brp-dir">
+    <header class="brp-head"><span class="brp-role">Dyrektor sportowy</span><h4 id="brp-dir">${esc(d.name)}</h4><small>${esc(`${d.age} lat${nat}`)}</small></header>
+    <dl class="brp-facts">${facts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
+    <ul class="brp-attrs" aria-label="Atrybuty dyrektora, skala 1 do 20">${Object.entries(A).map(([k, a]) => attrRow(k === 'KAD' ? 'Kadra i płace' : a.name, d.a?.[k] ?? d.q, `${a.name}: ${a.text}`)).join('')}</ul>
+  </article>`;
+}
+
+/** Panel „Zarząd klubu” (Klub, Zarząd): karta właściciela i karta dyrektora sportowego, tylko podgląd. */
+export function boardPeoplePanel(game) {
+  if (!game?.clubId) return '';
+  return panel('Zarząd klubu', 'misc', `<p class="tf-p__txt">O dyrektorze sportowym decyduje zarząd. Możesz poprosić o jego zmianę w Prośbach do zarządu.</p>
+    <div class="brp">${ownerCard(game)}${directorPanelCard(game)}</div>`, { cls: 'tf-board__people' });
+}
 
 const VERDICT_TONE = { yes: 'good', partial: 'info', cond: 'warn', no: 'bad' };
 const shortDate = (iso) => fmtDay(iso);
@@ -25,7 +74,7 @@ function typeCard(game, type, c) {
   else if (type === 'director') {
     const d = game.staff ? directorOf(game, game.clubId) : null;
     now = d ? `Teraz: ${d.name} (jakość ${d.q}), umowa do ${fmtDate(d.until)}` : 'Teraz: wakat, zarząd szuka dyrektora';
-    help = 'Decyduje zarząd: zaufanie, wyniki, ocena obecnego dyrektora (słaby: łatwiej), staż, odprawa i charakter właściciela. Możesz wskazać kandydata z listy wolnych dyrektorów.';
+    help = 'Prezes zaprosi cię na rozmowę i zada kilka pytań. Decyduje wynik rozmowy, zaufanie, wyniki, ocena obecnego dyrektora (słaby: łatwiej), staż, odprawa i charakter właściciela. Możesz wskazać kandydata z listy wolnych dyrektorów.';
   } else {
     const club = clubById(game.clubId);
     const lower = lowerGoal(club?.tier ?? 1, game.board.goal?.target ?? 15);
@@ -42,7 +91,7 @@ function typeCard(game, type, c) {
     const free = game.staff ? listFreeStaff(game, { role: 'dyrektor' }) : [];
     const q = (r) => (r.q.prec === 'exact' ? String(r.q.lo) : r.q.prec === 'approx' ? `${r.q.lo}-${r.q.hi}` : r.q.label.toLowerCase());
     actions = `<div class="br-custom"><label for="brDir">Kandydat (opcjonalnie)</label><select id="brDir"><option value="">Zarząd wybierze sam</option>${free.map((r) => `<option value="${esc(r.id)}">${esc(`${r.name}, jakość ${q(r)}, oczekuje ${zl(r.wage.mid)} / mies.`)}</option>`).join('')}</select>
-      <button class="btn btn--quiet btn--sm" data-act="br-ask" data-t="director" data-custom="1"${dis}>Poproś o zmianę dyrektora</button></div>`;
+      <button class="btn btn--quiet btn--sm" data-act="br-ask" data-t="director" data-custom="1"${dis}>Poproś o zmianę</button></div>`;
   }
   else {
     const presets = amountPresets(game, type);
@@ -97,7 +146,7 @@ function objectionsPanel(R) {
 }
 
 function historyPanel(R) {
-  const rows = R.log.slice(0, 10).map((e) => `<li data-k="${e.verdict}"><time>${esc(shortDate(e.date))}</time><span><b>${esc(REQ_TYPES[e.type].label)}</b>${e.amount ? ` <small>${esc(`${zl(e.amount)}${e.type === 'wage' ? ' tygodniowo' : ''}`)}</small>` : ''}<small>${esc(e.text ?? '')}</small></span><span class="tf-tag" data-k="${VERDICT_TONE[e.verdict]}">${esc(VERDICT_LABELS[e.verdict])}</span></li>`).join('');
+  const rows = R.log.slice(0, 10).map((e) => `<li data-k="${e.verdict}"><time>${esc(shortDate(e.date))}</time><span><b>${esc(REQ_TYPES[e.type].hist ?? REQ_TYPES[e.type].label)}</b>${e.amount ? ` <small>${esc(`${zl(e.amount)}${e.type === 'wage' ? ' tygodniowo' : ''}`)}</small>` : ''}<small>${esc(e.text ?? '')}</small></span><span class="tf-tag" data-k="${VERDICT_TONE[e.verdict]}">${esc(VERDICT_LABELS[e.verdict])}</span></li>`).join('');
   return panel('Odpowiedzi zarządu', 'misc', rows ? `<ol class="br-log">${rows}</ol>` : '<p class="tf-p__txt">Nie było jeszcze próśb.</p>', { cls: 'br-hist' });
 }
 
@@ -134,9 +183,10 @@ export function handleBoardAction(game, act, ds = {}, root = null) {
   if (act === 'br-ask') {
     const type = ds.t;
     if (type === 'director') {
+      // Prośba o zmianę dyrektora: najpierw rozmowa z prezesem (okno, presidentQuiz.js); decyzja po ostatnim pytaniu
       const candidate = root?.querySelector?.('#brDir')?.value || ds.cand || null;
-      const r = askBoard(game, 'director', 0, game.date, { candidate });
-      return { ui: { kMsg: r.text }, save: r.ok };
+      const r = startQuiz(game, { candidate });
+      return r.ok ? { ui: { pq: r.quiz, kMsg: null } } : { ui: { kMsg: r.text } };
     }
     const field = ds.custom ? root?.querySelector?.(`#brAmt-${type}`)?.value : null;
     const amount = Number(String(field ?? ds.a ?? 0).replace(/\s/g, '').replace(',', '.')) || 0;

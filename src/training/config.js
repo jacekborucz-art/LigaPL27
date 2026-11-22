@@ -207,6 +207,26 @@ export const ROLE_ATTRS = {
 export const DIRECTOR_ROLE = 'dyrektor';
 export const DIRECTOR_NAME = 'Dyrektor sportowy';
 
+/**
+ * Skala sztabu w Polsce (decyzja właściciela, v1.23 Beta, docs/sztab-atrybuty.md): wszystkie role poza
+ * fizjoterapeutą (i dyrektorem sportowym, skalibrowanym w licytacjach) mają atrybuty i jakość 1-12. Efekty w grze
+ * (staffMul, progi raportów, pensje) liczą się dalej na skali 1-20 przez staffEff: jakość 12 działa jak dawne 17
+ * (najlepsze sztaby w Polsce), 1 jak 1, liniowo pomiędzy, więc średni rozwój i trening zostają jak dotąd [SZAC].
+ */
+export const STAFF_CAP = 12;
+export const STAFF_EFF = 16 / 11; // 1 punkt skali 1-12 = 1,45 punktu dawnej skali 1-20
+const UNCAPPED = new Set(['fizjoterapeuta', DIRECTOR_ROLE]);
+/** Czy rola ma skalę 1-12 (wszystkie poza fizjoterapeutą i dyrektorem sportowym). */
+export const isCappedRole = (role) => !!role && !UNCAPPED.has(role);
+/** Najwyższa wartość atrybutu i jakości roli: 12 albo 20 (fizjoterapeuta, dyrektor). */
+export const staffCap = (role) => (isCappedRole(role) ? STAFF_CAP : 20);
+/** Wartość ze skali roli (1-12) na skalę efektów 1-20 (fizjoterapeuta i dyrektor bez zmian). */
+export const staffEff = (role, v) => (isCappedRole(role) && typeof v === 'number' ? 1 + (v - 1) * STAFF_EFF : v);
+/** Odwrotnie: wartość ze skali efektów 1-20 na skalę roli (do widoku), bez zaokrąglenia, najwyżej 12. */
+export const staffShown = (role, e) => (isCappedRole(role) && typeof e === 'number' ? Math.min(STAFF_CAP, Math.max(1, 1 + (e - 1) / STAFF_EFF)) : e);
+/** Dawna wartość 1-20 (stary zapis, stary datapack) na skalę roli: przeliczenie, zaokrąglenie i przycięcie do 12. */
+export const staffRescale = (role, v) => (isCappedRole(role) && typeof v === 'number' ? Math.min(STAFF_CAP, Math.max(1, Math.round(1 + (v - 1) / STAFF_EFF))) : v);
+
 export const staffMul = {
   dev: (q) => 0.85 + 0.015 * q,
   tac: (q) => 0.8 + 0.02 * q,

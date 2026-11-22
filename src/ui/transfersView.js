@@ -650,7 +650,7 @@ export function financeView(game) {
     </div>`;
 }
 
-export function boardView(game) {
+export function boardView(game, { extra = '' } = {}) {
   const B = game.board; const M = game.manager;
   const t = tablePos(game, game.clubId);
   const trustM = B.trust >= 55 ? 'good' : B.trust >= 40 ? 'info' : B.trust >= 25 ? 'warn' : 'bad';
@@ -668,6 +668,7 @@ export function boardView(game) {
       ${panel('Oceny zarządu', trustM, `<p class="tf-p__txt">Zarząd ocenia cię pierwszego dnia każdego miesiąca: miejsce w tabeli wobec celu, finanse i nastroje kibiców. Przy zaufaniu poniżej 18 (od października) grozi zwolnienie.</p>${reviews}`, { cls: 'tf-board__rev' })}
       ${fansPanel(game)}
       ${panel('Kariera trenera', 'good', `<ul class="tf-career">${M.history.map((h) => `<li>${crest(h.club, 28)}<span><b>${esc(clubById(h.club)?.name ?? h.club)}</b><small>od ${esc(fmtDate(h.from))}${h.to ? ` do ${esc(fmtDate(h.to))}` : ', obecnie'}</small></span></li>`).join('')}</ul>`, { cls: 'tf-board__car' })}
+      ${extra}
     </div>`;
 }
 

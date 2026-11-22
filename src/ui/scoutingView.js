@@ -32,7 +32,7 @@ const EVENT_K = { mecz: 'good', agent: 'good', uraz: 'bad', zaulek: 'bad', wyjaz
 
 // ------------------------------------------------------------ Pomocnicze
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
-const attr = (a, k) => Math.max(0, Math.min(20, Math.round(num(a?.[k]))));
+const attr = (a, k) => Math.max(0, Math.min(20, Math.round(num(a?.[k])))); // skala skauta 1-12 (starsze dane: do 20)
 const zl = (n) => `${String(Math.round(num(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} zł`;
 const mln = (n) => `${(num(n) / 1e6).toFixed(num(n) >= 1e7 ? 1 : 2).replace('.', ',')} mln zł`;
 const money = (n) => (num(n) >= 1e6 ? mln(n) : zl(n));
@@ -47,7 +47,8 @@ const posChip = (p) => `<span class="pos" data-g="${esc(GROUP[p] ?? 'MID')}">${e
 const natChip = (n) => `<span class="sk-nat">${esc(n)}</span>`;
 const regionOf = (key) => SCOUT_REGIONS.find((r) => r.key === key) ?? null;
 const regionLabel = (key, fallback = '') => regionOf(key)?.label ?? fallback ?? key;
-const bClass = (v) => (v >= 16 ? 'top' : v >= 13 ? 'good' : v <= 8 ? 'low' : '');
+// Skala skauta 1-12 (docs/sztab-atrybuty.md): 11+ wybitny, 9+ dobry, do 5 słaby
+const bClass = (v) => (v >= 11 ? 'top' : v >= 9 ? 'good' : v <= 5 ? 'low' : '');
 const expectedTxt = (e) => (Array.isArray(e) ? `${e[0]} do ${e[1]}` : typeof e === 'number' ? `około ${e}` : String(e ?? ''));
 const bandOf = (scout, key) => scout?.regions?.find((r) => r.key === key)?.band ?? null;
 
@@ -68,7 +69,7 @@ const levelsOf = (scouts) => {
   return out;
 };
 const regChip = (r) => `<span class="sk-reg" data-lv="${BAND_LV[r.band] ?? 1}" title="${esc(BAND_TXT[r.band] ?? '')}">${esc(r.label)} <span class="sk-tile__pips" aria-hidden="true"><i></i><i></i><i></i></span><small>${esc(BAND_TXT[r.band] ?? '')}</small></span>`;
-const attrBars = (a) => `<ul class="sk-attrs" aria-label="Cechy skauta, skala 1 do 20">${ATTRS.map(([k, n]) => `<li class="sk-attr" data-top="${attr(a, k) >= 16 ? 1 : 0}"><span>${esc(n)}</span><span class="sk-attr__bar" style="--v:${attr(a, k)}"><i></i></span><b>${attr(a, k)}</b></li>`).join('')}</ul>`;
+const attrBars = (a) => `<ul class="sk-attrs" aria-label="Cechy skauta, skala 1 do 12">${ATTRS.map(([k, n]) => `<li class="sk-attr" data-top="${attr(a, k) >= 11 ? 1 : 0}"><span>${esc(n)}</span><span class="sk-attr__bar" style="--v:${Math.round(Math.min(12, attr(a, k)) * 20 / 12 * 10) / 10}"><i></i></span><b>${attr(a, k)}</b></li>`).join('')}</ul>`;
 
 // ------------------------------------------------------------ Zlecenie: wartości domyślne i akcje stanu
 /** Domyślne zlecenie (kwoty według ligi klubu [SZAC]). */
@@ -236,7 +237,7 @@ function misjeTab(game, view, ui) {
       : `<div class="sk-empty-slot"><b>Wolne miejsce</b><span>Limit sztabu pozwala na jeszcze ${slots.max - slots.used === 1 ? 'jednego skauta' : `${slots.max - slots.used} skautów`}.</span><button class="btn btn--quiet" data-act="sk-tab" data-t="wolni">Znajdź skauta</button></div>`) : '';
   return `${heroHtml(view, away.length)}
   <div class="sk-grid sk-grid--side"><div class="sk-main">
-    <section aria-labelledby="h-our"><div class="sk-h"><h3 id="h-our">Nasi skauci</h3><p>Pięć cech w skali 1 do 20, kreska to środek skali</p></div>
+    <section aria-labelledby="h-our"><div class="sk-h"><h3 id="h-our">Nasi skauci</h3><p>Pięć cech w skali 1 do 12, kreska to połowa skali</p></div>
       <div class="sk-scouts">${view.scouts.map((s) => scoutCard(s, ui, game, view)).join('')}${slotCard}${empty}</div></section>
     ${away.length ? `<section aria-labelledby="h-mis"><div class="sk-h"><h3 id="h-mis">Misje w toku</h3></div><div class="sk-stack">${away.map((m) => missionCard(m, game, view, ui)).join('')}</div></section>` : ''}
     ${recent.length ? `<section aria-labelledby="h-rec"><div class="sk-h"><h3 id="h-rec">Ostatnie wyjazdy</h3></div><ul class="sk-recent">${recent.map((m) => `<li><span><b>${esc(m.scoutName)}</b>, ${esc(m.regionLabel || regionLabel(m.region))}, ${weeksTxt(num(m.weeks))}${m.status === 'odwołana' ? '' : `, wrócił ${day(m.end)}`}</span>${tag(m)}</li>`).join('')}</ul></section>` : ''}

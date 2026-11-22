@@ -10,7 +10,7 @@ import { createTactics } from '../src/engine/lineup.js';
 import { ensureCareer } from '../src/career/careerSystem.js';
 import { applySeasonState } from '../src/season/rollover.js';
 import { ensureTraining } from '../src/training/index.js';
-import { ROLE_ATTRS } from '../src/training/config.js';
+import { ROLE_ATTRS, staffCap, staffEff, staffRescale } from '../src/training/config.js';
 import { attrsAround, qFromAttrs, staffA, staffQ, healDays, physioInjMul, roleAttrKeys, SEVERE_DAYS } from '../src/training/staff.js';
 import { rosterOf, syncStaff, ensureStaff, staffNewSeason } from '../src/career/staffMarket.js';
 import { assistantProfile } from '../src/career/coaches.js';
@@ -37,12 +37,13 @@ test('Każda rola ma 3 atrybuty z opisem wpływu na grę (skaut 5, docs/skauting
   }
 });
 
-test('Profil wokół jakości: średnia równa jakości, 1-20, deterministyczny, także przy 1 i 20', () => {
-  for (const q of [1, 2, 5, 10, 15, 19, 20]) {
+test('Profil wokół jakości: średnia równa jakości, skala roli (1-12, fizjoterapeuta i dyrektor 1-20), deterministyczny, także na granicach', () => {
+  for (const q of [1, 2, 5, 10, 12, 15, 19, 20]) {
     for (const role of Object.keys(ROLE_ATTRS)) {
+      const cap = staffCap(role);
       const a = attrsAround(q, role, `t:${q}:${role}`);
-      assert.equal(qFromAttrs(a), q, `${role} q${q}`);
-      for (const v of Object.values(a)) assert.ok(v >= 1 && v <= 20);
+      assert.equal(qFromAttrs(a), Math.min(q, cap), `${role} q${q}`);
+      for (const v of Object.values(a)) assert.ok(v >= 1 && v <= cap);
       assert.deepEqual(attrsAround(q, role, `t:${q}:${role}`), a);
     }
   }
@@ -56,14 +57,17 @@ test('Każda osoba sztabu ma atrybuty roli, a jakość to ich średnia; stary za
     assert.deepEqual(Object.keys(p.a).sort(), roleAttrKeys(p.role).sort(), p.role);
     assert.equal(p.q, qFromAttrs(p.a));
   }
-  // Stary zapis: osoby bez atrybutów, jakość zostaje
+  // Stary zapis: osoby bez atrybutów, jakość na skali 1-20; po migracji skala roli (1-12) i ta sama jakość roli w grze
   const old = fresh();
   const qs = Object.fromEntries(Object.values(old.staff.people).map((p) => [p.id, p.q]));
-  for (const p of Object.values(old.staff.people)) delete p.a;
+  for (const p of Object.values(old.staff.people)) { delete p.a; p.q = Math.round(staffEff(p.role, p.q)); }
   delete old.staff.attrs;
   ensureStaff(old);
-  for (const p of Object.values(old.staff.people)) assert.equal(p.q, qs[p.id], p.id);
-  assert.equal(old.training.staff[CLUB].asystent.q, g.training.staff[CLUB].asystent.q, 'jakość roli bez zmian');
+  for (const p of Object.values(old.staff.people)) {
+    assert.ok(Math.abs(p.q - qs[p.id]) <= 1, `${p.id} ${p.q} ${qs[p.id]}`);
+    assert.ok(p.q <= staffCap(p.role) && Object.values(p.a).every((v) => v <= staffCap(p.role)), p.id);
+  }
+  assert.ok(Math.abs(old.training.staff[CLUB].asystent.q - g.training.staff[CLUB].asystent.q) <= 1.5, 'jakość roli w grze prawie bez zmian');
 });
 
 test('Efekty czytają atrybut: rehabilitacja tylko ciężkie urazy, profilaktyka ryzyko, równe atrybuty = jakość', () => {
@@ -111,29 +115,34 @@ test('Edytor i datapack: atrybuty w pliku v3, stary plik z samą jakością prze
   const cur = peopleValues(g, id).staff;
   assert.ok(cur.asystent[0].a.TAK >= 1, 'formularz i eksport mają atrybuty');
   // Formularz: atrybuty
-  const form = checkStaff({ asystent: [{ name: 'Jan Nowak', age: '44', a: { TAK: '18', OCE: '12', MOT: '9' } }] }, { form: true });
+  const form = checkStaff({ asystent: [{ name: 'Jan Nowak', age: '44', a: { TAK: '12', OCE: '10', MOT: '5' } }] }, { form: true });
   assert.deepEqual(form.errors, {});
   editStaff(g, id, form.value);
   const lead = peopleValues(g, id).staff.asystent[0];
-  assert.deepEqual(lead.a, { TAK: 18, OCE: 12, MOT: 9 });
-  assert.equal(lead.q, 13);
+  assert.deepEqual(lead.a, { TAK: 12, OCE: 10, MOT: 5 });
+  assert.equal(lead.q, 9);
   // Eksport v3 z atrybutami i import w innej grze
   const pk = exportPack(g, new Date('2026-11-19T10:00:00Z'), { full: true });
   assert.equal(pk.v, PACK_V); assert.ok(PACK_V >= 3);
   const other = newGame(77);
   importPack(other, parsePack(JSON.stringify(pk)));
-  assert.deepEqual(peopleValues(other, id).staff.asystent[0].a, { TAK: 18, OCE: 12, MOT: 9 });
-  // Stary datapack v2: tylko jakość, profil osoby przesunięty
+  assert.deepEqual(peopleValues(other, id).staff.asystent[0].a, { TAK: 12, OCE: 10, MOT: 5 });
+  // Stary datapack v2: tylko jakość (skala 1-20, przeliczona na 1-12), profil osoby przesunięty
   const prev = peopleValues(other, id).staff.fizyczny[0];
-  const v2 = { type: 'ligapl27-datapack', v: 2, seed: 1, clubs: { [id]: { staff: { fizyczny: [{ name: prev.name, age: prev.age, q: Math.min(20, prev.q + 2) }] } } }, players: {} };
+  const q20 = Math.round(staffEff('fizyczny', Math.min(10, prev.q))) + 3;
+  const v2 = { type: 'ligapl27-datapack', v: 2, seed: 1, clubs: { [id]: { staff: { fizyczny: [{ name: prev.name, age: prev.age, q: q20 }] } } }, players: {} };
   importPack(other, parsePack(JSON.stringify(v2)));
   const now = peopleValues(other, id).staff.fizyczny[0];
-  assert.equal(now.q, Math.min(20, prev.q + 2));
+  assert.equal(now.q, staffRescale('fizyczny', q20));
+  assert.ok(now.q > prev.q || prev.q > 10, 'wyżej niż dotąd');
   const diff = (x) => Object.keys(x.a).map((k) => x.a[k] - prev.a[k]);
   assert.ok(diff(now).every((d) => d >= 0), 'cały profil w górę');
   // Zły atrybut i wartość spoza skali
   assert.ok(Object.keys(checkStaff({ asystent: [{ a: { REG: 10 } }] }).errors).length);
   assert.ok(Object.keys(checkStaff({ asystent: [{ a: { TAK: 25 } }] }).errors).length);
+  assert.ok(Object.keys(checkStaff({ asystent: [{ a: { TAK: 13 } }] }).errors).length, 'asystent najwyżej 12');
+  assert.ok(Object.keys(checkStaff({ asystent: [{ q: 13 }] }).errors).length, 'jakość asystenta najwyżej 12');
+  assert.deepEqual(checkStaff({ fizjoterapeuta: [{ a: { LEC: 18, REH: 20, PRF: 15 } }] }).errors, {}, 'fizjoterapeuta 1-20');
   assert.throws(() => parsePack(JSON.stringify({ type: 'ligapl27-datapack', v: PACK_V + 1, clubs: {}, players: {} })), /nowszej gry/);
 });
 

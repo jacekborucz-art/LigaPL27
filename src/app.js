@@ -60,6 +60,8 @@ import { renderTransfers, handleTransferAction, isTransferAction, transferCardHt
 import { startMission, cancelMission, hireScout, fireScout, watchCandidate, markCandidatesSeen, scoutHidden } from './career/scoutOps.js'; // skauting zagraniczny (docs/skauting.md)
 import { poolClubLabel } from './career/foreignPool.js'; // klub zagraniczny zawodnika (także sprzedanego za granicę)
 import { renderClubHub, handleClubAction, isClubAction } from './ui/klubView.js';
+import { quizHtml, isQuizAction } from './ui/presidentQuizView.js'; // rozmowa z prezesem (prośba o zmianę dyrektora)
+import { answerQuiz, finishQuiz } from './career/presidentQuiz.js';
 import { skUiAction, setOrderField } from './ui/scoutingView.js'; // Skauting (Transfery): stan ekranu
 // Kariera i rynek pracy: okno odblokowania odznak i akcje job-* (docs: Klub > Kariera)
 import { mountUnlocks } from './ui/careerView.js';
@@ -172,6 +174,41 @@ function openSys(kind) {
   dlg.querySelector('h2')?.setAttribute('tabindex', '-1');
 }
 const closeSys = () => app.querySelector('#sysDlg')?.close();
+
+// ---------- Rozmowa z prezesem (src/ui/presidentQuizView.js): prośba o zmianę dyrektora sportowego ----------
+// Stan rozmowy w state.pq (nie w zapisie gry). Esc albo „Anuluj prośbę” przed decyzją: prośba niezłożona.
+function showQuiz({ first = false } = {}) {
+  const g = state.game;
+  if (!state.pq || !g) return;
+  let dlg = app.querySelector('#pqDlg');
+  if (!dlg) {
+    app.insertAdjacentHTML('beforeend', '<dialog id="pqDlg" class="sysdlg pqdlg" aria-labelledby="pqTitle"></dialog>');
+    dlg = app.querySelector('#pqDlg');
+    dlg.addEventListener('close', () => {
+      const decided = !!state.pq?.result;
+      state.pq = null;
+      dlg.remove();
+      if (decided) render();
+      app.querySelector('[data-act="br-ask"][data-t="director"]')?.focus({ preventScroll: true });
+    });
+  }
+  dlg.innerHTML = quizHtml(g, state.pq);
+  if (!dlg.open) dlg.showModal();
+  const body = dlg.querySelector('.pq-body');
+  if (body) body.scrollTop = body.scrollHeight;
+  (first ? dlg.querySelector('#pqTitle') : dlg.querySelector('.pq-ans, .pq-go') ?? dlg.querySelector('#pqTitle'))?.focus({ preventScroll: true });
+}
+async function quizAction(act, el) {
+  const g = state.game;
+  if (!state.pq) return;
+  if (act === 'pq-close') { app.querySelector('#pqDlg')?.close(); return; }
+  if (act === 'pq-ans') state.pq = answerQuiz(g, state.pq, Number(el.dataset.k));
+  else if (act === 'pq-finish') {
+    state.pq = finishQuiz(g, state.pq);
+    await save();
+  }
+  showQuiz();
+}
 
 // ---------- Raport meczu (src/ui/matchReportView.js): okno po kliknięciu wyniku ----------
 let reportFrom = null; // przycisk wyniku: fokus wraca po zamknięciu okna
@@ -1758,12 +1795,14 @@ async function dispatchAct(el, { root = app } = {}) {
     render();
     return;
   }
+  if (isQuizAction(act) && state.game) { await quizAction(act, el); return; } // rozmowa z prezesem
   if (isClubAction(act) && state.game) {
     const r = handleClubAction(state.game, act, el.dataset, root);
     Object.assign(state, r.ui ?? {});
     if (r.save) await save();
     render();
     careerFocus(act, el.dataset); // Kariera: fokus wraca na klikniętą odznakę, filtr albo przycisk rezygnacji
+    if (state.pq) { state.running = false; showQuiz({ first: true }); }
     return;
   }
   // ----- Kariera i rynek pracy: akcje job-* i okno odblokowania (blok do scalenia z gałęzią logiki) -----
@@ -2225,6 +2264,7 @@ document.addEventListener('keydown', (ev) => {
   if (ev.target.closest('#mrDlg')) return; // raport meczu: Escape zamyka tylko okno (przeglądarka), Enter nie gra meczu
   if (ev.target.closest('#piDlg')) return; // instrukcje indywidualne: jak wyżej
   if (ev.target.closest('#ulDlg')) return; // okno odblokowania odznaki: Escape zamyka tylko okno
+  if (ev.target.closest('#pqDlg')) return; // rozmowa z prezesem: Escape zamyka okno (prośba niezłożona), Enter nie gra dnia
   if (ev.key === 'Escape' && state.screen === 'career') { ev.preventDefault(); app.querySelector('[data-act="ncBack"]')?.click(); return; }
   // Wybór klubu w Nowej karierze: ukryty przełącznik prawdziwych nazw klubów (testy, src/data/clubNames.js); przeładowanie strony
   if (state.screen === 'career' && ev.ctrlKey && ev.altKey && !ev.shiftKey && ev.code === 'KeyP') {

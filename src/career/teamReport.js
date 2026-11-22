@@ -19,7 +19,8 @@ import { teamRating } from '../engine/teamStrength.js';
 import { standings } from '../season/standings.js';
 import { compOfClub, compClubIds } from '../season/leagueComps.js';
 import { anyClub, compLabel } from '../season/season.js';
-import { staffOf, staffA, staffLabel } from '../training/staff.js';
+import { staffOf, staffA, staffLabelEff } from '../training/staff.js';
+import { staffShown } from '../training/config.js';
 import { daysBetween, ageAt } from '../training/state.js';
 import { loadSummary } from '../training/load.js';
 import { teamCohesion } from '../training/cohesion.js';
@@ -446,8 +447,9 @@ export function buildTeamReport(game, date = game.date, id = date) {
   return {
     v: TREP.version, id, date, kind: 'monthly',
     authors: [
-      { role: 'asystent', title: ROLE_NAMES.asystent, name: asys.name ?? 'Asystent', q: asys.q ?? 10, label: staffLabel(asys.q ?? 10), attrs: Object.entries(STAFF_ATTRS.asystent).map(([k, l]) => ({ k, l, v: sk[k] })) },
-      { role: 'analityk', title: ROLE_NAMES.analityk, name: anal.name ?? 'Analityk', q: anal.q ?? 10, label: staffLabel(anal.q ?? 10), attrs: Object.entries(STAFF_ATTRS.analityk).map(([k, l]) => ({ k, l, v: sk[k] })) },
+      // Autorzy na skali roli (1-12), w liczbach całkowitych; sk i q z widoku sztabu są na skali efektów 1-20
+      { role: 'asystent', title: ROLE_NAMES.asystent, name: asys.name ?? 'Asystent', q: Math.round(staffShown('asystent', asys.q ?? 10)), label: staffLabelEff(asys.q ?? 10, 'asystent'), attrs: Object.entries(STAFF_ATTRS.asystent).map(([k, l]) => ({ k, l, v: Math.round(staffShown('asystent', sk[k])) })) },
+      { role: 'analityk', title: ROLE_NAMES.analityk, name: anal.name ?? 'Analityk', q: Math.round(staffShown('analityk', anal.q ?? 10)), label: staffLabelEff(anal.q ?? 10, 'analityk'), attrs: Object.entries(STAFF_ATTRS.analityk).map(([k, l]) => ({ k, l, v: Math.round(staffShown('analityk', sk[k])) })) },
     ],
     confidence: { prec, word: PREC_WORD[prec] },
     summary: sum.join(' '), recs, units, results, tactics, setPieces, depth, health, youth, rivals,

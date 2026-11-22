@@ -16,7 +16,7 @@ import { clubById, CLUBS_PL } from '../data/clubs_pl.js';
 import { classKeyOfTier } from '../season/leagueComps.js';
 import { ATTRS, OFF, POS_NAMES, ovrAt } from '../data/attributes.js';
 import { proficiency, POSITIONS } from '../engine/positions.js';
-import { staffOf, staffA, staffLabel } from '../training/staff.js';
+import { staffOf, staffA, staffLabelEff } from '../training/staff.js';
 import { daysBetween, mondayOf, ageAt } from '../training/state.js';
 import { loadSummary, acwrLabel, trainingInjuryChance } from '../training/load.js';
 import { staleness } from '../training/variety.js';
@@ -622,7 +622,7 @@ export function playerReport(game, pid) {
   const knownTxt = !p.lastMove ? 'zna go od dawna' : fam >= 1 ? 'zna go już dobrze' : `zna go od ${Math.max(0, daysBetween(p.lastMove, game.date))} ${dniWord(Math.max(0, daysBetween(p.lastMove, game.date)))}`;
   return {
     id: p.id, name: p.name, pos: p.pos, group: GROUP[p.pos], age, ovr: p.ovr, nat: p.nat, academy,
-    assistant: { name: staff.name ?? 'Asystent', q, label: staffLabel(q) },
+    assistant: { name: staff.name ?? 'Asystent', q, label: staffLabelEff(q, 'asystent') },
     confidence: { prec, word: PREC_WORD[prec], fam, text: `Pewność oceny: ${PREC_WORD[prec]}. Asystent ${knownTxt}.` },
     summary, stance: stance.id,
     sides: { strong: sides.strong, weak: sides.weak },
@@ -782,7 +782,7 @@ export function squadReport(game, date = game.date, periodId = date) {
   if (ac.length) dev.push(`W akademii wyróżnia się: ${ac.map((x) => x.p.name).join(', ')}.`);
   if (dev.length) sections.push({ title: 'Rozwój', lines: dev });
 
-  const closing = `Pewność raportu: ${PREC_WORD[prec]} (${staff.name ?? 'asystent'}, ${staffLabel(q).toLowerCase()}). Częstotliwość raportu zmienisz w zakładce Trening, Sztab.`;
+  const closing = `Pewność raportu: ${PREC_WORD[prec]} (${staff.name ?? 'asystent'}, ${staffLabelEff(q, 'asystent').toLowerCase()}). Częstotliwość raportu zmienisz w zakładce Trening, Sztab.`;
   const body = [...sections.map((s) => `${s.title}\n${s.lines.join('\n')}`), closing].join('\n\n');
   const [y, m] = date.split('-').map(Number);
   const subject = st.freq === 'monthly' ? `Raport asystenta: ${MONTHS_PL[m - 1]} ${y}` : `Raport asystenta, ${fmtDate(date)}`;

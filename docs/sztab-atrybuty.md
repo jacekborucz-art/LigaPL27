@@ -69,3 +69,31 @@ Bez zmian (ogólna jakość): asystent jako trener tymczasowy, liczba spraw zgł
 - Datapack v3: `staff: { rola: [{ name, age, q, a: { atrybut: 1-20 } }] }` (eksport zapisuje też `q` do podglądu).
 - Wsteczna zgodność: pliki v1 i v2 (tylko `q`) wczytują się, jakość przesuwa cały profil osoby o tyle samo.
   Nieznany atrybut roli albo wartość spoza 1-20 odrzuca plik. Plik v3 w starszej grze: komunikat o nowszej wersji.
+
+## Skala 1-12 (Nov 22, 2026, v1.23 Beta)
+
+Decyzja właściciela: jak na polską ligę sztab miał za wysokie atrybuty. Wszystkie role poza fizjoterapeutą (i poza
+dyrektorem sportowym, skalibrowanym w licytacjach) mają atrybuty i jakość 1-12 (`STAFF_CAP`, `staffCap(rola)` w
+`src/training/config.js`). Testy: `tests/staffCap.test.mjs`.
+
+- Efekty w grze liczą się dalej na skali 1-20: `staffEff(rola, q) = 1 + (q - 1) x 16/11`, czyli 12 działa jak dawne
+  17 (najlepsze sztaby w Polsce), 9 jak 12,6, 5 jak 6,8, 1 jak 1. Widok roli `game.training.staff` (q, d) jest na
+  skali efektów, więc `staffA`, `staffQ`, `staffMul`, progi raportów (14 i 8) i wszystkie dawne wzory działają jak
+  dotąd; `qs` w widoku to jakość roli do pokazania (najwyżej 12). Skaut: wyjazdy i progi renomy przez `staffEff`.
+- Etykiety skali 1-12: od 10 bardzo dobry, od 8 dobry, od 6 przeciętny, od 4 słaby, niżej bardzo słaby (bez „klasy
+  światowej”); fizjoterapeuta i dyrektor bez zmian. Kolory w Sztabie: od 10 i od 6.
+- Generowanie: te same losowania co dotąd na skali 1-20, potem przeliczenie `staffRescale` (x 11/16, zaokrąglenie,
+  najwyżej 12): kluby na starcie, lista wolnych, wolni skauci, nowe osoby. Atrybuty wokół jakości: odchylenie
+  1,8 / 1,45, najwyżej 2 punkty. Pomocnik pomaga od jakości 5 (dawne 7); jakość roli z pomocnikami najwyżej 12.
+- Pensja z jakości na skali efektów: jakość 12 = dawne 17, czyli najwyższe pensje w Polsce jak dotąd (asystent
+  ok. 47,7 tys. zł / mies.); kluby AI i budżety sztabu bez zmian.
+- Rozwój osób sztabu: szansa wzrostu i spadku / 1,45 (punkt skali 1-12 to 1,45 dawnego punktu), atrybuty najwyżej 12.
+  Adaptacja obcokrajowca: 2 / 1,45 punktu.
+- Migracja zapisu (`game.staff.attrs = 3`): każdy atrybut ról 1-12 przeliczony z 1-20 (x 11/16, zaokrąglenie,
+  wyżej przycięty do 12), jakość znów średnią, widoki klubów przeliczone. Efekty w grze bez zmian z dokładnością do
+  zaokrąglenia (do 0,7 punktu dawnej skali na osobę, średnio zero); dawne 18-20 działa jak 17.
+- Edytor: atrybuty ról 1-12 (pole i walidacja), fizjoterapeuta i dyrektor 1-20; jakość obok roli w liczbach całkowitych.
+  Datapack v7: pliki v1-v6 przeliczane przy wczytaniu tak samo jak zapis (`MIGRATE[6]`, `rescaleStaffClubs`).
+- Do decyzji właściciela: prośba brzmiała „przytnij do 12”. Samo przycięcie zostawiłoby prawie cały sztab
+  Ekstraklasy na 12 (mediana była 13), więc różnice między klubami by znikły; przeliczenie zachowuje różnice, a efekty
+  i pensje zostają jak dotąd. Pomiar wpływu: `docs/sztab.md` rozdz. 7.

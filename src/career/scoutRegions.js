@@ -5,6 +5,7 @@
 // Wszystkie liczby [SZAC].
 
 import { Rng, clamp } from '../core/rng.js';
+import { staffEff } from '../training/config.js';
 
 /**
  * Regiony: key, label (pełna nazwa), short (kafelek mapy), nats (kody krajów), w (wagi krajów), Lmed, Lmax,
@@ -48,7 +49,7 @@ const NEAR = SCOUT_REGIONS.filter((r) => r.near).map((r) => r.key);
  */
 export function scoutRegionsFor(p, key, opts = {}) {
   const rng = opts.rng ?? new Rng(`skaut-regiony:${key}`);
-  const q = p?.q ?? 10;
+  const q = p?.q != null ? staffEff('skaut', p.q) : 10; // skala efektów 1-20 (skaut ma 1-12)
   const n = rng.weighted([1, 2, 3], (k) => ({ 1: 0.35, 2: 0.45, 3: 0.2 })[k]);
   const w = (k) => (opts.weights?.[k] ?? 1) * (REGION_POPULARITY[k] ?? 1);
   const home = scoutRegionOf(p?.nat);

@@ -19,6 +19,7 @@ import { addPoolPlayers, topUpPool, poolCandidates, POOL, scoutBlocked, scoutCom
 import { completeTransfer } from '../src/career/transfers.js';
 import { startDeal } from '../src/career/transferDeals.js';
 import { migrateScoutAttrs, qFromAttrs, roleAttrKeys } from '../src/training/staff.js';
+import { staffEff } from '../src/training/config.js';
 import { rosterOf, ensureStaff } from '../src/career/staffMarket.js';
 import { parsePack, importPack, peopleValues, exportPack, checkStaff, PACK_V } from '../src/career/editor.js';
 import { mailLinks } from '../src/ui/mailLinks.js';
@@ -120,11 +121,11 @@ test('Statystyka: słabszy skaut częściej wraca bez nikogo, dłuższy wyjazd d
   assert.ok(stats(800, { s: 0.6, weeks: 4, D: 0.85 }).mean < w4.mean);
 });
 
-test('Sieć kontaktów częściowo zastępuje region: sieć 18 lepsza od sieci 8, gorsza od eksperta', () => {
-  const sc = (reg, sie) => ({ q: 12, a: { DOS: 12, OCE: 12, RYN: 12, SIE: sie, CHA: 12 }, reg });
-  const ex = scoutIndex(sc({ balkany: 17 }, 12), 'balkany');
-  const n18 = scoutIndex(sc({}, 18), 'balkany');
-  const n8 = scoutIndex(sc({}, 8), 'balkany');
+test('Sieć kontaktów częściowo zastępuje region: sieć 12 lepsza od sieci 6, gorsza od eksperta (skala skauta 1-12)', () => {
+  const sc = (reg, sie) => ({ q: 9, a: { DOS: 9, OCE: 9, RYN: 9, SIE: sie, CHA: 9 }, reg });
+  const ex = scoutIndex(sc({ balkany: 17 }, 9), 'balkany');
+  const n18 = scoutIndex(sc({}, 12), 'balkany');
+  const n8 = scoutIndex(sc({}, 6), 'balkany');
   assert.ok(ex.s > n18.s && n18.s > n8.s, `${ex.s} ${n18.s} ${n8.s}`);
   assert.ok(ex.a > n18.a && n18.a > n8.a);
   const N = (ix) => stats(600, { s: ix.s, k: ix.k, weeks: 4, D: 0.4 }).mean;
@@ -192,14 +193,15 @@ test('Migracja skauta: 3 atrybuty na 5, jakość bez zmian, 1-20; stary zapis be
     }
   }
   // Stary zapis: skauci z POT/OCU/RYN i bez game.scoutOps
+  // (zapis sprzed skali 1-12: jakość na skali 1-20, po migracji znów skala skauta 1-12)
   const g = fresh();
   const scouts = Object.values(g.staff.people).filter((p) => p.role === 'skaut' && p.club);
   const qs = scouts.map((p) => p.q);
-  for (const p of scouts) { p.a = { POT: p.q + 1, OCU: p.q - 1, RYN: p.q }; delete p.reg; }
+  for (const p of scouts) { p.q = Math.round(staffEff('skaut', p.q)); p.a = { POT: p.q + 1, OCU: p.q - 1, RYN: p.q }; delete p.reg; }
   g.staff.attrs = 1; delete g.scoutOps;
   ensureStaff(g);
   scouts.forEach((p, i) => {
-    assert.equal(p.q, qs[i]);
+    assert.ok(Math.abs(p.q - qs[i]) <= 1 && p.q <= 12, `${p.q} ${qs[i]}`);
     assert.deepEqual(Object.keys(p.a).sort(), roleAttrKeys('skaut').sort());
     assert.ok(p.reg && Object.keys(p.reg).length >= 1 && Object.keys(p.reg).every((k) => SCOUT_REGION[k]));
   });
@@ -468,14 +470,14 @@ test('Edytor i datapack v5: plik v4 ze starymi atrybutami skauta wczytuje się, 
   const pk = parsePack(JSON.stringify(v4));
   const a = pk.clubs[id].staff.skaut[0].a;
   assert.deepEqual(Object.keys(a).sort(), ['CHA', 'DOS', 'OCE', 'RYN', 'SIE']);
-  assert.equal(qFromAttrs(a), 12);
+  assert.equal(qFromAttrs(a), 8); // v4 (skala 1-20, q 12) -> skala skauta 1-12 (MIGRATE[6]): 12 x 11/16 ok. 8
   importPack(g, pk);
-  assert.equal(peopleValues(g, id).staff.skaut[0].q, 12);
+  assert.equal(peopleValues(g, id).staff.skaut[0].q, 8);
   const v5 = { type: 'ligapl27-datapack', v: 5, seed: 1, clubs: { [id]: { staff: { skaut: [{ name: 'Ana Skaut', age: 44, a: { DOS: 15, OCE: 14, RYN: 13, SIE: 16, CHA: 12 }, reg: { amerykaPd: 18, iberia: 11 } }] } } }, players: {} };
   importPack(g, parsePack(JSON.stringify(v5)));
   const now = peopleValues(g, id).staff.skaut[0];
   assert.deepEqual(now.reg, { amerykaPd: 18, iberia: 11 });
-  assert.equal(now.q, 14);
+  assert.equal(now.q, 10); // v5 (skala 1-20): 15, 14, 13, 16, 12 -> 11, 10, 9, 11, 9
   const full = exportPack(g, new Date('2026-11-20T10:00:00Z'), { full: true });
   assert.deepEqual(full.clubs[id].staff.skaut[0].reg, { amerykaPd: 18, iberia: 11 });
   const bad = (reg) => { const d = structuredClone(v5); d.clubs[id].staff.skaut[0].reg = reg; return () => parsePack(JSON.stringify(d)); };

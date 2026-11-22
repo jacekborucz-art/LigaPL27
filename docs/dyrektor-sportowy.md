@@ -101,8 +101,8 @@ w `transfers.js`) dostają teraz Negocjacje i Zarządzanie kadrą (wcześniej da
   losowania wokół średniej ligi). List w poczcie „Dyrektor sportowy: imię i nazwisko” (raz na klub).
 - Trener nie zatrudnia, nie zwalnia, nie podbiera i nie przedłuża dyrektora (`fireStaff`, `renewStaff`, `makeOffer`
   zwracają `dirOwner`; list 1 maja o końcu umowy nie dotyczy dyrektora).
-- Klub, Zarząd, „Prośby do zarządu”: nowa prośba „Zmiana dyrektora sportowego” (`askBoard(game, 'director', 0, data,
-  { candidate })`), ten sam mechanizm co inne prośby: najwyżej jedna w tygodniu i trzy w miesiącu, ta sama sprawa po
+- Klub, Zarząd, „Prośby do zarządu”: prośba „Poproś o zmianę dyrektora” (od v1.23 Beta najpierw rozmowa z prezesem,
+  rozdz. 12; potem `askBoard(game, 'director', 0, data, { candidate, quiz: { Q } })`), ten sam mechanizm co inne prośby: najwyżej jedna w tygodniu i trzy w miesiącu, ta sama sprawa po
   odmowie za 60 dni, po zgodzie za 90 dni, zaufanie -2 przy niskim zaufaniu albo wynikach dużo poniżej celu, -1 przy
   odmowie. Bez dyrektora (wakat) prośby nie ma: zarząd szuka sam.
 - Punktacja S (`directorScore`), zgoda od S >= 10 [SZAC]:
@@ -145,8 +145,13 @@ w `transfers.js`) dostają teraz Negocjacje i Zarządzanie kadrą (wcześniej da
   i umową, „co daje”: widełki ±x %, wypożyczenia, spór rezerw, Negocjacje tylko w klubach AI), przyciski „Poproś
   zarząd o zmianę dyrektora” (Klub, Zarząd) i „Wolni dyrektorzy (podgląd)”. Przy wakacie opis zarządu.
 - Rynek: karta dyrektora z atrybutami, bez formularza oferty („Tylko podgląd”, odnośnik do próśb do zarządu).
-- Klub, Zarząd: karta prośby „Zmiana dyrektora sportowego” z obecnym dyrektorem, listą kandydatów (opcjonalnie)
-  i przyciskiem „Poproś o zmianę dyrektora”.
+- Klub, Zarząd: karta prośby „Poproś o zmianę dyrektora” z obecnym dyrektorem, listą kandydatów (opcjonalnie)
+  i przyciskiem „Poproś o zmianę” (otwiera rozmowę z prezesem, rozdz. 12). W historii odpowiedzi wpis nazywa się
+  „Zmiana dyrektora sportowego”.
+- Klub, Zarząd, panel „Zarząd klubu” (pod oceną zarządu, kibicami i karierą, `boardPeoplePanel` w
+  `src/ui/boardRequestsView.js`): karta właściciela (imię lub firma, typ, jedno zdanie o charakterze, 5 cech 1-20
+  z paskami) i karta dyrektora sportowego (jakość, umowa, pensja, staż, 4 atrybuty z paskami); tylko podgląd.
+  Wakat i klub bez danych właściciela: krótki opis.
 - Rozmowy kontraktowe: blok dyrektora nad formularzem oferty (`ng-dir`).
 - Edytor, klub, Sztab: dyrektor z 4 atrybutami. Datapack v6: rola `dyrektor` w sekcji `staff` (docs/edytor.md).
 
@@ -298,3 +303,37 @@ Zmiany dyrektorów poza 1 lipca na sezon (9 sezonów, ok. 126 klubów z kadrą):
 - Negocjacje dyrektorów Ekstraklasy po 3 sezonach: średnio 12,7 (przed 11,8): podebrania przenoszą lepszych dyrektorów
   wyżej. Wakat klub AI obsadza dyrektorem na poziomie ligi (rozdz. 3), co ogranicza wzrost (bez tego 12,9). OVR bez
   dryfu. Do decyzji właściciela (rozdz. 8).
+
+## 12. Rozmowa z prezesem przy prośbie o zmianę dyrektora (Nov 22, 2026, v1.23 Beta)
+
+Kod: `src/career/presidentQuiz.js` (logika), `src/data/prezesQuiz.js` (34 pytania, teksty, ton), okno
+`src/ui/presidentQuizView.js` (`<dialog id="pqDlg">` w `src/app.js`, akcje `pq-ans`, `pq-finish`, `pq-close`),
+decyzja w `src/career/boardRequests.js` (`askDirectorChange`, `reviewDirector`). Testy: `tests/presidentQuiz.test.mjs`.
+
+- Klik „Poproś o zmianę” (gdy prośba jest dostępna) otwiera okno rozmowy. Prezes zadaje 4 pytania, a 5, gdy trener
+  pracuje w klubie co najmniej 6 miesięcy i rozegrał w tym czasie co najmniej 5 meczów ligowych. Pierwsze pytanie
+  z kategorii „powody”, ostatnie podchwytliwe, w środku bez powtórzeń i bez tej samej kategorii pod rząd; pytania
+  z danymi losowane dwa razy częściej. Wybór i kolejność odpowiedzi stałe dla gry, daty, klubu i liczby wcześniejszych
+  próśb o zmianę dyrektora.
+- Dane (pytanie bez danych nie jest losowane): tabela (od 4 meczów), cel sezonu, wyniki ligowe z okresu 6-12 miesięcy
+  (nie dłużej niż staż trenera, najwyżej 20 ostatnich meczów z historii meczów i terminarza: punkty, mecze, bilans),
+  przepłaty mimo sprzeciwu i sprzeciwy dyrektora z okresu (`game.board.requests.dirLog`), wypożyczenia zawodników klubu
+  z okresu (`game.market.history`, `kind: 'loan'`), zaufanie, odprawa i pensja nowego dyrektora, imię trenera
+  (`game.manager.profile`).
+- Ton prezesa z cech właściciela: porywczy (temperament od 13), biznesowy (zasobność od 13 albo spółka, bogaty
+  właściciel), spokojny. Po każdej odpowiedzi krótka reakcja prezesa; odpowiedź z warunkiem (`cond`), który się nie
+  zgadza z danymi, dostaje punkty `else` i inną reakcję (`reactionElse`): prezes zna tabelę i liczby.
+- Wynik Q = suma punktów odpowiedzi i modyfikatorów cech właściciela (`v x clamp((cecha - 10) / 5, -1, 1)`).
+  Decyzja: S = punktacja zarządu (`directorScore`, z losem jak dotąd) + 0,8 Q [SZAC]:
+  zgoda od 10 (dalej jak dotąd: odprawa, nowy dyrektor, kandydat gracza z szansą 75 %), zgoda warunkowa od 6, niżej
+  odmowa. Q <= -6 kosztuje dodatkowo 1 punkt zaufania; odmowa po złej rozmowie podaje powód „rozmowa z prezesem nie
+  przekonała zarządu”.
+- Zgoda warunkowa (prosta wersja): list zarządu, `game.board.requests.dirReview = { date, due, Q, candidate, dir }`,
+  przez 182 dni nowej prośby o zmianę dyrektora nie ma („Zarząd dał dyrektorowi pół roku i sam wróci do sprawy”).
+  W dniu oceny (system dnia `boardRequests`) zarząd liczy S z tego dnia + 0,8 Q z rozmowy: od 10 zmienia dyrektora
+  (kandydat gracza jak przy zgodzie), niżej dyrektor zostaje; w obu przypadkach list i wpis w historii. Gdy dyrektor
+  w międzyczasie odszedł, ocena odpada.
+- Okno: telefon i PC, Esc, krzyżyk albo „Anuluj prośbę” przed decyzją zamykają rozmowę bez prośby (gra bez zmian).
+  Po decyzji słowa prezesa w jego tonie (`VERDICT_TEXTS`), werdykt i odesłanie do listu w Poczcie.
+- Poprawki tekstów redaktora: odmiana liczebników (punkty, wypożyczenia, „raz”, „2 razy”), „w ciągu ostatnich
+  6 miesięcy”, reakcje zgodne z prawdą odpowiedzi, „Skoro wszystkie, to błąd popełnił też ten, kto go zatrudnił”.
