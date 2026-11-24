@@ -518,14 +518,15 @@ Test: `tests/lateFree.test.mjs`. Te same zasady dla gracza i klubów AI.
   umowa wygasa bez kosztów, zawodnik wraca do wolnych (`freeSince` = ten dzień). Inaczej `completeTransfer`
   jak wolny zawodnik, kontrakt i pensja od tego dnia (wpis historii rynku z `late: true`). Zawodnik nie może się
   wycofać (pierwsza wersja). Limit obcokrajowców jest w grze wyłączony, więc nie jest sprawdzany.
+- **Budżet płac**: pensje zawodników z umową poza oknem są odliczone od wolnego budżetu płac klubu od dnia porozumienia
+  (`finance.clubs[id].joinWages`, odejmowane w `wageRoom`), u gracza i klubów AI.
 - **Rotacja wolnych i koniec sezonu**: zawodnik z umową nie znika z rynku (`retireFreeAgents`, wolni 34+ i długo
   bez klubu przy zmianie sezonu, uzupełnianie kadr wolnymi).
 - **Kluby AI poza oknem** (poniedziałki): tylko przy wyraźnej potrzebie: mniej niż 2 bramkarzy bez kontuzji
   dłuższej niż 14 dni (szansa 40 % na tydzień), brak w kadrze (minimum grupy pozycji) albo długie kontuzje
-  zostawiają grupę poniżej minimum na mecz (ponad 14 dni) albo poniżej minimum kadry (ponad 42 dni). Szansa na tydzień: Ekstraklasa 3 % (6 % x0,5), 1 Liga 8 %, 2 Liga 7 %,
-  III liga 3,5 % (5 % x0,7) [SZAC]; bez potrzeby 0. Kandydat: wolny z grupy pozycji, OVR co najmniej 90 % mediany
-  grupy w klubie, wiek do 36 lat, oczekiwana pensja (askWage, bez zniżek) w wolnym budżecie płac (minus pensje
-  zawodników z umową poza oknem), bez transakcji, umowy i wyłączności skauta innego klubu. Dalej propozycja
+  zostawiają grupę poniżej minimum na mecz (ponad 14 dni) albo poniżej minimum kadry (ponad 28 dni). Szansa na tydzień (podniesiona Nov 24, 2026): Ekstraklasa 12 %, 1 Liga 20 %, 2 Liga 20 %,
+  III liga 12 % [SZAC]; bez potrzeby 0. Symulacja (ziarno 5, sezon): 9 podpisów poza oknem (Ekstraklasa 6, 1 Liga 3). Kandydat: wolny z grupy pozycji, OVR co najmniej 90 % mediany
+  grupy w klubie, wiek do 36 lat, oczekiwana pensja (askWage, bez zniżek) w wolnym budżecie płac, bez transakcji, umowy i wyłączności skauta innego klubu. Dalej propozycja
   i namysł jak w oknie: zwykły wolny dołącza od razu (transakcja wolnego zawodnika), wolny po zamknięciu okna
   w pierwszym dniu okna.
 - **Listy dla gracza**: po zgodzie „Umowa z X: dołączy DD mmm RRRR” (bez pensji do tego dnia), w dniu dołączenia

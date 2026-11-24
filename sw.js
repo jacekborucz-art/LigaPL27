@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-2374d6c554';
+const VERSION = 'v0.3-da55480401';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -204,12 +204,12 @@ const FILES = [
   ['./src/career/editor.js', '5269b2dddd'],
   ['./src/career/fans.js', '329e0cfdc9'],
   ['./src/career/fansSystem.js', 'ced36b7dd1'],
-  ['./src/career/finance.js', '97d5b4e381'],
+  ['./src/career/finance.js', 'e017d06c74'],
   ['./src/career/foreignMarket.js', 'd04cc0ac5b'],
   ['./src/career/foreignPool.js', '283c73474b'],
   ['./src/career/infrastructure.js', '855ad58d60'],
   ['./src/career/jobMarket.js', 'baf5c575b8'],
-  ['./src/career/lateJoins.js', 'cad0c4faf1'],
+  ['./src/career/lateJoins.js', '88b5358f56'],
   ['./src/career/leagueNews.js', '4652647fb3'],
   ['./src/career/loans.js', 'd7aad00962'],
   ['./src/career/mindset.js', 'bfb5eb974c'],

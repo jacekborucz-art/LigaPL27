@@ -31,11 +31,11 @@ export const LATE_JOIN = {
   medFail: 0.03, medFailOld: 0.06, oldAge: 32, // testy medyczne w dniu dołączenia: 3 %, powyżej 32 lat 6 %
   injuryDays: 90, // poważna kontuzja przed dołączeniem (ponad ok. 90 dni przerwy): klub wycofuje się bez kosztów
   // Klub AI poza oknem, tylko przy wyraźnej potrzebie: tygodniowa szansa wg poziomu ligi
-  // (Ekstraklasa 6 % x0,5, 1 Liga 8 %, 2 Liga 7 %, III liga 5 % x0,7)
-  chance: { 1: 0.03, 2: 0.08, 3: 0.07, 4: 0.035 },
+  // (podniesione na prośbę właściciela, Nov 24, 2026: cel ok. 4-10 podpisów na ligę w sezonie)
+  chance: { 1: 0.12, 2: 0.2, 3: 0.2, 4: 0.12 },
   gkChance: 0.4, gkFit: 2, // mniej niż 2 zdrowych bramkarzy: ok. 40 % tygodniowo
   longInjury: 14, // „zdrowy” bramkarz przy ocenie potrzeby: bez kontuzji dłuższej niż 14 dni
-  thinInjury: 42, // długa kontuzja (ponad 6 tygodni) zostawia grupę poniżej minimum kadry (SQUAD_TARGETS.min)
+  thinInjury: 28, // długa kontuzja (ponad 4 tygodnie) zostawia grupę poniżej minimum kadry (SQUAD_TARGETS.min)
   ovrBar: 0.9, maxAge: 36, // poziom: co najmniej 90 % mediany grupy w klubie, wiek do 36 lat
 };
 
@@ -60,14 +60,27 @@ export function ensureJoins(game) {
   const M = game.market;
   if (!M) return [];
   if (!Array.isArray(M.joins)) M.joins = [];
+  syncJoinWages(game);
   return M.joins;
+}
+/**
+ * Pensje czekających na dołączenie zarezerwowane w budżecie płac klubu (game.finance.clubs[id].joinWages, odejmowane
+ * w wageRoom, src/career/finance.js): gracz i AI nie zarezerwują zawodników ponad budżet płac.
+ */
+function syncJoinWages(game) {
+  const F = game.finance?.clubs;
+  if (!F) return;
+  const sum = {};
+  for (const j of game.market?.joins ?? []) sum[j.to] = (sum[j.to] ?? 0) + (j.contract?.wage ?? 0);
+  for (const [id, c] of Object.entries(F)) {
+    if (sum[id]) c.joinWages = sum[id];
+    else if (c.joinWages !== undefined) delete c.joinWages;
+  }
 }
 /** Umowa w toku zawodnika albo null. */
 export const joinOf = (game, pid) => (game.market?.joins ?? []).find((j) => j.pid === pid) ?? null;
 /** Ilu zawodników czeka na dołączenie do klubu (liczą się do limitu kadry). */
 export const joinsTo = (game, clubId) => (game.market?.joins ?? []).filter((j) => j.to === clubId).length;
-/** Pensje zawodników czekających na dołączenie do klubu (tygodniowo). */
-const joinWages = (game, clubId) => (game.market?.joins ?? []).filter((j) => j.to === clubId).reduce((s, j) => s + (j.contract?.wage ?? 0), 0);
 
 /** Opis umowy w toku dla UI: „Dołączy do X DD mmm RRRR” (albo null). */
 export function joinStatusText(game, p) {
@@ -86,6 +99,7 @@ export function reserveJoin(game, p, { to, contract, date = game.date, prop = nu
   const j = { pid: p.id, name: p.name, pos: p.pos, to, date: joinDateFor(date), since: date, contract, prop };
   J.push(j);
   p.joinOn = { clubId: to, date: j.date };
+  syncJoinWages(game);
   stat(game, to === game.clubId ? 'lateJoinsUser' : 'lateJoins');
   return j;
 }
@@ -94,7 +108,7 @@ export function reserveJoin(game, p, { to, contract, date = game.date, prop = nu
 export function joinAgreedMessage(game, j, date = game.date) {
   return createMessage({ date, key: `dolaczy:${j.pid}:${j.date}`, category: 'transfers', from: 'Dyrektor sportowy', priority: 'important',
     subject: `Umowa z ${j.name}: dołączy ${fmtDate(j.date)}`,
-    body: `${j.name} przyjął twoją propozycję. Został wolny po zamknięciu okna transferowego, więc zgłosimy go dopiero w pierwszym dniu okna: ${fmtDate(j.date)}. Do tego dnia nie gra i nie dostaje pensji, a kontrakt i pensja zaczną się w dniu dołączenia. Inne kluby nie mogą go już podpisać. Miejsce w kadrze jest zarezerwowane (liczy się do limitu kadry). Przed dołączeniem przejdzie testy medyczne.`,
+    body: `${j.name} przyjął twoją propozycję. Został wolny po zamknięciu okna transferowego, więc zgłosimy go dopiero w pierwszym dniu okna: ${fmtDate(j.date)}. Do tego dnia nie gra i nie dostaje pensji, a kontrakt i pensja zaczną się w dniu dołączenia. Inne kluby nie mogą go już podpisać. Miejsce w kadrze jest zarezerwowane (liczy się do limitu kadry), a jego pensja jest już odliczona od wolnego budżetu płac. Przed dołączeniem przejdzie testy medyczne.`,
     refs: { kind: 'lateJoin', pid: j.pid } });
 }
 
@@ -102,6 +116,7 @@ function dropJoin(game, j) {
   game.market.joins = (game.market.joins ?? []).filter((x) => x !== j);
   const p = game.world.players[j.pid];
   if (p?.joinOn) delete p.joinOn;
+  syncJoinWages(game);
 }
 
 // ------------------------------------------------------------ Dzień dołączenia (src/career/transferSystem.js, codziennie)
@@ -200,7 +215,7 @@ export function aiLateWeek(game, date) {
     const rng = new Rng(`wolni-poza-oknem:${game.seed}:${c.id}:${date}`);
     if (!rng.chance(need.gk ? LATE_JOIN.gkChance : chance)) continue;
     if (squadCount(game, c.id).full) continue;
-    const room = wageRoom(game.finance, W, c.id) - joinWages(game, c.id);
+    const room = wageRoom(game.finance, W, c.id); // pensje czekających na dołączenie już odjęte (joinWages)
     const bar = LATE_JOIN.ovrBar * median(squad.filter((p) => groupOf(p) === need.group).map((p) => p.ovr));
     const ask = (p) => p.askWage ?? effectiveAsk(p, c.tier, payLevel(c));
     const pool = free.filter((p) => !taken.has(p.id) && groupOf(p) === need.group && p.ovr >= bar && ask(p) <= room && !scoutBlocked(p, c.id, date))

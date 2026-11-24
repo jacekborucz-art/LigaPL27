@@ -29,6 +29,15 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 24, 2026, profil A (komputer domowy), wolni poza oknem: wyższe szanse AI i pensje w budżecie (v1.23 Beta)
+Zrobione (na prośbę właściciela):
+- `LATE_JOIN.chance` w `src/career/lateJoins.js`: 12/20/20/12 % (Ekstraklasa, 1 Liga, 2 Liga, III liga), długa kontuzja
+  w cienkiej grupie od 28 dni. Symulacja (ziarno 5, sezon): 9 podpisów AI poza oknem (Ekstraklasa 6, 1 Liga 3).
+- Pensje zawodników czekających na dołączenie odliczone od wolnego budżetu płac: `finance.clubs[id].joinWages`
+  (`syncJoinWages` przy rezerwacji, zerwaniu i codziennie w `ensureJoins`), odejmowane w `wageRoom` (`finance.js`).
+Zostało / dalej:
+- 2 Liga i III liga prawie bez podpisów poza oknem (kadry rzadko mają braki).
+
 ## Nov 24, 2026, profil A (komputer domowy), wolni zawodnicy poza oknem (v1.23 Beta)
 Zrobione (ekspert Sonnet medium, wdrożenie Opus high, sprawdzone):
 - Nowy `src/career/lateJoins.js`: wolny po zamknięciu okna (`lateFree`, przeniesione z UI) nie jest blokowany do rozmów;

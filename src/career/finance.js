@@ -281,6 +281,6 @@ export function spendable(F, clubId) {
 /** Wolne miejsce w budżecie płac (tygodniowo). */
 export function wageRoom(F, world, clubId) {
   const c = F.clubs[clubId];
-  return c ? Math.max(0, c.wageBudget - wageBill(world, clubId)) : 0;
+  return c ? Math.max(0, c.wageBudget - wageBill(world, clubId) - (c.joinWages ?? 0)) : 0; // joinWages: pensje zawodników czekających na dołączenie (lateJoins.js)
 }
 export { wageBill };

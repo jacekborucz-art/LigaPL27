@@ -12,6 +12,7 @@ import { buildContract, normalizeOffer } from '../src/career/negotiation.js';
 import { dealOf } from '../src/career/transferDeals.js';
 import { THINK, makeProposal, submitUserProposal, proposalsFor } from '../src/career/proposals.js';
 import { squadCount } from '../src/career/squadLimit.js';
+import { wageRoom } from '../src/career/finance.js';
 import { retireFreeAgents } from '../src/career/mindset.js';
 import { LATE_JOIN, lateFree, joinOf, joinsDay, reserveJoin, aiLateWeek, lateNeed } from '../src/career/lateJoins.js';
 import { handleTransferAction, renderTransfers, transferCardHtml } from '../src/ui/transfersView.js';
@@ -64,6 +65,7 @@ test('Wolny po zamknięciu okna: rozmowy możliwe, zgoda to umowa z dołączenie
   const neg = handleTransferAction(g, 'tf-negotiate', { id: p.id });
   assert.ok(neg.negotiate, `rozmowy nie są zablokowane: ${neg.ui?.tfMsg}`);
   const before = squadCount(g, 'widzew').counted;
+  const room0 = wageRoom(g.finance, g.world, 'widzew');
   const x = userAgrees(g, p);
   assert.equal(x.end.join, '2027-02-01');
   assert.deepEqual(p.joinOn, { clubId: 'widzew', date: '2027-02-01' });
@@ -73,6 +75,7 @@ test('Wolny po zamknięciu okna: rozmowy możliwe, zgoda to umowa z dołączenie
   assert.equal(p.wage, 0, 'bez pensji do dołączenia');
   assert.ok(!g.world.clubs.widzew.squad.includes(p.id), 'nie jest w kadrze, nie gra');
   assert.equal(squadCount(g, 'widzew').counted, before + 1, 'rezerwacja liczy się do limitu kadry');
+  assert.equal(wageRoom(g.finance, g.world, 'widzew'), Math.max(0, room0 - joinOf(g, p.id).contract.wage), 'pensja odliczona od wolnego budżetu płac');
   assert.ok(g.inbox.some((m) => m.subject === `Umowa z ${p.name}: dołączy 1 lut 2027` && /nie dostaje pensji/.test(m.body)));
   // Inne kluby (AI i gracz) nie mogą go podpisać
   assert.equal(makeProposal(g, { playerId: p.id, to: 'lech', contract: contractFor(g, 20000), kind: 'free' }), null);
