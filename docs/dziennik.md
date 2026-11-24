@@ -29,6 +29,20 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 24, 2026, profil A (komputer domowy), ławka sparingu w Skład i taktyka (v1.23 Beta)
+Zrobione:
+- `POPRAWKI.txt`, zadanie 2: Skład i taktyka przed sparingiem pokazuje całą ławkę sparingu (do 14), dobranych przez
+  grę z podpisem „dobrany na sparing”, licznik „x z 14” (`src/ui/tacticsView.js`, `src/app.js`, `src/styles/app.css`,
+  test w `tests/tacticsView.test.mjs`, opis `docs/sparingi-i-karne.md`).
+- Model: Sonnet, wysiłek medium (zgoda właściciela), sprawdzenie i poprawki wyglądu: profil A.
+Decyzje i pułapki:
+- Właściciel zatwierdza model do każdego zadania przed startem (podać model i wysiłek, czekać na zgodę).
+- Agent zamienił końce linii w `src/ui/tacticsView.js` (CRLF na LF, diff 663 linii); przywrócone CRLF. Po pracy agenta
+  sprawdzać `git diff --stat` i format końców linii.
+- Edytować da się nadal tylko miejsca ławki gracza; dobranych na sparing gracz nie zmienia (zasady bez zmian).
+Zostało / dalej:
+- Zadanie 3 z `POPRAWKI.txt`: nowo podpisany zawodnik zbyt szybko chce odchodzić (okres aklimatyzacji + RNG).
+
 ## Nov 24, 2026, profil A (komputer domowy), oferty za zawodników z listy transferowej (v1.23 Beta)
 Zrobione:
 - Lista poprawek właściciela `POPRAWKI.txt` (lokalnie w katalogu repo, robione po jednym zadaniu), zadanie 1:

@@ -42,6 +42,7 @@ import { WIDE_CARD, cardPos, placeCard, bindCardDrag } from './ui/playerCard.js'
 import { createTactics, changeFormation, setInstruction, refreshTactics, removeFromBench, checkTactics, AUTO_MODES, pruneArrows } from './engine/lineup.js';
 import { COMPETITIONS } from './config/competitions.js';
 import { mountMatchday } from './ui/matchdayView.js';
+import { matchTacticsFor, FRIENDLY_BENCH } from './match/matchday.js'; // ławka sparingu (podgląd na ekranie składu)
 import { mountDrawAnimation } from './ui/europeView.js';
 import { matchReportHtml } from './ui/matchReportView.js'; // raport meczu po kliknięciu wyniku (docs/raport-meczu.md)
 import { ensureUefa, syncSuperCupEU } from './season/europe.js';
@@ -681,7 +682,9 @@ function renderTab(tab, g, club) {
       queueMicrotask(mountTacticsScreen); // po wstawieniu HTML: okno atrybutów i fokus
       const wide = matchMedia(WIDE_INFO).matches;
       if (g.tactics.playerInstr) { const sqm = new Map(mySquad(g).map((p) => [p.id, p])); g.tactics.playerInstr = pruneArrows(g.tactics.playerInstr, g.tactics, sqm); } // nieważne strzałki znikają
-      return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), info: state.tInfo, msg: state.tMsg, numbers: shirtNumbers(g, g.clubId, squadOf(g.world, g.clubId)), kit: kitColors(clubById(g.clubId)), cards: tCardsFor(g, wide), wide, strengthOpen: tUi.strOpen, assistant: hasAssistant(g), rzChips, rzStrip: rzOn ? reservesStrip(g) : '', analyses: analysesBadge(g), arrows: state.tArrows });
+      // Sparing: pod ławką gracza widać rezerwowych dobranych na ten mecz (do FRIENDLY_BENCH), sam skład gracza bez zmian
+      const fr = nextFixture(g)?.comp === 'friendly' ? matchTacticsFor(g, { comp: 'friendly' }).bench.filter((id) => !g.tactics.bench.includes(id)) : null;
+      return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), benchExtra: fr, benchMax: fr ? Math.max(FRIENDLY_BENCH, benchSizeFor(g)) : null, info: state.tInfo, msg: state.tMsg, numbers: shirtNumbers(g, g.clubId, squadOf(g.world, g.clubId)), kit: kitColors(clubById(g.clubId)), cards: tCardsFor(g, wide), wide, strengthOpen: tUi.strOpen, assistant: hasAssistant(g), rzChips, rzStrip: rzOn ? reservesStrip(g) : '', analyses: analysesBadge(g), arrows: state.tArrows });
     }
     const ovrs = leagueOvrs(g, club.tier);
     const p = state.playerOpen && g.world.players[state.playerOpen];

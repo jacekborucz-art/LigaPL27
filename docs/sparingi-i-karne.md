@@ -217,3 +217,12 @@ Wdrożone wg rozdz. 6 (Nov 11, 2026). Testy: `tests/friendlyUi.test.mjs` (7 test
 
 - Plan drugiej jedenastki przed meczem (`S.plannedSubs`, rozdz. 6 pkt 9): przekazywany do silnika, ale bez ekranu w odprawie. Przerwa z „Drugą jedenastką” pokrywa ten przypadek.
 - Ustawienie kolejności przed końcem dogrywki (np. w przerwie przed dogrywką): silnik to umie, UI pyta dopiero w pauzie przed serią.
+
+## Ławka sparingu w Skład i taktyka (Nov 24, 2026, v1.23 Beta)
+
+Sparing ma ławkę do 14 rezerwowych (`FRIENDLY_BENCH`, `matchTacticsFor` w `src/match/matchday.js`): gracz ustawia
+miejsca ławki jak w lidze (9 albo 12), resztę do 14 dobiera gra. Wcześniej ekran Skład i taktyka pokazywał tylko
+ławkę gracza (licznik „x z 9”), choć w meczu grało 14 rezerwowych. Teraz, gdy najbliższy mecz to sparing, pod ławką
+gracza widać dobranych przez grę (podpis „dobrany na sparing”, tylko podgląd: bez przeciągania i usuwania), licznik
+„x z 14”, a ci zawodnicy nie są już w „Poza kadrą meczową” (`benchExtra`, `benchMax` w `renderTactics`,
+`src/ui/tacticsView.js`; `src/app.js`). Okno zmian w meczu pokazywało pełną ławkę już wcześniej. Zasady bez zmian.

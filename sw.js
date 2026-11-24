@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-06052a2f6d';
+const VERSION = 'v0.3-aa831e9640';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -186,7 +186,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', '157bf90e12'],
+  ['./src/app.js', '7392c15a17'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '3cd6d72f9f'],
   ['./src/career/assistantReport.js', 'e215edbbc2'],
@@ -317,7 +317,7 @@ const FILES = [
   ['./src/season/uefa.js', '750aef61b1'],
   ['./src/season/uefaCoef.js', 'e978b7d220'],
   ['./src/season/worldNations.js', '6003d36e12'],
-  ['./src/styles/app.css', '2efc98ab90'],
+  ['./src/styles/app.css', '3eab39ae00'],
   ['./src/styles/assistant.css', 'a1dd04f875'],
   ['./src/styles/base.css', 'f2fee58203'],
   ['./src/styles/club.css', '6615e08e49'],
@@ -395,7 +395,7 @@ const FILES = [
   ['./src/ui/tacticsArrows.js', '79ec9ea7a0'],
   ['./src/ui/tacticsDrag.js', 'e4a2009a87'],
   ['./src/ui/tacticsMoves.js', '36742ffefc'],
-  ['./src/ui/tacticsView.js', '7c3186d1c5'],
+  ['./src/ui/tacticsView.js', 'd5147ec3ea'],
   ['./src/ui/talksView.js', '4a00b34822'],
   ['./src/ui/teamReportView.js', 'c01abc57b6'],
   ['./src/ui/todoView.js', 'bd4d7aa1c4'],

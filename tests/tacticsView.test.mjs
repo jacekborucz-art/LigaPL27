@@ -118,3 +118,15 @@ test('Prośby do asystenta: drugi skład, najmłodsi, najświeżsi, najmniej gra
   assert.ok(pick('minutes', played).filter((id) => best.includes(id)).length <= 3, 'najmniej grający zamiast podstawowych');
   for (const m of ['second', 'young', 'fresh', 'minutes']) assert.equal(new Set(pick(m)).size, 11, `${m}: 11 różnych zawodników`);
 });
+
+test('Sparing: ławka pokazuje także rezerwowych dobranych automatycznie, licznik wg pełnego limitu; bez nich jak dotąd', () => {
+  const extra = squad.filter((p) => !tactics.xi.includes(p.id) && !tactics.bench.includes(p.id)).slice(0, 5).map((p) => p.id);
+  const html = view({ benchExtra: extra, benchMax: 14 });
+  assert.equal([...html.matchAll(/class="tp-row tp-row--auto"/g)].length, 5, 'wszyscy dodatkowi rezerwowi na ławce');
+  assert.match(html, new RegExp(`${tactics.bench.length + 5} z 14`));
+  const outPart = html.slice(html.indexOf('id="tp-h-out"'));
+  for (const id of extra) assert.doesNotMatch(outPart, new RegExp(`data-pid="${id}"`), 'nie są też poza kadrą');
+  const plain = view();
+  assert.doesNotMatch(plain, /tp-row--auto/);
+  assert.match(plain, new RegExp(`${tactics.bench.length} z 9`));
+});
