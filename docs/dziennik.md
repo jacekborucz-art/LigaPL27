@@ -29,6 +29,18 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 24, 2026, profil A (komputer domowy), sprawdzenie finansów właścicieli (v1.23 Beta)
+Zrobione (bez zmian w grze):
+- `POPRAWKI.txt`: czy pieniądze właściciela dla klubu są sztywne. Wynik (agent Haiku low, zweryfikowane): kwoty są
+  sztywne. Dopłata i skarbiec to stałe z `src/data/finanse_klubow.js` (`own(typ, kto, doplata, skarbiec)`), w planie
+  sezonu `clubPlan` (`src/career/finance.js`), dopłata co miesiąc 1/12, skarbiec na start sezonu; zasobność wyliczana
+  z tych kwot (`ownerWealth`, `src/career/owners.js`). Los tylko w decyzjach: prośby do zarządu (+-5 pkt), częściowa
+  wypłata przy warunku (szansa z cierpliwości i temperamentu, 35-65 % kwoty), zgoda zarządu i miasta na inwestycje.
+  Brak cech „hojność”, „rozrzutność” i zmienności kwot z sezonu na sezon.
+Zostało / dalej:
+- propozycja do decyzji właściciela: dopłata i skarbiec na sezon = kwota z danych x los zależny od cech właściciela
+  (ambicja, temperament) i wyników klubu.
+
 ## Nov 24, 2026, profil A (komputer domowy), rywale na obozie za granicą (v1.23 Beta)
 Zrobione:
 - `POPRAWKI.txt` (do sprawdzenia: brak rywali na obozie zimowym w 4. sezonie): przyczyną nie był kalendarz kolejnych
