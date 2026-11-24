@@ -24,6 +24,7 @@ import * as MD from '../match/matchday.js';
 import { CLIMATES, currentQuestion, progress, effectWords } from '../match/press.js';
 import { friendlyRuleTags, friendlyRulesOf } from '../training/friendlies.js';
 import { renderPlayerCard, cardFact, barFactHtml, WIDE_CARD, cardPos, placeCard, bindCardDrag } from './playerCard.js'; // karta jak w Kadra > Skład i taktyka
+import { footLabel } from './squadView.js'; // noga zawodnika (fakt karty)
 import { playerStatsHtml } from './playerStatsView.js';
 import { moraleLabel } from '../career/morale.js';
 import { PI_IDS, cleanPlayerInstrMap, playerInstrCount, arrowsFor, arrowAllowed } from '../data/playerInstructions.js';
@@ -1718,6 +1719,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       wide, slot: 0, cls: 'md-pcard', closeAttrs: 'data-md="pcardClose"',
       facts: [
         cardFact('W meczu', esc(where)),
+        ...(p.foot ? [cardFact('Noga', esc(footLabel[p.foot]))] : []), // noga: jak w profilu zawodnika
         cardFact('Stan', esc(state ? state[0].toUpperCase() + state.slice(1) : 'Do gry'), !!(hurt || r?.card === 'red' || r?.card === 'secondYellow' || x.sentOff)),
         cardFact('Kondycja', barFactHtml(x.cond ?? 100)),
         cardFact('Ocena meczu', r?.rating != null ? `<b class="rt rt--${rBand(r.rating)}">${r.rating.toFixed(1)}</b>` : 'brak'),

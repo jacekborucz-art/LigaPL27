@@ -29,6 +29,17 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 24, 2026, profil A (komputer domowy), lepsza noga w karcie w okienku (v1.23 Beta)
+Zrobione:
+- `POPRAWKI.txt`, zadanie 4: fakt „Noga” (Lewa, Prawa, Obie, jak w profilu) w karcie zawodnika w okienku:
+  Skład i taktyka (`src/ui/tacticsView.js`), mecz (`src/ui/matchdayView.js`), Transfery (`src/ui/transfersView.js`);
+  `footLabel` eksportowany z `src/ui/squadView.js`. Zrzuty PC i telefon sprawdzone.
+- Model: Haiku, wysiłek low (zgoda właściciela); sprawdzenie i zrzuty: profil A.
+Decyzje i pułapki:
+- Noga widoczna także w karcie kandydata skauta (jak w profilu zawodnika innego klubu).
+Zostało / dalej:
+- Zadanie 5 z `POPRAWKI.txt`: lista życzeń gracza (zawodnicy obserwowani).
+
 ## Nov 24, 2026, profil A (komputer domowy), okres aklimatyzacji nowego zawodnika (v1.23 Beta)
 Zrobione:
 - `POPRAWKI.txt`, zadanie 3: okres aklimatyzacji po zmianie klubu, po decyzji właściciela co najmniej rok

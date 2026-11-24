@@ -61,7 +61,7 @@ export function starsFor(ovr, leagueOvrsSorted) {
 const stars = (n) => `<span class="stars" aria-label="${n} na 5">${'★'.repeat(n)}<span class="stars__off">${'★'.repeat(5 - n)}</span></span>`;
 const moraleDot = (m) => `<span class="mdot" data-m="${m >= 14 ? 'hi' : m >= 10 ? 'mid' : 'lo'}" title="Morale: ${moraleLabel(m)}"></span>`;
 const sideLabel = (p) => (p.side ? ` ${p.side === 'L' ? 'L' : 'P'}` : '');
-const footLabel = { L: 'Lewa', P: 'Prawa', LP: 'Obie' };
+export const footLabel = { L: 'Lewa', P: 'Prawa', LP: 'Obie' }; // noga zawodnika (profil i karta w oknie)
 
 export const SQUAD_VIEWS = [['overview', 'Przegląd'], ['attrs', 'Atrybuty i forma'], ['stats', 'Statystyki']];
 const defaultOrder = (a, b) => (GROUP_ORDER[GROUP[a.pos]] - GROUP_ORDER[GROUP[b.pos]])

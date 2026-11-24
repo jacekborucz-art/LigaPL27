@@ -9,6 +9,7 @@ import { GROUP, isAvailable } from '../career/squad.js';
 import { moraleLabel, moraleTrend } from '../career/morale.js';
 import { locKey, playerAt } from './tacticsMoves.js';
 import { esc } from './dom.js';
+import { footLabel } from './squadView.js'; // noga zawodnika (fakt karty)
 import { profBand } from './positionMap.js';
 import { renderPlayerCard, cardFact, barFactHtml } from './playerCard.js'; // karta wspólna z oknem zmian w meczu
 import { piMarker, piSummary } from './playerInstrView.js'; // instrukcje indywidualne (docs/instrukcje-indywidualne.md)
@@ -329,6 +330,7 @@ function renderPlayerInfo(p, tactics, f, extra = '', { wide = false, pinned = fa
     closeAttrs: `data-act="tinfoclose" data-id="${id}"`, pinAttrs: `data-act="tcardpin" data-id="${id}"`,
     facts: [
       cardFact('Gdzie', esc(where)),
+      ...(p.foot ? [cardFact('Noga', esc(footLabel[p.foot]))] : []), // noga: jak w profilu zawodnika
       cardFact('Stan', esc(health), !!(p.injuryDays > 0 || p.suspended > 0 || p.callUp || p.loanBlock)),
       cardFact('Świeżość', barFactHtml(p.fresh ?? 95)),
       cardFact('Ostrość', `${Math.round(p.sharp ?? 70)}%`),

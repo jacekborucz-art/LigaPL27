@@ -8,7 +8,7 @@ import { crestHtml } from './crest.js';
 import { esc, fmtDate, fmtDay } from './dom.js';
 import { GROUP } from '../career/squad.js';
 import { reputationLabel } from '../career/reputation.js';
-import { repHtml } from './squadView.js'; // reputacja z trendem (docs/reputacja.md)
+import { repHtml, footLabel } from './squadView.js'; // reputacja z trendem (docs/reputacja.md)
 import { RENEW_WINDOW_MONTHS } from '../career/negotiation.js';
 import {
   marketLists, searchPlayers, askingPrice, notForSale, playerWillingness, offerForPlayer, answerIncoming, loanIn,
@@ -825,6 +825,7 @@ export function transferCardHtml(game, p, { wide = false } = {}) {
   const price = mine || playsAbroad(p) && !abroad ? null : !p.clubId && !abroad ? 'Bez odstępnego' : notForSale(game, p) && !p.contract?.clause ? 'Nie na sprzedaż' : fmtZl(askingPrice(game, p));
   const facts = [
     cardFact('Klub', esc(club)),
+    ...(p.foot ? [cardFact('Noga', esc(footLabel[p.foot]))] : []), // noga: jak w profilu zawodnika
     cardFact('Kontrakt', p.contract?.until ? `do ${esc(fmtDate(p.contract.until))}` : 'Brak'),
     cardFact(valueLabel(game, p), esc(valueOrScoutPrice(game, p, fmtZl))),
     ...(price ? [cardFact('Cena', esc(price))] : []),
