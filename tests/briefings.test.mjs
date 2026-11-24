@@ -389,3 +389,29 @@ test('Studio po meczu pucharowym: zarząd i kibice rozpoznają trofeum i awans p
   assert.ok(advDog.reactions.board.delta > 0 && advDog.reactions.fans.delta > 0);
   assert.doesNotMatch(advDog.reactions.board.text, /wściekły|rozczarowany/);
 });
+
+test('Nagłówek „Gol w końcówce” tylko dla bramki zwycięzcy: gol przegranego na 1:2 w 88. minucie nie robi z niego bohatera', () => {
+  const ctx = studioCtx();
+  const pre = preMatchStudio(ctx);
+  const lost = [
+    { min: 20, type: 'goal', side: 1, player: 'c13', name: 'C Gracz13', xg: 0.3 },
+    { min: 60, type: 'goal', side: 1, player: 'c14', name: 'C Gracz14', xg: 0.3 },
+    { min: 88, type: 'goal', side: 0, player: 'w14', name: 'W Gracz14', xg: 0.4 },
+  ];
+  for (let s = 0; s < 12; s++) {
+    const post = postMatchStudio({ ...ctx, seed: `bohater-${s}`, headlineHistory: [], events: lost, pre: pre.forPost, ratings: [{ id: 'w14', name: 'W Gracz14', side: 0, rating: 7.9 }] });
+    for (const h of post.headlines) assert.ok(!/W Gracz14 bohaterem|Rozstrzygnięcie w ostatnich minutach/.test(h.text), h.text);
+  }
+  // Zwycięski gol w 88. minucie nadal daje nagłówek o końcówce (gdy wylosowany)
+  const won = [
+    { min: 20, type: 'goal', side: 1, player: 'c13', name: 'C Gracz13', xg: 0.3 },
+    { min: 50, type: 'goal', side: 0, player: 'w13', name: 'W Gracz13', xg: 0.3 },
+    { min: 88, type: 'goal', side: 0, player: 'w14', name: 'W Gracz14', xg: 0.4 },
+  ];
+  let late = 0;
+  for (let s = 0; s < 12; s++) {
+    const post = postMatchStudio({ ...ctx, seed: `bohater-w-${s}`, headlineHistory: [], events: won, pre: pre.forPost, ratings: [] });
+    if (post.headlines.some((h) => /W Gracz14 bohaterem|ostatnich minutach/.test(h.text))) late++;
+  }
+  assert.ok(late > 0, 'zwycięski gol w końcówce bywa w nagłówku');
+});

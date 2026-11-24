@@ -29,6 +29,19 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 24, 2026, profil A (komputer domowy), nagłówek o bohaterze po porażce (v1.23 Beta)
+Zrobione:
+- `POPRAWKI.txt`: zawodnik gracza nie dostaje już nagłówka „Gol w końcówce! … bohaterem” po przegranym meczu
+  (bramka decydująca tylko zwycięzcy, `src/match/studio.js`, test w `tests/briefings.test.mjs`, opis w
+  `docs/odprawy-studio.md`). Bez agenta (profil A, Opus), za zgodą właściciela.
+- Pozycje zrobione w `POPRAWKI.txt` (plik lokalny właściciela, poza repozytorium) są przekreślone `~~…~~` z dopiskiem
+  „ZROBIONE Nov 24, 2026”.
+Decyzje i pułapki:
+- Właściciel: duże zadania (oferty za zawodników innych klubów) później, najpierw mniejsze z listy.
+Zostało / dalej (kolejność uzgodniona z właścicielem, modele do zgody przy każdym zadaniu):
+- oceny w przerwie w oknie zmian i taktyki (Haiku low), czyste konta bramkarzy (Sonnet medium), okno sugestii zmian
+  na tablecie i bez asystenta (Sonnet medium), sprawdzenie finansów właścicieli (Haiku low).
+
 ## Nov 24, 2026, profil A (komputer domowy), lista życzeń (v1.23 Beta)
 Zrobione:
 - `POPRAWKI.txt`, zadanie 5: lista życzeń gracza dla dowolnych zawodników spoza kadry (`src/career/wishlist.js`,

@@ -927,7 +927,8 @@ export function postMatchStudio(ctx) {
       if (last && goalsBy[last.name]) goalsBy[last.name]--;
     } else continue;
     if ((us === 'home' ? h - a : a - h) < 0) userTrailed = true;
-    if (e.type === 'goal' && Math.abs(h - a) === 1 && ((h > a && gH > gA) || (a > h && gA > gH))) decisive = e;
+    // Bramka decydująca: ostatni gol zwycięzcy, który dał mu prowadzenie (gol przegranego na 1:2 nią nie jest)
+    if (e.type === 'goal' && e.side === (gH > gA ? 'home' : 'away') && Math.abs(h - a) === 1 && ((h > a && gH > gA) || (a > h && gA > gH))) decisive = e;
   }
   if (ht === null) ht = `${h}:${a}`;
   if (gH === gA) decisive = null;

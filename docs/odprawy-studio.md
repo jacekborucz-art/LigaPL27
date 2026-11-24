@@ -362,3 +362,11 @@ Niesprawiedliwa krytyka zjada niemal cały zysk z pochwały drużyny, a uraza Wi
 - Silnik powinien przyjąć `engine.zStart`, `cardRisk`, `nerves` i `defBonus`. Nerwowość nie ma jeszcze wpisu w `modifiers.js` (proponowany wpis w rozdz. 3.4).
 - Nastrój kibiców i zaufanie zarządu są w studiu tylko zmianami (`delta`); zapis do stanu kariery należy do modułu zarządu.
 - Nagłówki i historia nagłówków są w zapisie gry jako tablica id (maks. 5 meczów).
+
+## Bramka decydująca w nagłówkach (Nov 24, 2026)
+
+Zgłoszenie właściciela: zawodnik gracza dostawał nagłówek „Gol w końcówce! … bohaterem” po przegranym meczu, gdy
+strzelił gola w ostatnich minutach. Przyczyna: `postMatchStudio` (`src/match/studio.js`) uznawał za bramkę decydującą
+każdy gol, po którym zwycięzca prowadził jedną bramką, także gol przegranego na 1:2. Teraz bramka decydująca to
+ostatni gol zwycięzcy, który dał mu prowadzenie (flagi `lateWinner` i strzelec w nagłówku). Test w
+`tests/briefings.test.mjs`.
