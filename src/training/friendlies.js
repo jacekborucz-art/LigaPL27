@@ -5,6 +5,7 @@
 // mecz rozgrywa aplikacja, a trening liczy go jak dzień meczowy (zgranie, obciążenie).
 
 import { addDays, registerDailySystem } from '../core/gameLoop.js';
+import { Rng } from '../core/rng.js';
 import { createMessage } from '../core/inbox.js';
 import { SEASON_START, FIFA_WINDOWS } from '../config/calendar2026.js';
 import { CLUBS_PL, clubById, LEAGUE_NAMES } from '../data/clubs_pl.js';
@@ -125,14 +126,18 @@ export function friendlyOpponents(game, date) {
   const sameRegion = (c) => !!me?.region && c.region === me.region;
   const tierOk = (c) => c.tier >= myTier - 1 || sameRegion(c); // o dwie ligi wyżej tylko sąsiad z regionu
   const near = (c) => Math.abs(c.L - myL) - (sameRegion(c) ? 0.6 : 0);
-  const pool = camp && camp.dest !== 'polska' ? [] : CLUBS_PL
+  const abroad = !!camp && camp.dest !== 'polska';
+  const campLand = abroad ? COUNTRY_NAMES[CAMP.dests[camp.dest].country] ?? CAMP.dests[camp.dest].name : null;
+  const pool = CLUBS_PL
     .filter((c) => c.id !== game.clubId && tierOk(c) && c.parent !== game.clubId && !used.has(c.id) && restOk(game.fixtures || [], c.id, date))
     .sort((a, b) => near(a) - near(b));
   // Kilka miejsc dla klubów z niższych lig (częsty sparing „dużego” z mniejszym), najpierw z regionu, potem najmocniejsze
   const lower = pool.filter((c) => c.tier > myTier).sort((a, b) => Number(sameRegion(b)) - Number(sameRegion(a)) || b.L - a.L).slice(0, FRIENDLY.lowerSlots);
   const top = pool.filter((c) => !lower.includes(c)).slice(0, FRIENDLY.maxPolish - lower.length);
-  const polish = [...top, ...lower].sort((a, b) => near(a) - near(b))
-    .map((c) => ({ id: c.id, name: c.name, short: c.short, foreign: false, where: `${LEAGUE_NAMES[c.tier]}${sameRegion(c) ? ', z regionu' : ''}`, L: c.L, level: levelText(c.L - myL), neutral: !!camp }));
+  // Obóz za granicą: polskie kluby, które są w tym czasie na obozach w tym kraju (do FRIENDLY.campPolish)
+  const polish = [...top, ...lower].sort((a, b) => near(a) - near(b)).slice(0, abroad ? FRIENDLY.campPolish : FRIENDLY.maxPolish)
+    .map((c) => ({ id: c.id, name: c.name, short: c.short, foreign: false, where: `${LEAGUE_NAMES[c.tier]}${abroad ? `, na obozie (${campLand})` : sameRegion(c) ? ', z regionu' : ''}`, L: c.L, level: levelText(c.L - myL), neutral: !!camp }));
+  if (abroad) return [...polish, ...campGuests(game, date, camp, myL, used)];
   const countries = camp ? [CAMP.dests[camp.dest].country] : FRIENDLY.neighbours;
   // Bez obozu za granicą rywali z zagranicy mają tylko kluby Ekstraklasy i 1 Ligi (niższe ligi grają sparingi w kraju)
   const foreign = !camp && myTier > 2 ? [] : UEFA_CLUBS
@@ -140,6 +145,27 @@ export function friendlyOpponents(game, date) {
     .sort((a, b) => Math.abs(a.L - myL - 0.5) - Math.abs(b.L - myL - 0.5)).slice(0, FRIENDLY.maxForeign)
     .map((c) => ({ id: c.id, name: c.name, short: c.short, foreign: true, where: COUNTRY_NAMES[c.country] ?? c.country, L: c.L, level: levelText(c.L - myL), neutral: !!camp }));
   return [...polish, ...foreign];
+}
+
+/**
+ * Rywale z zagranicy na obozie za granicą (Nov 24, 2026) [SZAC]: kluby z kraju obozu i drużyny z całej Europy, które
+ * są tam w tym samym czasie na obozach. Głównie podobny i niższy poziom (słabszy klub dostaje „niższą półkę”,
+ * np. San Marino, Luksemburg, Andora), rzadko jeden wyraźnie silniejszy (szansa FRIENDLY.campStrongChance na dzień).
+ */
+function campGuests(game, date, camp, myL, used) {
+  const land = CAMP.dests[camp.dest].country;
+  const rng = new Rng(`sparing-oboz:${game.seed}:${camp.from}:${date}`);
+  const ok = (c) => !used.has(c.id) && c.L >= myL - FRIENDLY.campDown && c.L <= myL + FRIENDLY.campUp;
+  const fromLand = UEFA_CLUBS.filter((c) => c.country === land && ok(c));
+  const guests = rng.shuffle(UEFA_CLUBS.filter((c) => c.country !== land && ok(c)))
+    .sort((a, b) => Math.abs(a.L - myL) - Math.abs(b.L - myL)).slice(0, FRIENDLY.campGuests);
+  const strong = rng.chance(FRIENDLY.campStrongChance)
+    ? rng.pick(UEFA_CLUBS.filter((c) => !used.has(c.id) && c.L > myL + FRIENDLY.campUp && c.L <= myL + FRIENDLY.campStrongUp)) ?? null
+    : null;
+  const seen = new Set();
+  return [...fromLand, ...guests, ...(strong ? [strong] : [])].filter((c) => !seen.has(c.id) && seen.add(c.id))
+    .slice(0, FRIENDLY.maxForeign + (strong ? 1 : 0))
+    .map((c) => ({ id: c.id, name: c.name, short: c.short, foreign: true, where: `${COUNTRY_NAMES[c.country] ?? c.country}${c.country === land ? '' : ', na obozie'}`, L: c.L, level: levelText(c.L - myL), neutral: true }));
 }
 
 /**

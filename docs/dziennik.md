@@ -29,6 +29,19 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 24, 2026, profil A (komputer domowy), rywale na obozie za granicą (v1.23 Beta)
+Zrobione:
+- `POPRAWKI.txt` (do sprawdzenia: brak rywali na obozie zimowym w 4. sezonie): przyczyną nie był kalendarz kolejnych
+  sezonów (pomiar 2026-2029 poprawny), tylko obóz za granicą (bez polskich klubów, z zagranicy tylko kraj obozu).
+  Teraz polskie kluby na obozie i goście z całej Europy, głównie podobnego i niższego poziomu, rzadko silniejszy
+  (`campGuests` w `src/training/friendlies.js`, `FRIENDLY` w `src/training/config.js`, testy `tests/friendlyPartners.test.mjs`,
+  `tests/camps.test.mjs`, opis `docs/sparingi-i-karne.md`). Bez agenta (profil A, Opus), za zgodą właściciela.
+Decyzje i pułapki:
+- Właściciel: na obozach bywają drużyny z całej Europy (np. San Marino, Luksemburg): słabszy klub dostaje niższą półkę,
+  silniejszy rywal tylko czasem.
+Zostało / dalej:
+- sprawdzenie finansów właścicieli (Haiku low), premie z kontraktów, oferty za zawodników innych klubów, menu obserwatora.
+
 ## Nov 24, 2026, profil A (komputer domowy), okno „Gra wstrzymana” w meczu (v1.23 Beta)
 Zrobione:
 - `POPRAWKI.txt`: okno z propozycjami asystenta po czerwonej kartce i urazie mieści się na tablecie i telefonie

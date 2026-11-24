@@ -39,3 +39,21 @@ test('III liga: wyższa liga tylko o jedną albo z regionu, bez rywali z zagrani
     assert.ok(c.tier >= me.tier - 1 || c.region === me.region, `${o.name}: liga ${c.tier}`);
   }
 });
+
+test('Obóz za granicą w kolejnych sezonach: polskie kluby na obozie i goście z niższej europejskiej półki dla słabszego', async () => {
+  const { applySeasonState } = await import('../src/season/rollover.js');
+  const { campWindow } = await import('../src/training/camps.js');
+  for (const y of [2026, 2029]) {
+    applySeasonState({ seasonYear: y });
+    for (const club of ['chelmianka', 'arka']) {
+      const g = newGame(club); g.seasonYear = y; g.date = `${y + 1}-01-05`;
+      const w = campWindow(g, 'winter');
+      g.training.camps = [{ half: 'winter', key: w.key, dest: 'turcja', from: `${y + 1}-02-09`, to: `${y + 1}-02-15`, days: 7 }];
+      const l = friendlyOpponents(g, `${y + 1}-02-12`);
+      assert.ok(l.filter((o) => !o.foreign).length >= 4, `${club} ${y}: polskie kluby na obozie`);
+      assert.ok(l.filter((o) => o.foreign).length >= 4, `${club} ${y}: goście z zagranicy`);
+      if (club === 'chelmianka') assert.ok(l.filter((o) => o.foreign && /Dużo silniejszy/.test(o.level)).length <= 1, 'najwyżej jeden wyraźnie silniejszy');
+    }
+  }
+  applySeasonState({ seasonYear: 2026 });
+});

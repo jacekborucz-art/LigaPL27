@@ -204,7 +204,7 @@ test('Sparingi: limity w okresach (6 latem, 2 na okno FIFA) i sparing na obozie 
   const atCamp = TR.clubFriendlies(g).find((f) => f.date >= from && f.date <= addDays(from, 9));
   assert.ok(atCamp && atCamp.neutral, 'sparing na obozie: teren neutralny');
   const tur = TR.friendlyOpponents(g, addDays(from, 4));
-  assert.ok(tur.length === 0 || tur.every((o) => o.foreign && o.where), 'na obozie w Turcji rywale z Turcji');
+  assert.ok(tur.length > 0 && tur.every((o) => o.neutral && (o.foreign || /na obozie/.test(o.where))), 'na obozie: polskie kluby na obozie i goście z zagranicy, teren neutralny');
   const fifa = TR.friendlyDates(g, { days: 120, limit: 400 }).filter((d) => d.period.kind === 'fifa');
   let fifaMade = 0;
   for (const d of fifa.filter((x) => x.period.id === fifa[0].period.id)) {

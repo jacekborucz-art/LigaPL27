@@ -239,3 +239,17 @@ z 7 krajów). `friendlyOpponents` (`src/training/friendlies.js`, liczby w `FRIEN
   do 8 (`maxForeign`); poza obozem za granicą tylko dla Ekstraklasy i 1 Ligi;
 - widok Trening, Sparingi: grupy „Polska” i „Zagranica” z liczbą rywali.
 Test `tests/friendlyPartners.test.mjs`.
+
+## Rywale na obozie za granicą (Nov 24, 2026)
+
+Zgłoszenie właściciela: Chełmianka w 4. sezonie (1 Liga) z obozem zimowym 9-15 lutego nie miała rywali, w 1-2 sezonie
+działało. Pomiar sezonów 2026/27-2029/30: kalendarz przesuwa się poprawnie (wolne terminy 8-16 lutego w każdym sezonie),
+a przyczyną był obóz za granicą: gra nie proponowała wtedy polskich klubów, a z zagranicy tylko kluby kraju obozu
+o zbliżonym poziomie (z Turcji tylko kilka czołowych), więc klub o niskim poziomie nie miał nikogo (Chełmianka 0,
+Arka 2). Teraz (`friendlyOpponents`, `campGuests` w `src/training/friendlies.js`, liczby w `FRIENDLY`) [SZAC]:
+- do 8 polskich klubów z wolnym terminem z dopiskiem „na obozie (kraj)” (te same zasady lig co w kraju);
+- kluby z kraju obozu o pasującym poziomie i goście z całej Europy, którzy są tam na obozach: głównie podobny i niższy
+  poziom (poziom od -2,5 do +2), więc słabszy klub dostaje „niższą półkę” (np. Andora, Luksemburg, San Marino,
+  Estonia), do 8; z szansą 25 % na dzień jeden wyraźnie silniejszy rywal (do +4,5);
+- wszystkie mecze na obozie na neutralnym boisku. Pomiar po zmianie: 16-17 rywali w każdym sezonie.
+Test w `tests/friendlyPartners.test.mjs` (sezony 2026 i 2029, III liga i 1 Liga, obóz w Turcji).

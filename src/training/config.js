@@ -291,4 +291,6 @@ export const FRIENDLY = {
   // Kraje sąsiednie i popularne kierunki sparingów polskich klubów (Nov 24, 2026) [SZAC]
   neighbours: ['CZE', 'SVK', 'AUT', 'HUN', 'GER', 'LTU', 'UKR', 'DEN', 'SWE', 'SVN', 'CRO', 'SRB', 'LVA', 'EST'],
   maxPolish: 16, maxForeign: 8, lowerSlots: 4, foreignUp: 2.5,
+  // Obóz za granicą: polskie kluby na obozie i goście z całej Europy, rzadko jeden silniejszy [SZAC]
+  campPolish: 8, campGuests: 8, campDown: 2.5, campUp: 2, campStrongUp: 4.5, campStrongChance: 0.25,
 };
