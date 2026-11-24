@@ -15,23 +15,23 @@ const band = (avg) => (avg == null ? '' : avg >= 7.2 ? 'hi' : avg >= 6.6 ? 'ok' 
 const monthYear = (iso) => fmtDate(iso).replace(/ \d+,/, '');
 
 /** Wiersz tabeli statystyk: grupa rozgrywek albo suma. */
-function statRow(label, arr, { foot = false, note = '' } = {}) {
+function statRow(label, arr, { foot = false, note = '', gk = false } = {}) {
   const s = statObj(arr);
   const zero = !s.apps;
   const cells = `<td>${num(s.apps)}</td><td class="w">${num(s.min)}</td><td>${num(s.g)}</td><td>${num(s.a)}</td>
-    <td class="phst__avg" data-b="${band(s.avg)}">${avgTxt(s.avg)}</td><td class="w">${num(s.yc)}</td><td class="w">${num(s.rc)}</td>`;
+    <td class="phst__avg" data-b="${band(s.avg)}">${avgTxt(s.avg)}</td><td class="w">${num(s.yc)}</td><td class="w">${num(s.rc)}</td>${gk ? `<td>${num(s.cs ?? 0)}</td>` : ''}`; // czyste konta tylko u bramkarza
   return `<tr class="${zero && !foot ? 'is-zero' : ''}"><th scope="row">${esc(label)}${note ? `<small>${esc(note)}</small>` : ''}</th>${cells}</tr>`;
 }
 
-function statTable(caption, groups, { extra = '' } = {}) {
-  const rows = STAT_GROUPS.map(([k, l]) => statRow(l, groups[k], { note: k === 'P' ? 'z Superpucharem' : k === 'L' ? 'z barażami' : '' })).join('');
+function statTable(caption, groups, { extra = '', gk = false } = {}) {
+  const rows = STAT_GROUPS.map(([k, l]) => statRow(l, groups[k], { gk, note: k === 'P' ? 'z Superpucharem' : k === 'L' ? 'z barażami' : '' })).join('');
   const all = sumStats(Object.values(groups));
   const official = sumStats(CLUB_GROUPS.map((k) => groups[k]));
   return `<table class="phst__t">
     <caption class="sr">${esc(caption)}</caption>
-    <thead><tr><th scope="col">Rozgrywki</th><th scope="col"><abbr title="Mecze">M</abbr></th><th scope="col" class="w"><abbr title="Minuty">Min.</abbr></th><th scope="col"><abbr title="Gole">G</abbr></th><th scope="col"><abbr title="Asysty">A</abbr></th><th scope="col"><abbr title="Średnia ocena">Ocena</abbr></th><th scope="col" class="w"><abbr title="Żółte kartki">Ż</abbr></th><th scope="col" class="w"><abbr title="Czerwone kartki">C</abbr></th></tr></thead>
+    <thead><tr><th scope="col">Rozgrywki</th><th scope="col"><abbr title="Mecze">M</abbr></th><th scope="col" class="w"><abbr title="Minuty">Min.</abbr></th><th scope="col"><abbr title="Gole">G</abbr></th><th scope="col"><abbr title="Asysty">A</abbr></th><th scope="col"><abbr title="Średnia ocena">Ocena</abbr></th><th scope="col" class="w"><abbr title="Żółte kartki">Ż</abbr></th><th scope="col" class="w"><abbr title="Czerwone kartki">C</abbr></th>${gk ? '<th scope="col"><abbr title="Czyste konta (bramkarz co najmniej 60 minut bez straconego gola)">CK</abbr></th>' : ''}</tr></thead>
     <tbody>${rows}${extra}</tbody>
-    <tfoot>${statRow('Mecze klubowe o punkty', official, { foot: true })}${statRow('Razem', all, { foot: true })}</tfoot>
+    <tfoot>${statRow('Mecze klubowe o punkty', official, { foot: true, gk })}${statRow('Razem', all, { foot: true, gk })}</tfoot>
   </table>`;
 }
 
@@ -54,7 +54,7 @@ function unsplit(p) {
     career: old.length || curGap ? { apps: old.reduce((s, h) => s + h.apps, 0) + curGap, g: old.reduce((s, h) => s + (h.g ?? 0), 0) + curG, a: old.reduce((s, h) => s + (h.a ?? 0), 0) + curA } : null,
   };
 }
-const unsplitRow = (u) => (u ? `<tr class="phst__old"><th scope="row">Bez podziału<small>mecze sprzed zapisu statystyk w rozgrywkach</small></th><td>${u.apps}</td><td class="w"></td><td>${u.g}</td><td>${u.a}</td><td class="phst__avg"></td><td class="w"></td><td class="w"></td></tr>` : '');
+const unsplitRow = (u, gk = false) => (u ? `<tr class="phst__old"><th scope="row">Bez podziału<small>mecze sprzed zapisu statystyk w rozgrywkach</small></th><td>${u.apps}</td><td class="w"></td><td>${u.g}</td><td>${u.a}</td><td class="phst__avg"></td><td class="w"></td><td class="w"></td>${gk ? '<td></td>' : ''}</tr>` : '');
 
 function seasonRows(p, seasonId) {
   const cur = p.st && Object.values(p.st).some((a) => a?.[0] > 0) ? [{ s: seasonId, c: p.clubId, l: p.loan ? 1 : 0, x: p.st, live: true }] : [];
@@ -101,8 +101,8 @@ export function playerStatsHtml(p, game) {
         <input type="radio" class="sr phst__in phst__rc" name="pst-${id}" id="pst-c-${id}"><label for="pst-c-${id}">Kariera</label>
       </div>
     </div>
-    <div class="phst__season">${statTable(`Statystyki w sezonie ${seasonId}`, cur, { extra: unsplitRow(u.season) })}</div>
-    <div class="phst__career">${statTable('Statystyki w karierze', careerGroups(p), { extra: unsplitRow(u.career) })}</div>
+    <div class="phst__season">${statTable(`Statystyki w sezonie ${seasonId}`, cur, { extra: unsplitRow(u.season, p.pos === 'BR'), gk: p.pos === 'BR' })}</div>
+    <div class="phst__career">${statTable('Statystyki w karierze', careerGroups(p), { extra: unsplitRow(u.career, p.pos === 'BR'), gk: p.pos === 'BR' })}</div>
     <p class="hint phst__note">Mecze liczone od startu gry. Ocena to średnia z meczów z oceną.${intl ? ` ${esc(intl)}` : ''}</p>
     <div class="phst__cols">
       <div><h3>Sezon po sezonie</h3>${seasonRows(p, seasonId)}</div>

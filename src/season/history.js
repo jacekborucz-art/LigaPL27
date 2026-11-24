@@ -35,7 +35,7 @@ export function statGroup(comp) {
   return null;
 }
 
-const blank = () => [0, 0, 0, 0, 0, 0, 0, 0];
+const blank = () => [0, 0, 0, 0, 0, 0, 0, 0, 0]; // [8]: czyste konta bramkarza (od Nov 24, 2026)
 const trimZeros = (a) => { const out = [...a]; while (out.length && !out[out.length - 1]) out.pop(); return out; };
 const pad = (a) => { const out = blank(); (a ?? []).forEach((v, i) => { out[i] = v ?? 0; }); return out; };
 
@@ -54,12 +54,13 @@ export function addPlayerMatch(p, group, x) {
   if (x.rating != null) { s[4] += Math.round(x.rating * 10); s[5]++; }
   s[6] += x.yc && !x.rc ? 1 : 0;
   s[7] += x.rc ? 1 : 0;
+  s[8] = (s[8] ?? 0) + (x.cs ? 1 : 0);
 }
 
 /** Statystyki grupy w czytelnej postaci. a: tablica z p.st albo z wiersza historii. */
 export function statObj(a) {
   const s = pad(a);
-  return { apps: s[0], min: s[1], g: s[2], a: s[3], avg: s[5] ? s[4] / 10 / s[5] : null, rSum: s[4] / 10, rN: s[5], yc: s[6], rc: s[7] };
+  return { apps: s[0], min: s[1], g: s[2], a: s[3], avg: s[5] ? s[4] / 10 / s[5] : null, rSum: s[4] / 10, rN: s[5], yc: s[6], rc: s[7], cs: s[8] };
 }
 
 /** Suma kilku tablic statystyk (sezon + kariera, wszystkie grupy). */

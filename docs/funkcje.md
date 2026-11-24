@@ -154,7 +154,7 @@ Zakładki: Zawodnicy, Skład i taktyka, Rezerwy, Rozmowy, Raport ogólny.
 - **Powołania zawodników do kadr**: zawodnicy wyjeżdżają w oknach FIFA, mecze reprezentacji w tle; Kadra (znacznik), Rozgrywki; `season/nationalSystem.js`.
 - **Historia sezonów**: mistrz, zdobywca pucharu, awanse, spadki i miejsca drużyn gracza za zakończone sezony; Rozgrywki, Historia; `ui/competitionsView.js` (`historyView`), `season/rollover.js`.
 - **Terminarz i wyniki**: ekran z kolejkami, historią meczów drużyny gracza po sezonach; Rozgrywki, przycisk Terminarz; `ui/fixturesView.js`, `season/history.js`; dok. `historia-i-statystyki.md`.
-- **Statystyki i strzelcy**: strzelcy, asysty, kartki i oceny w podziale na rozgrywki; Rozgrywki, Statystyki; `season/history.js`, `ui/competitionsView.js`; dok. `historia-i-statystyki.md`.
+- **Statystyki i strzelcy**: strzelcy, asysty, kartki i oceny w podziale na rozgrywki; Rozgrywki, Statystyki; `season/history.js`, `ui/competitionsView.js`; dok. `historia-i-statystyki.md`. Czyste konta bramkarzy (co najmniej 60 minut bez straconego gola): Kadra i kolumna CK w karcie bramkarza (Nov 24, 2026).
 - **Widok innego klubu**: kliknięcie nazwy w tabeli pokazuje kadrę ze statystykami, trenera i sztab, formę, kluczowych zawodników, absencje, terminarz (dokładność liczb zależy od analityka); Rozgrywki; `ui/clubView.js`.
 - **Profil zawodnika z innego klubu**: karta i statystyki z karty transferowej i menu pod prawym przyciskiem; wszędzie; `ui/playerCard.js`.
 - **Kalendarz sezonu i rozwiązywanie konfliktów terminów**: prawdziwe daty, priorytety, przesuwanie meczów bez psucia kolejności rund; cała gra; `config/calendar2026.js`, `season/season.js`; dok. PLAN 5.

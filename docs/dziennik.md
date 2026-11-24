@@ -29,6 +29,18 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 24, 2026, profil A (komputer domowy), czyste konta bramkarzy (v1.23 Beta)
+Zrobione:
+- `POPRAWKI.txt`: czyste konta bramkarzy były zawsze 0, bo nic ich nie liczyło. Teraz liczone po meczu o punkty
+  (bramkarz 60+ minut, drużyna bez straconego gola), w Kadrze i w kolumnie „CK” karty bramkarza
+  (`src/season/season.js`, `src/season/history.js`, `src/ui/playerStatsView.js`, test `tests/cleanSheets.test.mjs`,
+  opis `docs/historia-i-statystyki.md`). Bez agenta (profil A, Opus), za zgodą właściciela.
+Decyzje i pułapki:
+- Właściciel: przy błędach „widok nie pokazuje” najpierw sprawdzić, czy dane w ogóle są liczone.
+- Premie z kontraktów (`contract.bonus`) nie są wypłacane nigdzie; dopisane do `POPRAWKI.txt` jako nowa pozycja.
+Zostało / dalej:
+- okno sugestii zmian na tablecie i bez asystenta (Sonnet medium), sprawdzenie finansów właścicieli (Haiku low).
+
 ## Nov 24, 2026, profil A (komputer domowy), oceny w oknie Zmiany i taktyka (v1.23 Beta)
 Zrobione:
 - `POPRAWKI.txt`: w oknie Zmiany i taktyka (także w przerwie) przy każdym zawodniku ocena na żywo jak na liście składu

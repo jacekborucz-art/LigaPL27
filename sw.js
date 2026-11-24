@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-a86440bf65';
+const VERSION = 'v0.3-d22df2198b';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -297,7 +297,7 @@ const FILES = [
   ['./src/season/dailySystems.js', '612e5d4ef7'],
   ['./src/season/europe.js', 'fb7489f63d'],
   ['./src/season/europeAccess.js', '81a4d6f9bd'],
-  ['./src/season/history.js', '8fcbac8fa8'],
+  ['./src/season/history.js', '44c79ba14f'],
   ['./src/season/intl/engine.js', 'f65f4fa8bf'],
   ['./src/season/intl/hosts.js', '93583f6504'],
   ['./src/season/intl/ratings.js', '0ead6c75d4'],
@@ -310,7 +310,7 @@ const FILES = [
   ['./src/season/nationalSystem.js', '56b1056ddd'],
   ['./src/season/rollover.js', 'cb8a6776d9'],
   ['./src/season/schedule.js', 'a608f6730f'],
-  ['./src/season/season.js', '7fa356162b'],
+  ['./src/season/season.js', 'dc1f30a4ea'],
   ['./src/season/standings.js', 'b3bdff91e2'],
   ['./src/season/superCupEU.js', 'f728d6d300'],
   ['./src/season/suspension.js', '7671748aa6'],
@@ -381,7 +381,7 @@ const FILES = [
   ['./src/ui/playerCard.js', '6864228807'],
   ['./src/ui/playerInstrView.js', '9e2555a798'],
   ['./src/ui/playerMenus.js', '732d2bc870'],
-  ['./src/ui/playerStatsView.js', '00e99b6845'],
+  ['./src/ui/playerStatsView.js', 'c2b6b96daa'],
   ['./src/ui/playerTags.js', 'ccf10ebf2f'],
   ['./src/ui/positionMap.js', 'ef2c032d52'],
   ['./src/ui/postMatchView.js', 'acdba6d632'],

@@ -77,3 +77,16 @@ Wszystko leniwie: `ensureHistory` (wywoływane przy wczytaniu w `ensureGameShape
 bieżący sezon z terminarza. Brak `p.st`: tabela sezonu pokazuje wiersz „Bez podziału” z różnicą między
 `p.season` a meczami zapisanymi w grupach; stare wiersze `p.history` bez `x` idą do tego samego wiersza
 w karierze. Brak `p.cl`: okresy odtwarzane z `p.career` (lista transferów), inaczej jeden okres w obecnym klubie.
+
+## Czyste konta bramkarzy (Nov 24, 2026)
+
+Zgłoszenie właściciela: statystyki nie pokazywały czystych kont. Przyczyna: pole `p.season.cs` było zerowane na start
+sezonu, ale nic go nie zwiększało (widok w Kadrze czytał zawsze 0). Teraz `applyResult` (`src/season/season.js`) po
+meczu o punkty (bez sparingów) daje bramkarzowi (`pos` BR) czyste konto, gdy grał co najmniej 60 minut, a drużyna nie
+straciła gola (wynik z dogrywką, bez rzutów karnych). Licznik trafia do `p.season.cs` (kolumna „Czyste konta” w Kadrze)
+i do statystyk w podziale na rozgrywki (`p.st[grupa][8]`, `statObj(...).cs`, `src/season/history.js`; kolumna „CK”
+w tabelach statystyk karty bramkarza, `src/ui/playerStatsView.js`). Stare zapisy liczą od najbliższego meczu.
+Test `tests/cleanSheets.test.mjs` (suma czystych kont bramkarzy = mecze bez straconego gola).
+
+Uwaga: premie z kontraktów (za gola, asystę, czyste konto, występ, `contract.bonus`) są ustalane w negocjacjach,
+ale gra ich nie wypłaca; pozycja dopisana do listy poprawek właściciela.

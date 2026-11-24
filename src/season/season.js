@@ -457,6 +457,8 @@ export function applyResult(game, f, res, rng) {
       // Statystyki w podziale na rozgrywki (także sparingi) i historia klubowa (mecze o punkty), src/season/history.js;
       // mecz w drugiej drużynie klubu w grupie 'D' (bez historii klubowej i reputacji)
       const grp = guest ? 'D' : statGroup(f.comp);
+      // Czyste konto: bramkarz co najmniej 60 minut, drużyna bez straconego gola (z dogrywką, bez rzutów karnych)
+      x.cs = !friendly && p.pos === 'BR' && (x.minutes ?? 0) >= 60 && (res.score?.[1 - s] ?? 1) === 0 ? 1 : 0;
       addPlayerMatch(p, grp, x);
       if (!friendly && !guest) matchRepEvents(p, f, x); // zdarzenia reputacji (docs/reputacja.md)
       if (CLUB_GROUPS.includes(grp)) { const sp = syncSpell(p, f.date); if (sp) { sp.m++; sp.g += x.g; } }
@@ -477,6 +479,7 @@ export function applyResult(game, f, res, rng) {
       const ss0 = p.season ?? (p.season = { apps: 0, subs: 0, min: 0, g: 0, a: 0, yc: 0, rc: 0, rating: 0, motm: 0, cs: 0 });
       const ss = guest ? (ss0.oth ??= { apps: 0, min: 0, g: 0, a: 0, yc: 0, rc: 0, rating: 0, motm: 0 }) : ss0;
       ss.apps++; ss.min += x.minutes; ss.g += x.g; ss.a += x.a; ss.yc += x.yc ? 1 : 0; ss.rc += x.rc;
+      if (x.cs) ss.cs = (ss.cs ?? 0) + 1; // czyste konto bramkarza (przy addPlayerMatch)
       ss.ratingSum = (ss.ratingSum ?? 0) + x.rating; ss.rating = Math.round((ss.ratingSum / ss.apps) * 100) / 100;
       if (x.motm) ss.motm++;
       p.form = [...(p.form ?? []), x.rating].slice(-5);
