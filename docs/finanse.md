@@ -399,3 +399,13 @@ o połowę tego (1 + 0,5 (M - 1)). Te same zasady dla gracza i klubów AI. Liczb
 - Zacisk 0,75-1,3 (miliarder do 1,5); sufit zasobności: <= 5 najwyżej 1,0, <= 8 najwyżej 1,1, <= 12 najwyżej 1,2.
 - Gracz dostaje list „Pieniądze właściciela na sezon ...” z kwotą, zmianą w procentach, skarbcem i powodami.
 - Symulacja (ziarno 21, jeden sezon): mnożniki 0,8-1,24, mediana 1,0.
+
+## Premie z kontraktów (Nov 24, 2026)
+- Premie z umowy zawodnika (`contract.bonus`: gol, asysta, czyste konto, występ) są płacone po każdym meczu o stawkę: ligi, Puchar Polski, Superpuchar, puchary europejskie. Sparingi i mecze drugiej drużyny klubu (III i IV liga) nie liczą się. Kod: `career/contractBonus.js`, hak w `applyResult` (`season/season.js`): jeden raz na mecz, dla obu drużyn, także w tle.
+- Gol: za każdego gola zawodnika (karne w grze tak, serie karnych i samobóje nie). Asysta: za każdą asystę zapisaną w statystykach meczu. Występ: pełna kwota od 45 minut na boisku, połowa za 1-44 minut, ławka bez wejścia 0.
+- Czyste konto: tylko bramkarz i obrońcy (BR, ŚO, BO, WB), co najmniej 45 minut, drużyna nie straciła gola w 90 minutach (dogrywka i karne pomijane; z dogrywką liczone ze zdarzeń meczu).
+- Mnożnik rozgrywek (`CONTRACT_BONUS`): liga 1, Puchar Polski 1 (finał 1,5), Superpuchar 1, UEFA faza ligowa i eliminacje 1,5, UEFA faza pucharowa (baraże, 1/8 finału i dalej) 2 [SZAC].
+- Płaci klub, w którym zawodnik zagrał (wypożyczony: klub przyjmujący, stawki z kontraktu zawodnika). Kwota wpada do `finance.clubs[id].bonusDue`, suma sezonu zawodnika do `p.season.bonus` (karta zawodnika: „Premie w sezonie”, tylko gdy kontrakt ma premie). Stary zapis: brak pola = 0.
+- Wypłata co miesiąc 1. dnia razem z pozostałymi księgowaniami miesiąca: wydatek „Premie zawodników” (`bonus`), potem zerowanie. Klub bez gotówki też płaci (saldo może spaść poniżej zera, jak przy pensjach). Należność z końcówki sezonu przechodzi na nowy sezon i jest płacona 1 lipca. Sprzedany zawodnik: zarobione premie zostają w należności starego klubu.
+- Premie mają tylko kontrakty z negocjacji (transfery, przedłużenia, także AI); kadry z generatora świata nie mają premii (start gry: 0 z 4032 zawodników), więc zawodnicy startowi nic nie kosztują.
+- Symulacja jednego sezonu (ziarno 5, bez zmian kontraktów startowych): premie AI z nowych kontraktów to 0,34 % pensji w Ekstraklasie (średnio 109 tys. zł na klub), 0,21 % w 1 Lidze, 0,08 % niżej. Przy założeniu, że każdy zawodnik ma premie jak z oferty domyślnej (gol 4-10 % pensji tygodniowej, występ 2 %, czyste konto 3 % [SZAC]): ok. 1,7 % pensji w Ekstraklasie (średnio 538 tys. zł na klub), 1,5 % w 1 Lidze, 1,4 % w 2 Lidze, 1,0 % w IV lidze. Narzut czasu symulacji: w granicach szumu pomiaru.

@@ -342,6 +342,7 @@ export function rolloverSeason(game) {
     if (om) ownerNotes[c.id] = { ...om, before: clubPlan(c).owner };
     const fresh = old ? initClub(game.world, c, { balance: old.balance, date: newStart, ai: c.id !== game.clubId, ownerMul: om }) : initClub(game.world, c);
     if (old) fresh.history = [...(old.history ?? []), { season: oldSeason, ...seasonSummary(old) }].slice(-10);
+    if (old?.bonusDue) fresh.bonusDue = old.bonusDue; // premie z kontraktów z końcówki sezonu płacone 1 lipca
     F.clubs[c.id] = fresh;
   }
   F.merit = {};

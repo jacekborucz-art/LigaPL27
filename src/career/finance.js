@@ -236,6 +236,7 @@ export function financeDay(F, world, date) {
     if (dow === 1) book(F, id, date, 'out', 'wages', wageBill(world, id));
     if (date.endsWith('-01')) {
       const p = c.plan ?? { tv: c.base * 0.3, sponsor: c.base * 0.27, other: c.base * 0.18, owner: 0, ops: c.base * 0.17 };
+      if (c.bonusDue > 0) { book(F, id, date, 'out', 'bonus', c.bonusDue); c.bonusDue = 0; } // premie z kontraktów, src/career/contractBonus.js
       book(F, id, date, 'in', 'tv', p.tv / 12);
       if (!F.sponsorContracts) book(F, id, date, 'in', 'sponsor', p.sponsor / 12); // z umowami: src/career/sponsors.js
       book(F, id, date, 'in', 'other', p.other / 12);
@@ -268,7 +269,7 @@ export const FIN_LABELS = {
   wages: 'Pensje', ops: 'Koszty klubu', transfers: 'Transfery', signOn: 'Premie za podpis', agents: 'Prowizje agentów', release: 'Rozwiązania kontraktów',
   invest: 'Spłata długów i inwestycje', camps: 'Obozy przygotowawcze', fines: 'Kary PZPN',
   infra: 'Inwestycje w obiekty', upkeep: 'Utrzymanie obiektów',
-  staff: 'Pensje sztabu', staffComp: 'Rekompensaty za sztab',
+  bonus: 'Premie zawodników', staff: 'Pensje sztabu', staffComp: 'Rekompensaty za sztab',
   scouts: 'Skauci: wyprawy i prowizje', // skauting zagraniczny (src/career/scoutOps.js)
 };
 

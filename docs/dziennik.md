@@ -29,6 +29,18 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 24, 2026, profil A (komputer domowy), wypłata premii z kontraktów (v1.23 Beta)
+Zrobione (ekspert Sonnet medium, wdrożenie Sonnet medium, sprawdzone):
+- Nowy `src/career/contractBonus.js` (`CONTRACT_BONUS`, `bonusMultiplier`, `bonusContext`, `bonusFor`, `accrueBonus`), hak w
+  `applyResult` (`src/season/season.js`): po meczu o stawkę (bez sparingów i drugich drużyn) premie z `contract.bonus`
+  (gol, asysta, występ: pełna od 45 min, połowa krócej; czyste konto BR/ŚO/BO/WB od 45 min w 90 minutach), mnożniki
+  UEFA 1,5 / faza pucharowa 2, finał PP 1,5. Należność `finance.clubs[id].bonusDue`, wypłata 1. dnia miesiąca jako
+  „Premie zawodników” (`financeDay`), przechodzi przez zmianę sezonu. Płaci klub meczu (wypożyczony: klub biorący).
+- `p.season.bonus` i wiersz „Premie w sezonie” na karcie zawodnika (`squadView.js`). Test `tests/contractBonus.test.mjs`.
+Zostało / dalej:
+- zawodnicy startowi (z generatora) nie mają premii w kontraktach, mają je tylko kontrakty negocjowane w grze
+  (Ekstraklasa ok. 0,3 % pensji w sezonie; gdyby wszyscy mieli premie domyślne: ok. 1,7 %).
+
 ## Nov 24, 2026, profil A (komputer domowy), wolni poza oknem: wyższe szanse AI i pensje w budżecie (v1.23 Beta)
 Zrobione (na prośbę właściciela):
 - `LATE_JOIN.chance` w `src/career/lateJoins.js`: 12/20/20/12 % (Ekstraklasa, 1 Liga, 2 Liga, III liga), długa kontuzja

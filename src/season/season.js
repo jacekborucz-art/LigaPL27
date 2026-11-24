@@ -29,6 +29,7 @@ import { aiChooseSpeech, postMatchBriefing, closeMatchMemory, POST_TONES } from 
 import { coachOf, coachStyle, matchCoach, quickCoachTerm, formRng, assistantProfile, motivationSkill, COACH } from '../career/coaches.js';
 import { staffOf, healDays } from '../training/staff.js';
 import { statGroup, addPlayerMatch, syncSpell, recordTeamMatch, CLUB_GROUPS } from './history.js';
+import { bonusContext, accrueBonus } from '../career/contractBonus.js'; // premie z kontraktów (docs/finanse.md)
 import { matchRepEvents } from '../career/reputation.js';
 import { refStrictFor, refereeAfterMatch } from '../career/referees.js';
 import { noteSuspWhy, clearSuspWhy } from './suspension.js'; // powód pauzy: żółte albo czerwona (znaczniki w Kadrze)
@@ -441,6 +442,7 @@ export function applyResult(game, f, res, rng) {
     const tie = tieMood(f, s);
     const lossStreak = result === 'L' ? lossStreakOf(game, clubId, f) : 0; // wcześniej nie liczony: kara za serię porażek nie działała
     const diff = s === 0 ? res.strengthDiff : -res.strengthDiff;
+    const bonusCtx = bonusContext(game, f, res, s, clubId, clubById(clubId)); // premie z kontraktów: null w sparingu i w drugiej drużynie
     for (const p of squad) {
       const guest = p.clubId !== clubId; // gra w drugiej drużynie klubu (statystyki osobno, kontrakt bez zmian)
       const tell = mine || p.clubId === game.clubId; // wiadomości o zawodnikach gracza także z meczów rezerw
@@ -478,6 +480,7 @@ export function applyResult(game, f, res, rng) {
       // udział minut, strzelców ligi i rozmowy o grze)
       const ss0 = p.season ?? (p.season = { apps: 0, subs: 0, min: 0, g: 0, a: 0, yc: 0, rc: 0, rating: 0, motm: 0, cs: 0 });
       const ss = guest ? (ss0.oth ??= { apps: 0, min: 0, g: 0, a: 0, yc: 0, rc: 0, rating: 0, motm: 0 }) : ss0;
+      if (bonusCtx && !guest) accrueBonus(bonusCtx, p, x, ss);
       ss.apps++; ss.min += x.minutes; ss.g += x.g; ss.a += x.a; ss.yc += x.yc ? 1 : 0; ss.rc += x.rc;
       if (x.cs) ss.cs = (ss.cs ?? 0) + 1; // czyste konto bramkarza (przy addPlayerMatch)
       ss.ratingSum = (ss.ratingSum ?? 0) + x.rating; ss.rating = Math.round((ss.ratingSum / ss.apps) * 100) / 100;

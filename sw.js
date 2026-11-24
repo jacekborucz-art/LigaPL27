@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-da55480401';
+const VERSION = 'v0.3-8a71853b30';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -199,12 +199,13 @@ const FILES = [
   ['./src/career/coachCareer.js', '1b6aeea20e'],
   ['./src/career/coachMarket.js', '5b7ab28585'],
   ['./src/career/coaches.js', '041155fd9c'],
+  ['./src/career/contractBonus.js', 'd8aad3ecbf'],
   ['./src/career/director.js', 'e724a55f0f'],
   ['./src/career/directorRotation.js', '29b75d0168'],
   ['./src/career/editor.js', '5269b2dddd'],
   ['./src/career/fans.js', '329e0cfdc9'],
   ['./src/career/fansSystem.js', 'ced36b7dd1'],
-  ['./src/career/finance.js', 'e017d06c74'],
+  ['./src/career/finance.js', 'f992841a81'],
   ['./src/career/foreignMarket.js', 'd04cc0ac5b'],
   ['./src/career/foreignPool.js', '283c73474b'],
   ['./src/career/infrastructure.js', '855ad58d60'],
@@ -310,9 +311,9 @@ const FILES = [
   ['./src/season/matchReport.js', 'be9864d533'],
   ['./src/season/national.js', '1b51378924'],
   ['./src/season/nationalSystem.js', '56b1056ddd'],
-  ['./src/season/rollover.js', '54ce5bc49e'],
+  ['./src/season/rollover.js', '175a3a282c'],
   ['./src/season/schedule.js', 'a608f6730f'],
-  ['./src/season/season.js', 'dc1f30a4ea'],
+  ['./src/season/season.js', '05fdaa0d4e'],
   ['./src/season/standings.js', 'b3bdff91e2'],
   ['./src/season/superCupEU.js', 'f728d6d300'],
   ['./src/season/suspension.js', '7671748aa6'],
@@ -392,7 +393,7 @@ const FILES = [
   ['./src/ui/scoutMask.js', '6b18a0fc37'],
   ['./src/ui/scoutingView.js', '6a31d04469'],
   ['./src/ui/sponsorsView.js', '93ea7f72b4'],
-  ['./src/ui/squadView.js', '839456fcf2'],
+  ['./src/ui/squadView.js', 'aa5f25b88f'],
   ['./src/ui/staffView.js', '361bf379b1'],
   ['./src/ui/sysMenu.js', 'fc1677717f'],
   ['./src/ui/tacticsArrows.js', '79ec9ea7a0'],

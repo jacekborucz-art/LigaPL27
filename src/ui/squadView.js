@@ -294,7 +294,8 @@ export function renderPlayerProfile(p, opts = {}) {
         <ul class="plain-list">
           ${!p.contract ? `<li><span class="k">Status</span><span>${p.abroad && !p.free ? `Gra za granicą: ${esc(opts.clubName ?? '')}` : 'Wolny zawodnik, bez kontraktu'}</span></li>` : `${foreign ? '' : `<li><span class="k">Pensja</span><span>${esc(formatZl(p.contract.wage))} tygodniowo</span></li>`}
           <li><span class="k">Do</span><span>${esc(fmtDate(p.contract.until))}</span></li>
-          <li><span class="k">Klauzula</span><span>${p.contract.clause ? esc(formatZl(p.contract.clause)) : 'Brak'}</span></li>`}
+          <li><span class="k">Klauzula</span><span>${p.contract.clause ? esc(formatZl(p.contract.clause)) : 'Brak'}</span></li>
+          ${!foreign && Object.values(p.contract.bonus ?? {}).some((v) => v > 0) ? `<li><span class="k">Premie w sezonie</span><span>${esc(formatZl(p.season?.bonus ?? 0))}</span></li>` : ''}`}
           <li><span class="k">${hidden ? esc(valueLabel(opts.game, p)) : 'Wartość'}</span><span>${esc(hidden ? valueOrScoutPrice(opts.game, p, formatZl) : formatZl(p.value))}</span></li>
           ${foreign ? '' : `<li><span class="k">Agent</span><span>${esc(AGENT_TYPES[p.agent]?.label ?? 'Brak danych')}</span></li>`}
         </ul>
