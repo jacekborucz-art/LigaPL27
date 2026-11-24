@@ -289,7 +289,8 @@ export function startMatchday(game, f) {
   const benchSize = (LEAGUE_COMPS.includes(comp) ? COMPETITIONS[comp].benchSize : 12);
   const benchGk = COMPETITIONS[comp]?.benchGk ?? 1; // puchary UEFA: dwóch rezerwowych bramkarzy (docs/sklad-lawki.md)
   const mySquad = squadFor(game, game.clubId, comp);
-  game.tactics = matchTactics(game, mySquad, benchSize, benchGk);
+  syncFriendlyBench(game, f, benchSize); // ławka sparingu staje się zwykłą ławką gracza, po sparingu wraca do limitu ligi
+  game.tactics = matchTactics(game, mySquad, comp === 'friendly' ? FRIENDLY_BENCH : benchSize, benchGk);
   const oppSquad = squadFor(game, oppId, comp);
   // Sparing: na ławce cała dostępna kadra do 14 zawodników u obu drużyn (docs/sparingi-i-karne.md, rozdz. 4).
   // Ustawienia gracza (game.tactics) się nie zmieniają: dodatkowi rezerwowi dochodzą tylko na ten mecz.
@@ -371,12 +372,40 @@ export function aiPreMatchFormation(game, f, { userSide, mySquad, oppSquad, comp
 export const FRIENDLY_BENCH = 14;
 
 /**
+ * Ławka gracza przed sparingiem i po nim (docs/sparingi-i-karne.md, rozdz. 4). Gdy najbliższy mecz to sparing, raz na
+ * ten mecz (game.tactics.friendlyFor) dobrani przez grę rezerwowi do FRIENDLY_BENCH trafiają do game.tactics.bench
+ * (lista w friendlyExtra) i są zwykłymi zawodnikami ławki. Gdy najbliższy mecz nie jest sparingiem, ławka wraca do limitu
+ * ligi: najpierw odpadają zawodnicy z friendlyExtra, potem nadmiar od końca; zmiany gracza zostają. Zwraca true, gdy zmieniła taktykę.
+ */
+export function syncFriendlyBench(game, nextFix, leagueBenchSize) {
+  const t = game.tactics;
+  if (!t) return false;
+  if (nextFix?.comp === 'friendly') {
+    if (t.friendlyFor === nextFix.id) return false;
+    const squad = squadFor(game, game.clubId, 'friendly');
+    const bench = t.bench.filter((id) => !t.xi.includes(id));
+    const room = Math.max(0, FRIENDLY_BENCH - bench.length);
+    const added = autoPickBench(squad, t.xi, FRIENDLY_BENCH).filter((id) => !bench.includes(id)).slice(0, room);
+    const kept = (t.friendlyExtra ?? []).filter((id) => bench.includes(id));
+    game.tactics = { ...t, bench: [...bench, ...added], friendlyExtra: [...kept, ...added], friendlyFor: nextFix.id };
+    return true;
+  }
+  if (!t.friendlyExtra && !t.friendlyFor && t.bench.length <= leagueBenchSize) return false;
+  const extra = new Set(t.friendlyExtra ?? []);
+  const bench = t.bench.filter((id) => !extra.has(id)).slice(0, leagueBenchSize);
+  const { friendlyExtra, friendlyFor, ...rest } = t;
+  game.tactics = { ...rest, bench };
+  return true;
+}
+
+/**
  * Ustawienia gracza na ten mecz: game.tactics, w sparingu z ławką dopełnioną do FRIENDLY_BENCH dostępnymi
  * zawodnikami (najpierw ławka gracza w jego kolejności, potem wybór automatyczny). game.tactics bez zmian.
  */
 export function matchTacticsFor(game, S) {
   const t = game.tactics;
   if (S.comp !== 'friendly') return t;
+  if (t.friendlyFor) return t; // ławka sparingu już ustawiona przez gracza (syncFriendlyBench): bez dopełniania, zdjęci z ławki nie wracają
   const squad = squadFor(game, game.clubId, S.comp);
   const bench = t.bench.filter((id) => !t.xi.includes(id));
   const extra = autoPickBench(squad, t.xi, FRIENDLY_BENCH).filter((id) => !bench.includes(id));

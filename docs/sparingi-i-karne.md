@@ -92,6 +92,8 @@ Oznaczenia: [ŹRÓDŁO] potwierdzone w źródle z listy na końcu, [PEWNE] przep
 
 Wynik symulacji (200 sparingów na wariant, Ekstraklasa, ławka 12): bez limitu średnio 10,9 zmiany na drużynę, 8,3 w przerwie; ławka 9: 7,9 i 6,1; przy 5 zmianach: 5,2 i 3,4 (w dogrywce do 6).
 
+Przed sparingiem ławka ma 14 miejsc, które gracz może dowolnie rotować (dobrani przez grę rezerwowi trafiają do `game.tactics.bench`, `syncFriendlyBench` w `src/match/matchday.js`); po sparingu dodatkowi zawodnicy schodzą z ławki przed następnym meczem o stawkę.
+
 ### Seria rzutów karnych z wyborem gracza
 
 - Pauza przed serią na życzenie UI (`ctx.shootoutPrep: true`): silnik zatrzymuje się w fazie `shootoutPrep`, gracz widzi okno „Kolejność strzelców” z podpowiedzią asystenta (kolejność automatyczna), może przeciągać zawodników, wskazać bramkarza serii i zatwierdzić. „Zatwierdź podpowiedź” daje dokładnie to, co silnik zrobiłby bez pytania.
@@ -223,7 +225,7 @@ Wdrożone wg rozdz. 6 (Nov 11, 2026). Testy: `tests/friendlyUi.test.mjs` (7 test
 Sparing ma ławkę do 14 rezerwowych (`FRIENDLY_BENCH`, `matchTacticsFor` w `src/match/matchday.js`): gracz ustawia
 miejsca ławki jak w lidze (9 albo 12), resztę do 14 dobiera gra. Wcześniej ekran Skład i taktyka pokazywał tylko
 ławkę gracza (licznik „x z 9”), choć w meczu grało 14 rezerwowych. Teraz, gdy najbliższy mecz to sparing, pod ławką
-gracza widać dobranych przez grę (podpis „dobrany na sparing”, tylko podgląd: bez przeciągania i usuwania), licznik
+gracza są dobrani przez grę (od późniejszej poprawki to zwykła ławka 14 miejsc, bez podglądu „dobrany na sparing”), licznik
 „x z 14”, a ci zawodnicy nie są już w „Poza kadrą meczową” (`benchExtra`, `benchMax` w `renderTactics`,
 `src/ui/tacticsView.js`; `src/app.js`). Okno zmian w meczu pokazywało pełną ławkę już wcześniej. Zasady bez zmian.
 

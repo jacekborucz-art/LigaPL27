@@ -42,7 +42,7 @@ import { WIDE_CARD, cardPos, placeCard, bindCardDrag } from './ui/playerCard.js'
 import { createTactics, changeFormation, setInstruction, refreshTactics, removeFromBench, checkTactics, AUTO_MODES, pruneArrows } from './engine/lineup.js';
 import { COMPETITIONS } from './config/competitions.js';
 import { mountMatchday } from './ui/matchdayView.js';
-import { matchTacticsFor, FRIENDLY_BENCH } from './match/matchday.js'; // ławka sparingu (podgląd na ekranie składu)
+import { syncFriendlyBench, FRIENDLY_BENCH } from './match/matchday.js'; // ławka sparingu: 14 miejsc przed sparingiem, po nim limit ligi
 import { mountDrawAnimation } from './ui/europeView.js';
 import { matchReportHtml } from './ui/matchReportView.js'; // raport meczu po kliknięciu wyniku (docs/raport-meczu.md)
 import { ensureUefa, syncSuperCupEU } from './season/europe.js';
@@ -123,8 +123,10 @@ const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const state = { screen: 'start', slot: null, game: null, tab: 'pulpit', tier: 1, notice: null, mailCat: null, mailOpen: null, running: false, sqFilter: 'all', playerOpen: null, sqSub: 'players', tSel: null, matchNotes: [], cComp: null, cView: 'table', cRound: null, lastResult: null, uFilter: 'pl', uDraw: null, nc: null, confirmDel: null, theme: readTheme(), daySpeed: readDaySpeed(), menuFocus: null, fx: null };
 const WIDE_PICK = '(min-width: 1024px)';
 
-const benchSizeFor = (g) => COMPETITIONS[compOfClub(clubById(g.clubId)) ?? 'ekstraklasa']?.benchSize ?? 9;
+const leagueBenchSizeFor = (g) => COMPETITIONS[compOfClub(clubById(g.clubId)) ?? 'ekstraklasa']?.benchSize ?? 9;
 const nextFixture = (g) => (g.fixtures || []).filter((f) => !f.played && (f.home === g.clubId || f.away === g.clubId)).sort((a, b) => (a.date + (a.time ?? '')).localeCompare(b.date + (b.time ?? '')))[0];
+// Przed sparingiem ławka ma 14 miejsc (FRIENDLY_BENCH), w pozostałych meczach limit ligi
+const benchSizeFor = (g) => (nextFixture(g)?.comp === 'friendly' ? Math.max(FRIENDLY_BENCH, leagueBenchSizeFor(g)) : leagueBenchSizeFor(g));
 /** Kadra gracza z pauzami w rozgrywkach najbliższego meczu. */
 const mySquad = (g) => squadFor(g, g.clubId, nextFixture(g)?.comp ?? 'ekstraklasa');
 const leagueOvrCache = new Map();
@@ -441,7 +443,7 @@ function ensureGameShape(g) {
   for (const p of Object.values(g.world.players ?? {})) if (p?.nat) p.eu = EU.has(p.nat); // stare zapisy: 27 państw UE (Nov 18, 2026)
   ensureReserves(g); // rezerwy (src/career/reserves.js); stare zapisy: kartki 'league' do klasy ligi klubu zawodnika
   if (!g.tactics) g.tactics = createTactics(mySquad(g), { benchSize: benchSizeFor(g) });
-  else g.tactics = refreshTactics(g.tactics, mySquad(g), { benchSize: benchSizeFor(g) }).tactics;
+  else { syncFriendlyBench(g, nextFixture(g), leagueBenchSizeFor(g)); g.tactics = refreshTactics(g.tactics, mySquad(g), { benchSize: benchSizeFor(g) }).tactics; }
   if (!Array.isArray(g.inbox)) g.inbox = [];
   // Stare zapisy: Superpuchar zawsze na PGE Narodowym (teren neutralny)
   for (const f of g.fixtures ?? []) if (f.comp === 'super' && !f.played && !f.neutral) { f.neutral = true; f.venue = 'PGE Narodowy'; }
@@ -682,9 +684,8 @@ function renderTab(tab, g, club) {
       queueMicrotask(mountTacticsScreen); // po wstawieniu HTML: okno atrybutów i fokus
       const wide = matchMedia(WIDE_INFO).matches;
       if (g.tactics.playerInstr) { const sqm = new Map(mySquad(g).map((p) => [p.id, p])); g.tactics.playerInstr = pruneArrows(g.tactics.playerInstr, g.tactics, sqm); } // nieważne strzałki znikają
-      // Sparing: pod ławką gracza widać rezerwowych dobranych na ten mecz (do FRIENDLY_BENCH), sam skład gracza bez zmian
-      const fr = nextFixture(g)?.comp === 'friendly' ? matchTacticsFor(g, { comp: 'friendly' }).bench.filter((id) => !g.tactics.bench.includes(id)) : null;
-      return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), benchExtra: fr, benchMax: fr ? Math.max(FRIENDLY_BENCH, benchSizeFor(g)) : null, info: state.tInfo, msg: state.tMsg, numbers: shirtNumbers(g, g.clubId, squadOf(g.world, g.clubId)), kit: kitColors(clubById(g.clubId)), cards: tCardsFor(g, wide), wide, strengthOpen: tUi.strOpen, assistant: hasAssistant(g), rzChips, rzStrip: rzOn ? reservesStrip(g) : '', analyses: analysesBadge(g), arrows: state.tArrows });
+      syncFriendlyBench(g, nextFixture(g), leagueBenchSizeFor(g)); // sparing: dobrani rezerwowi stają się zwykłą ławką (raz na mecz)
+      return sub + renderTactics({ squad: mySquad(g), tactics: g.tactics, sel: state.tSel, benchSize: benchSizeFor(g), info: state.tInfo, msg: state.tMsg, numbers: shirtNumbers(g, g.clubId, squadOf(g.world, g.clubId)), kit: kitColors(clubById(g.clubId)), cards: tCardsFor(g, wide), wide, strengthOpen: tUi.strOpen, assistant: hasAssistant(g), rzChips, rzStrip: rzOn ? reservesStrip(g) : '', analyses: analysesBadge(g), arrows: state.tArrows });
     }
     const ovrs = leagueOvrs(g, club.tier);
     const p = state.playerOpen && g.world.players[state.playerOpen];
@@ -1977,6 +1978,7 @@ async function dispatchAct(el, { root = app } = {}) {
       }
       const a = primaryAction(g);
       if (a.kind === 'play') {
+        syncFriendlyBench(g, nextFixture(g), leagueBenchSizeFor(g));
         const { tactics, changes } = refreshTactics(g.tactics, mySquad(g), { benchSize: benchSizeFor(g) });
         g.tactics = tactics;
         const check = checkTactics(tactics, mySquad(g), { benchSize: benchSizeFor(g) });

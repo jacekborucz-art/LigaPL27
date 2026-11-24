@@ -29,6 +29,16 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 24, 2026, profil A (komputer domowy), rotacja ławki przed sparingiem (v1.23 Beta)
+Zrobione (agent Sonnet medium, sprawdzone):
+- Przed sparingiem ławka w Skład i taktyka ma 14 miejsc, a dobrani przez grę rezerwowi są zwykłą ławką gracza (przesuwanie,
+  zamiany z jedenastką, usuwanie, dodawanie). Wcześniej były tylko do podglądu (wiersze „dobrany na sparing”).
+- `syncFriendlyBench` (`src/match/matchday.js`): raz na sparing (`tactics.friendlyFor`) dopisuje dobranych (`tactics.friendlyExtra`);
+  przed meczem o stawkę ci zawodnicy schodzą pierwsi, ławka wraca do limitu ligi, zmiany gracza zostają.
+  `benchSizeFor` w `src/app.js` daje 14 przed sparingiem (`leagueBenchSizeFor` to limit ligi). `matchTacticsFor` nie dopełnia
+  już ławki ustawionej przez gracza (zdjęci z ławki nie wracają w meczu).
+- Testy `tests/friendlyUi.test.mjs`, opis `docs/sparingi-i-karne.md`.
+
 ## Nov 24, 2026, profil A (komputer domowy), zmienne pieniądze właściciela na sezon (v1.23 Beta)
 Zrobione:
 - Nowy `src/career/ownerFunding.js` (`OWNER_FUND`, `seasonVerdict`, `ownerSeasonMul`): od 2. sezonu dopłata = baza z danych

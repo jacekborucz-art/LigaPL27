@@ -7,13 +7,14 @@ import { generateWorld, squadOf } from '../src/world/worldGen.js';
 import { createSeason } from '../src/season/season.js';
 import { processDay } from '../src/core/gameLoop.js';
 import { createTactics } from '../src/engine/lineup.js';
+import { resolveMove } from '../src/ui/tacticsMoves.js';
 import { createFinance } from '../src/career/finance.js';
 import '../src/season/dailySystems.js';
 import * as TR from '../src/training/index.js';
 import { setFriendlyRules, friendlyRuleTags, friendlyRulesOf, normalizeFriendlyRules } from '../src/training/friendlies.js';
 import { renderTraining, handleTrainingAction } from '../src/ui/trainingView.js';
 import {
-  startMatchday, kickOff, tick, skip, finishMatchday, knockoutCtx, matchTacticsFor, FRIENDLY_BENCH, shootoutSetup,
+  startMatchday, kickOff, tick, skip, finishMatchday, knockoutCtx, matchTacticsFor, FRIENDLY_BENCH, syncFriendlyBench, shootoutSetup,
   previewShootoutOrder, confirmShootout, endShootout, secondEleven, applySecondEleven, liveRatings, keeperReminder,
 } from '../src/match/matchday.js';
 import { shootoutCandidates } from '../src/engine/match/match.js';
@@ -113,21 +114,67 @@ test('Dzień meczowy sparingu: ławka 14 u obu drużyn, zasady i pauza przed ser
   const d = TR.friendlyDates(g, { days: 60, limit: 60 })[0];
   const opp = TR.friendlyOpponents(g, d.date)[0];
   const { fixture: f } = TR.createFriendly(g, d.date, opp.id, { decider: 'et_penalties', subs: 'rolling', rotation: 'staggered' });
+  const leagueBench = g.tactics.bench.length;
   const S = startMatchday(g, f);
   const benchBefore = [...g.tactics.bench];
   assert.equal(S.benchSize, FRIENDLY_BENCH);
   const t = matchTacticsFor(g, S);
-  assert.ok(t.bench.length > g.tactics.bench.length && t.bench.length <= FRIENDLY_BENCH, `${t.bench.length}`);
-  assert.deepEqual(t.bench.slice(0, g.tactics.bench.length), g.tactics.bench, 'ławka gracza zostaje na początku');
+  assert.ok(g.tactics.bench.length > leagueBench && g.tactics.bench.length <= FRIENDLY_BENCH, 'dobrani rezerwowi są na ławce gracza');
+  assert.deepEqual(t.bench, g.tactics.bench, 'ławka gracza zostaje w jego kolejności');
   const M = kickOff(g, S);
   assert.equal(M.ctx.shootoutPrep, true);
   assert.deepEqual([M.rules.friendly, M.rules.decider, M.rules.subs, M.rules.reentry, M.rules.rotation, M.rules.period], [true, 'et_penalties', 'rolling', true, 'staggered', d.period.kind]);
   assert.equal(M.teams[S.userSide].bench.length, t.bench.length);
   assert.equal(M.teams[1 - S.userSide].bench.length, FRIENDLY_BENCH);
-  assert.deepEqual(g.tactics.bench, benchBefore, 'ustawienia gracza bez zmian');
+  assert.deepEqual(g.tactics.bench, benchBefore, 'ustawienia gracza bez zmian po starcie meczu');
   // Oceny na żywo z silnika
   while (S.step === 'live1') tick(S);
   assert.ok(Object.keys(liveRatings(S)).length >= 22);
+});
+
+test('Ławka przed sparingiem: 14 miejsc do swobodnej rotacji, po sparingu powrót do limitu ligi', () => {
+  const g = newGame();
+  const d = TR.friendlyDates(g, { days: 60, limit: 60 })[0];
+  const opp = TR.friendlyOpponents(g, d.date)[0];
+  const { fixture: f } = TR.createFriendly(g, d.date, opp.id, {});
+  const squad = squadOf(g.world, g.clubId);
+  const byId = new Map(squad.map((p) => [p.id, p]));
+  const before = [...g.tactics.bench];
+  assert.ok(before.length <= 12);
+  assert.equal(syncFriendlyBench(g, f, 12), true);
+  assert.ok(g.tactics.bench.length > before.length && g.tactics.bench.length <= FRIENDLY_BENCH);
+  assert.equal(g.tactics.friendlyFor, f.id);
+  assert.deepEqual(g.tactics.bench.slice(0, before.length), before, 'ławka gracza na początku');
+  assert.deepEqual(g.tactics.friendlyExtra, g.tactics.bench.slice(before.length));
+  assert.equal(syncFriendlyBench(g, f, 12), false, 'raz na mecz');
+  // Zamiana dodatkowego rezerwowego z zawodnikiem z jedenastki
+  const ex = g.tactics.friendlyExtra[0];
+  const idx = g.tactics.bench.indexOf(ex);
+  const r = resolveMove(g.tactics, { zone: 'bench', idx }, { zone: 'xi', idx: 5 }, { byId, benchSize: FRIENDLY_BENCH });
+  if (r.ok) {
+    g.tactics = r.tactics;
+    assert.ok(g.tactics.xi.includes(ex));
+    assert.ok(matchTacticsFor(g, { comp: 'friendly' }).xi.includes(ex));
+  }
+  // Usunięty z ławki nie wraca przy kolejnej synchronizacji tego samego sparingu
+  const gone = g.tactics.friendlyExtra.find((id) => g.tactics.bench.includes(id));
+  g.tactics = { ...g.tactics, bench: g.tactics.bench.filter((id) => id !== gone) };
+  syncFriendlyBench(g, f, 12);
+  assert.ok(!g.tactics.bench.includes(gone));
+  assert.ok(matchTacticsFor(g, { comp: 'friendly' }).bench.length <= FRIENDLY_BENCH, 'mecz do 14');
+  // Po sparingu: dodatkowi odpadają, zmiany gracza zostają
+  const kept = g.tactics.bench.filter((id) => !g.tactics.friendlyExtra.includes(id));
+  const lg = g.fixtures.find((x) => x.comp === 'ekstraklasa' && (x.home === g.clubId || x.away === g.clubId));
+  assert.equal(syncFriendlyBench(g, lg, 12), true);
+  assert.deepEqual(g.tactics.bench, kept.slice(0, 12));
+  assert.ok(g.tactics.bench.length <= 12);
+  assert.equal(g.tactics.friendlyExtra, undefined);
+  assert.equal(g.tactics.friendlyFor, undefined);
+  assert.equal(syncFriendlyBench(g, lg, 12), false);
+  // Limit ligi mniejszy od ławki: nadmiar od końca
+  g.tactics = { ...g.tactics, bench: [...g.tactics.bench, ...squad.map((p) => p.id).filter((id) => !g.tactics.xi.includes(id) && !g.tactics.bench.includes(id))].slice(0, 12) };
+  syncFriendlyBench(g, lg, 9);
+  assert.equal(g.tactics.bench.length, 9);
 });
 
 test('Rozstrzygnięcie remisu w ctx: Superpuchar od razu karne, puchar, dwumecz, liga', () => {

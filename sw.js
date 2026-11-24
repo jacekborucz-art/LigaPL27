@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-5713a338cd';
+const VERSION = 'v0.3-3149ed8f1f';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -186,7 +186,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', '745278473d'],
+  ['./src/app.js', '3548c58bfd'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '3cd6d72f9f'],
   ['./src/career/assistantReport.js', 'e215edbbc2'],
@@ -290,7 +290,7 @@ const FILES = [
   ['./src/engine/teamStrength.js', '48334cd7ed'],
   ['./src/match/aiPlan.js', '2f958da775'],
   ['./src/match/briefings.js', '259a9a1c24'],
-  ['./src/match/matchday.js', '9ac3d26258'],
+  ['./src/match/matchday.js', '374dadb2f2'],
   ['./src/match/press.js', 'd373887c96'],
   ['./src/match/pressSystem.js', 'f08d4d2743'],
   ['./src/match/studio.js', '5b1b2f1dad'],
@@ -397,7 +397,7 @@ const FILES = [
   ['./src/ui/tacticsArrows.js', '79ec9ea7a0'],
   ['./src/ui/tacticsDrag.js', 'e4a2009a87'],
   ['./src/ui/tacticsMoves.js', '36742ffefc'],
-  ['./src/ui/tacticsView.js', '1b72e6939c'],
+  ['./src/ui/tacticsView.js', '654ad56ae5'],
   ['./src/ui/talksView.js', '4a00b34822'],
   ['./src/ui/teamReportView.js', 'c01abc57b6'],
   ['./src/ui/todoView.js', 'bd4d7aa1c4'],

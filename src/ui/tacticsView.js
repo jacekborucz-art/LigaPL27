@@ -76,9 +76,8 @@ const hitsWord = (n) => (n !== 1 && few(n) ? 'pasują' : 'pasuje');
  * analyses: { n, alert } przycisk „Analizy meczów” (src/ui/postMatchView.js analysesBadge); brak: bez przycisku.
  * arrows: { on, pick } tryb strzałek ruchu (on: klik zawodnika otwiera kompas, przeciąganie wyłączone; pick: indeks
  * miejsca z otwartym kompasem albo null). Strzałki na boisku widać zawsze.
- * benchExtra: id rezerwowych dobranych automatycznie na ten mecz (sparing, tylko podgląd pod ławką gracza), benchMax: pełny limit ławki w tym meczu.
  */
-export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg = '', numbers = null, kit = null, infoExtra = '', rzChips = null, rzStrip = '', cards = null, wide = false, strengthOpen = true, assistant = true, analyses = null, arrows = null, benchExtra = null, benchMax = null }) {
+export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg = '', numbers = null, kit = null, infoExtra = '', rzChips = null, rzStrip = '', cards = null, wide = false, strengthOpen = true, assistant = true, analyses = null, arrows = null }) {
   const byId = new Map(squad.map((p) => [p.id, p]));
   const f = formationById(tactics.formation);
   const check = checkTactics(tactics, squad, { benchSize });
@@ -87,7 +86,6 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
   const selPlayer = selId ? byId.get(selId) : null;
   const inXI = new Set(tactics.xi.filter(Boolean));
   const onBench = new Set(tactics.bench);
-  const extraIds = (benchExtra ?? []).filter((id) => byId.has(id) && !onBench.has(id) && !inXI.has(id));
   const openCards = (cards ?? (info ? [{ id: info, pinned: false, slot: 0, extra: infoExtra }] : [])).filter((c) => byId.has(c.id));
   const openIds = new Set(openCards.map((c) => c.id));
   const pim = tactics.playerInstr ?? {};
@@ -205,17 +203,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
         <span class="tp-row__name">Wolne miejsce na ławce<small>${freeText(free)}</small></span>
       </button>
     </li>` : '';
-  // Sparing: rezerwowi dobrani automatycznie na ten mecz (bez przenoszenia i usuwania, ławka gracza zostaje bez zmian)
-  const benchAuto = extraIds.map((id) => byId.get(id)).map((p) => `<li class="tp-row tp-row--auto" data-pid="${esc(p.id)}">
-      <div class="tp-row__main">
-        <span class="tp-handle tp-handle--none"><span class="tp-grip" aria-hidden="true"></span><span class="pos" data-g="${GROUP[p.pos]}">${esc(posText(p))}</span></span>
-        <span class="tp-row__name"><span class="tp-row__nm">${esc(p.name)}</span><small class="tp-row__auto" title="Gra dobrała go automatycznie na sparing (tylko podgląd)">dobrany na sparing</small></span>
-        ${condHtml(p)}<b class="tp-ovr" title="Ocena ogólna w skali 1-20">${Math.round(p.ovr)}</b>
-      </div>
-      ${infoBtn(p)}
-      <span class="tp-row__x tp-row__x--none" aria-hidden="true"></span>
-    </li>`).join('');
-  const out = squad.filter((p) => !inXI.has(p.id) && !onBench.has(p.id) && !extraIds.includes(p.id))
+  const out = squad.filter((p) => !inXI.has(p.id) && !onBench.has(p.id))
     .sort((a, b) => Number(isAvailable(b)) - Number(isAvailable(a)) || byPosition(a, b)).map((p) => row(p, { zone: 'out', id: p.id })).join('');
 
   const repSum = sel && (tally.opt || tally.ok || tally.weak) ? ` Pasuje: ${tally.opt}, da radę: ${tally.ok}, słabo: ${tally.weak}.` : '';
@@ -276,8 +264,8 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
       </section>
       ${rzStrip && wide ? `<div class="tac__rz">${rzStrip}</div>` : rzStrip}
       <section class="tp-sec tp-sec--bench" aria-labelledby="tp-h-bench">
-        <h3 id="tp-h-bench">Ławka rezerwowych <span class="muted">${tactics.bench.length + extraIds.length} z ${benchMax ?? benchSize}</span>${hitsHtml('bench')}</h3>
-        <ul class="tp-list">${bench || (free || extraIds.length ? '' : '<li class="mail-empty">Ławka jest pusta.</li>')}${benchAuto}${benchAdd}</ul>
+        <h3 id="tp-h-bench">Ławka rezerwowych <span class="muted">${tactics.bench.length} z ${benchSize}</span>${hitsHtml('bench')}</h3>
+        <ul class="tp-list">${bench || (free ? '' : '<li class="mail-empty">Ławka jest pusta.</li>')}${benchAdd}</ul>
       </section>
       <section class="tp-sec tp-out" data-drop="outZone" aria-labelledby="tp-h-out">
         <h3 id="tp-h-out">Poza kadrą meczową${hitsHtml('out')}</h3>
