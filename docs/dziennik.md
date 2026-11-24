@@ -40,6 +40,8 @@ Decyzje i pułapki:
 - Agent zamienił końce linii w `src/ui/tacticsView.js` (CRLF na LF, diff 663 linii); przywrócone CRLF. Po pracy agenta
   sprawdzać `git diff --stat` i format końców linii.
 - Edytować da się nadal tylko miejsca ławki gracza; dobranych na sparing gracz nie zmienia (zasady bez zmian).
+- Wiersz dobranego na sparing ma puste miejsce w kolumnie × (`tp-row__x--none`), żeby kolumny ławki były wyrównane
+  (uwaga właściciela ze zrzutu ekranu).
 Zostało / dalej:
 - Zadanie 3 z `POPRAWKI.txt`: nowo podpisany zawodnik zbyt szybko chce odchodzić (okres aklimatyzacji + RNG).
 

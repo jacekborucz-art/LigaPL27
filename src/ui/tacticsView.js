@@ -212,6 +212,7 @@ export function renderTactics({ squad, tactics, sel, benchSize, info = null, msg
         ${condHtml(p)}<b class="tp-ovr" title="Ocena ogólna w skali 1-20">${Math.round(p.ovr)}</b>
       </div>
       ${infoBtn(p)}
+      <span class="tp-row__x tp-row__x--none" aria-hidden="true"></span>
     </li>`).join('');
   const out = squad.filter((p) => !inXI.has(p.id) && !onBench.has(p.id) && !extraIds.includes(p.id))
     .sort((a, b) => Number(isAvailable(b)) - Number(isAvailable(a)) || byPosition(a, b)).map((p) => row(p, { zone: 'out', id: p.id })).join('');
