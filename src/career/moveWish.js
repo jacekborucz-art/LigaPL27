@@ -16,7 +16,7 @@ import { CLUBS_PL, clubById } from '../data/clubs_pl.js';
 import { squadOf } from '../world/worldGen.js';
 import { clubReputation } from './reputation.js';
 import { personalityOf } from './personality.js';
-import { relationWith, aiNegotiate, currentGrudge } from './negotiation.js';
+import { relationWith, aiNegotiate, currentGrudge, applyPromiseCheck, ROLE_LABELS } from './negotiation.js';
 import {
   MEM, memOf, ensureMem, rejectOdds, noteReject, canRoll, hazardMemFactor, reconcileChance, noteRenewal,
   talkRaiseBonus, nextWindowOpen, nextWindowEnd, lateInWindow, addMonths, inAcclim,
@@ -212,6 +212,42 @@ function moodMonth(game, p, date, ym) {
   }
 }
 
+/**
+ * Obietnica roli z kontraktu (career/negotiation.js evaluatePromise): 1. dnia miesiąca udział w minutach meczów klubu
+ * z ostatniego miesiąca. Miesiąc bez meczów klubu albo z kontuzją zawodnika się nie liczy. Słaby miesiąc: ostrzeżenie,
+ * 3 słabe miesiące: obietnica złamana. Złamana obietnica kończy okres aklimatyzacji, a zawodnik prosi o odejście
+ * z szansą z charakteru (0,5 + ambicja i chęć gry, od 0,2 do 0,9) [SZAC]. Gracz dostaje wiadomości o swoich zawodnikach.
+ */
+function promiseMonth(game, p, clubId, clubGamesN, date) {
+  const pr = p.contract?.promise;
+  if (!pr || pr.broken || p.loan) return [];
+  const minNow = p.season?.min ?? 0;
+  const seen = pr.seen ?? { min: minNow, g: clubGamesN };
+  const dMin = minNow >= seen.min ? minNow - seen.min : minNow; // nowy sezon: statystyki od zera
+  const dG = clubGamesN >= seen.g ? clubGamesN - seen.g : clubGamesN;
+  const skip = !pr.seen || dG === 0 || p.injuryDays > 0;
+  p.contract = { ...p.contract, promise: { ...pr, seen: { min: minNow, g: clubGamesN } } };
+  if (skip) return [];
+  const r = applyPromiseCheck(p, clubId, date, clamp(dMin / (dG * 90), 0, 1));
+  if (!r) return [];
+  const out = [];
+  const mine = clubId === game.clubId;
+  if (mine && (r.type === 'promiseWarning' || r.type === 'promiseBroken')) {
+    const role = ROLE_LABELS[p.contract.promise.role] ?? p.contract.promise.role;
+    out.push(msg(date, { key: `obietnica:${p.id}:${date}`, from: r.speaker ?? `Agent zawodnika ${p.name}`, priority: r.type === 'promiseBroken' ? 'important' : 'info',
+      subject: r.type === 'promiseBroken' ? `${p.name}: złamana obietnica roli` : `${p.name} przypomina o obietnicy roli`,
+      body: `${r.text ?? ''}
+
+W kontrakcie: ${role}. ${r.type === 'promiseBroken' ? 'Trzeci słaby miesiąc: obietnica złamana, zaufanie i morale spadają, a zawodnik może poprosić o odejście.' : `Słaby miesiąc (${p.contract.promise.strikes} z 3). Po trzecim obietnica będzie złamana.`}` }));
+  }
+  if (r.type === 'promiseBroken') {
+    const t = traitsOf(p);
+    const chance = clamp(0.5 + 0.03 * (t.ambition - 10) + 0.03 * ((t.playTime ?? 10) - 10), 0.2, 0.9);
+    if (new Rng(`obietnica-prosba:${game.seed}:${p.id}:${date}`).chance(chance)) out.push(...openWish(game, p, date, 'obietnica'));
+  }
+  return out;
+}
+
 /** 1. dnia miesiąca: nowe prośby z ryzyka miesięcznego i wycofanie próśb po zamkniętym oknie. */
 export function requestsMonth(game, date) {
   const out = [];
@@ -224,6 +260,7 @@ export function requestsMonth(game, date) {
     const clubRep = clubReputation(c);
     const n = games[c.id] ?? 0;
     for (const p of squadOf(game.world, c.id)) {
+      out.push(...promiseMonth(game, p, c.id, n, date)); // obietnica roli z kontraktu: rozliczenie miesiąca
       if (p.moveWish) {
         // Po zamkniętym oknie bez oferty: 30 % w miesiącu, że zawodnik odpuszcza
         if (!inWin && !p.moveWish.promise && new Rng(`prosba-koniec:${game.seed}:${p.id}:${ym}`).chance(WISH.withdraw)) {

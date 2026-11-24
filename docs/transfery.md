@@ -460,15 +460,25 @@ cena 70 % wartości: 1,9 -> 3,3 oferty na zawodnika; 100 %: 1,9 -> 2,0; 130 %: 1
 Zgłoszenie właściciela: nowo kupiony zawodnik chciał odchodzić po kilku kolejkach. Przyczyna: po odrzuconej ofercie
 większego klubu „czas spokoju” po podpisie obniżał szansę prośby tylko do 20 %, a rozczarowanie nie zależało od stażu.
 Pomiar (160 zawodników 21-27 lat, 3 tygodnie po podpisie, odrzucona oferta dużo większego klubu): przed 82 prośby
-(zawodnicy z długim stażem 75), po 0 (długi staż bez zmian). Konsultacja z ekspertem piłkarskim (Sonnet, medium) [SZAC]:
-- `acclimUntil` w `src/career/wishMemory.js` (`ACCLIM`): od zmiany klubu (`p.lastMove`) 4 miesiące + charakter
-  (lojalność, cierpliwość dłużej, ambicja krócej, do +-1,5) + los (+-1), obcokrajowiec +1, podpis w czerwcu i lipcu +1,
-  zakres 3-8 miesięcy; podpis w styczniu i lutym co najmniej do 31 maja. Ziarno z id i daty zmiany klubu,
-  przedłużenie kontraktu okresu nie zmienia.
-- W tym czasie: brak prośby z ryzyka miesięcznego; po odrzuconej ofercie prośba tylko przy ofercie marzeń (x0,3),
-  rozczarowanie x0,3, bez eskalacji rozczarowania kolejną odmową. Te same zasady dla gracza i klubów AI.
+(zawodnicy z długim stażem 75), po 0 (długi staż bez zmian).
+
+Decyzja właściciela: zawodnik, który właśnie podpisał kontrakt, nie chce odchodzić; prosić może najwcześniej po roku.
+Wyjątek: trener obiecał w kontrakcie rolę (np. podstawowy skład), a zawodnik nie gra albo nie trafia do kadry.
+- `acclimUntil` w `src/career/wishMemory.js` (`ACCLIM`): od zmiany klubu (`p.lastMove`) 12 miesięcy + lojalność
+  i cierpliwość (do +2) + los (0-2), zakres 12-16 miesięcy [SZAC]. Ziarno z id i daty zmiany klubu, przedłużenie
+  kontraktu okresu nie zmienia.
+- W tym czasie: brak prośby z ryzyka miesięcznego i po odrzuconej ofercie (także ofercie marzeń), rozczarowanie x0,3,
+  bez eskalacji rozczarowania kolejną odmową. Te same zasady dla gracza i klubów AI.
+- Obietnica roli (`contract.promise`, `evaluatePromise` w `src/career/negotiation.js`) jest od Nov 24, 2026 naprawdę
+  rozliczana: wcześniej `applyPromiseCheck` nie był nigdzie wywoływany. `promiseMonth` w `src/career/moveWish.js`
+  1. dnia miesiąca liczy udział w minutach meczów klubu z ostatniego miesiąca (miesiąc bez meczów albo z kontuzją
+  się nie liczy, pierwszy miesiąc po podpisie bez rozliczenia). Udział poniżej 75 % progu roli (kluczowy 0,7,
+  podstawowy 0,55, rotacja 0,3, perspektywiczny 0,15, rezerwowy 0,05): ostrzeżenie (wiadomość dla gracza),
+  3 takie miesiące: obietnica złamana (zaufanie -20, morale -3, wiadomość), koniec aklimatyzacji i prośba o odejście
+  z szansą 0,5 + 0,03 x (ambicja - 10) + 0,03 x (chęć gry - 10), od 0,2 do 0,9.
 - Oferty klubów AI za zawodnika gracza, który nie jest na liście transferowej: 0-2 miesiące po zmianie klubu x0,1,
   2-4 x0,25, 4-6 x0,6 (`aiOffersForUser`, `src/career/transfers.js`).
+- Pół sezonu w klubach AI (2 światy): prośby z ryzyka i po ofertach bez zmian (52 i 9), doszło 7 próśb po złamanej
+  obietnicy u nowych zawodników (3-4 miesiące po transferze).
 - Nie wdrożone (propozycje eksperta, do decyzji): krótsza aklimatyzacja po wykupie z wypożyczenia, koniec aklimatyzacji
-  po zwolnieniu trenera, który sprowadził zawodnika, wcześniejsza prośba przy złamanej obietnicy roli, podłoga
-  „czasu spokoju” 0,35 przez 3 miesiące po aklimatyzacji.
+  po zwolnieniu trenera, który sprowadził zawodnika.

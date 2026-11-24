@@ -31,14 +31,17 @@ Zostało / dalej:
 
 ## Nov 24, 2026, profil A (komputer domowy), okres aklimatyzacji nowego zawodnika (v1.23 Beta)
 Zrobione:
-- `POPRAWKI.txt`, zadanie 3: okres aklimatyzacji po zmianie klubu (3-8 miesięcy, zimą do końca rundy): nowy zawodnik
-  nie prosi o transfer poza ofertą marzeń, rzadko bywa rozczarowany, kluby AI rzadziej składają oferty za świeżo
-  kupionego (`ACCLIM`, `acclimUntil` w `src/career/wishMemory.js`, `src/career/moveWish.js`, `src/career/transfers.js`,
+- `POPRAWKI.txt`, zadanie 3: okres aklimatyzacji po zmianie klubu, po decyzji właściciela co najmniej rok
+  (12-16 miesięcy): nowy zawodnik nie prosi o transfer, chyba że klub złamie obietnicę roli z kontraktu (obietnica
+  rozliczana co miesiąc od Nov 24, 2026, wcześniej `applyPromiseCheck` nie był wywoływany); kluby AI rzadziej składają
+  oferty za świeżo kupionego (`ACCLIM`, `acclimUntil` w `src/career/wishMemory.js`, `src/career/moveWish.js`, `src/career/transfers.js`,
   test `tests/acclimatization.test.mjs`, opis `docs/transfery.md` „Okres aklimatyzacji nowego zawodnika”).
 - Modele (zgoda właściciela): ekspert piłkarski Sonnet medium (burza mózgów), wdrożenie Opus (profil A).
 Decyzje i pułapki:
 - Pomiar: przed poprawką świeżo kupieni prosili po odrzuconej ofercie częściej niż zawodnicy z długim stażem (82 wobec 75 na 160).
-- Propozycje eksperta niewdrożone (wykup z wypożyczenia, zwolniony trener, złamana obietnica, podłoga 0,35) w `docs/transfery.md`.
+- Pierwsza wersja (3-8 miesięcy) poprawiona tego samego dnia na prośbę właściciela: „co najmniej po roku, chyba że trener
+  obiecał skład i nie daje grać”.
+- Propozycje eksperta niewdrożone (wykup z wypożyczenia, zwolniony trener) w `docs/transfery.md`.
 Zostało / dalej:
 - Zadanie 4 z `POPRAWKI.txt`: w karcie zawodnika w okienku brakuje lepszej nogi.
 

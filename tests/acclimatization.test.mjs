@@ -9,7 +9,7 @@ import { createTactics } from '../src/engine/lineup.js';
 import { ensureCareer } from '../src/career/careerSystem.js';
 import { applySeasonState } from '../src/season/rollover.js';
 import { acclimUntil, inAcclim, ACCLIM } from '../src/career/wishMemory.js';
-import { offerRejected, monthlyHazard } from '../src/career/moveWish.js';
+import { offerRejected, monthlyHazard, requestsMonth } from '../src/career/moveWish.js';
 
 function newGame(seed = 21) {
   applySeasonState({});
@@ -20,18 +20,38 @@ function newGame(seed = 21) {
 }
 const months = (a, b) => (Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / (30.44 * 864e5);
 
-test('Długość aklimatyzacji: 3-8 miesięcy, zimą do końca rundy wiosennej, stała dla zawodnika', () => {
+test('Długość aklimatyzacji: co najmniej rok (12-16 miesięcy), stała dla zawodnika', () => {
   const g = newGame();
   for (const p of squadOf(g.world, 'widzew')) {
-    p.lastMove = '2026-08-20';
-    const u = acclimUntil(p);
-    const m = months(p.lastMove, u);
-    assert.ok(m >= ACCLIM.min - 0.05 && m <= ACCLIM.max + 0.05, `${p.name}: ${m.toFixed(1)}`);
-    assert.equal(acclimUntil(p), u);
-    p.lastMove = '2027-01-25';
-    assert.ok(acclimUntil(p) >= '2027-05-31', 'zimą cała runda wiosenna');
+    for (const from of ['2026-08-20', '2027-01-25']) {
+      p.lastMove = from;
+      const u = acclimUntil(p);
+      const m = months(from, u);
+      assert.ok(m >= ACCLIM.min - 0.05 && m <= ACCLIM.max + 0.05, `${p.name}: ${m.toFixed(1)}`);
+      assert.equal(acclimUntil(p), u);
+    }
   }
   assert.equal(acclimUntil({ id: 'x' }), null, 'bez zmiany klubu: brak okresu');
+});
+
+test('Złamana obietnica roli kończy aklimatyzację: 3 słabe miesiące, wiadomości dla gracza, prośba możliwa', () => {
+  const g = newGame();
+  const p = squadOf(g.world, 'widzew')[20];
+  p.lastMove = '2026-07-05';
+  p.contract = { ...p.contract, signed: '2026-07-05', promise: { role: 'podstawowy', since: '2026-07-05', strikes: 0, kept: 0, broken: false } };
+  p.season = { ...(p.season ?? {}), min: 0 };
+  assert.ok(inAcclim(p, '2026-10-01'));
+  const mails = [];
+  let games = 0;
+  for (const d of ['2026-08-01', '2026-09-01', '2026-10-01', '2026-11-01', '2026-12-01']) {
+    games += 4; // klub gra, zawodnik nie
+    g.fixtures = [...Array(games)].map((_, i) => ({ played: true, home: 'widzew', away: 'lks', date: '2026-07-20', id: `x${i}` }));
+    mails.push(...requestsMonth(g, d).filter((m) => String(m.key ?? '').startsWith(`obietnica:${p.id}`)));
+  }
+  assert.ok(p.contract.promise.broken, 'obietnica złamana');
+  assert.equal(inAcclim(p, '2026-12-02'), false, 'koniec aklimatyzacji');
+  assert.ok(mails.some((m) => /złamana obietnica/.test(m.subject)), mails.map((m) => m.subject).join(' | '));
+  assert.ok(mails.some((m) => /przypomina o obietnicy/.test(m.subject)));
 });
 
 test('W okresie aklimatyzacji: bez prośby z ryzyka miesięcznego i po odrzuconych ofertach (poza ofertą marzeń)', () => {

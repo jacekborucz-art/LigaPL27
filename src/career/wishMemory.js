@@ -104,14 +104,15 @@ export function settleInfo(p) {
 
 // ------------------------------------------------------------ Okres aklimatyzacji (Nov 24, 2026)
 /**
- * Okres aklimatyzacji po zmianie klubu (p.lastMove: transfer, wolny zawodnik, wykup), konsultacja z ekspertem [SZAC]:
- * 4 miesiące + charakter (lojalność i cierpliwość dłużej, ambicja krócej, do +-1,5) + los (+-1), obcokrajowiec +1,
- * podpis latem (czerwiec, lipiec) +1 za okres przygotowawczy, od 3 do 8 miesięcy; podpis zimą (styczeń, luty) co
- * najmniej do 31 maja (runda wiosenna). Stała dla zawodnika (ziarno z id i daty zmiany klubu); przedłużenie kontraktu
- * jej nie zmienia. W tym czasie zawodnik nie prosi o transfer z ryzyka miesięcznego, a po odrzuconej ofercie tylko
- * przy ofercie marzeń (x0,3) i rzadko bywa rozczarowany (x0,3). Te same zasady dla gracza i klubów AI.
+ * Okres aklimatyzacji po zmianie klubu (p.lastMove: transfer, wolny zawodnik, wykup). Decyzja właściciela: zawodnik,
+ * który właśnie podpisał kontrakt, nie chce odchodzić; prosić może najwcześniej po roku. Długość: 12 miesięcy
+ * + lojalność i cierpliwość (do +2) + los (0-2), od 12 do 16 miesięcy [SZAC]. Stała dla zawodnika (ziarno z id
+ * i daty zmiany klubu); przedłużenie kontraktu jej nie zmienia. W tym czasie zawodnik nie prosi o transfer (ani
+ * z ryzyka miesięcznego, ani po odrzuconej ofercie, także ofercie marzeń), po odrzuconej ofercie rzadko bywa
+ * rozczarowany (x0,3). Jedyny wyjątek: złamana obietnica roli z kontraktu (career/negotiation.js evaluatePromise).
+ * Te same zasady dla gracza i klubów AI.
  */
-export const ACCLIM = { base: 4, trait: 1.5, rand: 1, foreign: 1, summer: 1, min: 3, max: 8, dreamPc: 0.3, prMul: 0.3 };
+export const ACCLIM = { base: 12, trait: 2, rand: 2, min: 12, max: 16, dreamPc: 0, prMul: 0.3 };
 
 /** Koniec okresu aklimatyzacji (data) albo null (brak zmiany klubu w danych). */
 export function acclimUntil(p) {
@@ -119,19 +120,19 @@ export function acclimUntil(p) {
   if (!from || from <= GAME_START) return null;
   const t = traitsOf(p);
   const rng = new Rng(`aklimatyzacja:${p.id}:${from}`);
-  const trait = clamp(0.1 * (t.loyalty - 10) + 0.08 * (t.patience - 10) - 0.1 * (t.ambition - 10), -ACCLIM.trait, ACCLIM.trait);
-  const m = Number(from.slice(5, 7));
-  let months = ACCLIM.base + trait + (rng.next() * 2 - 1) * ACCLIM.rand + (p.nat && p.nat !== 'POL' ? ACCLIM.foreign : 0) + (m === 6 || m === 7 ? ACCLIM.summer : 0);
-  months = clamp(months, ACCLIM.min, ACCLIM.max);
+  const trait = clamp(0.12 * (t.loyalty - 10) + 0.08 * (t.patience - 10), 0, ACCLIM.trait);
+  const months = clamp(ACCLIM.base + trait + rng.next() * ACCLIM.rand, ACCLIM.min, ACCLIM.max);
   const d = new Date(`${from}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + Math.round(months * 30.44));
-  let until = d.toISOString().slice(0, 10);
-  if ((m === 1 || m === 2) && until < `${from.slice(0, 4)}-05-31`) until = `${from.slice(0, 4)}-05-31`; // zimą: cała runda wiosenna
-  return until;
+  return d.toISOString().slice(0, 10);
 }
 
-/** Czy zawodnik jest w okresie aklimatyzacji. */
-export const inAcclim = (p, date) => { const u = acclimUntil(p); return !!(u && date && date < u); };
+/** Czy zawodnik jest w okresie aklimatyzacji (złamana obietnica roli z kontraktu go kończy). */
+export const inAcclim = (p, date) => {
+  if (p?.contract?.promise?.broken) return false;
+  const u = acclimUntil(p);
+  return !!(u && date && date < u);
+};
 
 /** fSpokój = 1 - 0,8 x max(0, 1 - m/D); m = miesiące od kontraktu. */
 export function settleFactor(p, date) {
