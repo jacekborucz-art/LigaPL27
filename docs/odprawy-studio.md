@@ -370,3 +370,14 @@ strzelił gola w ostatnich minutach. Przyczyna: `postMatchStudio` (`src/match/st
 każdy gol, po którym zwycięzca prowadził jedną bramką, także gol przegranego na 1:2. Teraz bramka decydująca to
 ostatni gol zwycięzcy, który dał mu prowadzenie (flagi `lateWinner` i strzelec w nagłówku). Test w
 `tests/briefings.test.mjs`.
+
+## Okno „Gra wstrzymana” w meczu (Nov 24, 2026)
+
+Zgłoszenie właściciela: na tablecie okno z propozycjami zmian było ucięte, a bez asystenta nie powinno się pojawiać.
+- Przyczyna ucięcia: `.md-halt` (`src/styles/matchday.css`) było `position: absolute` w wąskim `.pitch-wrap`
+  (boisko 220-480 px), bez limitu wysokości. Teraz `#mdHalt` jest poza `.pitch-wrap`, `position: fixed`, do 560 px
+  szerokości, `max-height: calc(100dvh - 16px)`, treść (`.md-halt__body`) przewijana, przyciski zawsze widoczne.
+- Bez asystenta trenera w sztabie (`hasAssistant` w `src/ui/matchdayView.js`, stary zapis bez sztabu jak z asystentem):
+  po czerwonej kartce i urazie okno się nie pojawia, mecz trwa, zdarzenie jest w relacji i w komunikacie nad boiskiem;
+  przypomnienie o bramkarzu przed karnymi pokazuje okno bez propozycji (`haltMode`). Z asystentem bez zmian.
+- Sprawdzone na prawdziwym meczu (strona testowa): tablet 820x1180 i 1024x768, telefon 390x844, z asystentem i bez.

@@ -21,6 +21,7 @@ import { openMenu, closeMenu, bindContextTrigger, showToast as menuToast } from 
 import { SHOUTS, SHOUT_COOLDOWN, SHOUT_DURATION } from '../engine/match/constants.js';
 import { TONES, TALKS, POST_TONES, MAX_TALKS } from '../match/briefings.js';
 import * as MD from '../match/matchday.js';
+import { rosterOf } from '../career/staffMarket.js'; // asystent trenera w sztabie: okno z propozycjami po zdarzeniu
 import { CLIMATES, currentQuestion, progress, effectWords } from '../match/press.js';
 import { friendlyRuleTags, friendlyRulesOf } from '../training/friendlies.js';
 import { renderPlayerCard, cardFact, barFactHtml, WIDE_CARD, cardPos, placeCard, bindCardDrag } from './playerCard.js'; // karta jak w Kadra > Skład i taktyka
@@ -65,6 +66,14 @@ function shortPlayerName(p) {
 }
 const lastName = (p) => p?.last ?? String(p?.name ?? '').trim().split(/\s+/).slice(-1)[0] ?? '';
 const fitBand = (prof) => (prof >= 85 ? 'ok' : prof >= 60 ? 'mid' : 'bad');
+
+/** Czy klub gracza ma asystenta trenera w sztabie (stary zapis bez sztabu liczy się jak z asystentem). */
+export const hasAssistant = (g) => !g.staff || rosterOf(g, g.clubId).some((p) => p.role === 'asystent');
+/**
+ * Czy i jak zatrzymać mecz po zdarzeniu: 'sugg' okno z propozycjami asystenta, 'plain' samo okno (tylko tekst i przyciski),
+ * 'none' bez okna (zdarzenie jest w relacji i w komunikacie). kind: 'info' (czerwona kartka, uraz) albo 'decision' (przypomnienie o bramkarzu).
+ */
+export function haltMode(assistant, kind) { return assistant ? 'sugg' : kind === 'decision' ? 'plain' : 'none'; }
 
 /**
  * Linie zdarzeń pod nazwami drużyn na tablicy: strzelcy (karny „k.”, samobój „sam.”), niestrzelone karne,
@@ -588,11 +597,11 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
             <div class="pitch-wrap"><canvas class="pitch" id="mdPitch" aria-label="Boisko. Prawy przycisk albo przytrzymanie na zawodniku otwiera menu."></canvas>
               <div class="goal" id="mdGoal" role="status"><div class="goal__in"><b id="mdGoalTitle">GOL</b><small id="mdGoalWho"></small><i class="goal__bar" aria-hidden="true"></i></div></div>
               <div class="md-toasts" id="mdToasts" aria-live="polite"></div>
-              <div class="md-halt" id="mdHalt" hidden role="alertdialog" aria-labelledby="mdHaltTitle">
-                <b id="mdHaltTitle">Gra wstrzymana</b><p id="mdHaltText"></p>
-                <div class="md-halt__sugg" id="mdHaltSugg"></div>
-                <div class="md-halt__btns"><button class="btn btn--quiet btn--sm" data-md="dlg:manage">Zmiany i taktyka</button><button class="btn btn--primary btn--sm" data-md="haltGo">Graj dalej</button></div>
-              </div>
+            </div>
+            <div class="md-halt" id="mdHalt" hidden role="alertdialog" aria-labelledby="mdHaltTitle">
+              <div class="md-halt__body"><b id="mdHaltTitle">Gra wstrzymana</b><p id="mdHaltText"></p>
+              <div class="md-halt__sugg" id="mdHaltSugg"></div></div>
+              <div class="md-halt__btns"><button class="btn btn--quiet btn--sm" data-md="dlg:manage">Zmiany i taktyka</button><button class="btn btn--primary btn--sm" data-md="haltGo">Graj dalej</button></div>
             </div>
           </div>
           <div class="live__ctrl">
@@ -944,8 +953,10 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
   function afterTick(r, fresh, staged = false) {
     if (!staged) updateLive(fresh);
     if (S.step !== 'live1' && S.step !== 'live2') { stop(); return route(); }
-    const halt = haltReason(r.events) ?? MD.keeperReminder(S);
-    if (halt) { stop(); showHalt(halt); return; }
+    const info = haltReason(r.events);
+    const halt = info ?? MD.keeperReminder(S);
+    const mode = halt ? haltMode(hasAssistant(game), info ? 'info' : 'decision') : 'none';
+    if (mode !== 'none') { stop(); showHalt(halt, mode); return; }
     const pause = (r.pause ?? 0) * 1000;
     ui.timer = setTimeout(loop, Math.max(staged ? 0 : pause, 1000 / ui.speed));
   }
@@ -1003,11 +1014,11 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     box.innerHTML = (ui.suggMsg ? `<small class="ok">${esc(ui.suggMsg)}</small>` : '')
       + (list.length ? `<small>Asystent proponuje:</small>${list.map((a, i) => `<button class="md-sugg" data-md="haltSug:${i}">${esc(suggLabel(a))}<span>Zastosuj</span></button>`).join('')}` : '');
   }
-  function showHalt(text) {
+  function showHalt(text, mode = 'sugg') {
     const h = app.querySelector('#mdHalt');
     if (!h) return;
     app.querySelector('#mdHaltText').textContent = text;
-    try { ui.sugg = assistantSuggest(S.M, S.userSide).slice(0, 3); } catch { ui.sugg = []; }
+    try { ui.sugg = mode === 'sugg' ? assistantSuggest(S.M, S.userSide).slice(0, 3) : []; } catch { ui.sugg = []; }
     ui.suggMsg = '';
     renderSugg();
     h.hidden = false;

@@ -262,8 +262,10 @@
 .md-toast--inj { border-left-color: #E8A33D; }
 @keyframes md-toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 /* Gra wstrzymana po czerwonej kartce albo kontuzji zawodnika gracza */
-.md-halt { position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 5; padding: var(--space-3); border-radius: var(--radius-m); background: var(--surface); color: var(--text); border: 2px solid var(--led); box-shadow: 0 10px 28px rgb(0 0 0 / .35); }
+.md-halt { position: fixed; left: 8px; right: 8px; bottom: 8px; z-index: 40; display: flex; flex-direction: column; gap: var(--space-2); box-sizing: border-box; max-width: 560px; max-height: calc(100vh - 16px); max-height: calc(100dvh - 16px); margin: 0 auto; padding: var(--space-3); border-radius: var(--radius-m); background: var(--surface); color: var(--text); border: 2px solid var(--led); box-shadow: 0 10px 28px rgb(0 0 0 / .35); }
 .md-halt[hidden] { display: none; }
+.md-halt__body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.md-halt__btns { flex: none; }
 .md-halt b { font: 700 var(--step-1)/1.2 var(--font-display); }
 .md-halt p { margin: 4px 0 var(--space-2); font-size: var(--step--1); }
 .md-halt__btns { display: flex; flex-wrap: wrap; gap: 6px; }

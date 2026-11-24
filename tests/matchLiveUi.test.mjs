@@ -2,7 +2,7 @@
 // (warianty 4-4-2), nazwy formacji w studiu, zalecana przemowa pomeczowa.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scoreboardLines, dramaStages } from '../src/ui/matchdayView.js';
+import { scoreboardLines, dramaStages, hasAssistant, haltMode } from '../src/ui/matchdayView.js';
 import { aiPreMatchFormation, postAdvice, startMatchday, kickOff, skip, finishMatchday } from '../src/match/matchday.js';
 import { assistantReport, formationShape, FORMATIONS as STUDIO_F } from '../src/match/studio.js';
 import { postMatchBriefing, POST_TONES } from '../src/match/briefings.js';
@@ -134,4 +134,16 @@ test('Dramaturgia VAR i karnego: etapy po kolei, wynik tymczasowy, zwykła minut
   // karny sędziego: najpierw baner RZUT KARNY, potem GOL z nowym wynikiem
   const kick = dramaStages([{ type: 'penalty', side: 0, text: 'Rzut karny!' }, { type: 'goal', side: 0, how: 'PEN', score: [1, 0], text: 'GOL! Nowak' }], [0, 0]);
   assert.deepEqual(kick.map((s) => [s.title, s.score.join(':')]), [['RZUT KARNY', '0:0'], ['GOL', '1:0']]);
+});
+
+test('okno po zdarzeniu: bez asystenta w sztabie nie ma okna z propozycjami (tylko przypomnienie o bramkarzu, bez sekcji asystenta)', () => {
+  const mine = { staff: { clubs: { k1: ['a'] }, people: { a: { role: 'asystent' }, b: { role: 'skaut' } } }, clubId: 'k1' };
+  const without = { staff: { clubs: { k1: ['b'] }, people: mine.staff.people }, clubId: 'k1' };
+  assert.equal(hasAssistant(mine), true);
+  assert.equal(hasAssistant(without), false);
+  assert.equal(hasAssistant({ clubId: 'k1' }), true); // stary zapis bez sztabu
+  assert.equal(haltMode(hasAssistant(without), 'info'), 'none');
+  assert.equal(haltMode(hasAssistant(without), 'decision'), 'plain');
+  assert.equal(haltMode(hasAssistant(mine), 'info'), 'sugg');
+  assert.equal(haltMode(hasAssistant(mine), 'decision'), 'sugg');
 });

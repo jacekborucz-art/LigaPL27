@@ -29,6 +29,20 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 24, 2026, profil A (komputer domowy), okno „Gra wstrzymana” w meczu (v1.23 Beta)
+Zrobione:
+- `POPRAWKI.txt`: okno z propozycjami asystenta po czerwonej kartce i urazie mieści się na tablecie i telefonie
+  (`position: fixed`, limit wysokości, przewijana treść) i nie pojawia się bez asystenta w sztabie
+  (`src/ui/matchdayView.js` `haltMode`, `hasAssistant`; `src/styles/matchday.css`; test w `tests/matchLiveUi.test.mjs`;
+  opis `docs/odprawy-studio.md`). Zrzuty z prawdziwego meczu: tablet pion i poziom, telefon, z asystentem i bez.
+- Model: Sonnet, wysiłek medium (zgoda właściciela); sprawdzenie i zrzuty: profil A.
+Decyzje i pułapki:
+- Zdarzenia zatrzymujące mecz (czerwona kartka, uraz) nie wymagają decyzji: silnik gra dalej, więc bez asystenta okna
+  nie ma. Jedyna sytuacja decyzyjna to przypomnienie o bramkarzu przed karnymi (okno bez propozycji).
+Zostało / dalej:
+- sprawdzenie finansów właścicieli (Haiku low); później obozy zimowe w kolejnych sezonach, premie z kontraktów,
+  oferty za zawodników innych klubów i menu obserwatora (większe).
+
 ## Nov 24, 2026, profil A (komputer domowy), więcej rywali do sparingów (v1.23 Beta)
 Zrobione:
 - Prośba właściciela (spoza `POPRAWKI.txt`): dłuższa lista rywali do sparingów: do 16 polskich (także o ligę wyżej,
