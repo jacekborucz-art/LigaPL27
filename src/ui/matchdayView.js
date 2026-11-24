@@ -1241,7 +1241,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     const pend = ui.pend;
     const outIds = new Set(pend.map((x) => x.out)); const inIds = new Set(pend.map((x) => x.in));
     const sel = ui.subSel;
-    const d = tacDraft(T); const diff = tacDiff(T);
+    const d = tacDraft(T); const diff = tacDiff(T); const rtOf = new Map(playerStates(M, S.userSide).map((r) => [r.id, r.rating])); // ocena na żywo (jak lista składu), także w przerwie
     const pv = draftPreview(T);
     const F = FORMATIONS.find((f) => f.id === d.formation) ?? T.formation;
     // Pozycja po zatwierdzeniu: slot z podglądu (zaplanowany zmiennik zajmuje miejsce schodzącego)
@@ -1282,7 +1282,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
       const pos = kind === 'on' ? sl?.pos ?? x.p.pos : x.p.pos;
       const prof = kind === 'on' ? fitOf(x.p, sl) : 100;
       const band = fitBand(prof);
-      const cond = Math.round(x.cond ?? 100);
+      const cond = Math.round(x.cond ?? 100); const rt = rtOf.get(x.id); // rt: null dla zawodnika, który jeszcze nie grał
       const k = x.knock && !x.knock.aggravated;
       const back = kind === 'bench' && x.rolledOff > 0 ? `może wrócić, grał ${x.prevMins ?? 0} min` : '';
       const note = [kind === 'on' && pos !== x.p.pos ? `nominalnie ${x.p.pos}${band !== 'ok' ? `, ${prof}% na tej pozycji` : ''}` : '', x.injury && !x.injury.playable ? 'uraz' : k ? `gra z bólem (${x.knock.name})` : '', x.yc ? 'żółta kartka' : '', back, kind === 'bench' ? `OVR ${Math.round(x.p.ovr)}` : ''].filter(Boolean).join(', ');
@@ -1292,7 +1292,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
           <span class="sub-handle" data-shandle aria-hidden="true"></span>
           <span class="pos" data-g="${GROUP[pos] ?? 'MID'}">${esc(pos)}</span>
           <span class="sub-name"><span class="sub-name__l"><span class="sub-name__t">${esc(x.p.name)}</span>${piMarker(d.pi?.[x.id])}${x.yc ? ICON.yellow : ''}${k ? ICON.knock : ''}</span>${sg ? `<span class="sub-sugg">${esc(sg.text)}</span>` : ''}${note ? `<small>${esc(note)}</small>` : ''}</span>
-          <span class="sub-cond" title="Kondycja"><i style="width:${cond}%" class="${condCls(cond)}"></i></span><b>${cond}%</b>
+          <span class="sub-cond" title="Kondycja"><i style="width:${cond}%" class="${condCls(cond)}"></i></span><b>${cond}%</b>${rt != null ? `<b class="rt rt--${rBand(rt)}" title="Ocena na żywo">${rt.toFixed(1)}</b>` : '<b class="rt rt--none" title="Ocena na żywo">–</b>'}
         </button></li>`;
     };
     // Boisko: wszystkie miejsca formacji; puste miejsca przy grze w osłabieniu, zaplanowany zmiennik zamiast schodzącego

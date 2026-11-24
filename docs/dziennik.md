@@ -29,6 +29,20 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 24, 2026, profil A (komputer domowy), oceny w oknie Zmiany i taktyka (v1.23 Beta)
+Zrobione:
+- `POPRAWKI.txt`: w oknie Zmiany i taktyka (także w przerwie) przy każdym zawodniku ocena na żywo jak na liście składu
+  (`managePanel` w `src/ui/matchdayView.js`, kolumna w `src/styles/matchday.css`, test `tests/manageRatings.test.mjs`).
+  Zrzuty PC i telefon z prawdziwego meczu (strona testowa z `mountMatchday`, bez zapisu gry).
+- Model: Haiku, wysiłek low (zgoda właściciela); sprawdzenie i zrzuty: profil A.
+Decyzje i pułapki:
+- Żetony na boisku bez oceny (za małe), ocena w liście zawodników okna.
+- Podgląd ekranu meczu bez kariery: strona z `mountMatchday(app, { game, fixture, save: () => {}, ... })`,
+  potem toBriefing, speech:pre, kickoff, skip (wynik do przerwy), dlg:manage.
+Zostało / dalej:
+- czyste konta bramkarzy (Sonnet medium), okno sugestii zmian na tablecie i bez asystenta (Sonnet medium),
+  sprawdzenie finansów właścicieli (Haiku low).
+
 ## Nov 24, 2026, profil A (komputer domowy), nagłówek o bohaterze po porażce (v1.23 Beta)
 Zrobione:
 - `POPRAWKI.txt`: zawodnik gracza nie dostaje już nagłówka „Gol w końcówce! … bohaterem” po przegranym meczu

@@ -128,7 +128,7 @@ Zakładki: Zawodnicy, Skład i taktyka, Rezerwy, Rozmowy, Raport ogólny.
 - **Kary za słowa o sędziach**: komisja dyscyplinarna rozstrzyga w kolejnych dniach; Poczta; `match/pressSystem.js`; dok. `konferencja-prasowa.md`.
 - **Mecz na żywo**: boisko, relacja, tempo (x1, x2,5, x5, Pokaż wynik), pasek przewagi z procentami, karty i kontuzje na boisku, oceny na żywo, pasek informacji (rozgrywki, pogoda, sędzia, widzowie); dzień meczowy; `ui/matchdayView.js`, `match/matchday.js`; dok. PLAN 7.
 - **Zatrzymanie gry i okienka zdarzeń**: mecz zatrzymuje się na ważnych zdarzeniach, a asystent podpowiada zmianę lub taktykę jednym kliknięciem (Propozycja asystenta); dzień meczowy; `ui/matchdayView.js`.
-- **Okno Zmiany i taktyka**: boisko, zmiany z listy, taktyka, strzałki, instrukcje indywidualne, karta zawodnika pod prawym przyciskiem; dzień meczowy; `ui/matchdayView.js`; dok. PLAN 7.
+- **Okno Zmiany i taktyka**: boisko, zmiany z listy, taktyka, strzałki, instrukcje indywidualne, karta zawodnika pod prawym przyciskiem; dzień meczowy; `ui/matchdayView.js`; dok. PLAN 7. Ocena na żywo przy zawodnikach, także w przerwie (Nov 24, 2026).
 - **Okrzyk z linii bocznej**: natychmiastowy impuls dla drużyny, działa ok. kilka minut, przycisk zablokowany na 5 minut; dzień meczowy; `ui/matchdayView.js`, `match/matchday.js`.
 - **Przerwa meczu**: wyśrodkowane statystyki, pierwsze jedenastki z ocenami, taktyka w przerwie; dzień meczowy; `ui/matchdayView.js`.
 - **Dogrywka i seria rzutów karnych**: z rozstrzygnięciem po meczach pucharowych; dzień meczowy; `engine/match/match.js`; dok. `sparingi-i-karne.md`.

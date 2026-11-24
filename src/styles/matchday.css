@@ -213,7 +213,7 @@
 .subs-grid h3, .subs-pending h3 { margin: 0 0 var(--space-2); font: 700 var(--step-0)/1.2 var(--font-display); }
 .sub-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-m); overflow: hidden; }
 .sub-row + .sub-row, .sub-pend + .sub-pend { border-top: 1px solid var(--line); }
-.sub-row__main { display: grid; grid-template-columns: 22px 40px minmax(0, 1fr) 54px 38px; gap: 8px; align-items: center; width: 100%; min-height: 48px; padding: 4px 10px 4px 4px; border: 0; background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: grab; }
+.sub-row__main { display: grid; grid-template-columns: 22px 40px minmax(0, 1fr) 54px 38px 36px; gap: 8px; align-items: center; width: 100%; min-height: 48px; padding: 4px 10px 4px 4px; border: 0; background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: grab; }
 .sub-row__main:focus-visible { outline: 3px solid var(--led); outline-offset: -3px; }
 .sub-row__main:disabled { cursor: default; opacity: .45; }
 .sub-row.is-sel .sub-row__main { box-shadow: inset 4px 0 0 var(--led); background: color-mix(in srgb, var(--led) 14%, var(--surface)); }
@@ -225,7 +225,7 @@
 .sub-cond { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .sub-cond i { display: block; height: 100%; background: var(--murawa, #2E8A4E); }
 .sub-cond i.mid { background: var(--led); } .sub-cond i.low { background: var(--kartka-czerwona); }
-.sub-row__main b { text-align: right; font-variant-numeric: tabular-nums; }
+.sub-row__main b { text-align: right; font-variant-numeric: tabular-nums; } .sub-row__main .rt { min-width: 0; padding: 3px 2px; font-size: var(--step--1); justify-self: end; }
 .subs-pending { margin-top: var(--space-3); }
 .sub-pend { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: 8px 10px; background: color-mix(in srgb, var(--led) 12%, var(--surface)); }
 .sub-pend .out, .sub-pend .in { color: var(--text); }
@@ -415,7 +415,7 @@
 .mm__lists { grid-area: lists; display: grid; grid-template-columns: 1fr 1fr; grid-template-areas: "xi bench" "tac tac"; align-content: start; gap: 14px 16px; padding: 12px 16px; overflow: auto; }
 .mm__xi { grid-area: xi; } .mm__bench { grid-area: bench; } .mm__tac { grid-area: tac; }
 .mm__lists h3 { margin: 0 0 6px; font: 700 var(--step-0)/1.2 var(--font-display); }
-.mm .sub-row__main { min-height: 42px; grid-template-columns: 18px 36px minmax(0, 1fr) 44px 36px; gap: 6px; }
+.mm .sub-row__main { min-height: 42px; grid-template-columns: 18px 36px minmax(0, 1fr) 44px 36px 32px; gap: 6px; }
 .mm-segs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; }
 .mm-seg { display: grid; grid-template-columns: 100px 1fr; align-items: center; gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
 .mm-seg__lbl { padding: 0; font: 700 12px/1.2 var(--font-display); float: left; }
