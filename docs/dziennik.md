@@ -30,7 +30,7 @@ Zostało / dalej:
 ## Wpisy
 
 ## Nov 24, 2026, profil A (komputer domowy), wersja v1.24 Beta
-Właściciel zatwierdził v1.24 Beta (`src/config/version.js`). Lista zmian v1.24:
+Właściciel zatwierdził v1.24 Beta (`src/config/version.js`). Lista zmian v1.24 (wszystko od wejścia v1.23 Beta, Nov 21, 2026):
 - Poprawiono: nagłówek „bohater meczu” po porażce, liczenie czystych kont bramkarzy, okno „Gra wstrzymana” na tablecie i telefonie.
 - Usprawniono sparingi: więcej rywali z Polski i z zagranicy, rywale na obozach za granicą, pełna ławka do rotacji.
 - Usprawniono mecz: oceny na żywo w oknie zmian i taktyki.
@@ -38,6 +38,11 @@ Właściciel zatwierdził v1.24 Beta (`src/config/version.js`). Lista zmian v1.2
 - Usprawniono zachowanie zawodników: aklimatyzacja nowych, prośby o odejście dopiero po roku, rozliczanie obietnic z kontraktu.
 - Usprawniono finanse: zmienne pieniądze właściciela co sezon, wypłata premii z kontraktów.
 - Karta zawodnika pokazuje lepszą nogę i premie w sezonie.
+- Nowość: dyrektor sportowy w każdym klubie (atrybuty, podpowiedzi w rozmowach, sprzeciw przy przepłacie lub zbyt taniej sprzedaży, odejścia i zwolnienia).
+- Nowość: rozmowa z prezesem o zmianie dyrektora sportowego; w Klub, Zarząd karta właściciela i dyrektora.
+- Usprawniono zarząd: rozliczenie warunku z końca sezonu z wyczuciem.
+- Usprawniono zachowanie zawodników: pamięć odrzuconych ofert i podwyżek, rzadsze prośby o transfer w niższych ligach.
+- Usprawniono obsługę: menu pod prawym przyciskiem i profil w okienku w Pulpicie i Treningu.
 
 ## Nov 24, 2026, profil A (komputer domowy), premie domyślne w kontraktach (v1.23 Beta)
 Zrobione (na prośbę właściciela):
