@@ -29,6 +29,16 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 24, 2026, profil A (komputer domowy), wersja v1.24 Beta
+Właściciel zatwierdził v1.24 Beta (`src/config/version.js`). Lista zmian v1.24:
+- Poprawiono: nagłówek „bohater meczu” po porażce, liczenie czystych kont bramkarzy, okno „Gra wstrzymana” na tablecie i telefonie.
+- Usprawniono sparingi: więcej rywali z Polski i z zagranicy, rywale na obozach za granicą, pełna ławka do rotacji.
+- Usprawniono mecz: oceny na żywo w oknie zmian i taktyki.
+- Usprawniono transfery: oferty za zawodników z listy zależne od ceny, lista życzeń, rozmowy z wolnymi zawodnikami po zamknięciu okna.
+- Usprawniono zachowanie zawodników: aklimatyzacja nowych, prośby o odejście dopiero po roku, rozliczanie obietnic z kontraktu.
+- Usprawniono finanse: zmienne pieniądze właściciela co sezon, wypłata premii z kontraktów.
+- Karta zawodnika pokazuje lepszą nogę i premie w sezonie.
+
 ## Nov 24, 2026, profil A (komputer domowy), premie domyślne w kontraktach (v1.23 Beta)
 Zrobione (na prośbę właściciela):
 - `DEFAULT_BONUS` i `contractBonusOf` w `src/career/contractBonus.js`: kontrakt bez `contract.bonus` (kadry z generatora,
