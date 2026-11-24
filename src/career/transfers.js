@@ -438,9 +438,12 @@ function aiOffersForUser(game, date, rng) {
     const ageMul = age <= 22 ? 1.2 : age <= 29 ? 1 : age <= 32 ? 0.7 : 0.4;
     const months = p.contract?.until ? (Date.parse(`${p.contract.until}T12:00:00Z`) - Date.parse(`${date}T12:00:00Z`)) / (30 * 864e5) : 24;
     const contractMul = months < 6 ? 0.5 : months < 12 ? 0.8 : 1; // krótki kontrakt: kluby czekają na wolnego zawodnika
+    // Świeżo kupiony i niewystawiony: kluby rzadko składają ofertę (0-2 miesiące x0,1, 2-4 x0,25, 4-6 x0,6) [SZAC]
+    const since = p.lastMove ? (Date.parse(`${date}T12:00:00Z`) - Date.parse(`${p.lastMove}T12:00:00Z`)) / (30.44 * 864e5) : 99;
+    const freshMul = listed ? 1 : since < 2 ? 0.1 : since < 4 ? 0.25 : since < 6 ? 0.6 : 1;
     const interest = listed
       ? Math.min(U.cap, U.base * quality * ageMul * contractMul * bargain ** (bargain >= 1 ? U.expCheap : U.expDear))
-      : U.unlisted * quality * ageMul * contractMul;
+      : U.unlisted * quality * ageMul * contractMul * freshMul;
     if (!rng.chance(interest)) continue;
     const ask = listed ?? p.value; // kupiec musi mieć pieniądze na cenę, nie na wartość rynkowa
     const wage = p.contract?.wage ?? 0;

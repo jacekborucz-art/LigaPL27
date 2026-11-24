@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-97b2d01b6a';
+const VERSION = 'v0.3-97920af022';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -213,7 +213,7 @@ const FILES = [
   ['./src/career/loans.js', 'd7aad00962'],
   ['./src/career/mindset.js', '5654596582'],
   ['./src/career/morale.js', '1c7d0eb69f'],
-  ['./src/career/moveWish.js', '494ba2fbd2'],
+  ['./src/career/moveWish.js', 'c6b100ec15'],
   ['./src/career/negotiation.js', '6c7231dc80'],
   ['./src/career/negotiationLines.js', 'cc97d8137f'],
   ['./src/career/offerFactors.js', 'fa80be89e3'],
@@ -243,9 +243,9 @@ const FILES = [
   ['./src/career/threat.js', 'bd519d5790'],
   ['./src/career/transferDeals.js', 'f577739259'],
   ['./src/career/transferSystem.js', 'a671fa42a7'],
-  ['./src/career/transfers.js', '1861f7080e'],
+  ['./src/career/transfers.js', 'ccfc56d670'],
   ['./src/career/weeklyTodo.js', 'c5096fc54c'],
-  ['./src/career/wishMemory.js', '26061765e6'],
+  ['./src/career/wishMemory.js', '42ad15bde2'],
   ['./src/config/calendar2026.js', '472a17ae89'],
   ['./src/config/competitions.js', '1ba35856b2'],
   ['./src/config/version.js', 'ecd3a4b86a'],

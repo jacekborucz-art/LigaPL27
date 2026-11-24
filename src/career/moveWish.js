@@ -19,7 +19,7 @@ import { personalityOf } from './personality.js';
 import { relationWith, aiNegotiate, currentGrudge } from './negotiation.js';
 import {
   MEM, memOf, ensureMem, rejectOdds, noteReject, canRoll, hazardMemFactor, reconcileChance, noteRenewal,
-  talkRaiseBonus, nextWindowOpen, nextWindowEnd, lateInWindow, addMonths,
+  talkRaiseBonus, nextWindowOpen, nextWindowEnd, lateInWindow, addMonths, inAcclim,
 } from './wishMemory.js';
 import { boardCaps } from './boardRequests.js';
 import { noteAttention } from './attention.js';
@@ -154,7 +154,7 @@ export function offerRejected(game, p, { buyerRep = 0, foreignWage = 0, date = g
   const mem0 = memOf(p);
   if (!canRoll(p, date)) { // w ciągu 30 dni od rzutu: tylko eskalacja istniejącego stanu
     noteReject(p, date);
-    if (mem0.mood === 'rozczarowany') {
+    if (mem0.mood === 'rozczarowany' && !inAcclim(p, date)) { // w okresie aklimatyzacji bez eskalacji
       stat(game, 'escalated');
       const messages = openWish(game, p, date, 'oferta');
       return { state: p.moveWish ? 'cicha' : 'rozczarowany', messages };
