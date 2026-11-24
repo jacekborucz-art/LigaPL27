@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-6777f40ec7';
+const VERSION = 'v0.3-2374d6c554';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -209,9 +209,10 @@ const FILES = [
   ['./src/career/foreignPool.js', '283c73474b'],
   ['./src/career/infrastructure.js', '855ad58d60'],
   ['./src/career/jobMarket.js', 'baf5c575b8'],
+  ['./src/career/lateJoins.js', 'cad0c4faf1'],
   ['./src/career/leagueNews.js', '4652647fb3'],
   ['./src/career/loans.js', 'd7aad00962'],
-  ['./src/career/mindset.js', '5654596582'],
+  ['./src/career/mindset.js', 'bfb5eb974c'],
   ['./src/career/morale.js', '1c7d0eb69f'],
   ['./src/career/moveWish.js', 'fc81518999'],
   ['./src/career/negotiation.js', '6c7231dc80'],
@@ -224,7 +225,7 @@ const FILES = [
   ['./src/career/preContracts.js', '2f290555b9'],
   ['./src/career/presidentQuiz.js', 'f0923fdee3'],
   ['./src/career/prizes.js', 'eed7f4e394'],
-  ['./src/career/proposals.js', '75ac0425de'],
+  ['./src/career/proposals.js', '7088277ea1'],
   ['./src/career/referees.js', 'e6a9ed319a'],
   ['./src/career/reputation.js', 'b2748d1d69'],
   ['./src/career/reputationSystem.js', '68df5d28ba'],
@@ -235,7 +236,7 @@ const FILES = [
   ['./src/career/shirts.js', '848f4d409c'],
   ['./src/career/sponsors.js', 'e59ba257b8'],
   ['./src/career/squad.js', 'f9b44da44d'],
-  ['./src/career/squadLimit.js', '8c60ef88b2'],
+  ['./src/career/squadLimit.js', 'e70a292643'],
   ['./src/career/squadLimitSystem.js', 'f25b8c5a64'],
   ['./src/career/staffMarket.js', '0efed14224'],
   ['./src/career/talkDialog.js', 'ad42f70af9'],
@@ -243,8 +244,8 @@ const FILES = [
   ['./src/career/teamTalks.js', '316bb1f3e2'],
   ['./src/career/threat.js', 'bd519d5790'],
   ['./src/career/transferDeals.js', 'f577739259'],
-  ['./src/career/transferSystem.js', 'a671fa42a7'],
-  ['./src/career/transfers.js', 'ccfc56d670'],
+  ['./src/career/transferSystem.js', '4189066021'],
+  ['./src/career/transfers.js', 'b77cb9dd30'],
   ['./src/career/weeklyTodo.js', 'c5096fc54c'],
   ['./src/career/wishMemory.js', 'a83ad4d297'],
   ['./src/career/wishlist.js', 'e2c4c0f4dd'],
@@ -309,7 +310,7 @@ const FILES = [
   ['./src/season/matchReport.js', 'be9864d533'],
   ['./src/season/national.js', '1b51378924'],
   ['./src/season/nationalSystem.js', '56b1056ddd'],
-  ['./src/season/rollover.js', 'cfe2be170a'],
+  ['./src/season/rollover.js', '54ce5bc49e'],
   ['./src/season/schedule.js', 'a608f6730f'],
   ['./src/season/season.js', 'dc1f30a4ea'],
   ['./src/season/standings.js', 'b3bdff91e2'],
@@ -381,9 +382,9 @@ const FILES = [
   ['./src/ui/negotiationView.js', 'f254eea6d2'],
   ['./src/ui/playerCard.js', '6864228807'],
   ['./src/ui/playerInstrView.js', '9e2555a798'],
-  ['./src/ui/playerMenus.js', '732d2bc870'],
+  ['./src/ui/playerMenus.js', 'd5b4d7d899'],
   ['./src/ui/playerStatsView.js', 'c2b6b96daa'],
-  ['./src/ui/playerTags.js', 'ccf10ebf2f'],
+  ['./src/ui/playerTags.js', '84b5a0c2a9'],
   ['./src/ui/positionMap.js', 'ef2c032d52'],
   ['./src/ui/postMatchView.js', 'acdba6d632'],
   ['./src/ui/presidentQuizView.js', 'dc71b1d687'],
@@ -402,8 +403,8 @@ const FILES = [
   ['./src/ui/teamReportView.js', 'c01abc57b6'],
   ['./src/ui/todoView.js', 'bd4d7aa1c4'],
   ['./src/ui/trainingView.js', '58ad4a6399'],
-  ['./src/ui/transferDealsView.js', 'd1c8751239'],
-  ['./src/ui/transfersView.js', '536f75b2be'],
+  ['./src/ui/transferDealsView.js', 'fa0f32335a'],
+  ['./src/ui/transfersView.js', '5ddb6685f1'],
   ['./src/world/ephemeral.js', '216b6bcdd9'],
   ['./src/world/playerGen.js', '7033b8b243'],
   ['./src/world/worldGen.js', '494992346d'],

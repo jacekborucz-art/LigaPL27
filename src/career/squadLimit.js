@@ -70,7 +70,9 @@ export function squadCount(game, clubId) {
   const exempt = squad.filter(isExempt);
   // Zawodnicy w drodze do klubu (transakcja w toku, src/career/transferDeals.js) liczą się już do limitu
   const incoming = (game.market?.deals ?? []).filter((d) => d.to === clubId && !d.end).length;
-  const counted = squad.length - exempt.length + incoming;
+  // Wolni zawodnicy z umową poza oknem (dołączą w dniu otwarcia okna, src/career/lateJoins.js) też się liczą
+  const joining = (game.market?.joins ?? []).filter((j) => j.to === clubId).length;
+  const counted = squad.length - exempt.length + incoming + joining;
   const lim = squadLimitOf(game, clubId);
   return { ...lim, counted, exempt, total: squad.length, over: Math.max(0, counted - lim.soft), room: Math.max(0, lim.hard - counted), full: counted >= lim.hard };
 }

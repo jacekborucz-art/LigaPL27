@@ -18,6 +18,7 @@ import { canSign, KEEP_MAX } from '../career/squadLimit.js';
 import { limitStatus } from '../career/squadLimitSystem.js';
 import { askingPrice, notForSale, playerWillingness, inWindow, releaseCost, fmtZl } from '../career/transfers.js';
 import { isPoolContracted, poolClubLabel } from '../career/foreignPool.js';
+import { lateFree, joinDateFor, joinStatusText } from '../career/lateJoins.js'; // wolni zawodnicy poza oknem
 import { scoutHidden } from '../career/scoutOps.js'; // kandydat skauta: bez OVR (ocenę zna skaut)
 import { PLAYER_TALKS, talkBlockedText, talkSuggestions } from '../career/teamTalks.js';
 import { PROGRAMS, MODES } from '../training/config.js';
@@ -283,8 +284,9 @@ function otherItems(game, p, { view, ui = {} } = {}) {
   const winTxt = inWindow(game.date) ? null : closedWindowText(game.date);
   const abroad = isPoolContracted(p); // kontrakt w klubie zagranicznym (src/career/foreignPool.js)
   if (!p.clubId && !abroad) {
+    const late = lateFree(game, p) ? `, dołączy ${fmtDate(joinDateFor(game.date))} (otwarcie okna)` : ''; // wolny po zamknięciu okna (lateJoins.js)
     items.push(item('Rozmawiaj o kontrakcie', withSteps(card, [{ act: 'tf-negotiate', id: p.id }], { focus: null }), {
-      hint: `Wolny zawodnik, oczekuje ok. ${fmtZl(p.askWage ?? 0)} tygodniowo`, disabled: capTxt ?? refuse,
+      hint: `Wolny zawodnik, oczekuje ok. ${fmtZl(p.askWage ?? 0)} tygodniowo${late}`, disabled: joinStatusText(game, p) ?? capTxt ?? refuse,
     }));
     return items;
   }

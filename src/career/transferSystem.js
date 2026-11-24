@@ -2,7 +2,8 @@
 // Nastawienie zawodników (poniedziałki), prośby o transfer (1. dnia miesiąca i poniedziałki), prekontrakty
 // (propozycje 1. dnia Jan-May, decyzje w poniedziałki Jan-Jun, wcześniejsze transfery zimą), kupcy z zagranicy
 // (poniedziałki w oknie), pula zawodników z zagranicy (uzupełnienie przed oknem), decyzje zawodników po namyśle
-// (propozycje klubów, codziennie przed transakcjami) i przebieg transakcji (codziennie). Spec: docs/transfery.md.
+// (propozycje klubów, codziennie przed transakcjami), umowy wolnych poza oknem (dołączenie w dniu otwarcia okna,
+// codziennie; kluby AI poza oknem w poniedziałki, src/career/lateJoins.js) i przebieg transakcji (codziennie). Spec: docs/transfery.md.
 
 import { registerDailySystem } from '../core/gameLoop.js';
 import { windowOf } from './transfers.js';
@@ -13,6 +14,7 @@ import { requestsMonth, requestsWeek } from './moveWish.js';
 import { foreignWeek } from './foreignMarket.js';
 import { ensureForeignPool, foreignPoolDay } from './foreignPool.js';
 import { ensureProposals, proposalsDay } from './proposals.js'; // namysł zawodnika przed podpisem (docs/transfery.md, rozdz. 10)
+import { ensureJoins, joinsDay, aiLateWeek } from './lateJoins.js'; // wolni zawodnicy poza oknem (docs/transfery.md)
 
 /** Leniwa inicjalizacja (stare zapisy). */
 export function ensureTransferState(game) {
@@ -20,6 +22,7 @@ export function ensureTransferState(game) {
   ensureDeals(game);
   ensurePre(game);
   ensureProposals(game); // stary zapis: brak game.market.pending
+  ensureJoins(game); // stary zapis: brak game.market.joins
   ensureForeignPool(game); // zawodnicy z zagranicy: stary zapis dostaje pulę raz (foreignPool.js)
 }
 
@@ -38,6 +41,8 @@ export function transfersDay(game, date) {
   if (dow === 1 && month >= 1 && month <= 6) out.push(...preDecisions(game, date));
   if (w && dow === 1) out.push(...earlySales(game, date));
   if (w && (dow === 1 || date === w.from)) out.push(...foreignWeek(game, date));
+  out.push(...joinsDay(game, date)); // umowy wolnych poza oknem: dołączenie w pierwszym dniu okna
+  if (!w && dow === 1) aiLateWeek(game, date); // kluby AI poza oknem: wolni zawodnicy tylko przy wyraźnej potrzebie
   out.push(...proposalsDay(game, date)); // przed transakcjami: zgoda w ostatnim dniu okna zdąży na zgłoszenie
   out.push(...dealsDay(game, date));
   return out;

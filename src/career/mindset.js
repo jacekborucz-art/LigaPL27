@@ -115,7 +115,7 @@ export function retireFreeAgents(game, date) {
   M.free = M.free.filter((id) => {
     const p = W.players[id];
     if (!p) return false;
-    if (p.transfer || !p.freeSince || M.talks?.[id]?.accepted || (p.scout && (p.scout.until ?? '') >= date)) return true; // kandydat skauta: do końca ważności raportu (scoutOps.js)
+    if (p.transfer || p.joinOn || !p.freeSince || M.talks?.[id]?.accepted || (p.scout && (p.scout.until ?? '') >= date)) return true; // kandydat skauta: do końca ważności raportu (scoutOps.js)
     if ((byGroup[grp(p)] ?? 0) <= (MIND.keepFree[grp(p)] ?? 8)) return true;
     const ch = freeLeaveChance(p, monthsSince(p.freeSince, date));
     if (!ch || !new Rng(`emerytura-wolny:${game.seed}:${id}:${ym}`).chance(ch)) return true;

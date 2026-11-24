@@ -29,6 +29,20 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 24, 2026, profil A (komputer domowy), wolni zawodnicy poza oknem (v1.23 Beta)
+Zrobione (ekspert Sonnet medium, wdrożenie Opus high, sprawdzone):
+- Nowy `src/career/lateJoins.js`: wolny po zamknięciu okna (`lateFree`, przeniesione z UI) nie jest blokowany do rozmów;
+  zgoda zawodnika (`accept` w `proposals.js`) daje umowę z dołączeniem w dniu otwarcia okna (`game.market.joins`,
+  `p.joinOn`): bez klubu, bez gry i pensji, zajęty dla innych, liczy się do limitu kadry (`squadCount`).
+  `joinsDay` w dniu dołączenia: limit kadry, kontuzja > 90 dni, testy medyczne 3 % (po 32. r.ż. 6 %), inaczej `completeTransfer`.
+- Kluby AI poza oknem (`aiLateWeek`, poniedziałki): tylko przy potrzebie (mniej niż 2 zdrowych bramkarzy, brak w kadrze,
+  kontuzje: poniżej minimum na mecz albo ponad 42 dni i poniżej minimum kadry), szanse wg ligi 3/8/7/3,5 %, bramkarz 40 %.
+  Zwykły wolny dołącza od razu, wolny po zamknięciu okna w dniu otwarcia. Symulacja (ziarno 5, sezon): 4 propozycje AI.
+- `retireFreeAgents` i zmiana sezonu oszczędzają zawodników z umową. Listy do gracza, status na karcie, panel w W toku.
+- Test `tests/lateFree.test.mjs`, opis `docs/transfery.md` (Wolni zawodnicy poza oknem).
+Zostało / dalej:
+- pensje zarezerwowanych nie wchodzą do ogólnego `wageRoom` gracza (tylko w logice AI); podpisy AI poza oknem nie trafiają do listu „Transfery tygodnia”.
+
 ## Nov 24, 2026, profil A (komputer domowy), rotacja ławki przed sparingiem (v1.23 Beta)
 Zrobione (agent Sonnet medium, sprawdzone):
 - Przed sparingiem ławka w Skład i taktyka ma 14 miejsc, a dobrani przez grę rezerwowi są zwykłą ławką gracza (przesuwanie,

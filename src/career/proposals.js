@@ -30,6 +30,7 @@ import { startDeal, hasOpenDeal, pendingFees, stat, expectedRegistration } from 
 import { isPoolContracted, poolSellerClub } from './foreignPool.js';
 import { fmtZl } from './transfers.js';
 import { fmtDate } from '../ui/dom.js';
+import { lateFree, reserveJoin, joinAgreedMessage } from './lateJoins.js'; // wolny zawodnik poza oknem: dołączy w dniu otwarcia okna
 
 export const THINK = {
   base: 3, min: -1, max: 2, // namysł 3 dni + RNG od -1 do +2 (2-5 dni)
@@ -94,7 +95,7 @@ export function makeProposal(game, opts) {
   const { playerId, to, fee = 0, contract, kind = 'transfer', maxWage = null, maxTotal = null, demand = null, sale = null } = opts;
   const date = opts.date ?? game.date;
   const p = game.world.players[playerId];
-  if (!p || !to || hasOpenDeal(game, playerId) || p.preContract) return null;
+  if (!p || !to || hasOpenDeal(game, playerId) || p.preContract || p.joinOn) return null;
   const mine = proposalsFor(game, playerId);
   if (mine.some((x) => x.to === to)) return null; // jedna propozycja na klub
   const needsWindow = stateOf(p) !== 'free'; // zawodnik z klubem decyduje najpóźniej w ostatnim dniu okna
@@ -275,7 +276,7 @@ function invalidReason(game, x, date) {
   if (!p) return 'gone';
   if (x.user && x.to !== game.clubId) return 'club'; // trener zmienił klub albo stracił pracę
   if (!game.world.clubs[x.to]) return 'gone';
-  if (hasOpenDeal(game, x.pid) || p.preContract) return 'deal';
+  if (hasOpenDeal(game, x.pid) || p.preContract || p.joinOn) return 'deal';
   if ((p.clubId ?? null) !== x.from || stateOf(p) !== x.fromState) return 'moved';
   if (x.needsWindow && !windowOn(date)) return 'window';
   return null;
@@ -372,6 +373,14 @@ function accept(game, x, date, out) {
     return null;
   }
   close(x, 'accepted', date);
+  // Wolny po zamknięciu okna (FIFA RSTP art. 6.1): umowa teraz, dołączenie w pierwszym dniu okna (lateJoins.js)
+  if (x.fromState === 'free' && lateFree(game, p, date)) {
+    const j = reserveJoin(game, p, { to: x.to, contract: x.contract, date, prop: x.id });
+    x.end.join = j.date;
+    stat(game, x.user ? 'propsUserYes' : 'propsYes');
+    if (x.user) { p.morale = clamp((p.morale ?? 12) + 2, 1, 20); out.push(joinAgreedMessage(game, j, date)); }
+    return { join: j };
+  }
   const deal = startDeal(game, { playerId: x.pid, to: x.to, fee: x.fee, contract: x.contract, kind: x.kind, date, stage: 'medical', prop: x.id });
   if (!deal) { x.status = 'expired'; x.end.reason = 'deal'; return null; }
   x.end.deal = deal.id;
@@ -451,6 +460,7 @@ export function finishLastRound(game, propId, contract, ok, date = game.date) {
   if (deal) for (const y of others) lose(game, y, x, date, out);
   if (out.length) game.inbox = addMessages(game.inbox ?? [], out).inbox;
   if (!deal) return { ok: false, text: `${x.name}: propozycja wycofana. ${out[0]?.body ?? ''}`.trim() };
+  if (deal.join) return { ok: true, text: `${x.name} podpisał umowę. Dołączy ${fmtDate(deal.join.date)} (otwarcie okna transferowego), do tego dnia bez pensji.` };
   return { ok: true, text: `${x.name} podpisał kontrakt. Teraz testy medyczne, zgłoszenie spodziewane ${fmtDate(expectedRegistration(deal))}.` };
 }
 

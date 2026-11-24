@@ -30,7 +30,7 @@ import { renderPlayerCard, cardFact } from './playerCard.js'; // karta w okienku
 import { playerStatsHtml } from './playerStatsView.js';
 import { moraleLabel } from '../career/morale.js';
 import { checkUserPre } from '../career/preContracts.js';
-import { DOMESTIC } from '../config/calendar2026.js';
+import { lateFree, joinDateFor, joinStatusText } from '../career/lateJoins.js'; // wolni zawodnicy poza oknem: dołączą w dniu otwarcia okna
 import { renderSkauting } from './scoutingView.js'; // zakładka Skauting
 import { isPoolContracted, poolClubLabel, playsAbroad, poolSellerClub, REGION_FILTERS, regionOf } from '../career/foreignPool.js'; // zawodnicy z zagranicy
 import { scoutHidden, scoutEye, ovrOrEye, shownOvr, hiddenAttrsHtml, valueOrScoutPrice, valueLabel } from './scoutMask.js'; // kandydaci skauta: ocena ukryta (lornetka)
@@ -403,7 +403,7 @@ function playerCard(game, p, ui) {
   const cap = canSign(game);
   const open = inWindow(game.date);
   const actions = [];
-  if (free) actions.push(`<p class="tf-p__txt">Wolny zawodnik: bez odstępnego, rozmawiasz od razu o kontrakcie.</p><button class="btn btn--primary" data-act="tf-negotiate" data-id="${esc(p.id)}">Rozmawiaj o kontrakcie</button>`);
+  if (free) actions.push(`<p class="tf-p__txt">${lateFree(game, p) ? esc(`Zawodnik wolny po zamknięciu okna: możesz się z nim dogadać, dołączy ${fmtDate(joinDateFor(game.date))} (otwarcie okna).`) : 'Wolny zawodnik: bez odstępnego, rozmawiasz od razu o kontrakcie.'}</p><button class="btn btn--primary" data-act="tf-negotiate" data-id="${esc(p.id)}">Rozmawiaj o kontrakcie</button>`);
   else if (p.loan) actions.push(`<p class="tf-p__txt">Wypożyczony z ${esc(clubById(p.loan.from)?.name ?? '')} do ${esc(fmtDate(p.loan.until))}. Klub wypożyczający nie może go sprzedać ani wypożyczyć dalej; o transferze porozmawiasz po jego powrocie.</p>`);
   else if (talk?.accepted) actions.push(`<p class="notice">Klub przyjął ofertę ${fmtZl(talk.accepted)}.</p><button class="btn btn--primary" data-act="tf-negotiate" data-id="${esc(p.id)}">Rozmawiaj z zawodnikiem</button>`);
   else if (!nfs && pendingObjection(game, `buy:${p.id}`)) actions.push(objectionPanel(game, `buy:${p.id}`, pendingObjection(game, `buy:${p.id}`)));
@@ -803,7 +803,7 @@ export function handleTransferAction(game, act, ds = {}, root = null) {
       const fee = sold ? t?.accepted ?? 0 : 0;
       if (sold && !t?.accepted) return { ui: { tfMsg: 'Najpierw dogadaj się z klubem.' } };
       if (sold && !inWindow(game.date)) return { ui: { tfMsg: 'Okno transferowe jest zamknięte.' } };
-      if (!sold && lateFree(game, p)) return { ui: { tfMsg: 'Zawodnik został wolny po zamknięciu okna transferowego. Zgłosisz go dopiero w następnym oknie (FIFA RSTP art. 6.1).' } };
+      if (!sold && p.joinOn) return { ui: { tfMsg: `${joinStatusText(game, p)}.${p.joinOn.clubId === game.clubId ? '' : ' Nie rozmawia z innymi klubami.'}` } }; // umowa poza oknem (lateJoins.js)
       if (p.transfer) return { ui: { tfMsg: 'Zawodnik jest w trakcie transferu.' } };
       if (userProposal(game, p.id)) return { ui: { tfMsg: `${p.name} rozważa twoją propozycję. Odpowie ok. ${fmtDate(thinkingUntil(game, p.id))}.` } };
       const cap = canSign(game);
@@ -857,13 +857,8 @@ export function handleTransferAction(game, act, ds = {}, root = null) {
   }
 }
 
-/** Wolny zawodnik bez klubu od dnia po zamknięciu ostatniego okna: poza oknem nie do zgłoszenia (FIFA RSTP art. 6.1). */
-export function lateFree(game, p) {
-  if (inWindow(game.date) || !p.freeSince) return false;
-  if (p.scout) return false; // wolny kandydat skauta jest bez klubu od dawna: można go zgłosić w każdej chwili (FIFA RSTP art. 6.1)
-  const last = (DOMESTIC.transferWindows ?? []).filter((w) => w.to < game.date).map((w) => w.to).sort().at(-1);
-  return !!last && p.freeSince > last;
-}
+/** Wolny zawodnik bez klubu od dnia po zamknięciu ostatniego okna: poza oknem dogada się, ale dołączy w dniu otwarcia okna (src/career/lateJoins.js). */
+export { lateFree };
 
 // ------------------------------------------------------------ Karta zawodnika w okienku (nazwisko jak link)
 /** Nazwisko zawodnika jako link do karty w okienku (w Transferach; kliknięcie nie otwiera karty transferowej). */
@@ -886,6 +881,7 @@ export function transferCardHtml(game, p, { wide = false } = {}) {
     cardFact(valueLabel(game, p), esc(valueOrScoutPrice(game, p, fmtZl))),
     ...(price ? [cardFact('Cena', esc(price))] : []),
     ...(mine ? [cardFact('Morale', esc(moraleLabel(p.morale ?? 12)))] : []),
+    ...(p.joinOn ? [cardFact('Status', esc(joinStatusText(game, p)))] : []), // umowa wolnego poza oknem (lateJoins.js)
     ...(thinkingUntil(game, p.id) ? [cardFact('Status', esc(`Rozważa oferty, odpowie do ${fmtDate(thinkingUntil(game, p.id))}`))] : []), // namysł (proposals.js)
   ];
   const go = `<p class="tf-pcard__go"><button class="btn btn--primary btn--sm" data-act="tf-open" data-id="${esc(p.id)}">${mine ? 'Otwórz kartę transferową' : 'Przejdź do oferty'}</button>${mine ? '' : ` ${wishBtn(game, p)}`}</p>`;

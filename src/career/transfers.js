@@ -318,7 +318,7 @@ function aiBuy(game, club, date, rng, log) {
   const money = spendable(F, club.id) - pendingFees(game, club.id); // odstępne w otwartych transakcjach jest zarezerwowane
   const room = wageRoom(F, W, club.id) + (squad.length > 26 ? inGroup[0]?.contract?.wage ?? 0 : 0);
   const pool = [];
-  const busy = (p) => p.transfer || p.preContract || hasOpenDeal(game, p.id); // transakcja w toku albo umowa od 1 lipca (namysł nie zajmuje)
+  const busy = (p) => p.transfer || p.preContract || p.joinOn || hasOpenDeal(game, p.id); // transakcja w toku, umowa od 1 lipca albo umowa wolnego poza oknem (lateJoins.js; namysł nie zajmuje)
   for (const id of game.market.free) { const p = W.players[id]; if (p && groupOf(p) === g && p.ovr > bar && !busy(p) && !scoutBlocked(p, club.id, date)) pool.push({ p, fee: 0 }); } // kandydat skauta innego klubu: wyłączność 14 dni
   for (const [id, l] of Object.entries(game.market.listed)) {
     const p = W.players[id];

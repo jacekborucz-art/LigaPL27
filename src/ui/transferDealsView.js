@@ -16,6 +16,7 @@ import { wishStateText } from '../career/wishMemory.js';
 import { squadOf } from '../world/worldGen.js';
 import { anyClub } from '../season/season.js';
 import { proposalsFor, userProposal, thinkingUntil, withdrawProposal, canImprove, improveUserProposal, THINK } from '../career/proposals.js'; // namysł zawodnika (docs/transfery.md, rozdz. 10)
+import { joinStatusText } from '../career/lateJoins.js'; // wolny zawodnik z umową poza oknem
 
 const posBadge = (p) => `<span class="pos" data-g="${GROUP[p.pos] ?? 'MID'}">${esc(p.pos)}</span>`;
 const tag = (txt, k = 'info') => `<span class="tf-tag" data-k="${k}">${esc(txt)}</span>`;
@@ -58,7 +59,7 @@ function propRow(game, x) {
     if (x.user && (x.rivals ?? 0) > 0) meta += x.improved ? ' Rozważa też inną propozycję. Swoją już poprawiłeś.' : ' Rozważa też propozycję innego klubu. Możesz raz poprawić pensję.';
     const raise = canImprove(game, x) ? THINK.improve.map((k) => `<button class="btn btn--primary btn--sm" data-act="tf-prop-raise" data-d="${esc(x.id)}" data-k="${k}">Pensja +${k} %</button>`).join('') : '';
     if (x.user) act = `<div class="td-acts">${raise}<button class="btn btn--quiet btn--sm" data-act="tf-prop-cancel" data-d="${esc(x.id)}">Wycofaj propozycję</button></div>`;
-  } else meta = `Odpowiedź ${fmtDate(x.end?.date ?? x.date)}: ${PROP_END[x.status] ?? x.status}${x.status === 'lost' && x.end?.winner ? ` (${clubName(x.end.winner)})` : ''}.`;
+  } else meta = `Odpowiedź ${fmtDate(x.end?.date ?? x.date)}: ${PROP_END[x.status] ?? x.status}${x.status === 'lost' && x.end?.winner ? ` (${clubName(x.end.winner)})` : ''}${x.end?.join ? `, dołączy ${fmtDate(x.end.join)} (otwarcie okna)` : ''}.`;
   return `<li class="td-deal" data-state="${x.status === 'accepted' ? 'ok' : x.status === 'open' || x.status === 'changes' ? 'open' : 'fail'}"${p ? ` data-pid="${esc(p.id)}"` : ''}>
     <div class="td-deal__head">${p ? posBadge(p) : ''}<span class="td-deal__who"><b>${p ? cardLink(p) : esc(x.name)}</b><em>${esc(route)}</em></span><b class="td-deal__fee">${esc(terms)}</b></div>
     <p class="td-deal__meta">${esc(meta)}</p>${act}
@@ -131,10 +132,14 @@ export function dealsView(game, ui = {}) {
   const sadRows = sad.map((p) => `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${cardLink(p)}<em>rozczarowany, ale zostaje</em></span><small data-k="warn">od ${esc(fmtDate(p.wishMemory.moodSince ?? game.date))}</small></button></li>`).join('');
   const wishList = wishes.length || sad.length ? `<ul class="tf-mini">${wishRows}${sadRows}</ul>${wishes.length ? '' : '<p class="tf-p__txt">Nikt nie prosi o transfer.</p>'}`
     : '<p class="tf-p__txt">Nikt nie prosi o transfer.</p>';
+  // Wolni zawodnicy z umową poza oknem: dołączą w dniu otwarcia okna (src/career/lateJoins.js)
+  const joins = (game.market.joins ?? []).filter((j) => j.to === game.clubId);
+  const joinRows = joins.map((j) => { const p = game.world.players[j.pid]; return `<li data-pid="${esc(j.pid)}"><button data-act="tf-open" data-id="${esc(j.pid)}">${p ? posBadge(p) : ''}<span>${p ? cardLink(p) : esc(j.name)}<em>${esc(`wolny zawodnik, ${formatZl(j.contract?.wage ?? 0)} tygodniowo`)}</em></span><small>od ${esc(fmtDate(j.date))}</small></button></li>`; }).join('');
   const msg = ui.tfMsg ? `<p class="notice">${esc(ui.tfMsg)}</p>` : '';
   return `${msg}<div class="td-view">
       <div class="td-col">
         ${proposalsSection(game)}
+        ${joins.length ? panel('Dołączą w oknie transferowym', 'info', `<ul class="tf-mini">${joinRows}</ul><p class="tf-p__txt">Wolni po zamknięciu okna: do dnia dołączenia nie grają i nie dostają pensji, ale liczą się do limitu kadry.</p>`, joins.length) : ''}
         ${panel('Transakcje twojego klubu', mineOpen.length ? 'warn' : 'info', mineOpen.length ? list(mineOpen, true) : '<p class="tf-p__txt">Brak transakcji w toku. Po porozumieniu klubów zawodnik przechodzi warunki osobiste, testy medyczne i zgłoszenie. Transfer krajowy trwa 2 do 4 dni, zagraniczny 5 do 9.</p>', mineOpen.length)}
         ${mineDone.length ? panel('Ostatnio zakończone', 'good', list(mineDone, false)) : ''}
         ${panel('Transakcje w Polsce', 'misc', others.length ? list(others.slice(0, 12), false) : '<p class="tf-p__txt">Kluby nie prowadzą teraz transakcji.</p>', others.length)}
@@ -189,6 +194,7 @@ export function otherDealPanel(game, p) {
     const price = earlyPrice(game, p);
     return { blocked: true, html: `<p class="tf-p__txt">${esc(p.name)} przyjdzie do ciebie ${esc(fmtDate(pc.start))} na podstawie umowy od 1 lipca.</p>${win ? `<p class="tf-p__txt">${esc(clubName(p.clubId))} odda go wcześniej za ${esc(fmtZl(price))}.</p><button class="btn btn--primary" data-act="tf-early" data-id="${esc(p.id)}">Ściągnij teraz za ${esc(fmtZl(price))}</button>` : '<p class="tf-p__txt">Wcześniejszy transfer możliwy w zimowym oknie transferowym.</p>'}` };
   }
+  if (p.joinOn) return { blocked: true, html: `<p class="${p.joinOn.clubId === game.clubId ? 'tf-p__txt' : 'notice'}">${esc(`${joinStatusText(game, p)}.${p.joinOn.clubId === game.clubId ? ' Do tego dnia nie gra i nie dostaje pensji.' : ' Nie rozmawia z innymi klubami.'}`)}</p>` }; // umowa wolnego poza oknem (lateJoins.js)
   if (!p.clubId) return { blocked: false, html: '' };
   if (canApproach(p, game.date)) {
     const chk = checkUserPre(game, p);

@@ -217,9 +217,10 @@ Zima 2027 według szacunku: Jan 25 - Feb 24, 2027 [SZAC].
 Gra ma lato od 1 lipca do 9 września co roku (decyzja właściciela Nov 20, 2026, v1.21 Beta; ruchomy kalendarz
 nie przesuwa końca okna, `setSeasonYear` w `src/config/calendar2026.js`) i zimę Feb 1 - Feb 26.
 
-Wolny zawodnik, który stracił klub po zamknięciu ostatniego okna, nie może być zgłoszony przez gracza przed
-kolejnym oknem (FIFA RSTP art. 6.1, `lateFree` w src/ui/transfersView.js). Zawodnicy wolni od lata (kontrakty
-do Jun 30, wolni z puli startowej) są do zgłoszenia przez cały rok.
+Wolny zawodnik, który stracił klub po zamknięciu ostatniego okna, nie może być zgłoszony przed kolejnym oknem
+(FIFA RSTP art. 6.1, `lateFree` w src/career/lateJoins.js). Klub (gracz i AI) może się z nim dogadać od razu,
+ale zawodnik dołącza w pierwszym dniu najbliższego okna (rozdział „Wolni zawodnicy poza oknem”). Zawodnicy wolni
+od lata (kontrakty do Jun 30, wolni z puli startowej) są do zgłoszenia przez cały rok.
 
 ## 6. Interfejs
 
@@ -497,3 +498,38 @@ innych klubów; zawodnik, który przejdzie do klubu gracza albo zniknie ze świa
   i usunięcie (`tf-wl-del`), filtr pozycji i sortowanie. Pod tabelą liczba obserwowanych przez skautów i przejście
   do Skautingu (`tf-wl-scout`), bez dublowania listy „Obserwowani”.
 - Test `tests/wishlist.test.mjs`.
+
+## Wolni zawodnicy poza oknem (Nov 24, 2026)
+
+Kod: `src/career/lateJoins.js` (stałe `LATE_JOIN`), wywołania w `src/career/transferSystem.js` i `src/career/proposals.js`.
+Test: `tests/lateFree.test.mjs`. Te same zasady dla gracza i klubów AI.
+
+- **Wolny po zamknięciu okna** (`lateFree`: bez klubu od dnia po końcu ostatniego okna, poza oknem, nie kandydat
+  skauta): rozmowy o kontrakcie i propozycja jak zwykle (namysł 2-5 dni). Zgoda zawodnika to umowa z dołączeniem
+  w pierwszym dniu najbliższego okna (`nextWindowOpen`: 1 lutego albo 1 lipca); bez wyboru innej daty.
+- **Do dnia dołączenia** zawodnik jest bez klubu (`p.clubId` null, zostaje w `game.market.free`), nie gra, nie
+  dostaje pensji. Jest zarezerwowany: inne kluby (gracz i AI) nie mogą go podpisać (`p.joinOn` jak transakcja
+  w toku albo prekontrakt). Umowa w `game.market.joins` (`{ pid, to, date, since, contract, prop }`), skrót
+  `p.joinOn = { clubId, date }`.
+- **Limit kadry**: rezerwacja liczy się do limitu od dnia porozumienia (`squadCount`), więc ani gracz, ani klub AI
+  nie zostaje z nadmiarem w dniu dołączenia.
+- **Dzień dołączenia** (codziennie, przed decyzjami zawodników): kadra ponad maksimum, poważna kontuzja (ponad
+  90 dni przerwy) albo nieudane testy medyczne (3 %, powyżej 32 lat 6 %, ziarno: gra, zawodnik, data) [SZAC]:
+  umowa wygasa bez kosztów, zawodnik wraca do wolnych (`freeSince` = ten dzień). Inaczej `completeTransfer`
+  jak wolny zawodnik, kontrakt i pensja od tego dnia (wpis historii rynku z `late: true`). Zawodnik nie może się
+  wycofać (pierwsza wersja). Limit obcokrajowców jest w grze wyłączony, więc nie jest sprawdzany.
+- **Rotacja wolnych i koniec sezonu**: zawodnik z umową nie znika z rynku (`retireFreeAgents`, wolni 34+ i długo
+  bez klubu przy zmianie sezonu, uzupełnianie kadr wolnymi).
+- **Kluby AI poza oknem** (poniedziałki): tylko przy wyraźnej potrzebie: mniej niż 2 bramkarzy bez kontuzji
+  dłuższej niż 14 dni (szansa 40 % na tydzień), brak w kadrze (minimum grupy pozycji) albo długie kontuzje
+  zostawiają grupę poniżej minimum na mecz (ponad 14 dni) albo poniżej minimum kadry (ponad 42 dni). Szansa na tydzień: Ekstraklasa 3 % (6 % x0,5), 1 Liga 8 %, 2 Liga 7 %,
+  III liga 3,5 % (5 % x0,7) [SZAC]; bez potrzeby 0. Kandydat: wolny z grupy pozycji, OVR co najmniej 90 % mediany
+  grupy w klubie, wiek do 36 lat, oczekiwana pensja (askWage, bez zniżek) w wolnym budżecie płac (minus pensje
+  zawodników z umową poza oknem), bez transakcji, umowy i wyłączności skauta innego klubu. Dalej propozycja
+  i namysł jak w oknie: zwykły wolny dołącza od razu (transakcja wolnego zawodnika), wolny po zamknięciu okna
+  w pierwszym dniu okna.
+- **Listy dla gracza**: po zgodzie „Umowa z X: dołączy DD mmm RRRR” (bez pensji do tego dnia), w dniu dołączenia
+  „Oficjalnie: X zawodnikiem klubu ...” albo „X nie dołączy do ...” z powodem.
+- **Interfejs**: karta wolnego po zamknięciu okna: „Zawodnik wolny po zamknięciu okna: możesz się z nim dogadać,
+  dołączy DD mmm RRRR (otwarcie okna).”; zawodnik z umową: status „Dołączy do X DD mmm RRRR” w karcie, w menu
+  zawodnika (rozmowy wyłączone dla innych) i znacznik PK; W toku: panel „Dołączą w oknie transferowym”.

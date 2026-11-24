@@ -114,6 +114,7 @@ export function playerTagList(game, p, opts = {}) {
     const start = pc.start ? ` od ${fmtDate(pc.start)}` : '';
     add('pk', 'PK', pc.club && pc.club === game?.clubId && p.clubId !== game?.clubId ? `Przedkontrakt: dołączy do nas${start}` : `Przedkontrakt: odchodzi do ${to}${start}`);
   }
+  if (p.joinOn) add('pk', 'PK', `Umowa poza oknem: dołączy do ${p.joinOn.clubId === game?.clubId ? 'nas' : clubName(p.joinOn.clubId)} ${fmtDate(p.joinOn.date)}`); // wolny zawodnik (src/career/lateJoins.js)
   // 5. Oferty do decyzji gracza (kupno, wypożyczenie, prawo pierwokupu)
   if (M?.offers?.length) {
     const open = M.offers.filter((o) => o.playerId === p.id && o.status === 'open' && !(o.expires < date));
