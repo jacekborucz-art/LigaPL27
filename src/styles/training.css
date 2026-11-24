@@ -368,6 +368,8 @@
 .tr-book { align-self: flex-start; justify-self: start; max-width: 100%; white-space: normal; text-align: left; }
 .tr-wrap { flex-wrap: wrap; overflow: visible; }
 .tr-frlist { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+/* Rywale sparingów: grupy Polska i Zagranica */
+.tr-frgroup { margin: var(--space-3) 0 4px; font: 700 var(--step-0)/1.2 var(--font-display); } .tr-frgroup small { font: 400 var(--step--1)/1 var(--font-body); color: var(--text-muted); }
 .tr-fr { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: 48px; padding: 6px var(--space-3); background: var(--surface); border-radius: var(--radius-s); }
 .tr-fr > span { display: grid; min-width: 0; }
 .tr-fr small { color: var(--text-muted); font-size: var(--step--1); }

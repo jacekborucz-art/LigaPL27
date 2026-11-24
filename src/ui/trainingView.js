@@ -803,8 +803,9 @@ function friendliesTab(game, ui) {
       <p class="muted">Kluby uzgadniają je z sędzią przed meczem. Zmienisz je do dnia meczu.</p>
       ${rulesEditor(rules, 'tr-fr-rule')}
       <h4>Rywale na ${esc(fmtDate(sel))}</h4>
-      <ul class="tr-frlist">${list2.map((o) => `<li class="tr-fr"><span><b>${esc(o.name)}</b><small>${esc(o.where)}, ${esc(o.level.toLowerCase())}${o.neutral ? ', mecz na obozie' : ''}</small></span>
-        <button class="btn btn--primary tr-mini" data-act="tr-fr-add" data-date="${esc(sel)}" data-opp="${esc(o.id)}" ${rd}>Umów</button></li>`).join('') || '<li class="muted">Nikt nie ma wolnego terminu.</li>'}</ul></section>`;
+      ${list2.length ? [['Polska', list2.filter((o) => !o.foreign)], ['Zagranica', list2.filter((o) => o.foreign)]].filter(([, l]) => l.length).map(([h, l]) => `<h5 class="tr-frgroup">${esc(h)} <small>(${l.length})</small></h5>
+      <ul class="tr-frlist">${l.map((o) => `<li class="tr-fr"><span><b>${esc(o.name)}</b><small>${esc(o.where)}, ${esc(o.level.toLowerCase())}${o.neutral ? ', mecz na obozie' : ''}</small></span>
+        <button class="btn btn--primary tr-mini" data-act="tr-fr-add" data-date="${esc(sel)}" data-opp="${esc(o.id)}" ${rd}>Umów</button></li>`).join('')}</ul>`).join('') : '<ul class="tr-frlist"><li class="muted">Nikt nie ma wolnego terminu.</li></ul>'}</section>`;
   }
   return `<div class="tr-cols tr-cols--fr">
     <div class="tr-col">

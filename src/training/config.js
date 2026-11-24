@@ -288,5 +288,7 @@ export const FRIENDLY = {
   time: '17:00',
   famWeight: 0.5, // sparing daje połowę zgrania z meczu o punkty
   loadMul: 0.85, xiMin: 70, benchMin: 25,
-  neighbours: ['CZE', 'SVK', 'AUT', 'HUN', 'GER', 'LTU', 'UKR'],
+  // Kraje sąsiednie i popularne kierunki sparingów polskich klubów (Nov 24, 2026) [SZAC]
+  neighbours: ['CZE', 'SVK', 'AUT', 'HUN', 'GER', 'LTU', 'UKR', 'DEN', 'SWE', 'SVN', 'CRO', 'SRB', 'LVA', 'EST'],
+  maxPolish: 16, maxForeign: 8, lowerSlots: 4, foreignUp: 2.5,
 };

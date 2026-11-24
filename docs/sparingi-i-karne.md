@@ -226,3 +226,16 @@ miejsca ławki jak w lidze (9 albo 12), resztę do 14 dobiera gra. Wcześniej ek
 gracza widać dobranych przez grę (podpis „dobrany na sparing”, tylko podgląd: bez przeciągania i usuwania), licznik
 „x z 14”, a ci zawodnicy nie są już w „Poza kadrą meczową” (`benchExtra`, `benchMax` w `renderTactics`,
 `src/ui/tacticsView.js`; `src/app.js`). Okno zmian w meczu pokazywało pełną ławkę już wcześniej. Zasady bez zmian.
+
+## Wybór rywali do sparingu (Nov 24, 2026, v1.23 Beta)
+
+Zgłoszenie właściciela: lista rywali była bardzo ograniczona (6 polskich klubów z ligi gracza i niższych, 4 zagraniczne
+z 7 krajów). `friendlyOpponents` (`src/training/friendlies.js`, liczby w `FRIENDLY`, `src/training/config.js`) [SZAC]:
+- polskie kluby z wolnym terminem: z ligi gracza, niższych i o jedną wyżej; o dwie i więcej wyżej tylko z tego samego
+  regionu (lokalny sparing z „dużym” klubem, dopisek „z regionu”); kolejność według poziomu, z regionu bliżej;
+  do 16 (`maxPolish`), w tym do 4 miejsc dla klubów z niższych lig (`lowerSlots`, najpierw z regionu);
+- zagraniczne: kraje sąsiednie i popularne kierunki (`neighbours`: Czechy, Słowacja, Austria, Węgry, Niemcy, Litwa,
+  Ukraina, Dania, Szwecja, Słowenia, Chorwacja, Serbia, Łotwa, Estonia; bez Białorusi), poziom od -2 do +2,5,
+  do 8 (`maxForeign`); poza obozem za granicą tylko dla Ekstraklasy i 1 Ligi;
+- widok Trening, Sparingi: grupy „Polska” i „Zagranica” z liczbą rywali.
+Test `tests/friendlyPartners.test.mjs`.

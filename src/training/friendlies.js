@@ -109,20 +109,35 @@ export function levelText(diff) {
   return diff >= 1.5 ? 'Dużo silniejszy' : diff >= 0.5 ? 'Silniejszy' : diff > -0.5 ? 'Podobny poziom' : diff > -1.5 ? 'Słabszy' : 'Dużo słabszy';
 }
 
-/** Propozycje rywali na dany dzień: polskie kluby z wolnym terminem i kluby zagraniczne. */
+/**
+ * Propozycje rywali na dany dzień (realia sparingów polskich klubów, Nov 24, 2026) [SZAC]:
+ * - polskie kluby z wolnym terminem: z ligi gracza, niższych i o jedną wyżej, a o dwie i więcej wyżej tylko z tego
+ *   samego regionu (lokalny sparing z „dużym” klubem); kolejność: poziom, bliżej z tego samego regionu; do 16;
+ * - zagraniczne: kraje sąsiednie i popularne kierunki sparingów (FRIENDLY.neighbours), poziom od -2 do +2,5; do 8;
+ *   do 4 miejsc na liście polskich dla klubów z niższych lig (najpierw z regionu).
+ */
 export function friendlyOpponents(game, date) {
   const me = clubById(game.clubId);
   const camp = campOn(game, date);
   const used = new Set(clubFriendlies(game).map((f) => (f.home === game.clubId ? f.away : f.home)));
   const myL = me?.L ?? 10;
-  const polish = camp && camp.dest !== 'polska' ? [] : CLUBS_PL
-    .filter((c) => c.id !== game.clubId && c.tier >= (me?.tier ?? 1) && c.parent !== game.clubId && !used.has(c.id) && restOk(game.fixtures || [], c.id, date))
-    .sort((a, b) => Math.abs(a.L - myL) - Math.abs(b.L - myL)).slice(0, 6)
-    .map((c) => ({ id: c.id, name: c.name, short: c.short, foreign: false, where: LEAGUE_NAMES[c.tier], L: c.L, level: levelText(c.L - myL), neutral: !!camp }));
+  const myTier = me?.tier ?? 1;
+  const sameRegion = (c) => !!me?.region && c.region === me.region;
+  const tierOk = (c) => c.tier >= myTier - 1 || sameRegion(c); // o dwie ligi wyżej tylko sąsiad z regionu
+  const near = (c) => Math.abs(c.L - myL) - (sameRegion(c) ? 0.6 : 0);
+  const pool = camp && camp.dest !== 'polska' ? [] : CLUBS_PL
+    .filter((c) => c.id !== game.clubId && tierOk(c) && c.parent !== game.clubId && !used.has(c.id) && restOk(game.fixtures || [], c.id, date))
+    .sort((a, b) => near(a) - near(b));
+  // Kilka miejsc dla klubów z niższych lig (częsty sparing „dużego” z mniejszym), najpierw z regionu, potem najmocniejsze
+  const lower = pool.filter((c) => c.tier > myTier).sort((a, b) => Number(sameRegion(b)) - Number(sameRegion(a)) || b.L - a.L).slice(0, FRIENDLY.lowerSlots);
+  const top = pool.filter((c) => !lower.includes(c)).slice(0, FRIENDLY.maxPolish - lower.length);
+  const polish = [...top, ...lower].sort((a, b) => near(a) - near(b))
+    .map((c) => ({ id: c.id, name: c.name, short: c.short, foreign: false, where: `${LEAGUE_NAMES[c.tier]}${sameRegion(c) ? ', z regionu' : ''}`, L: c.L, level: levelText(c.L - myL), neutral: !!camp }));
   const countries = camp ? [CAMP.dests[camp.dest].country] : FRIENDLY.neighbours;
-  const foreign = UEFA_CLUBS
-    .filter((c) => countries.includes(c.country) && !used.has(c.id) && c.L >= myL - 1.5 && c.L <= myL + 3)
-    .sort((a, b) => Math.abs(a.L - myL - 0.5) - Math.abs(b.L - myL - 0.5)).slice(0, camp ? 6 : 4)
+  // Bez obozu za granicą rywali z zagranicy mają tylko kluby Ekstraklasy i 1 Ligi (niższe ligi grają sparingi w kraju)
+  const foreign = !camp && myTier > 2 ? [] : UEFA_CLUBS
+    .filter((c) => countries.includes(c.country) && !used.has(c.id) && c.L >= myL - 2 && c.L <= myL + FRIENDLY.foreignUp)
+    .sort((a, b) => Math.abs(a.L - myL - 0.5) - Math.abs(b.L - myL - 0.5)).slice(0, FRIENDLY.maxForeign)
     .map((c) => ({ id: c.id, name: c.name, short: c.short, foreign: true, where: COUNTRY_NAMES[c.country] ?? c.country, L: c.L, level: levelText(c.L - myL), neutral: !!camp }));
   return [...polish, ...foreign];
 }

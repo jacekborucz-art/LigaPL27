@@ -29,6 +29,16 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 24, 2026, profil A (komputer domowy), więcej rywali do sparingów (v1.23 Beta)
+Zrobione:
+- Prośba właściciela (spoza `POPRAWKI.txt`): dłuższa lista rywali do sparingów: do 16 polskich (także o ligę wyżej,
+  wyżej tylko z regionu, kilka z niższych lig) i do 8 zagranicznych (więcej krajów, bez Białorusi, tylko dla
+  Ekstraklasy i 1 Ligi poza obozem), grupy Polska i Zagranica w widoku (`src/training/friendlies.js`,
+  `src/training/config.js`, `src/ui/trainingView.js`, `src/styles/training.css`, test `tests/friendlyPartners.test.mjs`,
+  opis `docs/sparingi-i-karne.md`). Bez agenta (profil A, Opus), za zgodą właściciela.
+Zostało / dalej:
+- okno sugestii zmian w meczu na tablecie i bez asystenta (Sonnet medium), sprawdzenie finansów właścicieli (Haiku low).
+
 ## Nov 24, 2026, profil A (komputer domowy), czyste konta bramkarzy (v1.23 Beta)
 Zrobione:
 - `POPRAWKI.txt`: czyste konta bramkarzy były zawsze 0, bo nic ich nie liczyło. Teraz liczone po meczu o punkty

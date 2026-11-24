@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-d22df2198b';
+const VERSION = 'v0.3-888278005c';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -337,14 +337,14 @@ const FILES = [
   ['./src/styles/staff.css', 'b926559481'],
   ['./src/styles/todo.css', 'd7bb59a735'],
   ['./src/styles/tokens.css', 'a7865d38be'],
-  ['./src/styles/training.css', 'ac4ad097d3'],
+  ['./src/styles/training.css', '412c41d719'],
   ['./src/styles/transfers.css', '47118aa460'],
   ['./src/training/aiClubs.js', '9ae7800183'],
   ['./src/training/camps.js', '751dd1d81f'],
   ['./src/training/cohesion.js', 'c573149821'],
-  ['./src/training/config.js', '519a11234c'],
+  ['./src/training/config.js', '24fd83c2c4'],
   ['./src/training/development.js', '741e3854bd'],
-  ['./src/training/friendlies.js', 'e8c68f4aa6'],
+  ['./src/training/friendlies.js', '114e0dfa8e'],
   ['./src/training/index.js', '21d1c253ff'],
   ['./src/training/load.js', '029d414e92'],
   ['./src/training/plan.js', 'ff0d7b9ed5'],
@@ -400,7 +400,7 @@ const FILES = [
   ['./src/ui/talksView.js', '4a00b34822'],
   ['./src/ui/teamReportView.js', 'c01abc57b6'],
   ['./src/ui/todoView.js', 'bd4d7aa1c4'],
-  ['./src/ui/trainingView.js', '5f787b7eda'],
+  ['./src/ui/trainingView.js', '58ad4a6399'],
   ['./src/ui/transferDealsView.js', 'd1c8751239'],
   ['./src/ui/transfersView.js', '536f75b2be'],
   ['./src/world/ephemeral.js', '216b6bcdd9'],
