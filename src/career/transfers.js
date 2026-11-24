@@ -4,7 +4,7 @@
 // Kontrakt z zawodnikiem negocjuje ekran rozmów (src/ui/negotiationView.js) albo aiNegotiate. Udane rozmowy to
 // propozycja dla zawodnika, który namyśla się 2-5 dni (src/career/proposals.js), potem transakcja (transferDeals.js).
 
-import { Rng } from '../core/rng.js';
+import { Rng, clamp } from '../core/rng.js';
 import { addMessages } from '../core/inbox.js';
 import { CLUBS_PL, clubById } from '../data/clubs_pl.js';
 import { l3GroupFor } from '../season/leagues.js';
@@ -408,27 +408,62 @@ function aiBalance(game, club, date) {
   }
 }
 
+/**
+ * Oferty klubów AI za zawodników gracza (do decyzji w poczcie). Kalibracja z ekspertem od rynku transferowego
+ * (Nov 24, 2026) [SZAC]: dobry zawodnik wystawiony za 70 % wartości ok. 3-4 oferty przez letnie okno, za 100 % ok. 2,
+ * za 130 % ok. 1; wiek, długość kontraktu, budżet płac i poziom kupca jak na polskim rynku.
+ */
+export const USER_OFFERS = {
+  base: 0.25, cap: 0.7, unlisted: 0.035, q12: 1.4, q14: 1.8, expCheap: 1.6, expDear: 4.5,
+  repBelow: 15, repAbove: 25, wageRoom: 0.8, coolDays: 14, needW: 1.5, noNeedW: 0.7, weekMax: 2, openMax: 4,
+};
 /** Oferty klubów AI za zawodników gracza (do decyzji w poczcie). */
 function aiOffersForUser(game, date, rng) {
   const W = game.world; const out = [];
   const mine = squadOf(W, game.clubId);
   const open = game.market.offers.filter((o) => o.status === 'open' && o.kind === 'incoming');
-  if (open.length >= 3) return out;
+  if (open.length >= USER_OFFERS.openMax) return out;
   const fullClubs = new Set(CLUBS_PL.filter((c) => c.id !== game.clubId && game.world.clubs[c.id] && squadCount(game, c.id).full).map((c) => c.id));
-  for (const p of rng.shuffle([...mine]).slice(0, 8)) {
+  // Zawodnicy z listy transferowej gracza są rozpatrywani zawsze (wcześniej tylko w losowej ósemce kadry), pozostali losowo
+  const isListed = (p) => game.market.userListed[p.id] != null;
+  const cands = [...rng.shuffle(mine.filter(isListed)), ...rng.shuffle(mine.filter((p) => !isListed(p))).slice(0, 8)];
+  const U = USER_OFFERS;
+  for (const p of cands) {
     if (open.some((o) => o.playerId === p.id) || p.loan || p.preContract || hasOpenDeal(game, p.id)) continue;
     const listed = game.market.userListed[p.id];
-    const interest = (listed ? 0.35 : 0.035) * (p.ovr >= 12 ? 1.4 : 1);
+    // Okazja: cena z listy wobec wartości rynkowej. Dobry zawodnik poniżej wartości przyciąga chętnych, za drogi odstrasza
+    const bargain = listed ? clamp(p.value / Math.max(1, listed), 0.4, 3) : 1;
+    const quality = p.ovr >= 14 ? U.q14 : p.ovr >= 12 ? U.q12 : 1;
+    const age = p.age ?? 25;
+    const ageMul = age <= 22 ? 1.2 : age <= 29 ? 1 : age <= 32 ? 0.7 : 0.4;
+    const months = p.contract?.until ? (Date.parse(`${p.contract.until}T12:00:00Z`) - Date.parse(`${date}T12:00:00Z`)) / (30 * 864e5) : 24;
+    const contractMul = months < 6 ? 0.5 : months < 12 ? 0.8 : 1; // krótki kontrakt: kluby czekają na wolnego zawodnika
+    const interest = listed
+      ? Math.min(U.cap, U.base * quality * ageMul * contractMul * bargain ** (bargain >= 1 ? U.expCheap : U.expDear))
+      : U.unlisted * quality * ageMul * contractMul;
     if (!rng.chance(interest)) continue;
-    const buyers = CLUBS_PL.filter((c) => c.id !== game.clubId && game.world.clubs[c.id] && !fullClubs.has(c.id) && clubReputation(c) >= (p.rep ?? 30) - 15 && spendable(game.finance, c.id) > p.value * 0.8);
+    const ask = listed ?? p.value; // kupiec musi mieć pieniądze na cenę, nie na wartość rynkowa
+    const wage = p.contract?.wage ?? 0;
+    const rep = p.rep ?? 30;
+    // Ten sam klub nie wraca z ofertą za tego zawodnika przez 14 dni po odrzuceniu
+    const cooled = new Set(game.market.offers.filter((o) => o.kind === 'incoming' && o.playerId === p.id && o.status !== 'open' && o.status !== 'accepted' && o.date >= addDaysIso(date, -U.coolDays)).map((o) => o.from));
+    const buyers = CLUBS_PL.filter((c) => c.id !== game.clubId && game.world.clubs[c.id] && !fullClubs.has(c.id) && !cooled.has(c.id)
+      && clubReputation(c) >= rep - U.repBelow && clubReputation(c) <= rep + U.repAbove // poziom zawodnika pasuje do klubu
+      && spendable(game.finance, c.id) - pendingFees(game, c.id) >= ask && wageRoom(game.finance, W, c.id) >= wage * U.wageRoom);
     if (!buyers.length) continue;
-    const buyer = rng.pick(buyers);
-    const fee = round((listed ?? p.value) * (0.85 + rng.next() * 0.27));
+    // Chętniej kupuje klub z luką na pozycji zawodnika
+    const g = groupOf(p);
+    const weights = buyers.map((c) => (squadDeficits(squadOf(W, c.id)).some((n) => n.group === g || n.group === 'ALL') ? U.needW : U.noNeedW));
+    let r = rng.next() * weights.reduce((x, y) => x + y, 0); let buyer = buyers[buyers.length - 1];
+    for (let i = 0; i < buyers.length; i++) { r -= weights[i]; if (r <= 0) { buyer = buyers[i]; break; } }
+    // Okazja (cena co najmniej 15 % poniżej wartości): oferta co najmniej równa cenie, czasem wyższa (inni też chcą kupić);
+    // zwykła cena: 90-110 % ceny z listy; zawodnik spoza listy jak dotąd
+    const fee = round(listed ? listed * (bargain >= 1.15 ? 1 + rng.next() * 0.12 : 0.9 + rng.next() * 0.2) : p.value * (0.85 + rng.next() * 0.27));
     if (fee > spendable(game.finance, buyer.id) - pendingFees(game, buyer.id)) continue;
     const offer = { id: `of-${date}-${p.id}`, kind: 'incoming', playerId: p.id, from: buyer.id, fee, status: 'open', date, expires: addDaysIso(date, 6) };
     game.market.offers.unshift(offer);
     out.push(offer);
-    if (out.length >= 2) break;
+    if (out.length >= U.weekMax) break;
   }
   return out;
 }

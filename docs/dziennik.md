@@ -29,6 +29,19 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 24, 2026, profil A (komputer domowy), oferty za zawodników z listy transferowej (v1.23 Beta)
+Zrobione:
+- Lista poprawek właściciela `POPRAWKI.txt` (lokalnie w katalogu repo, robione po jednym zadaniu), zadanie 1:
+  kluby AI składają oferty za zawodników z listy transferowej gracza zależnie od ceny wobec wartości, wieku,
+  kontraktu, budżetu płac i potrzeb kupca (`USER_OFFERS` w `src/career/transfers.js`, opis `docs/transfery.md`,
+  test `tests/userOffers.test.mjs`). Kalibracja z ekspertem od rynku transferowego (agent Sonnet, medium).
+Decyzje i pułapki:
+- Właściciel: logikę transferów i futbolu konsultować z ekspertem (burza mózgów), model dobierać do zadania.
+- Wcześniej wystawiony zawodnik mógł nie być w ogóle rozpatrzony (losowa ósemka kadry).
+- Kupcy z zagranicy (`foreignMarket.js`) nie zmienieni: przy cenie 130 % dają ok. połowę ofert.
+Zostało / dalej:
+- Kolejne zadania z `POPRAWKI.txt` (następne: ławka w sparingach pokazuje tylko 9 rezerwowych).
+
 ## Nov 22, 2026, profil A (chmura), rozmowa z prezesem waży więcej (v1.23 Beta)
 Zrobione:
 - Scalony panel Zarządu, quiz prezesa, sztab do 12 (2480dd1).

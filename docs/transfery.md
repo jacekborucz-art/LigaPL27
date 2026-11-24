@@ -434,3 +434,23 @@ z atrybutu Negocjacje.
   i przycisk „Przejdź do oferty” (własny zawodnik: „Otwórz kartę transferową”, morale zamiast ceny).
 - Kod: `transferCardHtml` i `cardLink` w `src/ui/transfersView.js`, otwieranie i zamykanie (`state.tfCard`) w `src/app.js`.
 
+
+## Oferty klubów AI za zawodników z listy transferowej gracza (Nov 24, 2026)
+
+Zgłoszenie właściciela: dobrzy zawodnicy wystawieni taniej niż ich wartość nie dostawali ofert. Przyczyny: co tydzień
+okna kluby patrzyły tylko na 8 losowych zawodników kadry, cena z listy nie zmieniała szansy, kupiec musiał mieć
+pieniądze na wartość rynkową, a nie na cenę. Kalibracja z ekspertem od rynku transferowego (Sonnet, burza mózgów),
+`aiOffersForUser` i `USER_OFFERS` w `src/career/transfers.js` [SZAC]:
+- wystawieni zawodnicy rozpatrywani zawsze, pozostali jak dotąd (8 losowych, szansa 3,5 %);
+- szansa tygodniowa: 0,25 x jakość (OVR 12+: 1,4, 14+: 1,8) x wiek (do 22: 1,2, 23-29: 1, 30-32: 0,7, 33+: 0,4)
+  x kontrakt (mniej niż 6 miesięcy: 0,5, do roku: 0,8) x okazja^w, okazja = wartość / cena (0,4-3), w = 1,6 dla
+  ceny poniżej wartości i 4,5 powyżej, najwyżej 0,7;
+- kupiec: miejsce w kadrze, pieniądze na cenę (po odliczeniu transakcji w toku), budżet płac na co najmniej 80 %
+  pensji, reputacja klubu od reputacji zawodnika - 15 do + 25, klub z luką na pozycji wybierany chętniej (1,5 wobec 0,7),
+  ten sam klub nie wraca z ofertą przez 14 dni po odrzuceniu;
+- kwota: okazja (cena co najmniej 15 % poniżej wartości) 100-112 % ceny, inaczej 90-110 %;
+- najwyżej 2 nowe oferty na tydzień i 4 otwarte naraz (było 3).
+
+Pomiar (3 zawodników z czołówki kadry Widzewa, lato do 20 sierpnia, 3 światy, oferty klubów z Polski i z zagranicy):
+cena 70 % wartości: 1,9 -> 3,3 oferty na zawodnika; 100 %: 1,9 -> 2,0; 130 %: 1,3 -> 1,3, w tym kluby z Polski ok. 0,7
+(kupcy z zagranicy, `foreignMarket.js`, bez zmian).

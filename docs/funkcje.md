@@ -173,6 +173,7 @@ Zakładki: Zawodnicy, Skład i taktyka, Rezerwy, Rozmowy, Raport ogólny.
 Zakładki: Rynek, Oferty, W toku, Kontrakty, Skauting.
 
 - **Rynek transferowy**: lista transferowa, do wypożyczenia, wolni zawodnicy, zawodnicy z zagranicy; filtry pozycji, regionu, szukanie; Transfery, Rynek; `career/transfers.js`, `ui/transfersView.js`; dok. `transfery.md`.
+- **Oferty za zawodników gracza z listy transferowej**: kluby AI w oknie, szansa i kwota zależne od ceny wobec wartości, wieku, kontraktu, budżetu płac i potrzeb kupca; Poczta, Transfery; `career/transfers.js` (`USER_OFFERS`); dok. `transfery.md` (Nov 24, 2026).
 - **Karta zawodnika w okienku**: kliknięcie nazwiska otwiera kartę bez wychodzenia z listy; Transfery; `ui/transfersView.js`, `ui/playerCard.js`; dok. `transfery.md`; od v1.19 Beta.
 - **Transfer jako proces**: porozumienie klubów, warunki osobiste, testy medyczne, podpis; Transfery, W toku; `career/transferDeals.js`, `ui/transferDealsView.js`; dok. `transfery.md` rozdz. 1.
 - **Oferty**: oferty kupna i przedłużenia, przyjęcie, odrzucenie, Żądaj więcej; Transfery, Oferty; `career/transfers.js`, `career/transferSystem.js`.
