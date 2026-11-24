@@ -204,6 +204,7 @@ Zakładki: Rynek, Oferty, W toku, Kontrakty, Skauting.
 Zakładki: Finanse, Sponsorzy, Infrastruktura, Zarząd, Kariera.
 
 - **Finanse klubu**: realne pensje, przychody (bilety, TV, sponsorzy, nagrody), budżety, plan sezonu, kary PZPN; Klub, Finanse; `career/finance.js`, `data/finanse_klubow.js`; dok. `finanse.md`.
+- **Pieniądze właściciela na sezon**: dopłata i skarbiec zmienne co sezon (nastrój z pamięcią, wynik wobec oczekiwań, awans, spadek, puchary, ambicja, sufit zasobności), list do gracza; Klub, Finanse, Poczta; `career/ownerFunding.js`, `season/rollover.js`; dok. `finanse.md` (Pieniądze właściciela na sezon); od v1.23 Beta.
 - **Nagrody i premie**: Puchar Polski według rundy, premie UEFA za etapy i zwycięstwa; Klub, Finanse; `career/prizes.js`; dok. `finanse.md` rozdz. 3.3.
 - **Sponsorzy**: umowy sponsorskie z pulą klubu, negocjacje i odnowienia; Klub, Sponsorzy; `career/sponsors.js`, `ui/sponsorsView.js`; dok. `finanse.md` (Sponsorzy).
 - **Infrastruktura**: stadion, baza treningowa i akademia (poziomy 1-10, w Polsce baza i akademia najwyżej 5 i 6), inwestycje po zgodzie zarządu (3-7 dni) i pozwoleniu miasta, licencja PZPN, drabina poziomów; Klub, Infrastruktura; `career/infrastructure.js`, `ui/infraView.js`; dok. `infrastruktura.md`; od v1.16 Beta wnioski, od v1.19 Beta skala światowa.

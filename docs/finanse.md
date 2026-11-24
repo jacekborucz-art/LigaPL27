@@ -385,3 +385,17 @@ Stadion, baza treningowa i akademia mają poziomy 1-10 (pełny opis, skala, źr�
   - 0,02 (ambicja - 10) + 0,004 (zaufanie - 50) - 0,15 (brak miejsc - 1)`, od 0,05 do 0,85; bez pieniędzy: cierpliwy
   właściciel bez kary, porywczy -1 zaufania.
 - Daleko od celu: bez pieniędzy, zaufanie -1 (porywczy właściciel przy 5+ miejscach: -2).
+
+## Pieniądze właściciela na sezon (Nov 24, 2026, v1.23 Beta)
+`src/career/ownerFunding.js`, wywołanie w `src/season/rollover.js` (`ownerFundingFor`), zastosowanie w `initClub` (`opts.ownerMul`).
+Dopłata i skarbiec z `src/data/finanse_klubow.js` to baza. Od 2. sezonu właściciel daje bazę x M, skarbiec zmienia się
+o połowę tego (1 + 0,5 (M - 1)). Te same zasady dla gracza i klubów AI. Liczby [SZAC].
+- Nastrój: los N(0, sd), sd = 0,08 + 0,008 (temperament - 10) w granicach 0,04-0,16; połowa zeszłorocznego nastroju
+  przechodzi dalej (`game.ownerMood`), więc dobre i złe passy trwają 2-3 sezony.
+- Wynik wobec oczekiwanego miejsca z siły klubu (`seasonVerdict`): powyżej +0,08, zgodnie +0,04, poniżej -0,06, katastrofa -0,1.
+- Ambicja: 0,006 (ambicja - 10); po słabym sezonie ambitny dokłada tylko przy zasobności > 8.
+- Awans +0,2; spadek -0,1 (spółka -0,15), biedny właściciel (zasobność <= 8) dodatkowo -0,08; puchary europejskie +0,05.
+- Miasto: połowa losu, bez wpływu wyniku i ambicji, 5 % szans na cięcia budżetu (-0,15), najwyżej 1,15.
+- Zacisk 0,75-1,3 (miliarder do 1,5); sufit zasobności: <= 5 najwyżej 1,0, <= 8 najwyżej 1,1, <= 12 najwyżej 1,2.
+- Gracz dostaje list „Pieniądze właściciela na sezon ...” z kwotą, zmianą w procentach, skarbcem i powodami.
+- Symulacja (ziarno 21, jeden sezon): mnożniki 0,8-1,24, mediana 1,0.

@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-dc70dba309';
+const VERSION = 'v0.3-5713a338cd';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -204,7 +204,7 @@ const FILES = [
   ['./src/career/editor.js', '5269b2dddd'],
   ['./src/career/fans.js', '329e0cfdc9'],
   ['./src/career/fansSystem.js', 'ced36b7dd1'],
-  ['./src/career/finance.js', 'b4eb190068'],
+  ['./src/career/finance.js', '97d5b4e381'],
   ['./src/career/foreignMarket.js', 'd04cc0ac5b'],
   ['./src/career/foreignPool.js', '283c73474b'],
   ['./src/career/infrastructure.js', '855ad58d60'],
@@ -217,6 +217,7 @@ const FILES = [
   ['./src/career/negotiation.js', '6c7231dc80'],
   ['./src/career/negotiationLines.js', 'cc97d8137f'],
   ['./src/career/offerFactors.js', 'fa80be89e3'],
+  ['./src/career/ownerFunding.js', '0786c52d2c'],
   ['./src/career/owners.js', '881a7a1333'],
   ['./src/career/personality.js', 'f490724de6'],
   ['./src/career/postMatchReport.js', 'd8bb4cab6b'],
@@ -308,7 +309,7 @@ const FILES = [
   ['./src/season/matchReport.js', 'be9864d533'],
   ['./src/season/national.js', '1b51378924'],
   ['./src/season/nationalSystem.js', '56b1056ddd'],
-  ['./src/season/rollover.js', 'cb8a6776d9'],
+  ['./src/season/rollover.js', 'cfe2be170a'],
   ['./src/season/schedule.js', 'a608f6730f'],
   ['./src/season/season.js', 'dc1f30a4ea'],
   ['./src/season/standings.js', 'b3bdff91e2'],

@@ -150,6 +150,8 @@ function transferBudgetOf(c, balance) {
  */
 export function initClub(world, club, opts = {}) {
   const plan = clubPlan(club);
+  // Pieniądze właściciela na sezon (src/career/ownerFunding.js): dopłata x mul, skarbiec x skarbiecMul
+  if (opts.ownerMul) { plan.owner = r1000(plan.owner * opts.ownerMul.mul); plan.skarbiec = r1000(plan.skarbiec * opts.ownerMul.skarbiecMul); plan.ownerMul = opts.ownerMul.mul; }
   const wages = wageBill(world, club.id);
   const c = {
     base: plan.domestic, plan, tier: plan.tier,

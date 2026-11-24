@@ -26,7 +26,8 @@ import { allocateEuropeanSpots } from './europeAccess.js';
 import { UCOMP_NAMES } from './uefa.js';
 import { ensureUefaCoef, accessRankForNext, closeSeason, shiftWindow, applyCoefSource, windowValues, computeCoefs, countryRank } from './uefaCoef.js';
 import { seasonWindows } from './intl/windows.js';
-import { initClub, seasonSummary, FIN } from '../career/finance.js';
+import { initClub, seasonSummary, FIN, clubPlan } from '../career/finance.js';
+import { ownerSeasonMul, seasonVerdict } from '../career/ownerFunding.js'; // pieniądze właściciela na sezon
 import { academyMods, academyCapOf } from '../career/infrastructure.js';
 import { addFreeAgents } from '../career/transfers.js';
 import { returnLoansAtRollover } from '../career/loans.js';
@@ -324,6 +325,7 @@ export function rolloverSeason(game) {
   // Finanse: plan sezonu z danych klubu dla nowej ligi (docs/finanse.md), saldo przechodzi, bogaty właściciel
   // uzupełnia saldo do skarbca, budżet transferowy z wolnego salda
   const F = game.finance;
+  const ownerNotes = {};
   for (const c of CLUBS_PL) {
     if (!game.world.clubs[c.id]) continue;
     const old = F.clubs[c.id];
@@ -334,7 +336,10 @@ export function rolloverSeason(game) {
         p.contract.wage = Math.round(p.contract.wage * (1 - (p.contract.relegationCut || FIN.RELEGATION_WAGE_CUT)) / 100) * 100; p.wage = p.contract.wage;
       }
     }
-    const fresh = old ? initClub(game.world, c, { balance: old.balance, date: newStart, ai: c.id !== game.clubId }) : initClub(game.world, c);
+    // Pieniądze właściciela na sezon: wynik wobec oczekiwań, awans, spadek, puchary, nastrój (src/career/ownerFunding.js)
+    const om = old ? ownerFundingFor(game, c, old, res, oldYear) : null;
+    if (om) ownerNotes[c.id] = { ...om, before: clubPlan(c).owner };
+    const fresh = old ? initClub(game.world, c, { balance: old.balance, date: newStart, ai: c.id !== game.clubId, ownerMul: om }) : initClub(game.world, c);
     if (old) fresh.history = [...(old.history ?? []), { season: oldSeason, ...seasonSummary(old) }].slice(-10);
     F.clubs[c.id] = fresh;
   }
@@ -402,6 +407,7 @@ export function rolloverSeason(game) {
   const sq = uid ? squadOf(game.world, uid).length : 0;
   if (uid && !fired) msgs.push(createMessage({ date: newStart, key: `kadra-lato:${year}`, category: 'staff', from: 'Dyrektor sportowy', priority: 'important', subject: `Kadra przed sezonem ${SEASON}: ${sq} zawodników`, body: `${squadLines.join('\n\n') || 'Bez zmian w kadrze.'}${sq < 22 ? '\n\nKadra liczy mniej niż 22 zawodników. Uzupełnij ją w zakładce Transfery (wolni zawodnicy są dostępni od razu).' : ''}` }));
   const fin = uid ? F.clubs[uid] : null;
+  if (uid && !fired && ownerNotes[uid]) msgs.push(ownerFundingMessage(game, uid, ownerNotes[uid], newStart));
   msgs.push(...careerMsgs);
   msgs.push(...negMsgs); // nowy dyrektor sportowy w klubie z ligi gracza (bez wartości atrybutu)
   if (fired) {
@@ -423,3 +429,27 @@ registerDailySystem({
 });
 
 export { SEASON_START, FIN, fmtDate };
+
+/** Mnożnik pieniędzy właściciela na nowy sezon dla klubu (stara liga z finansów, tabela końcowa z wyników sezonu). */
+function ownerFundingFor(game, c, old, res, oldYear) {
+  const oldTier = old.tier ?? c.tier;
+  const table = oldTier === 4 ? Object.values(res.groupTables).find((t) => t.includes(c.id)) ?? [] : res.tables[oldTier] ?? [];
+  const verdict = seasonVerdict(c.id, table, (id) => anyClub(id)?.L);
+  // Puchary europejskie w kończącym się sezonie (klub w którejkolwiek rundzie)
+  const europe = Object.values(game.season?.uefa?.comps ?? {}).some((x) => Object.values(x.rounds ?? {}).some((r) => (r.entrants ?? []).some((e) => (e?.id ?? e) === c.id)));
+  return ownerSeasonMul(game, c.id, { verdict, promoted: c.tier < oldTier, relegated: c.tier > oldTier, europe, year: oldYear + 1 });
+}
+
+/** Wiadomość dla gracza: ile właściciel daje na nowy sezon i dlaczego. */
+function ownerFundingMessage(game, clubId, n, date) {
+  const plan = game.finance?.clubs?.[clubId]?.plan;
+  const mln = (v) => `${(Math.round(v / 100000) / 10).toLocaleString('pl-PL')} mln zł`;
+  const pct = Math.round((n.mul - 1) * 100);
+  const who = plan?.ownerName || 'Właściciel';
+  const head = !plan?.owner ? `${who} nie dopłaca do klubu w tym sezonie.` : `${who} przeznacza na sezon ${mln(plan.owner)} dopłaty${pct ? ` (${pct > 0 ? '+' : ''}${pct} % wobec zwykłej kwoty)` : ' (tyle co zwykle)'}.`;
+  const reserve = plan?.skarbiec ? ` Rezerwa na start sezonu: ${mln(plan.skarbiec)}.` : '';
+  const why = n.why?.length ? `
+
+Powody: ${n.why.join(', ')}.` : '';
+  return createMessage({ date, key: `wlasciciel-sezon:${clubId}:${date}`, category: 'club', from: who, priority: 'info', subject: `Pieniądze właściciela na sezon ${SEASON}`, body: `${head}${reserve}${why}` });
+}

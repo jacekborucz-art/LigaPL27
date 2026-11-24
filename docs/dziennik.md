@@ -29,6 +29,17 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 24, 2026, profil A (komputer domowy), zmienne pieniądze właściciela na sezon (v1.23 Beta)
+Zrobione:
+- Nowy `src/career/ownerFunding.js` (`OWNER_FUND`, `seasonVerdict`, `ownerSeasonMul`): od 2. sezonu dopłata = baza z danych
+  x mnożnik (nastrój z pamięcią, wynik wobec oczekiwań, awans, spadek, puchary, ambicja, zacisk, sufit zasobności),
+  skarbiec o połowę zmiany. Konsultacja z ekspertem (Sonnet medium).
+- `initClub` (`src/career/finance.js`) przyjmuje `opts.ownerMul`; `src/season/rollover.js` liczy mnożnik (`ownerFundingFor`)
+  i wysyła graczowi list (`ownerFundingMessage`). Nastrój w `game.ownerMood` (stare zapisy: brak pola = 0).
+- Test `tests/ownerFunding.test.mjs`, opis `docs/finanse.md` (Pieniądze właściciela na sezon).
+Zostało / dalej:
+- propozycje eksperta bez wdrożenia: zmiana właściciela, kryzys właściciela jako zdarzenie.
+
 ## Nov 24, 2026, profil A (komputer domowy), sprawdzenie finansów właścicieli (v1.23 Beta)
 Zrobione (bez zmian w grze):
 - `POPRAWKI.txt`: czy pieniądze właściciela dla klubu są sztywne. Wynik (agent Haiku low, zweryfikowane): kwoty są
