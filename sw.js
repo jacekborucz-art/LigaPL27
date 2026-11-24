@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-8a71853b30';
+const VERSION = 'v0.3-eb3d893ce5';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -199,7 +199,7 @@ const FILES = [
   ['./src/career/coachCareer.js', '1b6aeea20e'],
   ['./src/career/coachMarket.js', '5b7ab28585'],
   ['./src/career/coaches.js', '041155fd9c'],
-  ['./src/career/contractBonus.js', 'd8aad3ecbf'],
+  ['./src/career/contractBonus.js', '29055a6dd7'],
   ['./src/career/director.js', 'e724a55f0f'],
   ['./src/career/directorRotation.js', '29b75d0168'],
   ['./src/career/editor.js', '5269b2dddd'],
@@ -393,7 +393,7 @@ const FILES = [
   ['./src/ui/scoutMask.js', '6b18a0fc37'],
   ['./src/ui/scoutingView.js', '6a31d04469'],
   ['./src/ui/sponsorsView.js', '93ea7f72b4'],
-  ['./src/ui/squadView.js', 'aa5f25b88f'],
+  ['./src/ui/squadView.js', '0c5d0bf0dc'],
   ['./src/ui/staffView.js', '361bf379b1'],
   ['./src/ui/sysMenu.js', 'fc1677717f'],
   ['./src/ui/tacticsArrows.js', '79ec9ea7a0'],

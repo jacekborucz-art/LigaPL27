@@ -3,6 +3,8 @@
 // przyjmujący). Klub płaci raz w miesiącu (1.) wydatkiem „Premie zawodników”, także na minusie, jak pensje.
 // Dane: game.finance.clubs[id].bonusDue (należność w zł), p.season.bonus (suma sezonu zawodnika w tej drużynie).
 
+import { GROUP } from './squad.js';
+
 /** Mnożniki rozgrywek i progi minut. Mnożniki UEFA [SZAC]. */
 export const CONTRACT_BONUS = {
   league: 1, pp: 1, ppFinal: 1.5, super: 1, uefa: 1.5, uefaKnockout: 2, // mnożnik kwoty z kontraktu
@@ -11,6 +13,30 @@ export const CONTRACT_BONUS = {
   csPos: ['BR', 'ŚO', 'BO', 'WB'], // czyste konto liczy się bramkarzowi i obrońcom
   uefaKnockoutRounds: ['KPO', 'R16', 'QF', 'SF', 'F'], // faza pucharowa UEFA (reszta: faza ligowa i eliminacje)
 };
+
+/**
+ * Premie domyślne (ułamek pensji tygodniowej) dla kontraktu bez ustalonych premii: zawodnicy z generatora świata
+ * i kontrakty zawarte bez negocjacji premii (Nov 24, 2026). Gol jak w ofercie AI (negotiation.js), do tego asysta
+ * i czyste konto [SZAC]. Kontrakt z negocjacji (contract.bonus) zostaje bez zmian, także z zerami.
+ */
+export const DEFAULT_BONUS = {
+  goal: { ATT: 0.1, MID: 0.06, DEF: 0.04, GK: 0 },
+  assist: { ATT: 0.04, MID: 0.04, DEF: 0.02, GK: 0 },
+  cleanSheet: { ATT: 0, MID: 0, DEF: 0.03, GK: 0.04 },
+  app: 0.02,
+};
+const round10 = (x) => Math.round(x / 10) * 10;
+
+/** Premie z kontraktu zawodnika: ustalone (contract.bonus) albo domyślne z pensji. Bez kontraktu: null. */
+export function contractBonusOf(p) {
+  const c = p?.contract;
+  if (!c) return null;
+  if (c.bonus) return c.bonus;
+  const w = c.wage ?? 0;
+  const g = GROUP[p.pos] ?? 'MID';
+  const D = DEFAULT_BONUS;
+  return { goal: round10(w * D.goal[g]), assist: round10(w * D.assist[g]), cleanSheet: round10(w * D.cleanSheet[g]), app: round10(w * D.app) };
+}
 
 /** Mnożnik premii dla meczu (f.comp, f.round, f.ucomp). */
 export function bonusMultiplier(f) {
@@ -42,7 +68,7 @@ export function bonusContext(game, f, res, s, clubId, clubObj) {
 
 /** Premia zawodnika za mecz (zł) z jego kontraktu; x = statystyki meczu { minutes, g, a }. */
 export function bonusFor(ctx, p, x) {
-  const b = p.contract?.bonus;
+  const b = contractBonusOf(p);
   if (!b || !x || !(x.minutes > 0)) return 0;
   const B = CONTRACT_BONUS;
   let sum = (b.goal ?? 0) * (x.g ?? 0) + (b.assist ?? 0) * (x.a ?? 0);

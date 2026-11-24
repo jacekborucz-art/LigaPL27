@@ -29,6 +29,12 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 24, 2026, profil A (komputer domowy), premie domyślne w kontraktach (v1.23 Beta)
+Zrobione (na prośbę właściciela):
+- `DEFAULT_BONUS` i `contractBonusOf` w `src/career/contractBonus.js`: kontrakt bez `contract.bonus` (kadry z generatora,
+  kontrakty bez negocjacji premii) ma premie domyślne z pensji tygodniowej (gol 10/6/4 %, asysta 4/4/2 %, czyste konto
+  BR 4 %, obrońca 3 %, występ 2 %), liczone w locie, bez migracji zapisu. Wypłata i karta zawodnika używają tej funkcji.
+
 ## Nov 24, 2026, profil A (komputer domowy), wypłata premii z kontraktów (v1.23 Beta)
 Zrobione (ekspert Sonnet medium, wdrożenie Sonnet medium, sprawdzone):
 - Nowy `src/career/contractBonus.js` (`CONTRACT_BONUS`, `bonusMultiplier`, `bonusContext`, `bonusFor`, `accrueBonus`), hak w

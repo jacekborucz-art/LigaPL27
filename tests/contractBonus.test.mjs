@@ -10,7 +10,7 @@ import { ensureCareer } from '../src/career/careerSystem.js';
 import { financeDay, FIN_LABELS } from '../src/career/finance.js';
 import { createLoan, loanTerms } from '../src/career/loans.js';
 import { applySeasonState } from '../src/season/rollover.js';
-import { bonusMultiplier, CONTRACT_BONUS } from '../src/career/contractBonus.js';
+import { bonusMultiplier, CONTRACT_BONUS, contractBonusOf } from '../src/career/contractBonus.js';
 import { Rng } from '../src/core/rng.js';
 import '../src/season/dailySystems.js';
 
@@ -51,6 +51,26 @@ test('Gol i występ w meczu ligowym: klub zawodnika dostaje należność z jego 
   assert.equal(g.finance.clubs.widzew.bonusDue, 1000 + 400 + 300);
   assert.equal(P(g, id).season.bonus, 1700);
   assert.ok(!g.finance.clubs.legia.bonusDue);
+});
+
+test('Kontrakt bez ustalonych premii (zawodnik z generatora): premie domyślne z pensji', () => {
+  const g0 = { world: generateWorld(21) };
+  const ps = Object.values(g0.world.players).filter((p) => p.contract);
+  assert.ok(ps.length && ps.every((p) => !p.contract.bonus), 'generator nie zapisuje premii');
+  const nap = ps.find((p) => p.pos === 'NAP' && p.contract.wage >= 5000);
+  const b = contractBonusOf(nap);
+  assert.ok(b.goal > 0 && b.assist > 0 && b.app > 0 && b.cleanSheet === 0, JSON.stringify(b));
+  const gk = contractBonusOf(ps.find((p) => p.pos === 'BR' && p.contract.wage >= 5000));
+  assert.ok(gk.cleanSheet > 0 && gk.goal === 0);
+  const g = newGame();
+  let id;
+  played(g, 'widzew', { tweak: (res) => {
+    const x = res.players[0].find((y) => ['SN', 'NAP'].includes(P(g, y.id).pos));
+    id = x.id; x.g = 1; delete P(g, id).contract.bonus;
+  } });
+  const d = contractBonusOf(P(g, id));
+  assert.equal(g.finance.clubs.widzew.bonusDue, d.goal + d.app);
+  assert.ok(d.goal > 0);
 });
 
 test('Sparing nie daje premii', () => {
