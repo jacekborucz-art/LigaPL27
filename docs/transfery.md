@@ -482,3 +482,18 @@ Wyjątek: trener obiecał w kontrakcie rolę (np. podstawowy skład), a zawodnik
   obietnicy u nowych zawodników (3-4 miesiące po transferze).
 - Nie wdrożone (propozycje eksperta, do decyzji): krótsza aklimatyzacja po wykupie z wypożyczenia, koniec aklimatyzacji
   po zwolnieniu trenera, który sprowadził zawodnika.
+
+## Lista życzeń gracza (Nov 24, 2026)
+
+Zgłoszenie właściciela: lista życzeń, do której gracz dodaje zawodników. Stan `game.market.wishlist = [{ id, added }]`
+(stare zapisy: pusta lista tworzona leniwie), moduł `src/career/wishlist.js` (`add`, `remove`, `toggle`, `list`,
+`prune`). Dodać można zawodnika spoza kadry gracza (inny klub, wolny, z zagranicy), bez własnych wypożyczonych do
+innych klubów; zawodnik, który przejdzie do klubu gracza albo zniknie ze świata, wypada z listy przy odczycie.
+- Dodawanie i usuwanie (`data-act="tf-wl"`): karta zawodnika w Transferach i w okienku, menu pod prawym przyciskiem
+  na zawodniku innego klubu, profil zawodnika innego klubu.
+- Transfery, Rynek, wybór „Lista życzeń (N)” (obok Wyszukaj): pozycja, nazwisko (karta w okienku), OVR, wiek, klub,
+  cena (wolny: oczekiwana pensja; „nie na sprzedaż”), koniec kontraktu, nastawienie, stan (lista transferowa,
+  do wypożyczenia, kontuzja, prekontrakt, transakcja w toku; data dodania w podpowiedzi), Oferta albo Rozmowy
+  i usunięcie (`tf-wl-del`), filtr pozycji i sortowanie. Pod tabelą liczba obserwowanych przez skautów i przejście
+  do Skautingu (`tf-wl-scout`), bez dublowania listy „Obserwowani”.
+- Test `tests/wishlist.test.mjs`.

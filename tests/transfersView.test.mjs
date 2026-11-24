@@ -37,7 +37,7 @@ test('Rynek: tabela z sortowanymi nagłówkami, wiersze z data-pid i tf-open, fi
   assert.match(html, /<table class="xl">/);
   assert.ok(count(html, /data-act="tf-sort" data-s="m"/g) >= 8);
   assert.match(html, /aria-sort="descending"><button data-act="tf-sort" data-s="m" data-k="ovr" data-dir="asc"/);
-  assert.equal(count(html, /data-act="tf-list"/g), 5); // z „Z zagranicy”
+  assert.equal(count(html, /data-act="tf-list"/g), 6); // z „Z zagranicy” i „Lista życzeń”
   assert.equal(count(html, /data-act="tf-pos"/g), 5);
   const rows = count(html, /<tr data-pid="/g);
   assert.equal(rows, count(html, /<th scope="row" class="xl__nm"><button data-act="tf-open"/g));

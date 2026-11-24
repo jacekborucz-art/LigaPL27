@@ -1704,7 +1704,7 @@ app.addEventListener('click', (ev) => {
   const el = ev.target.closest('[data-act]');
   if (!el || el.tagName === 'INPUT') return;
   if (el.dataset.act === 'tfcardclose') { closeTfCard(); return; }
-  if (state.tfCard && el.closest('dialog.tf-pcard')) state.tfCard = null; // skrót do oferty zamyka okienko
+  if (state.tfCard && el.closest('dialog.tf-pcard') && el.dataset.act !== 'tf-wl') state.tfCard = null; // skrót do oferty zamyka okienko
   return dispatchAct(el);
 });
 

@@ -29,6 +29,19 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 24, 2026, profil A (komputer domowy), lista życzeń (v1.23 Beta)
+Zrobione:
+- `POPRAWKI.txt`, zadanie 5: lista życzeń gracza dla dowolnych zawodników spoza kadry (`src/career/wishlist.js`,
+  `src/ui/transfersView.js`, `src/ui/playerMenus.js`, `src/ui/squadView.js`, `src/app.js`, `src/styles/transfers.css`,
+  test `tests/wishlist.test.mjs`, opis `docs/transfery.md` „Lista życzeń gracza”).
+- Model: Sonnet, wysiłek medium (zgoda właściciela); poprawki i zrzuty: profil A (bez kolumny „Dodano” i z przyciskiem ×,
+  żeby tabela mieściła się na PC bez przewijania; własny zawodnik wypożyczony do innego klubu nie trafia na listę).
+Decyzje i pułapki:
+- Lista życzeń jest wyborem na liście Rynku (obok Wyszukaj), nie szóstą podzakładką: test Skautingu wymaga 5 podzakładek.
+- Menu zawodnika innego klubu ma o jedną pozycję więcej (test `contextMenu` poprawiony).
+Zostało / dalej:
+- Zadanie 6 z `POPRAWKI.txt`: oferty za zawodników innych klubów (nie tylko z listy transferowej).
+
 ## Nov 24, 2026, profil A (komputer domowy), lepsza noga w karcie w okienku (v1.23 Beta)
 Zrobione:
 - `POPRAWKI.txt`, zadanie 4: fakt „Noga” (Lewa, Prawa, Obie, jak w profilu) w karcie zawodnika w okienku:

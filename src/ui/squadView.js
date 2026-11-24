@@ -15,6 +15,7 @@ import { playerStatsHtml } from './playerStatsView.js';
 import { scoutLine } from '../career/assistantReport.js'; // raport skauta: potencjał zawodników spoza klubu (docs/sztab.md)
 import { anyClub } from '../season/season.js';
 import { scoutEye, hiddenAttrsHtml, valueOrScoutPrice, valueLabel } from './scoutMask.js'; // kandydat skauta: ocena i atrybuty ukryte
+import { canWish, has as wishHas } from '../career/wishlist.js'; // przycisk listy życzeń w profilu zawodnika innego klubu
 import { playerTags, suspSplit, suspText } from './playerTags.js'; // znaczniki stanu za nazwiskiem (docs/tagi-zawodnika.md)
 
 /** Potencjał w profilu: zawodnik spoza klubu gracza oceniany przez skauta (precyzja z jakości skauta). */
@@ -256,7 +257,7 @@ export function renderPlayerProfile(p, opts = {}) {
   const alt = Object.entries(p.alt || {}).filter(([, v]) => v >= 70).map(([k]) => k);
   const hidden = !!opts.hidden; // kandydat skauta przed podpisaniem: bez OVR, gwiazdek, atrybutów i potencjału
   return `
-    <div class="pp-top"><button class="btn btn--quiet" data-act="${esc(back.act)}">${esc(back.label)}</button>${opts.promote ? (opts.promote.ok ? `<button class="btn btn--primary" data-act="ac-promote" data-id="${esc(p.id)}">Przenieś do pierwszego składu</button>` : `<span class="hint">${esc(opts.promote.text)}</span>`) : ''}</div>
+    <div class="pp-top"><button class="btn btn--quiet" data-act="${esc(back.act)}">${esc(back.label)}</button>${foreign && opts.game && canWish(opts.game, p) ? `<button class="btn btn--quiet" data-act="tf-wl" data-id="${esc(p.id)}">${wishHas(opts.game, p.id) ? 'Usuń z listy życzeń' : 'Do listy życzeń'}</button>` : ''}${opts.promote ? (opts.promote.ok ? `<button class="btn btn--primary" data-act="ac-promote" data-id="${esc(p.id)}">Przenieś do pierwszego składu</button>` : `<span class="hint">${esc(opts.promote.text)}</span>`) : ''}</div>
     ${opts.promoteMsg ? `<p class="hint" role="status">${esc(opts.promoteMsg)}</p>` : ''}
     ${foreign ? '<p class="hint">Zawodnik innego klubu: morale, świeżość, pensja i agent są znane tylko jego klubowi.</p>' : ''}
     <header class="pp" data-pid="${esc(p.id)}">

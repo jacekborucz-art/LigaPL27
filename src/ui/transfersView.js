@@ -34,13 +34,15 @@ import { DOMESTIC } from '../config/calendar2026.js';
 import { renderSkauting } from './scoutingView.js'; // zakładka Skauting
 import { isPoolContracted, poolClubLabel, playsAbroad, poolSellerClub, REGION_FILTERS, regionOf } from '../career/foreignPool.js'; // zawodnicy z zagranicy
 import { scoutHidden, scoutEye, ovrOrEye, shownOvr, hiddenAttrsHtml, valueOrScoutPrice, valueLabel } from './scoutMask.js'; // kandydaci skauta: ocena ukryta (lornetka)
+import { canWish, has as wishHas, list as wishList, count as wishCount, toggle as wishToggle, remove as wishRemove } from '../career/wishlist.js'; // lista życzeń gracza
+import { scoutingView } from '../career/scoutOps.js'; // liczba obserwowanych przez skautów (sekcja pod listą życzeń)
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size = 20) => (clubById(id) ? crestHtml(clubById(id), { size, clubsById }) : '');
 const groupOf = (p) => GROUP[p.pos] ?? 'MID';
 // Finanse i Zarząd są w zakładce Klub (src/ui/klubView.js); funkcje widoków eksportowane stąd
 export const TF_TABS = [['rynek', 'Rynek'], ['oferty', 'Oferty'], ['wtoku', 'W toku'], ['kontrakty', 'Kontrakty'], ['skauting', 'Skauting']];
-const LISTS = [['transfer', 'Lista transferowa'], ['loan', 'Do wypożyczenia'], ['free', 'Wolni'], ['abroad', 'Z zagranicy'], ['search', 'Wyszukaj']];
+const LISTS = [['transfer', 'Lista transferowa'], ['loan', 'Do wypożyczenia'], ['free', 'Wolni'], ['abroad', 'Z zagranicy'], ['search', 'Wyszukaj'], ['wishlist', 'Lista życzeń']];
 const POS_FILTERS = [['all', 'Wszyscy'], ['GK', 'Bramkarze'], ['DEF', 'Obrońcy'], ['MID', 'Pomocnicy'], ['ATT', 'Napastnicy']];
 export const isTransferAction = (act) => typeof act === 'string' && act.startsWith('tf-');
 const ovrTxt = (p) => Math.round(p.ovr);
@@ -133,6 +135,8 @@ function sortBy(list, sort, val) {
 }
 const willTone = (v) => (v === 'chętny' ? 'good' : v === 'otwarty' ? 'info' : v === 'niechętny' ? 'warn' : 'bad');
 const tag = (txt, k = 'info') => `<span class="tf-tag" data-k="${k}">${esc(txt)}</span>`;
+/** Przełącznik listy życzeń („Do listy życzeń” / „Usuń z listy życzeń”); pusty dla zawodnika z kadry gracza. */
+const wishBtn = (game, p, cls = 'btn btn--quiet btn--sm') => (canWish(game, p) ? `<button class="${cls}" data-act="tf-wl" data-id="${esc(p.id)}">${wishHas(game, p.id) ? 'Usuń z listy życzeń' : 'Do listy życzeń'}</button>` : '');
 /** Wypożyczenie z klubu: oferty do decyzji albo dyrektor sportowy szuka klubu (panel Wypożycz na karcie zawodnika). */
 function loanTag(game, p) {
   const n = openLoanOffers(game, p.id).length;
@@ -168,6 +172,15 @@ function moneyStrip(game) {
 
 // ------------------------------------------------------------ Rynek
 function marketRows(game, list, pos, ui) {
+  if (list === 'wishlist') { // lista życzeń gracza (src/career/wishlist.js): wolni, z klubów i z zagranicy
+    const tier = clubById(game.clubId)?.tier ?? 1;
+    return wishList(game).filter(({ p }) => pos === 'all' || groupOf(p) === pos).map(({ p, added }) => {
+      const abroad = isPoolContracted(p);
+      if (!p.clubId && !abroad) return { p, added, kind: 'free', price: 0, wage: effectiveAsk(p, tier), reasons: [] };
+      if (playsAbroad(p) && !abroad) return { p, added, kind: 'none', price: null, reasons: [] };
+      return { p, added, kind: notForSale(game, p) && !p.contract?.clause ? 'nfs' : 'club', price: askingPrice(game, p), reasons: [] };
+    });
+  }
   if (list === 'search') {
     const f = ui.tfFilter ?? {};
     return searchPlayers(game, { pos, maxPrice: Number(f.maxPrice) || Infinity, maxAge: Number(f.maxAge) || 99, minOvr: Number(f.minOvr) || 0, tier: f.tier ?? 'all', text: f.text ?? '' })
@@ -211,6 +224,44 @@ function marketTable(game, rows, list, sort, total) {
     <div class="xl-wrap tf-xl" tabindex="0" aria-label="Zawodnicy na rynku, tabela przewijana w poziomie"><table class="xl"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
 }
 
+/** Znaczniki stanu zawodnika na liście życzeń: lista transferowa, kontuzja, transakcja, prekontrakt. */
+function wishTags(game, p) {
+  const out = [];
+  const l = game.market.listed[p.id];
+  if (l && p.clubId && p.clubId !== game.clubId) out.push(tag(l.kind === 'loan' ? 'do wypożyczenia' : 'na liście transferowej', l.kind === 'loan' ? 'info' : 'good'));
+  if (p.injuryDays > 0) out.push(tag(`kontuzja, ${p.injuryDays} ${p.injuryDays === 1 ? 'dzień' : 'dni'}`, 'bad'));
+  if (game.market.talks?.[p.id]?.accepted) out.push(tag('oferta przyjęta', 'good'));
+  out.push(dealTags(game, p));
+  return out.join('') || '<span class="xl__z">·</span>';
+}
+
+/** Tabela listy życzeń: te same kolumny co inne listy rynku, do tego stan, data dodania i przyciski. */
+function wishlistTable(game, rows, sort, total) {
+  const head = `<tr>${th('m', 'pos', 'Poz.', sort, { cls: 'xl__pos', first: 'asc' })}${th('m', 'name', 'Zawodnik', sort, { cls: 'xl__nm', first: 'asc' })}${th('m', 'ovr', 'OVR', sort, { title: 'Ocena ogólna 1-20' })}
+    ${th('m', 'age', 'Wiek', sort, { first: 'asc' })}${th('m', 'club', 'Klub', sort, { cls: 'tf-l', first: 'asc' })}${th('m', 'price', 'Cena', sort, { title: 'Cena wywoławcza klubu; wolny bez odstępnego', cls: 'tf-num', first: 'asc' })}
+    ${th('m', 'until', 'Kontrakt do', sort, { first: 'asc' })}${th('m', 'will', 'Nastawienie', sort, { title: 'Czy zawodnik chce przejść do twojego klubu', first: 'asc' })}<th scope="col" class="tf-l">Stan</th>
+    <th scope="col" class="tf-l">Działania</th></tr>`;
+  const body = rows.map((x) => {
+    const { p } = x;
+    const club = p.clubId ? clubCell(p.clubId) : isPoolContracted(p) ? originCell(p) : '<span class="tf-club tf-club--none">wolny zawodnik</span>';
+    const price = x.kind === 'free' ? `<span class="fp-free">wolny</span><small> oczekuje ${fmtZl(x.wage)}/tydz.</small>` : x.kind === 'nfs' ? '<span class="tf-nfs">nie na sprzedaż</span>' : x.price == null ? '-' : fmtZl(x.price);
+    return `<tr data-pid="${esc(p.id)}"><td class="xl__pos">${posBadge(p)}</td>
+      <th scope="row" class="xl__nm"><button data-act="tf-open" data-id="${esc(p.id)}" data-pid="${esc(p.id)}"><span>${cardLink(p)}</span></button></th>
+      <td class="xl__ovr">${ovrOrEye(game, p)}</td><td>${p.age}</td><td class="tf-l">${club}</td><td class="tf-num tf-price">${price}</td>
+      <td>${p.contract?.until ? esc(fmtDate(p.contract.until)) : '-'}</td><td>${tag(x.will, willTone(x.will))}</td>
+      <td class="tf-l tf-why" title="${x.added ? esc(`Na liście od ${fmtDate(x.added)}`) : ''}">${wishTags(game, p)}</td>
+      <td class="tf-l"><span class="tf-wl-act"><button class="btn btn--primary btn--sm" data-act="tf-open" data-id="${esc(p.id)}">${x.kind === 'free' ? 'Rozmowy' : 'Oferta'}</button><button class="btn btn--quiet btn--sm" data-act="tf-wl-del" data-id="${esc(p.id)}" aria-label="${esc(`Usuń ${p.name} z listy życzeń`)}" title="Usuń z listy życzeń">×</button></span></td></tr>`;
+  }).join('');
+  return `<p class="xl-note">${total} ${total === 1 ? 'zawodnik' : 'zawodników'} na liście życzeń. Kliknij nazwisko, żeby otworzyć kartę zawodnika.</p>
+    <div class="xl-wrap tf-xl" tabindex="0" aria-label="Lista życzeń, tabela przewijana w poziomie"><table class="xl"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+}
+
+/** Sekcja pod listą życzeń: obserwowani przez skautów (osobna lista w Skautingu, bez dublowania). */
+function scoutWatchNote(game) {
+  const n = scoutingView(game).candidates.filter((c) => c.state === 'obserwowany' || c.state === 'nowy').length;
+  return `<div class="tf-wl-scout"><span>Obserwowani przez skautów: <b>${n}</b></span><button class="btn btn--quiet btn--sm" data-act="tf-wl-scout">Przejdź do Skautingu</button></div>`;
+}
+
 /** Pochodzenie zawodnika z puli: klub i kraj albo „bez klubu”. */
 function originCell(p) {
   if (!isPoolContracted(p)) return '<span class="tf-club tf-club--none">bez klubu</span>';
@@ -243,7 +294,7 @@ function marketView(game, ui) {
   const list = ui.tfList ?? 'transfer';
   const pos = ui.tfPos ?? 'all';
   const sort = ui.tfSort?.k ? ui.tfSort : { k: 'ovr', dir: 'desc' };
-  const chips = `<div class="tf-bar"><div class="chips">${LISTS.map(([k, l]) => `<button class="chip" data-act="tf-list" data-l="${k}" aria-pressed="${list === k}">${l}</button>`).join('')}</div>
+  const chips = `<div class="tf-bar"><div class="chips">${LISTS.map(([k, l]) => `<button class="chip" data-act="tf-list" data-l="${k}" aria-pressed="${list === k}">${l}${k === 'wishlist' && wishCount(game) ? ` (${wishCount(game)})` : ''}</button>`).join('')}</div>
     <div class="chips chips--sm">${POS_FILTERS.map(([k, l]) => `<button class="chip" data-act="tf-pos" data-p="${k}" aria-pressed="${pos === k}">${l}</button>`).join('')}</div>
     ${list === 'abroad' ? `<div class="chips chips--sm fp-regions" aria-label="Region">${REGION_FILTERS.map(([k, l]) => `<button class="chip" data-act="tf-region" data-r="${k}" aria-pressed="${(ui.tfRegion ?? 'all') === k}">${l}</button>`).join('')}</div>` : ''}</div>`;
   let form = '';
@@ -262,15 +313,16 @@ function marketView(game, ui) {
   const withWill = (x) => ({ ...x, will: playerWillingness(game, x.p).verdict });
   const val = (x, k) => (k === 'pos' ? POS_ORDER.indexOf(x.p.pos) : k === 'name' ? x.p.name : k === 'ovr' ? shownOvr(game, x.p) : k === 'price' ? (x.price ?? Infinity)
     : k === 'age' ? x.p.age : k === 'club' ? (clubById(x.p.clubId)?.name ?? x.p.abroad?.club ?? '') : k === 'value' ? (scoutHidden(game, x.p) ? (game.scoutOps?.cands?.[x.p.id]?.rep?.priceRange?.[0] ?? 0) : x.p.value ?? 0) : k === 'until' ? (x.p.contract?.until ?? '9999')
-      : k === 'nat' ? (NAT_NAMES[x.p.nat] ?? x.p.nat) : k === 'wage' ? x.wage ?? 0
+      : k === 'nat' ? (NAT_NAMES[x.p.nat] ?? x.p.nat) : k === 'wage' ? x.wage ?? 0 : k === 'added' ? x.added ?? ''
       : k === 'will' ? ['chętny', 'otwarty', 'niechętny', 'odmowa'].indexOf(x.will) : 0);
   const sorted = sortBy(needWill ? all.map(withWill) : all, sort, val).slice(0, 80);
   const rows = needWill ? sorted : sorted.map(withWill);
-  const table = all.length ? (list === 'abroad' ? abroadTable(game, rows, sort, all.length) : marketTable(game, rows, list, sort, all.length))
+  const table = all.length ? (list === 'abroad' ? abroadTable(game, rows, sort, all.length) : list === 'wishlist' ? wishlistTable(game, rows, sort, all.length) : marketTable(game, rows, list, sort, all.length))
+    : list === 'wishlist' ? `<p class="tf-empty">${wishCount(game) ? 'Brak zawodników na liście życzeń dla tej pozycji.' : 'Lista życzeń jest pusta. Kliknij nazwisko zawodnika i wybierz „Do listy życzeń” albo użyj menu pod prawym przyciskiem myszy (na telefonie przytrzymaj nazwisko).'}</p>`
     : `<p class="tf-empty">${list === 'search' || list === 'abroad' ? 'Brak zawodników dla tych filtrów.' : 'Lista jest pusta.'}</p>`;
   return `${moneyStrip(game)}
     <div class="tf-grid tf-grid--table">
-      <div class="tf-main">${chips}${form}${table}</div>
+      <div class="tf-main">${chips}${form}${table}${list === 'wishlist' ? scoutWatchNote(game) : ''}</div>
       <aside class="tf-side" aria-label="Kadra i budżet">${limitPanel(game)}${marketHelp(list)}</aside>
     </div>`;
 }
@@ -281,6 +333,7 @@ function marketHelp(list) {
     loan: 'Kluby chętnie wypożyczają młodych i rezerwowych na rundę, sezon albo rok. Ty ustalasz część pensji, którą pokrywasz, i dodatkowe warunki: opcję albo obowiązek wykupu, prawo pierwokupu.',
     free: 'Wolni zawodnicy nie kosztują odstępnego. Podpiszesz ich także poza oknem transferowym.',
     abroad: 'Obcokrajowcy zainteresowani grą w Polsce, głównie z Ameryki Południowej, Afryki i Bałkanów. Wolnych podpiszesz od razu. Za zawodnika z kontraktem płacisz odstępne klubowi zagranicznemu: słabsze ligi sprzedają taniej, mocniejsze oraz Hiszpania i Portugalia drożej. Po zgodzie klubu rozmawiasz o kontrakcie, a transfer trwa kilka dni dłużej (certyfikat ITC i podróż). Lista odnawia się przed każdym oknem.',
+    wishlist: 'Twoja lista zawodników do obserwowania: dodajesz ich z karty zawodnika, z profilu albo z menu pod prawym przyciskiem. Zawodnik znika z listy, gdy trafi do twojego klubu albo odejdzie z gry. Stan (lista transferowa, kontuzja, transakcja) widać w tabeli.',
     search: 'Szukasz w kadrach wszystkich klubów. Trzech najlepszych zawodników klubu nie jest na sprzedaż, chyba że mają klauzulę odstępnego.',
   }[list];
   return panel('Jak to działa', 'info', `<p class="tf-p__txt">${esc(t)}</p>`);
@@ -381,7 +434,7 @@ function playerCard(game, p, ui) {
   return `<div class="tf-back"><button class="btn btn--quiet btn--sm" data-act="tf-close">Wróć do listy</button></div>
     <div class="tf-grid tf-card">
       <div class="tf-main">
-        ${cardHead(game, p, `<button class="btn btn--quiet btn--sm" data-act="extplayer" data-id="${esc(p.id)}">Profil i statystyki</button>`)}
+        ${cardHead(game, p, `<button class="btn btn--quiet btn--sm" data-act="extplayer" data-id="${esc(p.id)}">Profil i statystyki</button> ${wishBtn(game, p)}`)}
         <ul class="tf-facts">
           ${fact(valueLabel(game, p), esc(valueOrScoutPrice(game, p, fmtZl)))}
           ${free ? fact('Oczekuje', `ok. ${fmtZl(effectiveAsk(p, clubById(game.clubId)?.tier ?? 1))}<small> tygodniowo</small>`, 'warn') : fact('Cena klubu', nfs ? 'nie na sprzedaż' : fmtZl(price), nfs ? 'bad' : 'good')}
@@ -778,6 +831,9 @@ export function handleTransferAction(game, act, ds = {}, root = null) {
       return { ui: { tfMsg: `${p.name} jest na liście transferowej za ${fmtZl(price)}.` }, save: true };
     }
     case 'tf-unlist': delete game.market.userListed[p.id]; return { ui: { tfMsg: `${p.name} zdjęty z listy.` }, save: true };
+    case 'tf-wl': { wishToggle(game, ds.id); return { ui: {}, save: true }; } // lista życzeń (src/career/wishlist.js)
+    case 'tf-wl-del': { wishRemove(game, ds.id); return { ui: {}, save: true }; }
+    case 'tf-wl-scout': return { ui: { tfTab: 'skauting', skTab: 'kandydaci', tfPlayer: null, tfMsg: null } }; // obserwowani przez skautów
     case 'tf-keep': { const r = toggleKeep(game, ds.id); return { ui: { tfMsg: r.text }, save: r.ok }; }
     case 'tf-release': return { ui: { tfConfirm: p.id } };
     case 'tf-release-ok': {
@@ -832,7 +888,7 @@ export function transferCardHtml(game, p, { wide = false } = {}) {
     ...(mine ? [cardFact('Morale', esc(moraleLabel(p.morale ?? 12)))] : []),
     ...(thinkingUntil(game, p.id) ? [cardFact('Status', esc(`Rozważa oferty, odpowie do ${fmtDate(thinkingUntil(game, p.id))}`))] : []), // namysł (proposals.js)
   ];
-  const go = `<p class="tf-pcard__go"><button class="btn btn--primary btn--sm" data-act="tf-open" data-id="${esc(p.id)}">${mine ? 'Otwórz kartę transferową' : 'Przejdź do oferty'}</button></p>`;
+  const go = `<p class="tf-pcard__go"><button class="btn btn--primary btn--sm" data-act="tf-open" data-id="${esc(p.id)}">${mine ? 'Otwórz kartę transferową' : 'Przejdź do oferty'}</button>${mine ? '' : ` ${wishBtn(game, p)}`}</p>`;
   return renderPlayerCard(p, {
     wide, slot: 0, cls: 'tf-pcard', closeAttrs: 'data-act="tfcardclose"', hidden: scoutHidden(game, p),
     facts, extra: go + playerStatsHtml(p, game),

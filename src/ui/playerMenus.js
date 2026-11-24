@@ -24,6 +24,7 @@ import { PROGRAMS, MODES } from '../training/config.js';
 import { locKey, playerAt, resolveMove, resolveTap, sameLoc } from './tacticsMoves.js';
 import { monthsLeft, compareText } from './transfersView.js';
 import { fmtDate } from './dom.js';
+import { canWish, has as wishHas } from '../career/wishlist.js'; // lista życzeń gracza
 import { rzMenuItems, rzCtx } from './reservesView.js'; // rezerwy: delegowanie i powołania (docs/rezerwy.md)
 import { piSummary } from './playerInstrView.js'; // instrukcje indywidualne (docs/instrukcje-indywidualne.md)
 import { arrowsFor, arrowLabel, arrowOf } from '../data/playerInstructions.js'; // strzałki ruchu (docs/strzalki-ruchu.md)
@@ -272,6 +273,10 @@ function otherItems(game, p, { view, ui = {} } = {}) {
   const items = [];
   if (!cardOpen) items.push(item('Karta zawodnika', card, { primary: true, hint: 'Cena, kontrakt, nastawienie' }));
   items.push(item('Profil i statystyki', { steps: [{ act: 'extplayer', id: p.id }], focus: '[data-act="extback"]' }, { hint: 'Atrybuty, mecze, gole, oceny, historia klubowa' }));
+  if (canWish(game, p)) {
+    const on = wishHas(game, p.id);
+    items.push(item(on ? 'Usuń z listy życzeń' : 'Do listy życzeń', { steps: [{ act: 'tf-wl', id: p.id }], toast: on ? `${p.name} usunięty z listy życzeń.` : `${p.name} dodany do listy życzeń.` }, { hint: 'Transfery, Rynek, Lista życzeń' }));
+  }
   const cap = canSign(game);
   const capTxt = cap.ok ? null : `Limit kadry ${cap.count.counted}/${cap.count.hard}`;
   const refuse = playerWillingness(game, p).verdict === 'odmowa' ? 'Nie chce przejść do twojego klubu' : null;
