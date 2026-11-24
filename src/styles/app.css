@@ -1752,6 +1752,3 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 /* Poczta: odnośniki do ekranów, których dotyczy wiadomość (src/ui/mailLinks.js) */
 .mail-links { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .mail-links__k { color: var(--text-muted); font-size: var(--step--1); }
-/* Sparing: rezerwowi dobrani automatycznie (tylko podgląd, bez przenoszenia) */
-.tp-row--auto .tp-row__main { cursor: default; }
-.tp-row__auto, .tac .tp-row__name .tp-row__auto { line-height: 1.35; font-size: 0.78em; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
