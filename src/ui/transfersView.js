@@ -38,6 +38,8 @@ import { canWish, has as wishHas, list as wishList, count as wishCount, toggle a
 import { scoutingView } from '../career/scoutOps.js'; // liczba obserwowanych przez skautów (sekcja pod listą życzeń)
 import { observeListHtml, observeStatusHtml } from './observerView.js'; // raport obserwatora: lista „Obserwacje” i stan w karcie
 import { observeMenuInfo } from '../career/observerReport.js'; // stan obserwacji w małej karcie zawodnika
+import { clubOfferPanel, readOfferForm, handleClubOfferAction } from './clubOffersView.js'; // oferty klub-klub: zapytanie, pakiet, stan rozmów
+import { agreementOf, inquiryOf, clauseAmount } from '../career/clubOffers.js';
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size = 20) => (clubById(id) ? crestHtml(clubById(id), { size, clubsById }) : '');
@@ -180,7 +182,7 @@ function marketRows(game, list, pos, ui) {
       const abroad = isPoolContracted(p);
       if (!p.clubId && !abroad) return { p, added, kind: 'free', price: 0, wage: effectiveAsk(p, tier), reasons: [] };
       if (playsAbroad(p) && !abroad) return { p, added, kind: 'none', price: null, reasons: [] };
-      return { p, added, kind: notForSale(game, p) && !p.contract?.clause ? 'nfs' : 'club', price: askingPrice(game, p), reasons: [] };
+      return { p, added, kind: notForSale(game, p) && !clauseAmount(p.contract) ? 'nfs' : 'club', price: askingPrice(game, p), reasons: [] };
     });
   }
   if (list === 'search') {
@@ -331,12 +333,12 @@ function marketView(game, ui) {
 
 function marketHelp(list) {
   const t = {
-    transfer: 'Zawodnicy wystawieni przez kluby. Cena jest punktem wyjścia: klub przyjmie ofertę bliską cenie, przy niższej złoży kontrofertę. Po zgodzie klubu rozmawiasz z zawodnikiem o kontrakcie.',
+    transfer: 'Zawodnicy wystawieni przez kluby. Cena jest punktem wyjścia. Ofertę (kwota, raty, premie, procent od sprzedaży, termin przejścia) złożysz w każdej chwili: klub rozważa ją kilka dni, potem przyjmuje, składa kontrofertę albo odrzuca. Po zgodzie klubu masz 14 dni na rozmowy z zawodnikiem o kontrakcie.',
     loan: 'Kluby chętnie wypożyczają młodych i rezerwowych na rundę, sezon albo rok. Ty ustalasz część pensji, którą pokrywasz, i dodatkowe warunki: opcję albo obowiązek wykupu, prawo pierwokupu.',
     free: 'Wolni zawodnicy nie kosztują odstępnego. Podpiszesz ich także poza oknem transferowym.',
     abroad: 'Obcokrajowcy zainteresowani grą w Polsce, głównie z Ameryki Południowej, Afryki i Bałkanów. Wolnych podpiszesz od razu. Za zawodnika z kontraktem płacisz odstępne klubowi zagranicznemu: słabsze ligi sprzedają taniej, mocniejsze oraz Hiszpania i Portugalia drożej. Po zgodzie klubu rozmawiasz o kontrakcie, a transfer trwa kilka dni dłużej (certyfikat ITC i podróż). Lista odnawia się przed każdym oknem.',
     wishlist: 'Twoja lista zawodników do obserwowania: dodajesz ich z karty zawodnika, z profilu albo z menu pod prawym przyciskiem. Zawodnik znika z listy, gdy trafi do twojego klubu albo odejdzie z gry. Stan (lista transferowa, kontuzja, transakcja) widać w tabeli.',
-    search: 'Szukasz w kadrach wszystkich klubów. Trzech najlepszych zawodników klubu nie jest na sprzedaż, chyba że mają klauzulę odstępnego.',
+    search: 'Szukasz w kadrach wszystkich klubów. Najważniejsi zawodnicy klubu (najlepsi w kadrze, grający dużo, bez zastępcy, w walce o cel sezonu) nie są na sprzedaż, chyba że mają klauzulę odstępnego. Cena w tabeli jest orientacyjna: dokładną cenę wywoławczą poda klub po zapytaniu.',
   }[list];
   return panel('Jak to działa', 'info', `<p class="tf-p__txt">${esc(t)}</p>`);
 }
@@ -401,19 +403,22 @@ function playerCard(game, p, ui) {
   const talk = game.market.talks[p.id];
   const abroad = isPoolContracted(p); // kontrakt w klubie zagranicznym (src/career/foreignPool.js)
   const free = !p.clubId && !abroad;
-  const nfs = notForSale(game, p) && !p.contract?.clause;
+  const nfs = notForSale(game, p) && !clauseAmount(p.contract);
   const cap = canSign(game);
   const open = inWindow(game.date);
+  const domestic = !!p.clubId && !abroad; // polski klub AI: oferta klub-klub (zapytanie, pakiet, namysł klubu; clubOffersView.js)
+  const inq = domestic ? inquiryOf(game, p.id) : null;
   const actions = [];
   if (free) actions.push(`<p class="tf-p__txt">${lateFree(game, p) ? esc(`Zawodnik wolny po zamknięciu okna: możesz się z nim dogadać, dołączy ${fmtDate(joinDateFor(game.date))} (otwarcie okna).`) : 'Wolny zawodnik: bez odstępnego, rozmawiasz od razu o kontrakcie.'}</p><button class="btn btn--primary" data-act="tf-negotiate" data-id="${esc(p.id)}">Rozmawiaj o kontrakcie</button>`);
   else if (p.loan) actions.push(`<p class="tf-p__txt">Wypożyczony z ${esc(clubById(p.loan.from)?.name ?? '')} do ${esc(fmtDate(p.loan.until))}. Klub wypożyczający nie może go sprzedać ani wypożyczyć dalej; o transferze porozmawiasz po jego powrocie.</p>`);
+  else if (domestic) actions.push(clubOfferPanel(game, p, { objection: pendingObjection(game, `buy:${p.id}`) ? objectionPanel(game, `buy:${p.id}`, pendingObjection(game, `buy:${p.id}`)) : '' }));
   else if (talk?.accepted) actions.push(`<p class="notice">Klub przyjął ofertę ${fmtZl(talk.accepted)}.</p><button class="btn btn--primary" data-act="tf-negotiate" data-id="${esc(p.id)}">Rozmawiaj z zawodnikiem</button>`);
   else if (!nfs && pendingObjection(game, `buy:${p.id}`)) actions.push(objectionPanel(game, `buy:${p.id}`, pendingObjection(game, `buy:${p.id}`)));
   else if (!nfs) {
     actions.push(`<div class="tf-offer"><label>Oferta odstępnego (zł)<input id="tfFee" type="number" min="0" step="10000" value="${talk?.counter ?? Math.round(price * 0.9 / 10000) * 10000}"></label>
       <button class="btn btn--primary" data-act="tf-offer" data-id="${esc(p.id)}" ${open ? '' : 'disabled'}>Złóż ofertę</button></div>
       <p class="hint">Cena klubu: ${fmtZl(price)}.${talk?.counter ? ` Kontroferta klubu: ${fmtZl(talk.counter)}.` : ''}${open ? '' : ' Okno transferowe jest zamknięte.'}</p>`);
-  } else actions.push('<p class="tf-p__txt">Klub nie chce sprzedać tego zawodnika (jeden z trzech najlepszych w kadrze, bez klauzuli odstępnego).</p>');
+  } else actions.push('<p class="tf-p__txt">Klub nie chce sprzedać tego zawodnika (jeden z najważniejszych w kadrze, bez klauzuli odstępnego).</p>');
   if (!free && !abroad && !p.loan && (listed?.kind === 'loan' || (p.age <= 21 && !nfs))) actions.push(loanInForm(game, p, open));
   const dp = otherDealPanel(game, p); // transakcja w toku, umowa od 1 lipca (transferDealsView.js)
   if (dp.blocked) actions.length = 0;
@@ -430,7 +435,7 @@ function playerCard(game, p, ui) {
   const notes = [
     ...(listed ? [`Wystawiony: ${listed.reasons.join(', ').toLowerCase()}`] : []),
     ...(recentlyMoved(p, game.date) ? ['Dopiero zmienił klub'] : []),
-    ...(p.contract?.clause ? [`Klauzula odstępnego: ${fmtZl(p.contract.clause)}`] : []),
+    ...(clauseAmount(p.contract) ? [`Klauzula odstępnego: ${fmtZl(clauseAmount(p.contract))}`] : []),
     ...(abroad ? ['Gra za granicą: transfer trwa kilka dni dłużej (certyfikat ITC i podróż)'] : []),
   ];
   return `<div class="tf-back"><button class="btn btn--quiet btn--sm" data-act="tf-close">Wróć do listy</button></div>
@@ -440,7 +445,7 @@ function playerCard(game, p, ui) {
         ${observeStatusHtml(game, p)}
         <ul class="tf-facts">
           ${fact(valueLabel(game, p), esc(valueOrScoutPrice(game, p, fmtZl)))}
-          ${free ? fact('Oczekuje', `ok. ${fmtZl(effectiveAsk(p, clubById(game.clubId)?.tier ?? 1))}<small> tygodniowo</small>`, 'warn') : fact('Cena klubu', nfs ? 'nie na sprzedaż' : fmtZl(price), nfs ? 'bad' : 'good')}
+          ${free ? fact('Oczekuje', `ok. ${fmtZl(effectiveAsk(p, clubById(game.clubId)?.tier ?? 1))}<small> tygodniowo</small>`, 'warn') : domestic && !listed ? fact('Cena klubu', inq ? (inq.nfs ? 'nie na sprzedaż' : `ok. ${fmtZl(inq.ask)}`) : 'zapytaj klub', inq ? (inq.nfs ? 'bad' : 'good') : 'info') : fact('Cena klubu', nfs ? 'nie na sprzedaż' : fmtZl(price), nfs ? 'bad' : 'good')}
           ${free ? '' : fact('Pensja', `${fmtZl(p.contract.wage)}<small> tygodniowo</small>`)}
           ${free ? '' : fact('Kontrakt do', esc(fmtDate(p.contract.until)))}
           ${abroad ? fact('Klub', `<span class="fp-fact">${esc(poolClubLabel(p))}</span>`, 'info') : ''}
@@ -594,7 +599,7 @@ function offersView(game) {
     </li>`;
   }).join('')}</ul>` : '<p class="tf-p__txt">Brak ofert. Kluby składają je w oknie transferowym, częściej za zawodników z listy transferowej.</p>';
   const talks = mine.length ? `<ul class="tf-mini">${mine.map(({ p, t }) => {
-    const [txt, k] = t.accepted ? [`przyjęta: ${fmtZl(t.accepted)}`, 'good'] : t.until ? [`przerwa do ${fmtDate(t.until)}`, 'bad'] : t.counter ? [`klub chce ${fmtZl(t.counter)}`, 'warn'] : ['odrzucona', 'bad'];
+    const [txt, k] = t.accepted ? [`przyjęta: ${fmtZl(t.accepted)}`, 'good'] : t.until ? ['rozmowy wstrzymane', 'bad'] : t.counter ? [`klub chce ${fmtZl(t.counter)}`, 'warn'] : t.co ? ['klub rozważa ofertę', 'info'] : ['odrzucona', 'bad']; // t.co: oferta klub-klub (clubOffers.js)
     return `<li data-pid="${esc(p.id)}"><button data-act="tf-open" data-id="${esc(p.id)}">${posBadge(p)}<span>${cardLink(p)}<em>${esc(clubById(p.clubId)?.name ?? (isPoolContracted(p) ? poolClubLabel(p) : 'bez klubu'))}</em></span><small data-k="${k}">${esc(txt)}</small></button></li>`;
   }).join('')}</ul>` : '<p class="tf-p__txt">Nie prowadzisz rozmów. Ofertę złożysz z karty zawodnika na Rynku.</p>';
   const listedOwn = Object.entries(game.market.userListed).map(([id, price]) => ({ p: game.world.players[id], price })).filter((x) => x.p && x.p.clubId === game.clubId);
@@ -794,8 +799,8 @@ export function handleTransferAction(game, act, ds = {}, root = null) {
       return { ui: { tfFilter: f } };
     }
     case 'tf-offer': {
-      const fee = Number(val('#tfFee', ds.fee)) || 0;
-      const r = offerForPlayer(game, p.id, fee);
+      const pkg = readOfferForm(root, ds); // pakiet: kwota, raty, premie, procent od sprzedaży, termin (clubOffersView.js)
+      const r = offerForPlayer(game, p.id, pkg.fee, { pkg });
       return { ui: { tfMsg: r.result === 'director' ? null : r.text }, save: true }; // sprzeciw dyrektora: panel w karcie
     }
     case 'tf-loan': return loanInAction(game, p, ds, root); // warunki wypożyczenia: src/ui/loansView.js
@@ -803,9 +808,11 @@ export function handleTransferAction(game, act, ds = {}, root = null) {
       const t = game.market.talks[p.id];
       const abroad = isPoolContracted(p); // klub zagraniczny: odstępne jak przy klubie AI, fromClub to opis klubu
       const sold = !!p.clubId || abroad;
-      const fee = sold ? t?.accepted ?? 0 : 0;
-      if (sold && !t?.accepted) return { ui: { tfMsg: 'Najpierw dogadaj się z klubem.' } };
-      if (sold && !inWindow(game.date)) return { ui: { tfMsg: 'Okno transferowe jest zamknięte.' } };
+      // Polski klub: porozumienie klubów z oknem 14 dni (clubOffers.js), także poza oknem transferowym (rejestracja później)
+      const ag = p.clubId ? agreementOf(game, p.id) : null;
+      const fee = sold ? (p.clubId ? ag?.fee ?? 0 : t?.accepted ?? 0) : 0;
+      if (sold && !(p.clubId ? ag : t?.accepted)) return { ui: { tfMsg: 'Najpierw dogadaj się z klubem.' } };
+      if (abroad && !inWindow(game.date)) return { ui: { tfMsg: 'Okno transferowe jest zamknięte.' } };
       if (!sold && p.joinOn) return { ui: { tfMsg: `${joinStatusText(game, p)}.${p.joinOn.clubId === game.clubId ? '' : ' Nie rozmawia z innymi klubami.'}` } }; // umowa poza oknem (lateJoins.js)
       if (p.transfer) return { ui: { tfMsg: 'Zawodnik jest w trakcie transferu.' } };
       if (userProposal(game, p.id)) return { ui: { tfMsg: `${p.name} rozważa twoją propozycję. Odpowie ok. ${fmtDate(thinkingUntil(game, p.id))}.` } };
@@ -856,7 +863,7 @@ export function handleTransferAction(game, act, ds = {}, root = null) {
       const closed = offerId && game.market.offers.find((x) => x.id === offerId)?.status !== 'open';
       return { ui: { tfMsg: r.text }, save: true, ...(closed ? { resolveOffer: offerId } : {}), squadChanged: !!r.sold, note: r.text };
     }
-    default: return handleDealAction(game, act, ds) ?? { ui: {} };
+    default: return handleClubOfferAction(game, act, ds) ?? handleDealAction(game, act, ds) ?? { ui: {} };
   }
 }
 
@@ -885,7 +892,7 @@ export function transferCardHtml(game, p, { wide = false } = {}) {
   const mine = p.clubId === game.clubId;
   const abroad = isPoolContracted(p);
   const club = p.clubId ? clubById(p.clubId)?.name ?? '' : p.abroad ? poolClubLabel(p) : 'Wolny zawodnik';
-  const price = mine || playsAbroad(p) && !abroad ? null : !p.clubId && !abroad ? 'Bez odstępnego' : notForSale(game, p) && !p.contract?.clause ? 'Nie na sprzedaż' : fmtZl(askingPrice(game, p));
+  const price = mine || playsAbroad(p) && !abroad ? null : !p.clubId && !abroad ? 'Bez odstępnego' : notForSale(game, p) && !clauseAmount(p.contract) ? 'Nie na sprzedaż' : fmtZl(askingPrice(game, p));
   const facts = [
     cardFact('Klub', esc(club)),
     ...(p.foot ? [cardFact('Noga', esc(footLabel[p.foot]))] : []), // noga: jak w profilu zawodnika

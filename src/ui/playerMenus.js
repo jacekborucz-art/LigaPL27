@@ -18,6 +18,7 @@ import { canSign, KEEP_MAX } from '../career/squadLimit.js';
 import { limitStatus } from '../career/squadLimitSystem.js';
 import { askingPrice, notForSale, playerWillingness, inWindow, releaseCost, fmtZl } from '../career/transfers.js';
 import { isPoolContracted, poolClubLabel } from '../career/foreignPool.js';
+import { agreementOf, userOffer, offerStatus, inquiryOf, talksBroken, clauseAmount } from '../career/clubOffers.js'; // oferty klub-klub
 import { lateFree, joinDateFor, joinStatusText } from '../career/lateJoins.js'; // wolni zawodnicy poza oknem
 import { scoutHidden } from '../career/scoutOps.js'; // kandydat skauta: bez OVR (ocenę zna skaut)
 import { PLAYER_TALKS, talkBlockedText, talkSuggestions } from '../career/teamTalks.js';
@@ -294,18 +295,26 @@ function otherItems(game, p, { view, ui = {} } = {}) {
     return items;
   }
   const talk = game.market?.talks?.[p.id];
-  const nfs = notForSale(game, p) && !p.contract?.clause;
-  if (talk?.accepted) {
+  const nfs = notForSale(game, p) && !clauseAmount(p.contract);
+  if (abroad) { // klub zagraniczny: odpowiedź od razu, tylko w oknie (foreignPool.js)
+    if (talk?.accepted) items.push(item('Rozmawiaj z zawodnikiem', withSteps(card, [{ act: 'tf-negotiate', id: p.id }], { focus: null }), { hint: `Klub przyjął ofertę ${fmtZl(talk.accepted)}`, disabled: winTxt ?? capTxt ?? refuse }));
+    else items.push(item('Złóż ofertę…', { ...card, focus: '#tfFee' }, { hint: `Cena klubu ok. ${fmtZl(askingPrice(game, p))}`, disabled: winTxt ?? capTxt ?? refuse }));
+    return items;
+  }
+  // Polski klub: oferta klub-klub w każdej chwili (zapytanie o cenę, pakiet, namysł klubu; clubOffers.js)
+  const ag = agreementOf(game, p.id);
+  const rec = userOffer(game, p.id);
+  if (ag) {
     items.push(item('Rozmawiaj z zawodnikiem', withSteps(card, [{ act: 'tf-negotiate', id: p.id }], { focus: null }), {
-      hint: `Klub przyjął ofertę ${fmtZl(talk.accepted)}`, disabled: winTxt ?? capTxt ?? refuse,
+      hint: `Porozumienie klubów do ${fmtDate(ag.talkUntil)}`, disabled: refuse,
     }));
   } else {
-    items.push(item('Złóż ofertę…', { ...card, focus: '#tfFee' }, {
-      hint: nfs ? null : `Cena klubu ok. ${fmtZl(askingPrice(game, p))}`,
-      disabled: nfs ? 'Klub go nie sprzedaje (czołowy zawodnik)' : winTxt ?? capTxt ?? refuse,
+    const st = rec && rec.seller === p.clubId ? offerStatus(game, rec) : null;
+    items.push(item('Złóż ofertę…', { ...card, focus: '#tfFee, [data-act="tf-inquire"], [data-act="tf-co-accept"]' }, {
+      hint: st && ['thinking', 'counter', 'broken'].includes(st.k) ? st.text : nfs ? 'Klub raczej go nie sprzeda (ważny zawodnik): zapytaj o cenę' : inquiryOf(game, p.id) ? 'Odpowiedź klubu w karcie, także poza oknem' : 'Zapytaj o cenę, potem oferta (także poza oknem)',
+      disabled: talksBroken(game, p.id) ? 'Rozmowy wstrzymane' : refuse ?? (winTxt ? null : capTxt), // poza oknem oferta na najbliższe okno albo od następnego sezonu
     }));
   }
-  if (abroad) return items; // klub zagraniczny nie wypożycza
   const loanable = game.market?.listed?.[p.id]?.kind === 'loan' || (p.age <= 21 && !nfs);
   items.push(item('Wypożycz…', { ...card, focus: '#tfShare' }, {
     hint: loanable ? 'Do końca sezonu, część pensji' : null,

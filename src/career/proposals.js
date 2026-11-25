@@ -26,7 +26,8 @@ import { squadDeficits, GROUP } from './squad.js';
 import { squadOf } from '../world/worldGen.js';
 import { spendable, wageRoom } from './finance.js';
 import { canSign, squadCount } from './squadLimit.js';
-import { startDeal, hasOpenDeal, pendingFees, stat, expectedRegistration } from './transferDeals.js';
+import { startDeal, hasOpenDeal, pendingFees, stat, expectedRegistration, cashOf } from './transferDeals.js';
+import { agreementOf, regDateOf, markOfferDone } from './clubOffers.js'; // porozumienie klubów: pakiet i data rejestracji
 import { isPoolContracted, poolSellerClub } from './foreignPool.js';
 import { fmtZl } from './transfers.js';
 import { fmtDate } from '../ui/dom.js';
@@ -51,6 +52,7 @@ const OPEN = new Set(['open', 'changes']);
 const isOpen = (x) => OPEN.has(x.status);
 const clubName = (id) => clubById(id)?.name ?? 'klub';
 const windowOn = (date) => (DOMESTIC.transferWindows ?? []).find((w) => date >= w.from && date <= w.to) ?? null;
+const SEASON_END_OF = (date) => `${Number(date.slice(0, 4)) + (date.slice(5) >= '07-01' ? 1 : 0)}-06-30`; // koniec sezonu dla daty
 
 // ------------------------------------------------------------ Stan
 export function ensureProposals(game) {
@@ -86,19 +88,20 @@ const stateOf = (p) => (p.clubId ? 'club' : isPoolContracted(p) ? 'pool' : 'free
 /**
  * Propozycja klubu dla zawodnika po udanych rozmowach. opts: { playerId, to, fee, contract, kind ('transfer'|'free'),
  * date, maxWage (klub AI: budżet pensji na drugą rundę), maxTotal (próg zarządu: roczny koszt kontraktu),
- * demand (orientacyjne żądanie z rozmów: limit poprawki w ciemno), sale (oferta klubu AI za zawodnika gracza: id oferty) }.
+ * demand (orientacyjne żądanie z rozmów: limit poprawki w ciemno), sale (oferta klubu AI za zawodnika gracza: id oferty),
+ * pkg (pakiet oferty klub-klub), regDate (data rejestracji po porozumieniu poza oknem), coff (id oferty klub-klub) }.
  * Kluby z wcześniejszymi propozycjami dowiadują się tylko, że zawodnik rozważa inną (bez klubu i kwoty).
  * Zwraca propozycję albo null (zawodnik zajęty albo ten klub już złożył propozycję).
  */
 export function makeProposal(game, opts) {
   ensureProposals(game);
-  const { playerId, to, fee = 0, contract, kind = 'transfer', maxWage = null, maxTotal = null, demand = null, sale = null } = opts;
+  const { playerId, to, fee = 0, contract, kind = 'transfer', maxWage = null, maxTotal = null, demand = null, sale = null, pkg = null, regDate = null, coff = null } = opts;
   const date = opts.date ?? game.date;
   const p = game.world.players[playerId];
   if (!p || !to || hasOpenDeal(game, playerId) || p.preContract || p.joinOn) return null;
   const mine = proposalsFor(game, playerId);
   if (mine.some((x) => x.to === to)) return null; // jedna propozycja na klub
-  const needsWindow = stateOf(p) !== 'free'; // zawodnik z klubem decyduje najpóźniej w ostatnim dniu okna
+  const needsWindow = stateOf(p) !== 'free' && !regDate; // zawodnik z klubem decyduje najpóźniej w ostatnim dniu okna (bez daty rejestracji)
   // W trakcie namysłu nowa propozycja dołącza do tej samej decyzji; w trakcie ostatniej rundy gracza: dzień po terminie
   const waiting = mine.filter((x) => x.status === 'open').map((x) => x.decide).sort();
   const changes = mine.find((x) => x.status === 'changes');
@@ -111,6 +114,7 @@ export function makeProposal(game, opts) {
     id: `n${++M.pendingSeq}-${playerId}`, pid: playerId, name: p.name, pos: p.pos, to, user: to === game.clubId,
     from: p.clubId ?? null, fromState: stateOf(p), fee, contract, kind, date, decide, needsWindow,
     maxWage, maxTotal, demand, sale, status: 'open', deadline: null, want: null, end: null,
+    ...(pkg ? { pkg } : {}), ...(regDate ? { regDate } : {}), ...(coff ? { coff } : {}),
   };
   M.pending.push(x);
   stat(game, x.user ? 'propsUser' : 'props');
@@ -200,7 +204,10 @@ export function improveUserProposal(game, propId, pct, date = game.date) {
  */
 export function submitUserProposal(game, { playerId, fee = 0, contract, fromClub = null }) {
   const p = game.world.players[playerId];
-  const prop = makeProposal(game, { playerId, to: game.clubId, fee, contract, kind: fromClub ? 'transfer' : 'free' });
+  // Porozumienie klubów (clubOffers.js): pakiet i data rejestracji (poza oknem albo od następnego sezonu)
+  const ag = fromClub ? agreementOf(game, playerId) : null;
+  const extra = ag ? { fee: ag.fee, pkg: ag.pkg, regDate: regDateOf(ag, game.date), coff: ag.id } : {};
+  const prop = makeProposal(game, { playerId, to: game.clubId, fee, contract, kind: fromClub ? 'transfer' : 'free', ...extra });
   if (!prop) return { ok: false, text: `${p?.name ?? 'Zawodnik'} jest już w trakcie innej transakcji albo czeka na twoją odpowiedź.`, prop: null };
   if (prop.decide <= game.date) {
     resolveNow(game, playerId);
@@ -364,7 +371,8 @@ function accept(game, x, date, out) {
   const p = game.world.players[x.pid];
   const F = game.finance;
   const full = x.to === game.clubId ? !canSign(game).ok : squadCount(game, x.to).full;
-  const money = x.fee && spendable(F, x.to) - (pendingFees(game, x.to) - x.fee) < x.fee;
+  const cash = cashOf(x); // pakiet: tylko kwota płatna przy rejestracji (clubOffers.js)
+  const money = !(x.regDate && x.regDate > SEASON_END_OF(date)) && cash && spendable(F, x.to) - (pendingFees(game, x.to) - cash) < cash;
   if (full || money) {
     const why = full ? 'limit' : 'money';
     close(x, 'expired', date, { reason: why });
@@ -381,9 +389,16 @@ function accept(game, x, date, out) {
     if (x.user) { p.morale = clamp((p.morale ?? 12) + 2, 1, 20); out.push(joinAgreedMessage(game, j, date)); }
     return { join: j };
   }
-  const deal = startDeal(game, { playerId: x.pid, to: x.to, fee: x.fee, contract: x.contract, kind: x.kind, date, stage: 'medical', prop: x.id });
+  const deal = startDeal(game, { playerId: x.pid, to: x.to, fee: x.fee, contract: x.contract, kind: x.kind, date, stage: 'medical', prop: x.id, pkg: x.pkg ?? null, regDate: x.regDate ?? null });
   if (!deal) { x.status = 'expired'; x.end.reason = 'deal'; return null; }
   x.end.deal = deal.id;
+  if (x.user) markOfferDone(game, x.pid); // porozumienie klubów wykorzystane
+  if (x.user && deal.deferred) { // porozumienie poza oknem: rejestracja w dniu otwarcia okna albo od następnego sezonu
+    stat(game, 'propsUserYes');
+    p.morale = clamp((p.morale ?? 12) + 2, 1, 20);
+    out.push(letter(game, x, 'yes', `${x.name} przyjmuje twoją propozycję`, `${x.name} zgodził się na warunki ${clubName(x.to)}${x.fee ? ` (odstępne ${fmtZl(x.fee)})` : ''}. Transfer od ${fmtDate(deal.deferred.regDate)}: do tego dnia zostaje w ${clubName(x.from)} i tam gra. Pieniądze na pierwszą ratę i miejsce w kadrze są zarezerwowane. W dniu rejestracji testy medyczne.`));
+    return deal;
+  }
   stat(game, x.user ? 'propsUserYes' : 'propsYes');
   if (x.user) p.morale = clamp((p.morale ?? 12) + 2, 1, 20); // podpis: jak po udanych rozmowach (negocjacje.md, rozdz. 7)
   if (x.user) out.push(letter(game, x, 'yes', `${x.name} przyjmuje twoją propozycję`, `${x.name} zgodził się na warunki ${clubName(x.to)}${x.fee ? ` (odstępne ${fmtZl(x.fee)})` : ''}. Teraz testy medyczne, zgłoszenie spodziewane ${fmtDate(expectedRegistration(deal))}.`));

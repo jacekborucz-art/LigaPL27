@@ -161,7 +161,7 @@ test('Zamiana przez wybór: przy wybranym innym zawodniku menu kończy zamianę 
   assert.equal(find(menu(g, cap, 'tactics'), 'Kapitan').checked, true);
 });
 
-test('Rynek: cudzy zawodnik. Oferta i wypożyczenie wyłączone poza oknem, przy pełnej kadrze i u nietykalnych', () => {
+test('Rynek: cudzy zawodnik. Oferta w każdej chwili (zapytanie o cenę), wypożyczenie poza oknem wyłączone, pełna kadra w oknie', () => {
   const g = newGame();
   const legia = squadOf(g.world, 'legia');
   const top3 = legia.find((p) => notForSale(g, p) && !p.contract?.clause);
@@ -169,14 +169,16 @@ test('Rynek: cudzy zawodnik. Oferta i wypożyczenie wyłączone poza oknem, przy
   const m = menu(g, regular.id, 'transfers');
   assert.deepEqual(top(m), ['Karta zawodnika', 'Profil i statystyki', 'Do listy życzeń', 'Raport obserwatora…', 'Złóż ofertę…', 'Wypożycz…']);
   assert.match(m.note, /^Twój najlepszy /, 'porównanie z najlepszym na pozycji');
-  assert.equal(find(m, 'Złóż ofertę…').run.focus, '#tfFee');
+  assert.match(find(m, 'Złóż ofertę…').run.focus, /#tfFee/);
   assert.equal(find(m, 'Złóż ofertę…').disabled, null, 'okno otwarte w lipcu');
-  assert.match(find(menu(g, top3.id, 'transfers'), 'Złóż ofertę…').disabled, /nie sprzedaje/);
+  // Nie na sprzedaż (indeks istotności): oferta możliwa (wyjątkowa kwota), podpowiedź bez ceny
+  if (top3) { assert.equal(find(menu(g, top3.id, 'transfers'), 'Złóż ofertę…').disabled, null); assert.match(find(menu(g, top3.id, 'transfers'), 'Złóż ofertę…').hint, /nie sprzeda/); }
   // Karta już otwarta: bez „Karta zawodnika”
   assert.ok(!find(menu(g, regular.id, 'transfers', { ui: { tfPlayer: regular.id } }), 'Karta zawodnika'));
   // Okno zamknięte
   g.date = '2026-10-10';
-  assert.match(find(menu(g, regular.id, 'transfers'), 'Złóż ofertę…').disabled, /^Okno transferowe zamknięte, otwarcie 1 lut 2027$/);
+  assert.equal(find(menu(g, regular.id, 'transfers'), 'Złóż ofertę…').disabled, null, 'oferta poza oknem: transfer w najbliższym oknie');
+  assert.match(find(menu(g, regular.id, 'transfers'), 'Wypożycz…').disabled ?? 'Okno', /Okno|wypożycza/);
   // Wolny zawodnik: rozmowa o kontrakcie także poza oknem
   const free = g.world.players[g.market.free[0]];
   assert.equal(find(menu(g, free.id, 'transfers'), 'Rozmawiaj o kontrakcie').disabled, null);

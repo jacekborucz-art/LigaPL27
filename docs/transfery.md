@@ -534,3 +534,100 @@ Test: `tests/lateFree.test.mjs`. Te same zasady dla gracza i klubów AI.
 - **Interfejs**: karta wolnego po zamknięciu okna: „Zawodnik wolny po zamknięciu okna: możesz się z nim dogadać,
   dołączy DD mmm RRRR (otwarcie okna).”; zawodnik z umową: status „Dołączy do X DD mmm RRRR” w karcie, w menu
   zawodnika (rozmowy wyłączone dla innych) i znacznik PK; W toku: panel „Dołączą w oknie transferowym”.
+
+## Oferty klub-klub (Nov 25, 2026)
+
+Kod: `src/career/clubOffers.js` (stałe `CO`), widok `src/ui/clubOffersView.js`, wywołania w `transfers.js`
+(`offerForPlayer`, `notForSale`, `completeTransfer`, `aiBuy`, `aiMaxPay`, `aiAfterAgreement`, `answerDirector`),
+`transferDeals.js` (etap „Porozumienie klubów” z datą rejestracji, `preRegistration`, `cashOf`, `pendingFees`),
+`proposals.js` (propozycja z pakietem i datą rejestracji) i `transferSystem.js` (`clubOffersDay` codziennie, przed
+decyzjami zawodników). Test: `tests/clubOffers.test.mjs`. Projekt: ekspert transferów (Nov 25, 2026). Te same funkcje
+dla gracza i klubów AI. Wszystkie liczby [SZAC].
+
+- **Zapytanie o cenę** (przycisk „Zapytaj o cenę” w karcie zawodnika polskiego klubu AI, w każdej chwili): zarząd
+  klubu odpowiada od razu i bez ponownego losowania (ziarno: gra, klub, zawodnik, okres = bieżące okno albo czas do
+  następnego), odpowiedź ważna 30 dni (`game.market.inq`). Odpowiedź: „nie na sprzedaż” albo cena wywoławcza
+  A0 = Res x (1,10 + 0,01 x (12 - N)), obcięta do 1,05-1,25 (N: Negocjacje dyrektora sprzedającego), i warunki
+  (raty możliwe albo „woli całą kwotę od razu” przy kłopotach finansowych; procent od sprzedaży u młodych z potencjałem;
+  „tylko za bardzo dobrą cenę”). Zawodnik z listy transferowej: A0 = cena z listy. Kontrakt kończy się w ciągu
+  6 miesięcy: odpowiedź wskazuje umowę od 1 lipca bez zgody klubu (prekontrakty, rozdz. 2).
+- **Indeks istotności I** (zamiast stałej „trójki najlepszych”, liczony raz w tygodniu na klub): miejsce w kadrze wg
+  OVR (1. +40, 2. +30, 3. +20, 4.-6. +8), minuty w sezonie (od 75 % +15, od 50 % +7; przed 5 meczami: poprzedni
+  sezon albo miejsce w kadrze), wychowanek (nigdy nie zmienił klubu, do 23 lat) +10, kupiony w ostatnich 240 dniach
+  +10, brak zastępcy (minimum grupy albo nikt w grupie z OVR >= jego - 1) +15, walka o cel (do 6 pkt od 3. miejsca,
+  w III lidze od 1., albo o utrzymanie do 4 pkt nad strefą, od 5 kolejek) +15, środek sezonu (zostało co najmniej
+  10 kolejek) +10, właściciel ambitny (od 15) i klub w czołowej trójce +5, zasobny (od 15) +5. I >= 60: nie na
+  sprzedaż (klauzula odstępnego działa zawsze); 40-60: tylko za bardzo dobrą cenę (Res x 1,25, nie dotyczy
+  trzech najlepszych, którzy mają już rolę x 1,45). Kluby AI nie mają kapitana w danych, więc bez punktów za opaskę.
+  Wyjątek: oferta o ekwiwalencie >= 2,2 x Res otwiera rozmowę z szansą 25 % (+2 pp za punkt zasobności właściciela
+  poniżej 10), ziarno: gra, klub, zawodnik, okres.
+- **Cena minimalna Res** = V x rola x cel x zastępca x finanse x kupujący x okres x reputacja x błąd dyrektora (RYN),
+  V = `marketValue`. Rola: kluczowy (3 najlepszych) 1,45, podstawowy 1,25, rotacja 1,05, rezerwa 0,85, lista
+  transferowa 1,08, rozwiązanie kontraktu 0,4, wychowanek +0,10. Cel: 1,15 (kluczowy 1,25). Zastępca: brak 1,30,
+  zastępca z OVR >= jego - 0,5 0,95. Finanse: saldo ujemne 0,80, budżet płac przekroczony albo saldo poniżej 8 tygodni
+  płac 0,90, właściciel zasobny 1,08. Kupujący: rywal w tabeli (ta sama liga, do 4 miejsc) 1,20, klub Ekstraklasy 1,08,
+  zagranica 0,97. Okres: ostatnie 3 dni okna 1,10 bez zastępcy, 0,92 przy kadrze ponad 26. Reputacja:
+  `askingPriceMultiplier`. Kontrakt krótszy niż 6 miesięcy: Res <= 0,6 V, podłoga 0,25 V; inaczej podłoga 0,55 V;
+  bez górnej granicy. Kilka ofert naraz za tego samego zawodnika: Res x (1 + 0,03 x (n - 1)). Szum decyzji:
+  Res x exp(N(0; 0,04)), ziarno: gra, klub, zawodnik, kupujący, runda, okres.
+- **Pakiet gracza** (formularz w karcie po zapytaniu): kwota stała, płatność (całość, 2 raty: 60 % przy transferze
+  i 40 % po roku, 3 raty: 50 %, 25 % po roku, 25 % po 2 latach), premie warunkowe (za 25 występów w klubie, za awans,
+  za grę w pucharach europejskich; ważne 2 lata, tylko gdy zawodnik jest w klubie), procent od następnej sprzedaży
+  5-30 %, termin przejścia (teraz: tylko w otwartym oknie; najbliższe okno; następny sezon: 1 lipca). Wypożyczenie
+  z opcją wykupu zostaje jak było (`loans.js`).
+- **Wartość pakietu dla sprzedającego** E = gotówka + raty x δ(t) x (1 - ρ) + premie x P x 0,6 + sell-on.
+  δ: 6 mies. 0,96, 12 mies. 0,92, 24 mies. 0,85 (klub w kłopotach finansowych: δ do kwadratu); ρ: kupujący z saldem
+  ujemnym 0,08, z saldem poniżej kwoty 0,03. P (prognoza): występy 0,75 / 0,35 / 0,10 (wg liczby lepszych na pozycji
+  u kupującego), awans 0,45 (miejsca 1-2), 0,2 (górna połowa), 0,05, puchary 0,5 (miejsca 1-3 Ekstraklasy), 0,2
+  (4-6), 0,05. Sell-on: s x V x g(wiek) x π(wiek) x 0,8; g: do 21 lat 1,6, 22-24 1,3, 25-27 1,0, 28-30 0,55, 31+ 0,2;
+  π: 0,6 / 0,6 / 0,5 / 0,35 / 0,1 (20 lat, V 4 mln, 15 %: 0,46 mln).
+- **Namysł klubu**: 3 + U(0..2) + U(0..2) dni, +1 przy decyzji właściciela (kwota ponad 1,5 V albo zawodnik nie na
+  sprzedaż), -1 przy ofercie od ceny wywoławczej (najmniej 3), w ostatnich 4 dniach okna (transfer „teraz”) najwyżej
+  do końca okna. Gracz widzi tylko „Klub rozważa ofertę” (bez daty).
+- **Odpowiedź** (r = E / Res): od 1,0 zgoda (0,97-1,0: zgoda w 35 %); 0,82-1,0 kontroferta
+  A_k = Res x (1 + (A0 / Res - 1) x (1 - c_k)), c_1 = 0,45 - 0,25 x (q - 0,47), c_2 = 0,80, q = (N - 1) / 19, kwota
+  przy tej samej strukturze pakietu; po dwóch kontrofertach odrzucenie („ostateczna cena”); 0,65-0,82 odrzucenie;
+  poniżej 0,65 obraza i przerwa 21-45 dni (poniżej 0,4: 60-90 dni). Gracz ma 3 oferty w rozmowie, trzecia nieudana:
+  przerwa 14-30 dni. Kontroferta czeka 5 dni (przyjmij, popraw ofertę, wycofaj się). Najwyżej 5 aktywnych rozmów
+  naraz. Przerwa w UI tylko słownie („kilka dni”, „kilka tygodni”, „najbliższe miesiące”). Nowa rozmowa (liczniki od
+  zera) po 30 dniach od ostatniej odpowiedzi albo po przerwie. Listy w Poczcie po każdej odpowiedzi klubu.
+- **Porozumienie klubów** jest warunkowe: 14 dni na warunki osobiste z zawodnikiem (FIFA RSTP art. 18.3). Rozmowy
+  z zawodnikiem jak dotąd (ekran rozmów, propozycja, namysł zawodnika `proposals.js`), także poza oknem. Bez
+  propozycji w ciągu 14 dni zgoda wygasa (list). Pieniądze na kwotę płatną przy transferze są zarezerwowane od
+  złożenia oferty (`offerReserve` w `pendingFees`), raty późniejszych sezonów nie.
+- **Data rejestracji**: zgoda zawodnika poza oknem albo z terminem „najbliższe okno” lub „następny sezon” zakłada
+  transakcję na etapie „Porozumienie klubów” z datą rejestracji (`d.deferred`): zawodnik gra w starym klubie,
+  pieniądze na pierwszą ratę i miejsce w kadrze są zarezerwowane, W toku: „Oczekuje na okno: transfer od DD mmm RRRR”.
+  W dniu rejestracji (`preRegistration`): kadra ponad maksimum: upadek; kontuzja od 6 tygodni: obniżka 15 % + 10 % za
+  każdy miesiąc ponad (najwyżej 50 %), sprzedawca zgadza się w 50 %, inaczej kupujący wycofuje się bez kosztów;
+  zmiana wartości o ponad 25 % (raz): wzrost, sprzedawca żąda połowy wzrostu w 35 %, spadek, kupujący wynegocjowuje
+  połowę spadku w 60 %; zawodnik zmienia zdanie 5 % (przy ponad 60 dniach czekania 8 %); brak pieniędzy: odroczenie
+  o 7 dni, potem upadek. Dalej testy medyczne i zgłoszenie jak zwykle. Data rejestracji po końcu kontraktu
+  zawodnika: oferta odrzucona ze wskazaniem umowy od 1 lipca (prekontrakt, bez odstępnego).
+- **Księgowanie**: przy rejestracji pierwsza rata (albo całość), kolejne raty w terminach (`game.market.instal`,
+  koszt „Transfery” u kupującego, przychód „Sprzedaż zawodników” u sprzedającego, budżety transferowe jak przy
+  odstępnym), premie 1. dnia miesiąca po spełnieniu warunku (`game.market.bonuses`, list dla gracza), procent od
+  następnej sprzedaży (`p.sellOn = { club, pct, owner }`) wypłacany przy kolejnej sprzedaży z odstępnym, także AI-AI
+  i za granicę; wolny transfer i rozwiązanie kontraktu kasują zobowiązanie.
+- **Kluby AI**: zakup zawodnika polskiego klubu to lekki rekord oferty (`aiClubOffer`, odpowiedź za 3-7 dni,
+  najpóźniej koniec okna) z warunkami z rozmów z zawodnikiem; w dniu odpowiedzi pętla do 4 rund (`aiLoop`, ta sama
+  `resolveClubOffer`): pierwsza oferta 85-95 % ceny orientacyjnej, kontroferta przyjęta do kwoty maksymalnej
+  (`aiMaxPay`: wartość x 1,45 x 1,25 zapasu, z listy x 1,08, x reputacja, błąd wyceny kupującego, przy braku
+  w kadrze x 1,1, nie więcej niż wolne środki), inaczej podbicie do połowy różnicy, po odrzuceniu +12 %, po obrazie
+  albo „nie na sprzedaż” koniec. Po zgodzie propozycja dla zawodnika (namysł). Kluby AI płacą całość od razu (bez rat,
+  premii i sell-on w v1) i składają oferty tylko w oknie. Oferty klubów AI za zawodników gracza bez zmian (kwota,
+  odpowiedź w Poczcie).
+- **Prośba o odejście** po odrzuconej albo zawyżonej (kontroferta ponad 1,25 V) uczciwej ofercie (E >= V):
+  szansa 0,25 x (0,5 + ambicja / 20) x 1,3 przy kontrakcie do 18 miesięcy, najwyżej raz na 60 dni, potem dotychczasowa
+  reakcja `onOfferRejected` (`moveWish.js`). „Nie na sprzedaż” nie wyzwala prośby.
+- **Sprzeciw dyrektora** liczony przy składaniu oferty z jego własnej wyceny, także gdy klub by odrzucił (wcześniej
+  tylko gdy klub przyjąłby kwotę, co zdradzało próg). Renegocjacja dyrektora obniża ofertę o 5-15 %, a klub
+  rozważa ją jak każdą inną.
+- **Klauzula odstępnego**: jeden odczyt `clauseAmount` (liczba albo `{ amount, foreignOnly }`; klauzula tylko dla
+  klubów zagranicznych nie dotyczy polskiego kupca). Oferta jednorazowa od kwoty klauzuli: porozumienie od razu.
+- **Stare zapisy**: `game.market.talks` zostaje lustrem dla starszego kodu; przy pierwszym wczytaniu `accepted`
+  zmienia się w porozumienie z oknem 14 dni, `counter` w kontrofertę (5 dni), `until` w przerwę.
+- **Symulacja** (ziarno 5, Widzew, sezon 2026/27, przed i po): transfery AI-AI z odstępnym 11 / 13 (Ekstraklasa 4 / 9,
+  1 Liga 6 / 4, 2 Liga 1 / 0), kwota do wartości w Ekstraklasie 1,37 / 1,46; „nie na sprzedaż” 12 % (stała trójka)
+  wobec 2-5 % na starcie sezonu, 6-10 % w sierpniu, 9-13 % zimą; pętla AI: 22 oferty, 14 zgód, rundy 1: 14, 2: 2,
+  3: 4, 4: 1. `npm run perf` na tym samym komputerze: sezon 10,2 s przed, 10,8 s po (+5 %, system transfers +5 %).

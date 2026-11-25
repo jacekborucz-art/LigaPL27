@@ -15,6 +15,7 @@ import {
   offerForPlayer, askingPrice, notForSale, completeTransfer, releasePlayer, releaseCost, answerIncoming, loanIn, marketWeek, createMarket,
 } from '../src/career/transfers.js';
 import { boardMonth, ensureBoard } from '../src/career/board.js';
+import { reservePrice, resolveClubOffer, normPkg, userOffer, clubOffersDay } from '../src/career/clubOffers.js'; // oferty klub-klub
 import { coachFired } from '../src/career/jobMarket.js';
 import '../src/season/dailySystems.js';
 
@@ -61,21 +62,34 @@ test('Sezon bez decyzji gracza: żaden klub nie bankrutuje, kadry 22-30 bez brak
   for (const c of Object.values(g.world.clubs)) for (const id of c.squad) { assert.ok(!seen.has(id), id); seen.add(id); }
 });
 
-test('Oferta za zawodnika: zbyt niska odrzucona, blisko ceny kontroferta, cena przyjęta; trzech najlepszych nie na sprzedaż', () => {
+test('Oferta za zawodnika: klub rozważa kilka dni; zbyt niska odrzucona, blisko ceny kontroferta, cena przyjęta; najważniejsi nie na sprzedaż; poza oknem też', () => {
   const g = newGame('widzew', 6, '2026-07-05');
-  g.finance.clubs.widzew.transferBudget = 5e7; g.finance.clubs.widzew.balance = 5e7;
+  g.finance.clubs.widzew.transferBudget = 5e8; g.finance.clubs.widzew.balance = 5e8;
   const sq = squadOf(g.world, 'rakow').sort((a, b) => b.ovr - a.ovr);
+  const calm = { gauss: () => 0, chance: () => false, int: (a) => a, next: () => 0.5 }; // bez szumu
   const star = sq.find((p) => !p.contract.clause && notForSale(g, p));
-  if (star) assert.equal(offerForPlayer(g, star.id, 1e9).result, 'reject');
+  if (star) assert.equal(resolveClubOffer(g, { p: star, pkg: normPkg({ fee: reservePrice(g, star).res * 1.5 }), rng: calm, rngExc: calm }).verdict, 'nfs');
   const p = sq.find((x) => x.pos === 'ŚP' && !notForSale(g, x) && !g.market.listed[x.id]); // pomocnik: sprzedaż nie łamie minimum grupy
-  const price = askingPrice(g, p);
-  assert.equal(offerForPlayer(g, p.id, Math.round(price * 0.5)).result, 'reject');
-  const c = offerForPlayer(g, p.id, Math.round(price * 0.9));
-  assert.ok(['counter', 'accept'].includes(c.result));
-  assert.equal(offerForPlayer(g, p.id, price * 1.4).result, 'accept');
-  // Poza oknem transfer niemożliwy
+  const { res } = reservePrice(g, p);
+  const at = (m) => resolveClubOffer(g, { p, pkg: normPkg({ fee: res * m }), rng: calm }).verdict;
+  assert.ok(['reject', 'lowball'].includes(at(0.5)));
+  assert.equal(at(0.9), 'counter');
+  assert.equal(at(1.05), 'accept');
+  // Oferta: odpowiedź po namyśle klubu (3-7 dni), bez daty w odpowiedzi
+  const r = offerForPlayer(g, p.id, Math.round(res * 1.3 / 10000) * 10000, { dirOk: true });
+  assert.equal(r.result, 'sent', r.text);
+  assert.doesNotMatch(r.text, /\d{4}|\d+ (sty|lut|mar|kwi|maj|cze|lip|sie|wrz|paź|lis|gru)/);
+  let d = g.date; let n = 0;
+  while (userOffer(g, p.id).status === 'thinking' && n < 10) { d = addDays(d, 1); n++; g.date = d; clubOffersDay(g, d); }
+  assert.ok(n >= 3 && n <= 7, `namysł ${n} dni`);
+  assert.equal(userOffer(g, p.id).status, 'agreed');
+  assert.equal(g.market.talks[p.id].accepted, Math.round(res * 1.3 / 10000) * 10000);
+  // Poza oknem: oferta możliwa, transfer w najbliższym oknie
   g.date = '2026-10-10';
-  assert.equal(offerForPlayer(g, sq[10].id, 1e7).result, 'reject');
+  const q = sq.find((x) => x !== p && !notForSale(g, x) && !g.market.listed[x.id] && x.contract.until > '2027-03-01');
+  const o = offerForPlayer(g, q.id, Math.round(reservePrice(g, q).res / 10000) * 10000, { dirOk: true });
+  assert.equal(o.result, 'sent', o.text);
+  assert.equal(userOffer(g, q.id).regDate, '2027-02-01');
 });
 
 test('Transfer: zawodnik zmienia klub, odstępne trafia do sprzedającego, kupujący płaci', () => {

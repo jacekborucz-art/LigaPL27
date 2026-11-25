@@ -431,3 +431,16 @@
 .tf-dirobj .tf-btns { grid-column: auto; justify-content: flex-start; }
 .tf-dirobj .btn { white-space: normal; text-align: left; }
 .tf-incoming--obj { border-left-color: var(--tf-warn); }
+
+/* Oferty klub-klub (src/ui/clubOffersView.js): odpowiedź na zapytanie, stan rozmów, formularz pakietu */
+.co-answer, .co-status { --c: var(--tf-info); display: grid; gap: 4px; margin: 0 0 var(--space-2); padding: 10px 12px; border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--c) 9%, var(--surface)); border: 1px solid color-mix(in srgb, var(--c) 28%, var(--line)); border-left: 4px solid var(--c); }
+.co-answer b, .co-status b { font: 700 var(--step-0)/1.25 var(--font-display); color: color-mix(in srgb, var(--c) 45%, var(--text)); overflow-wrap: anywhere; }
+.co-answer span, .co-status span { font-size: var(--step--1); color: var(--text); overflow-wrap: anywhere; }
+.co-answer small, .co-status small { font-size: var(--step--1); color: var(--text-muted); }
+.co-status + .tf-btns, .co-status + .btn { margin-bottom: var(--space-2); }
+.tf-offer.co-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); align-items: end; }
+.tf-offer.co-form label { flex: none; min-width: 0; }
+.tf-offer.co-form select { width: 100%; }
+.tf-offer.co-form .btn { justify-self: start; }
+.co-sub { margin: var(--space-3) 0 var(--space-1); font: 700 var(--step--1)/1.2 var(--font-display); color: var(--text-muted); }

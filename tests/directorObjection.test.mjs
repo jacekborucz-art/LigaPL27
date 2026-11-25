@@ -13,6 +13,7 @@ import { applySeasonState } from '../src/season/rollover.js';
 import { runDecision } from '../src/core/decisions.js';
 import { CLUBS_PL, clubById } from '../src/data/clubs_pl.js';
 import { offerForPlayer, answerIncoming, answerDirector, pendingObjection, askingPrice, notForSale } from '../src/career/transfers.js';
+import { userOffer, talksBroken } from '../src/career/clubOffers.js'; // oferta klub-klub: klub rozważa ofertę kilka dni
 import { boardCaps, feeIssues } from '../src/career/boardRequests.js';
 import {
   directorObjection, directorFairPrice, directorRenegotiate, objectionChance, insistPenalty, OBJ,
@@ -128,15 +129,16 @@ test('Kupno: okno sprzeciwu w karcie, wycofanie bez kary, nalegam (zaufanie -1, 
   const b = handleTransferAction(g, 'tf-dir', { k: key, a: 'back' });
   assert.match(b.ui.tfMsg, /Wycofujesz ofertę/);
   assert.equal(g.board.trust, t0);
-  assert.ok(!g.market.talks[x.p.id]?.accepted);
+  assert.ok(!g.market.talks[x.p.id]?.accepted && !userOffer(g, x.p.id));
   assert.equal(pendingObjection(g, key), null);
   assert.equal(g.board.requests.dirLog[0].action, 'back');
   // Nalegam: transakcja idzie dalej, zaufanie spada (kara z różnicy)
   assert.equal(offerForPlayer(g, x.p.id, x.fee).result, 'director');
   const obj = pendingObjection(g, key);
   const c = answerDirector(g, key, 'insist');
-  assert.equal(c.result, 'accept');
-  assert.equal(g.market.talks[x.p.id].accepted, x.fee);
+  assert.equal(c.result, 'sent', 'oferta idzie do klubu, który rozważa ją kilka dni');
+  assert.equal(userOffer(g, x.p.id).status, 'thinking');
+  assert.equal(userOffer(g, x.p.id).pkg.fee, x.fee);
   assert.equal(g.board.trust, t0 - insistPenalty(obj.gap));
   assert.match(c.text, /Zaufanie zarządu: \d+ na 100 \(-\d\)/);
   assert.equal(g.board.requests.dirLog[0].action, 'insist');
@@ -149,13 +151,14 @@ test('Kupno: okno sprzeciwu w karcie, wycofanie bez kary, nalegam (zaufanie -1, 
   const t2 = g2.board.trust;
   const r = answerDirector(g2, key, 'reneg');
   if (r.done && r.ok) {
-    assert.ok(g2.market.talks[x.p.id].accepted < x.fee && g2.market.talks[x.p.id].accepted >= x.fee * 0.84);
+    const fee = userOffer(g2, x.p.id).pkg.fee; // niższa oferta, klub ją rozważa
+    assert.ok(fee < x.fee && fee >= x.fee * 0.84);
     assert.equal(g2.board.trust, t2);
   } else if (r.tried) {
     assert.ok(pendingObjection(g2, key).tried);
     assert.equal(answerDirector(g2, key, 'reneg').ok, false, 'drugiej renegocjacji nie ma');
     assert.equal(answerDirector(g2, key, 'back').done, true);
-  } else assert.ok(g2.market.talks[x.p.id].until > g2.date, 'klub zrywa rozmowy');
+  } else assert.ok(talksBroken(g2, x.p.id), 'klub zrywa rozmowy');
   // Sprawa z wczoraj jest nieaktualna
   const g3 = fresh();
   offerForPlayer(g3, x.p.id, x.fee);

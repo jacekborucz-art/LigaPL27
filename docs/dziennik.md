@@ -29,6 +29,24 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 25, 2026, profil A (komputer domowy), oferty klub-klub, część 1 (v1.24 Beta)
+Zrobione (eksperci od transferów i psychologii zawodnika: Sonnet medium; wdrożenie Opus high; sprawdzone):
+- Nowe `src/career/clubOffers.js` (`CO`, `inquire`, `importance`, `reservePrice`, `packageValue`, `resolveClubOffer`,
+  `clubOffersDay`, `aiClubOffer`, `aiLoop`, `agreementOf`) i `src/ui/clubOffersView.js`: zapytanie o cenę w dowolnym
+  momencie (odpowiedź stała 30 dni), „nie na sprzedaż” z indeksu ważności (>= 60, wyjątek 2,2 x Res z p = 25 %), cena
+  wyjściowa 1,05-1,25 x Res, pakiet (raty 1-3, premie, procent od sprzedaży, termin przejścia), namysł klubu 3-7 dni
+  bez daty, progi r = E/Res, 3 oferty gracza i 2 kontroferty, zerwanie 21-90 dni, porozumienie z 14 dniami na rozmowy
+  z zawodnikiem (istniejący `tf-negotiate`), transakcja odroczona do okna ze zdarzeniami przed rejestracją.
+- Kluby AI: pętla 1-4 rund (`aiLoop`), tylko gotówka i tylko w oknie; oferty AI za zawodników gracza bez zmian.
+- Poprawki: sprzeciw dyrektora z jego wyceny przy złożeniu oferty (nie zdradza progu), `clauseAmount` (liczba albo obiekt).
+- Test `tests/clubOffers.test.mjs`, opis `docs/transfery.md` (Oferty klub-klub). Projekty ekspertów: scratchpad `oferty/`.
+Zostało / dalej:
+- CZĘŚĆ 2 (zatwierdzona): mind flow zawodnika (czy rozmawia, rundy 3-4, namysł ze zdarzeniami i kontrakcją klubu,
+  2 ostatnie szanse, zamknięcie 3-12 mies.), ukrycie daty decyzji zawodnika. Punkty styku: `agreementOf`, `tf-negotiate`,
+  `proposals.accept`, `transferDeals.preRegistration`, `aiAfterAgreement`.
+- Uwaga: uczciwa cena dyrektora liczona starym wzorem 1,45, a Res dla kluczowych zawodników dochodzi do 2-3 x wartości,
+  więc sprzeciw i weto zarządu częstsze; 1 Liga: odstępne/wartość spadło z 0,95 do 0,63 (do kalibracji).
+
 ## Nov 25, 2026, profil A (komputer domowy), raport obserwatora: menu w raporcie meczu i stan w karcie (v1.24 Beta)
 Zrobione:
 - Okno raportu meczu: `data-pid` w ocenach i zdarzeniach (`ui/matchReportView.js`), menu zawodnika w oknie (`app.js`,

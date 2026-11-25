@@ -3,7 +3,8 @@
 // (propozycje 1. dnia Jan-May, decyzje w poniedziałki Jan-Jun, wcześniejsze transfery zimą), kupcy z zagranicy
 // (poniedziałki w oknie), pula zawodników z zagranicy (uzupełnienie przed oknem), decyzje zawodników po namyśle
 // (propozycje klubów, codziennie przed transakcjami), umowy wolnych poza oknem (dołączenie w dniu otwarcia okna,
-// codziennie; kluby AI poza oknem w poniedziałki, src/career/lateJoins.js) i przebieg transakcji (codziennie). Spec: docs/transfery.md.
+// codziennie; kluby AI poza oknem w poniedziałki, src/career/lateJoins.js), odpowiedzi klubów na oferty klub-klub z ratami
+// i premiami (codziennie, src/career/clubOffers.js) i przebieg transakcji (codziennie). Spec: docs/transfery.md.
 
 import { registerDailySystem } from '../core/gameLoop.js';
 import { windowOf } from './transfers.js';
@@ -15,6 +16,7 @@ import { foreignWeek } from './foreignMarket.js';
 import { ensureForeignPool, foreignPoolDay } from './foreignPool.js';
 import { ensureProposals, proposalsDay } from './proposals.js'; // namysł zawodnika przed podpisem (docs/transfery.md, rozdz. 10)
 import { ensureJoins, joinsDay, aiLateWeek } from './lateJoins.js'; // wolni zawodnicy poza oknem (docs/transfery.md)
+import { ensureClubOffers, clubOffersDay } from './clubOffers.js'; // oferty klub-klub: odpowiedzi klubów, raty, premie (docs/transfery.md)
 
 /** Leniwa inicjalizacja (stare zapisy). */
 export function ensureTransferState(game) {
@@ -24,6 +26,7 @@ export function ensureTransferState(game) {
   ensureProposals(game); // stary zapis: brak game.market.pending
   ensureJoins(game); // stary zapis: brak game.market.joins
   ensureForeignPool(game); // zawodnicy z zagranicy: stary zapis dostaje pulę raz (foreignPool.js)
+  ensureClubOffers(game); // stary zapis: market.talks jako oferty klub-klub
 }
 
 export function transfersDay(game, date) {
@@ -43,6 +46,7 @@ export function transfersDay(game, date) {
   if (w && (dow === 1 || date === w.from)) out.push(...foreignWeek(game, date));
   out.push(...joinsDay(game, date)); // umowy wolnych poza oknem: dołączenie w pierwszym dniu okna
   if (!w && dow === 1) aiLateWeek(game, date); // kluby AI poza oknem: wolni zawodnicy tylko przy wyraźnej potrzebie
+  out.push(...clubOffersDay(game, date)); // odpowiedzi klubów na oferty (gracz i AI), raty i premie z transferów
   out.push(...proposalsDay(game, date)); // przed transakcjami: zgoda w ostatnim dniu okna zdąży na zgłoszenie
   out.push(...dealsDay(game, date));
   return out;

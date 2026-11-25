@@ -18,6 +18,10 @@ import { boardCaps } from './boardRequests.js';
 import { spellsOf, syncSpell } from '../season/history.js';
 import { completeTransfer, addFreeAgents, fmtZl } from './transfers.js';
 import { playerStage, moveRepEvent } from './reputationSystem.js'; // transfer do większej sceny (docs/reputacja.md)
+import { spendable } from './finance.js';
+import { marketValue } from '../world/playerGen.js';
+import { squadCount } from './squadLimit.js';
+import { CO, upfrontOf, offerReserve, paySellOn } from './clubOffers.js'; // pakiet oferty klub-klub, porozumienie z datą rejestracji
 import { fmtDate } from '../ui/dom.js';
 
 export const DEAL_STAGES = ['agreed', 'terms', 'medical', 'travel', 'announce', 'registered'];
@@ -28,6 +32,7 @@ export const STAGE_LABELS = {
 export const FAIL_LABELS = {
   terms: 'brak porozumienia z zawodnikiem', medical: 'testy medyczne', deadline: 'koniec okna transferowego',
   withdrawn: 'jedna ze stron wycofała się', seller: 'klub sprzedający wycofał się',
+  injury: 'kontuzja przed rejestracją', mind: 'zawodnik zmienił zdanie', money: 'brak pieniędzy', limit: 'limit kadry',
 };
 // Czasy etapów w dniach [min, max]. Transfer krajowy 2-4 dni, zagraniczny 5-9, wolny zawodnik 1-4, AI-AI 1-3.
 export const DEAL_DAYS = {
@@ -58,8 +63,11 @@ export const hasOpenDeal = (game, pid) => !!dealOf(game, pid);
  * Odstępne w otwartych transakcjach i w propozycjach w toku (namysł zawodnika, src/career/proposals.js),
  * w których klub kupuje: zarezerwowane w budżecie.
  */
-export const pendingFees = (game, clubId) => openDeals(game).filter((d) => d.to === clubId).reduce((s, d) => s + (d.fee || 0), 0)
-  + (game.market?.pending ?? []).filter((x) => x.to === clubId && (x.status === 'open' || x.status === 'changes')).reduce((s, x) => s + (x.fee || 0), 0);
+export const pendingFees = (game, clubId) => openDeals(game).filter((d) => d.to === clubId).reduce((s, d) => s + cashOf(d), 0)
+  + (game.market?.pending ?? []).filter((x) => x.to === clubId && (x.status === 'open' || x.status === 'changes')).reduce((s, x) => s + cashOf(x), 0)
+  + offerReserve(game, clubId); // oferty gracza u klubów (clubOffers.js)
+/** Gotówka płatna przy rejestracji: pierwsza rata pakietu (clubOffers.js) albo całe odstępne. */
+export const cashOf = (x) => (x?.pkg ? upfrontOf({ ...x.pkg, fee: x.fee || 0 }) : x?.fee || 0);
 /** Liczba zawodników w drodze do klubu (liczą się do limitu kadry). */
 export const pendingIn = (game, clubId) => openDeals(game).filter((d) => d.to === clubId).length;
 
@@ -111,7 +119,7 @@ export function dealStages(d) { return DEAL_STAGES.filter((s) => s !== 'travel' 
  */
 export function startDeal(game, opts) {
   ensureDeals(game);
-  const { playerId, to = null, fee = 0, contract = null, kind = 'transfer', foreign = null, needsTerms = false, early = false, prop = null } = opts;
+  const { playerId, to = null, fee = 0, contract = null, kind = 'transfer', foreign = null, needsTerms = false, early = false, prop = null, pkg = null, regDate = null } = opts;
   const date = opts.date ?? game.date;
   const p = game.world.players[playerId];
   if (!p || hasOpenDeal(game, playerId)) return null;
@@ -123,17 +131,22 @@ export function startDeal(game, opts) {
     ? { country: p.abroad.country, countryName: p.abroad.countryName ?? p.abroad.country, name: p.abroad.club, clubId: p.abroad.clubId ?? null } : null);
   const type = foreign || origin ? 'foreign' : kind === 'free' ? 'free' : user ? 'domestic' : 'ai';
   const plan = planDays(type, new Rng(`deal:${game.seed}:${id}`));
+  // Porozumienie z datą rejestracji (oferta klub-klub poza oknem albo od następnego sezonu, clubOffers.js): etap
+  // „Porozumienie klubów” do dnia rejestracji; pieniądze i miejsce w kadrze zarezerwowane, zawodnik gra w starym klubie
+  const deferred = !!regDate && regDate > date;
   const d = {
     id, pid: playerId, name: p.name, pos: p.pos, from: p.clubId ?? null, to, fee, contract, kind, foreign, origin, type, needsTerms, early,
-    start: date, stage: opts.stage ?? 'terms', due: null, plan, renegotiated: false, end: null, windowTo: kind === 'free' ? null : windowOn(date)?.to ?? null,
+    start: date, stage: deferred ? 'agreed' : opts.stage ?? 'terms', due: null, plan, renegotiated: false, end: null, windowTo: kind === 'free' || deferred ? null : windowOn(date)?.to ?? null,
     ...(prop ? { prop } : {}), // po propozycji i namyśle zawodnika (src/career/proposals.js)
+    ...(pkg ? { pkg } : {}), // pakiet: raty, premie, procent od sprzedaży (clubOffers.js)
+    ...(deferred ? { deferred: { regDate, v0: marketValue(p, { tier: clubById(p.clubId)?.tier ?? 1, date }) } } : {}),
   };
   // Kupiec AI z małą liczbą dni do końca okna: etapy skrócone, żeby zdążyć (zgłoszenie najpóźniej w ostatnim dniu)
   if (type === 'ai' && d.windowTo) {
     let over = Math.max(0, Math.round((Date.parse(addDays(date, plan.terms + plan.medical + plan.announce)) - Date.parse(d.windowTo)) / 86400000));
     for (const k of ['terms', 'announce', 'medical']) { const cut = Math.min(over, plan[k]); plan[k] -= cut; over -= cut; }
   }
-  d.due = dueFor(d, d.stage, date);
+  d.due = deferred ? regDate : dueFor(d, d.stage, date);
   M.deals.push(d);
   p.transfer = { deal: id, hold: STAGE_I[d.stage] >= STAGE_I.medical };
   stat(game, 'deals');
@@ -181,6 +194,10 @@ function failText(game, d, reason) {
     deadline: `Okno transferowe się zamknęło, zanim transakcja z ${other} dotarła do testów medycznych.`,
     withdrawn: `${other} wycofał się z transakcji.`,
     seller: `${sellerName(d)} wstrzymał transfer.`,
+    injury: `${d.name} doznał poważnej kontuzji przed rejestracją, a ${sellerName(d)} nie zgodził się obniżyć kwoty. ${buyerName(d)} wycofał się bez kosztów.`,
+    mind: `${d.name} zmienił zdanie przed rejestracją i zostaje w ${sellerName(d)}.`,
+    money: `${buyerName(d)} nie miał w dniu rejestracji pieniędzy na pierwszą ratę, także po tygodniu odroczenia.`,
+    limit: `W dniu rejestracji kadra ${buyerName(d)} była pełna (limit kadry).`,
   }[reason] ?? 'Transakcja nie doszła do skutku.';
   return `${t} ${d.from === game.clubId ? 'Zawodnik zostaje w klubie.' : 'Zawodnik zostaje w swoim klubie.'}`;
 }
@@ -222,7 +239,7 @@ function register(game, d, date, out, lastMinute = false) {
   const S0 = p ? playerStage(game, p) : 0;
   if (d.foreign) completeAbroad(game, d, date);
   else {
-    const e = completeTransfer(game, { playerId: d.pid, to: d.to, fee: d.fee, contract: d.contract, kind: d.kind === 'free' ? 'free' : 'transfer', date, fromName: d.origin?.name ?? null });
+    const e = completeTransfer(game, { playerId: d.pid, to: d.to, fee: d.fee, contract: d.contract, kind: d.kind === 'free' ? 'free' : 'transfer', date, fromName: d.origin?.name ?? null, pkg: d.pkg ?? null });
     if (d.early) e.early = true;
   }
   if (lastMinute) d.lastMinute = true;
@@ -249,6 +266,7 @@ export function completeAbroad(game, d, date = game.date) {
   const M = game.market;
   delete M.listed[p.id]; delete M.userListed[p.id]; delete M.talks[p.id];
   const F = game.finance;
+  paySellOn(game, p, { from, fee: d.fee, date }); // procent od sprzedaży dla poprzedniego sprzedawcy (clubOffers.js)
   if (d.fee && F.clubs[from]) { book(F, from, date, 'in', 'sales', d.fee, `${p.name} do ${d.foreign.name}`); F.clubs[from].transferBudget += Math.round(d.fee * 0.5); }
   p.clubId = null; p.contract = null; p.wage = 0; p.free = false; p.squad = null; p.lastMove = date;
   p.abroad = { country: d.foreign.country, club: d.foreign.name, clubId: d.foreign.clubId ?? null, since: date };
@@ -265,7 +283,14 @@ function advance(game, d, date, out) {
   const p = game.world.players[d.pid];
   const user = isUserDeal(game, d);
   switch (d.stage) {
-    case 'agreed': setStage(game, d, 'terms', d.due); return;
+    case 'agreed': {
+      if (!d.deferred) { setStage(game, d, 'terms', d.due); return; }
+      // Dzień rejestracji porozumienia z datą: sprawdzenia przed rejestracją, potem testy medyczne i zgłoszenie w oknie
+      if (preRegistration(game, d, date, out) !== 'ok') return;
+      d.windowTo = windowOn(date)?.to ?? null;
+      setStage(game, d, 'medical', date);
+      return;
+    }
     case 'terms': {
       if (d.needsTerms && !settleTerms(game, d, date)) return closeDeal(game, d, 'failed', 'terms', date, out);
       setStage(game, d, 'medical', d.due);
@@ -291,6 +316,57 @@ function advance(game, d, date, out) {
       return;
     default:
   }
+}
+
+/**
+ * Porozumienie z datą rejestracji, dzień rejestracji (clubOffers.js CO.pre): limit kadry, kontuzja od 6 tygodni
+ * (obniżka 15 % + 10 % za miesiąc, najwyżej 50 %, sprzedawca zgadza się w 50 %, inaczej kupujący wycofuje się), zmiana
+ * wartości o ponad 25 % (raz: wzrost, sprzedawca żąda więcej w 35 %; spadek, kupujący prosi o obniżkę w 60 %), zawodnik
+ * zmienia zdanie (5 %, przy ponad 60 dniach czekania 8 %), brak pieniędzy (odroczenie o 7 dni, potem upadek).
+ * Zwraca 'ok' | 'wait' | 'fail'.
+ */
+function preRegistration(game, d, date, out) {
+  const P = CO.pre; const D = d.deferred;
+  const p = game.world.players[d.pid];
+  const user = isUserDeal(game, d);
+  const note = (key, subject, body) => { if (user) out.push(dealMsg(date, d, key, subject, body)); };
+  const fail = (why) => { closeDeal(game, d, 'failed', why, date, out); stat(game, `coPre_${why}`); return 'fail'; };
+  if (d.to) { const sc = squadCount(game, d.to); if (sc.counted > sc.hard) return fail('limit'); }
+  if (!D.checked) {
+    D.checked = true;
+    const rng = new Rng(`deal:${game.seed}:${d.id}:przed-rejestracja`);
+    const inj = p.injuryDays ?? 0;
+    if (inj >= P.injuryDays) {
+      const cut = Math.min(P.maxCut, P.cut + P.perMonth * Math.floor((inj - P.injuryDays) / 30));
+      if (!rng.chance(P.sellerOk)) return fail('injury');
+      d.fee = round(d.fee * (1 - cut)); d.renegotiated = true;
+      note('pre-injury', `${d.name}: kwota obniżona po kontuzji`, `${d.name} ma poważną kontuzję (ok. ${Math.round(inj)} dni przerwy). ${sellerName(d)} zgodził się obniżyć kwotę o ${Math.round(cut * 100)} %: teraz ${fmtZl(d.fee)}.`);
+    }
+    const ratio = marketValue(p, { tier: clubById(d.from)?.tier ?? 1, date }) / Math.max(1, D.v0);
+    if (Math.abs(ratio - 1) > P.valueJump) {
+      if (ratio > 1 && rng.chance(P.sellerReopen)) {
+        const fee = round(d.fee * (1 + (ratio - 1) / 2));
+        if (d.to && spendable(game.finance, d.to) - (pendingFees(game, d.to) - cashOf(d)) < cashOf({ ...d, fee })) return fail('seller');
+        note('pre-value', `${sellerName(d)} żąda więcej za ${d.name}`, `Wartość zawodnika wyraźnie wzrosła od porozumienia. ${sellerName(d)} otworzył rozmowy i dostanie ${fmtZl(fee)} zamiast ${fmtZl(d.fee)}.`);
+        d.fee = fee;
+      } else if (ratio < 1 && rng.chance(P.buyerReopen)) {
+        const fee = round(d.fee * (1 - (1 - ratio) / 2));
+        note('pre-value', `Niższa kwota za ${d.name}`, `Wartość zawodnika wyraźnie spadła od porozumienia. ${buyerName(d)} wynegocjował ${fmtZl(fee)} zamiast ${fmtZl(d.fee)}.`);
+        d.fee = fee;
+      }
+    }
+    const long = (Date.parse(date) - Date.parse(d.start)) / 864e5 > P.longDays;
+    if (rng.chance(long ? P.mindLong : P.mind)) return fail('mind');
+  }
+  const cash = cashOf(d);
+  if (d.to && spendable(game.finance, d.to) - (pendingFees(game, d.to) - cash) < cash) {
+    if (D.moneyWait) return fail('money');
+    D.moneyWait = true;
+    d.due = addDays(date, P.moneyDays);
+    note('pre-money', `Rejestracja ${d.name} odroczona`, `Brakuje pieniędzy na kwotę płatną przy transferze (${fmtZl(cash)}). Rejestracja odroczona o ${P.moneyDays} dni, potem transfer upadnie.`);
+    return 'wait';
+  }
+  return 'ok';
 }
 
 /** Czy transakcja jest wciąż możliwa (zawodnik na miejscu, klub istnieje). */

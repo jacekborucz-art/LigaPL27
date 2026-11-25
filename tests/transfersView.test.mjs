@@ -84,7 +84,7 @@ test('Karta cudzego zawodnika: oferta z #tfFee i tf-offer, powrót tf-close; wł
   const html = renderTransfers(G, { tfPlayer: other.id });
   assert.match(html, /data-act="tf-close"/);
   assert.match(html, /class="tf-ch" data-pid="/);
-  assert.ok(/id="tfFee"/.test(html) || /nie chce|Kadra pełna|nie na sprzedaż/i.test(html));
+  assert.ok(/id="tfFee"|data-act="tf-inquire"/.test(html) || /nie chce|Kadra pełna|nie na sprzedaż/i.test(html)); // oferta klub-klub: najpierw zapytanie o cenę
   const own = squadOf(G.world, G.clubId).find((p) => !p.loan);
   const mine = renderTransfers(G, { tfTab: 'kontrakty', tfPlayer: own.id });
   assert.match(mine, /data-act="tf-list-own"|data-act="tf-unlist"/);

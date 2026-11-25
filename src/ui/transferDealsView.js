@@ -17,6 +17,7 @@ import { squadOf } from '../world/worldGen.js';
 import { anyClub } from '../season/season.js';
 import { proposalsFor, userProposal, thinkingUntil, withdrawProposal, canImprove, improveUserProposal, THINK } from '../career/proposals.js'; // namysł zawodnika (docs/transfery.md, rozdz. 10)
 import { joinStatusText } from '../career/lateJoins.js'; // wolny zawodnik z umową poza oknem
+import { clubOffersSection, offerTag } from './clubOffersView.js'; // oferty klub-klub (src/career/clubOffers.js)
 
 const posBadge = (p) => `<span class="pos" data-g="${GROUP[p.pos] ?? 'MID'}">${esc(p.pos)}</span>`;
 const tag = (txt, k = 'info') => `<span class="tf-tag" data-k="${k}">${esc(txt)}</span>`;
@@ -37,6 +38,7 @@ export function dealTags(game, p) {
   else if (p.moveWish && !p.transferRequest) out.push(tag('chce odejść', 'warn'));
   else if (!p.moveWish && p.clubId === game.clubId && p.wishMemory?.mood === 'rozczarowany') out.push(tag('rozczarowany, zostaje', 'warn'));
   if (!d && proposalsFor(game, p.id).length) out.push(tag(`rozważa ofertę, odpowie do ${fmtDate(thinkingUntil(game, p.id))}`, 'info'));
+  if (!d && p.clubId && p.clubId !== game.clubId) out.push(offerTag(game, p)); // oferta klub-klub: klub rozważa, kontroferta, porozumienie
   return out.join('');
 }
 
@@ -104,7 +106,8 @@ function dealRow(game, d, { mine = false } = {}) {
   const terms = d.fee ? fmtZl(d.fee) : 'bez odstępnego';
   const meta = d.end
     ? (d.end.result === 'registered' ? `Zgłoszony ${fmtDate(d.end.date)}${d.lastMinute ? ', w ostatniej chwili' : ''}.` : `Upadł ${fmtDate(d.end.date)}: ${FAIL_LABELS[d.end.reason] ?? d.end.reason}.`)
-    : `Etap: ${STAGE_LABELS[d.stage].toLowerCase()}. Spodziewane zgłoszenie: ${fmtDate(expectedRegistration(d))}.${d.renegotiated ? ' Kwota obniżona po testach medycznych.' : ''}`;
+    : d.deferred && d.stage === 'agreed' ? `Oczekuje na okno: transfer od ${fmtDate(d.deferred.regDate)}. Pieniądze na pierwszą ratę i miejsce w kadrze zarezerwowane, zawodnik gra jeszcze w ${clubName(d.from)}.` // porozumienie z datą rejestracji (clubOffers.js)
+      : `Etap: ${STAGE_LABELS[d.stage].toLowerCase()}. Spodziewane zgłoszenie: ${fmtDate(expectedRegistration(d))}.${d.renegotiated ? ' Kwota obniżona po testach medycznych.' : ''}`;
   const cancel = mine && !d.end && STAGE_I[d.stage] < STAGE_I.announce
     ? `<button class="btn btn--quiet btn--sm" data-act="tf-deal-cancel" data-d="${esc(d.id)}">${d.from === game.clubId ? 'Wstrzymaj transfer' : 'Wycofaj się'}</button>` : '';
   return `<li class="td-deal" data-state="${d.end ? (d.end.result === 'registered' ? 'ok' : 'fail') : 'open'}"${p ? ` data-pid="${esc(p.id)}"` : ''}>
@@ -138,6 +141,7 @@ export function dealsView(game, ui = {}) {
   const msg = ui.tfMsg ? `<p class="notice">${esc(ui.tfMsg)}</p>` : '';
   return `${msg}<div class="td-view">
       <div class="td-col">
+        ${clubOffersSection(game)}
         ${proposalsSection(game)}
         ${joins.length ? panel('Dołączą w oknie transferowym', 'info', `<ul class="tf-mini">${joinRows}</ul><p class="tf-p__txt">Wolni po zamknięciu okna: do dnia dołączenia nie grają i nie dostają pensji, ale liczą się do limitu kadry.</p>`, joins.length) : ''}
         ${panel('Transakcje twojego klubu', mineOpen.length ? 'warn' : 'info', mineOpen.length ? list(mineOpen, true) : '<p class="tf-p__txt">Brak transakcji w toku. Po porozumieniu klubów zawodnik przechodzi warunki osobiste, testy medyczne i zgłoszenie. Transfer krajowy trwa 2 do 4 dni, zagraniczny 5 do 9.</p>', mineOpen.length)}
