@@ -1662,7 +1662,23 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 .pit-row[data-g="DEF"] > * { background: color-mix(in srgb, #2D6A8F 18%, var(--surface)); }
 .pit-row[data-g="MID"] > * { background: color-mix(in srgb, var(--murawa) 18%, var(--surface)); }
 .pit-row[data-g="ATT"] > * { background: color-mix(in srgb, #A8323E 18%, var(--surface)); }
-.pit-row:hover > * { background: color-mix(in srgb, var(--text) 4%, var(--surface)); }
+/* Podświetlenie wiersza pod kursorem i przy nawigacji klawiaturą: tło grupy mocniejsze, obwódka (inset na komórkach: góra i dół wszędzie, lewa na pierwszej, prawa na ostatniej) pulsuje; --pit-hl-mix animowany */
+@property --pit-hl-mix { syntax: "<percentage>"; inherits: true; initial-value: 100%; }
+.pit-row { --pit-hl: var(--text); }
+.pit-row[data-g="GK"] { --pit-hl: var(--gk); --pit-bg: var(--gk); }
+.pit-row[data-g="DEF"] { --pit-hl: #2D6A8F; --pit-bg: #2D6A8F; }
+.pit-row[data-g="MID"] { --pit-hl: var(--murawa); --pit-bg: var(--murawa); }
+.pit-row[data-g="ATT"] { --pit-hl: #A8323E; --pit-bg: #A8323E; }
+.pit-row:is(:hover, :focus-within) { --pit-edge: color-mix(in srgb, color-mix(in srgb, var(--pit-hl) 50%, var(--text)) var(--pit-hl-mix), transparent); }
+.pit-row:is(:hover, :focus-within) > * { background: color-mix(in srgb, var(--pit-bg, var(--text)) 40%, var(--surface)); box-shadow: inset 0 2px 0 var(--pit-edge), inset 0 -2px 0 var(--pit-edge); }
+.pit-row:is(:hover, :focus-within) > :first-child { box-shadow: inset 3px 0 0 var(--pit-edge), inset 0 2px 0 var(--pit-edge), inset 0 -2px 0 var(--pit-edge); }
+.pit-row:is(:hover, :focus-within) > :last-child { box-shadow: inset -3px 0 0 var(--pit-edge), inset 0 2px 0 var(--pit-edge), inset 0 -2px 0 var(--pit-edge); }
+.pit-row:is(:hover, :focus-within) > td.is-set { box-shadow: inset 3px 0 0 var(--pi-tint), inset 0 2px 0 var(--pit-edge), inset 0 -2px 0 var(--pit-edge); }
+.pit-row:is(:hover, :focus-within) > td.is-set:last-child { box-shadow: inset 3px 0 0 var(--pi-tint), inset -3px 0 0 var(--pit-edge), inset 0 2px 0 var(--pit-edge), inset 0 -2px 0 var(--pit-edge); }
+@media (prefers-reduced-motion: no-preference) {
+  .pit-row:is(:hover, :focus-within) { animation: pit-glow 1.6s ease-in-out infinite alternate; }
+}
+@keyframes pit-glow { from { --pit-hl-mix: 55%; } to { --pit-hl-mix: 100%; } }
 .pit td.is-set { background: color-mix(in srgb, var(--pi-tint) 18%, var(--surface)); box-shadow: inset 3px 0 0 var(--pi-tint); }
 .pit-sel { width: 100%; min-width: 104px; min-height: 34px; padding: 0 6px; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--surface); color: var(--text); font: 500 var(--step--1)/1 var(--font-body); }
 .pit td.is-set .pit-sel { border-color: var(--pi-tint); background: color-mix(in srgb, var(--pi-tint) 22%, var(--surface)); font-weight: 700; }
@@ -1676,6 +1692,8 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 .pit-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .pit-item { display: grid; gap: 6px; padding: 8px 10px; border-left: 4px solid transparent; border-radius: var(--radius-s); background: color-mix(in srgb, var(--text) 4%, transparent); }
 .pit-item.is-set { border-left-color: var(--pi-tint); background: color-mix(in srgb, var(--pi-tint) 11%, transparent); }
+.pit-item:is(:hover, :focus-within) { border-left-color: var(--text-muted); background: color-mix(in srgb, var(--text) 10%, transparent); }
+.pit-item.is-set:is(:hover, :focus-within) { border-left-color: var(--pi-tint); background: color-mix(in srgb, var(--pi-tint) 20%, transparent); }
 .pit-item__who { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .pit-item__who .pit-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pit-item .pi-seg { grid-template-columns: repeat(3, 1fr); }
