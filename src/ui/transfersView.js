@@ -596,7 +596,7 @@ function offersView(game) {
     const what = o.foreign ? `${o.foreign.countryName ?? o.foreign.country}: chce ${whom}, pensja ok. ${fmtZl(o.foreign.wage)} tygodniowo` : o.pre ? `chce ${whom} już teraz (umowa od 1 lipca)` : `chce ${whom}`;
     const obj = pendingObjection(game, `sell:${o.id}`); // sprzeciw dyrektora sportowego przy sprzedaży
     return `<li class="tf-incoming${obj ? ' tf-incoming--obj' : ''}" data-pid="${esc(o.playerId)}">
-      <div class="tf-incoming__who">${o.foreign ? '<span class="td-flag" aria-hidden="true"></span>' : crest(o.from, 32)}<div><b>${esc(who)}</b><span>${esc(what)}</span></div></div>
+      <div class="tf-incoming__who">${o.foreign ? `<span class="td-flag" title="${esc(o.foreign.countryName ?? o.foreign.country)}" aria-hidden="true">${esc(o.foreign.country ?? '')}</span>` : crest(o.from, 32)}<div><b>${esc(who)}</b><span>${esc(what)}</span></div></div>
       <div class="tf-incoming__fee"><b>${fmtZl(o.fee)}</b><small>ważna do ${esc(fmtDate(o.expires))}${p ? `, wartość ${fmtZl(p.value)}` : ''}</small></div>
       ${obj ? objectionPanel(game, `sell:${o.id}`, obj) : `<span class="tf-btns"><button class="btn btn--primary btn--sm" data-act="tf-answer" data-o="${esc(o.id)}" data-a="accept">Przyjmij</button>${o.raised || o.pre ? '' : `<button class="btn btn--quiet btn--sm" data-act="tf-answer" data-o="${esc(o.id)}" data-a="more">Żądaj więcej</button>`}<button class="btn btn--quiet btn--sm" data-act="tf-answer" data-o="${esc(o.id)}" data-a="reject">Odrzuć</button></span>`}
     </li>`;
