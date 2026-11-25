@@ -205,7 +205,7 @@ function phaseFoul(M) {
 function benchCard(M, T) {
   const xs = [...T.bench, ...T.players.filter((y) => y.subbedOff)].filter((y) => !y.sentOff);
   if (!xs.length) return;
-  const x = M.rng.pick(xs);
+  const x = pickWeighted(M, xs, (y) => (y.yc ? K.benchBookedMul : 1)); // ukarany żółtą (często zmieniony z jej powodu) uważa na ławce
   const where = x.subbedOff ? 'zmieniony zawodnik' : 'rezerwowy';
   M.halfCounts.cards++;
   if (x.yc || M.rng.next() < K.benchRedShare) {

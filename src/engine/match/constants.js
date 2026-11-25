@@ -46,6 +46,7 @@ export const K = {
   tacFoul: 0.08, tacFoulYellow: 0.72, tacFoulDogso: 0.05, // faul taktyczny przerywający groźną kontrę (żółta -15%, Nov 25, 2026)
   penRetake: 0.05, penRebound: 0.35, penReboundXg: [0.15, 0.45], // powtórka (bramkarz przed linią), dobitka
   benchCardTick: 0.00035, benchRedShare: 0.08, // kartka dla rezerwowego lub zmienionego zawodnika
+  benchBookedMul: 0.15, // zawodnik z żółtą na ławce rzadziej dostaje kolejną (druga żółta po zejściu: 1,5 -> 0,5 na 1000 meczów, Nov 25, 2026)
   staffCardTick: 0.0007, staffRedShare: 0.08, // kartka dla trenera lub członka sztabu
   gkUp: { shotMul: 1.35, counter: 0.25, counterXg: [0.45, 0.75] }, // bramkarz w polu karnym rywala przy rożnym
   concussionMax: 2, // dodatkowe zmiany po wstrząśnieniu mózgu, tylko gdy rozgrywki je stosują (ctx.concussionSubs)

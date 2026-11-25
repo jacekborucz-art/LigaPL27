@@ -17,7 +17,7 @@ import { squadOf } from '../src/world/worldGen.js';
 import { Rng } from '../src/core/rng.js';
 
 // Skróty meczów sprzed instrukcji indywidualnych (Nov 18, 2026, tests/piHelpers.mjs przed zmianą silnika)
-// Wzorce przeliczone po celowych zmianach silnika (żółte -15%, zmęczenie z tolerancją, stałe fragmenty, nasycenie golami, kapitan, Nov 25, 2026)
+// Wzorce przeliczone po celowych zmianach silnika (żółte -15%, zmęczenie z tolerancją, stałe fragmenty, nasycenie golami, kapitan, Nov 25, 2026, kartki na ławce)
 const GOLD = {
   user: [
     'c5c982ae', '185a5c12', '9f91b6f', 'f381823e', '38e715f0', 'cd5adce4', 'bf4e9bb4', '63767f4b', 'ffffa8aa', 'ecbe7771',
@@ -28,8 +28,8 @@ const GOLD = {
   ],
   ai: [
     '67f9483d', 'ff359b7f', '8970d36a', 'd809582f', 'e2fc6076', 'f7c8f457', '32cb3dbb', 'c87614a0', '7c5e8b5b', 'fe999344',
-    'b2ffc53a', 'd9640445', '74a33e7a', '14655668', 'f215cab3', 'bc8dd671', 'd541ad5d', 'fd57fb40', '5368a250', '726c752b',
-    '49d01180', 'fb18b8b8', 'b321b72e', '1b70f26', 'd281ba5', '25d63c7e', 'f49f6afd', '98ec9d8f', '1cafbb2f', '1543379d',
+    'b2ffc53a', '5db27fb7', '74a33e7a', '14655668', 'f215cab3', 'bc8dd671', '8243a516', 'fd57fb40', '5368a250', '726c752b',
+    '5a0a7681', 'fb18b8b8', 'b321b72e', '1b70f26', 'd281ba5', '25d63c7e', 'f49f6afd', '98ec9d8f', '1cafbb2f', '1543379d',
     '3e3995bd', '832a4a77', '1e947780', '788f8a53', '244578c2', '629d0672', '2bf2b72a', 'c0cef82', 'b027dc47', 'a33d589c',
     '7a50e462', '89bfd07a', 'bd403abe', 'a66e81fd', '998deba', 'c3b771eb', '2fcfa6a2', '75a8a76b', '83aba344', '4d702d4f',
   ],
