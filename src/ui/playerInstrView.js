@@ -238,7 +238,7 @@ export function piTableHtml({ rows, map = {}, instructions = {}, filter = 'all',
     const grp = r.zone !== zone ? `<tr class="pit-grp"><th colspan="${PLAYER_INSTRUCTIONS.length + 1}" scope="colgroup">${esc(ZONE_HEAD[r.zone] ?? '')}</th></tr>` : '';
     zone = r.zone;
     const pos = piPos(r);
-    return `${grp}<tr class="pit-row${map[r.id] ? ' has-pi' : ''}"><th scope="row" class="pit-c0"><span class="pos" data-g="${GROUP[pos] ?? 'MID'}">${esc(pos)}</span>${nameBtn(r)}${piMarker(map[r.id])}</th>${PLAYER_INSTRUCTIONS.map((d) => cell(r, d)).join('')}</tr>`;
+    return `${grp}<tr class="pit-row${map[r.id] ? ' has-pi' : ''}" data-g="${GROUP[pos] ?? 'MID'}"><th scope="row" class="pit-c0"><span class="pos" data-g="${GROUP[pos] ?? 'MID'}">${esc(pos)}</span>${nameBtn(r)}${piMarker(map[r.id])}</th>${PLAYER_INSTRUCTIONS.map((d) => cell(r, d)).join('')}</tr>`;
   }).join('');
   const table = `<div class="pit-wrap"><table class="pit"><thead>${head}</thead><tbody>${body || `<tr><td colspan="${PLAYER_INSTRUCTIONS.length + 1}" class="hint">Brak zawodników w tym filtrze.</td></tr>`}</tbody></table></div>`;
 

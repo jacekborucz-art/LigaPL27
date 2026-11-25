@@ -67,7 +67,7 @@ test('Tabela: N zawodników x 7 instrukcji, pola „nie dotyczy”, nadpisania p
   const html = piTableHtml({ rows, map, instructions: base.instructions, attr });
   clean(html);
   const table = html.slice(html.indexOf('<table'), html.indexOf('</table>'));
-  const trs = [...table.matchAll(/<tr class="pit-row[^"]*">([\s\S]*?)<\/tr>/g)].map((m) => m[1]);
+  const trs = [...table.matchAll(/<tr class="pit-row[^"]*"[^>]*>([\s\S]*?)<\/tr>/g)].map((m) => m[1]);
   assert.equal(trs.length, squad.length, 'wszyscy zawodnicy kadry');
   for (const [i, tr] of trs.entries()) {
     const sel = (tr.match(/<select class="pit-sel"/g) ?? []).length;

@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-d8f15ee9d2';
+const VERSION = 'v0.3-9150781985';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -326,7 +326,7 @@ const FILES = [
   ['./src/season/uefa.js', '750aef61b1'],
   ['./src/season/uefaCoef.js', 'e978b7d220'],
   ['./src/season/worldNations.js', '6003d36e12'],
-  ['./src/styles/app.css', '2efc98ab90'],
+  ['./src/styles/app.css', 'b2f14a8374'],
   ['./src/styles/assistant.css', 'a1dd04f875'],
   ['./src/styles/base.css', 'f2fee58203'],
   ['./src/styles/club.css', '6615e08e49'],
@@ -390,7 +390,7 @@ const FILES = [
   ['./src/ui/negotiationView.js', '003df15c7b'],
   ['./src/ui/observerView.js', 'fb39407fea'],
   ['./src/ui/playerCard.js', '6864228807'],
-  ['./src/ui/playerInstrView.js', '9e2555a798'],
+  ['./src/ui/playerInstrView.js', 'bb6b55a4de'],
   ['./src/ui/playerMenus.js', '97305be85e'],
   ['./src/ui/playerStatsView.js', 'c2b6b96daa'],
   ['./src/ui/playerTags.js', '199bef8009'],
