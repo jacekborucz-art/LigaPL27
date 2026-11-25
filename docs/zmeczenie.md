@@ -31,3 +31,13 @@ Te same zasady obowiązują gracza i AI.
 Gra poza pozycją (1000 meczów, Pogoń z napastnikiem na środku obrony przeciw Legii): błędy obrony 0,015 na mecz przy nominalnym obrońcy, 0,061 z napastnikiem na środku obrony; stracone gole 2,19 wobec 2,45.
 
 Wartości balansowe [SZAC]. Zmęczenie było już wcześniej silne (zmęczeni goście przegrywali dużo częściej), dlatego nowe efekty są umiarkowane.
+
+## Kara kondycji z tolerancją zawodnika (Nov 25, 2026)
+
+Zgłoszenie: drużyna bez zmian w meczu powinna mieć lekko gorsze wyniki. Pomiar przed zmianą (600 meczów, gospodarz z AI kontra ten sam gospodarz bez zmian): bez zmian 1,642 pkt wobec 1,597, czyli brak zmian pomagał. Przyczyny (programista, 4000 meczów): kara -0,04 za punkt kondycji była za słaba (kondycja na koniec 76 to tylko -0,36), rezerwowi są słabsi od schodzących o ok. 0,7-1,2 punktu.
+
+- Kara: `condPenalty` w `src/engine/match/teams.js` (też `core.js` przy strzałach i `coach.js` przy wyborze zmiennika): -(0,04 d + 0,008 d²) x k, d = 85 - kondycja. Kondycja 76: ok. -1,0; 70: ok. -2,4. Przy 85 i więcej bez kary.
+- Tolerancja k na mecz (`fatigueTolerance`, `FATIGUE.tol`): 1 - 0,03 (PRA - 10) - 0,015 (OPA - 10) - 0,015 (WYT - 10) + los N(0; sd), sd = 0,18 - 0,012 ((PRA + WYT) / 2 - 10), najmniej 0,05; w granicach 0,6-1,5. Pracowity i wytrzymały znosi zmęczenie lepiej i równiej, leniwy gorzej i mniej przewidywalnie. Los z osobnego ziarna (mecz, zawodnik).
+- Pogoda i murawa: upał powyżej 28 st. (x1,3), śnieg (x1,1) i zła murawa (x1,15) przyspieszają spadek kondycji (`weather.fat`), więc kara rośnie szybciej.
+- Pomiar po zmianie (1500 meczów): ze zmianami AI 1,629 pkt, bez zmian 1,562 (+0,067 dla zmian; cel eksperta +0,05 do +0,08). Od 60. min strzelone 0,661 / 0,647, stracone 0,523 / 0,489 (pogoń AI otwiera grę). Zwykłe mecze: kalibracja `tests/matchEngine.test.mjs` bez zmian.
+- Testy: przeliczone wzorce złotego testu (`tests/playerInstr.test.mjs`); w `tests/strzalki.test.mjs` bilans bramek (+0,04) liczy się jako zysk strzałki (OP do przodu na zewnątrz).

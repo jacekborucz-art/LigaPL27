@@ -4,7 +4,7 @@
 
 import { Rng, clamp } from '../../core/rng.js';
 import { K, SHOOT_W, FOUL_W, INJURY_TYPES, RED_REASONS, KNOCK, FATIGUE } from './constants.js';
-import { buildTeam, updateZones, updateCondition, onPitch, goalkeeper, fieldPlayers, slotFit, makeKnock, errFactor } from './teams.js';
+import { buildTeam, updateZones, updateCondition, onPitch, goalkeeper, fieldPlayers, slotFit, makeKnock, errFactor, condPenalty } from './teams.js';
 import { matchRules, unlimitedSubs, UNLIMITED } from './rules.js';
 
 // Haki trenera (src/engine/match/coach.js rejestruje się przy imporcie). Silnik nie zna AI,
@@ -482,7 +482,7 @@ function drawXg(M, table) {
 
 function finishing(x, type, header) {
   const main = header ? attr(x, 'GLO') : type === 'DYS' ? attr(x, 'DYS') : attr(x, 'WYK');
-  const condPen = x.cond < 85 ? -0.04 * (85 - x.cond) : 0;
+  const condPen = condPenalty(x);
   return 0.6 * main + 0.25 * attr(x, 'OPA') + 0.15 * attr(x, 'TEC') + x.base + 0.035 * x.Z + condPen;
 }
 

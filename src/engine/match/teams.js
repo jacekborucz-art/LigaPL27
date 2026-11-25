@@ -5,7 +5,7 @@ import { formationById, FORMATIONS } from '../../data/formations.js';
 import { INSTRUCTIONS } from '../../data/instructions.js';
 import { proficiency, posEff, goalkeeperSlotModifiers, errorMul } from '../positions.js';
 import { evaluate } from '../modifiers.js';
-import { clamp } from '../../core/rng.js';
+import { clamp, Rng } from '../../core/rng.js';
 import { K, ROLE_SHARE, ZONE_N, FATIGUE_ROLE, KNOCK, FATIGUE, INSTR_NUM } from './constants.js';
 import { cleanPlayerInstrMap } from '../../data/playerInstructions.js';
 import { refreshPI, clearPI, applyShift, shiftedShare, validatePlayerInstr, mergePlayerInstr, PI } from './playerInstr.js';
@@ -136,10 +136,11 @@ export function buildTeam(side, cfg, rng, ctx, seed = 'mecz') {
       if (!byId.get(id)) return null;
       const x = mkPlayer(byId.get(id), formation.slots[i], side, rng, ctx, z[id] ?? 0);
       x.slotIdx = i;
+      x.fatK = fatigueTolerance(x.p, seed);
       return x;
     })
     .filter(Boolean);
-  const bench = cfg.tactics.bench.map((id) => byId.get(id)).filter(Boolean).map((p) => mkPlayer(p, null, side, rng, ctx, z[p.id] ?? 0));
+  const bench = cfg.tactics.bench.map((id) => byId.get(id)).filter(Boolean).map((p) => { const x = mkPlayer(p, null, side, rng, ctx, z[p.id] ?? 0); x.fatK = fatigueTolerance(p, seed); return x; });
   const params = tacticParams(formation, cfg.tactics.instructions);
   return {
     side, club: cfg.club, ai: !!cfg.ai, coach: cfg.coach ?? 'P',
@@ -181,10 +182,24 @@ export function formationShares(formation) {
 export const onPitch = (T, minute = 0) => T.players.filter((x) => x.on && !x.sentOff && x.treatedUntil < minute);
 export const goalkeeper = (T) => T.players.find((x) => x.on && !x.sentOff && x.slot?.pos === 'BR');
 
+/** Tolerancja zmęczenia zawodnika na mecz (FATIGUE.tol): stała z atrybutów + los z osobnego ziarna (bez zmiany losowań meczu). */
+export function fatigueTolerance(p, seed) {
+  const T = FATIGUE.tol;
+  const pra = a(p, 'PRA'); const wyt = a(p, 'WYT');
+  const sd = Math.max(T.sdMin, T.sd0 - T.sdK * ((pra + wyt) / 2 - 10));
+  const k = 1 - T.pra * (pra - 10) - T.opa * (a(p, 'OPA') - 10) - T.wyt * (wyt - 10) + new Rng(`zmeczenie:${seed}:${p.id}`).gauss(0, sd);
+  return clamp(k, T.min, T.max);
+}
+/** Kara kondycji do atrybutów: -(0,04 d + 0,008 d²) x tolerancja zawodnika, d = 85 - kondycja (FATIGUE). */
+export function condPenalty(x) {
+  const d = FATIGUE.penFrom - x.cond;
+  return d > 0 ? -(FATIGUE.penLin * d + FATIGUE.penQuad * d * d) * (x.fatK ?? 1) : 0;
+}
+
 /** Efektywna wartość zawodnika w strefie: posEff * R + przesunięcia stanu. */
 function eff(x, zone) {
   const prof = proficiency(x.p, x.slot.pos, x.slot.side);
-  const condPen = x.cond < 85 ? -0.04 * (85 - x.cond) : 0;
+  const condPen = condPenalty(x);
   return posEff(prof) * x.R[zone] + x.base + 0.035 * x.Z + condPen;
 }
 

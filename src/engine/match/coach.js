@@ -7,7 +7,7 @@
 
 import { substitute, changeTactics, subsAvailable, isConcussionSub, shout, canShout } from './control.js';
 import { setCoachHooks } from './core.js';
-import { goalkeeper, fieldPlayers, slotFit, reslot, assignSlots, shapeSlots } from './teams.js';
+import { goalkeeper, fieldPlayers, slotFit, reslot, assignSlots, shapeSlots, condPenalty } from './teams.js';
 import { proficiency } from '../positions.js';
 import { formationById } from '../../data/formations.js';
 import { K, KNOCK, COACHQ } from './constants.js';
@@ -59,7 +59,7 @@ export function tacSkill(T, st = null) {
 }
 /** Szansa p przesunięta umiejętnością s z siłą k: p x (1 + k s). Przy s = 0 bez zmian. */
 const pAdj = (p, s, k) => (s ? clamp(p * (1 + k * s), 0.02, 0.99) : p);
-const condAdj = (x) => (x.cond < 85 ? -0.04 * (85 - x.cond) : 0);
+const condAdj = (x) => condPenalty(x); // kara kondycji jak w silniku (teams.js)
 const chaseAt = (T, b) => b + (T.coach === 'O' ? -10 : T.coach === 'S' ? 5 : 0);
 const protectAt = (T, b) => b + (T.coach === 'O' ? 7 : T.coach === 'S' ? -10 : 0);
 

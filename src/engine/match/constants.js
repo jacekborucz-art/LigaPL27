@@ -117,6 +117,13 @@ export const FATIGUE = {
   errXg: [0.12, 0.35], // błąd przy wyprowadzeniu: dobra sytuacja
   foulFrom: 70, foulPerPt: 0.025, // zmęczony fauluje częściej: +2,5 % wagi za punkt kondycji poniżej 70
   tacFoulTired: 0.5, // spóźniony obrońca: faul taktyczny przy kontrze do +50 % (cała obrona zmęczona)
+  // Kara kondycji (Nov 25, 2026): stała krzywa x tolerancja zawodnika. d = 85 - kondycja; kara = -(0,04 d + 0,008 d²) x k.
+  // Kondycja 76: ok. -1,0 atrybutu, 70: ok. -2,4 (było liniowo -0,36 i -0,6): brak zmian kosztuje w końcówce.
+  // k na mecz: 1 - 0,03 (PRA - 10) - 0,015 (OPA - 10) - 0,015 (WYT - 10) + los N(0; sd), sd = 0,18 - 0,012 ((PRA + WYT) / 2 - 10)
+  // (najmniej 0,05), w granicach 0,6-1,5: pracowity i wytrzymały znosi zmęczenie lepiej i równiej, leniwy gorzej i mniej
+  // przewidywalnie. Pogoda i murawa przyspieszają spadek kondycji (weather.fat w updateCondition), więc i karę. [SZAC]
+  penFrom: 85, penLin: 0.04, penQuad: 0.008,
+  tol: { pra: 0.03, opa: 0.015, wyt: 0.015, sd0: 0.18, sdK: 0.012, sdMin: 0.05, min: 0.6, max: 1.5 },
 };
 
 export const KNOCK = {

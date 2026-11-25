@@ -1261,7 +1261,7 @@ export function mountMatchday(app, { game, fixture, save, onExit, onLineup }) {
     // Podpowiedzi po kliknięciu zawodnika: najlepsi kandydaci do zmiany (biegłość na miejscu, jakość, świeżość, kartka, uraz)
     const sugg = new Map();
     {
-      const condPen = (c) => (c < 85 ? 0.04 * (85 - c) : 0);
+      const condPen = (c) => (c < 85 ? 0.04 * (85 - c) + 0.008 * (85 - c) ** 2 : 0); // krzywa kary jak w silniku (FATIGUE), bez ukrytej tolerancji zawodnika
       const offPen = (prof) => (prof < 85 ? 0.04 * (85 - prof) : 0); // gra poza pozycją: także ryzyko błędów w obronie
       const effAt = (x, sl) => (x.p.ovr ?? 10) * posEff(fitOf(x.p, sl)) - condPen(x.cond ?? 100) - offPen(fitOf(x.p, sl));
       const outPen = (x) => (x.injury && !x.injury.playable ? 6 : x.knock && !x.knock.aggravated ? 1.2 : 0) + (x.yc ? 0.6 : 0);

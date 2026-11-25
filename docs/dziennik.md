@@ -29,6 +29,15 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 25, 2026, profil A (komputer domowy), brak zmian w meczu kosztuje (v1.24 Beta)
+Zrobione (ekspert futbolu i programista silnika: Sonnet medium; wdrożenie: ja):
+- Nieliniowa kara kondycji z tolerancją zawodnika (`condPenalty`, `fatigueTolerance`, `FATIGUE.penQuad/tol`), w silniku,
+  przy strzałach i w wyborze zmiennika AI; podpowiedź zmian w `matchdayView.js` z tą samą krzywą. Pomiar: drużyna bez
+  zmian 1,562 pkt wobec 1,629 ze zmianami AI (było 1,642 wobec 1,597). Opis: `docs/zmeczenie.md`.
+Zostało / dalej:
+- stracone gole po 60. min nadal nie rosną przy braku zmian (pogoń AI otwiera grę); ewentualnie koncentracja przy stałych
+  fragmentach po 70. min (propozycja eksperta, scratchpad `zmiany/`).
+
 ## Nov 25, 2026, profil A (komputer domowy), obietnice roli i żółte kartki (v1.24 Beta)
 Zrobione:
 - Obietnica roli: błąd, sparingi liczyły się do meczów klubu (`clubGames` w `moveWish.js`), więc grający dużo dostawali
