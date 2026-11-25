@@ -29,8 +29,10 @@ import { canWish, has as wishHas } from '../career/wishlist.js'; // lista życze
 import { rzMenuItems, rzCtx } from './reservesView.js'; // rezerwy: delegowanie i powołania (docs/rezerwy.md)
 import { piSummary } from './playerInstrView.js'; // instrukcje indywidualne (docs/instrukcje-indywidualne.md)
 import { arrowsFor, arrowLabel, arrowOf } from '../data/playerInstructions.js'; // strzałki ruchu (docs/strzalki-ruchu.md)
+import { observeMenuInfo } from '../career/observerReport.js'; // raport obserwatora (docs/raport-obserwatora.md)
 
-export const MENU_VIEWS = ['squad', 'profile', 'tactics', 'talks', 'transfers', 'training', 'dashboard'];
+// 'club': widok innego klubu i profil zawodnika innej drużyny (także w Rozgrywkach i Poczcie)
+export const MENU_VIEWS = ['squad', 'profile', 'tactics', 'talks', 'transfers', 'training', 'dashboard', 'club'];
 const ROLES = [['captain', 'Kapitan'], ['penalty', 'Rzuty karne'], ['freeKick', 'Rzuty wolne'], ['corner', 'Rzuty rożne']];
 
 // ------------------------------------------------------------ Budowanie pozycji
@@ -278,6 +280,7 @@ function otherItems(game, p, { view, ui = {} } = {}) {
     const on = wishHas(game, p.id);
     items.push(item(on ? 'Usuń z listy życzeń' : 'Do listy życzeń', { steps: [{ act: 'tf-wl', id: p.id }], toast: on ? `${p.name} usunięty z listy życzeń.` : `${p.name} dodany do listy życzeń.` }, { hint: 'Transfery, Rynek, Lista życzeń' }));
   }
+  items.push(...observeItems(game, p));
   const cap = canSign(game);
   const capTxt = cap.ok ? null : `Limit kadry ${cap.count.counted}/${cap.count.hard}`;
   const refuse = playerWillingness(game, p).verdict === 'odmowa' ? 'Nie chce przejść do twojego klubu' : null;
@@ -309,6 +312,17 @@ function otherItems(game, p, { view, ui = {} } = {}) {
     disabled: loanable ? (winTxt ?? capTxt ?? refuse) : 'Klub go nie wypożycza (tylko do 21 lat albo z listy)',
   }));
   return items;
+}
+
+/** Raport obserwatora: zlecenie, stan w toku, ostatni raport i nowa obserwacja (src/career/observerReport.js). */
+function observeItems(game, p) {
+  if (!game.clubId) return [];
+  const info = observeMenuInfo(game, p);
+  const order = { steps: [{ act: 'obs-order', id: p.id }], focus: '[data-act="obs-back"]' };
+  const show = info.last ? item('Pokaż raport', { steps: [{ act: 'obs-open', id: p.id }], focus: '[data-act="obs-back"]' }, { hint: `Raport z ${fmtDate(info.last.date)}${info.stale ? ', nieaktualny' : ''}` }) : null;
+  if (info.order) return [item('Raport obserwatora…', order, { hint: `Obserwacja: ${info.statusText}` }), show].filter(Boolean);
+  if (show) return [show, item('Nowa obserwacja…', order, { hint: info.hint })];
+  return [item('Raport obserwatora…', order, { hint: info.hint })];
 }
 
 // ------------------------------------------------------------ Nagłówek

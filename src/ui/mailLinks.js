@@ -113,6 +113,11 @@ export function mailLinks(game, m) {
   // Zawodnik chce zmian w kontrakcie: ostatnia runda rozmów, dopóki propozycja na nią czeka
   const lr = m.refs?.kind === 'proposal' && m.refs.lastRound ? (game.market?.pending ?? []).find((x) => x.id === m.refs.propId && x.status === 'changes') : null;
   if (lr) out.push(TO.lastRound(lr.pid));
+  // Raport obserwatora (src/career/observerReport.js): otwarcie raportu, dopóki jest w historii zawodnika
+  if (m.refs?.kind === 'obsReport' && p && game.observe?.reports?.[p.id]?.length) {
+    const i = game.observe.reports[p.id].findIndex((r) => r.id === m.refs.rid);
+    out.push(go('Otwórz raport', [{ act: 'obs-open', id: p.id, i: i >= 0 ? i : '' }], '[data-act="obs-back"]'));
+  }
   if (p) {
     const own = p.clubId === game.clubId;
     if (own && game.world.clubs?.[game.clubId]?.squad?.includes(p.id)) out.push(TO.profile(p.id), TO.talk(p.id));

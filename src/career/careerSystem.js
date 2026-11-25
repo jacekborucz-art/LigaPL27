@@ -31,6 +31,7 @@ import { foreignOfferMessage } from './foreignMarket.js';
 import { ensureStaff } from './staffMarket.js'; // sztab: zatrudnianie i zwalnianie, pensje sztabu (docs/sztab.md)
 import './directorRotation.js'; // rotacja dyrektorów sportowych poza 1 lipca (docs/dyrektor-sportowy.md, rozdz. 10)
 import './scoutOps.js'; // skauting zagraniczny: skauci, misje, kandydaci (docs/skauting.md)
+import './observerReport.js'; // raport obserwatora o zawodnikach innych drużyn (docs/raport-obserwatora.md)
 import { ensureCareerHistory, careerScan, careerMonth, careerPress, careerLeave, boardStartTrust } from './coachCareer.js'; // kariera trenera (docs/kariera-trenera.md)
 import { ensureJob, coachFired, jobAccepted, jobDeclined, unsolicitedOffers, offerMessage as jobOfferMessage } from './jobMarket.js'; // rynek pracy trenera
 import { clubReputation } from './reputation.js';

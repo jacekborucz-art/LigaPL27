@@ -271,8 +271,10 @@ test('Stary zapis bez zdarzeń: raport z wynikiem i strzelcami, bez błędu; puc
 });
 
 test('Widok: zawodnik usunięty ze świata (bez klubu i kontraktu) nie psuje raportu', () => {
-  const f = PLAYED.find((x) => x.result.ev?.some((e) => e[1] === 'g' && typeof e[3] === 'number'));
-  const id = unpackReport(f).ev.find((e) => e[1] === 'g')[3];
+  // Strzelec z klubu w świecie gry (zawodnicy klubów spoza świata, np. rywala w pucharach, nie mają wpisu w świecie)
+  const inWorld = (x) => unpackReport(x).ev.find((e) => e[1] === 'g' && G.world.players[e[3]]);
+  const f = PLAYED.find((x) => x.result.ev?.some((e) => e[1] === 'g' && typeof e[3] === 'number') && inWorld(x));
+  const id = inWorld(f)[3];
   const p = G.world.players[id];
   const saved = { clubId: p.clubId, contract: p.contract };
   p.clubId = null; p.contract = null;

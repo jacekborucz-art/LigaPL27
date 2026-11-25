@@ -39,7 +39,7 @@ const top = (m) => m.items.filter((x) => !x.sep).map((x) => x.label);
 const outIds = (g) => squadOf(g.world, g.clubId).map((p) => p.id).filter((id) => !g.tactics.xi.includes(id) && !g.tactics.bench.includes(id));
 
 // Akcje, które obsługuje app.js (kliknięcia data-act); prefiksy tf-, tt-, tr- mają własne handlery widoków.
-const APP_ACTS = new Set(['tab', 'tsub', 'player', 'tpick', 'tmove', 'tbench', 'tunbench', 'tcancel', 'tinfo', 'trole', 'extplayer', 'arep', 'pcard', 'ac-promote', 'pi-open', 'tarrow-set']);
+const APP_ACTS = new Set(['tab', 'tsub', 'player', 'tpick', 'tmove', 'tbench', 'tunbench', 'tcancel', 'tinfo', 'trole', 'extplayer', 'arep', 'pcard', 'ac-promote', 'pi-open', 'tarrow-set', 'obs-order', 'obs-open']);
 const TF_ACTS = new Set(['tf-open', 'tf-offer', 'tf-loan', 'tf-negotiate', 'tf-renew', 'tf-list-own', 'tf-unlist', 'tf-keep', 'tf-release', 'tf-wl']);
 const TR_ACTS = new Set(['tr-tab', 'tr-player', 'tr-focus', 'tr-mode', 'tr-pos', 'tr-prog']);
 
@@ -167,7 +167,7 @@ test('Rynek: cudzy zawodnik. Oferta i wypożyczenie wyłączone poza oknem, przy
   const top3 = legia.find((p) => notForSale(g, p) && !p.contract?.clause);
   const regular = legia.filter((p) => !notForSale(g, p)).sort((a, b) => a.age - b.age)[0];
   const m = menu(g, regular.id, 'transfers');
-  assert.deepEqual(top(m), ['Karta zawodnika', 'Profil i statystyki', 'Do listy życzeń', 'Złóż ofertę…', 'Wypożycz…']);
+  assert.deepEqual(top(m), ['Karta zawodnika', 'Profil i statystyki', 'Do listy życzeń', 'Raport obserwatora…', 'Złóż ofertę…', 'Wypożycz…']);
   assert.match(m.note, /^Twój najlepszy /, 'porównanie z najlepszym na pozycji');
   assert.equal(find(m, 'Złóż ofertę…').run.focus, '#tfFee');
   assert.equal(find(m, 'Złóż ofertę…').disabled, null, 'okno otwarte w lipcu');

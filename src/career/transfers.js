@@ -29,6 +29,7 @@ import { makeProposal, proposalsFor, resolveNow } from './proposals.js'; // namy
 import { clubNegotiation, contestPenalty } from './clubNegotiation.js'; // ukryty atrybut Negocjacje klubów AI (docs/negocjacje.md, rozdz. 15)
 import { rynMul, kadFeeMul, sieWeight, weightedOrder, directorObjection, objectionText, directorRenegotiate, logObjection, insistPenalty, directorWho } from './director.js'; // dyrektor sportowy: rynek, kadra, sieć (docs/dyrektor-sportowy.md)
 import { fmtDate } from '../ui/dom.js';
+import { aiSeenOvr } from './observerReport.js'; // kluby AI: OVR kandydata widziany przez sztab (docs/raport-obserwatora.md)
 
 export { SEASON_END };
 const round = (x, step = 5000) => Math.round(x / step) * step;
@@ -363,8 +364,10 @@ function aiBuy(game, club, date, rng, log) {
     if (!penOf.has(id)) penOf.set(id, n * contestPenalty(game, id, club.id, date));
     return penOf.get(id);
   };
-  // Kupujący ocenia cenę z błędem (Znajomość rynku dyrektora, bez przesunięcia): przepłaca albo trafia okazję
-  const score = (x) => x.p.ovr - (x.fee * rynMul(game, club.id, x.p.id, 'ocena')) / 5e6 - pen(x.p.id);
+  // Kupujący ocenia cenę z błędem (Znajomość rynku dyrektora, bez przesunięcia): przepłaca albo trafia okazję,
+  // a zawodnika OVR widzianym przez swój sztab (parytet z raportem obserwatora gracza, observerReport.js aiSeenOvr)
+  const seen = aiSeenOvr(game, club.id, date);
+  const score = (x) => seen(x.p) - (x.fee * rynMul(game, club.id, x.p.id, 'ocena')) / 5e6 - pen(x.p.id);
   const rank = (a, b) => score(b) - score(a);
   // Brak w kadrze: najpierw najlepsi z tych, na których klub stać (wcześniej drodzy wolni wypierali tanich z ośmiu kandydatów)
   const ordered = needs.length ? [...pool.filter(asks).sort(rank).slice(0, 8), ...pool.filter((x) => !asks(x)).sort(rank).slice(0, 3)]

@@ -29,6 +29,19 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 25, 2026, profil A (komputer domowy), raport obserwatora (v1.24 Beta)
+Zrobione (ekspert skautingu, redaktor tekstów i grafik: Sonnet medium; wdrożenie Opus high; sprawdzone):
+- Nowe `src/career/observerReport.js` (`OBS`, system dnia `observe`), `src/ui/observerView.js`, `src/styles/observer.css`:
+  zlecenie obserwacji zawodnika innej drużyny (1 mecz, 2-5 meczów, okres 2-6 tygodni), obserwuje wolny skaut, bez niego
+  asystent; dokładność A = 0,45 OCE + 0,30 R + 0,15 DOS + 0,10 DAN, przedziały cech, wspólny błąd raportu, charakter od
+  3 meczów / 4 tygodni. Raport z wykresami (przedziały, porównanie z naszym, forma, profil, werdykt, rekomendacja, rynek),
+  ważny 60 dni, list w Poczcie, panel Obserwacje w Transfery, Skauting. Koszt zagranicą 3 000 zł za mecz, 8 000 zł za tydzień.
+- Menu pod prawym przyciskiem na zawodniku innej drużyny także w Rozgrywkach i Poczcie (widok `club` w `menuView`).
+- Kluby AI: `aiSeenOvr` w `aiBuy` (`transfers.js`), błąd oceny z ich sztabu (wyłącznik `OBS.ai.on`).
+- Test `tests/observerReport.test.mjs`, opis `docs/raport-obserwatora.md`. Projekt i makieta: ekspert, redaktor, grafik.
+Zostało / dalej:
+- menu w oknie raportu meczu (nazwiska bez `data-pid`); stan obserwacji w małej karcie zawodnika w okienku.
+
 ## Nov 24, 2026, profil A (komputer domowy), wersja v1.24 Beta
 Właściciel zatwierdził v1.24 Beta (`src/config/version.js`). Lista zmian v1.24 (wszystko od wejścia v1.23 Beta, Nov 21, 2026):
 - Poprawiono: nagłówek „bohater meczu” po porażce, liczenie czystych kont bramkarzy, okno „Gra wstrzymana” na tablecie i telefonie.

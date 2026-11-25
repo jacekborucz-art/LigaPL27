@@ -36,6 +36,7 @@ import { isPoolContracted, poolClubLabel, playsAbroad, poolSellerClub, REGION_FI
 import { scoutHidden, scoutEye, ovrOrEye, shownOvr, hiddenAttrsHtml, valueOrScoutPrice, valueLabel } from './scoutMask.js'; // kandydaci skauta: ocena ukryta (lornetka)
 import { canWish, has as wishHas, list as wishList, count as wishCount, toggle as wishToggle, remove as wishRemove } from '../career/wishlist.js'; // lista życzeń gracza
 import { scoutingView } from '../career/scoutOps.js'; // liczba obserwowanych przez skautów (sekcja pod listą życzeń)
+import { observeListHtml, observeStatusHtml } from './observerView.js'; // raport obserwatora: lista „Obserwacje” i stan w karcie
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size = 20) => (clubById(id) ? crestHtml(clubById(id), { size, clubsById }) : '');
@@ -435,6 +436,7 @@ function playerCard(game, p, ui) {
     <div class="tf-grid tf-card">
       <div class="tf-main">
         ${cardHead(game, p, `<button class="btn btn--quiet btn--sm" data-act="extplayer" data-id="${esc(p.id)}">Profil i statystyki</button> ${wishBtn(game, p)}`)}
+        ${observeStatusHtml(game, p)}
         <ul class="tf-facts">
           ${fact(valueLabel(game, p), esc(valueOrScoutPrice(game, p, fmtZl)))}
           ${free ? fact('Oczekuje', `ok. ${fmtZl(effectiveAsk(p, clubById(game.clubId)?.tier ?? 1))}<small> tygodniowo</small>`, 'warn') : fact('Cena klubu', nfs ? 'nie na sprzedaż' : fmtZl(price), nfs ? 'bad' : 'good')}
@@ -746,7 +748,7 @@ export function renderTransfers(game, ui = {}) {
   const p = ui.tfPlayer && game.world.players[ui.tfPlayer];
   let body;
   if (p && (tab === 'rynek' || tab === 'kontrakty' || tab === 'oferty' || tab === 'wtoku' || tab === 'skauting')) body = playerCard(game, p, ui);
-  else if (tab === 'skauting') body = renderSkauting(game, ui);
+  else if (tab === 'skauting') { const ol = observeListHtml(game); body = (ol ? panel('Obserwacje', 'info', ol.html, { count: ol.count, cls: 'obs-panel' }) : '') + renderSkauting(game, ui); }
   else if (tab === 'oferty') body = offersView(game);
   else if (tab === 'wtoku') body = dealsView(game, ui);
   else if (tab === 'kontrakty') body = contractsView(game, ui);

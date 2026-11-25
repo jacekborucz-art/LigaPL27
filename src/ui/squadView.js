@@ -18,6 +18,7 @@ import { scoutEye, hiddenAttrsHtml, valueOrScoutPrice, valueLabel } from './scou
 import { canWish, has as wishHas } from '../career/wishlist.js'; // przycisk listy życzeń w profilu zawodnika innego klubu
 import { playerTags, suspSplit, suspText } from './playerTags.js'; // znaczniki stanu za nazwiskiem (docs/tagi-zawodnika.md)
 import { contractBonusOf } from '../career/contractBonus.js'; // premie z kontraktu (ustalone albo domyślne z pensji)
+import { observeStatusHtml } from './observerView.js'; // raport obserwatora: stan obserwacji i ostatni raport
 
 /** Potencjał w profilu: zawodnik spoza klubu gracza oceniany przez skauta (precyzja z jakości skauta). */
 function potentialText(p, game) {
@@ -261,6 +262,7 @@ export function renderPlayerProfile(p, opts = {}) {
     <div class="pp-top"><button class="btn btn--quiet" data-act="${esc(back.act)}">${esc(back.label)}</button>${foreign && opts.game && canWish(opts.game, p) ? `<button class="btn btn--quiet" data-act="tf-wl" data-id="${esc(p.id)}">${wishHas(opts.game, p.id) ? 'Usuń z listy życzeń' : 'Do listy życzeń'}</button>` : ''}${opts.promote ? (opts.promote.ok ? `<button class="btn btn--primary" data-act="ac-promote" data-id="${esc(p.id)}">Przenieś do pierwszego składu</button>` : `<span class="hint">${esc(opts.promote.text)}</span>`) : ''}</div>
     ${opts.promoteMsg ? `<p class="hint" role="status">${esc(opts.promoteMsg)}</p>` : ''}
     ${foreign ? '<p class="hint">Zawodnik innego klubu: morale, świeżość, pensja i agent są znane tylko jego klubowi.</p>' : ''}
+    ${foreign && opts.game ? observeStatusHtml(opts.game, p) : ''}
     <header class="pp" data-pid="${esc(p.id)}">
       <div class="pp__ovr">${hidden ? scoutEye('pp__ovrn pp__ovrn--eye') : `<span class="pp__ovrn" title="Ocena ogólna w skali 1-20">${Math.round(p.ovr)}</span>${stars(starsFor(p.ovr, leagueOvrs))}`}</div>
       <div>

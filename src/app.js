@@ -59,7 +59,9 @@ import { playerStatsHtml } from './ui/playerStatsView.js';
 import { renderClubView, hasClubView } from './ui/clubView.js';
 import { renderTransfers, handleTransferAction, isTransferAction, transferCardHtml } from './ui/transfersView.js';
 import { startMission, cancelMission, hireScout, fireScout, watchCandidate, markCandidatesSeen, scoutHidden } from './career/scoutOps.js'; // skauting zagraniczny (docs/skauting.md)
-import { poolClubLabel } from './career/foreignPool.js'; // klub zagraniczny zawodnika (także sprzedanego za granicę)
+import { poolClubLabel, isPoolContracted } from './career/foreignPool.js'; // klub zagraniczny zawodnika (także sprzedanego za granicę)
+import { createOrder, cancelOrder } from './career/observerReport.js'; // raport obserwatora (docs/raport-obserwatora.md)
+import { renderObserverReport, renderObserveOrder } from './ui/observerView.js';
 import { renderClubHub, handleClubAction, isClubAction } from './ui/klubView.js';
 import { quizHtml, isQuizAction } from './ui/presidentQuizView.js'; // rozmowa z prezesem (prośba o zmianę dyrektora)
 import { answerQuiz, finishQuiz } from './career/presidentQuiz.js';
@@ -626,6 +628,8 @@ function trackHeadHeight() {
 }
 
 function renderTab(tab, g, club) {
+  // Raport obserwatora i okno zlecenia (menu zawodnika innej drużyny, Poczta, Transfery): pełna strona w bieżącej zakładce
+  if (state.obs && g.world.players[state.obs.pid]) return state.obs.view === 'order' ? renderObserveOrder(g, state.obs) : renderObserverReport(g, state.obs);
   // Raport asystenta o zawodniku (menu zawodnika): pełna strona w bieżącej zakładce
   if (state.repOpen && g.world.players[state.repOpen]?.clubId === g.clubId) return renderAssistantReport(g, state.repOpen);
   // Profil zawodnika innego klubu (z karty transferowej albo z menu): tylko podgląd, bez danych wewnętrznych klubu
@@ -1284,7 +1288,7 @@ async function runDays() {
   state.running = false;
   if (squadKey() !== squadBefore) afterSquadChange(g);
   // Po Dalej zawsze Pulpit (nowe wiadomości i decyzje widać w panelu Poczta i w pasku decyzji na Pulpicie)
-  if (reason === 'message' || reason === 'decision' || reason === 'prematch') { state.tab = 'pulpit'; state.fx = null; state.todo = null; state.extPlayer = null; state.extClub = null; state.mailOpen = null; }
+  if (reason === 'message' || reason === 'decision' || reason === 'prematch') { state.tab = 'pulpit'; state.fx = null; state.todo = null; state.extPlayer = null; state.extClub = null; state.mailOpen = null; state.obs = null; }
   await save();
   renderHub();
 }
@@ -1781,6 +1785,38 @@ app.addEventListener('keydown', (ev) => {
 });
 // ===== koniec bloku Skauting =====
 
+// ===== Raport obserwatora: akcje obs-* (src/career/observerReport.js, widok src/ui/observerView.js, docs/raport-obserwatora.md) =====
+// state.obs: { view: 'order' | 'report', pid, i (raport z historii), mode, n, weeks, who, msg }
+async function observeAction(act, el) {
+  const g = state.game; const ds = el.dataset ?? {};
+  const keep = (sel) => { render(); window.scrollTo({ top: 0 }); (app.querySelector(sel) ?? app.querySelector('#obs-h'))?.focus({ preventScroll: true }); };
+  if (act === 'obs-order') { state.obs = { view: 'order', pid: ds.id, mode: 'match', n: 3, weeks: 4, who: null, msg: null }; keep('#obs-h'); return; }
+  if (act === 'obs-open') { state.obs = { view: 'report', pid: ds.id, i: ds.i !== undefined && ds.i !== '' ? Number(ds.i) : null }; keep('#obs-h'); return; }
+  if (act === 'obs-back') { state.obs = null; render(); return; }
+  if (!state.obs) return;
+  if (act === 'obs-mode') { state.obs.mode = ds.m; state.obs.msg = null; render(); app.querySelector(`[data-act="obs-mode"][data-m="${CSS.escape(ds.m ?? '')}"]`)?.focus({ preventScroll: true }); return; }
+  if (act === 'obs-n' || act === 'obs-weeks') { state.obs[act === 'obs-n' ? 'n' : 'weeks'] = Number(ds.v); render(); app.querySelector(`[data-act="${act}"][data-v="${CSS.escape(ds.v ?? '')}"]`)?.focus({ preventScroll: true }); return; }
+  if (act === 'obs-go') {
+    const r = createOrder(g, state.obs.pid, state.obs);
+    if (!r.ok) { state.obs.msg = r.text; render(); return; }
+    state.obs = null; await save(); render(); showToast(r.text); return;
+  }
+  if (act === 'obs-cancel') { const r = cancelOrder(g, ds.o); state.obs.msg = r.text; if (r.ok) await save(); render(); return; }
+  if (act === 'obs-offer') { // Złóż ofertę: karta transferowa z polem kwoty (jak w menu zawodnika)
+    const pid = ds.id; const p = g.world.players[pid];
+    state.obs = null;
+    await runMenuItem({ run: { steps: [{ act: 'tab', tab: 'transfery', sub: 'rynek' }, { act: 'tf-open', id: pid }], focus: p && (p.clubId || isPoolContracted(p)) ? '#tfFee' : '[data-act="tf-close"]' } }, pid);
+  }
+}
+// Kto pojedzie na obserwację (SELECT w oknie zlecenia)
+app.addEventListener('change', (ev) => {
+  const t = ev.target;
+  if (!state.game || !state.obs || !t.matches?.('[data-obs="who"]')) return;
+  state.obs.who = t.value || null; state.obs.msg = null; render();
+  app.querySelector('[data-obs="who"]')?.focus({ preventScroll: true });
+});
+// ===== koniec bloku Raport obserwatora =====
+
 /**
  * Wykonuje akcję data-act. el: przycisk albo { dataset } z menu kontekstowego.
  * root: miejsce, z którego handlery czytają pola formularzy (null = tylko wartości z dataset).
@@ -1825,6 +1861,7 @@ async function dispatchAct(el, { root = app } = {}) {
     return;
   }
   if (act?.startsWith('sk-') && state.game) { await skautingAction(act, el); return; } // Skauting (blok „Skauting: akcje sk-*”)
+  if (act?.startsWith('obs-') && state.game) { await observeAction(act, el); return; } // raport obserwatora (blok „Raport obserwatora”)
   if (isTransferAction(act) && state.game) {
     const r = handleTransferAction(state.game, act, el.dataset, root);
     Object.assign(state, r.ui ?? {});
@@ -1941,7 +1978,7 @@ async function dispatchAct(el, { root = app } = {}) {
       await new Promise((r) => setTimeout(r, matchMedia('(prefers-reduced-motion: reduce)').matches ? 150 : 450)); // podpis widoczny przed generowaniem świata
       await newGame(nc.slot, nc.clubId, profileOf(nc));
     }
-    if (act === 'tab') { state.tab = el.dataset.tab; state.kMsg = null; state.crResign = false; state.ma = null; state.mailOpen = null; state.playerOpen = null; state.repOpen = null; state.fx = null; state.todo = null; state.extPlayer = null; state.extClub = null; state.tfCard = null; if (el.dataset.sub) { if (state.tab === 'klub') state.kTab = el.dataset.sub; else state.tfTab = el.dataset.sub; } else if (state.tab === 'klub' && state.game && isUnemployed(state.game)) state.kTab = 'kariera'; render(); }
+    if (act === 'tab') { state.tab = el.dataset.tab; state.obs = null; state.kMsg = null; state.crResign = false; state.ma = null; state.mailOpen = null; state.playerOpen = null; state.repOpen = null; state.fx = null; state.todo = null; state.extPlayer = null; state.extClub = null; state.tfCard = null; if (el.dataset.sub) { if (state.tab === 'klub') state.kTab = el.dataset.sub; else state.tfTab = el.dataset.sub; } else if (state.tab === 'klub' && state.game && isUnemployed(state.game)) state.kTab = 'kariera'; render(); }
     // Terminarz i wyniki (Pulpit > Pokaż wszystko): sezon, rozgrywki, miejsce meczu
     if (act === 'fixtures') { state.tab = 'pulpit'; state.fx = { season: null, comp: 'all', venue: 'all' }; render(); window.scrollTo({ top: 0 }); app.querySelector('.fxs h2')?.setAttribute('tabindex', '-1'); app.querySelector('.fxs h2')?.focus({ preventScroll: true }); }
     if (act === 'fxback') { state.fx = null; render(); app.querySelector('[data-act="fixtures"]')?.focus(); }
@@ -2132,7 +2169,7 @@ async function dispatchAct(el, { root = app } = {}) {
     // Błąd widoku w trakcie kariery: zostajemy w grze (widok podglądu zamknięty), zamiast wyrzucać na ekran startowy
     if (state.game && state.screen === 'hub') {
       console.error(err);
-      state.extPlayer = null; state.extClub = null; state.repOpen = null; state.fx = null; state.todo = null;
+      state.extPlayer = null; state.extClub = null; state.repOpen = null; state.fx = null; state.todo = null; state.obs = null;
       try { render(); window.alert(`Nie udało się otworzyć tego widoku: ${err.message}`); return; } catch (e2) { console.error(e2); }
     }
     state.notice = err.message; state.screen = 'start'; render();
@@ -2147,6 +2184,7 @@ function menuView() {
   if (state.tab === 'kadra') return state.sqSub === 'tactics' ? 'tactics' : state.sqSub === 'talks' ? 'talks' : state.playerOpen ? 'profile' : 'squad';
   if (state.tab === 'transfery') return state.ng ? null : 'transfers';
   if (state.tab === 'trening') return 'training';
+  if (state.extClub || state.extPlayer || state.obs) return 'club'; // Rozgrywki, Poczta: widok klubu, profil i raport zawodnika innej drużyny
   return null;
 }
 
