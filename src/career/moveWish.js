@@ -197,9 +197,10 @@ export function offerRejected(game, p, { buyerRep = 0, foreignWage = 0, date = g
 export function onOfferRejected(game, p, ctx = {}) { return offerRejected(game, p, ctx).messages; }
 
 // ------------------------------------------------------------ Miesiąc i tydzień
-function clubGames(game) {
+export function clubGames(game) {
   const n = {};
-  for (const f of game.fixtures ?? []) if (f.played) { n[f.home] = (n[f.home] ?? 0) + 1; n[f.away] = (n[f.away] ?? 0) + 1; }
+  // sparingi: minuty nie wchodzą do sezonu zawodnika, więc i mecze klubu nie (obietnica roli, Nov 25, 2026)
+  for (const f of game.fixtures ?? []) if (f.played && f.comp !== 'friendly') { n[f.home] = (n[f.home] ?? 0) + 1; n[f.away] = (n[f.away] ?? 0) + 1; }
   return n;
 }
 
@@ -224,13 +225,17 @@ function promiseMonth(game, p, clubId, clubGamesN, date) {
   const pr = p.contract?.promise;
   if (!pr || pr.broken || p.loan) return [];
   const minNow = p.season?.min ?? 0;
-  const seen = pr.seen ?? { min: minNow, g: clubGamesN };
+  const missNow = p.season?.miss ?? 0; // mecze opuszczone przez kontuzję albo pauzę (season.js applyResult)
+  const seen = pr.seen ?? { min: minNow, g: clubGamesN, miss: missNow };
   const dMin = minNow >= seen.min ? minNow - seen.min : minNow; // nowy sezon: statystyki od zera
   const dG = clubGamesN >= seen.g ? clubGamesN - seen.g : clubGamesN;
-  const skip = !pr.seen || dG === 0 || p.injuryDays > 0;
-  p.contract = { ...p.contract, promise: { ...pr, seen: { min: minNow, g: clubGamesN } } };
+  const seenMiss = seen.miss ?? missNow; // stary zapis: bez licznika, od teraz
+  const dMiss = missNow >= seenMiss ? missNow - seenMiss : missNow;
+  const dAvail = Math.max(0, dG - dMiss); // mecze, w których zawodnik mógł zagrać
+  const skip = !pr.seen || dAvail === 0 || p.injuryDays > 0;
+  p.contract = { ...p.contract, promise: { ...pr, seen: { min: minNow, g: clubGamesN, miss: missNow } } };
   if (skip) return [];
-  const r = applyPromiseCheck(p, clubId, date, clamp(dMin / (dG * 90), 0, 1));
+  const r = applyPromiseCheck(p, clubId, date, clamp(dMin / (dAvail * 90), 0, 1));
   if (!r) return [];
   const out = [];
   const mine = clubId === game.clubId;

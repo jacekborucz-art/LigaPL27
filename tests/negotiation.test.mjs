@@ -5,7 +5,7 @@ import {
   generateTraits, generatePersonality, computeMindset, elementPrefs, TRAITS, AGENT_TYPES,
 } from '../src/career/personality.js';
 import {
-  openNegotiation, NegotiationSession, aiNegotiate, applyOutcome, applyPromiseCheck, canNegotiate,
+  openNegotiation, NegotiationSession, aiNegotiate, applyOutcome, applyPromiseCheck, canNegotiate, evaluatePromise, promiseTolerance, PROMISE_TOL,
   normalizeOffer, formatZl, formatDate, addDays, buildContract,
 } from '../src/career/negotiation.js';
 import { LINES } from '../src/career/negotiationLines.js';
@@ -216,6 +216,26 @@ test('Dotrzymana obietnica nie karze i buduje zaufanie', () => {
   for (const d of ['2026-08-31', '2026-09-30', '2026-10-31']) applyPromiseCheck(p, radomiak.id, d, 0.5);
   assert.equal(p.contract.promise.broken, false);
   assert.ok(p.relations.radomiak.trust > 50);
+});
+
+test('Obietnica roli: próg cierpliwości zależy od charakteru i losu, sparingi nie liczą się do meczów klubu', async () => {
+  const calm = pl('cierpliwy', {}, { patience: 18, professionalism: 16, ambition: 6, temper: 4 });
+  const hot = pl('porywczy', {}, { patience: 3, professionalism: 6, ambition: 17, temper: 17 });
+  const months = ['2026-08-31', '2026-09-30', '2026-10-31', '2026-11-30', '2027-03-31', '2027-04-30'];
+  const tc = months.map((d) => promiseTolerance(calm, d)); const th = months.map((d) => promiseTolerance(hot, d));
+  const avg = (a) => a.reduce((s, x) => s + x, 0) / a.length;
+  assert.ok(avg(tc) < 0.7 && avg(th) > 0.8, `cierpliwy ${avg(tc).toFixed(2)}, porywczy ${avg(th).toFixed(2)}`);
+  assert.ok(tc.every((x) => x >= PROMISE_TOL.min) && th.every((x) => x <= PROMISE_TOL.max));
+  const mid = pl('przeciętny', {}, { patience: 10, professionalism: 10, ambition: 10, temper: 10 });
+  assert.ok(new Set(months.map((d) => promiseTolerance(mid, d))).size > 1, 'los zmienia próg z miesiąca na miesiąc');
+  assert.equal(promiseTolerance(calm, '2026-09-30'), promiseTolerance(calm, '2026-09-30'), 'stały w danym miesiącu');
+  // Kluczowy (70 %) z udziałem 50 %: cierpliwy bez ostrzeżenia, porywczy z ostrzeżeniem
+  const pr = { role: 'kluczowy', since: '2026-01-01', strikes: 0, kept: 0, broken: false };
+  assert.equal(evaluatePromise(pr, 0.5, 6, 0.65).event, null);
+  assert.equal(evaluatePromise(pr, 0.5, 6, 0.85).event, 'promiseWarning');
+  const { clubGames } = await import('../src/career/moveWish.js');
+  const n = clubGames({ fixtures: [{ played: true, comp: 'ekstraklasa', home: 'a', away: 'b' }, { played: true, comp: 'friendly', home: 'a', away: 'c' }] });
+  assert.equal(n.a, 1, 'sparing nie liczy się do meczów klubu');
 });
 
 test('Gwiazda nie podpisze ze słabym klubem (spójność z willingnessToJoin)', () => {

@@ -446,6 +446,8 @@ export function applyResult(game, f, res, rng) {
     for (const p of squad) {
       const guest = p.clubId !== clubId; // gra w drugiej drużynie klubu (statystyki osobno, kontrakt bez zmian)
       const tell = mine || p.clubId === game.clubId; // wiadomości o zawodnikach gracza także z meczów rezerw
+      // Obietnica roli (moveWish.js promiseMonth): mecz opuszczony przez kontuzję albo pauzę nie liczy się zawodnikowi
+      const missed = !played.has(p.id) && f.comp !== 'friendly' && !guest && ((p.injuryDays ?? 0) > 0 || p.susp?.[key] > 0);
       // Odbycie pauzy: klub zagrał mecz w tych rozgrywkach
       if (p.susp?.[key] > 0 && !played.has(p.id)) {
         p.susp[key]--;
@@ -454,6 +456,7 @@ export function applyResult(game, f, res, rng) {
       }
       const x = played.get(p.id);
       const friendly = f.comp === 'friendly'; // sparing: bez statystyk sezonu, formy, kartek i pauz
+      if (missed) { const s0 = (p.season ??= { apps: 0, subs: 0, min: 0, g: 0, a: 0, yc: 0, rc: 0, rating: 0, motm: 0, cs: 0 }); s0.miss = (s0.miss ?? 0) + 1; }
       if (!friendly) p.morale = applyMorale(p.morale ?? 12, afterMatchDelta({ result, tie, strengthDiff: diff, derby: f.derby, lossStreak, played: !!x, rating: x?.rating, isRegular: (p.season?.apps ?? 0) >= 5 }));
       if (!x) continue;
       // Statystyki w podziale na rozgrywki (także sparingi) i historia klubowa (mecze o punkty), src/season/history.js;

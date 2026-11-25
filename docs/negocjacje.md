@@ -723,3 +723,10 @@ minimum, blef, ultimatum, agent), zmienia się adapter:
   dyrektor sportowy gracza (`directorTalkView`, `DIR_VIEW`): błąd N(0; 0,15 + 0,55 (1 - q)), q ze Znajomości rynku (RYN),
   stały dla zawodnika w danym oknie [SZAC]. Słowa: chętny, otwarty, do przekonania, niechętny, odmówi rozmów. Własny zawodnik:
   dawny wskaźnik `playerWillingness`. Dobry dyrektor rzadko się myli, słaby czasem pokaże „chętny” przy odmowie rozmów.
+
+### Obietnica roli: sprawdzanie minut (Nov 25, 2026)
+- Mecze klubu bez sparingów (`clubGames`, `moveWish.js`): wcześniej sparingi zaniżały udział minut (lipiec, przerwa zimowa).
+- Mecze opuszczone przez kontuzję albo pauzę nie liczą się zawodnikowi (`p.season.miss`, `season.js applyResult`).
+- Próg cierpliwości z charakteru i losu (`promiseTolerance`, `PROMISE_TOL`): ostrzeżenie, gdy udział < wymagany x tol,
+  tol = 0,75 + 0,02 (ambicja - 10) + 0,02 (temperament - 10) - 0,025 (cierpliwość - 10) - 0,015 (profesjonalizm - 10)
+  + N(0; 0,04) w miesiącu, w granicach 0,6-0,9 [SZAC].

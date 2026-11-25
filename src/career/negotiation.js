@@ -961,7 +961,7 @@ export function applyOutcome(player, out, opts = {}) {
  * minutesShare: udział minut w meczach, w których zawodnik był dostępny (0-1).
  * 3 słabe miesiące (poniżej 75 % progu roli) = obietnica złamana. [SZAC]
  */
-export function evaluatePromise(promise, minutesShare, monthsSince) {
+export function evaluatePromise(promise, minutesShare, monthsSince, tol = 0.75) {
   const none = { promise, event: null, trustDelta: 0, moraleDelta: 0 };
   if (!promise || promise.broken || monthsSince <= PROMISE_GRACE_MONTHS) return none;
   const p = { ...promise };
@@ -974,7 +974,7 @@ export function evaluatePromise(promise, minutesShare, monthsSince) {
     p.kept++;
     trustDelta = 1;
     if (p.kept % 6 === 0) event = 'promiseKept';
-  } else if (minutesShare < req * 0.75) {
+  } else if (minutesShare < req * tol) {
     p.strikes++;
     event = 'promiseWarning';
     moraleDelta = -0.5;
@@ -988,11 +988,26 @@ export function evaluatePromise(promise, minutesShare, monthsSince) {
   return { promise: p, event, trustDelta, moraleDelta };
 }
 
+/**
+ * Próg cierpliwości przy obietnicy roli (Nov 25, 2026): zawodnik przypomina o obietnicy, gdy udział minut spada poniżej
+ * wymaganego x tol. tol = 0,75 + 0,02 (ambicja - 10) + 0,02 (temperament - 10) - 0,025 (cierpliwość - 10)
+ * - 0,015 (profesjonalizm - 10) + los N(0; 0,04) w miesiącu, w granicach 0,6-0,9 [SZAC]: cierpliwy narzeka dopiero przy ok.
+ * 2/3 wymaganego udziału, ambitny albo porywczy już przy ok. 85 %.
+ */
+export const PROMISE_TOL = { base: 0.75, ambition: 0.02, temper: 0.02, patience: -0.025, professionalism: -0.015, noise: 0.04, min: 0.6, max: 0.9 };
+export function promiseTolerance(player, dateIso) {
+  const t = personalityOf(player).traits;
+  const T = PROMISE_TOL;
+  const x = T.base + T.ambition * ((t.ambition ?? 10) - 10) + T.temper * ((t.temper ?? 10) - 10) + T.patience * ((t.patience ?? 10) - 10)
+    + T.professionalism * ((t.professionalism ?? 10) - 10) + new Rng(`obietnica-prog:${player.id}:${String(dateIso).slice(0, 7)}`).gauss(0, T.noise);
+  return clamp(x, T.min, T.max);
+}
+
 /** Wersja z zapisem w zawodniku (mutuje kontrakt, relację i morale). Zwraca zdarzenie do wiadomości albo null. */
 export function applyPromiseCheck(player, clubId, dateIso, minutesShare) {
   const c = player.contract;
   if (!c?.promise) return null;
-  const r = evaluatePromise(c.promise, minutesShare, monthsBetween(c.promise.since, dateIso));
+  const r = evaluatePromise(c.promise, minutesShare, monthsBetween(c.promise.since, dateIso), promiseTolerance(player, dateIso));
   player.contract = { ...c, promise: r.promise };
   if (r.trustDelta || r.event === 'promiseBroken') {
     const rel = relationWith(player, clubId);
