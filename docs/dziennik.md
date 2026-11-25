@@ -29,6 +29,14 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 25, 2026, profil A (komputer domowy), premia za podpis jako warunek (v1.25 Beta)
+Zrobione (ekspert od kontraktów Sonnet medium; wdrożenie: ja):
+- `SIGN_MIN`, `signOnMin`, `_signMin` w `src/career/negotiation.js`: zawodnik z powodem (twardy agent, wolny transfer,
+  gwiazda, konkurencja, chciwość, ostatni duży kontrakt, chciwy młody talent) wymaga minimalnej premii za podpis
+  (Ekstraklasa 4-15 pensji tygodniowych, niżej mniej, III/IV liga bez wymogu); 0 = kontroferta i spadek nastroju, drugi raz
+  zerwanie. Klub AI dokłada premię. Pomiar: Ekstraklasa 58 %, 1 Liga 35 %, 2 Liga 16 %. Opis: `docs/negocjacje.md`.
+- Testy: `tests/signOn.test.mjs`; w 4 starszych plikach testów negocjacji `SIGN_MIN.on = false`.
+
 ## Nov 25, 2026, profil A (komputer domowy), wersja v1.25 Beta
 Właściciel zatwierdził v1.25 Beta. Lista zmian v1.25 (od wejścia v1.24 Beta):
 - Nowość: raport obserwatora (skaut obserwuje zawodnika innej drużyny, raport z wykresami i rekomendacją).

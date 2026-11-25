@@ -15,6 +15,8 @@ import { CLUBS_PL, clubById } from '../src/data/clubs_pl.js';
 import { Rng } from '../src/core/rng.js';
 import { PM, directorTalkView, DIR_VIEW_LABELS, talkGate, aiGate, verdictOf, userGate, setLock, lockState, timingValue, noteSpurned, gateWords } from '../src/career/playerMind.js';
 import { MIND, mindRounds, mindLockSpan, openNegotiation, valueOffer, aiNegotiate, normalizeOffer, buildContract, canNegotiate } from '../src/career/negotiation.js';
+import { SIGN_MIN } from '../src/career/negotiation.js';
+SIGN_MIN.on = false; // te testy sprawdzają inne reguły negocjacji; premia za podpis: tests/signOn.test.mjs
 import { slotOf, monthsLeftOf } from '../src/career/clubOffers.js';
 import { clubReputation } from '../src/career/reputation.js';
 import { makeProposal, submitUserProposal, proposalsDay, mindAccept, finalChance, improveUserProposal, THINK } from '../src/career/proposals.js';

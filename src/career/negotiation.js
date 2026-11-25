@@ -93,7 +93,7 @@ export function mindLockSpan(d, reason, rng) {
   let months = null; let days = null;
   if (reason === 'insult') months = L.insult + L.ego * (t.ego - 10) + L.temper * (t.temper - 10);
   else if (reason === 'mood' || reason === 'ultimatum') months = L.brk;
-  else if (r >= L.moneyR) days = rng.int(L.money[0], L.money[1]);
+  else if (r >= L.moneyR || reason === 'signOn') days = rng.int(L.money[0], L.money[1]); // spór o pieniądze (także premia za podpis)
   else if (r >= L.nearR) months = L.near;
   else months = reason === 'walkaway' ? L.base : L.base + rng.int(0, L.spread);
   if (days != null) return { until: addDays(d.date, days), months: null, days };
@@ -363,6 +363,49 @@ function rngFrom(j) {
  * Zwraca { ok:true, session, opening } albo { ok:false, reason, text, until?, outcome? }.
  * reason: 'locked' | 'refuseJoin' | 'tooEarly' | 'expired' | 'refuseRenew' | 'refused'.
  */
+/**
+ * Premia za podpis jako osobny warunek (Nov 25, 2026, ekspert od kontraktów w polskich ligach). Wymagają jej zawodnicy
+ * z powodem: twardy agent (rekin; inny agent +10 pp szansy), wolny transfer, gwiazda (reputacja 55+), oferta konkurencji, chciwość (14+), 29+ przy ostatnim dużym
+ * kontrakcie, młody talent (do 21 lat, potencjał +3) chciwy albo z agentem; pozostali z szansą 25 % (Ekstraklasa,
+ * 1 Liga), 10 % (2 Liga); III i IV liga: bez wymogu. Młody bez talentu i bez chciwości nie wymaga. Minimum w pensjach
+ * tygodniowych (cel): zwykle 4 / 2 / 1, z mocnym powodem (gwiazda, agent, wolny transfer, młody talent) 10 / 6 / 3,
+ * ostatni duży kontrakt 8 / 4 / 2; chciwy x1,5, lojalny (14+) x0,5; przy podwyżce pensji 20 %+ (przedłużenie) x0,5 w ofercie.
+ * Niższe ligi: powód działa z szansą 45 % (1 Liga), 25 % (2 Liga). Pomiar (przedłużenia, ziarno 5): wymaga premii
+ * Ekstraklasa 58 %, 1 Liga 35 %, 2 Liga 16 %, III i IV liga 0. [SZAC]
+ */
+export const SIGN_MIN = {
+  on: true, // wyłącznik (testy innych reguł negocjacji)
+  chance: { 1: 0.25, 2: 0.25, 3: 0.10 }, weeks: { 1: 4, 2: 2, 3: 1 }, strong: { 1: 10, 2: 6, 3: 3 }, last: { 1: 8, 2: 4, 3: 2 },
+  agentAdd: 0.1, reasonGate: { 1: 1, 2: 0.45, 3: 0.25 }, star: 55, greed: 14, loyal: 14, talentAge: 21, talentGap: 3, greedyMul: 1.5, loyalMul: 0.5, raise: 0.2, raiseMul: 0.5,
+  moodHit: 4, strikes: 2,
+};
+export function signOnMin({ player, club, kind, fromClub, traits: t, agent, mindset, target, rival, date }) {
+  const tier = club?.tier ?? 2;
+  if (!SIGN_MIN.on || !SIGN_MIN.weeks[tier]) return 0;
+  const S = SIGN_MIN;
+  const age = player.age ?? 25;
+  const talent = age <= S.talentAge && ((player.hidden?.POT ?? player.ovr ?? 10) - (player.ovr ?? 10)) >= S.talentGap;
+  const shark = agent === 'rekin'; // twardy agent: zawsze żąda; inni agenci tylko zwiększają szansę
+  const hasAgent = agent && agent !== 'brak';
+  const greedy = (t.greed ?? 10) >= S.greed;
+  const free = kind === 'sign' && !fromClub && !player.clubId;
+  const star = (player.rep ?? 0) >= S.star;
+  const last = age >= 29 && mindset === 'ostatniKontrakt';
+  const youngTalent = talent && (greedy || shark);
+  const strong = star || shark || free || youngTalent;
+  const reason = strong || last || greedy || !!rival;
+  const roll = new Rng(`podpis:${player.id}:${club?.id}:${String(date).slice(0, 4)}`);
+  if (reason && !roll.chance(S.reasonGate[tier] ?? 1)) return 0; // niższe ligi: premia za podpis rzadziej (pensje, premie za mecze)
+  if (!reason) {
+    if (age <= S.talentAge) return 0; // młody bez talentu i bez chciwości: zgoda na 0
+    if (!roll.chance((S.chance[tier] ?? 0) + (hasAgent ? S.agentAdd : 0))) return 0;
+  }
+  let weeks = strong ? S.strong[tier] : last ? S.last[tier] : S.weeks[tier];
+  if (greedy) weeks *= S.greedyMul;
+  if ((t.loyalty ?? 10) >= S.loyal) weeks *= S.loyalMul;
+  return Math.round((weeks * target) / 1000) * 1000;
+}
+
 export function openNegotiation(opts) {
   const { kind = 'sign', player, club, fromClub = null, date, mode = 'player' } = opts;
   const ctx = opts.ctx || {};
@@ -515,7 +558,8 @@ export function openNegotiation(opts) {
     pRel: ctx.relegationRisk ?? 0.15, value: estimateValue(player),
     windowEnd: ctx.windowEnd || null, seasonEnd: ctx.seasonEnd || seasonEndOf(date),
     rival, publicDemand: Math.round(publicDemand),
-    hidden: { target: Math.round(target), min: Math.round(min), minOwn: Math.round(minOwn), anchor: Math.round(anchor), maxRounds },
+    hidden: { target: Math.round(target), min: Math.round(min), minOwn: Math.round(minOwn), anchor: Math.round(anchor), maxRounds,
+      signMin: signOnMin({ player, club, kind, fromClub, traits: t, agent, mindset: mindset.key, target, rival, date }), curWage: player.contract?.wage ?? 0 },
     ...(mv ? { mind: { verdict: mind.verdict, timing: mind.timing ?? 0, wow: mv.wow, r: null, extra: false } } : {}),
     st: {
       status: 'open', round: 0, mood: Math.round(mood * 10) / 10, ask: Math.round(anchor), offended: 0,
@@ -608,6 +652,17 @@ export class NegotiationSession {
     st.mood = Math.round(clamp(st.mood + dm, 0, 100) * 10) / 10;
     st.prevWeq = v.weq;
     const entry = { round: st.round, offer: o, weq: Math.round(v.weq), mood: st.mood, events };
+
+    // Premia za podpis jako osobny warunek (SIGN_MIN): za mało = kontroferta z premią, spadek nastroju, po 2 razach zerwanie
+    const sMin = this._signMin(o);
+    if (sMin > 0 && (o.signOn ?? 0) < sMin) {
+      st.signShort = (st.signShort ?? 0) + 1;
+      st.mood = Math.round(clamp(st.mood - SIGN_MIN.moodHit, 0, 100) * 10) / 10;
+      entry.mood = st.mood; events.push('signOn');
+      if (st.signShort >= SIGN_MIN.strikes || (ai && st.round >= 2)) return this._break('signOn', entry);
+      return this._counter({ ...o, bonus: { ...o.bonus }, signOn: sMin }, entry, false);
+    }
+    st.signShort = 0;
 
     // Decyzja
     const meetsCounter = st.lastCounter && v.weq >= st.lastCounter.weq - 0.5; // zawodnik dotrzymuje własnej kontroferty
@@ -826,6 +881,15 @@ export class NegotiationSession {
       claim: claimNow, lines, speaker: lines[lines.length - 1]?.speaker ?? '', text: lines.map((l) => l.text).join(' '),
       ...extra,
     };
+  }
+
+  /** Wymagana premia za podpis dla oferty (0 bez wymogu); przedłużenie z podwyżką pensji 20 %+: połowa. */
+  _signMin(o) {
+    const H = this.d.hidden;
+    const m = H.signMin ?? 0;
+    if (!m) return 0;
+    const raise = this.d.kind === 'renew' && H.curWage > 0 && o.wage >= H.curWage * (1 + SIGN_MIN.raise);
+    return raise ? Math.round((m * SIGN_MIN.raiseMul) / 1000) * 1000 : m;
   }
 
   _counter(o, entry, claimNow) {
@@ -1062,6 +1126,7 @@ export function aiNegotiate({ kind = 'sign', player, club, fromClub = null, date
     role: d.roleExp,
     bonus: { goal: roundTo(wage * goalBonus, 100), app: roundTo(wage * 0.02, 50) },
     agentFee: roundTo(0.07 * wage * 52 * feeMul, 1000), // rynkowy standard prowizji (x Zarządzanie kadrą dyrektora)
+    signOn: Math.min(s._signMin({ wage, signOn: 0 }), maxSignOn), // premia za podpis, gdy zawodnik jej wymaga (SIGN_MIN), w granicach budżetu
   });
   let resp = s.propose(offer);
   if (d.mind) {

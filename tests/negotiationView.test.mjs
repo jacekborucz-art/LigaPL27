@@ -5,6 +5,8 @@ import {
   startNegotiation, renderNegotiation, handleNegotiationAction, isNegotiationAction, readNegotiationForm,
   mergeDraft, offerIssues, windowEndFor, minutesShareOf, ageLabel,
 } from '../src/ui/negotiationView.js';
+import { SIGN_MIN } from '../src/career/negotiation.js';
+SIGN_MIN.on = false; // te testy sprawdzają widok i inne reguły; premia za podpis: tests/signOn.test.mjs
 
 const BIG = { maxWage: 10_000_000, maxSignOn: 100_000_000 };
 const newGame = () => ({ seed: 'ekran', clubId: 'lech', date: '2026-08-10', world: generateWorld('ekran'), fixtures: [] });

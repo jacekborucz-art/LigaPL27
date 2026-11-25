@@ -730,3 +730,11 @@ minimum, blef, ultimatum, agent), zmienia się adapter:
 - Próg cierpliwości z charakteru i losu (`promiseTolerance`, `PROMISE_TOL`): ostrzeżenie, gdy udział < wymagany x tol,
   tol = 0,75 + 0,02 (ambicja - 10) + 0,02 (temperament - 10) - 0,025 (cierpliwość - 10) - 0,015 (profesjonalizm - 10)
   + N(0; 0,04) w miesiącu, w granicach 0,6-0,9 [SZAC].
+
+### Premia za podpis jako osobny warunek (Nov 25, 2026)
+Zgłoszenie: przy przedłużeniu zawodnik godził się na 0 zł za podpis, bo premia była tylko częścią wartości oferty. Ekspert od kontraktów w polskich ligach: premia za podpis jest częsta w Ekstraklasie (ok. 40-60 % umów kluczowych zawodników), rzadsza w 1 Lidze (20-35 %), rzadka w 2 Lidze (10-20 %), wyjątkowa w III i IV lidze.
+- `SIGN_MIN`, `signOnMin` w `src/career/negotiation.js`, minimum w `d.hidden.signMin`, sprawdzenie w `propose` (`_signMin`).
+- Powody: twardy agent (rekin), wolny transfer, gwiazda (reputacja 55+), oferta konkurencji, chciwość 14+, 29+ przy ostatnim dużym kontrakcie, młody talent (do 21 lat, potencjał +3) chciwy albo z twardym agentem. Bez powodu: szansa 25 % (Ekstraklasa, 1 Liga), 10 % (2 Liga), inny agent +10 pp. Młody bez talentu i bez chciwości: zgoda na 0. Niższe ligi: powód działa w 45 % (1 Liga), 25 % (2 Liga). III i IV liga: bez wymogu.
+- Minimum w pensjach tygodniowych (cel): zwykle 4 / 2 / 1, mocny powód 10 / 6 / 3, ostatni duży kontrakt 8 / 4 / 2; chciwy x1,5, lojalny x0,5; przedłużenie z podwyżką pensji 20 %+: połowa.
+- Oferta poniżej minimum: kontroferta z premią i spadek nastroju (-4); druga taka oferta: zerwanie rozmów (spór o pieniądze, przy transferze blokada 14-60 dni). Klub AI dokłada premię w granicach budżetu.
+- Pomiar (przedłużenia, ziarno 5): wymaga premii Ekstraklasa 58 % (średnio 7 pensji tygodniowych), 1 Liga 35 % (3), 2 Liga 16 % (1,6), III i IV liga 0. Testy: `tests/signOn.test.mjs`; starsze testy negocjacji wyłączają wymóg (`SIGN_MIN.on = false`).

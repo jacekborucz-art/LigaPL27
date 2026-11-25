@@ -8,6 +8,8 @@ import {
   openNegotiation, NegotiationSession, aiNegotiate, applyOutcome, applyPromiseCheck, canNegotiate, evaluatePromise, promiseTolerance, PROMISE_TOL,
   normalizeOffer, formatZl, formatDate, addDays, buildContract,
 } from '../src/career/negotiation.js';
+import { SIGN_MIN } from '../src/career/negotiation.js';
+SIGN_MIN.on = false; // te testy sprawdzają inne reguły negocjacji; premia za podpis: tests/signOn.test.mjs
 import { LINES } from '../src/career/negotiationLines.js';
 import { willingnessToJoin } from '../src/career/reputation.js';
 import { transferListCandidates } from '../src/career/squad.js';

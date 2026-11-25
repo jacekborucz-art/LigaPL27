@@ -8,6 +8,8 @@ import { processDay, addDays } from '../src/core/gameLoop.js';
 import { createTactics } from '../src/engine/lineup.js';
 import { ensureCareer } from '../src/career/careerSystem.js';
 import { buildContract, normalizeOffer } from '../src/career/negotiation.js';
+import { SIGN_MIN } from '../src/career/negotiation.js';
+SIGN_MIN.on = false; // te testy sprawdzają inne reguły negocjacji; premia za podpis: tests/signOn.test.mjs
 import { marketWeek } from '../src/career/transfers.js';
 import { dealOf, pendingFees } from '../src/career/transferDeals.js';
 import {
