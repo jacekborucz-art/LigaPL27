@@ -197,7 +197,9 @@
 .obs-mode.is-on { border: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
 .obs-field { display: grid; gap: 6px; }
 .obs-field__k { font-size: var(--step--1); color: var(--text-muted); font-weight: 600; }
-.obs-field select { min-height: var(--tap); width: min(100%, 520px); }
+.obs-field select { min-height: var(--tap); width: min(100%, 520px); padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--surface); color: var(--text); font: inherit; }
+.obs-field select option { background: var(--surface); color: var(--text); } /* lista rozwijana w kolorach motywu (w ciemnym tekst znikał na białym tle) */
+.obs-field select option:disabled { color: var(--text-muted); }
 .obs-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .obs-chipbtn { min-height: var(--tap); padding: 4px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--text); font: 600 var(--step-0)/1 var(--font-body); cursor: pointer; }
 .obs-chipbtn.is-on { background: var(--accent); color: var(--accent-text); border-color: transparent; }
