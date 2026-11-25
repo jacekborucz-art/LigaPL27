@@ -29,6 +29,15 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 25, 2026, profil A (komputer domowy), obietnice roli i żółte kartki (v1.24 Beta)
+Zrobione:
+- Obietnica roli: błąd, sparingi liczyły się do meczów klubu (`clubGames` w `moveWish.js`), więc grający dużo dostawali
+  ostrzeżenia w lipcu i zimą; mecze opuszczone przez kontuzję lub pauzę nie liczą się (`p.season.miss`); próg z charakteru
+  i losu (`promiseTolerance` w `negotiation.js`). Opis w `docs/negocjacje.md`.
+- Żółte kartki -15 % (decyzja właściciela): pełny silnik `yellowPerFoul` 0,101, `otherYellowTick` 0,0024, `tacFoulYellow`
+  0,72 (3,76 -> 3,13 na mecz), mecze w tle `YELLOW_H/A` 1,16 / 1,49 (3,31 -> 2,80). Testy: zakres kalibracji 2,7-3,7,
+  przeliczone wzorce złotego testu (`playerInstr.test`), ziarno scenariusza w `situations.test` (rywal strzelał karnego).
+
 ## Nov 25, 2026, profil A (komputer domowy), mniej kontuzji w meczach w tle (v1.24 Beta)
 Zrobione (decyzja właściciela):
 - `QS.INJ` w `src/engine/quickSim.js`: 0,45 -> 0,19 kontuzji na drużynę w meczach w tle (liga i puchary). Pomiar: 0,373 na mecz

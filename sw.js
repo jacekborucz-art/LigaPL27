@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-18ab1e743a';
+const VERSION = 'v0.3-9143f3a8fa';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -216,8 +216,8 @@ const FILES = [
   ['./src/career/loans.js', 'd7aad00962'],
   ['./src/career/mindset.js', 'bfb5eb974c'],
   ['./src/career/morale.js', '1c7d0eb69f'],
-  ['./src/career/moveWish.js', '65592345c0'],
-  ['./src/career/negotiation.js', '5272d9da77'],
+  ['./src/career/moveWish.js', '5934884415'],
+  ['./src/career/negotiation.js', '4be45b8f02'],
   ['./src/career/negotiationLines.js', 'c8c8acb890'],
   ['./src/career/observerReport.js', '146af07995'],
   ['./src/career/offerFactors.js', '24c1166ac9'],
@@ -281,7 +281,7 @@ const FILES = [
   ['./src/data/reprezentacje_swiat.json', '29c3c96adf'],
   ['./src/engine/lineup.js', 'fd8c7c295e'],
   ['./src/engine/match/coach.js', 'b25f14ff0a'],
-  ['./src/engine/match/constants.js', '4c7f75d944'],
+  ['./src/engine/match/constants.js', '320a08b56f'],
   ['./src/engine/match/control.js', 'cfc35b73b8'],
   ['./src/engine/match/core.js', '6ca41fe2c9'],
   ['./src/engine/match/match.js', 'd1ed756f73'],
@@ -291,7 +291,7 @@ const FILES = [
   ['./src/engine/matchStats.js', '71542c9b3b'],
   ['./src/engine/modifiers.js', 'cf8f446d97'],
   ['./src/engine/positions.js', 'ee736ff7cc'],
-  ['./src/engine/quickSim.js', 'a8e63e746f'],
+  ['./src/engine/quickSim.js', '5a91264f0b'],
   ['./src/engine/teamStrength.js', '48334cd7ed'],
   ['./src/match/aiPlan.js', '2f958da775'],
   ['./src/match/briefings.js', '259a9a1c24'],
@@ -316,7 +316,7 @@ const FILES = [
   ['./src/season/nationalSystem.js', '56b1056ddd'],
   ['./src/season/rollover.js', '175a3a282c'],
   ['./src/season/schedule.js', 'a608f6730f'],
-  ['./src/season/season.js', '05fdaa0d4e'],
+  ['./src/season/season.js', '6294972768'],
   ['./src/season/standings.js', 'b3bdff91e2'],
   ['./src/season/superCupEU.js', 'f728d6d300'],
   ['./src/season/suspension.js', '7671748aa6'],

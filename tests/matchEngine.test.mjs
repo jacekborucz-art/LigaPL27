@@ -51,7 +51,7 @@ test('Kalibracja: realne średnie na 1500 meczach Ekstraklasy', () => {
   assert.ok(avg('on') > 7.5 && avg('on') < 10.5, `celne ${avg('on')}`);
   assert.ok(avg('c') > 8 && avg('c') < 12, `rożne ${avg('c')}`);
   assert.ok(avg('f') > 22 && avg('f') < 31, `faule ${avg('f')}`);
-  assert.ok(avg('y') > 3.4 && avg('y') < 4.4, `żółte ${avg('y')}`);
+  assert.ok(avg('y') > 2.7 && avg('y') < 3.7, `żółte ${avg('y')}`); // żółte -15% (Nov 25, 2026)
   assert.ok(avg('off') > 3 && avg('off') < 5.5, `spalone ${avg('off')}`);
   assert.ok(avg('pass') > 350 && avg('pass') < 480, `podania ${avg('pass')}`);
   assert.ok(avg('acc') > 74 && avg('acc') < 86, `celność ${avg('acc')}`);

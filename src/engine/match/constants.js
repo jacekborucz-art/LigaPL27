@@ -20,7 +20,7 @@ export const K = {
   cornerShot: 0.30, cornerXg: [0.04, 0.14], saveCorner: 0.30, blockCorner: 0.33,
   foulTick: 0.27, foulDefShare: 0.78, dangerFK: 0.14,
   fkDirect: 0.45, fkXgD: [0.04, 0.09], fkCrossShot: 0.30, fkXgC: [0.05, 0.15],
-  yellowPerFoul: 0.119, redPerFoul: 0.0024, otherYellowTick: 0.0028, // kartki -10% na prośbę właściciela (Nov 17, 2026): ok. 3,7 ŻK/mecz
+  yellowPerFoul: 0.101, redPerFoul: 0.0024, otherYellowTick: 0.0024, // kartki -10% na prośbę właściciela (Nov 17, 2026): ok. 3,7 ŻK/mecz; żółte -15% (Nov 25, 2026): ok. 3,1 ŻK/mecz
   bookedFoulMul: 0.4, bookedYellowMul: 0.5, // z żółtą gra ostrożniej: druga żółta rzadziej (0.7 -> 0.5)
   homeCreate: 1.15, awayCreate: 0.90, homeCardMul: 0.88, awayCardMul: 1.15,
   ogPerMatch: 0.08,
@@ -43,7 +43,7 @@ export const K = {
   momentumScale: 12, momentumAct: 0.06,
   // Sytuacje meczowe (docs/sytuacje-meczowe.md) [SZAC]
   redShare: { dogso: 0.40, sfp: 0.33, violent: 0.12, handball: 0.15 }, // powody bezpośrednich czerwonych
-  tacFoul: 0.08, tacFoulYellow: 0.85, tacFoulDogso: 0.05, // faul taktyczny przerywający groźną kontrę
+  tacFoul: 0.08, tacFoulYellow: 0.72, tacFoulDogso: 0.05, // faul taktyczny przerywający groźną kontrę (żółta -15%, Nov 25, 2026)
   penRetake: 0.05, penRebound: 0.35, penReboundXg: [0.15, 0.45], // powtórka (bramkarz przed linią), dobitka
   benchCardTick: 0.00035, benchRedShare: 0.08, // kartka dla rezerwowego lub zmienionego zawodnika
   staffCardTick: 0.0007, staffRedShare: 0.08, // kartka dla trenera lub członka sztabu

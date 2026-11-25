@@ -119,7 +119,7 @@ test('Kontuzja bramkarza: z rezerwowym zmiana 1 za 1, bez rezerwowego zawodnik z
 
 test('Czerwona po wykorzystaniu wszystkich zmian i kontuzja bez zmian: gra w 10 z nowym ustawieniem', () => {
   {
-    const { M, T, from } = setup('redall', { min: 80, score: [1, 0] });
+    const { M, T, from } = setup('redall2', { min: 80, score: [1, 0] }); // ziarno bez gola rywala w tej minucie (kartki -15%, Nov 25, 2026)
     T.subsUsed = T.subsLimit;
     const cb = T.players.find((x) => x.on && x.slot.pos === 'ŚO');
     sendOff(M, T, cb, 'second');

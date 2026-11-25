@@ -17,20 +17,21 @@ import { squadOf } from '../src/world/worldGen.js';
 import { Rng } from '../src/core/rng.js';
 
 // Skróty meczów sprzed instrukcji indywidualnych (Nov 18, 2026, tests/piHelpers.mjs przed zmianą silnika)
+// Wzorce przeliczone po celowej zmianie kartek (żółte -15%, Nov 25, 2026)
 const GOLD = {
   user: [
-    '51d11ef6', '7c1f7160', 'a6794f8b', '8491fad3', 'ce5c146b', 'c16ec75', 'd273ad4f', 'e443be4d', '3233c51a', 'c1b0d8da',
-    'caecbe7d', 'ed72ddf9', 'f173ee7b', '9add37ad', '85440a0d', 'a1c21d6', '916a98bd', '715979af', '526e3bcf', 'ce69a85c',
-    '7c796ad0', 'f5f20104', '5862233b', 'b0764ddd', '6fd2d1c2', 'b1a022c4', '4e5c624f', '4f0d3f83', '7a7edc91', '609361e3',
-    'ceb29ead', 'f1496a4a', '6e4ca49a', 'c0167fe6', '70a9eea1', '41f02886', 'a726a572', '8e2347af', 'e7b635bf', '5dcc13c1',
-    'e6cb290f', '5fa93982', '1fe5297b', 'd34e4f16', 'f5bc37a7', '4d0d6f56', '88eddd1a', '574e2a2f', '3490f060', '58c2d2d0',
+    '51d11ef6', '79b34db8', 'a6794f8b', 'd0b1e682', 'ce5c146b', '4b2417c', '60f01698', 'e443be4d', '1688283', '58402c3a',
+    'e40d775c', 'e8d0877b', 'c54dcd72', '7d53f207', '85440a0d', '7aa20957', '2167a0f2', '715979af', '85c2454', '6c3fb2f2',
+    '7c796ad0', 'cb962cf5', '8859c72a', 'b0764ddd', '69270f9a', 'b1a022c4', '188f20f7', '47174d56', '7a7edc91', 'be4bc34',
+    '38a78d3e', '83b9aa5a', '3596337d', 'c0167fe6', 'c34e5a88', '41f02886', 'a726a572', '8e2347af', 'c4584cb8', '9e13fc51',
+    '448d2503', '5fa93982', '1fe5297b', 'bf4e961e', '4ad4f257', '4d0d6f56', '54531639', '9376351a', 'bad70f1c', '77e9f3d6',
   ],
   ai: [
-    'ac31e723', 'ad753349', '7ff304d7', 'ca6f28a3', 'b54d5103', 'c20c51b0', '54b33ab3', 'dee286b7', '5fbeee66', '4a8fe095',
-    'a3b92736', 'd75ad48f', 'fc1c97c9', '8e29a753', '65dd85b', 'f6cec728', '9abfed90', '8eadfb65', '13f58df8', 'b457384f',
-    'e40a7ec7', '607af0b5', '248a8edf', '162412d4', '17b2cf7c', '67eeebe3', 'e233d584', 'e7252ba0', 'e63e4294', '1f5f6493',
-    'ef7ebf9a', '264e02a5', 'af72c8b9', '711f0c23', '7af01887', '719e5aa', 'b560ea3f', '2bc5f7b4', '56549eaa', '1ae99041',
-    'f03e132b', '5e8d6838', 'f10f964d', '9a63c67', 'b80488a4', '4f9359bf', '53f7ffc', '551e76b5', '4973ef98', 'cf03b464',
+    '3d864ffd', 'ad753349', '7ff304d7', '18315e6', 'b54d5103', 'c20c51b0', '9fdbdd4f', 'dee286b7', '5fbeee66', '4a8fe095',
+    'a3b92736', '6aa50cd7', 'fc1c97c9', 'fab433d5', '65dd85b', 'f6cec728', '9abfed90', '8eadfb65', '13f58df8', 'e028a54a',
+    'f682257f', '607af0b5', '248a8edf', '162412d4', '17b2cf7c', '67eeebe3', 'e233d584', '12e784c4', '462a29f5', '5d3a5c67',
+    'acab8289', '264e02a5', 'af72c8b9', '711f0c23', '598b8368', 'b78943b2', 'd0395398', '2bc5f7b4', '56549eaa', '1ae99041',
+    'f03e132b', '5e8d6838', 'dfc53b62', '742b26aa', 'b80488a4', '4f9359bf', 'ab3a77a3', '551e76b5', '4973ef98', 'c444cd84',
   ],
 };
 

@@ -17,7 +17,7 @@ export const QS = {
   XG_PER_SHOT: 0.108, // ok. 2,72 gola / 25 strzałów
   ON_TARGET_NON_GOAL: 0.28,
   CORNERS_PER_SHOT: 0.4,
-  YELLOW_H: 1.36, YELLOW_A: 1.75, RED: 0.038, INJ: 0.19, // INJ: kontuzje na drużynę (Nov 25, 2026: 0,45 -> 0,19 na prośbę właściciela, ok. 0,38 na mecz, mniej niż pełny silnik 0,52); kartki -10%, potem -20% w meczach w tle (Nov 17, 2026); RED to bezpośrednie czerwone, drugie żółte dochodzą w playQuick (razem ok. 0,15/mecz jak pełny silnik)
+  YELLOW_H: 1.16, YELLOW_A: 1.49, RED: 0.038, INJ: 0.19, // żółte -15% jak w pełnym silniku (Nov 25, 2026); INJ: kontuzje na drużynę (Nov 25, 2026: 0,45 -> 0,19 na prośbę właściciela, ok. 0,38 na mecz, mniej niż pełny silnik 0,52); kartki -10%, potem -20% w meczach w tle (Nov 17, 2026); RED to bezpośrednie czerwone, drugie żółte dochodzą w playQuick (razem ok. 0,15/mecz jak pełny silnik)
 };
 
 /** Średnie bramek z sił stref (wzór eksperta). */
