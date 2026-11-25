@@ -29,6 +29,12 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 25, 2026, profil A (komputer domowy), krycie zmęczonej obrony przy stałych fragmentach (v1.24 Beta)
+Zrobione (decyzja właściciela, propozycja eksperta):
+- `spLapse` w `src/engine/match/core.js` (`FATIGUE.sp*`): od 70. min przy średniej kondycji obrony < 80 rośnie szansa na strzał
+  po rożnym i xG po stałych fragmentach (4 % za punkt, maks. 30 %). Efekt mały (+0,005 straconego gola po 60. min bez zmian).
+  Przeliczone wzorce złotego testu.
+
 ## Nov 25, 2026, profil A (komputer domowy), brak zmian w meczu kosztuje (v1.24 Beta)
 Zrobione (ekspert futbolu i programista silnika: Sonnet medium; wdrożenie: ja):
 - Nieliniowa kara kondycji z tolerancją zawodnika (`condPenalty`, `fatigueTolerance`, `FATIGUE.penQuad/tol`), w silniku,

@@ -124,6 +124,10 @@ export const FATIGUE = {
   // przewidywalnie. Pogoda i murawa przyspieszają spadek kondycji (weather.fat w updateCondition), więc i karę. [SZAC]
   penFrom: 85, penLin: 0.04, penQuad: 0.008,
   tol: { pra: 0.03, opa: 0.015, wyt: 0.015, sd0: 0.18, sdK: 0.012, sdMin: 0.05, min: 0.6, max: 1.5 },
+  // Koncentracja zmęczonej obrony przy stałych fragmentach (Nov 25, 2026, ekspert futbolu): od 70. min, gdy średnia kondycja
+  // zawodników z pola broniącej drużyny spada poniżej 80, szansa na strzał po rożnym i xG strzału po rożnym i dośrodkowaniu
+  // z wolnego rywala rosną o 4 % za punkt, najwyżej o 30 % (kondycja 76: +16 %; drużyna ze zmianami ok. 81: bez efektu) [SZAC].
+  spFrom: 70, spCond: 80, spPer: 0.04, spMax: 0.3,
 };
 
 export const KNOCK = {

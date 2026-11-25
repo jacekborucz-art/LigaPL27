@@ -538,14 +538,24 @@ function shot(M, ai, xg, type, header, forced = null) {
 
 const round2 = (v) => Math.round(v * 100) / 100;
 
+/** Gorsze krycie zmęczonej obrony przy stałych fragmentach po 70. min: mnożnik xG strzału rywala (FATIGUE.sp*). */
+function spLapse(M, D) {
+  if (M.minute < FATIGUE.spFrom) return 1;
+  const xs = onPitch(D, M.minute).filter((y) => y.slot.pos !== 'BR');
+  if (!xs.length) return 1;
+  const avg = xs.reduce((s, y) => s + y.cond, 0) / xs.length;
+  return avg < FATIGUE.spCond ? 1 + Math.min(FATIGUE.spMax, FATIGUE.spPer * (FATIGUE.spCond - avg)) : 1;
+}
+
 function corner(M, ai) {
   const A = M.teams[ai]; const D = M.teams[1 - ai];
   A.threat += 2;
   emit(M, 'corner', ai, null);
   const gkUp = desperate(M, A);
   if (gkUp) emit(M, 'gkUp', ai, goalkeeper(A), { text: `${last(goalkeeper(A))} biegnie w pole karne rywala!` });
-  if (M.rng.next() < K.cornerShot * Math.exp(0.08 * (A.zones.SPA - D.zones.SPD)) * (gkUp ? K.gkUp.shotMul : 1)) {
-    shot(M, ai, K.cornerXg[0] + M.rng.next() * (K.cornerXg[1] - K.cornerXg[0]), 'SP', true);
+  const lapse = spLapse(M, D); // zmęczona obrona gorzej kryje po 70. min
+  if (M.rng.next() < K.cornerShot * Math.exp(0.08 * (A.zones.SPA - D.zones.SPD)) * (gkUp ? K.gkUp.shotMul : 1) * lapse) {
+    shot(M, ai, (K.cornerXg[0] + M.rng.next() * (K.cornerXg[1] - K.cornerXg[0])) * lapse, 'SP', true);
   } else if (gkUp && M.rng.next() < K.gkUp.counter) {
     // Kontra na pustą bramkę
     M.emptyNet = true;
@@ -571,7 +581,7 @@ function setPiece(M, ai) {
     const xg = (K.fkXgD[0] + M.rng.next() * (K.fkXgD[1] - K.fkXgD[0])) * (1 + 0.04 * ((taker ? attr(taker, 'SFR') : 10) - 12));
     shot(M, ai, Math.max(0.01, xg), 'FK', false, taker ?? null);
   } else if (M.rng.next() < K.fkCrossShot) {
-    shot(M, ai, K.fkXgC[0] + M.rng.next() * (K.fkXgC[1] - K.fkXgC[0]), 'SP', true);
+    shot(M, ai, (K.fkXgC[0] + M.rng.next() * (K.fkXgC[1] - K.fkXgC[0])) * spLapse(M, M.teams[1 - ai]), 'SP', true);
   }
 }
 
