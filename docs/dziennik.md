@@ -29,6 +29,11 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 25, 2026, profil A (komputer domowy), nastawienie zawodnika jako ocena dyrektora (v1.24 Beta)
+Zrobione (decyzja właściciela, opcja 2):
+- `directorTalkView` i `DIR_VIEW` w `src/career/playerMind.js`: kafelek „Nastawienie” i kolumny list w Transferach pokazują
+  bramkę rozmów z błędem dyrektora (RYN), stałym w oknie; `willWord` w `src/ui/transfersView.js`. Test w `playerMind.test`.
+
 ## Nov 25, 2026, profil A (komputer domowy), oferty, część 2: decyzja zawodnika (v1.24 Beta)
 Zrobione (wdrożenie Opus high, sprawdzone):
 - Nowy `src/career/playerMind.js` (`talkGate`, `timingValue`, `mindAccept`, `mindLockSpan`, `lockState`, `aiGate`):

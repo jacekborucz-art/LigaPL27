@@ -13,7 +13,7 @@ import { ensureCareer } from '../src/career/careerSystem.js';
 import { applySeasonState } from '../src/season/rollover.js';
 import { CLUBS_PL, clubById } from '../src/data/clubs_pl.js';
 import { Rng } from '../src/core/rng.js';
-import { PM, talkGate, aiGate, verdictOf, userGate, setLock, lockState, timingValue, noteSpurned, gateWords } from '../src/career/playerMind.js';
+import { PM, directorTalkView, DIR_VIEW_LABELS, talkGate, aiGate, verdictOf, userGate, setLock, lockState, timingValue, noteSpurned, gateWords } from '../src/career/playerMind.js';
 import { MIND, mindRounds, mindLockSpan, openNegotiation, valueOffer, aiNegotiate, normalizeOffer, buildContract, canNegotiate } from '../src/career/negotiation.js';
 import { slotOf, monthsLeftOf } from '../src/career/clubOffers.js';
 import { clubReputation } from '../src/career/reputation.js';
@@ -313,4 +313,20 @@ test('Termin przejścia: czynnik „timing” (do 0,3) i korekta bramki; odrzuco
   const h1 = monthlyHazard(p, { clubRep: 50, share: 0.8, games: 10, month: 7, date: '2026-07-20', tier: 1 });
   assert.ok(h0 === 0 || Math.abs(h1 / h0 - 1.5) < 1e-6, 'ryzyko prośby x1,5');
   assert.ok(!/\d/.test(gateWords(p, { verdict: 'refuse', reason: 'stay' })), 'słowa bez liczb');
+});
+
+test('Kafelek „Nastawienie”: ocena dyrektora sportowego z błędem, stała w oknie, zwykle zgodna z decyzją zawodnika', () => {
+  const g = fresh();
+  const ps = ek(g).flatMap((c) => squadOf(g.world, c.id)).slice(0, 200);
+  let same = 0;
+  for (const p of ps) {
+    const v = directorTalkView(g, p);
+    assert.ok(Object.values(DIR_VIEW_LABELS).includes(v.label));
+    assert.deepEqual(directorTalkView(g, p), v, 'ta sama ocena przy ponownym otwarciu');
+    if (v.verdict === talkGate(g, p).verdict) same++;
+  }
+  assert.ok(same / ps.length >= 0.55 && same / ps.length < 1, `zgodność ${same}/${ps.length}`);
+  const html = renderTransfers(g, { tfTab: 'rynek', tfPlayer: ps[0].id });
+  const tile = html.slice(html.indexOf('Nastawienie'), html.indexOf('Nastawienie') + 200);
+  assert.ok(tile.includes(directorTalkView(g, ps[0]).label), tile);
 });

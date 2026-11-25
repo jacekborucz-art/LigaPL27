@@ -40,7 +40,7 @@ import { observeListHtml, observeStatusHtml } from './observerView.js'; // rapor
 import { observeMenuInfo } from '../career/observerReport.js'; // stan obserwacji w małej karcie zawodnika
 import { clubOfferPanel, readOfferForm, handleClubOfferAction } from './clubOffersView.js'; // oferty klub-klub: zapytanie, pakiet, stan rozmów
 import { agreementOf, inquiryOf, clauseAmount, regDateOf, markPlayerRefused } from '../career/clubOffers.js';
-import { userGate } from '../career/playerMind.js'; // decyzja zawodnika: czy chce rozmawiać (docs/negocjacje.md, Nov 25, 2026)
+import { userGate, directorTalkView } from '../career/playerMind.js'; // decyzja zawodnika: czy chce rozmawiać (docs/negocjacje.md, Nov 25, 2026)
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size = 20) => (clubById(id) ? crestHtml(clubById(id), { size, clubsById }) : '');
@@ -138,7 +138,9 @@ function sortBy(list, sort, val) {
     return dir * d || val(b, 'ovr') - val(a, 'ovr'); // OVR z val: kandydat skauta bez prawdziwej oceny
   });
 }
-const willTone = (v) => (v === 'chętny' ? 'good' : v === 'otwarty' ? 'info' : v === 'niechętny' ? 'warn' : 'bad');
+const willTone = (v) => (v === 'chętny' ? 'good' : v === 'otwarty' ? 'info' : v === 'niechętny' || v === 'do przekonania' ? 'warn' : 'bad');
+/** Nastawienie zawodnika innej drużyny słowami dyrektora sportowego (playerMind.js directorTalkView); własny: stary wskaźnik. */
+const willWord = (game, p) => (p.clubId === game.clubId ? playerWillingness(game, p).verdict : directorTalkView(game, p).label);
 const tag = (txt, k = 'info') => `<span class="tf-tag" data-k="${k}">${esc(txt)}</span>`;
 /** Przełącznik listy życzeń („Do listy życzeń” / „Usuń z listy życzeń”); pusty dla zawodnika z kadry gracza. */
 const wishBtn = (game, p, cls = 'btn btn--quiet btn--sm') => (canWish(game, p) ? `<button class="${cls}" data-act="tf-wl" data-id="${esc(p.id)}">${wishHas(game, p.id) ? 'Usuń z listy życzeń' : 'Do listy życzeń'}</button>` : '');
@@ -315,11 +317,11 @@ function marketView(game, ui) {
   }
   const all = marketRows(game, list, pos, ui);
   const needWill = sort.k === 'will';
-  const withWill = (x) => ({ ...x, will: playerWillingness(game, x.p).verdict });
+  const withWill = (x) => ({ ...x, will: willWord(game, x.p) });
   const val = (x, k) => (k === 'pos' ? POS_ORDER.indexOf(x.p.pos) : k === 'name' ? x.p.name : k === 'ovr' ? shownOvr(game, x.p) : k === 'price' ? (x.price ?? Infinity)
     : k === 'age' ? x.p.age : k === 'club' ? (clubById(x.p.clubId)?.name ?? x.p.abroad?.club ?? '') : k === 'value' ? (scoutHidden(game, x.p) ? (game.scoutOps?.cands?.[x.p.id]?.rep?.priceRange?.[0] ?? 0) : x.p.value ?? 0) : k === 'until' ? (x.p.contract?.until ?? '9999')
       : k === 'nat' ? (NAT_NAMES[x.p.nat] ?? x.p.nat) : k === 'wage' ? x.wage ?? 0 : k === 'added' ? x.added ?? ''
-      : k === 'will' ? ['chętny', 'otwarty', 'niechętny', 'odmowa'].indexOf(x.will) : 0);
+      : k === 'will' ? ['chętny', 'otwarty', 'do przekonania', 'niechętny', 'odmówi rozmów', 'odmowa'].indexOf(x.will) : 0);
   const sorted = sortBy(needWill ? all.map(withWill) : all, sort, val).slice(0, 80);
   const rows = needWill ? sorted : sorted.map(withWill);
   const table = all.length ? (list === 'abroad' ? abroadTable(game, rows, sort, all.length) : list === 'wishlist' ? wishlistTable(game, rows, sort, all.length) : marketTable(game, rows, list, sort, all.length))
@@ -451,7 +453,7 @@ function playerCard(game, p, ui) {
           ${free ? '' : fact('Kontrakt do', esc(fmtDate(p.contract.until)))}
           ${abroad ? fact('Klub', `<span class="fp-fact">${esc(poolClubLabel(p))}</span>`, 'info') : ''}
           ${fact('Reputacja', repHtml(p), 'misc')}
-          ${fact('Nastawienie', esc(will.verdict), willTone(will.verdict))}
+          ${(() => { const w = willWord(game, p); return fact('Nastawienie', esc(w), willTone(w)); })()}
         </ul>
         <div class="tf-cols">
           ${panel('Mocne strony', 'info', scoutHidden(game, p) ? hiddenAttrsHtml() : `<ul class="tf-attrs">${strengths(p)}</ul>`)}

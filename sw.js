@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-f244bbbf28';
+const VERSION = 'v0.3-392c814ea4';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -224,7 +224,7 @@ const FILES = [
   ['./src/career/ownerFunding.js', '0786c52d2c'],
   ['./src/career/owners.js', '881a7a1333'],
   ['./src/career/personality.js', 'f490724de6'],
-  ['./src/career/playerMind.js', '5172c5fc4e'],
+  ['./src/career/playerMind.js', '123bc1d7d4'],
   ['./src/career/postMatchReport.js', 'd8bb4cab6b'],
   ['./src/career/preContracts.js', '2f290555b9'],
   ['./src/career/presidentQuiz.js', 'f0923fdee3'],
@@ -411,7 +411,7 @@ const FILES = [
   ['./src/ui/todoView.js', 'bd4d7aa1c4'],
   ['./src/ui/trainingView.js', '58ad4a6399'],
   ['./src/ui/transferDealsView.js', '7aadd7cfb8'],
-  ['./src/ui/transfersView.js', '4db162f7d1'],
+  ['./src/ui/transfersView.js', 'd279dcc1ba'],
   ['./src/world/ephemeral.js', '216b6bcdd9'],
   ['./src/world/playerGen.js', '7033b8b243'],
   ['./src/world/worldGen.js', '494992346d'],

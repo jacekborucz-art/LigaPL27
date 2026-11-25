@@ -717,3 +717,9 @@ minimum, blef, ultimatum, agent), zmienia się adapter:
 - Sprzeciw dyrektora i weto: docs/transfery.md, „Oferty klub-klub”, punkt „Sprzeciw dyrektora”.
 - `npm run perf` (ten sam komputer, przed / po): sezon 10,5-10,7 s / 10,3-10,5 s (szum), system transfers 700 / 750-770 ms
   (+7-10 %).
+
+### Nastawienie w Transferach (ocena dyrektora, Nov 25, 2026)
+- Kafelek „Nastawienie” na karcie i kolumny list w Transferach pokazują wynik bramki rozmów (`talkGate`) tak, jak widzi go
+  dyrektor sportowy gracza (`directorTalkView`, `DIR_VIEW`): błąd N(0; 0,15 + 0,55 (1 - q)), q ze Znajomości rynku (RYN),
+  stały dla zawodnika w danym oknie [SZAC]. Słowa: chętny, otwarty, do przekonania, niechętny, odmówi rozmów. Własny zawodnik:
+  dawny wskaźnik `playerWillingness`. Dobry dyrektor rzadko się myli, słaby czasem pokaże „chętny” przy odmowie rozmów.

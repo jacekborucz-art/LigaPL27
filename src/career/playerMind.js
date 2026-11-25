@@ -22,6 +22,7 @@ import { inAcclim, settleFactor, nextWindowOpen, windowAt, addMonths } from './w
 import { homeRegionOf, abroadWish } from './offerFactors.js';
 import { playerWillingness } from './transfers.js';
 import { slotOf, monthsLeftOf } from './clubOffers.js';
+import { directorAttr } from './director.js'; // ocena nastawienia przez dyrektora sportowego (Znajomość rynku)
 
 export const PM = {
   noise: 0.35, hard: -3, // twarda odmowa z willingnessToJoin (klub dużo poniżej poziomu zawodnika)
@@ -44,6 +45,21 @@ export const PM = {
 };
 
 export const VERDICT_LABELS = { keen: 'chętny', open: 'otwarty', convince: 'do przekonania', reluctant: 'niechętny', refuse: 'odmawia rozmów' };
+
+/**
+ * Nastawienie widziane przez dyrektora sportowego gracza (kafelek „Nastawienie” i kolumny list w Transferach, Nov 25, 2026):
+ * wynik bramki rozmów (talkGate) z błędem dyrektora: sd = 0,15 + 0,55 (1 - q), q z Znajomości rynku (RYN 1-20).
+ * Błąd stały dla zawodnika w danym oknie, więc ocena się nie zmienia przy każdym otwarciu karty. [SZAC]
+ */
+export const DIR_VIEW = { sd0: 0.15, sd1: 0.55 };
+export const DIR_VIEW_LABELS = { keen: 'chętny', open: 'otwarty', convince: 'do przekonania', reluctant: 'niechętny', refuse: 'odmówi rozmów' };
+export function directorTalkView(game, p, date = game.date) {
+  const g = talkGate(game, p, game.clubId, { date });
+  const q = (clamp(directorAttr(game, game.clubId, 'RYN'), 1, 20) - 1) / 19;
+  const e = new Rng(`mind-dyrektor:${game.seed}:${p.id}:${game.clubId}:${periodKey(date)}`).gauss(0, DIR_VIEW.sd0 + DIR_VIEW.sd1 * (1 - q));
+  const verdict = g.S <= PM.hard ? 'refuse' : verdictOf(g.S + e);
+  return { verdict, label: DIR_VIEW_LABELS[verdict] };
+}
 
 /** Werdykt z wyniku S. */
 export function verdictOf(S) {
