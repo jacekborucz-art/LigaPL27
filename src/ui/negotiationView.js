@@ -21,6 +21,9 @@ import { contractIssues, recordVeto, appealStatus, appealVeto, boardCaps } from 
 import { esc, fmtDate } from './dom.js';
 import { scoutHidden } from '../career/scoutOps.js'; // kandydat skauta: bez OVR (ocenę zna skaut)
 import { directorWageHint } from '../career/director.js'; // widełki dyrektora sportowego (docs/dyrektor-sportowy.md)
+import { lockWords } from '../career/negotiation.js';
+import { noteLock } from '../career/playerMind.js'; // decyzja zawodnika: blokada po fiasku i uraza (docs/negocjacje.md, Nov 25, 2026)
+import { WHEN_LABELS } from '../career/clubOffers.js';
 
 export const isNegotiationAction = (act) => typeof act === 'string' && act.startsWith('ng-');
 
@@ -48,7 +51,7 @@ const BREAK_REASONS = {
 };
 const DEMAND_LABELS = {
   role: 'rola w zespole', years: 'długość kontraktu', clause: 'klauzula odstępnego',
-  agentFee: 'prowizja agenta', relegationCut: 'obniżka po spadku', signOn: 'premia za podpis',
+  agentFee: 'prowizja agenta', relegationCut: 'obniżka po spadku', signOn: 'premia za podpis', bonus: 'premia za występ',
 };
 
 // ------------------------------------------------------------ Kontekst z gry
@@ -190,12 +193,13 @@ export function offerSummary(o) {
  * Otwiera rozmowy z danych gry.
  * opts: { kind: 'sign'|'renew', playerId, fromClub = null (id albo obiekt klubu; null = wolny zawodnik),
  *         limits = { maxWage, maxSignOn }, fee = 0 (kwota transferu, tylko do wyświetlenia),
- *         rival = null ({ club, wage }, prawdziwa oferta konkurencji), relegationRisk }
+ *         rival = null ({ club, wage }, prawdziwa oferta konkurencji), relegationRisk,
+ *         mind = null (bramka playerMind.js: { verdict, timing, words }), when = null (termin przejścia: { mode, regDate }) }
  * Zwraca { ok: true, ng } albo { ok: false, reason, text, speaker?, until?, save }.
  * save: true, gdy odmowa zmieniła zawodnika (odmowa przedłużenia zapisuje renewRefused).
  */
 export function startNegotiation(game, opts = {}) {
-  const { kind = 'sign', playerId, limits = {}, fee = 0, rival = null, relegationRisk, pre = false, stayBonus = 0, lastRound = null } = opts;
+  const { kind = 'sign', playerId, limits = {}, fee = 0, rival = null, relegationRisk, pre = false, stayBonus = 0, lastRound = null, mind = null, when = null } = opts;
   const player = game.world?.players?.[playerId];
   if (!player) return { ok: false, reason: 'noPlayer', text: 'Nie ma takiego zawodnika.', save: false };
   const club = resolveClub(game.clubId);
@@ -209,6 +213,7 @@ export function startNegotiation(game, opts = {}) {
   const ctx = negotiationContext(game, { kind, player, club, fromClub, rival, relegationRisk });
   if (stayBonus) { ctx.stayBonus = stayBonus; ctx.forceRenew = true; } // podwyżka przy prośbie o transfer (career/moveWish.js)
   if (kind === 'sign' && !pre && !lastRound) ctx.proposal = true; // kwestie agenta: propozycja, nie podpis
+  if (kind === 'sign' && mind && !lastRound) ctx.mind = { verdict: mind.verdict, timing: mind.timing ?? 0 }; // werdykt bramki i termin
   const rng = new Rng(`${game.seed}:ng:${playerId}:${game.date}`);
   const r = openNegotiation({ kind, player, club, fromClub, date: game.date, rng, mode: 'player', ctx });
   if (!r.ok) {
@@ -228,6 +233,7 @@ export function startNegotiation(game, opts = {}) {
     log: [],
     counter: null, counterType: null, demand: null,
     error: null, notice: null, done: null, veto: null, lastRound: lastRound?.propId ?? null, lastUntil: lastRound?.until ?? null,
+    when: kind === 'sign' && !pre ? when : null, mindWords: mind?.words ?? null,
     // Widełki dyrektora sportowego (Znajomość rynku): z minimum zawodnika bez cudzych ofert, tylko informacja
     dirHint: directorWageHint(game, { playerId, min: s.d.hidden.minOwn ?? s.d.hidden.min }),
   };
@@ -243,6 +249,7 @@ export function startNegotiation(game, opts = {}) {
     pushLine(ng, { speaker: r.opening?.speaker ?? player.name, text: `Jesteśmy blisko, ale ${player.name.split(' ')[0]} chce lepszych warunków: ${offerSummary(want)}. To nasza ostatnia rozmowa.` });
     return { ok: true, ng };
   }
+  if (mind?.words) pushLine(ng, { speaker: hasAgent ? s.view().agent : player.name, text: mind.words }); // odpowiedź na zaproszenie (słowa)
   pushLine(ng, r.opening);
   return { ok: true, ng };
 }
@@ -360,6 +367,7 @@ function finish(game, ng) {
   const proposal = ng.kind === 'sign' && !ng.pre && !ng.lastRound && outcome?.accepted;
   const hadWish = !!player?.moveWish;
   if (outcome && player) applyOutcome(player, proposal ? { ...outcome, moraleDelta: 0 } : outcome, { seed: game.seed });
+  if (outcome?.lock?.mind && player) noteLock(game, player, game.clubId, game.date); // rozmowy o transferze: uraza i warunki otwarcia
   // Podwyżka przy prośbie o transfer: uspokaja tylko z pewną szansą (src/career/wishMemory.js)
   ng.wishAfter = hadWish && outcome?.accepted && ng.kind === 'renew' ? (player.moveWish ? 'stays' : 'calmed') : null;
   ng.counter = null;
@@ -368,6 +376,7 @@ function finish(game, ng) {
   ng.done = {
     accepted: !!outcome?.accepted, outcome, contract: outcome?.contract ?? null,
     kind: ng.kind, playerId: ng.playerId, fromClub: ng.fromClub, fee: ng.fee, pre: !!ng.pre, lastRound: ng.lastRound,
+    mind: s.d.mind ? { r: s.d.mind.r, mood: s.d.st.mood } : null, // do kontrpropozycji zawodnika po namyśle (proposals.js)
   };
   return { ng, done: ng.done, save: true };
 }
@@ -418,6 +427,12 @@ function fact(label, value, tone = '') {
   return `<div class="ng-fact"><dt>${esc(label)}</dt><dd${tone ? ` data-tone="${tone}"` : ''}>${esc(value)}</dd></div>`;
 }
 
+/** Termin przejścia z porozumienia klubów (teraz, najbliższe okno, następny sezon). */
+function whenText(w) {
+  const label = WHEN_LABELS[w.mode] ?? WHEN_LABELS.now;
+  return w.regDate ? `${label}, od ${fmtDate(w.regDate)}` : `${label}, od razu po zgodzie zawodnika`;
+}
+
 function header(game, ng, player, view) {
   const pos = POS_NAMES[player.pos] ?? player.pos ?? '';
   const curClub = player.clubId ? anyClub(player.clubId)?.name : null;
@@ -436,6 +451,7 @@ function header(game, ng, player, view) {
       <p class="muted">${esc(`${ageLabel(player.age)}, ${pos}, ${scoutHidden(game, player) ? 'ocenę zna skaut' : `OVR ${Math.round(player.ovr ?? 0)}`}, ${where}`)}</p>
       <p class="ng-contract">${esc(contractLine)}</p>
       ${ng.kind === 'sign' && ng.fee > 0 ? `<p class="ng-contract">Kwota transferu: <b>${esc(formatZl(ng.fee))}</b></p>` : ''}
+      ${ng.when ? `<p class="ng-contract">Termin przejścia: <b>${esc(whenText(ng.when))}</b></p>` : ''}
     </div>
     <dl class="ng-facts">
       ${fact(ng.hasAgent ? 'Agent' : 'Rozmowa', view.agent)}
@@ -574,7 +590,7 @@ function outcomePanel(ng) {
       ? `Nowy kontrakt obowiązuje od dziś. Zawodnik pamięta obietnicę roli.${wish}`
       : ng.pre ? 'Zawodnik zgodził się na warunki. Umowa zacznie obowiązywać 1 lipca, do tego czasu gra w swoim klubie.'
         : ng.lastRound ? 'Zawodnik przyjął warunki i podpisał kontrakt. Teraz testy medyczne i zgłoszenie (Transfery, W toku).'
-          : pr?.decide > ng.date ? `Propozycja złożona, zawodnik odpowie ok. ${fmtDate(pr.decide)}. Do tego czasu może rozważać oferty innych klubów. Odpowiedź przyjdzie w poczcie.`
+          : pr?.decide > ng.date ? 'Propozycja złożona. Zawodnik się zastanawia i może rozważać oferty innych klubów. Odpowiedź przyjdzie w poczcie.'
             : pr ? 'Propozycja złożona. To ostatni dzień okna, więc zawodnik odpowiedział od razu: sprawdź pocztę.'
               : 'Propozycja złożona. Zawodnik namyśli się kilka dni, odpowiedź przyjdzie w poczcie.';
     return `<section class="panel ng-result" data-result="ok" aria-label="Wynik rozmów">
@@ -588,7 +604,7 @@ function outcomePanel(ng) {
   if (!outcome) lines.push(ng.lastRound ? 'Ostatnia runda zakończona bez oferty. Propozycja przepadła.' : 'Rozmowy zakończone przed złożeniem oferty. Zawodnik nie ma pretensji.');
   else {
     lines.push(`${BREAK_REASONS[outcome.reason] ?? 'Brak porozumienia'}.`);
-    if (outcome.lock) lines.push(`Zawodnik nie chce rozmawiać z klubem do ${fmtDate(outcome.lock.until)}.`);
+    if (outcome.lock) lines.push(outcome.lock.mind ? `Zawodnik nie chce teraz rozmawiać, wróć za ${lockWords(ng.date, outcome.lock.until)}.` : `Zawodnik nie chce rozmawiać z klubem do ${fmtDate(outcome.lock.until)}.`);
     if (outcome.moraleDelta < 0) lines.push(`Morale zawodnika spadło (${outcome.moraleDelta}).`);
     if (outcome.transferRequest) lines.push('Zawodnik poprosił o wystawienie na listę transferową.');
     else if (outcome.renewRefused) lines.push('Zawodnik nie przedłuży kontraktu.');

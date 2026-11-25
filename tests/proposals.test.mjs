@@ -1,5 +1,5 @@
 // Namysł zawodnika przed podpisem (docs/transfery.md, rozdz. 10; docs/negocjacje.md, rozdz. 14):
-// propozycje klubów, 2-5 dni namysłu, wybór najlepszej oferty, ostatnia runda gracza, koniec okna, stary zapis.
+// propozycje klubów, 3-5 dni namysłu (wolny 2-4), wybór najlepszej oferty, ostatnie szanse gracza, koniec okna, stary zapis.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateWorld, squadOf } from '../src/world/worldGen.js';
@@ -50,15 +50,17 @@ const YES = { pMin: 1, pMax: 1 };
 const CHANGES = { pMin: 0, pMax: 0, changes: 1 };
 const NO = { pMin: 0, pMax: 0, changes: 0 };
 
-test('Namysł trwa 2-5 dni (3 + RNG od -1 do +2), to samo ziarno daje ten sam wynik', () => {
+test('Namysł trwa 3-5 dni (wolny 2-4), to samo ziarno daje ten sam wynik', () => {
   const g = { seed: 7 };
-  const seen = new Set();
+  const seen = new Set(); const free = new Set();
   for (let i = 0; i < 300; i++) {
     const d = thinkDays(g, `p${i}`, 'lech', '2026-07-10');
-    assert.ok(d >= 2 && d <= 5, `namysł ${d}`);
+    assert.ok(d >= 3 && d <= 5, `namysł ${d}`);
     seen.add(d);
+    free.add(thinkDays(g, `p${i}`, 'lech', '2026-07-10', true));
   }
-  assert.deepEqual([...seen].sort(), [2, 3, 4, 5]);
+  assert.deepEqual([...seen].sort(), [3, 4, 5]);
+  assert.deepEqual([...free].sort(), [2, 3, 4]);
   assert.equal(thinkDays(g, 'p1', 'lech', '2026-07-10'), thinkDays(g, 'p1', 'lech', '2026-07-10'));
 });
 
@@ -105,11 +107,12 @@ test('Kontroferta gracza w trakcie namysłu po propozycji klubu AI: zawodnik por
   const r = submitUserProposal(g, { playerId: p.id, contract: contractFor(g, Math.round((p.askWage ?? 3000) * 1.8 / 100) * 100), fromClub: null });
   assert.ok(r.ok, r.text);
   assert.equal(r.prop.decide, ai.decide, 'propozycja gracza dołącza do namysłu');
-  assert.match(r.text, /odpowie ok\. \d{1,2} [a-zź]{3} \d{4}/);
+  assert.match(r.text, /się zastanawia/);
+  assert.doesNotMatch(r.text, /\d{4}/, 'bez daty decyzji');
   assert.ok(userProposal(g, p.id));
   // Karta zawodnika: twoja propozycja czeka (bez nowej oferty), status namysłu
   const html = renderTransfers(g, { tfTab: 'rynek', tfPlayer: p.id });
-  assert.ok(html.includes('Wycofaj propozycję') && /Rozważa oferty/.test(html));
+  assert.ok(html.includes('Wycofaj propozycję') && /się zastanawia/.test(html));
   assert.equal(handleTransferAction(g, 'tf-negotiate', { id: p.id }).negotiate, undefined, 'druga propozycja tego klubu zablokowana');
   withThink(YES, () => { while (g.date < ai.decide) step(g); });
   assert.equal(r.prop.status, 'accepted');
@@ -118,7 +121,7 @@ test('Kontroferta gracza w trakcie namysłu po propozycji klubu AI: zawodnik por
   assert.ok(mailLinks(g, g.inbox.find((m) => m.refs?.kind === 'proposal')).some((l) => /W toku|Propozycje/.test(l.label)));
 });
 
-test('Gracz przegrywa z lepszą ofertą klubu AI: list „wybrał X”, odmowa blokuje rozmowy na 2 tygodnie', () => {
+test('Gracz przegrywa z lepszą ofertą klubu AI: list „wybrał X”, odmowa po ostatniej szansie blokuje rozmowy na 14-60 dni', () => {
   const g = newGame('widzew', 65, '2026-07-10');
   const p = freeAgent(g, 2);
   const mine = makeProposal(g, { playerId: p.id, to: 'widzew', contract: contractFor(g, Math.round((p.askWage ?? 3000) * 0.8 / 100) * 100), kind: 'free' });
@@ -129,18 +132,23 @@ test('Gracz przegrywa z lepszą ofertą klubu AI: list „wybrał X”, odmowa b
   // Odmowa (osobny zawodnik)
   const q = freeAgent(g, 3);
   const x = makeProposal(g, { playerId: q.id, to: 'widzew', contract: contractFor(g, 3000), kind: 'free' });
-  withThink(NO, () => { while (g.date < x.decide) step(g); });
+  withThink(NO, () => { while (!x.final && x.status === 'open') step(g); });
+  assert.equal(x.status, 'open', 'najpierw ostatnia szansa: poprawka pensji');
+  assert.ok(x.final && g.inbox.some((m) => m.subject === `${q.name} ma wątpliwości`));
+  withThink(NO, () => { while (x.status === 'open') step(g); });
   assert.equal(x.status, 'rejected');
   assert.ok(g.inbox.some((m) => m.subject === `${q.name} odrzuca twoją propozycję`));
-  assert.equal(q.relations.widzew.lockUntil, addDays(x.decide, THINK.refuseLockDays));
+  const span = (Date.parse(q.relations.widzew.lockUntil) - Date.parse(x.end.date)) / 864e5;
+  assert.ok(span >= THINK.refuseLock[0] && span <= THINK.refuseLock[1], `blokada ${span} dni`);
   assert.equal(startNegotiation(g, { kind: 'sign', playerId: q.id }).reason, 'locked');
 });
 
 test('Chce zmian: ostatnia runda rozmów (ultimatum), porozumienie to podpis od razu', () => {
   const g = newGame('widzew', 66, '2026-07-10');
   const p = freeAgent(g, 4);
-  const x = makeProposal(g, { playerId: p.id, to: 'widzew', contract: contractFor(g, Math.round((p.askWage ?? 3000) / 100) * 100), kind: 'free' });
-  withThink(CHANGES, () => { while (g.date < x.decide) step(g); });
+  // r i nastrój z rozmów: blisko celu, dobry nastrój (kontrpropozycja zawodnika po ostatniej szansie gracza)
+  const x = makeProposal(g, { playerId: p.id, to: 'widzew', contract: contractFor(g, Math.round((p.askWage ?? 3000) / 100) * 100), kind: 'free', r: 0.99, mood: 55 });
+  withThink(CHANGES, () => { while (x.status === 'open') step(g); });
   assert.equal(x.status, 'changes');
   assert.equal(x.deadline, addDays(x.decide, THINK.lastRoundDays));
   assert.ok(x.want.wage > x.contract.wage, 'zawodnik chce wyższej pensji');
@@ -167,8 +175,8 @@ test('Chce zmian: ostatnia runda rozmów (ultimatum), porozumienie to podpis od 
 test('Chce zmian: słabsza oferta kończy rozmowy (fiasko), brak odpowiedzi do terminu: propozycja wygasa', () => {
   const g = newGame('widzew', 67, '2026-07-10');
   const p = freeAgent(g, 5);
-  const x = makeProposal(g, { playerId: p.id, to: 'widzew', contract: contractFor(g, Math.round((p.askWage ?? 3000) / 100) * 100), kind: 'free' });
-  withThink(CHANGES, () => { while (g.date < x.decide) step(g); });
+  const x = makeProposal(g, { playerId: p.id, to: 'widzew', contract: contractFor(g, Math.round((p.askWage ?? 3000) / 100) * 100), kind: 'free', r: 0.99, mood: 55 });
+  withThink(CHANGES, () => { while (x.status === 'open') step(g); });
   const r = handleTransferAction(g, 'tf-lastround', { id: p.id });
   const s = startNegotiation(g, { ...r.negotiate, limits: { maxWage: 1e7, maxSignOn: 1e8 } });
   const res = handleNegotiationAction(g, s.ng, 'ng-propose', {}, { wage: String(x.contract.wage) });
@@ -180,7 +188,7 @@ test('Chce zmian: słabsza oferta kończy rozmowy (fiasko), brak odpowiedzi do t
   assert.equal(dealOf(g, p.id), null);
   // Bez odpowiedzi do terminu
   const q = freeAgent(g, 6);
-  const y = makeProposal(g, { playerId: q.id, to: 'widzew', contract: contractFor(g, Math.round((q.askWage ?? 3000) / 100) * 100), kind: 'free' });
+  const y = makeProposal(g, { playerId: q.id, to: 'widzew', contract: contractFor(g, Math.round((q.askWage ?? 3000) / 100) * 100), kind: 'free', r: 0.99, mood: 55 });
   withThink(CHANGES, () => { while (g.date <= addDays(y.decide, THINK.lastRoundDays)) step(g); });
   assert.equal(y.status, 'expired');
   assert.ok(g.inbox.some((m) => m.subject === `Propozycja dla ${q.name} wygasła`));
@@ -222,7 +230,7 @@ test('Wycofanie propozycji gracza i znaczniki statusu (karta, kwadrat w Kadrze, 
   const p = freeAgent(g, 10);
   const x = makeProposal(g, { playerId: p.id, to: 'widzew', contract: contractFor(g, 3000), kind: 'free' });
   const tags = playerTagList(g, p, { own: false });
-  assert.ok(tags.some((t) => t.k === 'tr' && t.o && /Rozważa oferty/.test(t.title)));
+  assert.ok(tags.some((t) => t.k === 'tr' && t.o && /się zastanawia/.test(t.title) && !/\d{4}/.test(t.title)));
   const html = renderTransfers(g, { tfTab: 'wtoku' });
   assert.ok(html.includes('Propozycje czekają na odpowiedź') && html.includes(p.name));
   assert.ok(withdrawProposal(g, x.id).ok);

@@ -390,7 +390,7 @@
 .td-deal__who { display: flex; flex-direction: column; min-width: 0; }
 .td-deal__who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .td-deal__who em { font-style: normal; font-size: var(--step--1); color: var(--text-muted); overflow-wrap: anywhere; }
-.td-deal__fee { font: 700 var(--step-0)/1.1 var(--font-display); white-space: nowrap; color: color-mix(in srgb, var(--tf-good) 55%, var(--text)); }
+.td-deal__fee { font: 700 var(--step-0)/1.1 var(--font-display); color: color-mix(in srgb, var(--tf-good) 55%, var(--text)); max-width: 8.5em; text-align: right; } /* długie warunki (pensja i odstępne) zawijają się, nazwisko zostaje widoczne na telefonie */
 .td-deal__meta { margin: 0; font-size: var(--step--1); color: var(--text-muted); }
 .td-deal .btn { justify-self: start; }
 .td-bar { display: flex; gap: 3px; }

@@ -36,6 +36,7 @@ import { canApproach } from './preContracts.js';
 import { nextWindowOpen } from './wishMemory.js';
 import { isPoolContracted } from './foreignPool.js';
 import { fmtDate } from '../ui/dom.js';
+import { aiGate, noteSpurned } from './playerMind.js'; // decyzja zawodnika: czy chciał odejść (odrzucona uczciwa oferta)
 
 export const CO = {
   // Indeks istotności I: miejsce w kadrze wg OVR, minuty, wychowanek, świeżo kupiony, brak zastępcy, cel, okres, właściciel
@@ -242,6 +243,17 @@ export function importance(game, p, date = game.date) {
   return clubCtx(game, p.clubId, date).info.get(p.id)?.I ?? 0;
 }
 
+/**
+ * Miejsce zawodnika w kadrze klubu (z pamięci tygodnia): { r, share, starter, rotation, homegrown, fresh, I, fight, mid }
+ * albo null (bez klubu z kadrą). Bramka „czy chce rozmawiać” i termin przejścia (src/career/playerMind.js).
+ */
+export function slotOf(game, p, date = game.date) {
+  if (!p?.clubId || !game.world?.clubs?.[p.clubId]) return null;
+  const cx = clubCtx(game, p.clubId, date);
+  const inf = cx.info.get(p.id);
+  return inf ? { ...inf, fight: cx.tab.fight, mid: cx.tab.mid } : null;
+}
+
 /** Nie na sprzedaż: indeks istotności I >= 60 (bez listy transferowej). Klauzulę sprawdza wywołujący. */
 export function notForSaleI(game, p, date = game.date) {
   if (!p || !isAiClub(game, p.clubId) || game.market?.listed?.[p.id]) return false;
@@ -269,9 +281,10 @@ function buyerK(game, sellerId, buyerId, tab) {
 
 /**
  * Cena minimalna klubu sprzedającego (bez szumu) i cena wywoławcza. Zwraca { res, A0, V, I, N, listed }.
- * buyerId: klub kupujący (null: zagranica).
+ * buyerId: klub kupujący (null: zagranica). opts.ryn = false: bez błędu wyceny dyrektora sprzedającego (wycena
+ * dyrektora kupującego i progi zarządu, director.js, boardRequests.js).
  */
-export function reservePrice(game, p, buyerId = game.clubId, date = game.date) {
+export function reservePrice(game, p, buyerId = game.clubId, date = game.date, { ryn = true } = {}) {
   const seller = p.clubId;
   const cx = clubCtx(game, seller, date);
   const inf = cx.info.get(p.id) ?? { r: 99, starter: false, rotation: false, noRepl: false, hasRepl: false, homegrown: false, I: 0 };
@@ -286,7 +299,7 @@ export function reservePrice(game, p, buyerId = game.clubId, date = game.date) {
   const w = windowOn(date);
   const late = w && daysBetween(date, w.to) < CO.period.lastDays;
   const period = late ? (inf.noRepl ? CO.period.late : cx.size > 26 ? CO.period.surplus : 1) : 1;
-  let res = V * role * goal * repl * finK(game, seller) * buyerK(game, seller, buyerId, cx.tab) * period * askingPriceMultiplier(p.rep ?? 30) * rynMul(game, seller, p.id, 'cena');
+  let res = V * role * goal * repl * finK(game, seller) * buyerK(game, seller, buyerId, cx.tab) * period * askingPriceMultiplier(p.rep ?? 30) * (ryn ? rynMul(game, seller, p.id, 'cena') : 1);
   const short = monthsLeftOf(p, date) < CO.shortMonths;
   if (short) res = Math.min(res, CO.shortCap * V);
   res = Math.max(res, (short ? CO.floorShort : CO.floor) * V);
@@ -615,6 +628,8 @@ export function breakTalks(game, pid, days, date = game.date) {
 /** Prośba o odejście po odrzuconej albo zawyżonej uczciwej ofercie (raz na 60 dni, 0,25 x ambicja). */
 function maybeUpset(game, p, buyerId, v, date) {
   if (!p?.clubId || v.E < CO.wish.fairV * v.V) return;
+  // Zawodnik chciał odejść (prośba, niezadowolenie albo chętny i otwarty na ten klub): S +0,5 i ryzyko prośby x1,5 przez 3 mies.
+  if (p.moveWish || p.unhappy || p.transferRequest || ['keen', 'open'].includes(aiGate(game, p, buyerId, date).verdict)) { noteSpurned(p, date); stat(game, 'mindSpurned'); }
   if (p.coUpset && daysBetween(p.coUpset, date) < CO.wish.days) return;
   const amb = personalityOf(p).traits.ambition ?? 10;
   const chance = CO.wish.p * (0.5 + amb / 20) * (monthsLeftOf(p, date) <= CO.wish.shortMonths ? CO.wish.shortMul : 1);
@@ -701,6 +716,12 @@ export function withdrawClubOffer(game, pid, date = game.date) {
   if (!rec || !['thinking', 'counter'].includes(rec.status)) return { ok: false, text: 'Oferta jest już nieaktualna.' };
   Object.assign(rec, { status: 'withdrawn', date }); syncTalk(game, rec);
   return { ok: true, text: `Wycofano ofertę za ${rec.name}.` };
+}
+
+/** Zawodnik odmówił rozmów po porozumieniu klubów (bramka, playerMind.js): porozumienie przepada. */
+export function markPlayerRefused(game, pid, date = game.date) {
+  const rec = userOffer(game, pid);
+  if (rec && rec.status === 'agreed') { Object.assign(rec, { status: 'refused', date }); syncTalk(game, rec); stat(game, 'coUserPlayerNo'); }
 }
 
 /** Porozumienie zamienione w propozycję i transakcję: koniec rozmów z klubem. */
@@ -878,6 +899,7 @@ export function offerStatus(game, rec, date = game.date) {
     case 'broken': return rec.until > date ? { k: 'broken', text: `Rozmowy wstrzymane na ${breakWords(daysBetween(date, rec.until))}`, tone: 'bad' } : null;
     case 'rejected': return { k: 'rejected', text: rec.reason === 'nfs' ? 'Klub odrzucił ofertę: nie na sprzedaż' : 'Klub odrzucił ofertę', tone: 'bad' };
     case 'lapsed': return { k: 'lapsed', text: 'Porozumienie wygasło', tone: 'bad' };
+    case 'refused': return { k: 'refused', text: 'Zawodnik nie chce rozmawiać, porozumienie przepadło', tone: 'bad' };
     case 'expired': return { k: 'expired', text: 'Oferta nieaktualna', tone: 'bad' };
     case 'withdrawn': return { k: 'withdrawn', text: 'Oferta wycofana', tone: 'info' };
     default: return null;

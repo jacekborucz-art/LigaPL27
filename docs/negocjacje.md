@@ -565,3 +565,155 @@ Te same czynniki działają dla gracza i klubów AI.
 Jak dodać klocek: obiekt na końcu `OFFER_FACTORS` (`id`, `label`, `cap: 0.3`, `weight`, `value`, opcjonalnie `why`),
 `value` zwraca 0 przy braku danych, dane klubu dopisuje widok oferty u wywołującego (`offerView` w `preContracts.js`
 i `proposals.js`, `referenceUtility`), potem przekalibrować `THINK.accept` i dopisać test w `tests/offerFactors.test.mjs`.
+
+## Decyzja zawodnika przy transferze (Nov 25, 2026)
+
+Część 2 ofert klub-klub (docs/transfery.md, „Oferty klub-klub”), projekt: psycholog sportu i agent piłkarski
+(scratchpad `oferty/ekspert-zawodnik.md`), zatwierdzony przez właściciela. Kod: `src/career/playerMind.js` (`PM`,
+`talkGate`, `aiGate`, `userGate`, `timingValue`, `setLock`, `lockState`, `noteSpurned`), `negotiation.js` (`MIND`,
+`mindRounds`, `mindLockSpan`, `lockWords`, sesja z `ctx.mind`), `proposals.js` (namysł, `mindAccept`, ostatnie
+szanse, kontrakcja klubu), `offerFactors.js` (czynnik `timing`), `transfers.js` (`aiBuy`, `answerIncoming`),
+`clubOffers.js` (`slotOf`, `markPlayerRefused`, `maybeUpset`), `ui/transfersView.js` (`tf-negotiate`, `tf-pre`),
+`ui/negotiationView.js`, `ui/transferDealsView.js`. Test: `tests/playerMind.test.mjs`. Te same zasady dla gracza
+i klubów AI (kluby AI w wersji uproszczonej). Gracz widzi tylko słowa, nigdy liczb oczekiwań. Wszystkie liczby [SZAC].
+
+### Bramka „czy chce rozmawiać”
+
+Po porozumieniu klubów (przycisk „Rozmawiaj z zawodnikiem”), przy wolnym zawodniku, zawodniku z zagranicy i umowie
+od 1 lipca. S = s z `willingnessToJoin` (wynik przed sigmoidą, pole `s`, bez dublowania reputacji, ligi i Europy)
++ korekty + N(0; 0,35). Szum losowany raz na parę zawodnik-klub w oknie (ziarno: gra, zawodnik, klub, okno), więc
+ponowne pytanie daje tę samą odpowiedź, dopóki nie zmieni się sytuacja.
+
+| Korekta | Wartość |
+|---|---|
+| Rola i minuty | 1,2 x (udział minut w roli u nas - obecny udział), -0,6..+0,8 |
+| Rozwój (do 23 lat, POT - OVR >= 3) | +0,35 miejsce w składzie, -0,3 ławka |
+| Morale | do 8: +0,4; od 16: -0,3 |
+| Prośba o transfer | +0,7 |
+| Lojalność | -0,06 x (lojalność - 10) |
+| Wychowanek (do 23 lat, bez zmiany klubu) | -0,25 |
+| Kapitan klubu gracza | -0,2 |
+| Wiek | od 32 lat +0,2; do 20 lat i mało gra +0,2 |
+| Dom | powrót do regionu +0,1; wyjazd z domu -0,05 x (przywiązanie - 10) |
+| Zagranica | +0,25 x chęć wyjazdu, przy przywiązaniu od 15: -0,2 |
+| Aklimatyzacja (bez niezadowolenia) | -0,5, świeży kontrakt -0,8 |
+| Kontrakt 7-12 mies. | +0,1 (do 6 mies. już w bazie +0,25) |
+| Zadowolony z długiego kontraktu | -1,8 x (kontrakt 12 -> 36 mies.) - 0,4 x (minuty 30 -> 80 %), bez niezadowolenia, prośby i przy morale od 9 |
+| Uraza | -0,03 x uraza; po fiasku z naszym klubem -0,3 na czas blokady (także po wcześniejszym otwarciu) |
+| Agent | rekin +0,15, z rodziny -0,1 |
+| Klub odrzucił uczciwą ofertę, a chciał odejść | +0,5 przez 3 miesiące |
+| Termin przejścia | `timingValue`, -0,3..+0,4 (niżej) |
+
+Progi: od 0,6 chętny, 0-0,6 otwarty, -0,7..0 do przekonania (rozmawia, ale wyższe żądania), -1,4..-0,7 niechętny
+(jedna rozmowa), poniżej -1,4 odmawia rozmów. Twarda odmowa z `willingnessToJoin` (klub dużo poniżej poziomu
+zawodnika) zostaje. Kalibracja: zawodnik zadowolony (podstawowy, kontrakt na 3+ lata, bez niezadowolenia) przy klubie
+o podobnej reputacji odmawia rozmów w 56 % na starcie sezonu i w 72 % w październiku (3 ziarna, Ekstraklasa;
+średnio ok. 62 %). Wszystkie pary w Ekstraklasie o podobnej reputacji: ok. 13 % odmów, 30 % do przekonania albo
+niechętny.
+
+Słowa (Poczta, ekran rozmów): chętny „Zawodnik jest zainteresowany i gotów usiąść do rozmów.”, otwarty „Zawodnik
+wysłucha propozycji, nic nie obiecuje.”, do przekonania „Agent zastrzega: zawodnik ma wątpliwości, oferta musi być
+naprawdę dobra.”, niechętny „Zawodnik jest zadowolony tam, gdzie jest. Zgodzi się na jedną rozmowę.”, odmowa
+„Zawodnik nie widzi sensu rozmów z waszym klubem. <powód> Wróćcie do tematu za kilka miesięcy.” (powód z
+najmocniejszej korekty ujemnej: zadowolony w klubie, związany z klubem, rodzina, dopiero się zadomowił, nie ten
+kierunek, pamięta ostatnie rozmowy). Odmowa po porozumieniu klubów zamyka porozumienie (status „Zawodnik nie chce
+rozmawiać, porozumienie przepadło”).
+
+### Termin przejścia
+
+Termin z porozumienia klubów (teraz, najbliższe okno, następny sezon) widać w nagłówku rozmów („Termin przejścia”).
+„Szybko” to teraz albo najbliższe okno przy zamkniętym oknie. `timingValue`: prosi o transfer szybko +0,4, mało gra
+(poniżej 35 % minut) albo niezadowolony szybko +0,25, później -0,3; kontrakt do 6 mies.: później +0,3; podstawowy
+z kontraktem od 24 mies. albo w walce o cel: szybko -0,2 (w trakcie sezonu w walce o cel -0,3), później +0,1.
+Działa w bramce, w oczekiwaniach rozmów (cel x (1 - 0,1 x timing)) i jako czynnik `timing` w `OFFER_FACTORS`
+(waga 1, cap 0,3) przy namyśle.
+
+### Rundy i reakcje
+
+Rozmowy o podpisie z werdyktem bramki (`ctx.mind`) korzystają z tej samej `NegotiationSession` (nastrój, cel,
+minimum, blef, ultimatum, agent), zmienia się adapter:
+
+- Werdykt: chętny cel x1, nastrój +5, rundy 4-5; otwarty bez zmian; do przekonania cel x1,08, nastrój -8, rundy 2-3;
+  niechętny cel x1,15, nastrój -12, 2 rundy, „wow” 1,30.
+- Rundy: round((3,5 + 0,12 (cierpliwość - 10) - 0,08 (temperament - 10) + 0,1 (profesjonalizm - 10) + U(-0,6; 0,6))
+  x cierpliwość agenta), 2-5 (typowo 3-4: 75 % w teście na 3000 losowaniach), klub AI najwyżej 4.
+- Cel rundy mięknie z rundami: cel - 0,9 x (cel - minimum) x ustępliwość agenta x (runda - 1) / (rundy - 1)
+  (zastępuje dawne ustępstwa żądania; zdemaskowany blef: cel -3 %).
+- r = wartość oferty / cel rundy: od 1,20 (niechętny 1,30) zgoda od razu; 1,00-1,20 zgoda, w 30 % raz prośba
+  o drobny dodatek (5 % celu); 0,92-1,00 kontroferta podbija o (1 - r) x cel x U(0,5; 1) na ulubionym elemencie
+  (pensja, premia za podpis, rola, długość, klauzula, premia za występ; z preferencji i cech, szum 30 %; poprawka warta
+  więcej niż różnica: pensja); 0,85-0,92 twardo (szansa 0,35 + 0,02 (ego - 10) - 0,02 (cierpliwość - 10)) albo mała
+  kontroferta; poniżej 0,85 odmowa tej oferty bez kontroferty (nastrój -4); obraza jak dotąd (linia 0,74 + ...).
+  Ostatnia runda: ultimatum na poziomie celu rundy (od r 0,85) albo zerwanie.
+- Kwestie bez liczb oczekiwań: „Pensja powinna lepiej oddawać pozycję...”, „prosi o większą gwarancję na start”,
+  „chce usłyszeć, że będzie ważnym ogniwem”, „Nie ruszymy się ani o krok”, „To dla nas zbyt mało” (`negotiationLines.js`,
+  klucze `mind_*`). Kontroferta pokazuje warunki zawodnika jak dotąd.
+
+### Namysł
+
+- Zawodnik z klubem 3-5 dni, wolny 2-4. Data decyzji ukryta: UI i listy mówią „Zawodnik się zastanawia”, odpowiedź
+  w Poczcie.
+- Szansa zgody: clamp(1 - zmiana zdania + 0,4 x (U - U_odniesienia), 0,5; 0,95); zmiana zdania z werdyktu (chętny 8 %,
+  otwarty 15 %, do przekonania 25 %, niechętny 30 %), +10 pp po zignorowanej kontrakcji klubu, -5 pp przy zaufaniu do
+  klubu od 70, -0,2 x przesunięcie S ze zdarzeń.
+- Zdarzenia dnia (propozycje gracza): rozmowa z rodziną 20 %/dzień x (1 + 0,04 (przywiązanie - 10)), S +0,3 przy klubie
+  z regionu domu, -0,3 przy przywiązaniu od 13, inaczej +-0,15; morale zmienione o 2 od złożenia: +-0,15. Wszystkie
+  propozycje: inna oferta 6 %/dzień x reputacja / 50 (raz, bez prawdziwej konkurencji), S -0,2. Sygnał słowny w W toku.
+- Kontrakcja obecnego klubu AI (raz na namysł): p = clamp(0,15 + 0,35 podstawowy + 0,1 (reputacja zawodnika >= 55)
+  + 0,15 (kontrakt do 12 mies.), 0, 0,7), dzień w trakcie namysłu, podwyżka 10-25 % przez przedłużenie kontraktu
+  (`aiNegotiate` w trybie AI, progi zarządu). Zawodnik zostaje z szansą 1 / (1 + exp(-(U_obecny - U_nowy) / 0,15))
+  (`scoreOffer`): nowy kontrakt, wszystkie propozycje odrzucone, rozmowy z nim dopiero od następnego okna (bez urazy),
+  list „Zawodnik zostaje, doceniając gest klubu”; inaczej myśli dalej (+10 pp zmiany zdania, list informacyjny).
+  Zawodnik gracza: kontrakcja to decyzja gracza (przedłużenie), bez automatu.
+- Dwie ostatnie szanse gracza po odmowie: (1) poprawka pensji +4/8/12 % w 2 dni (W toku, list „ma wątpliwości”),
+  zgoda 15 % + 5 pp za punkt procentowy (do 85 %), bez poprawki odmowa; (2) gdy rozmowy skończyły się przy r >= 0,97
+  i nastroju >= 40: kontrpropozycja zawodnika (dawne „chce zmian”, ostatnia runda z ultimatum). Kluby AI: jak dotąd
+  (podwyżka w budżecie albo rezygnacja).
+- Odmowa po namyśle: spór o pieniądze, 14-60 dni bez rozmów (słownie „kilka tygodni”), uraza na ten czas.
+
+### Zamknięcie rozmów i wcześniejsze otwarcie
+
+- Odmowa w bramce: 3 miesiące (6 przy lojalności od 15 i walce obecnego klubu o cel). Nieudane rozmowy: wyczerpane
+  rundy 3-6 mies., bliska odmowa (r 0,90-0,97) 4, zerwanie z nastroju i odrzucone ultimatum 6, obraza 8 + 0,4 (ego - 10)
+  + 0,3 (temperament - 10); agent rekin x1,2, bez agenta x0,7; RNG +-1 mies.; 3-12 mies.; koniec poza oknem przesunięty
+  do otwarcia najbliższego okna. Spór o pieniądze (r >= 0,97): 14-60 dni bez zaokrąglenia.
+- Zapis: `rel.lockUntil`, `rel.lockReason`, `rel.lockCtx` (data, klub, liga, reputacja naszego klubu, minuty),
+  `rel.sour` (uraza -0,3 do końca pierwotnej blokady); `canNegotiate` bez zmian.
+- Wcześniejsze otwarcie (sprawdzane przy próbie rozmów, `lockState`): zmiana klubu, kontrakt do 6 mies., spadek jego
+  klubu, nasz klub +20 reputacji, nowy trener w jego klubie, prośba o transfer (po obrazie połowa blokady), przestał
+  grać (grał od 50 % minut, teraz poniżej 35 %, potrzeba gry od 12): połowa blokady. Słowa: „Sytuacja zawodnika
+  zmieniła się. Jest gotów porozmawiać ponownie.”
+- UI tylko słowami: „Zawodnik nie chce teraz rozmawiać, wróć za kilka miesięcy.” (kilka dni / tygodni / miesięcy).
+
+### Skutki
+
+- Klub odrzucił uczciwą ofertę (E >= V), a zawodnik chciał odejść (prośba, niezadowolenie albo chętny/otwarty na tego
+  kupca): dotychczasowa reakcja (`onOfferRejected`, morale -3 przy odmowie prośby), do tego S +0,5 i ryzyko prośby
+  o transfer x1,5 przez 3 miesiące (`p.coSpurned`, `monthlyHazard`).
+- Nieudane rozmowy z naszym klubem: uraza -0,3 w bramce wobec nas na czas blokady, uraza z rozmów (`grudge`) jak dotąd.
+- Szatnia: bez nowego systemu (kapitan tylko jako korekta bramki).
+
+### Kluby AI
+
+- `aiBuy`: ta sama bramka (`aiGate`, pamięć na parę i okno), odmowa: następny kandydat. Rozmowy `aiNegotiate` z
+  werdyktem: prosta pętla do 4 rund (kontroferta w budżecie, przy kontrofercie ponad budżet granica budżetu, bez
+  kontroferty podwyżka z atrybutu Negocjacje, na granicy budżetu ta sama oferta). Namysł bez zdarzeń rodzinnych,
+  z kontrakcją obecnego klubu i konkurencją.
+- Klub AI chce zawodnika gracza: po przyjęciu oferty zawodnik decyduje tą samą bramką; odmowa rozmów: oferta przepada,
+  list „<zawodnik> nie chce rozmawiać z <klub>”.
+
+### Symulacja (sezon 2026/27, Widzew, ziarna 5, 6, 7; przed / po)
+
+- Transfery AI-AI z odstępnym: 13 / 15, 14 / 15, 22 / 19 (Ekstraklasa 32 / 30, 1 Liga 14 / 17, 2 Liga 2 / 2).
+  Propozycje klubów AI 85 / 74, 97 / 84, 103 / 91; zgody 74 / 63, 74 / 65, 85 / 68; wolni zawodnicy 57 / 50, 58 / 57,
+  55 / 47 (ok. -10 %: wątpliwości zawodników, cel bliżej żądania). Ziarno 8: odstępne 20 / 18, propozycje 89 / 89.
+- Kwota do wartości (w dniu transferu, wartość w lidze sprzedającego) w ofertach klub-klub: Ekstraklasa 1,17-1,29 /
+  1,10-1,36, 1 Liga 0,83-1,02 / 0,85-1,35 (małe próbki 1-6). Spadek „1 Liga 0,63” z części 1 to głównie wcześniejszy
+  wykup zawodników z umową od 1 lipca (`earlyPrice`, 0,11-0,14 x wartość, 2-6 na sezon) liczony razem z ofertami;
+  bez nich 1 Liga jest w przedziale 0,85-1,0, więc wzory Res i `CO.ai.stretch` bez zmian.
+- Bramka klubów AI: 535-547 ocen na sezon, odmowy 1-4 (kluby AI kupują głównie w górę i wolnych). Rundy pętli AI
+  (liczba rund rozmowy): 1: 45 %, 2: 33 %, 3: 8 %, 4: 9 %. Kontrakcja obecnego klubu 3-8 na sezon (zostaje 0-3).
+  Gracz: rundy 2-5, 3-4 w 75 % (test).
+- Sprzeciw dyrektora i weto: docs/transfery.md, „Oferty klub-klub”, punkt „Sprzeciw dyrektora”.
+- `npm run perf` (ten sam komputer, przed / po): sezon 10,5-10,7 s / 10,3-10,5 s (szum), system transfers 700 / 750-770 ms
+  (+7-10 %).

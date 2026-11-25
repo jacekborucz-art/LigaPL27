@@ -1885,7 +1885,7 @@ async function dispatchAct(el, { root = app } = {}) {
       state.tfMsg = finishLastRound(state.game, d.lastRound, d.contract, !!d.accepted).text;
     } else if (d?.accepted && d.kind === 'sign') {
       // Po rozmowach: propozycja, zawodnik namyśla się 2-5 dni (zakładka Transfery, W toku; odpowiedź w poczcie)
-      const sub = submitUserProposal(state.game, { playerId: d.playerId, fee: d.fee ?? 0, contract: d.contract, fromClub: d.fromClub });
+      const sub = submitUserProposal(state.game, { playerId: d.playerId, fee: d.fee ?? 0, contract: d.contract, fromClub: d.fromClub, r: d.mind?.r ?? null, mood: d.mind?.mood ?? null });
       state.tfMsg = sub.text;
       if (sub.prop) d.proposal = { id: sub.prop.id, decide: sub.prop.decide };
     } else if (d?.accepted) state.tfMsg = 'Kontrakt przedłużony.';

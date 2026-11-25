@@ -76,7 +76,7 @@ export function clubOfferPanel(game, p, { objection = '' } = {}) {
       ${more ? `<p class="co-sub">Popraw ofertę</p>${offerForm(game, p, live, inquiryOf(game, p.id))}` : '<p class="hint">To była twoja ostatnia oferta w tych rozmowach.</p>'}`;
   }
   const inq = inquiryOf(game, p.id);
-  const last = live && ['rejected', 'expired', 'lapsed', 'withdrawn'].includes(live.status) ? `<p class="notice">${esc(`${offerStatus(game, live).text}.`)}</p>` : '';
+  const last = live && ['rejected', 'expired', 'lapsed', 'withdrawn', 'refused'].includes(live.status) ? `<p class="notice">${esc(`${offerStatus(game, live).text}.`)}</p>` : '';
   if (!inq) return `${last}<p class="tf-p__txt">Zapytaj klub o cenę: odpowie od razu, podając cenę wywoławczą i swoje warunki albo że zawodnik nie jest na sprzedaż. Ofertę złożysz w każdej chwili, także poza oknem (transfer w najbliższym oknie albo od następnego sezonu).</p><button class="btn btn--primary" data-act="tf-inquire" data-id="${esc(p.id)}">Zapytaj o cenę</button>`;
   return `${last}${inquiryBox(inq)}${offerForm(game, p, live, inq)}`;
 }

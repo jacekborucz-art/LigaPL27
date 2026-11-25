@@ -5,7 +5,7 @@
 // propozycja dla zawodnika, który namyśla się 2-5 dni (src/career/proposals.js), potem transakcja (transferDeals.js).
 
 import { Rng, clamp } from '../core/rng.js';
-import { addMessages } from '../core/inbox.js';
+import { addMessages, createMessage } from '../core/inbox.js';
 import { CLUBS_PL, clubById } from '../data/clubs_pl.js';
 import { l3GroupFor } from '../season/leagues.js';
 import { DOMESTIC, SEASON_END, SEASON_YEAR } from '../config/calendar2026.js';
@@ -31,6 +31,7 @@ import { rynMul, kadFeeMul, sieWeight, weightedOrder, directorObjection, objecti
 import { fmtDate } from '../ui/dom.js';
 import { aiSeenOvr } from './observerReport.js'; // kluby AI: OVR kandydata widziany przez sztab (docs/raport-obserwatora.md)
 import { CO, notForSaleI, clauseAmount, submitClubOffer, aiClubOffer, paySellOn, bookPackage, breakTalks } from './clubOffers.js'; // oferty klub-klub (docs/transfery.md, rozdz. „Oferty klub-klub”)
+import { aiGate, reasonWords } from './playerMind.js'; // decyzja zawodnika: czy chce rozmawiać (docs/negocjacje.md, Nov 25, 2026)
 
 export { SEASON_END };
 const round = (x, step = 5000) => Math.round(x / step) * step;
@@ -345,13 +346,22 @@ function aiBuy(game, club, date, rng, log) {
   const ordered = needs.length ? [...pool.filter(asks).sort(rank).slice(0, 8), ...pool.filter((x) => !asks(x)).sort(rank).slice(0, 3)]
     : pool.sort(rank).slice(0, 5);
   // Brak w kadrze: po nieudanych rozmowach z pierwszym kandydatem klub próbuje z kolejnymi (do trzech w tygodniu)
-  const willing = ordered.filter((x) => playerWillingness(game, x.p, club.id).verdict !== 'odmowa').slice(0, needs.length ? 3 : 1);
+  // Bramka „czy chce rozmawiać” (playerMind.js): ta sama co dla gracza, jedna ocena na parę zawodnik-klub w oknie
+  const willing = [];
+  for (const x of ordered) {
+    if (willing.length >= (needs.length ? 3 : 1) || playerWillingness(game, x.p, club.id).verdict === 'odmowa') continue;
+    x.gate = aiGate(game, x.p, club.id, date);
+    stat(game, 'mindAiGate');
+    if (x.gate.verdict === 'refuse') { stat(game, 'mindAiRefuse'); continue; }
+    willing.push(x);
+  }
   let pick = null; let neg = null; let caps = null;
   const nego = clubNegotiation(game, club.id);
   const feeMul = kadFeeMul(game, club.id); // premie za podpis i prowizje: Zarządzanie kadrą i płacami dyrektora
   for (const x of willing) {
     caps = boardCaps(game, club.id, x.p, 'sign', cb);
-    neg = aiNegotiate({ kind: 'sign', player: { ...x.p, contract: x.p.contract ?? { wage: effectiveAsk(x.p, club.tier, payLevel(club)), until: date } }, club: { ...club, name: club.name }, fromClub: x.p.clubId ? clubById(x.p.clubId) : isPoolContracted(x.p) ? poolSellerClub(x.p) : null, date, rng, budget: { wage: Math.min(Math.max(500, room), caps.wage), maxYears: caps.years, total: caps.total }, neg: nego, feeMul });
+    neg = aiNegotiate({ kind: 'sign', player: { ...x.p, contract: x.p.contract ?? { wage: effectiveAsk(x.p, club.tier, payLevel(club)), until: date } }, club: { ...club, name: club.name }, fromClub: x.p.clubId ? clubById(x.p.clubId) : isPoolContracted(x.p) ? poolSellerClub(x.p) : null, date, rng, budget: { wage: Math.min(Math.max(500, room), caps.wage), maxYears: caps.years, total: caps.total }, neg: nego, feeMul, mind: { verdict: x.gate.verdict, timing: x.gate.parts.timing ?? 0 } });
+    stat(game, `mindAiRounds${neg.rounds}`);
     if (neg.result === 'signed') { pick = x; break; }
   }
   if (!pick) return null;
@@ -549,9 +559,19 @@ export function answerIncoming(game, offerId, action) {
   if (o.foreign) return ok(startDeal(game, { playerId: p.id, to: null, fee: o.fee, kind: 'abroad', foreign: o.foreign, needsTerms: true }));
   if (squadCount(game, o.from).full) { o.status = 'withdrawn'; return { text: `${buyer.name} wycofuje ofertę: nie ma miejsca w kadrze (limit kadry).` }; }
   if (o.pre && p.preContract?.club === o.from) return ok(startDeal(game, { playerId: p.id, to: o.from, fee: o.fee, contract: { ...p.preContract.contract, signedOn: game.date }, kind: 'transfer', early: true }));
+  // Zawodnik gracza decyduje tą samą bramką: odmowa rozmów z kupcem, list do gracza (playerMind.js)
+  const gate = aiGate(game, p, o.from, game.date);
+  if (gate.verdict === 'refuse') {
+    o.status = 'failed';
+    stat(game, 'mindUserPlayerRefuse');
+    const txt = `${p.name} nie chce rozmawiać z ${buyer.name}. ${reasonWords(gate)}`.trim();
+    game.inbox = addMessages(game.inbox ?? [], [createMessage({ date: game.date, key: `bramka-sprzedaz:${o.id}`, category: 'transfers', from: `Agent zawodnika ${p.name}`, priority: 'important',
+      subject: `${p.name} nie chce rozmawiać z ${buyer.name}`, body: `${txt} Oferta ${buyer.name} przepada, zawodnik zostaje w klubie.`, refs: { pid: p.id } })]).inbox;
+    return { text: `${txt} Oferta przepada, zawodnik zostaje w klubie.` };
+  }
   const caps = boardCaps(game, o.from, p, 'sign');
   const maxWage = Math.min(caps.wage, Math.max(p.contract.wage * 1.6, wageRoom(game.finance, game.world, o.from) + p.contract.wage));
-  const neg = aiNegotiate({ kind: 'sign', player: p, club: buyer, fromClub: clubById(game.clubId), date: game.date, rng, budget: { wage: maxWage, maxYears: caps.years, total: caps.total }, neg: clubNegotiation(game, o.from), feeMul: kadFeeMul(game, o.from) });
+  const neg = aiNegotiate({ kind: 'sign', player: p, club: buyer, fromClub: clubById(game.clubId), date: game.date, rng, budget: { wage: maxWage, maxYears: caps.years, total: caps.total }, neg: clubNegotiation(game, o.from), feeMul: kadFeeMul(game, o.from), mind: { verdict: gate.verdict, timing: gate.parts.timing ?? 0 } });
   if (neg.result !== 'signed') { o.status = 'failed'; return { text: `${p.name} nie dogadał się z ${buyer.name}. Zostaje w klubie.` }; }
   const rofr = firstRefusal(game, p, o.from, o.fee, game.date, neg.contract); // prawo pierwokupu klubu, w którym był wypożyczony (loans.js)
   if (rofr.blocked) { o.status = 'accepted'; return { text: rofr.text ?? `${p.name}: transfer czeka na decyzję klubu z prawem pierwokupu.`, sold: !!rofr.matched }; }
@@ -560,7 +580,7 @@ export function answerIncoming(game, offerId, action) {
   if (!prop) { o.status = 'failed'; return { text: `${p.name} jest już w trakcie innej transakcji.` }; }
   o.status = 'accepted'; o.prop = prop.id;
   if (prop.decide <= game.date) { resolveNow(game, p.id); return { text: `Porozumienie z ${buyer.name} w sprawie ${p.name} (${fmtZl(o.fee)}). To ostatni dzień okna: zawodnik odpowiedział od razu, sprawdź pocztę.`, deal: true }; }
-  return { text: `Porozumienie z ${buyer.name} w sprawie ${p.name} (${fmtZl(o.fee)}). Zawodnik rozważa warunki osobiste i odpowie do ${fmtDate(prop.decide)}. Potem testy medyczne. Do zgłoszenia zawodnik zostaje w klubie.`, deal: true };
+  return { text: `Porozumienie z ${buyer.name} w sprawie ${p.name} (${fmtZl(o.fee)}). Zawodnik rozważa warunki osobiste, odpowiedź przyjdzie w poczcie. Potem testy medyczne. Do zgłoszenia zawodnik zostaje w klubie.`, deal: true };
 }
 
 // ------------------------------------------------------------ Sprzeciw dyrektora sportowego: decyzja trenera

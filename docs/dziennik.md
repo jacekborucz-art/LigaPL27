@@ -29,6 +29,21 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 25, 2026, profil A (komputer domowy), oferty, część 2: decyzja zawodnika (v1.24 Beta)
+Zrobione (wdrożenie Opus high, sprawdzone):
+- Nowy `src/career/playerMind.js` (`talkGate`, `timingValue`, `mindAccept`, `mindLockSpan`, `lockState`, `aiGate`):
+  czy zawodnik chce rozmawiać (chętny / otwarty / do przekonania / niechętny / odmawia, szum z ziarna na okno),
+  czynnik `timing` w `offerFactors.js`, adapter rund w `NegotiationSession` (`MIND`), namysł 3-5 dni (wolny 2-4) z ukrytą
+  datą, zdarzenia (rodzina, konkurencja, morale, kontrakcja obecnego klubu), 2 ostatnie szanse, blokady 3-12 mies.
+  (do otwarcia okna) i wcześniejsze otwarcie, uraza -0,3, `coSpurned`. Kluby AI: `aiGate` i pętla do 4 rund.
+- Kalibracja: dyrektor wycenia zakup od Res (sprzeciw przy kluczowych 31 % -> 14 %), weto zarządu max(2 x wartość x skala,
+  1,3 x Res) (16 % -> 7 %). 1 Liga 0,63: to wykupy umów od 1 lipca w średniej, ceny bez zmian.
+- Test `tests/playerMind.test.mjs`, opis `docs/negocjacje.md` (Decyzja zawodnika przy transferze). `history.test`: próg
+  zwolnionego trenera 15 meczów.
+Zostało / dalej:
+- kafelek „Nastawienie” na karcie pokazuje stary wskaźnik (może być „chętny” przy odmowie rozmów): decyzja właściciela.
+- ziarno 7: prośby o transfer 209 -> 109 (ziarno 8: 182 -> 192), niepotwierdzone.
+
 ## Nov 25, 2026, profil A (komputer domowy), oferty klub-klub, część 1 (v1.24 Beta)
 Zrobione (eksperci od transferów i psychologii zawodnika: Sonnet medium; wdrożenie Opus high; sprawdzone):
 - Nowe `src/career/clubOffers.js` (`CO`, `inquire`, `importance`, `reservePrice`, `packageValue`, `resolveClubOffer`,

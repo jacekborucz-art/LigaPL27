@@ -15,7 +15,7 @@ import { reactToWish, WISH_ACTIONS } from '../career/moveWish.js';
 import { wishStateText } from '../career/wishMemory.js';
 import { squadOf } from '../world/worldGen.js';
 import { anyClub } from '../season/season.js';
-import { proposalsFor, userProposal, thinkingUntil, withdrawProposal, canImprove, improveUserProposal, THINK } from '../career/proposals.js'; // namysł zawodnika (docs/transfery.md, rozdz. 10)
+import { proposalsFor, userProposal, thinkingUntil, withdrawProposal, canImprove, improveUserProposal, finalChance, THINK } from '../career/proposals.js'; // namysł zawodnika (docs/transfery.md, rozdz. 10)
 import { joinStatusText } from '../career/lateJoins.js'; // wolny zawodnik z umową poza oknem
 import { clubOffersSection, offerTag } from './clubOffersView.js'; // oferty klub-klub (src/career/clubOffers.js)
 
@@ -37,13 +37,14 @@ export function dealTags(game, p) {
   if (p.moveWish?.promise && !p.moveWish.promise.broken) out.push(tag('czeka do okna', 'warn'));
   else if (p.moveWish && !p.transferRequest) out.push(tag('chce odejść', 'warn'));
   else if (!p.moveWish && p.clubId === game.clubId && p.wishMemory?.mood === 'rozczarowany') out.push(tag('rozczarowany, zostaje', 'warn'));
-  if (!d && proposalsFor(game, p.id).length) out.push(tag(`rozważa ofertę, odpowie do ${fmtDate(thinkingUntil(game, p.id))}`, 'info'));
+  if (!d && proposalsFor(game, p.id).length) out.push(tag('zawodnik się zastanawia', 'info')); // bez daty decyzji
   if (!d && p.clubId && p.clubId !== game.clubId) out.push(offerTag(game, p)); // oferta klub-klub: klub rozważa, kontroferta, porozumienie
   return out.join('');
 }
 
 // ------------------------------------------------------------ Propozycje (namysł zawodnika)
 const PROP_END = { accepted: 'zgoda', rejected: 'odmowa', lost: 'wybrał inny klub', expired: 'nieaktualna', withdrawn: 'wycofana', failed: 'ostatnia runda bez porozumienia' };
+const PROP_WHY = { stays: 'zostaje w obecnym klubie po nowym kontrakcie' };
 
 /** Wiersz propozycji gracza (albo oferty klubu AI za jego zawodnika). */
 function propRow(game, x) {
@@ -55,13 +56,17 @@ function propRow(game, x) {
   if (x.status === 'changes') {
     meta = `Chce zmian w kontrakcie: pensja ${fmtZl(x.want?.wage ?? 0)} tygodniowo. Ostatnia runda rozmów do ${fmtDate(x.deadline)}.`;
     act = `<div class="td-acts"><button class="btn btn--primary btn--sm" data-act="tf-lastround" data-id="${esc(x.pid)}">Ostatnia runda rozmów</button></div>`;
+  } else if (x.status === 'open' && finalChance(game, x)) {
+    // Ostatnia szansa: zawodnik ma wątpliwości, jedna poprawka pensji do terminu (decyzja gracza, termin widoczny)
+    meta = `Zawodnik ma wątpliwości. Ostatnia szansa: popraw pensję do ${fmtDate(x.final.until)}, bez poprawki odmówi.`;
+    act = `<div class="td-acts">${THINK.improve.map((k) => `<button class="btn btn--primary btn--sm" data-act="tf-prop-raise" data-d="${esc(x.id)}" data-k="${k}">Pensja +${k} %</button>`).join('')}<button class="btn btn--quiet btn--sm" data-act="tf-prop-cancel" data-d="${esc(x.id)}">Wycofaj propozycję</button></div>`;
   } else if (x.status === 'open') {
-    meta = `Rozważa ${sale ? 'ofertę' : 'oferty'}, odpowie do ${fmtDate(thinkingUntil(game, x.pid) ?? x.decide)}.`;
+    meta = `Zawodnik się zastanawia${sale ? ' nad ofertą' : ''}.${x.note && !sale ? ` ${x.note}` : ''}`; // bez daty decyzji
     // Licytacja w ciemno: inny klub złożył propozycję po twojej (bez klubu i kwoty), jedna poprawka pensji
     if (x.user && (x.rivals ?? 0) > 0) meta += x.improved ? ' Rozważa też inną propozycję. Swoją już poprawiłeś.' : ' Rozważa też propozycję innego klubu. Możesz raz poprawić pensję.';
     const raise = canImprove(game, x) ? THINK.improve.map((k) => `<button class="btn btn--primary btn--sm" data-act="tf-prop-raise" data-d="${esc(x.id)}" data-k="${k}">Pensja +${k} %</button>`).join('') : '';
     if (x.user) act = `<div class="td-acts">${raise}<button class="btn btn--quiet btn--sm" data-act="tf-prop-cancel" data-d="${esc(x.id)}">Wycofaj propozycję</button></div>`;
-  } else meta = `Odpowiedź ${fmtDate(x.end?.date ?? x.date)}: ${PROP_END[x.status] ?? x.status}${x.status === 'lost' && x.end?.winner ? ` (${clubName(x.end.winner)})` : ''}${x.end?.join ? `, dołączy ${fmtDate(x.end.join)} (otwarcie okna)` : ''}.`;
+  } else meta = `Odpowiedź ${fmtDate(x.end?.date ?? x.date)}: ${PROP_WHY[x.end?.reason] ?? PROP_END[x.status] ?? x.status}${x.status === 'lost' && x.end?.winner ? ` (${clubName(x.end.winner)})` : ''}${x.end?.join ? `, dołączy ${fmtDate(x.end.join)} (otwarcie okna)` : ''}.`;
   return `<li class="td-deal" data-state="${x.status === 'accepted' ? 'ok' : x.status === 'open' || x.status === 'changes' ? 'open' : 'fail'}"${p ? ` data-pid="${esc(p.id)}"` : ''}>
     <div class="td-deal__head">${p ? posBadge(p) : ''}<span class="td-deal__who"><b>${p ? cardLink(p) : esc(x.name)}</b><em>${esc(route)}</em></span><b class="td-deal__fee">${esc(terms)}</b></div>
     <p class="td-deal__meta">${esc(meta)}</p>${act}
@@ -87,7 +92,7 @@ export function proposalPanel(game, p) {
   if (mine) return { blocked: true, html: `<ul class="td-deals">${propRow(game, mine)}</ul>` };
   const until = thinkingUntil(game, p.id);
   if (!until) return null;
-  return { blocked: false, html: `<p class="notice">Rozważa oferty, odpowie do ${esc(fmtDate(until))}. Możesz złożyć własną propozycję: zawodnik porówna wszystkie.</p>` };
+  return { blocked: false, html: '<p class="notice">Zawodnik się zastanawia nad ofertami innych klubów. Możesz złożyć własną propozycję: zawodnik porówna wszystkie.</p>' };
 }
 
 // ------------------------------------------------------------ Pasek etapów

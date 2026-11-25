@@ -241,7 +241,8 @@ export function willingnessToJoin(ctx) {
 
   const score = 1 / (1 + Math.exp(-2 * s));
   const verdict = score >= 0.7 ? 'chętny' : score >= 0.45 ? 'otwarty' : score >= 0.2 ? 'niechętny' : 'odmowa';
-  return { score: Math.round(score * 100) / 100, verdict, wageDemand, reasons };
+  // s: wynik przed sigmoidą (bramka „czy chce rozmawiać”, src/career/playerMind.js), bez wpływu na score i werdykt
+  return { score: Math.round(score * 100) / 100, verdict, wageDemand, reasons, s };
 }
 
 /** Mnożnik ceny wywoławczej klubu sprzedającego: znanych zawodników trudniej wyciągnąć. */

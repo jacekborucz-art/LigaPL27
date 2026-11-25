@@ -13,7 +13,7 @@ import { applySeasonState } from '../src/season/rollover.js';
 import { runDecision } from '../src/core/decisions.js';
 import { CLUBS_PL, clubById } from '../src/data/clubs_pl.js';
 import { offerForPlayer, answerIncoming, answerDirector, pendingObjection, askingPrice, notForSale } from '../src/career/transfers.js';
-import { userOffer, talksBroken } from '../src/career/clubOffers.js'; // oferta klub-klub: klub rozważa ofertę kilka dni
+import { userOffer, talksBroken, reservePrice } from '../src/career/clubOffers.js'; // oferta klub-klub: klub rozważa ofertę kilka dni
 import { boardCaps, feeIssues } from '../src/career/boardRequests.js';
 import {
   directorObjection, directorFairPrice, directorRenegotiate, objectionChance, insistPenalty, OBJ,
@@ -61,7 +61,7 @@ test('Sprzeciw: przy cenie klubu bardzo rzadki, przy dużej przepłacie częsty;
     g.clubId = u;
     for (const c of sellers(g)) for (const p of squadOf(g.world, c.id)) {
       if (notForSale(g, p)) continue;
-      const price = askingPrice(g, p);
+      const price = reservePrice(g, p, u).res; // cena klubu: jego minimum (dyrektor liczy z tej samej wyceny, Nov 25, 2026)
       for (const m of [1, 2]) {
         const fee = price * m;
         if (feeIssues(boardCaps(g, u, p, 'sign'), fee).issues.length) continue; // weto zarządu ma pierwszeństwo

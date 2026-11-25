@@ -21,6 +21,7 @@ import { directorOf, severanceOf, ownerReplaceDirector } from './staffMarket.js'
 import { ownerOf } from './owners.js';
 import { wageBill, book, spendable } from './finance.js';
 import { marketWage, estimateValue, MAX_YEARS, yearsLabel } from './negotiation.js';
+import { reservePrice } from './clubOffers.js'; // cena minimalna klubu sprzedającego (próg odstępnego, Nov 25, 2026)
 import { fmtDate } from '../ui/dom.js';
 import { LEAGUE_COMPS, compClubIds } from '../season/leagueComps.js';
 
@@ -58,6 +59,9 @@ export const VETO = {
   BUDGET_SHARE: 0.25, // pensja najwyżej 25 % tygodniowego budżetu płac
   TOTAL_SHARE: 0.15, // roczny koszt kontraktu (pensja i rozłożone premie) najwyżej 15 % rocznych przychodów z dopłatą właściciela
   FEE_VALUE_X: 2, FEE_WARN_X: 1.5, FEE_MIN: 1e6, // odstępne do wartości rynkowej (powyżej 1 mln zł)
+  // albo do 1,3 x ceny minimalnej klubu sprzedającego (polski klub, bez błędu jego dyrektora; ostrzeżenie od 1,1 x):
+  // kluczowi zawodnicy kosztują 2-3 x wartość, więc sam próg z wartości wetował uczciwe ceny (Nov 25, 2026) [SZAC]
+  FEE_FAIR_X: 1.3, FEE_FAIR_WARN: 1.1,
   FEE_REVENUE: 0.4, // odstępne najwyżej 40 % przychodów krajowych (chyba że pokrywa skarbiec właściciela)
   SIGN_ON: 0.5, // premia za podpis najwyżej połowa pensji z pierwszego roku
   AGENT: 0.1, // prowizja najwyżej 10 % wartości kontraktu
@@ -730,6 +734,7 @@ export function boardCaps(game, clubId, player, kind = 'sign', data = null) {
   const squadCap = Math.max(d.squadX * top, VETO.MARKET_X * market, kind === 'renew' ? VETO.RENEW_X * cur : 0) * d.s;
   const budgetCap = VETO.BUDGET_SHARE * d.wageBudget * d.s;
   const value = estimateValue(player);
+  const fair = kind === 'sign' && player.clubId && player.clubId !== clubId && game.world?.clubs?.[player.clubId] && clubById(player.clubId) && game.date ? reservePrice(game, player, clubId, game.date, { ryn: false }).res : 0;
   const ovr = game.board?.requests?.overrides?.[player.id];
   const override = ovr && ovr.until >= (game.date ?? '') && clubId === game.clubId ? ovr : null;
   return {
@@ -738,7 +743,8 @@ export function boardCaps(game, clubId, player, kind = 'sign', data = null) {
     years: maxYearsFor(player), age: player.age ?? 25,
     total: Math.round(VETO.TOTAL_SHARE * (d.revenue ?? d.domestic) * d.s), totalPct: VETO.TOTAL_SHARE * d.s,
     signOnPct: VETO.SIGN_ON * d.s, agentPct: VETO.AGENT * d.s,
-    value, fee: Math.max(VETO.FEE_MIN, VETO.FEE_VALUE_X * d.s * value), feeWarn: Math.max(VETO.FEE_MIN, VETO.FEE_WARN_X * d.s * value),
+    value, fair, fee: Math.max(VETO.FEE_MIN, VETO.FEE_VALUE_X * d.s * value, VETO.FEE_FAIR_X * fair), feeWarn: Math.max(VETO.FEE_MIN, VETO.FEE_WARN_X * d.s * value, VETO.FEE_FAIR_WARN * fair),
+    feeWhy: VETO.FEE_FAIR_X * fair > Math.max(VETO.FEE_MIN, VETO.FEE_VALUE_X * d.s * value) ? 'fair' : 'value',
     feeRevenue: d.skarbiec > VETO.FEE_REVENUE * d.domestic * d.s ? d.skarbiec : VETO.FEE_REVENUE * d.domestic * d.s, feeRevenuePct: VETO.FEE_REVENUE * d.s,
     s: d.s, override,
   };
@@ -775,11 +781,13 @@ export function contractIssues(caps, offer) {
 export function feeIssues(caps, fee) {
   const out = [];
   if (!caps || !(fee > 0) || (caps.override && fee <= (caps.override.fee ?? 0))) return { issues: out, warn: null };
-  if (fee > caps.fee) out.push({ code: 'fee', over: fee / caps.fee - 1, text: `Kwota ${zl(fee)} jest ponad ${String(Math.round(VETO.FEE_VALUE_X * caps.s * 10) / 10).replace('.', ',')} raza wyższa od wartości rynkowej zawodnika (${zl(caps.value)}). Zaakceptujemy najwyżej ${zl(floor10k(caps.fee))}.` });
+  if (fee > caps.fee) out.push({ code: 'fee', over: fee / caps.fee - 1, text: caps.feeWhy === 'fair' ? `Kwota ${zl(fee)} jest o ponad ${pct(VETO.FEE_FAIR_X - 1)} wyższa od ceny, za jaką według nas klub powinien go sprzedać (${zl(roundFair(caps.fair))}). Zaakceptujemy najwyżej ${zl(floor10k(caps.fee))}.` : `Kwota ${zl(fee)} jest ponad ${String(Math.round(VETO.FEE_VALUE_X * caps.s * 10) / 10).replace('.', ',')} raza wyższa od wartości rynkowej zawodnika (${zl(caps.value)}). Zaakceptujemy najwyżej ${zl(floor10k(caps.fee))}.` });
   if (fee > caps.feeRevenue) out.push({ code: 'feeRevenue', over: fee / caps.feeRevenue - 1, text: `Kwota ${zl(fee)} przekracza ${pct(caps.feeRevenuePct)} rocznych przychodów krajowych klubu. Zaakceptujemy najwyżej ${zl(floor10k(caps.feeRevenue))}.` });
-  const warn = !out.length && fee > caps.feeWarn ? `Zarząd ostrzega: kwota ${zl(fee)} jest o ${pct(fee / caps.value - 1)} wyższa od wartości rynkowej zawodnika (${zl(caps.value)}).` : null;
+  const warn = !out.length && fee > caps.feeWarn ? (caps.feeWhy === 'fair' ? `Zarząd ostrzega: kwota ${zl(fee)} jest o ${pct(fee / caps.fair - 1)} wyższa od ceny, za jaką według nas klub powinien go sprzedać (${zl(roundFair(caps.fair))}).` : `Zarząd ostrzega: kwota ${zl(fee)} jest o ${pct(fee / caps.value - 1)} wyższa od wartości rynkowej zawodnika (${zl(caps.value)}).`) : null;
   return { issues: out, warn };
 }
+
+const roundFair = (x) => Math.round(x / 10000) * 10000;
 
 /** Dopasowanie oferty klubu AI do progów: pensja, długość i koszt całego kontraktu (bez weta, po prostu w granicach). */
 export function fitOfferToCaps(caps, offer) {

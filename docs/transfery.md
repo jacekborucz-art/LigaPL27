@@ -542,7 +542,9 @@ Kod: `src/career/clubOffers.js` (stałe `CO`), widok `src/ui/clubOffersView.js`,
 `transferDeals.js` (etap „Porozumienie klubów” z datą rejestracji, `preRegistration`, `cashOf`, `pendingFees`),
 `proposals.js` (propozycja z pakietem i datą rejestracji) i `transferSystem.js` (`clubOffersDay` codziennie, przed
 decyzjami zawodników). Test: `tests/clubOffers.test.mjs`. Projekt: ekspert transferów (Nov 25, 2026). Te same funkcje
-dla gracza i klubów AI. Wszystkie liczby [SZAC].
+dla gracza i klubów AI. Wszystkie liczby [SZAC]. Etap zawodnika po porozumieniu klubów (czy chce rozmawiać, termin
+przejścia, rundy, namysł bez daty, kontrakcja klubu, ostatnie szanse, zamknięcie rozmów): docs/negocjacje.md,
+„Decyzja zawodnika przy transferze (Nov 25, 2026)”.
 
 - **Zapytanie o cenę** (przycisk „Zapytaj o cenę” w karcie zawodnika polskiego klubu AI, w każdej chwili): zarząd
   klubu odpowiada od razu i bez ponownego losowania (ziarno: gra, klub, zawodnik, okres = bieżące okno albo czas do
@@ -592,7 +594,8 @@ dla gracza i klubów AI. Wszystkie liczby [SZAC].
   naraz. Przerwa w UI tylko słownie („kilka dni”, „kilka tygodni”, „najbliższe miesiące”). Nowa rozmowa (liczniki od
   zera) po 30 dniach od ostatniej odpowiedzi albo po przerwie. Listy w Poczcie po każdej odpowiedzi klubu.
 - **Porozumienie klubów** jest warunkowe: 14 dni na warunki osobiste z zawodnikiem (FIFA RSTP art. 18.3). Rozmowy
-  z zawodnikiem jak dotąd (ekran rozmów, propozycja, namysł zawodnika `proposals.js`), także poza oknem. Bez
+  z zawodnikiem (ekran rozmów, propozycja, namysł zawodnika `proposals.js`), także poza oknem; od Nov 25, 2026 najpierw
+  bramka „czy chce rozmawiać” (odmowa zamyka porozumienie) i termin przejścia w rozmowach (docs/negocjacje.md). Bez
   propozycji w ciągu 14 dni zgoda wygasa (list). Pieniądze na kwotę płatną przy transferze są zarezerwowane od
   złożenia oferty (`offerReserve` w `pendingFees`), raty późniejszych sezonów nie.
 - **Data rejestracji**: zgoda zawodnika poza oknem albo z terminem „najbliższe okno” lub „następny sezon” zakłada
@@ -622,7 +625,12 @@ dla gracza i klubów AI. Wszystkie liczby [SZAC].
   reakcja `onOfferRejected` (`moveWish.js`). „Nie na sprzedaż” nie wyzwala prośby.
 - **Sprzeciw dyrektora** liczony przy składaniu oferty z jego własnej wyceny, także gdy klub by odrzucił (wcześniej
   tylko gdy klub przyjąłby kwotę, co zdradzało próg). Renegocjacja dyrektora obniża ofertę o 5-15 %, a klub
-  rozważa ją jak każdą inną.
+  rozważa ją jak każdą inną. Od Nov 25, 2026 (część 2) wycena dyrektora przy kupnie od polskiego klubu to cena
+  minimalna Res tego klubu (bez błędu dyrektora sprzedającego) z własnym błędem RYN (wcześniej wartość x 1,45, a kluczowi
+  kosztują 2-3 x wartość). Weto zarządu (`boardCaps`, także kluby AI): odstępne do max(2 x wartość x skala, 1,3 x Res
+  bez błędu), ostrzeżenie od max(1,5 x wartość x skala, 1,1 x Res). Symulacja (3 ziarna, start sezonu, kupno przez
+  Widzew za cenę wywoławczą A0 / za Res, przed / po): kluczowi (Res >= 1,7 V) sprzeciw 31 / 14 % i 17 / 5 %, weto 16 / 7 %
+  i 9 / 2 %; pozostali sprzeciw 1,5-3,7 / 4-9 % (A0) i 0,4-0,6 / 1-2 % (Res), weto 0 %.
 - **Klauzula odstępnego**: jeden odczyt `clauseAmount` (liczba albo `{ amount, foreignOnly }`; klauzula tylko dla
   klubów zagranicznych nie dotyczy polskiego kupca). Oferta jednorazowa od kwoty klauzuli: porozumienie od razu.
 - **Stare zapisy**: `game.market.talks` zostaje lustrem dla starszego kodu; przy pierwszym wczytaniu `accepted`

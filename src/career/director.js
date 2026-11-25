@@ -14,6 +14,7 @@ import { directorOf, personAttr, STAFF_MARKET, halfKeyOf } from './staffMarket.j
 import { clubById } from '../data/clubs_pl.js';
 import { marketValue } from '../world/playerGen.js';
 import { askingPriceMultiplier } from './reputation.js';
+import { reservePrice } from './clubOffers.js'; // cena minimalna klubu sprzedającego (wycena dyrektora przy kupnie)
 
 export const DIR = {
   // Widełki pensji dla gracza: połowa szerokości x (25 % przy RYN 1, 15 % przy 10, 6 % przy 20, liniowo pomiędzy);
@@ -148,13 +149,16 @@ const roundFee = (x) => (x >= 100000 ? Math.round(x / 10000) * 10000 : Math.max(
 
 /**
  * Uczciwa cena zawodnika według dyrektora klubu gracza (jego wycena z błędem RYN, ten sam mechanizm co w klubach AI).
- * Kupno: cena, jakiej spodziewa się po klubie sprzedającym (wartość x 1,45 albo x 1,08 z listy, x reputacja), czyli
- * wzór ceny wywoławczej bez błędu sprzedającego; sprzedaż: wartość rynkowa w lidze klubu gracza. Bez cudzych ofert.
+ * Kupno od polskiego klubu: cena minimalna klubu sprzedającego (clubOffers.js reservePrice: rola w kadrze, cel, zastępca,
+ * finanse, kupujący, okres, reputacja) bez błędu dyrektora sprzedającego, z własnym błędem RYN (Nov 25, 2026; wcześniej
+ * wartość x 1,45, a kluczowi zawodnicy kosztują 2-3 x wartość). Inni (pula zagraniczna, bez kadry): wartość x 1,45 albo
+ * x 1,08 z listy, x reputacja. Sprzedaż: wartość rynkowa w lidze klubu gracza. Bez cudzych ofert.
  */
 export function directorFairPrice(game, p, kind = 'buy', date = game?.date) {
   const clubId = game.clubId;
   const err = rynMul(game, clubId, p.id, 'ocena');
   if (kind === 'sell') return roundFee(marketValue(p, { tier: clubById(clubId)?.tier ?? 1, date }) * err);
+  if (p.clubId && p.clubId !== clubId && game.world?.clubs?.[p.clubId] && clubById(p.clubId)) return roundFee(reservePrice(game, p, clubId, date, { ryn: false }).res * err);
   const listed = game.market?.listed?.[p.id];
   const mul = listed ? (listed.kind === 'release' ? 0.4 : 1.08) : 1.45;
   return roundFee(marketValue(p, { tier: clubById(p.clubId)?.tier ?? 1, date }) * mul * askingPriceMultiplier(p.rep ?? 30) * err);

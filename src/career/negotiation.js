@@ -13,7 +13,7 @@ import { GROUP } from './squad.js';
 import { personalityOf, computeMindset, elementPrefs, AGENT_TYPES } from './personality.js';
 import { pickLine } from './negotiationLines.js';
 import { payLevel, EUR_PLN } from '../data/finanse_klubow.js';
-import { noteRenewal } from './wishMemory.js'; // pamięć prośby o transfer po przedłużeniu
+import { noteRenewal, addMonths, nextWindowOpen, windowAt } from './wishMemory.js'; // pamięć prośby o transfer po przedłużeniu, okna (blokada po fiasku)
 
 /** Wartość rynkowa: EUR przy OVR 10 w Ekstraklasie i nachylenie po OVR (docs/finanse.md 3.2). [SZAC] */
 export const VALUE_BASE_EUR = 250000;
@@ -36,7 +36,7 @@ export const ROLE_LABELS = {
 export const ROLE_RANK = { kluczowy: 4, podstawowy: 3, rotacja: 2, perspektywiczny: 1.5, rezerwowy: 1 };
 /** Minimalny udział w minutach, przy którym obietnica roli jest dotrzymana (miesięcznie). [SZAC] */
 export const ROLE_MIN_SHARE = { kluczowy: 0.7, podstawowy: 0.55, rotacja: 0.3, perspektywiczny: 0.15, rezerwowy: 0.05 };
-const ROLE_EXP_SHARE = { kluczowy: 0.85, podstawowy: 0.7, rotacja: 0.45, perspektywiczny: 0.25, rezerwowy: 0.15 }; // [SZAC]
+export const ROLE_EXP_SHARE = { kluczowy: 0.85, podstawowy: 0.7, rotacja: 0.45, perspektywiczny: 0.25, rezerwowy: 0.15 }; // [SZAC]
 // Oczekiwane statystyki na mecz do wyceny premii (gole, asysty, czyste konta). [SZAC]
 const RATES = { GK: { g: 0, a: 0.01, cs: 0.3 }, DEF: { g: 0.04, a: 0.06, cs: 0.3 }, MID: { g: 0.12, a: 0.15, cs: 0 }, ATT: { g: 0.35, a: 0.15, cs: 0 } };
 // Jak bardzo niska oferta obraża danego typu osobowości. [SZAC]
@@ -47,6 +47,61 @@ export const WAGE_BASE = 9000;
 export const WAGE_SLOPE = 0.45;
 export const TIER_WAGE = { 1: 1, 2: 0.66, 3: 0.38, 4: 0.2 };
 export const WAGE_MAX = 140000; // ok. 600 tys. zł miesięcznie, poziom najlepiej opłacanych w Ekstraklasie [SZAC]
+
+/**
+ * Decyzja zawodnika przy transferze (docs/negocjacje.md „Decyzja zawodnika przy transferze”, src/career/playerMind.js):
+ * rozmowy o podpisie z werdyktem bramki ctx.mind = { verdict, timing }. Werdykt zmienia oczekiwania, rundy i nastrój
+ * na start; reakcje na ofertę liczone z r = wartość oferty / cel; blokada po fiasku w miesiącach. [SZAC]
+ */
+export const MIND = {
+  verdict: {
+    keen: { ask: 1, mood: 5, wow: 1.2, rounds: [4, 5] }, // chętny: pełne rundy
+    open: { ask: 1, mood: 0, wow: 1.2, rounds: [2, 5] },
+    convince: { ask: 1.08, mood: -8, wow: 1.2, rounds: [2, 3] }, // do przekonania: wyższe żądania, mniej rund
+    reluctant: { ask: 1.15, mood: -12, wow: 1.3, rounds: [2, 2] }, // niechętny: jedna rozmowa, potrzebne „wow”
+  },
+  timingW: 0.1, // termin przejścia: oczekiwania x (1 - 0,1 x timing), pasujący termin obniża, zły podnosi
+  rounds: { base: 3.5, patience: 0.12, temper: -0.08, prof: 0.1, rnd: 0.6, min: 2, max: 5, ai: 4 },
+  extraP: 0.3, extra: 0.05, // r 1,00-1,20: 30 % prosi o drobny dodatek (5 % celu) na ulubionym elemencie
+  soften: 0.9, // zawodnik mięknie z rundami: w ostatniej rundzie cel - 0,9 x (cel - minimum) x ustępliwość agenta
+  counterR: 0.92, firmR: 0.85, firm: [0.35, 0.02, -0.02], small: [0.75, 1], gap: [0.5, 1], lowMood: 4, bluffCut: 0.97,
+  // Blokada po fiasku (miesiące, poza oknem do otwarcia najbliższego okna): wyczerpane rundy 3-6, bliska odmowa 4,
+  // zerwanie i ultimatum 6, obraza 8 + 0,4 (ego - 10) + 0,3 (temperament - 10); spór o pieniądze (r >= 0,97) 14-60 dni
+  lock: { base: 3, spread: 3, near: 4, nearR: 0.9, moneyR: 0.97, money: [14, 60], brk: 6, insult: 8, ego: 0.4, temper: 0.3, min: 3, max: 12, agent: { rekin: 1.2, brak: 0.7 } },
+};
+
+/** Liczba rund rozmów o transferze (2-5, typowo 3-4): cierpliwość, temperament, profesjonalizm, agent, werdykt bramki. */
+export function mindRounds(t, agentType, verdict, rng, ai = false) {
+  const R = MIND.rounds;
+  const ag = AGENT_TYPES[agentType] || AGENT_TYPES.rozsadny;
+  const x = (R.base + R.patience * (t.patience - 10) + R.temper * (t.temper - 10) + R.prof * (t.professionalism - 10) + (rng.next() * 2 - 1) * R.rnd) * ag.patienceMul;
+  const [lo, hi] = (MIND.verdict[verdict] ?? MIND.verdict.open).rounds;
+  const n = clamp(clamp(Math.round(x), R.min, R.max), lo, hi);
+  return ai ? Math.min(n, R.ai) : n;
+}
+
+/** Koniec blokady: w oknie transferowym bez zmian, poza oknem otwarcie najbliższego okna. */
+export function lockEnd(iso) {
+  return windowAt(iso) ? iso : nextWindowOpen(iso);
+}
+
+/** Blokada po nieudanych rozmowach o transferze (czysta funkcja). d: dane sesji. Zwraca { until, months, days }. */
+export function mindLockSpan(d, reason, rng) {
+  const L = MIND.lock;
+  const t = d.traits;
+  const r = d.mind?.r ?? 0;
+  let months = null; let days = null;
+  if (reason === 'insult') months = L.insult + L.ego * (t.ego - 10) + L.temper * (t.temper - 10);
+  else if (reason === 'mood' || reason === 'ultimatum') months = L.brk;
+  else if (r >= L.moneyR) days = rng.int(L.money[0], L.money[1]);
+  else if (r >= L.nearR) months = L.near;
+  else months = reason === 'walkaway' ? L.base : L.base + rng.int(0, L.spread);
+  if (days != null) return { until: addDays(d.date, days), months: null, days };
+  months *= L.agent[d.agentType] ?? 1;
+  months = clamp(Math.round(months + rng.int(-1, 1)), L.min, L.max);
+  const until = lockEnd(addMonths(d.date, months));
+  return { until, months, days: daysBetween(d.date, until) };
+}
 
 // ---------------------------------------------------------------- Formatowanie i daty
 const MONTHS = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru']; // data po polsku jak fmtDate (src/ui/dom.js)
@@ -87,6 +142,12 @@ export function seasonEndOf(iso) {
 }
 
 const ceilTo = (x, step) => Math.ceil(x / step) * step;
+
+/** Słownie, kiedy zawodnik wróci do rozmów (bez daty): kilka dni, kilka tygodni, kilka miesięcy. */
+export function lockWords(fromIso, untilIso) {
+  const n = daysBetween(fromIso, untilIso);
+  return n <= 10 ? 'kilka dni' : n <= 45 ? 'kilka tygodni' : 'kilka miesięcy';
+}
 const roundTo = (x, step) => Math.round(x / step) * step;
 
 // ---------------------------------------------------------------- Rynek
@@ -423,11 +484,22 @@ export function openNegotiation(opts) {
     min = Math.max(min, rival.wage * attract * 0.97);
     target = Math.max(target, min * 1.05);
   }
+  // Decyzja zawodnika przy transferze (ctx.mind z bramki playerMind.js): werdykt podnosi żądania, termin przejścia je zmienia
+  const mind = kind === 'sign' && ctx.mind ? ctx.mind : null;
+  const mv = mind ? MIND.verdict[mind.verdict] ?? MIND.verdict.open : null;
+  if (mv) {
+    const f = mv.ask * (1 - MIND.timingW * clamp(mind.timing ?? 0, -0.3, 0.4));
+    target *= f; min *= f;
+  }
   const anchor = target * ag.anchor * (1 + 0.005 * (t.ego - 10));
-  const maxRounds = ai ? 2 : clamp(Math.round(2 + 0.22 * t.patience * ag.patienceMul + rng.gauss(0, 0.5)
+  let maxRounds = ai ? 2 : clamp(Math.round(2 + 0.22 * t.patience * ag.patienceMul + rng.gauss(0, 0.5)
     - 0.7 * broken - (rival ? 1 : 0) - grudge / 40), 2, 8);
-  const mood = clamp(55 + (willScore - 0.5) * 40 + (trust - 50) * 0.4 - grudge * 0.4 - broken * 8
+  let mood = clamp(55 + (willScore - 0.5) * 40 + (trust - 50) * 0.4 - grudge * 0.4 - broken * 8
     + (agent === 'rodzinny' ? 3 : 0) + rng.gauss(0, 4), 15, 90);
+  if (mv) {
+    maxRounds = mindRounds(t, agent, mind.verdict, rng, ai);
+    mood = clamp(mood + mv.mood, 15, 90);
+  }
 
   const roleExp = ctx.expectedRole ?? expectedRole(player, club, t);
   const grp = GROUP[player.pos] || 'MID';
@@ -444,6 +516,7 @@ export function openNegotiation(opts) {
     windowEnd: ctx.windowEnd || null, seasonEnd: ctx.seasonEnd || seasonEndOf(date),
     rival, publicDemand: Math.round(publicDemand),
     hidden: { target: Math.round(target), min: Math.round(min), minOwn: Math.round(minOwn), anchor: Math.round(anchor), maxRounds },
+    ...(mv ? { mind: { verdict: mind.verdict, timing: mind.timing ?? 0, wow: mv.wow, r: null, extra: false } } : {}),
     st: {
       status: 'open', round: 0, mood: Math.round(mood * 10) / 10, ask: Math.round(anchor), offended: 0,
       prevWeq: null, lastCounter: null, ultimatum: null, claim: null, concBoost: 0,
@@ -538,7 +611,9 @@ export class NegotiationSession {
 
     // Decyzja
     const meetsCounter = st.lastCounter && v.weq >= st.lastCounter.weq - 0.5; // zawodnik dotrzymuje własnej kontroferty
+    if (d.mind) d.mind.r = entry.r = Math.round((v.weq / this._mindTarget()) * 1000) / 1000;
     if (st.ultimatum) return v.weq >= st.ultimatum.weq - 0.5 || meetsCounter ? this._accept(o, entry) : this._break('ultimatum', entry);
+    if (d.mind) return this._mindDecide(o, v, entry, offense, meetsCounter);
     if (v.weq >= st.ask - 0.5 || meetsCounter) return this._accept(o, entry);
     if (ai && st.round >= 2) return this._break('ai', entry);
     if (st.mood <= 8) return this._break('mood', entry);
@@ -567,6 +642,109 @@ export class NegotiationSession {
     return this._counter(o, entry, claimNow);
   }
 
+  /**
+   * Reakcja na ofertę przy transferze (MIND): r = wartość oferty / cel. r >= 1,20 (niechętny 1,30): zgoda od razu;
+   * 1,00-1,20: zgoda, w 30 % prośba o drobny dodatek; 0,92-1,00: kontroferta podbija o (1 - r) x cel x U(0,5; 1);
+   * 0,85-0,92: twardo albo mała kontroferta; poniżej 0,85: odmowa tej oferty; obraza jak zawsze. Ostatnia runda:
+   * ultimatum (blisko) albo zerwanie. Klub AI: bez ultimatum, do 4 rund.
+   */
+  _mindDecide(o, v, entry, offense, meetsCounter) {
+    const d = this.d;
+    const st = d.st;
+    const H = d.hidden;
+    const t = d.traits;
+    const M = MIND;
+    const ai = d.mode === 'ai';
+    const T = this._mindTarget();
+    const r = v.weq / T;
+    if (meetsCounter || r >= d.mind.wow) return this._accept(o, entry);
+    if (r >= 1) {
+      if (!d.mind.extra && this.rng.chance(M.extraP)) {
+        d.mind.extra = true;
+        return this._mindCounter(o, v, T * M.extra, entry, 'mind_extra', false);
+      }
+      return this._accept(o, entry);
+    }
+    if (st.mood <= 8) return this._break('mood', entry);
+    if (offense >= 0.3 && t.ego >= 15) return this._break('insult', entry);
+    let claimNow = false;
+    if (!ai && !st.claim) {
+      const ag = AGENT_TYPES[d.agentType];
+      if (d.rival && this.rng.chance(0.6)) { st.claim = { real: true, round: st.round, checked: false }; claimNow = true; }
+      else if (!d.rival && this.rng.chance(ag.bluff * (0.6 + 0.04 * (t.greed - 10)))) { st.claim = { real: false, round: st.round, checked: false }; claimNow = true; }
+    }
+    const last = st.round >= H.maxRounds;
+    if (last || (!ai && st.mood < 22)) {
+      if (!ai && r >= M.firmR) return this._ultimatum(o, entry);
+      if (last) return this._break('patience', entry);
+    }
+    if (r >= M.counterR) return this._mindCounter(o, v, (1 - r) * T * this._u(M.gap), entry, null, claimNow);
+    if (r >= M.firmR) {
+      const firm = clamp(M.firm[0] + M.firm[1] * (t.ego - 10) + M.firm[2] * (t.patience - 10), 0.05, 0.9);
+      if (this.rng.chance(firm)) return this._mindCounter(o, v, (1 - r) * T, entry, 'mind_firm', claimNow);
+      return this._mindCounter(o, v, (1 - r) * T * this._u(M.small), entry, null, claimNow);
+    }
+    st.mood = Math.round(clamp(st.mood - M.lowMood, 0, 100) * 10) / 10;
+    entry.mood = st.mood;
+    return this._respond('reject', entry, {}, 'mind_low', {}, claimNow);
+  }
+
+  _u([a, b]) { return a + (b - a) * this.rng.next(); }
+
+  /**
+   * Cel w tej rundzie: zawodnik mięknie z rundami (tempo ustępstw agenta), w ostatniej rundzie
+   * cel - 0,9 x (cel - minimum) x ustępliwość agenta (jak dawne ustępstwa żądania); blef zdemaskowany: cel -3 %.
+   */
+  _mindTarget() {
+    const d = this.d;
+    const H = d.hidden;
+    const k = clamp((d.st.round - 1) / Math.max(1, H.maxRounds - 1), 0, 1);
+    const ag = AGENT_TYPES[d.agentType] || AGENT_TYPES.rozsadny;
+    return Math.max(H.min, H.target - (H.target - H.min) * MIND.soften * ag.concession * k);
+  }
+
+  /** Element, który zawodnik podbija (preferencje i cechy, szum 30 %). */
+  _prefElement(o) {
+    const d = this.d;
+    const pr = d.prefs;
+    const t = d.traits;
+    const w = {
+      wage: pr.moneyW * (1 + 0.03 * (t.greed - 10)),
+      signOn: pr.signOnPref * (d.age >= 29 ? 1.2 : 0.8),
+      role: roleRank(o.role, d.age) < roleRank(d.roleExp, d.age) ? pr.roleW : 0,
+      years: Math.abs(o.years - pr.idealYears) >= 1 ? pr.lenW * 0.8 : 0,
+      clause: clausePenalty(o.clause, d) > 0 ? pr.clauseW * 0.6 : 0,
+      bonus: d.exp.apps >= 8 ? pr.bonusPref * 0.6 : 0,
+    };
+    let best = 'wage'; let bw = -1;
+    for (const [k, x] of Object.entries(w)) {
+      const sc = x * (1 + 0.3 * this.rng.next());
+      if (x > 0 && sc > bw) { best = k; bw = sc; }
+    }
+    return best;
+  }
+
+  /** Kontroferta o delta (ekwiwalent pensji) na ulubionym elemencie, reszta różnicy w pensji. */
+  _mindCounter(o, v, delta, entry, key, claimNow) {
+    const d = this.d;
+    const pr = d.prefs;
+    const el = this._prefElement(o);
+    const add = Math.max(50, delta);
+    const want = v.weq + add;
+    let c = { ...o, bonus: { ...o.bonus } };
+    if (el === 'signOn') c.signOn += ceilTo((add * c.years * 52) / pr.signOnPref, 1000);
+    else if (el === 'bonus') c.bonus.app += ceilTo((add * 52) / (pr.bonusPref * Math.max(1, d.exp.apps)), 50);
+    else if (el === 'role') c = withFix(c, ['role', d.roleExp]);
+    else if (el === 'years') c = withFix(c, ['years', pr.idealYears]);
+    else if (el === 'clause') c = withFix(c, ['clause', desiredClause(d)]);
+    let w = valueOffer(c, d);
+    if (w.weq > want + 0.5 && ['role', 'years', 'clause'].includes(el)) { c = { ...o, bonus: { ...o.bonus } }; w = valueOffer(c, d); } // poprawka warta więcej niż różnica: podbija pensję
+    if (want - w.weq > 0.5) { c.wage = ceilTo(c.wage + (want - w.weq) / w.a, 100); w = valueOffer(c, d); }
+    d.st.lastCounter = { offer: c, weq: w.weq };
+    const extra = { counter: c, ...(el !== 'wage' ? { demand: { element: el, value: el === 'bonus' ? c.bonus.app : c[el] ?? null } } : {}) };
+    return this._respond('counter', entry, extra, key ?? `mind_${el}`, offerVars(c), claimNow);
+  }
+
   /** Sprawdzenie, czy agent blefuje. Kosztuje nastrój; zdemaskowany blef obniża żądania. Nie zużywa rundy. */
   callBluff() {
     const d = this.d;
@@ -583,6 +761,7 @@ export class NegotiationSession {
       const span = d.hidden.anchor - d.hidden.min;
       st.ask = Math.round(Math.max(d.hidden.min, st.ask - 0.25 * span));
       st.concBoost += 0.3;
+      if (d.mind) d.hidden.target = Math.round(d.hidden.target * MIND.bluffCut); // rozmowy o transferze: niższy cel
       line = this._say('bluffExposed', {});
     }
     st.mood = Math.round(clamp(st.mood - cost, 0, 100) * 10) / 10;
@@ -664,7 +843,8 @@ export class NegotiationSession {
 
   _ultimatum(o, entry) {
     const d = this.d;
-    const c = buildCounter(o, d, Math.max(d.st.ask, d.hidden.min));
+    // Rozmowy o transferze (MIND): ultimatum na poziomie celu tej rundy (zawodnik mięknie z rundami)
+    const c = buildCounter(o, d, d.mind ? this._mindTarget() : Math.max(d.st.ask, d.hidden.min));
     d.st.ultimatum = c;
     d.st.lastCounter = c;
     return this._respond('ultimatum', entry, { ultimatum: c.offer, counter: c.offer }, 'ultimatum', offerVars(c.offer));
@@ -690,7 +870,7 @@ export class NegotiationSession {
       res.lines.push(l);
       res.text += ` ${l.text}`;
     }
-    if (r.lock && d.mode !== 'ai') res.text += ` Zawodnik nie chce rozmawiać do ${formatDate(r.lock.until)}.`;
+    if (r.lock && d.mode !== 'ai') res.text += d.mind ? ` Zawodnik nie chce teraz rozmawiać, wróć za ${lockWords(d.date, r.lock.until)}.` : ` Zawodnik nie chce rozmawiać do ${formatDate(r.lock.until)}.`;
     return res;
   }
 
@@ -720,6 +900,7 @@ export class NegotiationSession {
         if (end > until) until = end;
       }
       res.lock = { until, weeks, extreme };
+      if (d.mind) { const m = mindLockSpan(d, reason, this.rng); res.lock = { until: m.until, weeks: Math.round(m.days / 7), extreme: false, months: m.months, days: m.days, mind: true }; }
       res.grudgeAdd = Math.round(15 + off * 60);
       if (d.kind === 'renew') {
         res.moraleDelta = -3 - (off > 0.2 ? 1 : 0);
@@ -838,7 +1019,8 @@ export function applyPromiseCheck(player, clubId, dateIso, minutesShare) {
  * podwyżka w drugiej rundzie x (1,06 + 0,08q); bez atrybutu (null) dawne 0,97 i 1,10. Budżet zawsze twardym limitem.
  * Zwraca { result: 'signed'|'failed'|'refused', rounds, contract, outcome, demand (orientacyjne żądanie), reason? }.
  */
-export function aiNegotiate({ kind = 'sign', player, club, fromClub = null, date, rng, ctx = {}, budget = {}, neg = null, feeMul = 1 }) {
+export function aiNegotiate({ kind = 'sign', player, club, fromClub = null, date, rng, ctx = {}, budget = {}, neg = null, feeMul = 1, mind = null }) {
+  if (mind && kind === 'sign') ctx = { ...ctx, mind }; // decyzja zawodnika: werdykt bramki, do 4 rund (playerMind.js)
   const r = openNegotiation({ kind, player, club, fromClub, date, rng, ctx, mode: 'ai' });
   if (!r.ok) return { result: 'refused', rounds: 0, reason: r.reason, contract: null, outcome: r.outcome ?? null };
   const s = r.session;
@@ -867,7 +1049,20 @@ export function aiNegotiate({ kind = 'sign', player, club, fromClub = null, date
     agentFee: roundTo(0.07 * wage * 52 * feeMul, 1000), // rynkowy standard prowizji (x Zarządzanie kadrą dyrektora)
   });
   let resp = s.propose(offer);
-  if (resp.type !== 'accept' && s.status === 'open') {
+  if (d.mind) {
+    // Prosta pętla do 4 rund: kontroferta w budżecie, podwyżka z atrybutu Negocjacje albo granica budżetu
+    let o = offer;
+    while (s.status === 'open') {
+      const c = resp.counter;
+      if (c && c.wage <= maxWage && c.signOn <= maxSignOn) o = fit(c);
+      else {
+        // Kontroferta ponad budżet: klub idzie do granicy budżetu; bez kontroferty podwyżka z atrybutu Negocjacje
+        const w = Math.min(maxWage, c ? Math.floor(maxWage / 100) * 100 : roundTo(o.wage * lv.raise, 100));
+        if (w > o.wage) o = fit({ ...o, wage: w }); // na granicy budżetu: ta sama oferta, zawodnik mięknie z rundami
+      }
+      resp = s.propose(o);
+    }
+  } else if (resp.type !== 'accept' && s.status === 'open') {
     const c = resp.counter;
     if (c && c.wage <= maxWage && c.signOn <= maxSignOn) resp = s.propose(fit(c));
     else s.propose(fit({ ...offer, wage: Math.min(maxWage, roundTo(offer.wage * lv.raise, 100)) })); // progi zarządu zawsze twardym limitem

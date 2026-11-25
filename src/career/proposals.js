@@ -1,6 +1,10 @@
 // Namysł zawodnika przed podpisem (docs/transfery.md, rozdz. 10; docs/negocjacje.md, rozdz. 14).
-// Udane rozmowy (gracza i klubu AI) to propozycja złożona zawodnikowi, nie podpis. Zawodnik namyśla się 2-5 dni
-// (3 dni + RNG od -1 do +2, ziarno: seed, zawodnik, klub, data), zawodnik z klubem najpóźniej do ostatniego dnia okna.
+// Udane rozmowy (gracza i klubu AI) to propozycja złożona zawodnikowi, nie podpis. Zawodnik z klubem namyśla się 3-5 dni,
+// wolny 2-4 (ziarno: seed, zawodnik, klub, data), zawodnik z klubem najpóźniej do ostatniego dnia okna. Gracz nie widzi
+// daty decyzji („Zawodnik się zastanawia”). Decyzja zawodnika przy transferze (docs/negocjacje.md, Nov 25, 2026):
+// szansa zmiany zdania z werdyktu bramki (8/15/25 %), zdarzenia namysłu (rozmowa z rodziną, inna oferta, morale,
+// kontrakcja obecnego klubu przez przedłużenie kontraktu), dwie ostatnie szanse gracza (poprawka pensji, potem
+// kontrpropozycja zawodnika przy r >= 0,97 i nastroju >= 40), odmowa blokuje rozmowy na 14-60 dni.
 // W tym czasie może dostać propozycje innych klubów (jedna na klub). W dniu decyzji porównuje wszystkie wzorem
 // użyteczności z prekontraktów (offerUtility, src/career/preContracts.js) i odpowiada: zgoda (transakcja od testów
 // medycznych), odmowa, wybrał inny klub albo chce zmian (gracz: ostatnia runda rozmów, klub AI: podnosi pensję
@@ -16,7 +20,11 @@ import { addDays } from '../core/gameLoop.js';
 import { clubById } from '../data/clubs_pl.js';
 import { DOMESTIC } from '../config/calendar2026.js';
 import { clubReputation } from './reputation.js';
-import { relationWith, formatZl } from './negotiation.js';
+import { relationWith, formatZl, aiNegotiate, lockWords } from './negotiation.js';
+import { aiGate, talkGate, timingValue } from './playerMind.js'; // decyzja zawodnika: bramka, termin przejścia
+import { personalityOf } from './personality.js';
+import { homeRegionOf } from './offerFactors.js';
+import { nextWindowOpen } from './wishMemory.js';
 import { offerUtility } from './preContracts.js';
 import { clubStability } from './offerFactors.js'; // klocki decyzji zawodnika
 import { clubNegotiation, negLevers, NEG, Q10 } from './clubNegotiation.js'; // ukryty atrybut Negocjacje klubów AI
@@ -27,22 +35,34 @@ import { squadOf } from '../world/worldGen.js';
 import { spendable, wageRoom } from './finance.js';
 import { canSign, squadCount } from './squadLimit.js';
 import { startDeal, hasOpenDeal, pendingFees, stat, expectedRegistration, cashOf } from './transferDeals.js';
-import { agreementOf, regDateOf, markOfferDone } from './clubOffers.js'; // porozumienie klubów: pakiet i data rejestracji
+import { agreementOf, regDateOf, markOfferDone, slotOf, monthsLeftOf } from './clubOffers.js'; // porozumienie klubów: pakiet i data rejestracji
 import { isPoolContracted, poolSellerClub } from './foreignPool.js';
 import { fmtZl } from './transfers.js';
 import { fmtDate } from '../ui/dom.js';
 import { lateFree, reserveJoin, joinAgreedMessage } from './lateJoins.js'; // wolny zawodnik poza oknem: dołączy w dniu otwarcia okna
 
 export const THINK = {
-  base: 3, min: -1, max: 2, // namysł 3 dni + RNG od -1 do +2 (2-5 dni)
+  base: 3, free: 2, min: 0, max: 2, // namysł: zawodnik z klubem 3-5 dni, wolny 2-4 dni
   noise: 0.107, // szum użyteczności: przy 11 000 zł wobec 10 000 zł (reszta równa) lepsza oferta wygrywa ok. 73 % (było 0,08: 80 %)
-  accept: 0.787, slope: 0.4, pMin: 0.5, pMax: 0.92, // szansa zgody = clamp(0,787 + 0,4 x (U - U_odniesienia), 0,5; 0,92); 0,78 przed nowymi klockami
+  accept: 0.787, slope: 0.4, pMin: 0.5, pMax: 0.95, // acceptChance: clamp(0,787 + 0,4 x (U - U_odniesienia), 0,5; ...) (narzędzia)
+  // Szansa zgody w dniu decyzji: clamp(1 - zmiana zdania + 0,4 x (U - U_odniesienia), 0,5; 0,95); zmiana zdania z werdyktu
+  // bramki (chętny 8 %, otwarty 15 %, do przekonania 25 %), +10 pp po kontrakcji klubu, -5 pp przy zaufaniu >= 70,
+  // zdarzenia namysłu: -0,2 x przesunięcie S (rodzina +-0,3, inna oferta -0,2, morale +-0,15)
+  mind: { keen: 0.08, open: 0.15, convince: 0.25, reluctant: 0.3, refuse: 0.3, counter: 0.1, trust: 0.05, trustMin: 70, shiftK: 0.2 },
+  family: { p: 0.2, ties: 0.04, home: 0.3, away: -0.3, tiesMin: 13, other: 0.15 }, // rozmowa z rodziną: 20 %/dzień
+  rival: { p: 0.06, rep: 50, s: -0.2 }, moraleD: 2, moraleS: 0.15, // inna oferta: 6 %/dzień x reputacja / 50
+  // Kontrakcja obecnego klubu (AI): p = 0,15 + 0,35 podstawowy + 0,1 (reputacja >= 55) + 0,15 (kontrakt <= 12 mies.), do 0,7;
+  // podwyżka 10-25 % przez przedłużenie kontraktu; zawodnik zostaje z szansą 1 / (1 + exp(-(U_obecny - U_nowy) / 0,15))
+  cm: { base: 0.15, starter: 0.35, rep: 0.1, repMin: 55, short: 0.15, shortMonths: 12, max: 0.7, raise: [0.1, 0.25], slope: 0.15 },
+  // Dwie ostatnie szanse gracza: poprawka pensji (4/8/12 %) w 2 dni, zgoda 15 % + 5 pp za punkt procentowy (do 85 %),
+  // potem kontrpropozycja zawodnika, gdy r rozmów >= 0,97 i nastrój >= 40
+  final: { days: 2, base: 0.15, per: 0.05, max: 0.85 }, counterR: 0.97, counterMood: 40,
+  refuseLock: [14, 60], // odmowa po namyśle: spór o pieniądze, 14-60 dni bez rozmów
   changes: 0.6, // bez zgody: 60 % „chce zmian”, 40 % odmowa
   wantMin: 0.08, wantMax: 0.18, // „chce zmian”: pensja wyżej o 8-18 %
   lastRoundDays: 2, // termin na ostatnią rundę rozmów gracza
   aiRaise: 0.1, // klub AI bez atrybutu przy „chce zmian”: pensja +10 % (z atrybutem jak druga runda aiNegotiate)
   improve: [4, 8, 12], // gracz: jedna poprawka propozycji po cudzej propozycji (pensja +4, 8 albo 12 %)
-  refuseLockDays: 14, // po odmowie zawodnik nie rozmawia z tym klubem 2 tygodnie
   freeRepGap: 15, freeStepDown: 0.4, // odniesienie wolnego zawodnika: klub o reputacji +15, minus 0,4 x gotowość do zejścia niżej
   listed: -0.2, unhappy: -0.3, // odniesienie zawodnika z klubem: wystawiony na listę, niezadowolony albo prosi o transfer
   keepDays: 60, // zamknięte propozycje zostają w zapisie 60 dni (lista ostatnich odpowiedzi)
@@ -53,6 +73,8 @@ const isOpen = (x) => OPEN.has(x.status);
 const clubName = (id) => clubById(id)?.name ?? 'klub';
 const windowOn = (date) => (DOMESTIC.transferWindows ?? []).find((w) => date >= w.from && date <= w.to) ?? null;
 const SEASON_END_OF = (date) => `${Number(date.slice(0, 4)) + (date.slice(5) >= '07-01' ? 1 : 0)}-06-30`; // koniec sezonu dla daty
+const dayNo = (date) => Math.floor(Date.parse(`${date}T12:00:00Z`) / 864e5);
+const r2 = (x) => Math.round(x * 100) / 100;
 
 // ------------------------------------------------------------ Stan
 export function ensureProposals(game) {
@@ -77,9 +99,9 @@ export function thinkingUntil(game, pid) {
   return d;
 }
 
-/** Długość namysłu w dniach (2-5) z ziarna gry, zawodnika, klubu i daty. */
-export function thinkDays(game, pid, to, date) {
-  return THINK.base + new Rng(`namysl:${game.seed}:${pid}:${to ?? 'z'}:${date}`).int(THINK.min, THINK.max);
+/** Długość namysłu w dniach (zawodnik z klubem 3-5, wolny 2-4) z ziarna gry, zawodnika, klubu i daty. */
+export function thinkDays(game, pid, to, date, free = false) {
+  return (free ? THINK.free : THINK.base) + new Rng(`namysl:${game.seed}:${pid}:${to ?? 'z'}:${date}`).int(THINK.min, THINK.max);
 }
 
 const stateOf = (p) => (p.clubId ? 'club' : isPoolContracted(p) ? 'pool' : 'free');
@@ -89,13 +111,14 @@ const stateOf = (p) => (p.clubId ? 'club' : isPoolContracted(p) ? 'pool' : 'free
  * Propozycja klubu dla zawodnika po udanych rozmowach. opts: { playerId, to, fee, contract, kind ('transfer'|'free'),
  * date, maxWage (klub AI: budżet pensji na drugą rundę), maxTotal (próg zarządu: roczny koszt kontraktu),
  * demand (orientacyjne żądanie z rozmów: limit poprawki w ciemno), sale (oferta klubu AI za zawodnika gracza: id oferty),
- * pkg (pakiet oferty klub-klub), regDate (data rejestracji po porozumieniu poza oknem), coff (id oferty klub-klub) }.
+ * pkg (pakiet oferty klub-klub), regDate (data rejestracji po porozumieniu poza oknem), coff (id oferty klub-klub),
+ * r i mood (wynik rozmów: wartość oferty / cel i nastrój, do kontrpropozycji zawodnika), mode (termin przejścia) }.
  * Kluby z wcześniejszymi propozycjami dowiadują się tylko, że zawodnik rozważa inną (bez klubu i kwoty).
  * Zwraca propozycję albo null (zawodnik zajęty albo ten klub już złożył propozycję).
  */
 export function makeProposal(game, opts) {
   ensureProposals(game);
-  const { playerId, to, fee = 0, contract, kind = 'transfer', maxWage = null, maxTotal = null, demand = null, sale = null, pkg = null, regDate = null, coff = null } = opts;
+  const { playerId, to, fee = 0, contract, kind = 'transfer', maxWage = null, maxTotal = null, demand = null, sale = null, pkg = null, regDate = null, coff = null, r = null, mood = null } = opts;
   const date = opts.date ?? game.date;
   const p = game.world.players[playerId];
   if (!p || !to || hasOpenDeal(game, playerId) || p.preContract || p.joinOn) return null;
@@ -105,7 +128,7 @@ export function makeProposal(game, opts) {
   // W trakcie namysłu nowa propozycja dołącza do tej samej decyzji; w trakcie ostatniej rundy gracza: dzień po terminie
   const waiting = mine.filter((x) => x.status === 'open').map((x) => x.decide).sort();
   const changes = mine.find((x) => x.status === 'changes');
-  let decide = waiting[0] ?? (changes ? addDays(changes.deadline, 1) : addDays(date, thinkDays(game, playerId, to, date)));
+  let decide = waiting[0] ?? (changes ? addDays(changes.deadline, 1) : addDays(date, thinkDays(game, playerId, to, date, stateOf(p) === 'free')));
   const w = needsWindow ? windowOn(date) : null;
   if (w && decide > w.to) decide = w.to;
   if (decide < date) decide = date;
@@ -115,7 +138,9 @@ export function makeProposal(game, opts) {
     from: p.clubId ?? null, fromState: stateOf(p), fee, contract, kind, date, decide, needsWindow,
     maxWage, maxTotal, demand, sale, status: 'open', deadline: null, want: null, end: null,
     ...(pkg ? { pkg } : {}), ...(regDate ? { regDate } : {}), ...(coff ? { coff } : {}),
+    ...(r != null ? { r } : {}), ...(mood != null ? { mood } : {}),
   };
+  initMind(game, x, p, date, opts.mode);
   M.pending.push(x);
   stat(game, x.user ? 'propsUser' : 'props');
   for (const y of mine) if (y.status === 'open') rivalArrived(game, y, date);
@@ -133,7 +158,7 @@ function rivalArrived(game, y, date) {
   if (y.rivals > 1 || y.improved || y.to !== game.clubId) return; // jeden list na propozycję
   const msg = createMessage({ date, key: `namysl-rywal:${y.pid}:${y.id}`, category: 'transfers', from: `Agent zawodnika ${y.name}`, priority: 'important',
     subject: `${y.name} rozważa też inną propozycję`,
-    body: `${y.name} dostał propozycję innego klubu. Nie zdradzę, którego ani na jakich warunkach. Odpowie do ${fmtDate(thinkingUntil(game, y.pid) ?? y.decide)}. Jeśli chcesz, możesz raz poprawić pensję w swojej propozycji (Transfery, W toku).`,
+    body: `${y.name} dostał propozycję innego klubu. Nie zdradzę, którego ani na jakich warunkach. Zawodnik się zastanawia. Jeśli chcesz, możesz raz poprawić pensję w swojej propozycji (Transfery, W toku).`,
     refs: { kind: 'proposal', pid: y.pid, propId: y.id } });
   game.inbox = addMessages(game.inbox ?? [], [msg]).inbox;
 }
@@ -171,8 +196,12 @@ export function blindRaise(game, y, date = game.date) {
   return true;
 }
 
-/** Czy gracz może poprawić propozycję: zawodnik dostał po niej propozycję innego klubu, jedna poprawka. */
-export const canImprove = (game, x) => !!x && x.user && x.to === game.clubId && x.status === 'open' && (x.rivals ?? 0) > 0 && !x.improved;
+/**
+ * Czy gracz może poprawić propozycję: zawodnik dostał po niej propozycję innego klubu (jedna poprawka) albo ma
+ * wątpliwości po namyśle (ostatnia szansa: jedna poprawka do terminu).
+ */
+export const finalChance = (game, x) => !!x && x.user && x.to === game.clubId && x.status === 'open' && !!x.final && !x.final.pct && x.final.until >= game.date;
+export const canImprove = (game, x) => finalChance(game, x) || (!!x && x.user && x.to === game.clubId && x.status === 'open' && (x.rivals ?? 0) > 0 && !x.improved && !x.final);
 
 /**
  * Gracz raz poprawia swoją propozycję (pensja +4, 8 albo 12 %) w tych samych granicach co w rozmowach: wolne miejsce
@@ -191,29 +220,31 @@ export function improveUserProposal(game, propId, pct, date = game.date) {
   // Progi zarządu dotyczące pensji (pensja i roczny koszt); długość i premie zostały zatwierdzone w rozmowach
   const issues = p ? contractIssues(boardCaps(game, game.clubId, p, 'sign'), c).filter((i) => i.code === 'wage' || i.code === 'total') : [];
   if (issues.length) return { ok: false, text: `Zarząd nie zatwierdzi tej pensji: ${issues.map((i) => i.text).join(' ')}` };
+  const fin = finalChance(game, x);
   x.contract = c;
   x.improved = true;
   x.improvedOn = date;
+  if (fin) { x.final.pct = k; x.decide = addDays(date, 1); stat(game, 'propsUserFinal'); } // ostatnia szansa: decyzja jutro
   stat(game, 'propsUserImprove');
-  return { ok: true, text: `Poprawiono propozycję dla ${x.name}: pensja ${formatZl(c.wage)} tygodniowo zamiast ${formatZl(old)}. Odpowie do ${fmtDate(thinkingUntil(game, x.pid) ?? x.decide)}.` };
+  return { ok: true, text: `Poprawiono propozycję dla ${x.name}: pensja ${formatZl(c.wage)} tygodniowo zamiast ${formatZl(old)}. Zawodnik się zastanawia, odpowiedź przyjdzie w poczcie.` };
 }
 
 /**
  * Propozycja gracza po udanych rozmowach (ekran rozmów). Decyzja przypadająca na dziś (ostatni dzień okna)
  * zapada od razu, bo systemy dnia już się wykonały. Zwraca { ok, text, prop }.
  */
-export function submitUserProposal(game, { playerId, fee = 0, contract, fromClub = null }) {
+export function submitUserProposal(game, { playerId, fee = 0, contract, fromClub = null, r = null, mood = null }) {
   const p = game.world.players[playerId];
   // Porozumienie klubów (clubOffers.js): pakiet i data rejestracji (poza oknem albo od następnego sezonu)
   const ag = fromClub ? agreementOf(game, playerId) : null;
-  const extra = ag ? { fee: ag.fee, pkg: ag.pkg, regDate: regDateOf(ag, game.date), coff: ag.id } : {};
-  const prop = makeProposal(game, { playerId, to: game.clubId, fee, contract, kind: fromClub ? 'transfer' : 'free', ...extra });
+  const extra = ag ? { fee: ag.fee, pkg: ag.pkg, regDate: regDateOf(ag, game.date), coff: ag.id, mode: ag.mode } : {};
+  const prop = makeProposal(game, { playerId, to: game.clubId, fee, contract, kind: fromClub ? 'transfer' : 'free', r, mood, ...extra });
   if (!prop) return { ok: false, text: `${p?.name ?? 'Zawodnik'} jest już w trakcie innej transakcji albo czeka na twoją odpowiedź.`, prop: null };
   if (prop.decide <= game.date) {
     resolveNow(game, playerId);
     return { ok: true, text: `Propozycja złożona. ${p.name} odpowiedział od razu, bo to ostatni dzień okna transferowego: sprawdź pocztę.`, prop };
   }
-  return { ok: true, text: `Propozycja złożona. ${p.name} odpowie ok. ${fmtDate(prop.decide)}.`, prop };
+  return { ok: true, text: `Propozycja złożona. ${p.name} się zastanawia, odpowiedź przyjdzie w poczcie.`, prop };
 }
 
 /** Decyzje na dziś poza systemem dnia (np. ostatni dzień okna): listy trafiają od razu do poczty. */
@@ -244,7 +275,7 @@ function offerView(game, p, x, first = false) {
   const c = clubById(x.to) ?? { prestige: 3, tier: 1, L: 11 };
   const ct = x.contract ?? {};
   const wage = (ct.wage ?? 0) + (ct.signOn ?? 0) / Math.max(52, (ct.years ?? 2) * 52);
-  return { wage, rep: clubReputation(c), L: c.L, prestige: c.prestige, tier: c.tier, europe: inEurope(game, x.to), foreign: false, region: c.region, stab: clubStability(game, x.to), first };
+  return { wage, rep: clubReputation(c), L: c.L, prestige: c.prestige, tier: c.tier, europe: inEurope(game, x.to), foreign: false, region: c.region, stab: clubStability(game, x.to), first, timing: x.timing ?? 0 };
 }
 /** Kolejność złożenia propozycji (numer z id „n<seq>-<zawodnik>”). */
 const seqOf = (x) => Number.parseInt(String(x.id).slice(1), 10) || 0;
@@ -343,9 +374,15 @@ function decidePlayer(game, pid, date, out) {
   const { ref, scored } = weighProposals(game, p, list, rng);
   for (const { x, u } of scored) x.u = Math.round(u * 100) / 100;
   for (const { x, u } of scored) {
-    const pYes = acceptChance(u, ref);
+    const pYes = mindAccept(game, p, x, u, ref);
     const r = rng.next();
-    let ans = r < pYes ? 'yes' : r < pYes + (1 - pYes) * THINK.changes ? 'changes' : 'no';
+    let ans = r < pYes ? 'yes' : x.user ? 'no' : r < pYes + (1 - pYes) * THINK.changes ? 'changes' : 'no';
+    if (ans === 'no' && x.user && lastChance(game, x, date, rng, out)) {
+      // Ostatnia szansa gracza: inne propozycje czekają do dnia po jej terminie
+      const until = x.status === 'changes' ? x.deadline : x.decide;
+      for (const y of scored) if (y.x !== x && y.x.status === 'open') y.x.decide = addDays(until, 1);
+      return;
+    }
     if (ans === 'changes' && !x.user) {
       // Klub AI: jak druga runda aiNegotiate (podwyżka z atrybutu Negocjacje), w budżecie albo rezygnacja
       const wage = Math.round(((x.contract?.wage ?? 0) * aiRaiseMul(game, x.to)) / 100) * 100;
@@ -415,16 +452,55 @@ function lose(game, x, winner, date, out) {
     : `${x.name} wybrał ofertę ${clubName(winner.to)}, a nie ${clubName(x.to)}.`));
 }
 
-/** Odmowa: zawodnik nie rozmawia z tym klubem przez 2 tygodnie (bez urazy). */
+/**
+ * Szansa zgody w dniu decyzji (bez skutków): 1 - zmiana zdania (werdykt bramki, kontrakcja klubu, zaufanie, zdarzenia
+ * namysłu) + 0,4 x (U - U_odniesienia). Ostatnia szansa gracza: 15 % + 5 pp za punkt procentowy poprawki, bez poprawki 0.
+ */
+export function mindAccept(game, p, x, u, ref) {
+  if (x.final) return x.final.pct ? clamp(THINK.final.base + THINK.final.per * x.final.pct, 0, THINK.final.max) : 0;
+  const M = THINK.mind;
+  let change = M[x.verdict ?? 'open'] ?? M.open;
+  if (x.cm?.result === 'ignored') change += M.counter;
+  if (relationWith(p, x.to).trust >= M.trustMin) change -= M.trust;
+  change -= M.shiftK * (x.shift ?? 0);
+  return clamp(1 - change + THINK.slope * (u - ref), THINK.pMin, THINK.pMax);
+}
+
+/**
+ * Dwie ostatnie szanse gracza po odmowie: najpierw poprawka pensji (2 dni), potem kontrpropozycja zawodnika (ostatnia
+ * runda), gdy rozmowy skończyły się blisko celu (r >= 0,97) i w dobrym nastroju (>= 40). Zwraca true, gdy szansa jest.
+ */
+function lastChance(game, x, date, rng, out) {
+  if (!x.final) {
+    let until = addDays(date, THINK.final.days);
+    const w = x.needsWindow ? windowOn(date) : null;
+    if (w && until > w.to) until = w.to;
+    if (until <= date) return false;
+    x.final = { since: date, until, pct: 0 };
+    x.decide = until;
+    stat(game, 'propsUserDoubt');
+    out.push(letter(game, x, 'final', `${x.name} ma wątpliwości`, `${x.name} nie jest przekonany do przejścia do ${clubName(x.to)}. To ostatnia szansa: możesz raz poprawić pensję w propozycji (Transfery, W toku). Bez poprawki zawodnik odmówi.`));
+    return true;
+  }
+  if (!x.wantUsed && (x.r ?? 0) >= THINK.counterR && (x.mood ?? 0) >= THINK.counterMood) {
+    x.wantUsed = true;
+    askChanges(game, x, date, rng, out);
+    return true;
+  }
+  return false;
+}
+
+/** Odmowa: spór o pieniądze, zawodnik nie rozmawia z tym klubem 14-60 dni (uraza na ten czas). */
 function refuse(game, x, date, out) {
   const p = game.world.players[x.pid];
   close(x, 'rejected', date);
   stat(game, x.user ? 'propsUserNo' : 'propsNo');
-  const until = addDays(date, THINK.refuseLockDays);
+  const until = addDays(date, new Rng(`namysl-blokada:${game.seed}:${x.pid}:${x.to}:${date}`).int(THINK.refuseLock[0], THINK.refuseLock[1]));
   const rel = relationWith(p, x.to);
   if (!rel.lockUntil || rel.lockUntil < until) { rel.lockUntil = until; rel.lockReason = 'odmowa'; }
+  if (x.user) { rel.sour = { until: rel.lockUntil, s: -0.3 }; rel.lockCtx = { date, club: p.clubId ?? null, tier: p.clubId ? clubById(p.clubId)?.tier ?? null : null, rep: clubReputation(clubById(x.to) ?? { prestige: 3, tier: 1 }), share: null }; }
   p.relations = { ...(p.relations ?? {}), [x.to]: rel };
-  if (x.user) out.push(letter(game, x, 'no', `${x.name} odrzuca twoją propozycję`, `Po namyśle ${x.name} nie przejdzie do ${clubName(x.to)}. Agent prosi, żeby nie wracać do rozmów przed ${fmtDate(until)}.`));
+  if (x.user) out.push(letter(game, x, 'no', `${x.name} odrzuca twoją propozycję`, `Po namyśle ${x.name} nie przejdzie do ${clubName(x.to)}. Agent prosi, żeby nie wracać do rozmów przez ${lockWords(date, rel.lockUntil)}.`));
   else if (x.sale) out.push(letter(game, x, 'no', `${x.name} nie dogadał się z ${clubName(x.to)}`, `${x.name} odrzucił propozycję ${clubName(x.to)}. Zostaje w klubie.`));
 }
 
@@ -479,6 +555,104 @@ export function finishLastRound(game, propId, contract, ok, date = game.date) {
   return { ok: true, text: `${x.name} podpisał kontrakt. Teraz testy medyczne, zgłoszenie spodziewane ${fmtDate(expectedRegistration(deal))}.` };
 }
 
+// ------------------------------------------------------------ Namysł: werdykt, zdarzenia, kontrakcja klubu
+/** Stan namysłu w nowej propozycji: werdykt bramki, termin przejścia, morale na start, plan kontrakcji klubu. */
+function initMind(game, x, p, date, modeIn) {
+  const mode = modeIn ?? (x.fromState === 'free' ? null : x.regDate ? (x.regDate > SEASON_END_OF(date) ? 'season' : 'window') : 'now');
+  if (mode) x.mode = mode;
+  const gate = x.user ? talkGate(game, p, x.to, { date, mode }) : aiGate(game, p, x.to, date, mode ?? 'now');
+  x.verdict = gate.verdict === 'refuse' ? 'reluctant' : gate.verdict;
+  x.timing = r2(timingValue(game, p, mode, date));
+  x.shift = 0;
+  x.m0 = p.morale ?? 12;
+  x.cm = planCounter(game, x, p, date);
+}
+
+/** Plan kontrakcji obecnego klubu (klub AI): dzień w trakcie namysłu i podwyżka 10-25 %, albo null. */
+function planCounter(game, x, p, date) {
+  if (x.fromState !== 'club' || !x.from || x.from === game.clubId || !game.world.clubs[x.from] || !p.contract?.wage) return null;
+  const C = THINK.cm;
+  const span = dayNo(x.decide) - dayNo(date);
+  if (span < 2) return null;
+  const sl = slotOf(game, p, date);
+  const pc = clamp(C.base + (sl?.starter ? C.starter : 0) + ((p.rep ?? 30) >= C.repMin ? C.rep : 0) + (monthsLeftOf(p, date) <= C.shortMonths ? C.short : 0), 0, C.max);
+  const rng = new Rng(`mind-kontra:${game.seed}:${x.pid}:${x.to}:${date}`);
+  if (!rng.chance(pc)) return null;
+  return { day: addDays(date, rng.int(1, span - 1)), raise: r2(C.raise[0] + (C.raise[1] - C.raise[0]) * rng.next()) };
+}
+
+/** Zdarzenia dnia namysłu: rozmowa z rodziną i morale (tylko propozycje gracza), inna oferta (wszystkie). */
+function thinkEvents(game, x, p, date) {
+  const T = THINK;
+  const rng = new Rng(`mind-dzien:${game.seed}:${x.pid}:${x.id}:${date}`);
+  const t = personalityOf(p).traits;
+  if (x.user) {
+    if (rng.chance(T.family.p * (1 + T.family.ties * (t.homeTies - 10)))) {
+      const home = homeRegionOf(p);
+      const reg = clubById(x.to)?.region;
+      const s = home && reg === home ? T.family.home : home && t.homeTies >= T.family.tiesMin ? T.family.away : (rng.chance(0.5) ? T.family.other : -T.family.other);
+      x.shift = r2((x.shift ?? 0) + s);
+      x.note = s > 0 ? 'Rodzina jest za przeprowadzką.' : 'Rodzina ma wątpliwości co do przeprowadzki.';
+      stat(game, 'mindFamily');
+    }
+    const dm = (p.morale ?? 12) - (x.m0 ?? p.morale ?? 12);
+    if (!x.moraleEv && x.fromState === 'club' && Math.abs(dm) >= T.moraleD) {
+      x.moraleEv = true;
+      x.shift = r2((x.shift ?? 0) + (dm < 0 ? T.moraleS : -T.moraleS));
+      x.note = dm < 0 ? 'Gorszy czas w obecnym klubie: chętniej myśli o zmianie.' : 'Dobrze mu idzie w obecnym klubie: waha się.';
+    }
+  }
+  if (!x.compet && !(x.rivals > 0) && rng.chance(T.rival.p * (p.rep ?? 30) / T.rival.rep)) {
+    x.compet = true;
+    x.shift = r2((x.shift ?? 0) + T.rival.s);
+    if (x.user) x.note = 'Do zawodnika dotarła inna oferta.';
+    stat(game, 'mindRival');
+  }
+}
+
+/**
+ * Kontrakcja obecnego klubu AI w trakcie namysłu: przedłużenie kontraktu z podwyżką 10-25 % (aiNegotiate, tryb AI).
+ * Zawodnik porównuje obecny klub po podwyżce z nową ofertą (scoreOffer): zostaje albo myśli dalej (zmiana zdania +10 pp).
+ */
+function counterMove(game, x, p, date, out) {
+  x.cm.done = true;
+  if (proposalsFor(game, x.pid).some((y) => y !== x && y.cm?.result)) { x.cm.result = 'skip'; return; } // jedna kontrakcja na namysł
+  const club = clubById(x.from);
+  const cur = p.contract?.wage ?? 0;
+  if (!club || !cur) { x.cm.result = 'skip'; return; }
+  const rng = new Rng(`mind-kontra-rozmowy:${game.seed}:${x.pid}:${date}`);
+  const caps = boardCaps(game, x.from, p, 'renew');
+  const r = aiNegotiate({ kind: 'renew', player: p, club, date, rng, ctx: { forceRenew: true }, budget: { wage: Math.min(Math.round((cur * (1 + x.cm.raise)) / 100) * 100, caps.wage), maxYears: caps.years, total: caps.total }, neg: clubNegotiation(game, x.from) });
+  stat(game, 'mindCounter');
+  if (r.result !== 'signed' || !r.contract) { x.cm.result = 'refused'; return; }
+  const own = { wage: r.contract.wage, rep: clubReputation(club), L: club.L, prestige: club.prestige, tier: club.tier, europe: inEurope(game, x.from), foreign: false, own: true, region: club.region, stab: clubStability(game, x.from) };
+  const uCur = offerUtility(p, own, { trust: relationWith(p, x.from).trust });
+  const uNew = offerUtility(p, offerView(game, p, x));
+  const stay = 1 / (1 + Math.exp(-(uCur - uNew) / THINK.cm.slope));
+  const mine = proposalsFor(game, x.pid).filter((y) => y.user || y.sale);
+  if (!rng.chance(stay)) {
+    x.cm.result = 'ignored';
+    for (const y of proposalsFor(game, x.pid)) if (y.user) y.note = 'Obecny klub zaproponował mu nowy kontrakt. Zawodnik się zastanawia.';
+    for (const y of mine) if (y.user) out.push(letter(game, y, 'cm', `${y.name}: obecny klub walczy o zawodnika`, `${clubName(x.from)} zaproponował ${y.name} nowy kontrakt. Zawodnik się zastanawia, odpowiedź przyjdzie w poczcie.`, 'info'));
+    stat(game, 'mindCounterIgnored');
+    return;
+  }
+  // Zostaje: nowy kontrakt w obecnym klubie, wszystkie propozycje odrzucone, rozmowy dopiero w następnym oknie (bez urazy)
+  x.cm.result = 'stays';
+  p.contract = { ...r.contract, signedOn: date };
+  p.wage = p.contract.wage;
+  stat(game, 'mindCounterStays');
+  const until = windowOn(date) ? addDays(windowOn(date).to, 1) : nextWindowOpen(date);
+  for (const y of proposalsFor(game, x.pid)) {
+    close(y, 'rejected', date, { reason: 'stays' });
+    stat(game, y.user ? 'propsUserNo' : 'propsNo');
+    const rel = relationWith(p, y.to);
+    if (!rel.lockUntil || rel.lockUntil < until) { rel.lockUntil = until; rel.lockReason = 'zostaje'; }
+    p.relations = { ...(p.relations ?? {}), [y.to]: rel };
+    if (y.user) out.push(letter(game, y, 'stays', `${y.name} zostaje w ${clubName(x.from)}`, `${clubName(x.from)} zaproponował ${y.name} nowy kontrakt. Zawodnik zostaje, doceniając gest klubu. Twoja propozycja jest nieaktualna.`));
+  }
+}
+
 // ------------------------------------------------------------ System dnia (src/career/transferSystem.js)
 /** Dzień: wygasłe ostatnie rundy, decyzje zawodników, porządki. Zwraca listy dla gracza. */
 export function proposalsDay(game, date) {
@@ -490,6 +664,14 @@ export function proposalsDay(game, date) {
     stat(game, 'propsExpired');
     if (x.user && x.to === game.clubId) out.push(letter(game, x, 'expired', `Propozycja dla ${x.name} wygasła`, `Nie było odpowiedzi na prośbę o zmiany w kontrakcie. ${x.name} nie czeka dłużej.`, 'info'));
     for (const y of P) if (y.pid === x.pid && y.status === 'open' && y.decide > date) y.decide = date;
+  }
+  // Namysł: zdarzenia dnia i kontrakcja obecnego klubu (przed decyzjami)
+  for (const x of P) {
+    if (x.status !== 'open' || x.decide <= date || x.final) continue;
+    const p = game.world.players[x.pid];
+    if (!p || invalidReason(game, x, date)) continue;
+    thinkEvents(game, x, p, date);
+    if (x.cm && !x.cm.done && x.cm.day <= date) counterMove(game, x, p, date, out);
   }
   const due = new Set();
   for (const x of P) if (x.status === 'open' && x.decide <= date) due.add(x.pid);

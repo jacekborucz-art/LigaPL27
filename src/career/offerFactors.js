@@ -116,6 +116,13 @@ export const OFFER_FACTORS = [
     weight: (p, t) => 0.05 * clamp(1 + 0.1 * (t.patience - 10), 0, 2),
     value: (p, o) => (o.first ? 1 : 0),
     why: (v) => (v ? 'pierwsza oferta' : null) },
+  // ---- Termin przejścia (Nov 25, 2026, docs/negocjacje.md „Decyzja zawodnika przy transferze”)
+  { id: 'timing', label: 'Termin przejścia', cap: 0.3,
+    // o.timing: -0,3..+0,4 z sytuacji zawodnika i terminu (playerMind.js timingValue, liczy wywołujący): mało gra albo
+    // prosi o transfer, woli szybko; podstawowy z długim kontraktem albo w walce o cel woli później; kończy mu się kontrakt, woli lato
+    weight: () => 1,
+    value: (p, o) => (Number.isFinite(o.timing) ? o.timing : 0),
+    why: (v) => (v > 0.1 ? 'dobry termin przejścia' : v < -0.1 ? 'zły termin przejścia' : null) },
 ];
 export const LEGACY_FACTORS = OFFER_FACTORS.filter((f) => f.legacy).map((f) => f.id);
 

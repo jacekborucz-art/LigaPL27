@@ -135,7 +135,7 @@ test('Koniec sezonu: historia meczów zostaje, statystyki do p.history z podzia�
   // Pełny sezon w jednym klubie: co najmniej 34 mecze; po zmianie pracy albo zwolnieniu zimą mniej
   // (nowy klub ma swój terminarz, trener bez klubu nie gra)
   const fullSeason = g.manager.history.length === 1 && !g.manager.history[0].to;
-  assert.ok(played26.length >= (fullSeason ? 34 : 20), `mecze sezonu: ${played26.length}`);
+  assert.ok(played26.length >= (fullSeason ? 34 : 15), `mecze sezonu: ${played26.length}`); // zwolnienie zimą: ok. 17-19 meczów jesieni
   // Każdy mecz w historii to mecz klubu, który trener wtedy prowadził (także po zmianie pracy w trakcie sezonu)
   // Dzień zwolnienia włącznie: mecz tego dnia gra jeszcze stary klub (decyzja o nowej pracy przychodzi po meczu)
   const ledAt = (club, d) => (g.manager.history ?? []).some((h) => h.club === club && h.from <= d && (!h.to || d <= h.to));

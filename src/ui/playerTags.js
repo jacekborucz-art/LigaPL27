@@ -106,7 +106,7 @@ export function playerTagList(game, p, opts = {}) {
     add('tr', 'TR', `${head}${stage ? `: ${stage}` : ''}${p.transfer?.hold ? '. Po testach medycznych nie gra' : ''}`);
   } else if (M?.pending?.length) {
     const until = thinkingUntil(game, p.id); // propozycja w toku: obrys, wynik nieznany
-    if (until) add('tr', 'TR', `Rozważa oferty, odpowie do ${fmtDate(until)}`, true);
+    if (until) add('tr', 'TR', 'Zawodnik się zastanawia nad ofertami', true); // bez daty decyzji
   }
   if (p.preContract) {
     const pc = p.preContract;

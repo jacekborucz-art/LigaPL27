@@ -33,6 +33,7 @@ export const WISH = {
   morale: { open: -1, list: 2, promise: 1, refuse: -3, broken: -2.5, calmed: 1, talkFail: -1 },
   ai: { list: 0.6, renew: 0.3 }, // reszta: klub ignoruje prośbę
   listPrice: 0.95, refusePenalty: -0.15, stayBonus: 0.15,
+  spurned: 1.5, // klub odrzucił uczciwą ofertę, a zawodnik chciał odejść: ryzyko x1,5 przez 3 miesiące (p.coSpurned, playerMind.js)
 };
 
 const round = (x, step = 10000) => Math.round(x / step) * step;
@@ -66,6 +67,7 @@ export function monthlyHazard(p, ctx) {
   let h = ((ctx.tier ?? 1) >= 2 ? WISH.baseLow : WISH.base) * fRep * fBench * fStall * fAge * fTrait * fMonth;
   if (p.lastMove && ctx.date && daysBetween(p.lastMove, ctx.date) < WISH.recentDays) h *= 0.2;
   h *= hazardMemFactor(p, ctx.date); // fSpokój x fPamięć, czekanie na okno, rozczarowany w oknie x2 (wishMemory.js)
+  if (p.coSpurned && ctx.date && p.coSpurned.until > ctx.date) h *= WISH.spurned;
   return clamp(h, 0, WISH.cap);
 }
 

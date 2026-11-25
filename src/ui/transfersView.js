@@ -39,7 +39,8 @@ import { scoutingView } from '../career/scoutOps.js'; // liczba obserwowanych pr
 import { observeListHtml, observeStatusHtml } from './observerView.js'; // raport obserwatora: lista „Obserwacje” i stan w karcie
 import { observeMenuInfo } from '../career/observerReport.js'; // stan obserwacji w małej karcie zawodnika
 import { clubOfferPanel, readOfferForm, handleClubOfferAction } from './clubOffersView.js'; // oferty klub-klub: zapytanie, pakiet, stan rozmów
-import { agreementOf, inquiryOf, clauseAmount } from '../career/clubOffers.js';
+import { agreementOf, inquiryOf, clauseAmount, regDateOf, markPlayerRefused } from '../career/clubOffers.js';
+import { userGate } from '../career/playerMind.js'; // decyzja zawodnika: czy chce rozmawiać (docs/negocjacje.md, Nov 25, 2026)
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size = 20) => (clubById(id) ? crestHtml(clubById(id), { size, clubsById }) : '');
@@ -815,10 +816,14 @@ export function handleTransferAction(game, act, ds = {}, root = null) {
       if (abroad && !inWindow(game.date)) return { ui: { tfMsg: 'Okno transferowe jest zamknięte.' } };
       if (!sold && p.joinOn) return { ui: { tfMsg: `${joinStatusText(game, p)}.${p.joinOn.clubId === game.clubId ? '' : ' Nie rozmawia z innymi klubami.'}` } }; // umowa poza oknem (lateJoins.js)
       if (p.transfer) return { ui: { tfMsg: 'Zawodnik jest w trakcie transferu.' } };
-      if (userProposal(game, p.id)) return { ui: { tfMsg: `${p.name} rozważa twoją propozycję. Odpowie ok. ${fmtDate(thinkingUntil(game, p.id))}.` } };
+      if (userProposal(game, p.id)) return { ui: { tfMsg: `${p.name} rozważa twoją propozycję. Zawodnik się zastanawia, odpowiedź przyjdzie w poczcie.` } };
       const cap = canSign(game);
       if (!cap.ok) return { ui: { tfMsg: cap.text } };
-      return { ui: {}, negotiate: { kind: 'sign', playerId: p.id, fromClub: abroad ? poolSellerClub(p) : p.clubId ?? null, fee, limits: negotiationLimits(game, 'sign', p) } };
+      // Bramka: czy zawodnik chce rozmawiać (po porozumieniu klubów, także wolny i z zagranicy); odmowa zamyka rozmowy
+      const g = userGate(game, p, { mode: ag?.mode ?? null });
+      if (!g.ok) { if (g.refused && ag) markPlayerRefused(game, p.id); return { ui: { tfMsg: g.text }, save: !!g.refused }; }
+      const when = ag ? { mode: ag.mode, regDate: regDateOf(ag, game.date) } : null;
+      return { ui: {}, save: true, negotiate: { kind: 'sign', playerId: p.id, fromClub: abroad ? poolSellerClub(p) : p.clubId ?? null, fee, limits: negotiationLimits(game, 'sign', p), mind: { verdict: g.gate.verdict, timing: g.gate.parts.timing ?? 0, words: g.text }, when } };
     }
     case 'tf-lastround': { // ostatnia runda rozmów: zawodnik chce zmian w kontrakcie (src/career/proposals.js)
       const x = p && userProposal(game, p.id);
@@ -830,7 +835,9 @@ export function handleTransferAction(game, act, ds = {}, root = null) {
     case 'tf-pre': { // umowa od 1 lipca (src/career/preContracts.js)
       const chk = checkUserPre(game, p);
       if (!chk.ok) return { ui: { tfMsg: chk.text } };
-      return { ui: {}, negotiate: { kind: 'sign', playerId: p.id, fromClub: p.clubId, fee: 0, pre: true, limits: negotiationLimits(game, 'sign', p) } };
+      const g = userGate(game, p, { mode: 'season' }); // bramka: czy chce rozmawiać o umowie od 1 lipca
+      if (!g.ok) return { ui: { tfMsg: g.text }, save: !!g.refused };
+      return { ui: {}, save: true, negotiate: { kind: 'sign', playerId: p.id, fromClub: p.clubId, fee: 0, pre: true, limits: negotiationLimits(game, 'sign', p), mind: { verdict: g.gate.verdict, timing: g.gate.parts.timing ?? 0, words: g.text } } };
     }
     case 'tf-wish': // podwyżka przy prośbie o transfer otwiera rozmowy o przedłużeniu z bonusem do chęci pozostania
       if (ds.a === 'raise') return { ui: {}, negotiate: { kind: 'renew', playerId: p.id, fromClub: null, fee: 0, stayBonus: 0.15, limits: negotiationLimits(game, 'renew', p) } };
@@ -902,7 +909,7 @@ export function transferCardHtml(game, p, { wide = false } = {}) {
     ...(mine ? [cardFact('Morale', esc(moraleLabel(p.morale ?? 12)))] : []),
     ...(p.joinOn ? [cardFact('Status', esc(joinStatusText(game, p)))] : []), // umowa wolnego poza oknem (lateJoins.js)
     ...obsFact(game, p, mine), // raport obserwatora: obserwacja w toku albo data ostatniego raportu
-    ...(thinkingUntil(game, p.id) ? [cardFact('Status', esc(`Rozważa oferty, odpowie do ${fmtDate(thinkingUntil(game, p.id))}`))] : []), // namysł (proposals.js)
+    ...(thinkingUntil(game, p.id) ? [cardFact('Status', esc('Zawodnik się zastanawia'))] : []), // namysł (proposals.js), bez daty decyzji
   ];
   const go = `<p class="tf-pcard__go"><button class="btn btn--primary btn--sm" data-act="tf-open" data-id="${esc(p.id)}">${mine ? 'Otwórz kartę transferową' : 'Przejdź do oferty'}</button>${mine ? '' : ` ${wishBtn(game, p)}`}</p>`;
   return renderPlayerCard(p, {

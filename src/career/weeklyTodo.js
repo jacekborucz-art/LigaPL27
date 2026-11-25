@@ -173,6 +173,12 @@ export function collectTodo(game, date = game.date) {
     fact({ key: `namysl:${x.id}`, type: 'proposal', from: `Agent zawodnika ${x.name}`, area: 'transfer', pid: x.pid, due: x.deadline, prio: pPrio(x.deadline), title: `Ostatnia runda rozmów: ${x.name}`,
       why: `${x.name} chce zmian w kontrakcie. Odpowiedz do ${fmtDate(x.deadline)}, potem propozycja wygaśnie.`, act: { steps: [{ act: 'tab', tab: 'transfery', sub: 'wtoku' }, { act: 'tf-lastround', id: x.pid }] } });
   }
+  // 2b. Zawodnik ma wątpliwości po namyśle: ostatnia szansa, poprawka pensji do terminu (fakt; docs/negocjacje.md, Nov 25, 2026)
+  for (const x of openProposals(game)) {
+    if (x.status !== 'open' || !x.user || x.to !== clubId || !x.final || x.final.pct || x.final.until < date) continue;
+    fact({ key: `namysl-szansa:${x.id}`, type: 'proposal', from: `Agent zawodnika ${x.name}`, area: 'transfer', pid: x.pid, due: x.final.until, prio: pPrio(x.final.until), title: `Ostatnia szansa: ${x.name}`,
+      why: `${x.name} ma wątpliwości. Popraw pensję w propozycji do ${fmtDate(x.final.until)}, bez poprawki odmówi.`, act: { steps: [{ act: 'tab', tab: 'transfery', sub: 'wtoku' }] } });
+  }
 
   // 3. Limit kadry (fakt, zarząd)
   const L = W && game.squadLimit?.case?.clubId === clubId ? limitStatus(game) : null;

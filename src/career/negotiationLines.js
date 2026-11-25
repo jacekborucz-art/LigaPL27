@@ -161,6 +161,32 @@ export const LINES = [
   ['promiseKept', 'A', '', '{imie} jest zadowolony z roli w drużynie.'],
   ['transferRequest', 'P', '', 'Proszę o wystawienie mnie na listę transferową.'],
   ['transferRequest', 'A', '', 'Oficjalnie prosimy o zgodę na transfer.'],
+
+  // ------------------------- rozmowy o transferze: sygnały bez liczb oczekiwań (src/career/playerMind.js, MIND w negotiation.js)
+  ['mind_wage', 'A', '', 'Pensja powinna lepiej oddawać pozycję {imie}. Proponujemy {kwota} tygodniowo.'],
+  ['mind_wage', 'A', 'rekin', 'Mój klient jest wart więcej. {kwota} tygodniowo i rozmawiamy dalej.'],
+  ['mind_wage', 'A', 'rodzinny', 'Rodzina liczyła na trochę więcej: {kwota} tygodniowo.'],
+  ['mind_wage', 'P', '', 'Pensja to dla mnie ważna sprawa. Myślałem o {kwota} tygodniowo.'],
+  ['mind_signOn', 'A', '', '{imie} prosi o większą gwarancję na start: {premia} za podpis.'],
+  ['mind_signOn', 'P', '', 'Chcę mieć pewność na start. Premia za podpis {premia} i jesteśmy blisko.'],
+  ['mind_role', 'A', '', '{imie} chce usłyszeć, że będzie ważnym ogniwem: {rola}.'],
+  ['mind_role', 'P', '', 'Muszę wiedzieć, że będę grał. Proszę wpisać rolę: {rola}.'],
+  ['mind_years', 'A', '', '{imie} woli kontrakt na {lata}. To dla niego ważne.'],
+  ['mind_years', 'P', '', 'Wolałbym umowę na {lata}.'],
+  ['mind_clause', 'A', '', 'Pytamy o klauzulę odstępnego: {klauzula}.'],
+  ['mind_clause', 'P', '', 'Chcę mieć furtkę na przyszłość: klauzula {klauzula}.'],
+  ['mind_bonus', 'A', '', '{imie} chętnie zarobi więcej za grę. Prosimy o wyższą premię za występ.'],
+  ['mind_bonus', 'P', '', 'Wolę zarabiać za to, co daję na boisku. Proszę o wyższą premię za występ.'],
+  ['mind_extra', 'A', '', 'Jesteśmy prawie dogadani. Brakuje drobiazgu i podpisujemy.'],
+  ['mind_extra', 'A', 'rekin', 'Prawie. Jeszcze jeden mały gest i mamy umowę.'],
+  ['mind_extra', 'P', '', 'Prawie się zgadzam. Proszę jeszcze o mały dodatek.'],
+  ['mind_firm', 'A', '', 'Nie ruszymy się ani o krok. Nasze warunki są na stole.'],
+  ['mind_firm', 'A', 'rekin', 'Tu nie ma o czym rozmawiać. Albo te warunki, albo nic.'],
+  ['mind_firm', 'P', '', 'Zostaję przy swoim. Te warunki to dla mnie minimum.'],
+  ['mind_low', 'A', '', 'To dla nas zbyt mało. Oferta jest daleko od naszych oczekiwań.'],
+  ['mind_low', 'A', 'rekin', 'Za takie pieniądze nawet nie siadamy do stołu. Proszę o poważną ofertę.'],
+  ['mind_low', 'A', 'rodzinny', 'Przykro nam, ale to za mało. {imie} czuje się niedoceniony.'],
+  ['mind_low', 'P', '', 'To za mało. Czuję się niedoceniony.'],
 ];
 
 const AGENT_TAGS = new Set(['rekin', 'rozsadny', 'rodzinny']);
