@@ -54,8 +54,9 @@ wygląd: grafik, Nov 24, 2026). Kod: `src/career/observerReport.js` (logika, sta
 - Polski klub: mecze o stawkę z terminarza (`game.fixtures`), ocena, gole i asysty z `p.fh`, minuty z przyrostu
   `p.season.min`. Mecz rozegrany przez klub, w którym zawodnik nie zagrał: kontuzja (`injuryDays`), pauza za kartki
   albo ławka bez minut; nie zwiększa licznika. Po 3 ławkach raport pisze „nie ma regularnej gry”.
-- Zawodnik bez polskiego klubu (zagranica, wolny): mecz co 7 dni od 3. dnia zlecenia (zagranica: gra w 80 %,
-  wolny: gra kontrolna), ocena z poziomu zawodnika i losu.
+- Zawodnik bez polskiego klubu (zagranica, wolny): tylko obserwacja przez okres 2-6 tygodni (`periodOnly`, Nov 25, 2026).
+  Ligi zagraniczne i wolni nie mają w grze meczów, więc raport nie pokazuje meczów, ocen, goli ani osi czasu; forma to jedno
+  zdanie, a cechy, zdrowie, charakter i rynek liczą się jak zwykle.
 - Zlecenie wygasa po 60 dniach: z obejrzanymi meczami powstaje raport, bez nich list „Obserwacja bez raportu”.
   Zawodnik przechodzi do klubu gracza albo znika: zlecenie się kończy.
 - Koszt: w Polsce 0 zł; za granicą 3 000 zł za mecz (płatne przy każdym wyjeździe na mecz, także gdy siedział na

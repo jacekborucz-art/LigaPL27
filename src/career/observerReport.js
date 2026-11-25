@@ -46,7 +46,6 @@ export const OBS = {
   cost: { match: 3000, week: 8000 }, // zagranica: za mecz albo za tydzień okresu (koszty skautów w Finansach)
   slots: 2, slotsDos: 16, slotsHigh: 3, assistSlots: 1,
   price: { noDir: 0.35, listed: 0.10, wageUp: 1.1 },
-  synth: { first: 3, every: 7, play: 0.8 }, // zawodnik bez polskiego klubu: mecz co 7 dni (od 3. dnia zlecenia)
   keepPerPlayer: 6, keepPlayers: 40,
   // Kluby AI: OVR kandydata widziany z błędem (jak raport po ok. 4 tygodniach obserwacji). on: false wyłącza parytet
   ai: { on: true, sample: 0.55 },
@@ -221,8 +220,13 @@ export function observerOptions(game, p) {
 // ------------------------------------------------------------ Zlecenie
 
 const normMode = (mode) => (OBS_MODES[mode] ? mode : 'match');
-function normOrder(o = {}) {
-  const mode = normMode(o.mode);
+/**
+ * Zawodnik bez polskiego klubu (za granicą albo wolny): tylko obserwacja przez okres. Ligi zagraniczne i wolni nie mają
+ * w grze meczów, więc raport nie pokazuje meczów, ocen ani goli, tylko cechy, zdrowie, charakter i rynek (Nov 25, 2026).
+ */
+export const periodOnly = (p) => whereKind(p) !== 'domestic';
+function normOrder(o = {}, onlyPeriod = false) {
+  const mode = onlyPeriod ? 'period' : normMode(o.mode);
   const n = mode === 'match' ? 1 : mode === 'matches' ? clamp(Math.round(Number(o.n) || 3), OBS.matches.min, OBS.matches.max) : 0;
   const weeks = mode === 'period' ? clamp(Math.round(Number(o.weeks) || 4), OBS.weeks.min, OBS.weeks.max) : 0;
   return { mode, n, weeks, who: o.who ?? null };
@@ -253,7 +257,7 @@ export const activeOrderFor = (game, pid) => (game.observe?.orders ?? []).find((
 export function orderQuote(game, pid, raw = {}) {
   ensureObserve(game);
   const p = game.world?.players?.[pid];
-  const o = normOrder(raw);
+  const o = normOrder(raw, !!p && periodOnly(p));
   const errors = []; const warnings = [];
   if (!p) return { ok: false, errors: ['Nie ma takiego zawodnika.'], warnings, observer: null, options: null, cost: 0, costText: '', ready: null, order: o };
   if (!game.clubId) errors.push('Bez klubu nie zlecisz obserwacji.');
@@ -271,7 +275,8 @@ export function orderQuote(game, pid, raw = {}) {
   const cost = orderCost(p, o);
   const bal = game.finance?.clubs?.[game.clubId]?.balance;
   if (cost > 0 && bal != null && bal < cost) errors.push('Na raport nie starcza budżetu.');
-  if (kind === 'abroad') warnings.push('Zawodnik gra za granicą, więc wyjazd kosztuje więcej, a skaut może tam mniej widzieć.');
+  if (kind === 'abroad') warnings.push('Zawodnik gra za granicą, więc wyjazd kosztuje więcej, a skaut może tam mniej widzieć. Z ligi zagranicznej nie mamy statystyk meczów, raport opisze to, co skaut zobaczy w czasie okresu.');
+  if (kind === 'free') warnings.push('Zawodnik nie ma klubu i nie gra meczów o stawkę. Skaut obejrzy go na treningach w czasie okresu.');
   if (kind === 'domestic' && tierOf(game, p.clubId) > tierOf(game, game.clubId)) warnings.push('Zawodnik gra w niższej lidze, jego liczby mogą być zawyżone.');
   if (p.injuryDays > 0) warnings.push('Zawodnik jest kontuzjowany. Mecze liczą się od jego powrotu.');
   if (observer?.kind === 'assistant') warnings.push(options.noScouts ? 'Nie mamy skauta, raport napisze asystent, ogólniej i bez opisu charakteru.' : 'Bez wolnego skauta raport napisze asystent, bez opisu charakteru.');
@@ -280,8 +285,7 @@ export function orderQuote(game, pid, raw = {}) {
   let ready;
   const date = game.date;
   if (o.mode === 'period') ready = addDays(date, 7 * o.weeks);
-  else if (kind === 'domestic') { const fx = nextFixtures(game, p.clubId, date)[o.n - 1]; ready = fx ? addDays(fx.date, 1) : null; }
-  else ready = addDays(date, OBS.synth.first + OBS.synth.every * (o.n - 1));
+  else { const fx = nextFixtures(game, p.clubId, date)[o.n - 1]; ready = fx ? addDays(fx.date, 1) : null; }
   return { ok: !errors.length, errors, warnings, observer: observer ? { kind: observer.kind, id: observer.id, name: observer.name } : null, options, cost, costText, ready, order: o };
 }
 
@@ -332,19 +336,6 @@ export function orderStatusText(game, o) {
 
 // ------------------------------------------------------------ System dnia
 
-/** Mecz zawodnika bez polskiego klubu (zagranica, wolny): co 7 dni od 3. dnia zlecenia, z ziarna zlecenia i daty. */
-function syntheticGame(game, o, p, date) {
-  const rng = new Rng(`obserwator-mecz:${game.seed}:${o.id}:${date}`);
-  const free = whereKind(p) === 'free';
-  const label = free ? 'gra kontrolna wolnych zawodników' : `mecz ligowy (${countryName(p) || 'zagranica'})`;
-  if (p.injuryDays > 0) return { k: 'injury', d: date, label };
-  if (!free && !rng.chance(OBS.synth.play)) return { k: 'bench', d: date, label };
-  const att = ['NAP', 'SN', 'OP'].includes(p.pos) ? 0.35 : ['BP', 'ŚP', 'WB'].includes(p.pos) ? 0.12 : 0.04;
-  const r = clamp(Math.round((6.5 + 0.1 * ((p.ovr ?? 10) - 10) + rng.gauss(0, 0.6)) * 10) / 10, 4.5, 9.5);
-  const min = rng.chance(0.7) ? 90 : rng.int(25, 85);
-  return { k: 'seen', d: date, label, r, min, g: rng.poisson(att * min / 90), a: rng.poisson(att * 0.6 * min / 90) };
-}
-
 /** Mecze zawodnika z polskim klubem od ostatniego przeglądu: obejrzany (z oceną z p.fh), kontuzja, pauza albo ławka. */
 function realGames(game, o, p, date) {
   const club = p.clubId;
@@ -379,16 +370,7 @@ function orderDay(game, o, date) {
   const p = game.world.players[o.pid];
   if (!p) { o.status = 'cancelled'; o.closed = date; return []; }
   if (p.clubId === game.clubId) { o.status = 'cancelled'; o.closed = date; return []; } // zawodnik jest już u nas
-  let fresh = [];
-  if (p.clubId) fresh = realGames(game, o, p, date);
-  else {
-    const d = daysBetween(o.start, date);
-    const key = `s:${date}`;
-    if (d >= OBS.synth.first && (d - OBS.synth.first) % OBS.synth.every === 0 && !o.seen.includes(key) && (o.mode !== 'period' || date <= o.end)) {
-      o.seen.push(key);
-      fresh = [syntheticGame(game, o, p, date)];
-    }
-  }
+  const fresh = p.clubId && o.kind === 'domestic' ? realGames(game, o, p, date) : []; // za granicą i wolny: bez meczów (periodOnly)
   for (const g of fresh) {
     if (o.mode === 'matches' || o.mode === 'match') { if (watchedOf(o) >= o.n) break; }
     o.games.push(g);
@@ -400,7 +382,7 @@ function orderDay(game, o, date) {
   const w = watchedOf(o);
   const done = o.mode === 'period' ? date >= o.end : w >= o.n;
   if (done || date >= o.until) {
-    if (w > 0) return [finishOrder(game, o, date)];
+    if (w > 0 || (o.kind !== 'domestic' && o.mode === 'period' && done)) return [finishOrder(game, o, date)];
     o.status = 'expired'; o.closed = date;
     return [createMessage({ date, key: `obs-expired:${o.pid}:${o.id}`, category: 'transfers', from: o.observer.name, priority: 'info', subject: `Obserwacja bez raportu: ${o.name}`, body: `${o.name} nie zagrał w żadnym meczu w czasie zlecenia (kontuzja, pauza albo ławka). Zlecenie wygasło bez raportu. Możesz zlecić nową obserwację, gdy zacznie grać.`, refs: { kind: 'obsExpired', pid: o.pid } })];
   }
@@ -599,6 +581,12 @@ export function buildReport(game, o, date = game.date) {
   const fv = { minuty: minutes, gole: form.goals, asysty: form.assists, gole_txt: plCount(form.goals, 'gol', 'gole', 'goli'), asysty_txt: plCount(form.assists, 'asysta', 'asysty', 'asyst'), ocena: rating == null ? '-' : rating.toFixed(1).replace('.', ',') };
   form.lines = [fill(pick(T.stats), fv), stage === 'one' ? pick(T.oneForm) : seen.length && minutes / seen.length < 35 ? pick(T.fewMin) : pick(trend > 0 ? T.up : trend < 0 ? T.down : T.flatForm)];
   if (form.noRegular) form.lines.push(pick(T.noRegular));
+  if (o.kind !== 'domestic') { // za granicą i wolny: bez meczów i liczb (periodOnly), forma jednym zdaniem
+    form.noMatches = true;
+    form.lines = [o.kind === 'free'
+      ? `Nie ma klubu i nie gra meczów o stawkę. Oglądałem go przez ${plWeeks(o.weeks)} na treningach, więc o formie meczowej nic pewnego nie powiem.`
+      : `Oglądałem go przez ${plWeeks(o.weeks)} w lidze zagranicznej (${countryName(p) || 'za granicą'}). Statystyk z tej ligi nie mamy, opis opiera się na tym, co zobaczyłem.`];
+  }
   // Zdrowie: odporność na urazy widziana z błędem (ocena zawodnika)
   const odp = clamp((p.hidden?.ODP ?? 10) + bias + rng.gauss(0, sd), 1, 20);
   const health = { now: p.injuryDays > 0 ? p.injuryDays : 0, during: injured, risk: odp <= 6 ? 'wysokie' : odp <= 9.5 ? 'umiarkowane' : 'niskie' };

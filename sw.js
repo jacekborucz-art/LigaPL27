@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-0f1ae61a1a';
+const VERSION = 'v0.3-21b2439402';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -218,7 +218,7 @@ const FILES = [
   ['./src/career/moveWish.js', 'fc81518999'],
   ['./src/career/negotiation.js', '6c7231dc80'],
   ['./src/career/negotiationLines.js', 'cc97d8137f'],
-  ['./src/career/observerReport.js', 'a32a4c5d17'],
+  ['./src/career/observerReport.js', '146af07995'],
   ['./src/career/offerFactors.js', 'fa80be89e3'],
   ['./src/career/ownerFunding.js', '0786c52d2c'],
   ['./src/career/owners.js', '881a7a1333'],
@@ -383,7 +383,7 @@ const FILES = [
   ['./src/ui/menuView.js', 'a5ede751c2'],
   ['./src/ui/nationalView.js', '92d610d773'],
   ['./src/ui/negotiationView.js', 'f254eea6d2'],
-  ['./src/ui/observerView.js', '8dc68b5d0c'],
+  ['./src/ui/observerView.js', 'fb39407fea'],
   ['./src/ui/playerCard.js', '6864228807'],
   ['./src/ui/playerInstrView.js', '9e2555a798'],
   ['./src/ui/playerMenus.js', '5d3219b5f1'],

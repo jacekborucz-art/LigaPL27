@@ -187,10 +187,15 @@ test('Zagranica: okres płatny z góry (8 000 zł za tydzień), kategoria skaut�
   assert.ok(r.ok);
   assert.equal(bal - c.balance, 2 * OBS.cost.week);
   assert.equal(c.ledger[g.date.slice(0, 7)].out.scouts, 2 * OBS.cost.week);
-  // Okres: mecze co tydzień (zawodnik bez polskiego klubu), raport po 2 tygodniach
+  // Za granicą tylko okres, bez wymyślonych meczów: raport po 2 tygodniach, forma jednym zdaniem
+  assert.equal(orderQuote(g, p.id, { mode: 'match' }).order.mode, 'period', 'tryb meczów niedostępny za granicą');
+  assert.doesNotMatch(renderObserveOrder(g, { pid: p.id }), /data-m="match"/);
   step(g, 14);
   const L = lastReport(g, p.id);
   assert.ok(L && L.r.flags.abroad, 'raport z zagranicy');
+  assert.equal(L.r.form.games.length, 0, 'bez meczów');
+  assert.ok(L.r.form.noMatches);
+  assert.doesNotMatch(renderObserverReport(g, { pid: p.id }), /Forma i statystyki z obejrzanych meczów/);
   assert.ok(L.r.lines.profile.some((x) => /granic|kraju|zagraniczna/.test(x)));
 });
 
@@ -233,9 +238,11 @@ test('Widok raportu: bez dokładności, tekst przez esc(), zawodnik bez klubu i 
   assert.match(renderObserveOrder(g, { pid: free.id, mode: 'match' }), /Zleć raport/);
   const r = createOrder(g, free.id, { mode: 'match' });
   assert.ok(r.ok, r.text);
-  step(g, 4);
+  assert.equal(r.order.mode, 'period', 'wolny zawodnik: tylko okres');
+  step(g, 7 * r.order.weeks + 1);
   const L = lastReport(g, free.id);
   assert.ok(L, 'raport o wolnym zawodniku');
+  assert.ok(L.r.form.noMatches && !L.r.form.games.length, 'bez meczów');
   assert.equal(L.r.market.price, null, 'bez ceny');
   assert.match(renderObserverReport(g, { pid: free.id }), /bez kontraktu/);
   void s;

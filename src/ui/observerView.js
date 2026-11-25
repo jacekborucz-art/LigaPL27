@@ -9,7 +9,7 @@ import { NAT_NAMES } from '../data/names.js';
 import { anyClub } from '../season/season.js';
 import { fmtZl } from '../career/transfers.js';
 import {
-  OBS, OBS_MODES, REC, VERDICTS, orderQuote, activeOrderFor, orderStatusText, observeMenuInfo, observeList, clubAndLeague,
+  OBS, OBS_MODES, REC, VERDICTS, orderQuote, activeOrderFor, orderStatusText, observeMenuInfo, observeList, clubAndLeague, periodOnly,
 } from '../career/observerReport.js';
 
 const FOOT = { L: 'lewa', P: 'prawa', LP: 'obie' };
@@ -161,7 +161,7 @@ export function renderObserverReport(game, ui = {}) {
     </div>
     <ul class="obs-authors">${authors.map(([a, b]) => `<li><b>${esc(a)}</b><small>${esc(b)}</small></li>`).join('')}</ul>
     <div class="obs-facts">
-      <span>Obejrzano <b>${esc(r.mode === 'period' ? plMatches(r.watched) : `${r.watched} z ${plMatches(r.n)}`)}</b></span>
+      <span>${r.form?.noMatches ? `Obserwacja: <b>${esc(`okres ${r.weeks} tyg.`)}</b>` : `Obejrzano <b>${esc(r.mode === 'period' ? plMatches(r.watched) : `${r.watched} z ${plMatches(r.n)}`)}</b>`}</span>
       <span>Rozgrywki: <b>${esc(s.league)}</b></span>
       <span>Okres: <b>${esc(`${fmtDate(r.start)} - ${fmtDate(r.date)}`)}</b></span>
     </div>
@@ -196,7 +196,7 @@ export function renderObserverReport(game, ui = {}) {
   const f = r.form;
   const ref = r.role.our && game.world.players[r.role.our.id]?.season?.rating > 0 ? game.world.players[r.role.our.id].season.rating : null;
   const trendTxt = r.stage === 'one' ? '' : f.trend > 0 ? '▲ zwyżka' : f.trend < 0 ? '▼ spadek' : '► stabilna';
-  const form = card('form', 'Forma i statystyki z obejrzanych meczów', `<div class="obs-form">
+  const form = f.noMatches ? card('form', 'Forma', `<div class="obs-sub">${lines(f.lines)}</div>`, { sub: `Okres: ${r.weeks} tyg.` }) : card('form', 'Forma i statystyki z obejrzanych meczów', `<div class="obs-form">
       <div class="obs-sub">
         <div class="obs-fm__head"><span class="obs-fm__avg">${esc(`śr. ${f.rating == null ? '-' : num1(f.rating)}`)}</span>${trendTxt ? `<span class="obs-fm__trend" data-d="${f.trend}">${esc(trendTxt)}</span>` : ''}<span class="obs-note">${esc(`${plMatches(r.watched)}, ${f.minutes} min, gole: ${f.goals}, asysty: ${f.assists}`)}</span></div>
         ${formChart(f.games, ref)}
@@ -281,13 +281,13 @@ export function renderObserveOrder(game, ui = {}) {
     const body = `<section class="obs-card" data-t="info"><div class="obs-card__head"><h3>Obserwacja w toku</h3><span class="obs-card__sub">${esc(order.observer.name)}</span></div>
       <p class="obs-txt">${esc(`${p.name}: ${orderStatusText(game, order)}.`)}</p>
       <p class="obs-note">${esc(`Zlecenie z ${fmtDate(order.start)}: ${order.mode === 'period' ? `okres ${order.weeks} tyg. (do ${fmtDate(order.end)})` : plMatches(order.n)}. Wygasa ${fmtDate(order.until)}.${order.cost ? ` Koszty wyjazdów: ${fmtZl(order.cost)}.` : ''}`)}</p>
-      ${timeline(order.games)}
+      ${periodOnly(p) ? '' : timeline(order.games)}
       <div class="obs-actions"><button class="btn btn--quiet" data-act="obs-cancel" data-o="${esc(order.id)}">Odwołaj obserwację</button><button class="btn btn--quiet" data-act="obs-back">Wróć</button></div></section>`;
     return `<div class="obs obs--order" aria-labelledby="obs-h"><div class="obs-top"><button class="btn btn--quiet" data-act="obs-back">Wróć</button></div>${head}${msg}${body}${prevBtn}</div>`;
   }
   const q = orderQuote(game, p.id, { mode: ui.mode, n: ui.n, weeks: ui.weeks, who: ui.who });
   const o = q.order;
-  const modes = Object.keys(OBS_MODES).map((k) => `<button class="obs-mode${o.mode === k ? ' is-on' : ''}" data-act="obs-mode" data-m="${k}" aria-pressed="${o.mode === k}"><b>${esc(OBS_MODES[k])}</b><small>${esc(MODE_TXT[k])}</small></button>`).join('');
+  const modes = Object.keys(OBS_MODES).filter((k) => !periodOnly(p) || k === 'period').map((k) => `<button class="obs-mode${o.mode === k ? ' is-on' : ''}" data-act="obs-mode" data-m="${k}" aria-pressed="${o.mode === k}"><b>${esc(OBS_MODES[k])}</b><small>${esc(MODE_TXT[k])}</small></button>`).join('');
   const chips = (act, from, to, cur, unit) => `<div class="obs-chips" role="group">${Array.from({ length: to - from + 1 }, (_, i) => from + i).map((v) => `<button class="obs-chipbtn${v === cur ? ' is-on' : ''}" data-act="${act}" data-v="${v}" aria-pressed="${v === cur}">${esc(`${v} ${unit(v)}`)}</button>`).join('')}</div>`;
   const extra = o.mode === 'matches' ? `<div class="obs-field"><span class="obs-field__k">Liczba meczów</span>${chips('obs-n', OBS.matches.min, OBS.matches.max, o.n, (v) => (v < 5 ? 'mecze' : 'meczów'))}</div>`
     : o.mode === 'period' ? `<div class="obs-field"><span class="obs-field__k">Długość okresu</span>${chips('obs-weeks', OBS.weeks.min, OBS.weeks.max, o.weeks, () => 'tyg.')}</div>` : '';

@@ -29,6 +29,12 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 25, 2026, profil A (komputer domowy), raport obserwatora: zagranica i wolni tylko przez okres (v1.24 Beta)
+Zrobione (decyzja właściciela):
+- `periodOnly` w `src/career/observerReport.js`: zawodnik za granicą albo wolny ma tylko tryb „Okres”; usunięte wymyślone
+  mecze (`syntheticGame`, `OBS.synth`). Raport bez meczów, ocen i osi czasu, forma jednym zdaniem (`form.noMatches`).
+- Właściciel zostawił błąd oceny w klubach AI (`OBS.ai.on`).
+
 ## Nov 25, 2026, profil A (komputer domowy), raport obserwatora (v1.24 Beta)
 Zrobione (ekspert skautingu, redaktor tekstów i grafik: Sonnet medium; wdrożenie Opus high; sprawdzone):
 - Nowe `src/career/observerReport.js` (`OBS`, system dnia `observe`), `src/ui/observerView.js`, `src/styles/observer.css`:
