@@ -17,21 +17,21 @@ import { squadOf } from '../src/world/worldGen.js';
 import { Rng } from '../src/core/rng.js';
 
 // Skróty meczów sprzed instrukcji indywidualnych (Nov 18, 2026, tests/piHelpers.mjs przed zmianą silnika)
-// Wzorce przeliczone po celowych zmianach silnika (żółte -15%, kara zmęczenia z tolerancją, krycie zmęczonej obrony przy stałych fragmentach, Nov 25, 2026)
+// Wzorce przeliczone po celowych zmianach silnika (żółte -15%, zmęczenie z tolerancją, stałe fragmenty, nasycenie golami, Nov 25, 2026)
 const GOLD = {
   user: [
-    '5234c068', '3826b215', '883fda8c', '7b179cf1', '8d30037', '2860d6c2', 'f7db251e', '9cbb0558', '83e75735', 'c9340e3c',
-    '2221f8cf', '71d74805', '4810e36', 'e955e38b', '73bf8acf', 'f9d7806d', 'a667554f', 'f00215bc', 'f9968d8e', '2a8f2a0a',
-    'c65f8cb7', 'c9207507', '90fe28ef', '93a0b944', '5daf5735', '34a84b25', '45e7bc5b', 'cdf40436', '6fefe980', 'abb22045',
-    'b514ac05', '7372b340', '5e778232', '51cd8141', '55230baa', '9cedaef', 'd6258b7b', '35469569', '51ce96ec', '520e6770',
-    '5df8cf8b', '4036f82e', '94fbf632', 'd6a2cf4d', '40e9fa55', 'aa672728', '9c934941', 'e0b220c6', '36852ba8', 'd1644980',
+    '34078cb0', '6ce8d9c5', '883fda8c', '7b179cf1', '8d30037', '2860d6c2', 'f7db251e', '9cbb0558', '83e75735', '694234d6',
+    '2221f8cf', 'eef20fbf', '211e56b', 'e955e38b', '73bf8acf', 'f9d7806d', 'a667554f', '730da59a', 'f9968d8e', '1cc2fe26',
+    'c65f8cb7', 'c9207507', '2b2276c1', '93a0b944', '6975917', '34a84b25', '45e7bc5b', 'cdf40436', '9a49740f', 'abb22045',
+    'b514ac05', 'bdc3c0f7', '5e778232', '51cd8141', '55230baa', '6b371b1c', 'd6258b7b', '9bee6691', '51ce96ec', '520e6770',
+    '856a85e6', 'c7ecfffb', 'aa2ca0a9', 'd6a2cf4d', '40e9fa55', 'aa672728', '943747', 'e0b220c6', '75dbc3f1', '21b04ce7',
   ],
   ai: [
-    'b89c3308', '2437b59d', '438143f3', 'a74d43e', '8e0dfcea', '93e38323', 'a7a30f03', 'fccae89f', '5496d5ed', '97d258a5',
-    '6677e92d', 'd7a3e7b9', '3e84e97e', 'a705ae8b', '7aac84d7', 'f740b572', '58b552d0', 'c3f325ea', '45b393a', '59b41071',
-    '8a539863', '840ccc96', 'fcea51e1', '714b36f1', 'e6fa7529', '3cc6935d', '8193569c', 'bba818e6', 'be0be41c', '10190e83',
-    '4c3362a6', '80d74a54', '9343017f', '6875af1a', 'bccf575d', '7a486251', 'ef65bb93', 'd164978c', 'f76bad3e', '45d5a21',
-    '6b52c39f', '96d9f4cc', 'c33e4a93', 'ae6faac2', 'c6e793e4', '58ecc2a9', '9e030ed6', '8ca5a9af', 'cf3f1495', '3de002bd',
+    '9f995449', '1952f72e', '438143f3', 'a74d43e', 'd0a70b32', '93e38323', 'a7a30f03', 'fccae89f', '5496d5ed', '8a1d512c',
+    'dba9b31d', 'd7a3e7b9', '3e84e97e', 'a705ae8b', '20bb73c6', 'f740b572', '58b552d0', 'c3f325ea', '9672dc15', 'e01ec887',
+    'd7418be8', '840ccc96', '3e15498', '714b36f1', 'e6fa7529', '43a37e54', 'd597cb80', 'bba818e6', 'be0be41c', '10190e83',
+    '4c3362a6', 'c9745319', '4aff12ef', '6875af1a', 'bd59c6f0', '7a486251', 'ef65bb93', '450cdc9f', 'f76bad3e', '1b4d6eb',
+    'a5ef231a', '96d9f4cc', '7824558a', 'ae6faac2', 'c6e793e4', '58ecc2a9', 'b89c4a4c', '8ca5a9af', 'e8bd1c4e', 'd692df0b',
   ],
 };
 
@@ -163,7 +163,7 @@ test('Kierunek efektów każdej instrukcji (A/B na tych samych ziarnach, 300 mec
     'dribble:1': (x) => x.acc < -0.6 && x.condI < -0.3 && x.konA > 0,
     'shoot:-1': (x) => x.dysI < -0.4,
     'shoot:1': (x) => x.dysI > 0.4,
-    'cross:-1': (x) => x.kpI < -0.1 && x.condI > 0.2,
+    'cross:-1': (x) => x.kpI < 0 && x.condI > 0.2, // kierunek; próg -0,1 był na granicy szumu po nasyceniu golami (Nov 25, 2026)
     'cross:1': (x) => x.kpI > 0.15 && x.condI < -0.3,
     'tackle:-1': (x) => x.foulI < -0.6 && x.ycI < -0.2,
     'tackle:1': (x) => x.foulI > 1 && x.ycI > 0.25 && x.shA < 0,

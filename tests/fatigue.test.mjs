@@ -5,7 +5,9 @@ import { generateWorld, squadOf } from '../src/world/worldGen.js';
 import { createTactics, assign } from '../src/engine/lineup.js';
 import { CLUBS_PL, clubById } from '../src/data/clubs_pl.js';
 import { createMatch, runToEnd } from '../src/engine/match/match.js';
-import { condSpeed } from '../src/engine/match/teams.js';
+import { condSpeed, hungerOf, teamHunger, fatigueTolerance } from '../src/engine/match/teams.js';
+import { shout } from '../src/engine/match/match.js';
+import { SAT } from '../src/engine/match/constants.js';
 
 const world = generateWorld(42);
 const EK = CLUBS_PL.filter((c) => c.tier === 1);
@@ -69,4 +71,30 @@ test('Napastnik na środku obrony popełnia błędy częściej niż nominalny ob
   // Próg 1,5: ok. 10 błędów na 300 meczów to mała próbka, a zmiana ławki (docs/sklad-lawki.md) przesuwa losowanie
   // (przed nią 10 i 24, po niej 11 i 22)
   assert.ok(swapped > natural * 1.5, `błędy: nominalny ŚO ${natural}, napastnik na ŚO ${swapped}`);
+});
+
+test('Nasycenie golami: głód goli z pracowitości, ambicji, profesjonalizmu, przywództwa i regularności; okrzyk go podnosi', () => {
+  const base = sq[EK[0].id][0];
+  const lazy = { ...base, attr: { ...base.attr, PRA: 4, LID: 4 }, traits: { ...(base.traits ?? {}), ambition: 4, professionalism: 4, ego: 4 }, hidden: { ...base.hidden, KON: 4, PRF: 4 } };
+  const hungry = { ...base, attr: { ...base.attr, PRA: 18, LID: 18 }, traits: { ...(base.traits ?? {}), ambition: 18, professionalism: 18, ego: 18 }, hidden: { ...base.hidden, KON: 18, PRF: 18 } };
+  assert.ok(hungerOf(hungry) > hungerOf(lazy) + 0.5, `${hungerOf(lazy)} ${hungerOf(hungry)}`);
+  const M = createMatch({ seed: 'glod', home: side(EK[0].id), away: side(EK[1].id) });
+  M.minute = 60; const T = M.teams[0];
+  const h0 = teamHunger(T, M);
+  assert.ok(h0 > 0 && h0 < 1);
+  assert.equal(teamHunger(T, M), h0, 'w danej minucie ta sama wartość');
+  const r = shout(M, 0, 'nieodpuszczamy');
+  assert.ok(r.ok, r.error);
+  M.minute = 61;
+  assert.ok(teamHunger(T, M) > h0 + 0.15, 'okrzyk podnosi głód goli');
+  assert.ok(T.shout.drain > 0, 'okrzyk kosztuje kondycję');
+  assert.ok(SAT.slack2 < 1 && SAT.smax > 0);
+});
+
+test('Tolerancja zmęczenia: pracowity i wytrzymały znosi zmęczenie lepiej', () => {
+  const base = sq[EK[0].id][3];
+  const avg = (p) => { let s = 0; for (let i = 0; i < 40; i++) s += fatigueTolerance(p, `t${i}`); return s / 40; };
+  const strong = { ...base, attr: { ...base.attr, PRA: 18, WYT: 18, OPA: 16 } };
+  const weak = { ...base, attr: { ...base.attr, PRA: 4, WYT: 5, OPA: 6 } };
+  assert.ok(avg(strong) < 0.8 && avg(weak) > 1.2, `${avg(strong)} ${avg(weak)}`);
 });

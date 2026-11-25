@@ -7,7 +7,7 @@
 
 import { substitute, changeTactics, subsAvailable, isConcussionSub, shout, canShout } from './control.js';
 import { setCoachHooks } from './core.js';
-import { goalkeeper, fieldPlayers, slotFit, reslot, assignSlots, shapeSlots, condPenalty } from './teams.js';
+import { goalkeeper, fieldPlayers, slotFit, reslot, assignSlots, shapeSlots, condPenalty, teamHunger } from './teams.js';
 import { proficiency } from '../positions.js';
 import { formationById } from '../../data/formations.js';
 import { K, KNOCK, COACHQ } from './constants.js';
@@ -966,6 +966,7 @@ function aiShout(M, T, st, rng) {
   else if (st.diff < 0 && st.minute >= 75 && ok('naprzod')) { id = 'naprzod'; p = T.coach === 'S' ? 0.2 : 0.3; }
   else if (st.diff === 1 && st.minute >= 80 && st.mom < -0.1 && ok('uwaga')) { id = 'uwaga'; p = T.coach === 'O' ? 0.3 : 0.5; }
   else if (st.diff < 0 && st.minute >= 50 && st.minute < 75 && st.mom < -0.1 && ok('walka')) { id = 'walka'; p = 0.2; }
+  else if (st.diff >= 2 && st.minute >= 50 && teamHunger(T, M) < 0.45 && ok('nieodpuszczamy')) { id = 'nieodpuszczamy'; p = 0.3; } // nasycenie golami (SAT)
   if (id && rng.chance(pAdj(p, cqOf(T).mot, COACHQ.shoutP))) shout(M, T.side, id);
 }
 

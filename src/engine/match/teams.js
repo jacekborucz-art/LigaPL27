@@ -6,7 +6,7 @@ import { INSTRUCTIONS } from '../../data/instructions.js';
 import { proficiency, posEff, goalkeeperSlotModifiers, errorMul } from '../positions.js';
 import { evaluate } from '../modifiers.js';
 import { clamp, Rng } from '../../core/rng.js';
-import { K, ROLE_SHARE, ZONE_N, FATIGUE_ROLE, KNOCK, FATIGUE, INSTR_NUM } from './constants.js';
+import { K, ROLE_SHARE, ZONE_N, FATIGUE_ROLE, KNOCK, FATIGUE, INSTR_NUM, SAT } from './constants.js';
 import { cleanPlayerInstrMap } from '../../data/playerInstructions.js';
 import { refreshPI, clearPI, applyShift, shiftedShare, validatePlayerInstr, mergePlayerInstr, PI } from './playerInstr.js';
 
@@ -137,10 +137,11 @@ export function buildTeam(side, cfg, rng, ctx, seed = 'mecz') {
       const x = mkPlayer(byId.get(id), formation.slots[i], side, rng, ctx, z[id] ?? 0);
       x.slotIdx = i;
       x.fatK = fatigueTolerance(x.p, seed);
+      x.hung = hungerOf(x.p);
       return x;
     })
     .filter(Boolean);
-  const bench = cfg.tactics.bench.map((id) => byId.get(id)).filter(Boolean).map((p) => { const x = mkPlayer(p, null, side, rng, ctx, z[p.id] ?? 0); x.fatK = fatigueTolerance(p, seed); return x; });
+  const bench = cfg.tactics.bench.map((id) => byId.get(id)).filter(Boolean).map((p) => { const x = mkPlayer(p, null, side, rng, ctx, z[p.id] ?? 0); x.fatK = fatigueTolerance(p, seed); x.hung = hungerOf(p); return x; });
   const params = tacticParams(formation, cfg.tactics.instructions);
   return {
     side, club: cfg.club, ai: !!cfg.ai, coach: cfg.coach ?? 'P',
@@ -148,6 +149,7 @@ export function buildTeam(side, cfg, rng, ctx, seed = 'mecz') {
     cq: cfg.coachQ ?? null, assistantCq: cfg.assistantQ ?? null,
     tactics: { ...cfg.tactics, playerInstr }, formation, players, bench,
     subsUsed: 0, windowsUsed: 0, windowMinute: null, subsLimit: 5, windowsLimit: 3,
+    satSeed: `${seed}:${side}`, satLuck: clamp(new Rng(`glod-mecz:${seed}:${side}`).gauss(0, SAT.luck), -SAT.luckCap, SAT.luckCap), // nasycenie golami: los na mecz
     S: clamp(cfg.cohesion ?? 85, 30, 100), lastTacChange: -99,
     tac: { from: params, to: params, t0: 0, adapt: 0, buf: {} }, P: params, Pbase: params,
     // Instrukcje indywidualne (playerInstr.js): piOn tylko przy nadpisaniach; sCap: sufit spójności w meczu
@@ -190,6 +192,40 @@ export function fatigueTolerance(p, seed) {
   const k = 1 - T.pra * (pra - 10) - T.opa * (a(p, 'OPA') - 10) - T.wyt * (wyt - 10) + new Rng(`zmeczenie:${seed}:${p.id}`).gauss(0, sd);
   return clamp(k, T.min, T.max);
 }
+/** Skala 1-20 na 0-1. */
+const t01 = (v) => clamp(((v ?? 10) - 1) / 19, 0, 1);
+/**
+ * Głód goli zawodnika (SAT.w) bez ego: pracowitość, ambicja, profesjonalizm, przywództwo, regularność (0-1 względem wag).
+ * Cechy charakteru z p.traits (career/personality.js), bez nich ukryte atrybuty albo środek skali.
+ */
+export function hungerOf(p) {
+  const W = SAT.w; const tr = p.traits ?? {}; const h = p.hidden ?? {};
+  return W.PRA * t01(a(p, 'PRA')) + W.amb * t01(tr.ambition) + W.prf * t01(tr.professionalism ?? h.PRF) + W.LID * t01(a(p, 'LID')) + W.KON * t01(h.KON);
+}
+/**
+ * Głód goli drużyny H (0-1) w danej minucie: zawodnicy na boisku z wagą pozycji, ego tylko u ofensywnych, lider na boisku,
+ * los na mecz (T.satLuck), szum co 15 min (osobne ziarno), okrzyk z SAT. Wynik w pamięci na minutę.
+ */
+export function teamHunger(T, M) {
+  if (T.satMin === M.minute) return T.satH;
+  const xs = onPitch(T, M.minute);
+  let sw = 0; let sh = 0; let lid = 0;
+  for (const x of xs) {
+    const w = SAT.pos[x.slot.pos] ?? 1;
+    const ego = SAT.egoPos.includes(x.slot.pos) ? t01(x.p.traits?.ego) : 0.5;
+    sw += w; sh += w * ((x.hung ?? hungerOf(x.p)) + SAT.w.ego * ego);
+    lid = Math.max(lid, a(x.p, 'LID'));
+  }
+  let H = sw ? sh / sw : 0.5;
+  for (const [min, add] of SAT.lid) if (lid >= min) { H += add; break; }
+  const blk = Math.floor(M.minute / SAT.noiseEvery);
+  if (T.satBlk !== blk) { T.satBlk = blk; T.satNoise = clamp(new Rng(`glod:${T.satSeed}:${blk}`).gauss(0, SAT.noise), -SAT.noise * 2, SAT.noise * 2); }
+  H += (T.satLuck ?? 0) + (T.satNoise ?? 0);
+  if (T.shout?.hunger && M.minute < T.shout.until) H += T.shout.hunger;
+  T.satMin = M.minute; T.satH = clamp(H, 0, 1);
+  return T.satH;
+}
+
 /** Kara kondycji do atrybutów: -(0,04 d + 0,008 d²) x tolerancja zawodnika, d = 85 - kondycja (FATIGUE). */
 export function condPenalty(x) {
   const d = FATIGUE.penFrom - x.cond;
@@ -287,7 +323,8 @@ export function updateCondition(T, M) {
     const mid = ['DP', 'ŚP', 'OP', 'BP'].includes(x.slot.pos) ? P.fatMidMul : 1;
     const dK = 0.22 * P.fatMul * mid * role * (1.4 - 0.04 * a(x.p, 'WYT')) * (M.ctx.weather?.fat ?? 1) * ((x.p.age ?? 25) >= 31 ? 1.1 : 1)
       * (x.knock && !x.knock.aggravated ? KNOCK.fatigue : 1) * (x.pi?.fat ?? 1);
-    x.cond = Math.max(20, x.cond - dK);
+    const drain = T.shout?.drain && M.minute < T.shout.until ? T.shout.drain : 0; // okrzyk „Nie odpuszczamy!”: wysiłek kosztuje kondycję
+    x.cond = Math.max(20, x.cond - dK - drain);
     x.Z *= 0.97;
   }
   T.S = Math.min(T.sCap ?? 100, T.S + 1 + 0.05 * ((T.avg?.('LID') ?? 10) - 10));

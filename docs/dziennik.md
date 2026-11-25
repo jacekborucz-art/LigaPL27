@@ -29,6 +29,16 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 25, 2026, profil A (komputer domowy), nasycenie golami (v1.24 Beta)
+Zrobione (ekspert futbolu Sonnet medium; wdrożenie: ja):
+- `SAT`, `hungerOf`, `teamHunger`, `satAct`, `satXg`: przy prowadzeniu 2+ drużyna rzadziej atakuje i słabiej wykańcza,
+  zależnie od głodu goli zawodników na boisku (PRA, ambicja, profesjonalizm, LID, ego, KON, lider, los); nowy okrzyk
+  „Nie odpuszczamy!” (też AI), „Więcej walki!” podnosi głód. Pomiar: +2 1,78 -> 1,59, +3 2,31 -> 1,81 gola/90.
+  Opis w `docs/balans.md`.
+- Progi dwóch testów A/B instrukcji poluzowane (na granicy szumu), wzorce złotego testu przeliczone.
+Zostało / dalej:
+- rola kapitana (projekt eksperta w scratchpad `nasycenie/kapitan.md`, zatwierdzone przez właściciela): wdrożenie.
+
 ## Nov 25, 2026, profil A (komputer domowy), krycie zmęczonej obrony przy stałych fragmentach (v1.24 Beta)
 Zrobione (decyzja właściciela, propozycja eksperta):
 - `spLapse` w `src/engine/match/core.js` (`FATIGUE.sp*`): od 70. min przy średniej kondycji obrony < 80 rośnie szansa na strzał

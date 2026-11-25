@@ -153,11 +153,31 @@ export const RATING = {
   yellow: -0.3, red: -1.5, errorGoal: -1.0, errorP: 0.08, offside: -0.05, win: 0.2, loss: -0.2, noise: 0.2,
 };
 
+/**
+ * Nasycenie golami (Nov 25, 2026, ekspert futbolu): przy prowadzeniu 2 golami (od 55. min) i 3+ (od 45. min) drużyna
+ * rzadziej atakuje: act x (1 - smax x slack x (1 - H)), slack = 0,5 przy +2 i 1 przy +3 i więcej. H (głód goli, 0-1)
+ * liczony co minutę z zawodników na boisku (waga pozycji): pracowitość PRA 0,25, ambicja 0,20, profesjonalizm 0,20,
+ * przywództwo LID 0,15, ego 0,10 (tylko NAP, SN, OP, ŚP; pozostali neutralnie), regularność KON 0,10; lider na boisku
+ * (LID >= 15: +0,05, >= 18: +0,08), los na mecz N(0; 0,05) w granicach +-0,10 i szum +-0,02 co 15 min, okrzyk
+ * („Więcej walki!”, „Nie odpuszczamy!”) +0,25. Przegrywający 2+ golami: act x (1 - 0,10 (1 - H)). [SZAC]
+ */
+export const SAT = {
+  from2: 30, from3: 30, smax: 0.40, trail: 0.10, trailFrom: 55,
+  slack2: 0.65, // rozluźnienie przy +2 (przy +3 i więcej: 1)
+  xgShare: 0.6, // część rozluźnienia działająca na jakość strzału (xG x (1 - 0,6 (1 - mnożnik akcji)))
+  w: { PRA: 0.25, amb: 0.20, prf: 0.20, LID: 0.15, ego: 0.10, KON: 0.10 },
+  egoPos: ['NAP', 'SN', 'OP', 'ŚP'],
+  pos: { NAP: 1.6, SN: 1.3, OP: 1.3, BP: 1.3, ŚP: 1.1, DP: 0.8, BO: 0.8, WB: 0.8, ŚO: 0.5, BR: 0.2 },
+  lid: [[18, 0.08], [15, 0.05]],
+  luck: 0.05, luckCap: 0.10, noise: 0.02, noiseEvery: 15,
+};
+
 export const SHOUTS = {
   naprzod: { label: 'Naprzód!', actMul: 1.06, D: -0.10 },
   uwaga: { label: 'Uwaga z tyłu!', actMul: 0.95, D: 0.15 },
   spokojnie: { label: 'Spokojnie!', calm: true, yellowMul: 0.8 },
-  walka: { label: 'Więcej walki!', Z: 2, foulMul: 1.1, yellowMul: 1.15 },
+  walka: { label: 'Więcej walki!', Z: 2, foulMul: 1.1, yellowMul: 1.15, hunger: 0.25 },
+  nieodpuszczamy: { label: 'Nie odpuszczamy!', hunger: 0.25, foulMul: 1.06, yellowMul: 1.08, drain: 0.3 }, // przy wysokim prowadzeniu: głód goli (SAT), kosztem kondycji
   brawo: { label: 'Brawo!', Z: 1, morale: 0.3, maxUses: 2 },
 };
 export const SHOUT_COOLDOWN = 5; // minuty meczu do kolejnego okrzyku (gracz i AI tak samo)

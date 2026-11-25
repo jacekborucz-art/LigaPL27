@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-b2ce4c56eb';
+const VERSION = 'v0.3-b84d45a1c5';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -280,14 +280,14 @@ const FILES = [
   ['./src/data/reprezentacje.json', '551a9d5bdd'],
   ['./src/data/reprezentacje_swiat.json', '29c3c96adf'],
   ['./src/engine/lineup.js', 'fd8c7c295e'],
-  ['./src/engine/match/coach.js', 'ff6d63bc64'],
-  ['./src/engine/match/constants.js', '10e2cf1fe4'],
+  ['./src/engine/match/coach.js', '194df3bbb1'],
+  ['./src/engine/match/constants.js', '2ab728c58d'],
   ['./src/engine/match/control.js', 'cfc35b73b8'],
-  ['./src/engine/match/core.js', 'cfd0bae5a1'],
+  ['./src/engine/match/core.js', '72b0ad0259'],
   ['./src/engine/match/match.js', 'd1ed756f73'],
   ['./src/engine/match/playerInstr.js', '98cd40e95e'],
   ['./src/engine/match/rules.js', 'd5cc299ded'],
-  ['./src/engine/match/teams.js', '683f1cc173'],
+  ['./src/engine/match/teams.js', 'bc7ea29a66'],
   ['./src/engine/matchStats.js', '71542c9b3b'],
   ['./src/engine/modifiers.js', 'cf8f446d97'],
   ['./src/engine/positions.js', 'ee736ff7cc'],

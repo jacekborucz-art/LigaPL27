@@ -3,8 +3,8 @@
 // wynik, statystyki, oceny, relacja i momentum liczą się tylko z dziennika.
 
 import { Rng, clamp } from '../../core/rng.js';
-import { K, SHOOT_W, FOUL_W, INJURY_TYPES, RED_REASONS, KNOCK, FATIGUE } from './constants.js';
-import { buildTeam, updateZones, updateCondition, onPitch, goalkeeper, fieldPlayers, slotFit, makeKnock, errFactor, condPenalty } from './teams.js';
+import { K, SHOOT_W, FOUL_W, INJURY_TYPES, RED_REASONS, KNOCK, FATIGUE, SAT } from './constants.js';
+import { buildTeam, updateZones, updateCondition, onPitch, goalkeeper, fieldPlayers, slotFit, makeKnock, errFactor, condPenalty, teamHunger } from './teams.js';
 import { matchRules, unlimitedSubs, UNLIMITED } from './rules.js';
 
 // Haki trenera (src/engine/match/coach.js rejestruje się przy imporcie). Silnik nie zna AI,
@@ -69,9 +69,27 @@ function pickWeighted(M, list, w) { return M.rng.weighted(list, w); }
 const centralMid = new Set(['DP', 'ŚP', 'OP']);
 
 function gameState(M, side) {
-  if (M.minute < K.gsFrom || M.score[0] === M.score[1]) return { act: 1, D: 0 };
+  const sat = satAct(M, side);
+  if (M.minute < K.gsFrom || M.score[0] === M.score[1]) return { act: sat, D: 0 };
   const leading = M.score[side] > M.score[1 - side];
-  return leading ? { act: K.gsLeadAct, D: K.gsLeadD } : { act: K.gsTrailAct, D: K.gsTrailD };
+  return leading ? { act: K.gsLeadAct * sat, D: K.gsLeadD } : { act: K.gsTrailAct * sat, D: K.gsTrailD };
+}
+
+/** Nasycenie golami: część rozluźnienia przy prowadzeniu 2+ działa na jakość wykończenia (SAT.xgShare). */
+function satXg(M, side) {
+  if (M.score[side] - M.score[1 - side] < 2) return 1;
+  return 1 - SAT.xgShare * (1 - satAct(M, side));
+}
+
+/** Nasycenie golami (SAT): mnożnik akcji przy prowadzeniu 2+ (rozluźnienie) i przegrywaniu 2+ (rezygnacja), z głodu goli H. */
+function satAct(M, side) {
+  const diff = M.score[side] - M.score[1 - side];
+  if (diff >= 2 && M.minute >= (diff >= 3 ? SAT.from3 : SAT.from2)) {
+    const slack = diff >= 3 ? 1 : SAT.slack2;
+    return 1 - SAT.smax * slack * (1 - teamHunger(M.teams[side], M));
+  }
+  if (diff <= -2 && M.minute >= SAT.trailFrom) return 1 - SAT.trail * (1 - teamHunger(M.teams[side], M));
+  return 1;
 }
 
 function shoutMods(T, M) {
@@ -493,6 +511,7 @@ const ASSIST_POS_W = { ŚO: 0.3, BO: 0.9, WB: 1.1, DP: 0.6, ŚP: 1.1, OP: 1.9, B
 const GK_ASSIST = { KON: 0.07, other: 0.012 };
 function shot(M, ai, xg, type, header, forced = null) {
   const A = M.teams[ai]; const D = M.teams[1 - ai];
+  xg *= satXg(M, ai); // nasycenie golami: rozluźniony prowadzący mniej dokładnie wykańcza akcje (SAT; rzuty karne osobno)
   const field = onPitch(A, M.minute).filter((y) => y.slot.pos !== 'BR');
   if (!field.length) return;
   const s = forced ?? pickWeighted(M, field, (y) => (SHOOT_W[y.slot.pos] ?? 1) * (header && y.slot.pos === 'ŚO' ? 3 : 1)

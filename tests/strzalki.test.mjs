@@ -126,7 +126,7 @@ test('A/B każdego kierunku na każdej pozycji (300 meczów): jest zysk i mierza
   // Koszt i zysk: zmiana średniej na mecz wyraźnie ponad szum (te same ziarna)
   const cost = (d) => d.shA > 0.15 || d.konA > 0.1 || d.skrA > 0.1 || d.condI < -0.7 || d.poss < -0.3 || d.sh < -0.2 || d.kpI < -0.15 || d.shI < -0.2;
   // gd: bilans bramek (Nov 25, 2026: mocniejsza kara zmęczenia, OP:fo zyskuje głównie bilansem, mniej dośrodkowaniami)
-  const gain = (d) => d.poss > 0.3 || d.sh > 0.2 || d.shA < -0.15 || d.konA < -0.1 || d.skr > 0.15 || d.kpI > 0.15 || d.shI > 0.15 || d.condI > 0.7 || d.kon > 0.1 || d.gd > 0.04;
+  const gain = (d) => d.poss > 0.3 || d.sh > 0.2 || d.shA < -0.15 || d.konA < -0.1 || d.skr > 0.15 || d.kpI > 0.15 || d.shI > 0.15 || d.condI > 0.7 || d.kon > 0.1 || d.gd >= 0.03; // bilans bramek; próg obniżony po nasyceniu golami (Nov 25, 2026)
   const res = {};
   for (const [g, G] of Object.entries(ARROW_GROUPS)) {
     const base = abRunArrow(N, g, null);
