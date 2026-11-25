@@ -4,7 +4,8 @@
 
 import { Rng, clamp } from '../../core/rng.js';
 import { K, SHOOT_W, FOUL_W, INJURY_TYPES, RED_REASONS, KNOCK, FATIGUE, SAT } from './constants.js';
-import { buildTeam, updateZones, updateCondition, onPitch, goalkeeper, fieldPlayers, slotFit, makeKnock, errFactor, condPenalty, teamHunger } from './teams.js';
+import { buildTeam, updateZones, updateCondition, onPitch, goalkeeper, fieldPlayers, slotFit, makeKnock, errFactor, condPenalty, teamHunger, updateCaptain } from './teams.js';
+import { CAPTAIN } from '../captain.js';
 import { matchRules, unlimitedSubs, UNLIMITED } from './rules.js';
 
 // Haki trenera (src/engine/match/coach.js rejestruje się przy imporcie). Silnik nie zna AI,
@@ -100,13 +101,14 @@ function rateEv(x, v) { if (x) x.ev += v; }
 
 // ------------------------------------------------------------ Fazy minuty
 function phaseTeams(M) {
-  for (const T of M.teams) { updateCondition(T, M); updateZones(T, M); T.threat = 0; }
+  for (const T of M.teams) { updateCaptain(T, M); updateCondition(T, M); updateZones(T, M); T.threat = 0; }
 }
 
 function phasePossession(M) {
   const [H, A] = M.teams;
   const logit = K.posK * (H.zones.MID - A.zones.MID) + K.posHome * M.hfa + H.P.pos - A.P.pos + A.P.oppPos - H.P.oppPos
-    + 0.08 * (H.central - A.central);
+    + 0.08 * (H.central - A.central)
+    + CAPTAIN.pos * (H.capES - A.capES); // kapitan przy stawce: mniej strat przy podaniu, dłużej przy piłce (docs/kapitan.md)
   const pH = clamp(sig(logit), K.posClamp[0], K.posClamp[1]);
   emit(M, 'possessionMinute', null, null, { share: Math.round(pH * 1000) / 1000 });
   M.possession.push(pH);
@@ -118,8 +120,9 @@ function phasePossession(M) {
     const n = M.rng.poisson(K.passesPerMinute * share * style);
     if (!n) continue;
     const O = M.teams[1 - T.side];
-    const acc = clamp(K.passAcc + 0.012 * (T.avg('POD') - 11) + 0.006 * (T.avg('TEC') - 11)
+    let acc = clamp(K.passAcc + 0.012 * (T.avg('POD') - 11) + 0.006 * (T.avg('TEC') - 11)
       + T.P.passAcc - 0.03 * O.P.pressHigh, 0.6, 0.93);
+    if (T.capES) acc = 1 - (1 - acc) * (1 - CAPTAIN.passErr * T.capES); // kapitan przy stawce: mniej strat (docs/kapitan.md)
     let ok = 0;
     for (let i = 0; i < n; i++) if (M.rng.next() < acc) ok++;
     if (ok) emit(M, 'pass', T.side, null, { count: ok });
@@ -146,8 +149,13 @@ function phaseFoul(M) {
   const rankFoul = M.ctx.rank >= 2 ? 1.1 : 1;
   const tw = M.teams.map((T) => (T.P.timewasting && M.score[T.side] > M.score[1 - T.side]));
   const baseFoul = K.foulTick * (M.ctx.weather.foul ?? 1) * rankFoul * (1.1 - 0.1 * r);
-  if (M.rng.next() < baseFoul * avgFoulMul(M) * tiredFoulRate(M)) {
-    const fi = M.rng.next() < K.foulDefShare ? 1 - ai : ai;
+  // Kapitan przy stawce (docs/kapitan.md): drużyna rzadziej fauluje, x(1 - 0,10 E S); udział fauli obu drużyn wg tych mnożników
+  const cf = M.teams.map((T) => 1 - CAPTAIN.foul * T.capES);
+  const calm = cf[0] !== 1 || cf[1] !== 1;
+  const capMix = calm ? K.foulDefShare * cf[1 - ai] + (1 - K.foulDefShare) * cf[ai] : 1;
+  const defShare = calm ? K.foulDefShare * cf[1 - ai] / capMix : K.foulDefShare;
+  if (M.rng.next() < baseFoul * avgFoulMul(M) * tiredFoulRate(M) * capMix) {
+    const fi = M.rng.next() < defShare ? 1 - ai : ai;
     const ft = M.teams[fi];
     const xs = onPitch(ft, M.minute);
     const x = pickWeighted(M, xs, (y) => (FOUL_W[y.slot.pos] ?? 1) * (attr(y, 'AGR') / 10) * (y.yc ? K.bookedFoulMul : 1) * tiredFoul(y) * (y.pi?.foulW ?? 1));
@@ -156,7 +164,7 @@ function phaseFoul(M) {
     emit(M, 'freeKick', 1 - fi, null);
     const sm = shoutMods(ft, M);
     const cm = (fi === 0 ? K.homeCardMul : K.awayCardMul) ** (M.hfa ? 1 : 0) * r * (0.7 + 0.03 * (x.p.hidden?.TMP ?? 10))
-      * (M.ctx.rank >= 2 ? 1.15 : 1) * (M.minute > 80 ? 1.15 : 1) * (sm.yellowMul ?? 1) * (1 + 0.03 * Math.max(0, x.Z));
+      * (M.ctx.rank >= 2 ? 1.15 : 1) * (M.minute > 80 ? 1.15 : 1) * (sm.yellowMul ?? 1) * (1 + 0.03 * Math.max(0, x.Z)) * (1 - CAPTAIN.card * ft.capES);
     let carded = false;
     if (M.rng.next() < K.redPerFoul * cm * Math.sqrt(r) * ft.P.redPerFoul * ft.P.redMul * (x.pi?.rc ?? 1)) {
       straightRed(M, ft, x, M.rng.weighted(['sfp', 'violent', 'dogso'], (k) => ({ sfp: 0.6, violent: 0.15, dogso: 0.25 })[k]));
@@ -178,7 +186,7 @@ function phaseFoul(M) {
     if (fi !== ai && M.rng.next() < K.dangerFK) { at(M).threat += 2; setPiece(M, ai); }
   }
   for (const T of M.teams) {
-    if (M.rng.next() < K.otherYellowTick / 2 + (tw[T.side] ? T.P.yellowPerMin : 0)) {
+    if (M.rng.next() < K.otherYellowTick / 2 * cf[T.side] + (tw[T.side] ? T.P.yellowPerMin : 0)) {
       const xs = onPitch(T, M.minute);
       if (xs.length) {
         const x = M.rng.pick(xs);
@@ -283,6 +291,7 @@ export function sendOff(M, T, x, code = 'sfp', detail = '') {
   // Reakcja drużyny: lider tłumi, bez lidera spadek zaangażowania
   const leader = onPitch(T, M.minute).some((y) => y.p.persona === 'Lider');
   for (const y of onPitch(T, M.minute)) y.Z += leader ? 2 : -1;
+  if (x === T.capX) T.S = Math.max(30, T.S - CAPTAIN.redS); // czerwona kartka kapitana: drużyna traci zgranie (docs/kapitan.md)
   // Trenerzy obu drużyn reagują jeszcze w tej samej przerwie w grze (coach.js)
   T.react.push({ kind: 'ownRed', tick: M.tick, pos: x.slot?.pos ?? null, gk: wasGk });
   M.teams[1 - T.side].react.push({ kind: 'oppRed', tick: M.tick });
@@ -346,7 +355,7 @@ function phaseAction(M) {
   const type = pickType(M, A, D);
   // Rzut karny
   // Karny podyktowany przez sędziego zostaje (VAR sprawdza tylko sytuacje, w których sędzia nie gwizdał)
-  if (M.rng.next() < K.penPerAction * D.P.penMul * (0.85 + 0.15 * M.ctx.refStrict) * dribblePen(A)) {
+  if (M.rng.next() < K.penPerAction * D.P.penMul * (0.85 + 0.15 * M.ctx.refStrict) * dribblePen(A) * (1 - CAPTAIN.foul * D.capES)) { // faul w polu karnym: kapitan przy stawce
     awardPenalty(M, ai);
     return;
   }
@@ -412,14 +421,15 @@ function tacticalFoul(M, A, D) {
   const pool = clean.length ? clean : xs;
   const leadingLate = M.score[D.side] > M.score[A.side] && M.minute >= 70;
   const p = K.tacFoul * D.P.tacFoulMul * (leadingLate ? 1.5 : 1) * (clean.length ? 1 : 0.25)
-    * (1 + FATIGUE.tacFoulTired * (D.defTired ?? 0)); // zmęczona obrona nie nadąża i częściej przerywa faulem
+    * (1 + FATIGUE.tacFoulTired * (D.defTired ?? 0)) // zmęczona obrona nie nadąża i częściej przerywa faulem
+    * (1 - CAPTAIN.foul * D.capES); // kapitan przy stawce (docs/kapitan.md)
   if (M.rng.next() >= p) return false;
   const x = pickWeighted(M, pool, (y) => attr(y, 'AGR') * (y.slot.pos === 'DP' ? 1.5 : 1) * (y.pi?.foulW ?? 1));
   x.fouls++;
   emit(M, 'foul', D.side, x, { tactical: true });
   emit(M, 'freeKick', A.side, null);
   if (M.rng.next() < K.tacFoulDogso) straightRed(M, D, x, 'dogso');
-  else if (M.rng.next() < K.tacFoulYellow * Math.sqrt(M.ctx.refStrict)) card(M, D, x, 'faul taktyczny, przerwanie kontry');
+  else if (M.rng.next() < K.tacFoulYellow * Math.sqrt(M.ctx.refStrict) * (1 - CAPTAIN.card * D.capES)) card(M, D, x, 'faul taktyczny, przerwanie kontry');
   return true;
 }
 
@@ -444,7 +454,7 @@ function paceTerm(M, ai, A, D) {
 }
 /** Błąd obrony przy wyprowadzeniu piłki (zmęczenie, gra poza pozycją): strata i dobra sytuacja rywala. */
 function defError(M, ai, A, D) {
-  const p = FATIGUE.errBase * Math.max(0, (D.errF ?? 1) - 1);
+  const p = FATIGUE.errBase * Math.max(0, (D.errF ?? 1) - 1) * (1 - CAPTAIN.passErr * D.capES); // kapitan przy stawce: mniej strat
   if (p <= 0 || M.rng.next() >= p) return false;
   const xs = onPitch(D, M.minute).filter((y) => ['ŚO', 'BO', 'WB', 'DP'].includes(y.slot.pos));
   if (!xs.length) return false;
@@ -673,7 +683,10 @@ function goal(M, ai, s, assister, xg, how) {
     if (ds.length) rateEv(pickWeighted(M, ds, (y) => 20 - attr(y, 'DEC')), -1.0);
   }
   for (const y of onPitch(A, M.minute)) y.Z += 1;
-  for (const y of onPitch(D, M.minute)) y.Z += y.p.persona === 'Wrażliwy' ? -3 : y.p.persona === 'Lider' ? 0 : y.p.persona === 'Narwaniec' ? 1 : -1;
+  // Kapitan po straconym golu (docs/kapitan.md): spadek zaangażowania x(1 - 0,25 E), kapitan w kryzysie (E < 0) do +15 %
+  const zl = D.capE >= 0 ? 1 - CAPTAIN.goalLoss * D.capE : 1 - CAPTAIN.goalLossNeg * D.capE;
+  for (const y of onPitch(D, M.minute)) { const dz = y.p.persona === 'Wrażliwy' ? -3 : y.p.persona === 'Lider' ? 0 : y.p.persona === 'Narwaniec' ? 1 : -1; y.Z += dz < 0 ? dz * zl : dz; }
+  D.capGoal = M.minute;
   // Samobój: pechowiec z obrony rywala (bez gola w statystykach strzelców)
   const ogBy = how === 'OG' ? pickWeighted(M, onPitch(D, M.minute), (y) => ({ ŚO: 4, BO: 2.5, WB: 2, DP: 2, BR: 1 }[y.slot.pos] ?? 0.5)) : null;
   const text = how === 'OG' ? `GOL! Samobójcze trafienie${ogBy ? `: ${last(ogBy)}` : ''}.`

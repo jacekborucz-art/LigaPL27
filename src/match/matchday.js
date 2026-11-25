@@ -42,6 +42,7 @@ import { addMessages, createMessage } from '../core/inbox.js';
 import { applyMorale, teamMorale } from '../career/morale.js';
 import { isAvailable } from '../career/squad.js';
 import { compClubIds } from '../season/leagueComps.js';
+import { clubCaptainId, fixtureStakes, withClubCaptain, captainInfo } from '../career/captaincy.js'; // kapitan (docs/kapitan.md)
 import { matchReferee } from '../career/referees.js';
 import { recordMatchReport } from '../career/postMatchReport.js'; // analiza pomeczowa sztabu (docs/analiza-pomeczowa.md)
 
@@ -242,7 +243,7 @@ function teamCtx(game, clubId, comp, table, tactics) {
  */
 export function matchTactics(game, squad, benchSize, benchGk = 1) {
   const prev = game.tactics;
-  if (prev.assistant) return { ...createTactics(squad, { formation: prev.formation, instructions: prev.instructions, benchSize, benchGk, playerInstr: prev.playerInstr }), assistant: true };
+  if (prev.assistant) return withClubCaptain(game, { ...createTactics(squad, { formation: prev.formation, instructions: prev.instructions, benchSize, benchGk, playerInstr: prev.playerInstr }), assistant: true });
   const subs = { ...(game.tacticsSubs ?? {}) }; // miejsce w jedenastce -> { orig: zastąpiony, sub: zastępca }
   const byId = new Map(squad.map((p) => [p.id, p]));
   const out = (id) => { const p = byId.get(id); return !p || !isAvailable(p); };
@@ -274,7 +275,7 @@ export function matchTactics(game, squad, benchSize, benchGk = 1) {
   });
   game.tacticsSubs = subs;
   game.tacticsLast = [...tactics.xi];
-  return tactics;
+  return withClubCaptain(game, tactics); // kapitan wybrany przez gracza wraca z opaską po urazie albo pauzie
 }
 
 /** Zaczyna dzień meczowy dla meczu gracza. */
@@ -421,7 +422,8 @@ export function matchSquadPlayers(game, S) {
 }
 
 export function preAdvice(game, S) {
-  return assistantAdvice('pre', matchSquadPlayers(game, S), { ...S.pre.forBriefing, ko: koBrief(game, S), clubId: game.clubId, date: S.f.date, context: talkContext(game, S) }, S.memory);
+  const cap = captainInfo(game, S.f.date); // kapitan przed meczem o stawkę (docs/kapitan.md)
+  return assistantAdvice('pre', matchSquadPlayers(game, S), { ...S.pre.forBriefing, ko: koBrief(game, S), clubId: game.clubId, date: S.f.date, context: talkContext(game, S), captain: cap ? { E: cap.E, M: cap.M } : null }, S.memory);
 }
 
 /** Odprawa przedmeczowa gracza; zwraca reakcje do pokazania (bez liczb). */
@@ -470,6 +472,9 @@ export function kickOff(game, S) {
   // teamMorale: średnie morale drużyny dla instrukcji indywidualnych (silnik nie importuje career/)
   const mine = { club: anyClub(game.clubId), squad: mySquad, tactics: matchTacticsFor(game, S), ai: false, coach: 'P', zStart: S.briefings.pre?.engine?.zStart ?? {}, assistantQ: S.myQ ?? null, teamMorale: teamMorale(mySquad) };
   const theirs = { club: oppClub, squad: oppSquad, tactics: S.oppTactics, ai: true, coach: coachStyle(game, S.oppId), zStart: zOpp, coachQ: oppQ, teamMorale: teamMorale(oppSquad) };
+  // Kapitan klubu (docs/kapitan.md): opaska z wyboru gracza albo klubu AI; poza jedenastką gra wicekapitan
+  mine.captainId = clubCaptainId(game, game.clubId) ?? mine.tactics.captain;
+  theirs.captainId = clubCaptainId(game, S.oppId) ?? theirs.tactics.captain;
   // Trening: spójność zespołu na start meczu i stałe fragmenty (src/training)
   Object.assign(mine, trainingMatchInput(game, game.clubId, mine));
   Object.assign(theirs, trainingMatchInput(game, S.oppId, theirs));
@@ -480,6 +485,7 @@ export function kickOff(game, S) {
     away: S.userSide === 0 ? theirs : mine,
     ctx: {
       neutral: !!S.f.neutral, var: S.hasVar, rank: S.pre.preview.rank.level, refStrict: S.referee.strictness, date: S.f.date,
+      stakes: fixtureStakes(S.f, S.pre.preview.rank.level, S.pre.preview.rank.tags ?? []), // stawka dla kapitana (docs/kapitan.md)
       concussionSubs: false, // zmiany po wstrząśnieniu mózgu: flaga rozgrywek (UEFA ich nie stosuje, brak potwierdzenia dla Ekstraklasy)
       attendance: S.pre.conditions.attendance.fill, weather: engineWeather(S.weather, S.pitch),
       knockout: knockoutCtx(S.f),

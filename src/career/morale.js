@@ -4,12 +4,17 @@
 
 import { clamp } from '../core/rng.js';
 
-export const MORALE = { MIN: 1, MAX: 20, START: 12, DRIFT_TARGET: 12, DRIFT_WEEK: 0.3, DRIFT_WEEK_LEADER: 0.5 };
+export const MORALE = { MIN: 1, MAX: 20, START: 12, DRIFT_TARGET: 12, DRIFT_WEEK: 0.3 };
+
+// Kapitan (docs/kapitan.md, E z src/engine/captain.js): porażka x(1 - 0,1 E), wygrana z rywalem x(1 + 0,15 E), seria 3+ porażek
+// -2 (przy E >= 0,6: -1,9), dryf w górę 0,3 + 0,1 E (E < 0: 0,3 + 0,1 E, min 0,2, a dryf w dół o 0,1 szybszy). [SZAC]
+// Kalibracja (projekt: 0,2 / 0,2 / -1,5 dawał ok. 2,2-3 pkt różnicy): 4 porażki z rzędu i 3 tygodnie, E 0,75 wobec 0,15: +1,2 morale.
+export const CAPTAIN_MORALE = { loss: 0.1, win: 0.15, streak: 2, streakSoft: 1.9, streakE: 0.6, drift: 0.1, driftNeg: 0.1, driftMin: 0.2, downNeg: 0.1 };
 
 /**
  * Zmiana morale zawodnika po meczu.
- * m: { result: 'W'|'D'|'L', strengthDiff (nasza siła - rywala), derby, lossStreak, played, minutes,
- *      rating, benchedStreak, isRegular }
+ * m: { result: 'W'|'D'|'L', strengthDiff (nasza siła - rywala), derby, rival (mecz z rywalem), lossStreak, played, minutes,
+ *      rating, benchedStreak, isRegular, capE (efekt kapitana klubu, docs/kapitan.md) }
  */
 export function afterMatchDelta(m) {
   let d = 0;
@@ -20,7 +25,12 @@ export function afterMatchDelta(m) {
     if (m.result === 'D') d += m.strengthDiff < -1 ? 0.6 : m.strengthDiff > 1 ? -0.6 : 0;
   }
   if (m.derby) d += m.result === 'W' ? 1.5 : m.result === 'L' ? -1.5 : 0; // razem z wynikiem daje +-3
-  if (m.result === 'L' && (m.lossStreak ?? 0) >= 3) d -= 2;
+  const E = m.capE ?? 0;
+  const CM = CAPTAIN_MORALE;
+  if (m.result === 'L' && (m.lossStreak ?? 0) >= 3) d -= E >= CM.streakE ? CM.streakSoft : CM.streak;
+  // Kapitan: porażka boli mniej przy dobrym kapitanie (bardziej przy kapitanie w kryzysie), wygrana z rywalem cieszy bardziej
+  if (E && m.result === 'L' && d < 0) d *= 1 - CM.loss * E;
+  if (E && m.result === 'W' && d > 0 && (m.derby || m.rival)) d *= 1 + CM.win * E;
   if (m.played && m.rating) d += clamp(0.3 * (m.rating - 6.6), -0.6, 0.6); // własny występ
   if (!m.played && m.isRegular && (m.benchedStreak ?? 0) >= 3) d -= 1; // ważny zawodnik bez gry
   return Math.round(d * 100) / 100;
@@ -56,9 +66,14 @@ export function applyMorale(value, delta) {
   return clamp(Math.round((value + delta) * 100) / 100, MORALE.MIN, MORALE.MAX);
 }
 
-/** Tygodniowy dryf ku 12 (szybszy, gdy w drużynie jest lider). */
-export function weeklyDrift(value, hasLeader = false) {
-  const step = hasLeader ? MORALE.DRIFT_WEEK_LEADER : MORALE.DRIFT_WEEK;
+/**
+ * Tygodniowy dryf ku 12. capE: efekt kapitana klubu (docs/kapitan.md): dobry kapitan przyspiesza powrót z niskiego morale,
+ * kapitan w kryzysie (E < 0) go spowalnia i szybciej gasi dobre nastroje.
+ */
+export function weeklyDrift(value, capE = 0) {
+  const CM = CAPTAIN_MORALE;
+  const up = capE >= 0 ? MORALE.DRIFT_WEEK + CM.drift * capE : Math.max(CM.driftMin, MORALE.DRIFT_WEEK + CM.driftNeg * capE);
+  const step = value < MORALE.DRIFT_TARGET ? up : MORALE.DRIFT_WEEK + (capE < 0 ? CM.downNeg : 0);
   if (Math.abs(value - MORALE.DRIFT_TARGET) <= step) return MORALE.DRIFT_TARGET;
   return value + (value < MORALE.DRIFT_TARGET ? step : -step);
 }

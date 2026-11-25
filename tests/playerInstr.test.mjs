@@ -17,21 +17,21 @@ import { squadOf } from '../src/world/worldGen.js';
 import { Rng } from '../src/core/rng.js';
 
 // Skróty meczów sprzed instrukcji indywidualnych (Nov 18, 2026, tests/piHelpers.mjs przed zmianą silnika)
-// Wzorce przeliczone po celowych zmianach silnika (żółte -15%, zmęczenie z tolerancją, stałe fragmenty, nasycenie golami, Nov 25, 2026)
+// Wzorce przeliczone po celowych zmianach silnika (żółte -15%, zmęczenie z tolerancją, stałe fragmenty, nasycenie golami, kapitan, Nov 25, 2026)
 const GOLD = {
   user: [
-    '34078cb0', '6ce8d9c5', '883fda8c', '7b179cf1', '8d30037', '2860d6c2', 'f7db251e', '9cbb0558', '83e75735', '694234d6',
-    '2221f8cf', 'eef20fbf', '211e56b', 'e955e38b', '73bf8acf', 'f9d7806d', 'a667554f', '730da59a', 'f9968d8e', '1cc2fe26',
-    'c65f8cb7', 'c9207507', '2b2276c1', '93a0b944', '6975917', '34a84b25', '45e7bc5b', 'cdf40436', '9a49740f', 'abb22045',
-    'b514ac05', 'bdc3c0f7', '5e778232', '51cd8141', '55230baa', '6b371b1c', 'd6258b7b', '9bee6691', '51ce96ec', '520e6770',
-    '856a85e6', 'c7ecfffb', 'aa2ca0a9', 'd6a2cf4d', '40e9fa55', 'aa672728', '943747', 'e0b220c6', '75dbc3f1', '21b04ce7',
+    'c5c982ae', '185a5c12', '9f91b6f', 'f381823e', '38e715f0', 'cd5adce4', 'bf4e9bb4', '63767f4b', 'ffffa8aa', 'ecbe7771',
+    'bb8293c2', '2e298f18', '3412c152', '683cdf84', 'ab569bd3', 'a184ea1a', '84808614', '1917df5a', '88ceb912', 'cc80bfec',
+    '4bfa9427', '6d998077', '9ff39f0d', '55c6ae29', 'd4aa81aa', 'eab8a4de', '138f2ce9', '86758013', 'fc856d96', '32f7f2db',
+    'ccf452c7', '6424597b', 'b5e4bda4', '530a78b3', '419ad45d', '59badda0', '4d1a1cac', '3bbbae01', '302bcaa3', '388d0544',
+    'cbc767ef', '715ba84f', '2e811448', '89654c1e', 'c3eb9c8b', '3ed0695d', '6f012635', 'd793ee21', '87d62406', '2ce88c8e',
   ],
   ai: [
-    '9f995449', '1952f72e', '438143f3', 'a74d43e', 'd0a70b32', '93e38323', 'a7a30f03', 'fccae89f', '5496d5ed', '8a1d512c',
-    'dba9b31d', 'd7a3e7b9', '3e84e97e', 'a705ae8b', '20bb73c6', 'f740b572', '58b552d0', 'c3f325ea', '9672dc15', 'e01ec887',
-    'd7418be8', '840ccc96', '3e15498', '714b36f1', 'e6fa7529', '43a37e54', 'd597cb80', 'bba818e6', 'be0be41c', '10190e83',
-    '4c3362a6', 'c9745319', '4aff12ef', '6875af1a', 'bd59c6f0', '7a486251', 'ef65bb93', '450cdc9f', 'f76bad3e', '1b4d6eb',
-    'a5ef231a', '96d9f4cc', '7824558a', 'ae6faac2', 'c6e793e4', '58ecc2a9', 'b89c4a4c', '8ca5a9af', 'e8bd1c4e', 'd692df0b',
+    '67f9483d', 'ff359b7f', '8970d36a', 'd809582f', 'e2fc6076', 'f7c8f457', '32cb3dbb', 'c87614a0', '7c5e8b5b', 'fe999344',
+    'b2ffc53a', 'd9640445', '74a33e7a', '14655668', 'f215cab3', 'bc8dd671', 'd541ad5d', 'fd57fb40', '5368a250', '726c752b',
+    '49d01180', 'fb18b8b8', 'b321b72e', '1b70f26', 'd281ba5', '25d63c7e', 'f49f6afd', '98ec9d8f', '1cafbb2f', '1543379d',
+    '3e3995bd', '832a4a77', '1e947780', '788f8a53', '244578c2', '629d0672', '2bf2b72a', 'c0cef82', 'b027dc47', 'a33d589c',
+    '7a50e462', '89bfd07a', 'bd403abe', 'a66e81fd', '998deba', 'c3b771eb', '2fcfa6a2', '75a8a76b', '83aba344', '4d702d4f',
   ],
 };
 

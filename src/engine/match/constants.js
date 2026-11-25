@@ -168,7 +168,7 @@ export const SAT = {
   w: { PRA: 0.25, amb: 0.20, prf: 0.20, LID: 0.15, ego: 0.10, KON: 0.10 },
   egoPos: ['NAP', 'SN', 'OP', 'ŚP'],
   pos: { NAP: 1.6, SN: 1.3, OP: 1.3, BP: 1.3, ŚP: 1.1, DP: 0.8, BO: 0.8, WB: 0.8, ŚO: 0.5, BR: 0.2 },
-  lid: [[18, 0.08], [15, 0.05]],
+  cap: 0.08, // kapitan pilnuje koncentracji: H + 0,08 x E kapitana (docs/kapitan.md; wcześniej premia za LID 15+/18+)
   luck: 0.05, luckCap: 0.10, noise: 0.02, noiseEvery: 15,
 };
 

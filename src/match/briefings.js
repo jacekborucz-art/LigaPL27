@@ -685,6 +685,12 @@ export function assistantAdvice(phase, players, ctx = {}, memory) {
   const note = phase === 'pre' ? adviceNote(c, best) : null;
   if (note) lines.push(note);
   if (repeatCount(memory, best) >= 1) lines.push('Używałeś jej niedawno, więc zadziała słabiej.');
+  // Kapitan przed meczem o stawkę (docs/kapitan.md, ctx.captain z matchday.js preAdvice): bez liczb
+  const cap = ctx.captain;
+  if (phase === 'pre' && cap && ((sit.rank ?? 0) >= 2 || c?.rival || c?.knockout)) {
+    if (cap.M < 0.6) lines.push('Opaska u zawodnika w kryzysie: w nerwowych chwilach drużyna może nie mieć oparcia.');
+    else if (cap.E >= 0.6) lines.push('Kapitan spokojny, drużyna w dobrych rękach.');
+  }
   const sensitive = players.filter((p) => traitsOf(p).persona === 'Wrażliwy').length;
   if (best === 'shout' && sensitive) lines.push('Kilku zawodników źle znosi krzyk.');
   // propozycje rozmów

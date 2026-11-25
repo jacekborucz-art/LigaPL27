@@ -9,6 +9,7 @@ import { clamp, Rng } from '../../core/rng.js';
 import { K, ROLE_SHARE, ZONE_N, FATIGUE_ROLE, KNOCK, FATIGUE, INSTR_NUM, SAT } from './constants.js';
 import { cleanPlayerInstrMap } from '../../data/playerInstructions.js';
 import { refreshPI, clearPI, applyShift, shiftedShare, validatePlayerInstr, mergePlayerInstr, PI } from './playerInstr.js';
+import { captainPower, baseStakes, CAPTAIN } from '../captain.js';
 
 const a = (p, k) => p.attr?.[k] ?? p.ovr ?? 10;
 
@@ -53,6 +54,7 @@ function mkPlayer(p, slot, side, rng, ctx, Z = 0) {
   const waz = ctx.rank >= 2 ? 0.04 * ((p.hidden?.WAZ ?? 10) - 10) : 0;
   // Uraz sprzed meczu, z którym zawodnik gra z bólem: kara do formy daje modyfikator playingInjured (modifiers.js)
   const knock = p.playingInjured && p.injuryDays > 0 ? makeKnock(p.injury?.name ?? 'stłuczenie', 0, { pre: true, days: p.injuryDays }) : null;
+  const cap = captainPower(p, ctx.date ?? null); // kapitan i wicekapitan (src/engine/captain.js): siła C i efekt E
   return {
     id: p.id, p, slot, side, R: zoneRatings(p), base: evaluate('player', p, { inMatch: true }).total + dayForm + waz, dayForm,
     cond: p.fresh ?? 95, on: !!slot, sentOff: false, subbedOff: false, injury: null, treatedUntil: -1,
@@ -60,6 +62,7 @@ function mkPlayer(p, slot, side, rng, ctx, Z = 0) {
     ev: 0, g: 0, ast: 0, sh: 0, sot: 0, kp: 0, tk: 0, saves: 0, fouls: 0, offs: 0,
     fit: null, prevSlot: null, bookChecked: false, knock, slotIdx: -1, redCode: null,
     pi: null, piDraw: null, // instrukcje indywidualne (playerInstr.js): efekty i losowania na mecz
+    capC: cap.C, capE: cap.E,
   };
 }
 
@@ -143,7 +146,7 @@ export function buildTeam(side, cfg, rng, ctx, seed = 'mecz') {
     .filter(Boolean);
   const bench = cfg.tactics.bench.map((id) => byId.get(id)).filter(Boolean).map((p) => { const x = mkPlayer(p, null, side, rng, ctx, z[p.id] ?? 0); x.fatK = fatigueTolerance(p, seed); x.hung = hungerOf(p); return x; });
   const params = tacticParams(formation, cfg.tactics.instructions);
-  return {
+  const T = {
     side, club: cfg.club, ai: !!cfg.ai, coach: cfg.coach ?? 'P',
     // Umiejętności trenera w tym meczu (career/coaches.js matchCoach) i asystenta gracza; brak: zachowanie neutralne
     cq: cfg.coachQ ?? null, assistantCq: cfg.assistantQ ?? null,
@@ -167,7 +170,36 @@ export function buildTeam(side, cfg, rng, ctx, seed = 'mecz') {
     assistant: false, injuredGk: null, staffYellow: 0, coachBanned: false, penMissed: [], central: 0, avg: null,
     // Historia ustawień widoczna z ławki rywala (coach.js czyta ją z opóźnieniem rozpoznania)
     tacLog: [{ min: -99, formation: cfg.tactics.formation, instr: { ...cfg.tactics.instructions } }],
+    // Kapitan (docs/kapitan.md): opaska klubu (cfg.captainId, inaczej kapitan z taktyki), efekt E w tej minucie, stawka S
+    capId: cfg.captainId ?? cfg.tactics.captain ?? null, capX: null, capE: 0, capES: 0, capOff: null, capGoal: -99, capS0: baseStakes(ctx),
   };
+  T.capX = [...players, ...bench].find((x) => x.id === T.capId) ?? null;
+  if (!T.capX?.on) T.capOff = -99; // kapitan poza jedenastką od początku: wicekapitan od pierwszej minuty, bez szoku
+  updateCaptain(T, { minute: 0, score: [0, 0] });
+  // Nerwy przed meczem o stawkę (ujemne zaangażowanie na start): spokojny kapitan je tłumi, kapitan w kryzysie wzmacnia
+  if (T.capS0 >= CAPTAIN.sFrom && T.capE) for (const x of [...players, ...bench]) if (x.Z < 0) x.Z *= 1 - CAPTAIN.nerves * T.capE * T.capS0;
+  return T;
+}
+
+/**
+ * Kapitan w tej minucie (co minutę, przed kondycją): E kapitana na boisku; po zejściu (zmiana, kontuzja, czerwona)
+ * 2 min bez kapitana, potem wicekapitan (najwyższe C na boisku) x0,6. T.capES = E x S przy stawce S >= 0,5, inaczej 0.
+ */
+export function updateCaptain(T, M) {
+  const c = T.capX;
+  if (c && c.on && !c.sentOff) { T.capE = c.capE; T.capOff = null; }
+  else {
+    if (T.capOff == null) T.capOff = M.minute;
+    if (M.minute < T.capOff + CAPTAIN.shock) T.capE = 0;
+    else {
+      let best = null;
+      for (const x of T.players) if (x.on && !x.sentOff && x !== c && (!best || x.capC > best.capC)) best = x;
+      T.capE = best ? CAPTAIN.deputy * best.capE : 0;
+    }
+  }
+  let S = T.capS0;
+  if (M.minute >= CAPTAIN.lateFrom && Math.abs(M.score[0] - M.score[1]) <= 1) S = Math.max(S, CAPTAIN.stakes.late);
+  T.capES = S >= CAPTAIN.sFrom ? T.capE * S : 0;
 }
 
 const shareCache = new Map();
@@ -203,21 +235,20 @@ export function hungerOf(p) {
   return W.PRA * t01(a(p, 'PRA')) + W.amb * t01(tr.ambition) + W.prf * t01(tr.professionalism ?? h.PRF) + W.LID * t01(a(p, 'LID')) + W.KON * t01(h.KON);
 }
 /**
- * Głód goli drużyny H (0-1) w danej minucie: zawodnicy na boisku z wagą pozycji, ego tylko u ofensywnych, lider na boisku,
+ * Głód goli drużyny H (0-1) w danej minucie: zawodnicy na boisku z wagą pozycji, ego tylko u ofensywnych, kapitan (E),
  * los na mecz (T.satLuck), szum co 15 min (osobne ziarno), okrzyk z SAT. Wynik w pamięci na minutę.
  */
 export function teamHunger(T, M) {
   if (T.satMin === M.minute) return T.satH;
   const xs = onPitch(T, M.minute);
-  let sw = 0; let sh = 0; let lid = 0;
+  let sw = 0; let sh = 0;
   for (const x of xs) {
     const w = SAT.pos[x.slot.pos] ?? 1;
     const ego = SAT.egoPos.includes(x.slot.pos) ? t01(x.p.traits?.ego) : 0.5;
     sw += w; sh += w * ((x.hung ?? hungerOf(x.p)) + SAT.w.ego * ego);
-    lid = Math.max(lid, a(x.p, 'LID'));
   }
   let H = sw ? sh / sw : 0.5;
-  for (const [min, add] of SAT.lid) if (lid >= min) { H += add; break; }
+  H += SAT.cap * (T.capE ?? 0); // kapitan pilnuje koncentracji (docs/kapitan.md), zamiast premii za LID najlepszego lidera
   const blk = Math.floor(M.minute / SAT.noiseEvery);
   if (T.satBlk !== blk) { T.satBlk = blk; T.satNoise = clamp(new Rng(`glod:${T.satSeed}:${blk}`).gauss(0, SAT.noise), -SAT.noise * 2, SAT.noise * 2); }
   H += (T.satLuck ?? 0) + (T.satNoise ?? 0);
@@ -318,6 +349,8 @@ export function updateZones(T, M) {
 /** Kondycja zawodników i odbudowa spójności co minutę. */
 export function updateCondition(T, M) {
   const P = T.P;
+  // Po straconym golu dobry kapitan szybciej odbudowuje zaangażowanie (5 min, docs/kapitan.md)
+  const regen = T.capE > 0 && M.minute - (T.capGoal ?? -99) <= CAPTAIN.regenMin ? CAPTAIN.regen * T.capE : 0;
   for (const x of onPitch(T, M.minute)) {
     const role = FATIGUE_ROLE[x.slot.pos] ?? 1;
     const mid = ['DP', 'ŚP', 'OP', 'BP'].includes(x.slot.pos) ? P.fatMidMul : 1;
@@ -325,7 +358,7 @@ export function updateCondition(T, M) {
       * (x.knock && !x.knock.aggravated ? KNOCK.fatigue : 1) * (x.pi?.fat ?? 1);
     const drain = T.shout?.drain && M.minute < T.shout.until ? T.shout.drain : 0; // okrzyk „Nie odpuszczamy!”: wysiłek kosztuje kondycję
     x.cond = Math.max(20, x.cond - dK - drain);
-    x.Z *= 0.97;
+    x.Z *= x.Z < 0 && regen ? 0.97 - regen : 0.97;
   }
   T.S = Math.min(T.sCap ?? 100, T.S + 1 + 0.05 * ((T.avg?.('LID') ?? 10) - 10));
 }

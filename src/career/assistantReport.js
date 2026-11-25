@@ -23,6 +23,7 @@ import { staleness } from '../training/variety.js';
 import { teamCohesion } from '../training/cohesion.js';
 import { DEV, MODES, ACCENTS, LOAD_LEVELS, PROGRAMS } from '../training/config.js';
 import { teamMorale, moraleLabel, moraleFalling, moraleTrend } from './morale.js';
+import { captainInfo } from './captaincy.js';
 import { personalityOf, AGENT_TYPES, computeMindset } from './personality.js';
 import { relationWith } from './negotiation.js';
 import { talkSuggestions, talkCooldown, PLAYER_TALKS } from './teamTalks.js';
@@ -684,6 +685,16 @@ export function squadReport(game, date = game.date, periodId = date) {
   if (!leaders.length && q >= 8) atm.push('W szatni brakuje naturalnego lidera; kapitan musi wziąć więcej na siebie.');
   const sadLeaders = leaders.filter((p) => (p.morale ?? 12) <= 9 && sees(`lider:${p.id}`));
   if (sadLeaders.length) atm.push(`Uwaga na liderów w złym nastroju (${sadLeaders.map((p) => p.name).join(', ')}): ich humor szybko udziela się reszcie.`);
+  // Kapitan (docs/kapitan.md, career/captaincy.js): słowa bez liczb
+  const cap = captainInfo(game, date);
+  if (cap) {
+    const nm = cap.p.name;
+    if (cap.M < 0.6 && sees(`kap-forma:${cap.p.id}`, true)) atm.push(`Kapitan (${nm}) nie radzi sobie z presją i zmaga się ze swoją formą: rozważ zmianę opaski.`);
+    else if (cap.young && sees(`kap-mlody:${cap.p.id}`)) atm.push(`Młody kapitan (${nm}) nie ma jeszcze autorytetu, starsi zawodnicy patrzą na to z dystansem.`);
+    else if (cap.E < 0.25 && sees(`kap-slaby:${cap.p.id}`)) atm.push(`Drużyna zbyt łatwo traci spokój w derbach i ważnych meczach, kapitan (${nm}) słabo ją prowadzi.`);
+    else if (cap.E >= 0.6 && q >= 10) atm.push(`Kapitan (${nm}) trzyma szatnię w ryzach: w nerwowych meczach drużyna ma na kim się oprzeć.`);
+    if (cap.snubbed && sees(`kap-lider:${cap.snubbed.id}`)) atm.push(`Naturalny lider szatni (${cap.snubbed.name}) czuje się pominięty przy wyborze kapitana.`);
+  }
   if (q >= 10) {
     const byNat = {};
     for (const p of squad) if (p.nat && p.nat !== 'POL') (byNat[p.nat] ??= []).push(p);

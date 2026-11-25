@@ -100,6 +100,7 @@ import { submitUserProposal, finishLastRound } from './career/proposals.js'; // 
 import { trustLabel } from './career/board.js';
 import { spendable, wageBill, monthSummary } from './career/finance.js';
 import { teamMorale, moraleLabel } from './career/morale.js';
+import { noteCaptain } from './career/captaincy.js';
 import { fanMoodLabel } from './career/fans.js';
 import { GROUP } from './career/squad.js';
 import { limitStatus } from './career/squadLimitSystem.js';
@@ -1521,6 +1522,7 @@ const ROLE_KEYS = ['captain', 'penalty', 'freeKick', 'corner'];
 /** Kapitan i wykonawcy stałych fragmentów (lista wyboru na ekranie składu i menu kontekstowe). */
 async function setRole(role, id) {
   if (!ROLE_KEYS.includes(role) || !id) return;
+  if (role === 'captain') noteCaptain(state.game, id); // opaska z wyboru gracza: stabilność i kapitan klubu (docs/kapitan.md)
   state.game.tactics = { ...state.game.tactics, [role]: id };
   await save();
   render();

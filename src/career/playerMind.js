@@ -30,7 +30,7 @@ export const PM = {
   role: 1.2, roleCap: [-0.6, 0.8], // +1,2 x (udział minut w nowej roli - obecny udział)
   young: { age: 23, gap: 3, slot: 0.35, bench: -0.3 },
   morale: { low: 8, lowS: 0.4, high: 16, highS: -0.3 }, wish: 0.7,
-  loyalty: -0.06, homegrown: -0.25, captain: -0.2,
+  loyalty: -0.06, homegrown: -0.25, captain: -0.2, snubbed: 0.1, // snubbed: naturalny lider od 6 tygodni bez opaski (docs/kapitan.md)
   old: { age: 32, s: 0.2 }, kid: { age: 20, share: 0.35, s: 0.2 },
   home: -0.05, homeBack: 0.1, abroad: 0.25, abroadTies: 15, abroadTiesS: -0.2,
   acclim: -0.5, acclimSettle: -0.8, settleHigh: 0.5,
@@ -118,6 +118,7 @@ export function talkGate(game, p, toClubId = game.clubId, { date = game.date, mo
     parts.loyalty = PM.loyalty * (t.loyalty - 10);
     if (sl?.homegrown) parts.homegrown = PM.homegrown;
     if (p.clubId === game.clubId && game.tactics?.captain === p.id) parts.captain = PM.captain;
+    if (p.capSnubU) parts.snubbed = PM.snubbed; // pominięty przy wyborze kapitana (career/captaincy.js)
     if (ml > 6 && ml <= 12) parts.contract = PM.months12;
     if (inAcclim(p, date) && !p.unhappy && !wish) parts.acclim = settleFactor(p, date) <= PM.settleHigh ? PM.acclimSettle : PM.acclim;
     // Zadowolony: długi kontrakt i regularna gra, bez niezadowolenia i prośby o transfer

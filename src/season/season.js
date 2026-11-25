@@ -19,9 +19,11 @@ import { familySquad, matchGuests, noteFamilyMatch, serveFamilySuspensions, clos
 import { reserveMayPlayIn } from './leagues.js';
 import { squadOf } from '../world/worldGen.js';
 import { ephemeralSquad } from '../world/ephemeral.js';
-import { quickMatch, quickKnockout } from '../engine/quickSim.js';
+import { quickMatch, quickKnockout, QS } from '../engine/quickSim.js';
+import { CAPTAIN } from '../engine/captain.js';
 import { tableConfidence } from '../engine/teamStrength.js';
 import { afterMatchDelta, applyMorale, weeklyDrift, recordMoraleWeek, talkFollowUp } from '../career/morale.js';
+import { captainWeek, clubCaptainE, fixtureStakes, rivalMatch } from '../career/captaincy.js'; // kapitan (docs/kapitan.md)
 import { INJURY_TYPES } from '../engine/match/constants.js';
 import { fmtDate } from '../ui/dom.js';
 import { UEFA_CLUBS, createUefa } from './uefa.js';
@@ -228,6 +230,12 @@ export function playQuick(game, f, rng, cache = new Map()) {
   const rank = quickRank(game, f, cache);
   home.coachTerm = quickCoach(game, f, f.home, rank);
   away.coachTerm = quickCoach(game, f, f.away, rank);
+  // Kapitan w meczu o stawkę (S >= 0,5: derby, rywal, ranga 2+, puchar): lekki przechył wyniku wg różnicy E kapitanów (QS.CAP)
+  const capS = fixtureStakes(f, rank);
+  if (capS >= CAPTAIN.sFrom) {
+    const tilt = Math.exp(QS.CAP * capS * (clubCaptainE(game, f.home, f.date, { playing: true }) - clubCaptainE(game, f.away, f.date, { playing: true })));
+    home.qsMul = tilt; away.qsMul = 1 / tilt;
+  }
   const ctx = { neutral: !!f.neutral, refStrict: refStrictFor(game, f) }; // sędzia z puli (src/career/referees.js), średnia listy 1,0
   const r = f.knockout ? quickKnockout(home, away, ctx, rng, f.knockout) : quickMatch(home, away, ctx, rng);
   // Zawodnicy w meczu: jedenastka z symulacji; kartki rozdzielone wg agresji, asysty do partnerów
@@ -426,6 +434,7 @@ export function applyResult(game, f, res, rng) {
   f.result = { score: res.score, scorers: res.scorers, shootout: res.shootout, extraTime: res.extraTime, stats: res.stats, ...packReport(res, f) };
   const msgs = [];
   const inSquad = new Set(); // kadra meczowa obu drużyn (przydziały z rezerw: wykorzystane albo przepadłe)
+  const rival = rivalMatch(f); // wygrana z rywalem: dobry kapitan wzmacnia radość (docs/kapitan.md)
   [f.home, f.away].forEach((clubId, s) => {
     if (!game.world.clubs[clubId]) return; // kluby bez stałej kadry: bez zapisu
     // Klucz kartek: klasa ligi (baraże w klasie klubu), PP, UEFA; reguły żółtych klasy (baraże jak liga)
@@ -443,6 +452,7 @@ export function applyResult(game, f, res, rng) {
     const lossStreak = result === 'L' ? lossStreakOf(game, clubId, f) : 0; // wcześniej nie liczony: kara za serię porażek nie działała
     const diff = s === 0 ? res.strengthDiff : -res.strengthDiff;
     const bonusCtx = bonusContext(game, f, res, s, clubId, clubById(clubId)); // premie z kontraktów: null w sparingu i w drugiej drużynie
+    const capE = f.comp === 'friendly' ? 0 : clubCaptainE(game, clubId, f.date); // kapitan klubu: porażka boli mniej, wygrana z rywalem cieszy bardziej
     for (const p of squad) {
       const guest = p.clubId !== clubId; // gra w drugiej drużynie klubu (statystyki osobno, kontrakt bez zmian)
       const tell = mine || p.clubId === game.clubId; // wiadomości o zawodnikach gracza także z meczów rezerw
@@ -457,7 +467,7 @@ export function applyResult(game, f, res, rng) {
       const x = played.get(p.id);
       const friendly = f.comp === 'friendly'; // sparing: bez statystyk sezonu, formy, kartek i pauz
       if (missed) { const s0 = (p.season ??= { apps: 0, subs: 0, min: 0, g: 0, a: 0, yc: 0, rc: 0, rating: 0, motm: 0, cs: 0 }); s0.miss = (s0.miss ?? 0) + 1; }
-      if (!friendly) p.morale = applyMorale(p.morale ?? 12, afterMatchDelta({ result, tie, strengthDiff: diff, derby: f.derby, lossStreak, played: !!x, rating: x?.rating, isRegular: (p.season?.apps ?? 0) >= 5 }));
+      if (!friendly) p.morale = applyMorale(p.morale ?? 12, afterMatchDelta({ result, tie, strengthDiff: diff, derby: f.derby, rival, lossStreak, played: !!x, rating: x?.rating, isRegular: (p.season?.apps ?? 0) >= 5, capE }));
       if (!x) continue;
       // Statystyki w podziale na rozgrywki (także sparingi) i historia klubowa (mecze o punkty), src/season/history.js;
       // mecz w drugiej drużynie klubu w grupie 'D' (bez historii klubowej i reputacji)
@@ -714,8 +724,9 @@ registerDailySystem({
     if (!game.world) return {};
     const messages = [];
     const monday = new Date(`${date}T12:00:00Z`).getUTCDay() === 1;
-    const leaders = new Set();
-    if (monday) for (const [cid, c] of Object.entries(game.world.clubs)) if (c.squad.some((id) => game.world.players[id]?.persona === 'Lider')) leaders.add(cid);
+    // Kapitan klubu (docs/kapitan.md): opaska w klubach AI i skutki złych wyborów, potem dryf morale zależny od kapitana
+    const capE = new Map();
+    if (monday) { captainWeek(game, date); for (const cid of Object.keys(game.world.clubs)) capE.set(cid, clubCaptainE(game, cid, date)); }
     const sharpCut = addDays(date, -4); // ostrość spada po 4 dniach bez meczu
     const W = game.world.players;
     // for-in zamiast Object.values: ta sama kolejność, bez kopii 4000 zawodników (słownik) co dzień
@@ -739,7 +750,7 @@ registerDailySystem({
       if (monday) {
         if (p.clubId && game.world.clubs[p.clubId]) recordMoraleWeek(p); // historia morale: kluby z kadrą w grze
         else if (p.moraleHist) delete p.moraleHist; // poza klubem w grze (wolny, zagranica): historia bez znaczenia
-        p.morale = weeklyDrift(p.morale ?? 12, leaders.has(p.clubId));
+        p.morale = weeklyDrift(p.morale ?? 12, capE.get(p.clubId) ?? 0);
       }
     }
     talkFollowUp(game, date); // skutek rozmowy tydzień później (Kadra > Rozmowy)

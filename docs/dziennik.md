@@ -29,6 +29,21 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 25, 2026, profil A (komputer domowy), rola kapitana (v1.24 Beta)
+Zrobione (ekspert psychologii sportu Sonnet medium; wdrożenie Opus high; sprawdzone):
+- Nowe `src/engine/captain.js` (siła B z LID, OPA, PRF, KON, doświadczenia i persony; forma psychiczna M z morale, prośby
+  o transfer, niezadowolenia, złamanej obietnicy, formy; E od -0,5 do 1) i `src/career/captaincy.js` (`game.captainLog`,
+  `captainWeek`, `withClubCaptain`). W meczu przy stawce (derby, rywal, ranga, puchar, końcówka na styku): mniej fauli
+  i kartek, strat, nerwów, szybszy powrót po straconym golu, wicekapitan x0,6; głód goli H + 0,08 E (zamiast premii LID).
+  Morale: porażka x(1 - 0,1 E), dryf 0,3 + 0,1 E (zamiast `hasLeader`), seria porażek; pominięty lider traci morale,
+  młody kapitan, częste zmiany opaski. Mecz w tle: lekki przechył przy stawce. Komunikaty w raporcie asystenta i odprawie.
+- Pomiar: derby E 0,9 wobec 0,2: +0,033 pkt/mecz, faule -6,8 %, kartki -9,2 %; zwykłe mecze w szumie; morale po 4 porażkach
+  +1,17. Opis: `docs/kapitan.md`. Test `tests/captain.test.mjs`.
+Zostało / dalej:
+- `f.derby` nie jest ustawiane w terminarzu, więc dawna premia derbowa morale w `afterMatchDelta` nie działa (kapitan
+  używa nowej flagi `rival`); do decyzji właściciela.
+- `tests/strzalki.test.mjs`: koszt strzałki `OP:b` niemierzalny (także na starym kodzie), sprawdzenie pominięte z komentarzem.
+
 ## Nov 25, 2026, profil A (komputer domowy), nasycenie golami (v1.24 Beta)
 Zrobione (ekspert futbolu Sonnet medium; wdrożenie: ja):
 - `SAT`, `hungerOf`, `teamHunger`, `satAct`, `satXg`: przy prowadzeniu 2+ drużyna rzadziej atakuje i słabiej wykańcza,

@@ -8,6 +8,7 @@ import { proficiency, posEff, assessLineup, validateLineup } from './positions.j
 import { conditionTerms, lineupRating } from './teamStrength.js';
 import { GROUP, isAvailable } from '../career/squad.js';
 import { knockEligible } from './match/teams.js';
+import { captainPower } from './captain.js';
 import { cleanPlayerInstrMap, arrowOf, arrowAllowed } from '../data/playerInstructions.js';
 
 /** Wartość zawodnika na danym slocie (OVR z karą pozycji + stan zawodnika). */
@@ -167,12 +168,13 @@ export function autoPickBench(squad, xi, benchSize, keep = [], { gks = 1 } = {})
 
 const score = (p, keys) => keys.reduce((s, k) => s + (p.attr?.[k] ?? 0), 0);
 
-/** Kapitan i wykonawcy stałych fragmentów spośród jedenastki. */
+/** Kapitan (najwyższe C: siła x forma psychiczna, src/engine/captain.js) i wykonawcy stałych fragmentów spośród jedenastki. */
 export function autoRoles(squad, xi) {
   const players = xi.filter(Boolean).map((id) => squad.find((p) => p.id === id)).filter(Boolean);
   const best = (keys, pred = () => true) => players.filter(pred).sort((a, b) => score(b, keys) - score(a, keys))[0]?.id ?? null;
+  const capC = new Map(players.map((p) => [p, captainPower(p).C]));
   return {
-    captain: players.sort((a, b) => (b.attr.LID + (b.persona === 'Lider' ? 3 : 0) + b.age * 0.1) - (a.attr.LID + (a.persona === 'Lider' ? 3 : 0) + a.age * 0.1))[0]?.id ?? null,
+    captain: players.sort((a, b) => capC.get(b) - capC.get(a))[0]?.id ?? null,
     penalty: best(['WYK', 'OPA', 'SFR'], (p) => p.pos !== 'BR'),
     freeKick: best(['SFR', 'DYS', 'TEC'], (p) => p.pos !== 'BR'),
     corner: best(['SFR', 'DOS'], (p) => p.pos !== 'BR'),

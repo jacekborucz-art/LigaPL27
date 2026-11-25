@@ -1008,7 +1008,7 @@ export function applyPromiseCheck(player, clubId, dateIso, minutesShare) {
   const c = player.contract;
   if (!c?.promise) return null;
   const r = evaluatePromise(c.promise, minutesShare, monthsBetween(c.promise.since, dateIso), promiseTolerance(player, dateIso));
-  player.contract = { ...c, promise: r.promise };
+  player.contract = { ...c, promise: r.event === 'promiseBroken' ? { ...r.promise, brokenAt: dateIso } : r.promise }; // brokenAt: forma kapitana (docs/kapitan.md)
   if (r.trustDelta || r.event === 'promiseBroken') {
     const rel = relationWith(player, clubId);
     rel.trust = clamp(rel.trust + r.trustDelta, 0, 100);
