@@ -29,6 +29,11 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 25, 2026, profil A (komputer domowy), mniej kontuzji w meczach w tle (v1.24 Beta)
+Zrobione (decyzja właściciela):
+- `QS.INJ` w `src/engine/quickSim.js`: 0,45 -> 0,19 kontuzji na drużynę w meczach w tle (liga i puchary). Pomiar: 0,373 na mecz
+  (było ok. 0,9), średnio 25 dni. Pełny silnik bez zmian (ok. 0,52 na mecz). Opis w `docs/taktyka-i-urazy.md`.
+
 ## Nov 25, 2026, profil A (komputer domowy), nastawienie zawodnika jako ocena dyrektora (v1.24 Beta)
 Zrobione (decyzja właściciela, opcja 2):
 - `directorTalkView` i `DIR_VIEW` w `src/career/playerMind.js`: kafelek „Nastawienie” i kolumny list w Transferach pokazują

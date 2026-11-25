@@ -322,3 +322,8 @@ Logika dnia meczowego (`src/match`):
 
 Testy: `tests/matchLiveUi.test.mjs`. Otwarte: zmiana bramkarza z pola przy pustej bramce pokazuje tylko błąd silnika
 („Ktoś musi stanąć w bramce.”); zawodnik z urazem, który musi zejść, nie ma kropki na boisku w oknie zmian (jest na liście).
+
+## Kontuzje w meczach w tle (Nov 25, 2026)
+- Szybka symulacja (`src/engine/quickSim.js`, `QS.INJ`): 0,19 kontuzji na drużynę (było 0,45), na prośbę właściciela.
+  Pomiar (900 meczów ligowych i pucharowych, ziarno 5): 0,373 kontuzji na mecz, średnio 25 dni, ponad 28 dni 0,068 na mecz;
+  ok. 114 kontuzji meczowych w sezonie ligi 18 drużyn (było ok. 275). Pełny silnik (mecze gracza): ok. 0,52 na mecz.
