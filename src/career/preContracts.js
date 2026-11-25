@@ -80,6 +80,7 @@ export function checkUserPre(game, p, date = game.date) {
   if (p.preContract) return { ok: false, text: `${p.name} ma już umowę od 1 lipca z innym klubem.` };
   if (!canApproach(p, date)) return { ok: false, text: `Rozmowy o umowie od 1 lipca najwcześniej ${PRE.months} miesięcy przed końcem kontraktu${p.contract?.until ? ` (od ${fmtDate(preOpensOn(p))})` : ''}.` };
   if (hasOpenDeal(game, p.id)) return { ok: false, text: 'Zawodnik jest w trakcie transferu.' };
+  if (game.debt?.clubs?.[game.clubId]?.ban) return { ok: false, text: 'Zakaz transferowy za zaległości wobec zawodników: najpierw spłać zaległości.' }; // src/career/arrears.js
   if (userPreContracts(game).length >= PRE.userMax) return { ok: false, text: `Masz już ${PRE.userMax} umowy od 1 lipca. To limit.` };
   const hard = squadLimitOf(game, game.clubId).hard;
   if (nextSeasonCount(game) + 1 > hard) return { ok: false, text: `Kadra na przyszły sezon byłaby za duża (maksimum ${hard}).` };
@@ -168,6 +169,7 @@ export function aiPreProposals(game, date) {
     preByClub.get(cl).push(p);
   }
   for (const c of rng.shuffle(CLUBS_PL.filter((x) => isAi(game, x.id) && x.tier <= 4))) {
+    if (game.debt?.clubs?.[c.id]?.ban) continue; // zakaz transferowy (src/career/arrears.js)
     const need = nextSeasonNeeds(game, c.id, preByClub)[0];
     if (!need) continue;
     const rep = clubReputation(c);

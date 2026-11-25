@@ -42,6 +42,10 @@ import { archivePlayerSeason, archiveSeasonMatches, syncSpell } from './history.
 import { reputationSeasonEnd, applyClubRep } from '../career/reputationSystem.js'; // docs/reputacja.md
 import { pruneSuspWhy } from './suspension.js';
 import { negSeason } from '../career/clubNegotiation.js'; // ukryty atrybut Negocjacje klubów AI (docs/negocjacje.md, rozdz. 15)
+import { ownershipRollover, noteOwnerCrisis, newOwnerCoaches, newOwnerBoard, ownerChangeMessage, saleWarningMessage } from '../career/ownership.js'; // zmiana właściciela (docs/wlasciciele-i-dlugi.md)
+import { licenceVerdicts, licenceFailed, debtNewSeason, transferBan, emergencySquadFill } from '../career/arrears.js'; // długi, zaległości, licencja
+import { goalText } from '../career/board.js';
+import { setPointDeductions } from './standings.js';
 
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
 const fmtCoef = (x) => (Math.round(x * 1000) / 1000).toFixed(3).replace('.', ',');
@@ -56,6 +60,7 @@ export function applySeasonState(game) {
   applyLeagueState(game);
   applyClubRep(game); // marka krajowa klubów z zapisu (club.rep), po ustaleniu lig
   applyCoefSource(game); // rozstawienia UEFA: współczynniki z zapisu (game.uefaCoef), nowa gra: dane startowe
+  setPointDeductions(game.season?.deductions ?? null); // ujemne punkty w tabelach z zapisu (src/career/arrears.js)
 }
 
 // ------------------------------------------------------------ Wyniki sezonu
@@ -101,7 +106,7 @@ function polandNextSeason(game, res) {
   const seasons = [...C.seasons];
   shiftWindow(C);
   applyCoefSource(game);
-  const eligible = (id) => !clubById(id)?.parent;
+  const eligible = (id) => !clubById(id)?.parent && !licenceFailed(game, id); // klub bez licencji nie gra w pucharach
   const spots = allocateEuropeanSpots(res.tables[1], res.cup, Math.max(1, access.rank), eligible);
   return { rank: access.rank, rankNow, coefNow: totals.get('POL') ?? 0, accessSeason: access.season, window: `${seasons[0]}-${seasons[4]}`, spots };
 }
@@ -243,7 +248,9 @@ export function rolloverSeason(game) {
   const userTable = !uid ? [] : userTier === 4 ? res.groupTables[userGroup] ?? [] : res.tables[userTier] ?? [];
   const userPos = uid ? userTable.indexOf(uid) + 1 : null;
   // Ruchy między ligami (III liga z tabel grup i baraży, IV liga: uzupełnienie grup, docs/iii-liga.md)
-  const moves = computeMoves(res.tables, res.playoffWinners, res.groupTables, rng.fork('ligi'), { l3Playoff: res.l3Playoff });
+  // Kluby bez licencji (zaległości wobec zawodników 30 czerwca, src/career/arrears.js): spadek albo kara punktowa
+  const lic = licenceVerdicts(game, oldYear);
+  const moves = computeMoves(res.tables, res.playoffWinners, res.groupTables, rng.fork('ligi'), { l3Playoff: res.l3Playoff, licence: lic.drops });
   const tiers4 = Object.fromEntries(Object.entries(moves.tiers).filter(([, t]) => t <= 4));
   const errors = validateTiers(tiers4, moves.groups);
   const europe = polandNextSeason(game, res);
@@ -314,6 +321,8 @@ export function rolloverSeason(game) {
   addFreeAgents(game, 8, newStart, `import-${year}`, { imports: true }); // było 22: wolni z zagranicy przychodzą też z puli (career/foreignPool.js)
   for (const cid of Object.keys(game.world.clubs)) {
     if (!clubById(cid)) continue;
+    // Zakaz transferowy (zaległości): tylko awaryjne uzupełnienie z drugiej drużyny albo juniorami (src/career/arrears.js)
+    if (transferBan(game, cid)) { const add = emergencySquadFill(game, cid, newStart, rng.fork(`uzup:${cid}`), cid === game.clubId ? 18 : 23); if (cid === game.clubId) report.signed.push(...add.map((p) => `${p.name} (${p.pos}, ${p.emergency})`)); continue; }
     if (cid === game.clubId) fillSquad(game, cid, 18, newStart, rng.fork(`uzup:${cid}`), report);
     else fillSquad(game, cid, 23, newStart, rng.fork(`uzup:${cid}`));
   }
@@ -327,9 +336,15 @@ export function rolloverSeason(game) {
   // uzupełnia saldo do skarbca, budżet transferowy z wolnego salda
   const F = game.finance;
   const ownerNotes = {};
+  // Zmiana właściciela (src/career/ownership.js): przed planem sezonu, bo nowy właściciel zmienia dopłatę i rezerwę
+  const ownerCh = ownershipRollover(game, { res, oldYear, year, date: newStart });
+  const oldCosts = {}; const startCover = {};
   for (const c of CLUBS_PL) {
     if (!game.world.clubs[c.id]) continue;
     const old = F.clubs[c.id];
+    if (old?.plan) oldCosts[c.id] = old.plan.wages + old.plan.ops;
+    const ch = ownerCh[c.id];
+    const ov = game.ownerOverride?.[c.id] ?? null;
     // Spadek: pensje obniżone o klauzulę spadkową z kontraktu (domyślnie 30 %) [SZAC]
     if (old?.tier && c.tier > old.tier) {
       for (const p of squadOf(game.world, c.id)) {
@@ -338,14 +353,20 @@ export function rolloverSeason(game) {
       }
     }
     // Pieniądze właściciela na sezon: wynik wobec oczekiwań, awans, spadek, puchary, nastrój (src/career/ownerFunding.js)
-    const om = old ? ownerFundingFor(game, c, old, res, oldYear) : null;
-    if (om) ownerNotes[c.id] = { ...om, before: clubPlan(c).owner };
-    const fresh = old ? initClub(game.world, c, { balance: old.balance, date: newStart, ai: c.id !== game.clubId, ownerMul: om }) : initClub(game.world, c);
+    // Właściciel uzupełnia saldo na start sezonu (także dług), chyba że klub właśnie zmienił właściciela (spłata części
+    // długu), miasto wycofało wsparcie albo właściciel odmówił po 3 ciężkich sezonach (src/career/arrears.js)
+    const noTopUp = !!ch || !!ov?.withdrawn || !!game.debt?.bail?.[c.id]?.off;
+    if (old && !noTopUp && old.balance < 0) startCover[c.id] = -old.balance;
+    const om = ch ? ch.om : old ? ownerFundingFor(game, c, old, res, oldYear) : null;
+    noteOwnerCrisis(game, c.id, om);
+    if (om) ownerNotes[c.id] = { ...om, before: clubPlan(c, ov).owner };
+    const fresh = old ? initClub(game.world, c, { balance: old.balance, date: newStart, ai: c.id !== game.clubId, ownerMul: om, owner: ov, cover: ch?.cover, injection: ch?.injection, noTopUp }) : initClub(game.world, c, { owner: ov });
     if (old) fresh.history = [...(old.history ?? []), { season: oldSeason, ...seasonSummary(old) }].slice(-10);
     if (old?.bonusDue) fresh.bonusDue = old.bonusDue; // premie z kontraktów z końcówki sezonu płacone 1 lipca
     F.clubs[c.id] = fresh;
   }
   F.merit = {};
+  newOwnerCoaches(game, ownerCh, newStart, year); // nowy właściciel klubu AI: czasem nowy trener
 
   // Zarząd: ocena sezonu, nowy cel (tylko trener z klubem)
   let B = null; let droppedOut = false; let fired = false;
@@ -361,6 +382,7 @@ export function rolloverSeason(game) {
     B.reviews = [{ date: newStart, trust: B.trust, delta: Math.round(delta * 10) / 10, pos: userPos, notes: [`Sezon ${oldSeason} zakończony na ${userPos}. miejscu.`] }, ...(B.reviews ?? [])].slice(0, 12);
     game.manager.seasons = [...(game.manager.seasons ?? []), { season: oldSeason, club: uid, tier: userTier, pos: userPos, target }];
     B.goal = boardGoal(game, clubById(uid)); B.goalClub = uid;
+    if (ownerCh[uid]) newOwnerBoard(game, B, clubById(uid), ownerCh[uid], year, goalText); // nowy właściciel: zaufanie 50, cel wg ambicji
     droppedOut = clubById(uid).tier > 4; // IV liga nie jest prowadzona: trener szuka nowego klubu
     // Próg zwolnienia zależy od popularności trenera u kibiców (src/career/coachCareer.js)
     fired = B.trust < fireThreshold(game.manager?.career?.pop?.fans) || droppedOut;
@@ -373,6 +395,8 @@ export function rolloverSeason(game) {
   game.season = createSeason(`${game.seed}:${year}`, { playerClub: uid && !fired ? uid : null, superCup: [champion, cupWinner], holder: res.uefa.LM ?? undefined, uefaHolders: res.uefa });
   game.season.polishEurope = polishEurope;
   game.fixtures = game.season.fixtures;
+  // Długi: dopłaty właścicieli podsumowane, zaległości spłacone przez nowego właściciela, kara za brak licencji
+  const debtMsgs = debtNewSeason(game, newStart, { oldCosts, licPoints: lic.points, startCover });
   if (uid) game.tactics = createTactics(squadOf(game.world, uid), { benchSize: 12, formation: game.tactics?.formation, instructions: game.tactics?.instructions, playerInstr: game.tactics?.playerInstr });
   if (game.summary) game.summary.season = SEASON;
 
@@ -391,6 +415,8 @@ export function rolloverSeason(game) {
       ...(moves.l3Playoff ?? []).map((x) => `Baraż o 2 Ligę: ${name(x.keeper)} - ${name(x.challenger)}, wygrywa ${name(x.winner)}.`),
       `Awans do III ligi z IV ligi: ${list(moves.promoted[4])}. Spadek do IV ligi: ${list(moves.relegated[5])}.`,
       ...moves.notes.filter((n) => n.kind === 'reserve').map((n) => `${name(n.id)}: przeniesienie administracyjne (rezerwy muszą grać niżej niż pierwsza drużyna).`),
+      ...moves.notes.filter((n) => n.kind === 'licence').map((n) => `${name(n.id)}: brak licencji (zaległości wobec zawodników), gra niżej: ${leagueLabel({ tier: n.to })}.`),
+      ...Object.keys(lic.points).map((id) => `${name(id)}: brak licencji (zaległości wobec zawodników), zaczyna sezon z karą ${lic.points[id]} punktów.`),
       `Puchary europejskie: ${Object.entries(res.uefa).map(([k, v]) => `${UCOMP_NAMES[k]}: ${name(v)}`).join(', ')}.`,
       ...(errors.length ? [`Uwaga techniczna: ${errors.join('; ')}`] : []),
     ].join('\n'),
@@ -409,7 +435,10 @@ export function rolloverSeason(game) {
   const sq = uid ? squadOf(game.world, uid).length : 0;
   if (uid && !fired) msgs.push(createMessage({ date: newStart, key: `kadra-lato:${year}`, category: 'staff', from: 'Dyrektor sportowy', priority: 'important', subject: `Kadra przed sezonem ${SEASON}: ${sq} zawodników`, body: `${squadLines.join('\n\n') || 'Bez zmian w kadrze.'}${sq < 22 ? '\n\nKadra liczy mniej niż 22 zawodników. Uzupełnij ją w zakładce Transfery (wolni zawodnicy są dostępni od razu).' : ''}` }));
   const fin = uid ? F.clubs[uid] : null;
-  if (uid && !fired && ownerNotes[uid]) msgs.push(ownerFundingMessage(game, uid, ownerNotes[uid], newStart));
+  if (uid && ownerCh[uid]) msgs.push(ownerChangeMessage(game, uid, ownerCh[uid], newStart, fin));
+  else if (uid && !fired) { const w = saleWarningMessage(game, uid, newStart); if (w) msgs.push(w); }
+  if (uid && !fired && ownerNotes[uid] && !ownerCh[uid]) msgs.push(ownerFundingMessage(game, uid, ownerNotes[uid], newStart));
+  msgs.push(...debtMsgs);
   msgs.push(...careerMsgs);
   msgs.push(...negMsgs); // nowy dyrektor sportowy w klubie z ligi gracza (bez wartości atrybutu)
   if (fired) {

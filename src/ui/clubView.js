@@ -8,6 +8,7 @@ import { compOfClub, compClubIds } from '../season/leagueComps.js';
 import { squadOf } from '../world/worldGen.js';
 import { coachOf, headCoachName, coachBlurb, coachSeen, coachBand, COACH_ATTRS, COACH_KEYS, COACH_STYLES } from '../career/coaches.js';
 import { ownerOf, ownerBlurb, OWNER_TYPES } from '../career/owners.js';
+import { ownerData } from '../career/ownership.js'; // nowy właściciel z zapisu (docs/wlasciciele-i-dlugi.md)
 import { NAT_NAMES } from '../data/names.js';
 import { GROUP } from '../career/squad.js';
 import { shirtNumbers, kitColors } from '../career/shirts.js';
@@ -95,8 +96,9 @@ function coachHistoryHtml(game, clubId, c) {
 function ownerHtml(game, clubId, facts) {
   const o = game.world?.clubs?.[clubId] ? ownerOf(game, clubId) : null;
   if (!o && !facts.owner) return '';
-  const name = facts.owner || o?.name;
-  const type = facts.ownerType || OWNER_TYPES[o?.type]?.label || '';
+  const ov = game.ownerOverride?.[clubId] ? ownerData(game, clubId) : null; // zmiana właściciela w grze
+  const name = ov ? ov.name : facts.owner || o?.name;
+  const type = ov ? (ov.withdrawn ? 'miasto bez dotacji' : OWNER_TYPES[ov.type]?.label ?? '') : facts.ownerType || OWNER_TYPES[o?.type]?.label || '';
   const blurb = o ? ownerBlurb(o) : '';
   return `<div><dt>Właściciel</dt><dd>${esc(name)}${type ? `<small>${esc(type)}</small>` : ''}${blurb ? `<small class="clv-owner">${esc(blurb)}</small>` : ''}</dd></div>`;
 }

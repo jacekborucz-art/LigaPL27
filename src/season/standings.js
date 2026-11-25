@@ -1,6 +1,11 @@
 // Tabela ligowa liczona z rozegranych meczów (nie ma osobnego stanu, więc nie może się rozjechać).
 // Kryteria (Ekstraklasa i niższe ligi): punkty, mecze bezpośrednie (punkty, bramki), bilans, bramki, zwycięstwa.
 
+// Ujemne punkty (zaległości wobec zawodników, brak licencji: src/career/arrears.js): { comp: { clubId: punkty } }
+// z zapisu gry (game.season.deductions), ustawiane przy wczytaniu i przy każdej nowej karze
+let DEDUCT = null;
+export function setPointDeductions(map) { DEDUCT = map ?? null; }
+
 export function standings(fixtures, clubIds, { tieBreak = ['points', 'h2hPoints', 'h2hGoalDiff', 'goalDiff', 'goalsFor', 'wins'] } = {}) {
   const row = (id) => ({ id, played: 0, wins: 0, draws: 0, losses: 0, gf: 0, ga: 0, points: 0, form: [] });
   const rows = new Map(clubIds.map((id) => [id, row(id)]));
@@ -14,6 +19,8 @@ export function standings(fixtures, clubIds, { tieBreak = ['points', 'h2hPoints'
     else if (gh < ga) { a.wins++; h.losses++; a.points += 3; h.form.push('P'); a.form.push('W'); }
     else { h.draws++; a.draws++; h.points++; a.points++; h.form.push('R'); a.form.push('R'); }
   }
+  const ded = DEDUCT && fixtures.length ? DEDUCT[fixtures[0].comp] : null;
+  if (ded) for (const r of rows.values()) if (ded[r.id]) { r.points -= ded[r.id]; r.deducted = ded[r.id]; }
   const list = [...rows.values()].map((r) => ({ ...r, goalDiff: r.gf - r.ga, form: r.form.slice(-5) }));
   // Mecze bezpośrednie między drużynami z równą liczbą punktów
   const h2h = (group) => {

@@ -36,7 +36,7 @@ export function seasonGoalFor(club) {
 const GOAL_TEXT = {
   1: [[1, 'obrona mistrzostwa Polski'], [3, 'walka o mistrzostwo Polski'], [6, 'miejsce dające grę w europejskich pucharach'], [12, 'spokojne miejsce w środku tabeli'], [99, 'utrzymanie w Ekstraklasie']],
 };
-function goalText(tier, target, base) {
+export function goalText(tier, target, base) {
   if (tier === 4) return target <= 1 ? 'awans do 2 Ligi' : target <= 2 ? 'awans do 2 Ligi albo baraże o awans' : target <= 4 ? 'miejsce w czołówce grupy' : base.text;
   if (tier !== 1) return target <= 2 ? (tier === 2 ? 'awans do Ekstraklasy' : 'awans do 1 Ligi') : target <= 6 ? 'miejsce w strefie baraży o awans' : base.text;
   return GOAL_TEXT[1].find(([t]) => target <= t)[1];

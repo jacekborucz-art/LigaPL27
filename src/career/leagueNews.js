@@ -2,8 +2,9 @@
 // tylko ważne sprawy. Bez klubu gracza (o nim przychodzą osobne wiadomości).
 // - duże transfery: odstępne od progu ligi, z wyższych lig od podwójnego progu [SZAC];
 // - koszmarne kontuzje: przerwa od 120 dni [SZAC]; z wyższych lig tylko znani zawodnicy (reputacja od 60);
-// - kłopoty finansowe: saldo klubu poniżej zera, a poniżej progu ligi ostrzeżenie o zagrożeniu licencji
-//   (w grze nie ma mechanizmu bankructwa; to tylko wiadomość, raz na sezon).
+// - kłopoty finansowe: saldo klubu poniżej zera, a poniżej progu ligi ostrzeżenie o zagrożeniu licencji (raz na sezon);
+// - zmiany właścicieli (src/career/ownership.js), zaległości, zakazy transferowe, kary punktowe, odejścia zawodników
+//   i brak licencji (src/career/arrears.js).
 // Zwolnienia trenerów: src/career/coachMarket.js (Media, ta sama zasada ligi). Reprezentacja: kategoria national.
 import { registerDailySystem, addDays } from '../core/gameLoop.js';
 import { createMessage } from '../core/inbox.js';
@@ -81,8 +82,34 @@ export function leagueNewsDay(game, date) {
         `Klub jest na minusie (${fmtZl(F.balance)}). Media donoszą o opóźnieniach w wypłatach i szukaniu oszczędności.`));
     }
   }
+  // Właściciele i zaległości wobec zawodników w innych klubach (zdarzenia z ostatnich dni)
+  for (const e of game.ownerLog ?? []) {
+    if (e.date < since || e.date > date || e.club === me || !inScope(tierOf(e.club), my, e.club, me)) continue;
+    const n = nameOf(e.club);
+    const t = OWNER_NEWS[e.kind];
+    if (t) out.push(media(date, `news-wlasciciel:${e.club}:${e.date}`, t.s(n, e), `${t.b(n, e)}${e.coach ? ' Nowy właściciel zmienia też trenera.' : ''}`));
+  }
+  for (const e of game.debt?.events ?? []) {
+    if (e.date < since || e.date > date || e.club === me || !inScope(tierOf(e.club), my, e.club, me)) continue;
+    const t = DEBT_NEWS[e.kind];
+    if (t) out.push(media(date, `news-dlug:${e.kind}:${e.club}:${e.date}`, t.s(nameOf(e.club), e), t.b(nameOf(e.club), e)));
+  }
   return out;
 }
+
+const OWNER_NEWS = {
+  sale: { s: (n) => `${n} ma nowego właściciela`, b: (n, e) => `Klub przejmuje ${e.name.toLowerCase()} (wcześniej: ${e.fromName}). Media spekulują o nowym budżecie na kolejny sezon.` },
+  city: { s: (n) => `${n}: miasto przejmuje klub`, b: (n, e) => `${e.name} przejmuje klub od dotychczasowego właściciela (${e.fromName}). Budżet będzie skromniejszy niż za poprzednich rządów.` },
+  withdraw: { s: (n) => `Miasto wycofuje wsparcie dla klubu ${n}`, b: (n, e) => `${e.name} nie przekaże w nowym sezonie dotacji. Klub musi utrzymać się z biletów, praw TV i sponsorów.` },
+  investor: { s: (n) => `${n}: inwestor ratuje klub`, b: (n, e) => `Po wycofaniu się miasta klub przejmuje ${e.name.toLowerCase()}.` },
+};
+const DEBT_NEWS = {
+  arrears: { s: (n) => `Zaległości w płacach w klubie ${n}`, b: () => 'Zawodnicy nie dostali pensji na czas. Jeśli zaległości potrwają, mogą wezwać klub do zapłaty i odejść za darmo.' },
+  ban: { s: (n) => `${n} z zakazem transferowym`, b: () => 'Klub zalega z pensjami od 2 miesięcy. Do spłaty zaległości nie może zgłaszać nowych zawodników, a zawodnicy wysłali wezwania do zapłaty.' },
+  points: { s: (n, e) => `${n} ukarany: minus ${e.n} punkty`, b: () => 'Kara za zaległości wobec zawodników. Kolejne kary co 2 miesiące do spłaty długu.' },
+  term: { s: (n, e) => `Zawodnicy odchodzą z ${n} (${e.n})`, b: (n, e) => `${e.n} ${e.n === 1 ? 'zawodnik rozwiązał' : 'zawodników rozwiązało'} kontrakty z winy klubu po niewypłaconych pensjach. Są wolni i mogą podpisać umowy także poza oknem.` },
+  licFail: { s: (n) => `${n} bez licencji`, b: (n, e) => `Komisja licencyjna odmówiła licencji${e.repeat ? ' drugi sezon z rzędu' : ''} z powodu zaległości wobec zawodników.` },
+};
 
 registerDailySystem({
   id: 'leagueNews', order: 95,

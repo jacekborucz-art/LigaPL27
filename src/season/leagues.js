@@ -71,9 +71,16 @@ const voivOf = (c, g) => c.voiv ?? VOIVS[g][hash(c.id) % VOIVS[g].length];
  * groupTables: { 1..4: [id...] } (końcowe tabele grup III ligi), rng,
  * opts.l3Playoff: rozegrane baraże III ligi [{ keeper, challenger, winner }] albo null (wtedy symulacja z siły),
  * opts.semis: pary półfinałów do symulacji (domyślnie losowanie).
+ * opts.licence: kluby bez licencji { id: o ile klas niżej (1-2) } (src/career/arrears.js): klub na końcu tabeli swojej
+ * ligi (spada zamiast ostatniego sportowo, nie awansuje); 2 klasy: dalej o klasę, a najlepszy spadkowicz tej ligi zostaje.
  * Zwraca { tiers: { id: nowa liga 1-5 }, groups: { id: grupa III ligi }, promoted, relegated, l3Up, l3Runners, l3Playoff, notes }.
  */
-export function computeMoves(tables, playoffWinners, groupTables, rng, { l3Playoff = null } = {}) {
+export function computeMoves(tables, playoffWinners, groupTables, rng, { l3Playoff = null, licence = null } = {}) {
+  const lic = Object.entries(licence ?? {}).filter(([, n]) => n > 0);
+  if (lic.length) {
+    tables = { ...tables };
+    for (const [id] of lic) for (const t of [1, 2, 3]) if (tables[t]?.includes(id)) tables[t] = [...tables[t].filter((x) => x !== id), id];
+  }
   const tier = {}; const group = {};
   for (const t of [1, 2, 3]) for (const id of tables[t] ?? []) tier[id] = t;
   const groupsIn = L3_GROUPS.filter((g) => groupTables?.[g]?.length);
@@ -103,6 +110,17 @@ export function computeMoves(tables, playoffWinners, groupTables, rng, { l3Playo
   for (const id of promoted[2]) tier[id] = 2;
   for (const id of relegated[3]) tier[id] = 3;
   for (const id of relegated[4]) tier[id] = 4;
+  // Brak licencji drugi sezon z rzędu: o 2 klasy niżej (najniżej III liga); najlepszy spadkowicz ligi pośredniej zostaje
+  for (const [id, n] of lic) {
+    const t = [1, 2, 3].find((x) => tables[x]?.includes(id));
+    if (!t || n < 2 || t + 2 > 4 || tier[id] !== t + 1) continue;
+    tier[id] = t + 2;
+    relegated[t + 1] = relegated[t + 1].filter((x) => x !== id); relegated[t + 2].push(id);
+    const saved = relegated[t + 2].find((x) => x !== id && tier[x] === t + 2 && tables[t + 1]?.includes(x) && !parentOf(x));
+    if (saved) { tier[saved] = t + 1; relegated[t + 2] = relegated[t + 2].filter((x) => x !== saved); notes.push({ id: saved, kind: 'reprieve', tier: t + 1 }); }
+    notes.push({ id, kind: 'licence', from: t, to: t + 2 });
+  }
+  for (const [id, n] of lic) if (n === 1 && !notes.some((x) => x.id === id && x.kind === 'licence')) notes.push({ id, kind: 'licence', to: tier[id] });
 
   // III liga: zwycięzca grupy awansuje, wicemistrz gra w barażach; rezerwy tylko, gdy wolno (inaczej kolejny klub)
   const ok = (id) => { const p = parentOf(id); return !p || reserveMayPlayIn(3, tier[p] ?? KNOWN.get(p)?.tier ?? 1); };

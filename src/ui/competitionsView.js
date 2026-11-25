@@ -53,11 +53,11 @@ function tableView(game, comp) {
           <span class="tbl__pos">${r.pos}</span>
           <span class="tbl__club">${crest(r.id)}<button class="club-link" data-act="club" data-club="${esc(r.id)}" title="Pokaż klub">${esc(name(r.id))}</button></span>
           <span>${r.played}</span><span class="w">${r.wins}</span><span class="w">${r.draws}</span><span class="w">${r.losses}</span>
-          <span>${r.gf}:${r.ga}</span><b>${r.points}</b><span class="w2">${formDots(r.form)}</span>
+          <span>${r.gf}:${r.ga}</span><b${r.deducted ? ` title="${esc(`Kara: minus ${r.deducted} pkt (zaległości wobec zawodników albo brak licencji)`)}"` : ''}>${r.points}${r.deducted ? '*' : ''}</b><span class="w2">${formDots(r.form)}</span>
         </div>`;
       }).join('')}
     </div>
-    <ul class="legend">${zones.map((z) => `<li data-zone="${z.kind}">${esc(z.label)}</li>`).join('')}</ul>
+    <ul class="legend">${zones.map((z) => `<li data-zone="${z.kind}">${esc(z.label)}</li>`).join('')}${rows.filter((r) => r.deducted).map((r) => `<li>${esc(`* ${name(r.id)}: minus ${r.deducted} pkt kary`)}</li>`).join('')}</ul>
     </div><aside class="cgrid__aside">
       ${current ? `<section class="cside"><div class="cside__head"><h3>${current}. kolejka</h3><button class="btn btn--quiet btn--sm" data-act="cview" data-v="fixtures">Terminarz</button></div>${roundList(game, comp, current, { compact: true })}</section>` : ''}
       <section class="cside"><div class="cside__head"><h3>Strzelcy</h3><button class="btn btn--quiet btn--sm" data-act="cview" data-v="stats">Statystyki</button></div>${topScorers(game, comp)}</section>

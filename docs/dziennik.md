@@ -29,6 +29,19 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 26, 2026, profil A (komputer domowy), właściciele i długi (v1.25 Beta)
+Zrobione (eksperci finansów i prawa sportowego Sonnet medium; wdrożenie Opus high; sprawdzone):
+- Nowe `src/career/ownership.js` (odejście właściciela na koniec sezonu: typ, cechy, x1,15 po słabych latach, mnożnik ligi;
+  nowy właściciel losowy albo miasto; wycofanie miasta; `game.ownerOverride`, `ownerHist`, `ownerLog`) i
+  `src/career/arrears.js` (zaległości w pensjach, wezwania, rozwiązania z winy klubu, zakaz transferów, -3 pkt co 2 mies.,
+  licencja 31 marca / 30 czerwca, awaryjna kadra: rezerwy -2 klasy, juniorzy -3; `game.debt`), `src/ui/ownerDebtView.js`.
+- Ujemne punkty w tabelach (`setPointDeductions`), licencja przed ruchami lig, media, panel w Klub, Finanse.
+- Opis: `docs/wlasciciele-i-dlugi.md` (przepisy [DO SPRAWDZENIA]). Testy: `ownership`, `arrears`; `multiseason.test` dostosowany.
+Zostało / dalej (do decyzji właściciela):
+- symulacja 3 x 5 sezonów: zmian właściciela 6,1 na sezon (Ekstraklasa+1 Liga 2,5, cel 3-4), przejęć przez miasto 0,6
+  (cel 1-2), wycofań miasta 3,1 (cel 0-1, głównie III liga), rozwiązań kontraktów 7-136 na sezon.
+- kluby AI dalej z dopłatami do długów (najwyżej 3 ciężkie sezony), klub gracza bez nich; brak sprawdzenia w przeglądarce.
+
 ## Nov 25, 2026, profil A (komputer domowy), premia za podpis jako warunek (v1.25 Beta)
 Zrobione (ekspert od kontraktów Sonnet medium; wdrożenie: ja):
 - `SIGN_MIN`, `signOnMin`, `_signMin` w `src/career/negotiation.js`: zawodnik z powodem (twardy agent, wolny transfer,

@@ -48,6 +48,7 @@ const clubName = (id) => clubById(id)?.name ?? 'klub';
 export function lateFree(game, p, date = game.date) {
   if (windowOn(date) || !p.freeSince) return false;
   if (p.scout) return false; // wolny kandydat skauta jest bez klubu od dawna: można go zgłosić w każdej chwili (FIFA RSTP art. 6.1)
+  if (p.justCause && p.justCause === p.freeSince) return false; // rozwiązał kontrakt z winy klubu (zaległości, arrears.js): zgłoszenie poza oknem
   const last = (DOMESTIC.transferWindows ?? []).filter((w) => w.to < date).map((w) => w.to).sort().at(-1);
   return !!last && p.freeSince > last;
 }
@@ -126,6 +127,7 @@ const VOID_TEXT = {
   limit: (j, c) => `Kadra jest pełna (limit kadry ${c.counted - 1}/${c.hard}), więc umowa wygasła bez kosztów. ${j.name} wraca na listę wolnych zawodników.`,
   injury: (j, c, p) => `${j.name} ma poważną kontuzję (ok. ${Math.round(p.injuryDays)} dni przerwy). Klub wycofał się z umowy bez kosztów. ${j.name} wraca na listę wolnych zawodników.`,
   medical: (j) => `${j.name} nie przeszedł testów medycznych. Umowa wygasła bez kosztów. ${j.name} wraca na listę wolnych zawodników.`,
+  ban: (j) => `Klub ma zakaz transferowy za zaległości wobec zawodników, więc nie może zgłosić ${j.name}. Umowa wygasła bez kosztów.`,
 };
 
 /** Szansa niezaliczenia testów medycznych w dniu dołączenia. */
@@ -146,6 +148,7 @@ export function joinsDay(game, date) {
     let why = !p ? 'gone' : p.clubId || p.joinOn?.clubId !== j.to ? 'moved' : !W.clubs[j.to] ? 'club' : null;
     const c = why ? null : squadCount(game, j.to); // liczy już tego zawodnika (rezerwacja)
     if (!why && c.counted > c.hard) why = 'limit';
+    if (!why && c.ban) why = 'ban'; // zakaz transferowy (src/career/arrears.js)
     if (!why && (p.injuryDays ?? 0) > LATE_JOIN.injuryDays) why = 'injury';
     if (!why && new Rng(`dolaczenie:${game.seed}:${j.pid}:${j.date}`).chance(joinMedicalFail(p))) why = 'medical';
     dropJoin(game, j);

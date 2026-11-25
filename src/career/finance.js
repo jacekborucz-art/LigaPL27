@@ -4,7 +4,8 @@
 // dopłaty właściciela lub miasta, nagrody (Puchar Polski, UEFA w realnych kwotach), sprzedaż zawodników.
 // Koszty: pensje zawodników co tydzień, koszty klubu co miesiąc (sztab, administracja, akademia, stadion, podróże),
 // transfery, premie za podpis, prowizje. Bogaty właściciel uzupełnia saldo na start sezonu (skarbiec),
-// a długi klubów AI pokrywa właściciel (careerSystem.js), więc żaden klub AI nie bankrutuje.
+// a długi klubów AI pokrywa właściciel najwyżej 3 sezony z rzędu, potem zaległości jak u gracza (src/career/arrears.js).
+// Zmiana właściciela (src/career/ownership.js): dane właściciela z game.ownerOverride zamiast danych klubu.
 // Wszystkie liczby oznaczone [SZAC] to założenia do kalibracji.
 
 import { clamp } from '../core/rng.js';
@@ -109,8 +110,9 @@ const r1000 = (x) => Math.round(x / 1000) * 1000;
 /**
  * Plan sezonu klubu z danych: roczne przychody i koszty, parametry dnia meczowego, właściciel.
  * Kwoty przeliczone na ligę, w której klub gra teraz (spadek: mniej sponsorów, widzów i płac).
+ * ov: nowy właściciel z zapisu (game.ownerOverride[id], src/career/ownership.js): { type, name, doplata, skarbiec } w mln zł.
  */
-export function clubPlan(club) {
+export function clubPlan(club, ov = null) {
   const d = clubFinanceData(club);
   const t = tierOf(club); const t0 = d.liga ?? t;
   const att = Math.min(d.pojemnosc, Math.round(d.frekwencja * ratio(FIN.K_ATT, t, t0)));
@@ -130,6 +132,7 @@ export function clubPlan(club) {
     skarbiec: r1000((d.wlasciciel?.skarbiec ?? 0) * M),
     ownerType: d.wlasciciel?.typ ?? 'miasto', ownerName: d.wlasciciel?.kto ?? '', sponsorLevel: d.sponsor ?? 1,
   };
+  if (ov) Object.assign(plan, { owner: r1000((ov.doplata ?? 0) * M), skarbiec: r1000((ov.skarbiec ?? 0) * M), ownerType: ov.type ?? plan.ownerType, ownerName: ov.name ?? plan.ownerName });
   plan.domestic = plan.tv + plan.merit + plan.sponsor + plan.other + plan.tickets;
   plan.ops = r1000(plan.wages * FIN.STAFF + plan.domestic * (FIN.OTHER_COSTS[t] ?? 0.25));
   plan.net = plan.domestic + plan.owner - plan.wages - plan.ops;
@@ -147,9 +150,12 @@ function transferBudgetOf(c, balance) {
 /**
  * Finanse klubu na start sezonu. opts.balance: saldo przeniesione z poprzedniego sezonu (bez niego saldo startowe
  * z przychodów). opts.date: dzień startu sezonu; wtedy bogaty właściciel uzupełnia saldo do skarbca (wpis 'owner').
+ * opts.owner: nowy właściciel z zapisu (clubPlan); opts.cover: część długu spłacana przez nowego właściciela (0-1),
+ * opts.injection: jednorazowy zastrzyk nowego właściciela (zł), src/career/ownership.js. opts.noTopUp: właściciel nie
+ * uzupełnia salda (nowy właściciel spłaca tylko część długu, miasto po wycofaniu, odmowa po 3 sezonach: arrears.js).
  */
 export function initClub(world, club, opts = {}) {
-  const plan = clubPlan(club);
+  const plan = clubPlan(club, opts.owner);
   // Pieniądze właściciela na sezon (src/career/ownerFunding.js): dopłata x mul, skarbiec x skarbiecMul
   if (opts.ownerMul) { plan.owner = r1000(plan.owner * opts.ownerMul.mul); plan.skarbiec = r1000(plan.skarbiec * opts.ownerMul.skarbiecMul); plan.ownerMul = opts.ownerMul.mul; }
   const wages = wageBill(world, club.id);
@@ -161,10 +167,12 @@ export function initClub(world, club, opts = {}) {
   };
   if (opts.balance != null) {
     c.balance = Math.round(opts.balance);
-    if (opts.date && plan.skarbiec > c.balance) {
+    if (opts.date && plan.skarbiec > c.balance && !opts.noTopUp) {
       const add = plan.skarbiec - c.balance;
       bookOne(c, opts.date, 'in', 'owner', add, `${plan.ownerName || 'Właściciel'}: pieniądze na nowy sezon`);
     }
+    if (opts.date && opts.cover > 0 && c.balance < 0) bookOne(c, opts.date, 'in', 'owner', r1000(-c.balance * Math.min(1, opts.cover)), `${plan.ownerName || 'Nowy właściciel'}: spłata długów przy przejęciu klubu`);
+    if (opts.date && opts.injection > 0) bookOne(c, opts.date, 'in', 'owner', r1000(opts.injection), `${plan.ownerName || 'Nowy właściciel'}: pieniądze na wejście`);
     // Klub AI z dużą nadwyżką spłaca zadłużenie i inwestuje (stadion, baza, akademia), zamiast trzymać gotówkę [SZAC]
     const cap = plan.domestic * FIN.SURPLUS_CAP + plan.skarbiec;
     if (opts.ai && opts.date && c.balance > cap) bookOne(c, opts.date, 'out', 'invest', (c.balance - cap) * FIN.SURPLUS_SPEND, 'Spłata zadłużenia i inwestycje w infrastrukturę');
@@ -271,6 +279,7 @@ export const FIN_LABELS = {
   infra: 'Inwestycje w obiekty', upkeep: 'Utrzymanie obiektów',
   bonus: 'Premie zawodników', staff: 'Pensje sztabu', staffComp: 'Rekompensaty za sztab',
   scouts: 'Skauci: wyprawy i prowizje', // skauting zagraniczny (src/career/scoutOps.js)
+  arrearsComp: 'Odszkodowania dla zawodników', // rozwiązania kontraktów z winy klubu (src/career/arrears.js)
 };
 
 /** Ile klub może dziś wydać (budżet transferowy ograniczony saldem). */

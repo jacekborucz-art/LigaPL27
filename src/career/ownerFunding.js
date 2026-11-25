@@ -16,6 +16,7 @@ export const OWNER_FUND = {
   europe: 0.05, // klub w pucharach europejskich
   clamp: [0.75, 1.3], billionaireMax: 1.5, cityMax: 1.15,
   cityCrisis: { p: 0.05, hit: -0.15 }, // kryzys budżetu miasta
+  cityGrowth: 0.05, // miasto po przejęciu klubu (src/career/ownership.js): dopłata rośnie najwyżej o 5 % na rok
   wealthCap: [[5, 1.0], [8, 1.1], [12, 1.2]], // zasobność <= 5: najwyżej 1,0 (nie ma z czego dołożyć)
   skarbiecShare: 0.5,
 };
@@ -65,11 +66,14 @@ export function ownerSeasonMul(game, clubId, ctx) {
     why.push('spadek');
   }
   if (ctx.europe) { m += F.europe; why.push('puchary europejskie'); }
-  if (city && rng.chance(F.cityCrisis.p)) { m += F.cityCrisis.hit; why.push('cięcia w budżecie miasta'); }
+  let crisis = false;
+  if (city && rng.chance(F.cityCrisis.p)) { m += F.cityCrisis.hit; why.push('cięcia w budżecie miasta'); crisis = true; }
   if (Math.abs(mood) >= 0.08) why.push(mood > 0 ? 'dobry nastrój właściciela' : 'właściciel ostrożniej wydaje');
-  const hi = o.type === 'miliarder' ? F.billionaireMax : city ? F.cityMax : F.clamp[1];
+  let hi = o.type === 'miliarder' ? F.billionaireMax : city ? F.cityMax : F.clamp[1];
+  const ov = game.ownerOverride?.[clubId];
+  if (city && ov?.type === 'miasto' && ov.since) hi = Math.max(F.clamp[0], Math.min(hi, 1 + F.cityGrowth * Math.max(0, ctx.year - ov.since)));
   m = clamp(m, F.clamp[0], hi);
   for (const [w, cap] of F.wealthCap) if ((o.zasobnosc ?? 10) <= w) { m = Math.min(m, cap); break; }
   const mul = Math.round(m * 100) / 100;
-  return { mul, skarbiecMul: Math.round((1 + F.skarbiecShare * (mul - 1)) * 100) / 100, why };
+  return { mul, skarbiecMul: Math.round((1 + F.skarbiecShare * (mul - 1)) * 100) / 100, why, crisis };
 }

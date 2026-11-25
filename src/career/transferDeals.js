@@ -33,6 +33,7 @@ export const FAIL_LABELS = {
   terms: 'brak porozumienia z zawodnikiem', medical: 'testy medyczne', deadline: 'koniec okna transferowego',
   withdrawn: 'jedna ze stron wycofała się', seller: 'klub sprzedający wycofał się',
   injury: 'kontuzja przed rejestracją', mind: 'zawodnik zmienił zdanie', money: 'brak pieniędzy', limit: 'limit kadry',
+  ban: 'zakaz transferowy',
 };
 // Czasy etapów w dniach [min, max]. Transfer krajowy 2-4 dni, zagraniczny 5-9, wolny zawodnik 1-4, AI-AI 1-3.
 export const DEAL_DAYS = {
@@ -198,6 +199,7 @@ function failText(game, d, reason) {
     mind: `${d.name} zmienił zdanie przed rejestracją i zostaje w ${sellerName(d)}.`,
     money: `${buyerName(d)} nie miał w dniu rejestracji pieniędzy na pierwszą ratę, także po tygodniu odroczenia.`,
     limit: `W dniu rejestracji kadra ${buyerName(d)} była pełna (limit kadry).`,
+    ban: `${buyerName(d)} ma zakaz transferowy za zaległości wobec zawodników i nie może zgłosić nowego zawodnika.`,
   }[reason] ?? 'Transakcja nie doszła do skutku.';
   return `${t} ${d.from === game.clubId ? 'Zawodnik zostaje w klubie.' : 'Zawodnik zostaje w swoim klubie.'}`;
 }
@@ -386,6 +388,7 @@ export function dealsDay(game, date) {
     if (d.end) continue;
     if (d.msgs) { out.push(...d.msgs); delete d.msgs; }
     if (!stillValid(game, d)) { closeDeal(game, d, 'failed', 'withdrawn', date, out); continue; }
+    if (d.to && game.debt?.clubs?.[d.to]?.ban) { closeDeal(game, d, 'failed', 'ban', date, out); continue; } // zakaz transferowy (arrears.js)
     let guard = 0;
     while (!d.end && d.due <= date && guard++ < 8) advance(game, d, date, out);
     if (d.end || !d.windowTo || date < d.windowTo) continue;

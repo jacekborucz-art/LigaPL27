@@ -74,7 +74,9 @@ export function squadCount(game, clubId) {
   const joining = (game.market?.joins ?? []).filter((j) => j.to === clubId).length;
   const counted = squad.length - exempt.length + incoming + joining;
   const lim = squadLimitOf(game, clubId);
-  return { ...lim, counted, exempt, total: squad.length, over: Math.max(0, counted - lim.soft), room: Math.max(0, lim.hard - counted), full: counted >= lim.hard };
+  // Zakaz transferowy za zaległości wobec zawodników (src/career/arrears.js): klub nie zgłasza nowych zawodników
+  const ban = !!game.debt?.clubs?.[clubId]?.ban;
+  return { ...lim, counted, exempt, total: squad.length, over: Math.max(0, counted - lim.soft), room: ban ? 0 : Math.max(0, lim.hard - counted), full: ban || counted >= lim.hard, ban };
 }
 
 /**
@@ -85,6 +87,10 @@ export function canSign(game, clubId = game.clubId) {
   const c = squadCount(game, clubId);
   const extra = [c.europe ? 'gra w pucharach' : '', c.emergency ? 'kryzys kadrowy' : ''].filter(Boolean).join(', ');
   const who = `Do limitu liczą się wszyscy zawodnicy pierwszej drużyny, także wypożyczeni do klubu, bez wychowanków do ${YOUTH_EXEMPT_AGE} lat.`;
+  if (c.ban) {
+    const m = game.debt.clubs[clubId].months ?? 0;
+    return { ok: false, warn: false, count: c, ban: true, text: `Zakaz transferowy: klub zalega z pensjami (${m} ${m === 1 ? 'miesiąc' : m >= 2 && m <= 4 ? 'miesiące' : 'miesięcy'}). Nowych zawodników zgłosisz dopiero po spłacie zaległości (saldo klubu co najmniej zero).` };
+  }
   if (c.full) {
     return { ok: false, warn: false, count: c, text: `Limit kadry: ${c.counted}/${c.hard}${extra ? ` (${extra})` : ''}. Zarząd nie zgodzi się na kolejny transfer. ${who} Najpierw sprzedaj, wypożycz albo rozwiąż kontrakt.` };
   }

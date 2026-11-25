@@ -54,7 +54,9 @@ test('Trzy sezony: ligi po 18 klubów, reguły rezerw, kadry i finanse w normie,
       const sq = squadOf(game.world, c.id);
       assert.ok(sq.length >= (c.id === game.clubId ? 16 : 22), `${SEASON} ${c.id}: kadra ${sq.length}`);
       for (const p of sq) { assert.ok(!seen.has(p.id), p.id); seen.add(p.id); assert.equal(p.clubId, c.id); }
-      assert.ok(game.finance.clubs[c.id].balance >= 0 || c.id === game.clubId, `${c.id} saldo`);
+      // Ujemne saldo na start sezonu tylko po zmianie właściciela (spłata części długu), wycofaniu miasta albo przy
+      // zaległościach (src/career/ownership.js, src/career/arrears.js)
+      assert.ok(game.finance.clubs[c.id].balance >= 0 || c.id === game.clubId || game.debt?.clubs?.[c.id] || game.ownerOverride?.[c.id] || game.debt?.bail?.[c.id]?.off, `${c.id} saldo`);
     }
     // Kalendarz nowego sezonu: te same dni tygodnia, rok dalej
     assert.equal(DOMESTIC.ekstraklasa.start.slice(0, 4), String(SEASON_YEAR));

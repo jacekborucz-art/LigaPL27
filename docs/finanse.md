@@ -167,7 +167,7 @@ budżet płac (tydz.)    = max(obecne płace, docelowe płace / 52 x (1 + do 25 
 
 Stabilność bez decyzji gracza:
 
-- Klub AI, którego saldo 1. dnia miesiąca spadnie poniżej miesięcznych płac, dostaje dopłatę właściciela (rezerwy: od pierwszej drużyny) do tego poziomu; przy długu budżet transferowy przepada.
+- Klub AI, którego saldo 1. dnia miesiąca spadnie poniżej miesięcznych płac, dostaje dopłatę właściciela (rezerwy: od pierwszej drużyny) do tego poziomu; przy długu budżet transferowy przepada. Od Nov 26, 2026 najwyżej 3 ciężkie sezony z rzędu, potem zaległości wobec zawodników, zakaz transferowy, kary i licencja jak u gracza; zmiana właściciela, przejęcie i wycofanie miasta: `docs/wlasciciele-i-dlugi.md`.
 - Klub AI z saldem ponad 50 % rocznych przychodów krajowych plus skarbiec wydaje co sezon połowę nadwyżki na spłatę zadłużenia i inwestycje (`invest`, "Spłata długów i inwestycje") [SZAC]. To odpowiada polskim realiom (większość klubów ma ujemne kapitały) i zatrzymuje narastanie gotówki.
 - Bogaty właściciel uzupełnia saldo do skarbca 1 lipca (także klubowi gracza): realne pieniądze na transfery, jak dokapitalizowania Widzewa, Pogoni i Śląska.
 

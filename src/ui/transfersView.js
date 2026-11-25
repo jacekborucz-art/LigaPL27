@@ -40,6 +40,7 @@ import { observeListHtml, observeStatusHtml } from './observerView.js'; // rapor
 import { observeMenuInfo } from '../career/observerReport.js'; // stan obserwacji w małej karcie zawodnika
 import { clubOfferPanel, readOfferForm, handleClubOfferAction } from './clubOffersView.js'; // oferty klub-klub: zapytanie, pakiet, stan rozmów
 import { agreementOf, inquiryOf, clauseAmount, regDateOf, markPlayerRefused } from '../career/clubOffers.js';
+import { ownerDebtPanel } from './ownerDebtView.js'; // właściciel i zaległości wobec zawodników (docs/wlasciciele-i-dlugi.md)
 import { userGate, directorTalkView } from '../career/playerMind.js'; // decyzja zawodnika: czy chce rozmawiać (docs/negocjacje.md, Nov 25, 2026)
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
@@ -708,6 +709,7 @@ export function financeView(game) {
           <p class="tf-sum tf-sum--net"><span>Wynik miesiąca</span><b class="${m.net < 0 ? 'neg' : ''}">${m.net >= 0 ? '+' : ''}${fmtZl(m.net)}</b></p>`)}
       </div>
       <div class="tf-stack">
+        ${ownerDebtPanel(game, c, { panel, meter })}
         ${planPanel(game, c, s)}
         ${panel('Ostatnie operacje', 'info', `<ul class="tf-log">${c.log.slice(0, 12).map((l) => `<li><time>${esc(shortDate(l.date))}</time><span>${esc(l.note)}</span><b data-k="${l.dir}">${l.dir === 'out' ? '-' : '+'}${fmtZl(l.amount)}</b></li>`).join('') || '<li><span>Brak.</span></li>'}</ul>`)}
       </div>

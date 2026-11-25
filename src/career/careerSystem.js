@@ -32,6 +32,7 @@ import { ensureStaff } from './staffMarket.js'; // sztab: zatrudnianie i zwalnia
 import './directorRotation.js'; // rotacja dyrektorów sportowych poza 1 lipca (docs/dyrektor-sportowy.md, rozdz. 10)
 import './scoutOps.js'; // skauting zagraniczny: skauci, misje, kandydaci (docs/skauting.md)
 import './observerReport.js'; // raport obserwatora o zawodnikach innych drużyn (docs/raport-obserwatora.md)
+import { ownerBailouts } from './arrears.js'; // długi klubów i zaległości wobec zawodników (docs/wlasciciele-i-dlugi.md)
 import { ensureCareerHistory, careerScan, careerMonth, careerPress, careerLeave, boardStartTrust } from './coachCareer.js'; // kariera trenera (docs/kariera-trenera.md)
 import { ensureJob, coachFired, jobAccepted, jobDeclined, unsolicitedOffers, offerMessage as jobOfferMessage } from './jobMarket.js'; // rynek pracy trenera
 import { clubReputation } from './reputation.js';
@@ -223,19 +224,10 @@ registerDailySystem({
     careerPress(game);
     if (date.endsWith('-01') && date > SEASON_START) messages.push(...careerMonth(game, date));
     financeDay(game.finance, game.world, date);
-    if (date.endsWith('-01')) {
-      // Długi klubów AI pokrywa właściciel (a rezerw pierwsza drużyna) z zapasem na miesiąc pensji, żeby saldo
-      // nie spadło pod zero przed kolejną wpłatą; przy długu budżet transferowy przepada
-      for (const [id, c] of Object.entries(game.finance.clubs)) {
-        const cushion = Math.round((c.plan?.wages ?? 0) / 12 / 1000) * 1000;
-        if (id === game.clubId || c.balance >= cushion) continue;
-        const need = cushion - c.balance; const inDebt = c.balance < 0;
-        const parent = clubById(id)?.parent;
-        if (parent && game.finance.clubs[parent]) book(game.finance, parent, date, 'out', 'ops', need, `Dopłata do rezerw (${clubById(id).name})`);
-        book(game.finance, id, date, 'in', 'owner', need, parent ? 'Dopłata pierwszej drużyny' : 'Dopłata właściciela do długów');
-        if (inDebt) c.transferBudget = 0;
-      }
-    }
+    // Długi klubów AI pokrywa właściciel (a rezerw pierwsza drużyna) z zapasem na miesiąc pensji, żeby saldo
+    // nie spadło pod zero przed kolejną wpłatą; przy długu budżet transferowy przepada. Najwyżej 3 ciężkie sezony
+    // z rzędu, potem zaległości jak u gracza (src/career/arrears.js)
+    if (date.endsWith('-01')) ownerBailouts(game, date);
     matchMoney(game, date);
     uefaSolidarity(game, date); // 15 grudnia: wypłaty solidarnościowe UEFA (src/career/prizes.js)
     const dow = new Date(`${date}T12:00:00Z`).getUTCDay();
