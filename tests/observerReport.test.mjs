@@ -15,7 +15,7 @@ import { OBS, orderQuote, createOrder, observeDay, buildReport, aiSeenOvr, accur
 import { renderObserverReport, renderObserveOrder, observeStatusHtml, observeListHtml } from '../src/ui/observerView.js';
 import { playerMenu, flattenMenu } from '../src/ui/playerMenus.js';
 import { mailLinks } from '../src/ui/mailLinks.js';
-import { renderTransfers } from '../src/ui/transfersView.js';
+import { renderTransfers, transferCardHtml } from '../src/ui/transfersView.js';
 import '../src/season/dailySystems.js';
 
 const CLUB = 'widzew';
@@ -258,4 +258,14 @@ test('Kluby AI: OVR widziany z błędem sztabu (deterministyczny), wyłącznik p
   assert.ok(diff / ps.length > 0.05 && diff / ps.length < 3, `średni błąd ${diff / ps.length}`);
   OBS.ai.on = false;
   try { assert.equal(aiSeenOvr(g, 'legia')(ps[0]), ps[0].ovr); } finally { OBS.ai.on = true; }
+});
+
+test('Mała karta zawodnika w okienku: stan obserwacji, potem data raportu', () => {
+  const g = fresh(); oneScout(g, 10);
+  const p = others(g)[0];
+  assert.doesNotMatch(transferCardHtml(g, p), /Obserwacja/);
+  createOrder(g, p.id, { mode: 'match' });
+  assert.match(transferCardHtml(g, p), /Obserwacja[\s\S]*czeka na pierwszy mecz/);
+  fakeMatch(g, p, addDays(g.date, 1));
+  assert.match(transferCardHtml(g, p), /Raport[\s\S]*z \d+ \S+ \d{4}/);
 });

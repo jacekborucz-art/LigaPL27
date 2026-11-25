@@ -29,6 +29,13 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 25, 2026, profil A (komputer domowy), raport obserwatora: menu w raporcie meczu i stan w karcie (v1.24 Beta)
+Zrobione:
+- Okno raportu meczu: `data-pid` w ocenach i zdarzeniach (`ui/matchReportView.js`), menu zawodnika w oknie (`app.js`,
+  `bindContextTrigger`: `container: dlg`, wybór zamyka okno).
+- Mała karta zawodnika w okienku (`transferCardHtml`): „Obserwacja” albo „Raport z ...” (`obsFact`).
+- Testy w `tests/matchReport.test.mjs` i `tests/observerReport.test.mjs`.
+
 ## Nov 25, 2026, profil A (komputer domowy), raport obserwatora: zagranica i wolni tylko przez okres (v1.24 Beta)
 Zrobione (decyzja właściciela):
 - `periodOnly` w `src/career/observerReport.js`: zawodnik za granicą albo wolny ma tylko tryb „Okres”; usunięte wymyślone

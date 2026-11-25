@@ -212,6 +212,10 @@ test('Mecz gracza przez applyResult: raport w terminarzu z pełnego silnika, wid
   assert.match(html, /Raport meczu/);
   assert.match(html, /Oceny zawodników/);
   assert.doesNotMatch(html, /undefined|NaN|\u2014/);
+  // Menu zawodnika pod prawym przyciskiem w oknie raportu: oceny i zdarzenia z data-pid zawodników świata gry
+  const pids = [...html.matchAll(/data-pid="([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(pids.length >= 22, `data-pid: ${pids.length}`);
+  assert.ok(pids.every((id) => g.world.players[id]), 'tylko zawodnicy świata gry');
 });
 
 test('Zapis: kod zawodnika względem klubu i minuty z doliczonym czasem', () => {

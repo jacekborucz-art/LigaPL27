@@ -91,7 +91,7 @@ function describe(game, f, e, score) {
   const club = [f.home, f.away][side];
   const opp = [f.home, f.away][1 - side];
   const nm = (id, c = club) => playerName(game, id, c);
-  const base = { min, label: minuteLabel(min), side, k: code, serious: false };
+  const base = { min, label: minuteLabel(min), side, k: code, serious: false, pid: game.world?.players?.[pid] ? pid : null }; // pid: menu zawodnika pod prawym przyciskiem (tylko zawodnicy świata gry)
   switch (code) {
     case 'g': score[side]++; return { ...base, k: 'g', who: nm(pid), note: x ? `asysta: ${nm(x)}` : 'gol', score: [...score] };
     case 'p': score[side]++; return { ...base, k: 'g', who: nm(pid), note: 'gol z rzutu karnego', score: [...score] };
@@ -154,7 +154,7 @@ export function reportModel(game, ref) {
   const evs = rep.ev.map((e) => describe(game, f, e, score)).filter((e) => e && e.k !== 'y');
   const subsIn = new Set(rep.ev.filter((e) => e[1] === 's').map((e) => e[3]));
   const yellow = new Set(rep.ev.filter((e) => e[1] === 'y' && !e[4]).map((e) => e[3]));
-  const ratings = [0, 1].map((s) => rep.players[s].map((x) => ({ name: playerName(game, x.id, [f.home, f.away][s]), rating: x.rating, sub: subsIn.has(x.id), yc: yellow.has(x.id) })));
+  const ratings = [0, 1].map((s) => rep.players[s].map((x) => ({ name: playerName(game, x.id, [f.home, f.away][s]), pid: game.world?.players?.[x.id] ? x.id : null, rating: x.rating, sub: subsIn.has(x.id), yc: yellow.has(x.id) })));
   const best = Math.max(0, ...ratings.flat().map((x) => x.rating));
   return {
     ...head, kind: 'full', full: rep.full, abandoned: rep.abandoned,
@@ -183,7 +183,7 @@ const KIND_WORD = { g: 'Gol', o: 'Gol samobójczy', y: 'Żółta kartka', r: 'Cz
 /** Wiersz przebiegu; herb drużyny widać tylko na wąskim ekranie (jedna kolumna zamiast stron boiska). */
 function evRow(e, M) {
   const sc = e.score ? `<b class="mr-ev__sc">${e.score[0]}:${e.score[1]}</b>` : '';
-  return `<li class="mr-ev mr-ev--${e.side === 0 ? 'h' : 'a'}${e.serious ? ' is-serious' : ''}" data-k="${esc(e.k)}">
+  return `<li class="mr-ev mr-ev--${e.side === 0 ? 'h' : 'a'}${e.serious ? ' is-serious' : ''}" data-k="${esc(e.k)}"${e.pid ? ` data-pid="${esc(e.pid)}"` : ''}>
     <span class="mr-ev__min">${esc(e.label)}</span>
     <span class="mr-ev__body"><span class="mr-ev__crest">${crest([M.home, M.away][e.side], 16)}</span><span class="mr-ev__ico" title="${esc(KIND_WORD[e.k] ?? '')}">${ICON[e.k] ?? ''}</span><span class="mr-ev__txt"><b>${esc(e.who)}</b><small>${esc(e.note)}</small></span>${sc}</span>
   </li>`;
@@ -203,7 +203,7 @@ function statsHtml(st) {
 
 function ratingsHtml(M) {
   if (!M.ratings?.some((l) => l.length)) return '';
-  const col = (s) => `<div class="mr-rt__col"><h4>${crest([M.home, M.away][s], 20)}${esc(clubName([M.home, M.away][s]))}</h4><ol class="mr-rt__list">${M.ratings[s].map((x) => `<li${x.rating === M.best ? ' class="is-best"' : ''}><span>${esc(x.name)}${x.yc ? ` <span class="mr-rt__yc" title="Żółta kartka">${ICON.y}</span>` : ''}${x.sub ? ' <small>z ławki</small>' : ''}</span><b>${num(x.rating, 1)}</b></li>`).join('')}</ol></div>`;
+  const col = (s) => `<div class="mr-rt__col"><h4>${crest([M.home, M.away][s], 20)}${esc(clubName([M.home, M.away][s]))}</h4><ol class="mr-rt__list">${M.ratings[s].map((x) => `<li${x.rating === M.best ? ' class="is-best"' : ''}${x.pid ? ` data-pid="${esc(x.pid)}"` : ''}><span>${esc(x.name)}${x.yc ? ` <span class="mr-rt__yc" title="Żółta kartka">${ICON.y}</span>` : ''}${x.sub ? ' <small>z ławki</small>' : ''}</span><b>${num(x.rating, 1)}</b></li>`).join('')}</ol></div>`;
   return `<details class="mr-sec mr-rt"><summary>Oceny zawodników</summary><div class="mr-rt__grid">${col(0)}${col(1)}</div></details>`;
 }
 

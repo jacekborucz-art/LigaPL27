@@ -2221,13 +2221,14 @@ bindContextTrigger(app, {
   selector: '[data-pid]',
   noTouch: '[data-handle]', // na ekranie składu przytrzymanie uchwytu zaczyna przeciąganie
   open(el, at) {
-    const view = menuView();
+    const dlg = el.closest('#mrDlg'); // okno raportu meczu: menu wewnątrz okna, wybór zamyka okno i wykonuje akcję na ekranie
+    const view = dlg ? (state.screen === 'hub' && state.game ? 'club' : null) : menuView();
     if (!view) return false;
     const g = state.game;
     const pid = el.dataset.pid;
     const model = playerMenu(g, pid, { view, ui: state, why: el.dataset.why ?? null, lineup: { tactics: g.tactics, ...tCtx(g) } });
     if (!model?.items.length) return false;
-    openMenu({ ...at, model, anchor: el, onSelect: (it) => runMenuItem(it, pid) });
+    openMenu({ ...at, model, anchor: el, container: dlg, onSelect: (it) => { if (dlg?.open) dlg.close(); runMenuItem(it, pid); } });
     return true;
   },
 });

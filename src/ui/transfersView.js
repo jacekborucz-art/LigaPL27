@@ -37,6 +37,7 @@ import { scoutHidden, scoutEye, ovrOrEye, shownOvr, hiddenAttrsHtml, valueOrScou
 import { canWish, has as wishHas, list as wishList, count as wishCount, toggle as wishToggle, remove as wishRemove } from '../career/wishlist.js'; // lista życzeń gracza
 import { scoutingView } from '../career/scoutOps.js'; // liczba obserwowanych przez skautów (sekcja pod listą życzeń)
 import { observeListHtml, observeStatusHtml } from './observerView.js'; // raport obserwatora: lista „Obserwacje” i stan w karcie
+import { observeMenuInfo } from '../career/observerReport.js'; // stan obserwacji w małej karcie zawodnika
 
 const clubsById = new Map(CLUBS_PL.map((c) => [c.id, c]));
 const crest = (id, size = 20) => (clubById(id) ? crestHtml(clubById(id), { size, clubsById }) : '');
@@ -866,6 +867,15 @@ export { lateFree };
 /** Nazwisko zawodnika jako link do karty w okienku (w Transferach; kliknięcie nie otwiera karty transferowej). */
 export const cardLink = (p) => `<span class="pc-link" data-pcard="${esc(p.id)}" title="Pokaż kartę zawodnika">${esc(p.name)}</span>`;
 
+/** Fakt „Obserwacja” w małej karcie zawodnika innej drużyny: stan zlecenia albo ostatni raport (observerReport.js). */
+function obsFact(game, p, mine) {
+  if (mine || !game.observe) return [];
+  const o = observeMenuInfo(game, p);
+  if (o.order) return [cardFact('Obserwacja', esc(o.statusText))];
+  if (o.last) return [cardFact('Raport', esc(`z ${fmtDate(o.last.date)}${o.stale ? ', nieaktualny' : ''}`))];
+  return [];
+}
+
 /**
  * Karta zawodnika w okienku (Transfery): to samo okno co w Skład i taktyka (src/ui/playerCard.js), treść jak
  * w profilu zawodnika innego klubu (atrybuty, pozycje, forma, kontrakt, statystyki), do tego cena i skrót do oferty.
@@ -884,6 +894,7 @@ export function transferCardHtml(game, p, { wide = false } = {}) {
     ...(price ? [cardFact('Cena', esc(price))] : []),
     ...(mine ? [cardFact('Morale', esc(moraleLabel(p.morale ?? 12)))] : []),
     ...(p.joinOn ? [cardFact('Status', esc(joinStatusText(game, p)))] : []), // umowa wolnego poza oknem (lateJoins.js)
+    ...obsFact(game, p, mine), // raport obserwatora: obserwacja w toku albo data ostatniego raportu
     ...(thinkingUntil(game, p.id) ? [cardFact('Status', esc(`Rozważa oferty, odpowie do ${fmtDate(thinkingUntil(game, p.id))}`))] : []), // namysł (proposals.js)
   ];
   const go = `<p class="tf-pcard__go"><button class="btn btn--primary btn--sm" data-act="tf-open" data-id="${esc(p.id)}">${mine ? 'Otwórz kartę transferową' : 'Przejdź do oferty'}</button>${mine ? '' : ` ${wishBtn(game, p)}`}</p>`;

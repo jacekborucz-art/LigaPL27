@@ -105,3 +105,8 @@ poprzednie raporty.
   albo { k, none }], groups, words, seenOvr, potential, form, health, character, acclim, role, market, rec, recText,
   lines, flags }`: tylko dane widziane (przedziały, słowa), bez dokładności.
 - System dnia `observe` (kolejność 52.6, po meczach dnia i skautingu); bez zleceń nic nie robi.
+
+## Menu w oknie raportu meczu i stan w małej karcie (Nov 25, 2026)
+- Okno raportu meczu (`ui/matchReportView.js`): oceny i zdarzenia zawodników świata gry mają `data-pid`; menu pod prawym
+  przyciskiem otwiera się w oknie (`openMenu` z `container`), wybór pozycji zamyka okno i wykonuje akcję (widok `club`).
+- Mała karta zawodnika w okienku (`transferCardHtml`): fakt „Obserwacja” (stan zlecenia) albo „Raport” (data, nieaktualny).
