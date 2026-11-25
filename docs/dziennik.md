@@ -29,6 +29,16 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 25, 2026, profil A (komputer domowy), wersja v1.25 Beta
+Właściciel zatwierdził v1.25 Beta. Lista zmian v1.25 (od wejścia v1.24 Beta):
+- Nowość: raport obserwatora (skaut obserwuje zawodnika innej drużyny, raport z wykresami i rekomendacją).
+- Nowość: oferty za zawodników innych klubów jak w rzeczywistości (zapytanie o cenę, raty, premie, procent od sprzedaży, namysł klubu).
+- Nowość: zawodnik sam decyduje o transferze (czy chce rozmawiać, negocjacje, namysł, zamknięcie rozmów).
+- Nowość: rola kapitana (spokój w meczach o stawkę, morale drużyny).
+- Usprawniono mecz: brak zmian kosztuje (zmęczenie), nasycenie golami przy wysokim prowadzeniu, okrzyk „Nie odpuszczamy!”.
+- Usprawniono balans: mniej kontuzji w meczach w tle, mniej żółtych kartek.
+- Poprawiono: obietnice roli, menu zawodnika w Rozgrywkach i raporcie meczu, nastawienie zawodnika jako ocena dyrektora.
+
 ## Nov 25, 2026, profil A (komputer domowy), rola kapitana (v1.24 Beta)
 Zrobione (ekspert psychologii sportu Sonnet medium; wdrożenie Opus high; sprawdzone):
 - Nowe `src/engine/captain.js` (siła B z LID, OPA, PRF, KON, doświadczenia i persony; forma psychiczna M z morale, prośby
