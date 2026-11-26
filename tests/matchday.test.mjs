@@ -126,3 +126,23 @@ test('Dane dla silnika i ze silnika: temperatura, kara za czerwoną z powodu, wa
   const post = finishMatchday(g, S);
   for (const x of post.suspensions) assert.ok(x.id, JSON.stringify(x));
 });
+
+test('Studio pomeczowe: miejsce przed meczem i po nim takie jak w tabeli ligi (punkty, nie bilans bramek)', async () => {
+  const { standings } = await import('../src/season/standings.js');
+  const { compClubIds } = await import('../src/season/leagueComps.js');
+  const { applyResultToTable } = await import('../src/match/studio.js');
+  const g = newGame('widzew', 11);
+  const f = primaryAction(g).match;
+  const table = () => standings(g.fixtures.filter((x) => x.comp === f.comp), compClubIds(f.comp));
+  const before = table().find((r) => r.id === g.clubId).pos;
+  const S = startMatchday(g, f);
+  doPreBriefing(g, S, preAdvice(g, S).tone, []);
+  kickOff(g, S);
+  skip(S); if (S.step === 'break') { doHalfBriefing(g, S, 'calm', []); continueAfterBreak(S); skip(S); }
+  const post = finishMatchday(g, S);
+  assert.equal(post.table.user.before, before);
+  assert.equal(post.table.user.after, table().find((r) => r.id === g.clubId).pos);
+  // Zapasowe liczenie (bez tabeli po meczu) bierze punkty z pola points tabeli ligi
+  const rows = applyResultToTable([{ id: 'a', name: 'A', points: 10, gf: 2, ga: 9 }, { id: 'b', name: 'B', points: 4, gf: 9, ga: 2 }], null, null, 0, 0);
+  assert.equal(rows[0].id, 'a', 'więcej punktów wyżej mimo gorszego bilansu');
+});

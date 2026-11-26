@@ -29,6 +29,11 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 26, 2026, profil A (komputer domowy), studio pomeczowe: prawdziwe miejsce w tabeli (v1.25 Beta)
+Zrobione: `applyResultToTable` (`match/studio.js`) czytał punkty z pola `pts`, a `standings` ma `points`, więc „miejsce w tabeli”
+w studiu szło z bilansu bramek. Teraz `finishMatchday` liczy tabelę ligi po meczu (`tableAfter`, z meczami bezpośrednimi)
+i studio bierze miejsce przed i po z tabeli ligi; zapasowe liczenie czyta `points`. Test w `tests/matchday.test.mjs`.
+
 ## Nov 26, 2026, profil A (komputer domowy), Pulpit: odbyta rozmowa znika z listy (v1.25 Beta)
 Zrobione: podpis pamięci podręcznej `buildWeeklyTodo` (`career/weeklyTodo.js` `signature`) brał tylko długość dziennika rozmów
 (limit 20) i datę pierwszego wpisu, więc przy pełnym dzienniku druga rozmowa tego samego dnia nie odświeżała listy.

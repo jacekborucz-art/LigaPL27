@@ -695,13 +695,14 @@ export function finishMatchday(game, S) {
   const tableBefore = S.preCtx.table ? standings(game.fixtures.filter((x) => x.comp === S.comp), compClubIds(S.comp)) : null;
   const rng = new Rng(`wynik:${game.seed}:${S.f.id}`);
   const msgs = applyResult(game, S.f, fromEngineResult(r), rng);
+  const tableAfter = tableBefore ? standings(game.fixtures.filter((x) => x.comp === S.comp), compClubIds(S.comp)) : null; // tabela ligi po meczu (jej zasady: mecze bezpośrednie, ujemne punkty)
   const names = new Map([...M.teams[0].players, ...M.teams[0].bench, ...M.teams[1].players, ...M.teams[1].bench].map((x) => [x.id, x.p.name]));
   const events = M.events.map((e) => ({ ...e, name: e.pid ? names.get(e.pid) : e.ogId ? names.get(e.ogId) : undefined, assistName: e.aid ? names.get(e.aid) : undefined, minute: e.min }));
   const post = postMatchStudio({
     home: { id: S.f.home, name: anyClub(S.f.home).name }, away: { id: S.f.away, name: anyClub(S.f.away).name },
     competition: S.preCtx.competition, events: events.map(toStudioEvent), ratings: r.ratings, pre: S.pre.forPost,
     board: { trust: game.board.trust }, headlineHistory: game.headlineHistory ?? [], date: S.f.date, seed: `${game.seed}`,
-    userClubId: game.clubId, referee: S.referee, tableBefore, tie: S.tie = tieInfo(game, S, r),
+    userClubId: game.clubId, referee: S.referee, tableBefore, tableAfter, tie: S.tie = tieInfo(game, S, r),
   });
   if (S.f.comp !== 'friendly') { // sparing nie zmienia ocen zarządu i kibiców
     game.board.trust = Math.max(0, Math.min(100, game.board.trust + post.reactions.board.delta));

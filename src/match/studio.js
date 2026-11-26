@@ -879,11 +879,11 @@ export function keyMoments(events, names) {
 /** Tabela po meczu: aktualizuje dwa wiersze i sortuje (punkty, różnica bramek, gole, nazwa). */
 export function applyResultToTable(rows, homeId, awayId, gH, gA) {
   const next = rows.map((r) => {
-    if (r.id !== homeId && r.id !== awayId) return { ...r };
+    if (r.id !== homeId && r.id !== awayId) return { ...r, pts: r.pts ?? r.points ?? 0 }; // tabela ligi ma punkty w polu points
     const isH = r.id === homeId;
     const f = isH ? gH : gA; const ag = isH ? gA : gH;
     const w = f > ag ? 1 : 0; const d = f === ag ? 1 : 0; const l = f < ag ? 1 : 0;
-    return { ...r, p: (r.p ?? 0) + 1, w: (r.w ?? 0) + w, d: (r.d ?? 0) + d, l: (r.l ?? 0) + l, gf: (r.gf ?? 0) + f, ga: (r.ga ?? 0) + ag, pts: (r.pts ?? 0) + 3 * w + d };
+    return { ...r, p: (r.p ?? 0) + 1, w: (r.w ?? 0) + w, d: (r.d ?? 0) + d, l: (r.l ?? 0) + l, gf: (r.gf ?? 0) + f, ga: (r.ga ?? 0) + ag, pts: (r.pts ?? r.points ?? 0) + 3 * w + d };
   });
   next.sort((x, y) => y.pts - x.pts || (y.gf - y.ga) - (x.gf - x.ga) || y.gf - x.gf || String(x.name).localeCompare(String(y.name), 'pl'));
   return next.map((r, i) => ({ ...r, pos: i + 1 }));
@@ -1011,10 +1011,16 @@ export function postMatchStudio(ctx) {
   // tabela po meczu
   let table = null;
   if (Array.isArray(ctx.tableBefore) && ctx.tableBefore.length) {
-    const rowsBefore = applyResultToTable(ctx.tableBefore, null, null, 0, 0);
-    const rows = applyResultToTable(ctx.tableBefore, home.id, away.id, gH, gA);
     const uid = userIsHome ? home.id : away.id;
-    table = { rows, user: { before: rowsBefore.find((r) => r.id === uid)?.pos ?? null, after: rows.find((r) => r.id === uid)?.pos ?? null } };
+    if (Array.isArray(ctx.tableAfter) && ctx.tableAfter.length) {
+      // Prawdziwa tabela ligi przed meczem i po nim (Nov 26, 2026): wcześniej studio czytało punkty z pola pts, a tabela ma points,
+      // więc kolejność szła z bilansu bramek i miejsce bywało złe
+      table = { rows: ctx.tableAfter, user: { before: ctx.tableBefore.find((r) => r.id === uid)?.pos ?? null, after: ctx.tableAfter.find((r) => r.id === uid)?.pos ?? null } };
+    } else {
+      const rowsBefore = applyResultToTable(ctx.tableBefore, null, null, 0, 0);
+      const rows = applyResultToTable(ctx.tableBefore, home.id, away.id, gH, gA);
+      table = { rows, user: { before: rowsBefore.find((r) => r.id === uid)?.pos ?? null, after: rows.find((r) => r.id === uid)?.pos ?? null } };
+    }
   }
 
   // nowe kontuzje i pauzy
