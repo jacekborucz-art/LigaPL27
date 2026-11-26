@@ -18,7 +18,7 @@ import { canSign, squadCount } from '../src/career/squadLimit.js';
 import { lateFree } from '../src/career/lateJoins.js';
 import { reservesOf } from '../src/career/reserves.js';
 import {
-  DEBT, ensureDebt, monthlyCost, debtMonth, debtDay, quitChance, emergencySquadFill, licenceVerdicts, licenceDrop, ownerBailouts, debtNewSeason,
+  DEBT, ensureDebt, monthlyCost, debtMonth, debtDay, distressSale, quitChance, emergencySquadFill, licenceVerdicts, licenceDrop, ownerBailouts, debtNewSeason,
 } from '../src/career/arrears.js';
 import '../src/season/dailySystems.js';
 
@@ -199,4 +199,17 @@ test('Stary zapis bez stanu długów: system dnia działa, brak zaległości prz
   assert.deepEqual(debtMonth(g, '2026-08-01'), []);
   assert.deepEqual(debtDay(g, '2026-08-02'), []);
   assert.deepEqual(g.debt.clubs, {});
+});
+
+test('Klub AI w zaległościach wystawia najdroższych zawodników taniej, klub gracza nie', () => {
+  const g = newGame();
+  const ai = CLUBS_PL.find((c) => c.tier === 1 && c.id !== g.clubId && g.world.clubs[c.id]).id;
+  const n = distressSale(g, ai, '2026-10-01');
+  assert.equal(n, DEBT.sale.listed);
+  const listed = squadOf(g.world, ai).filter((p) => g.market.listed[p.id]?.distress);
+  const top = squadOf(g.world, ai).filter((p) => !p.loan).sort((a, b) => (b.value ?? 0) - (a.value ?? 0)).slice(0, 2).map((p) => p.id).sort();
+  assert.deepEqual(listed.map((p) => p.id).sort(), top, 'najdrożsi');
+  for (const p of listed) assert.ok(g.market.listed[p.id].price <= p.value * 0.9 + 10000 && g.market.listed[p.id].price >= p.value * 0.8 - 10000, 'taniej o 10-20 %');
+  assert.equal(distressSale(g, ai, '2026-11-01'), 0, 'najwyżej 2 naraz');
+  assert.equal(distressSale(g, g.clubId, '2026-10-01'), 0, 'klub gracza decyduje sam');
 });

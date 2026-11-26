@@ -42,6 +42,7 @@ export const DEBT = {
   licence: { maxTier: 3, ekPoints: 6, lowestTier: 4 },
   bail: { seasons: 3, heavy: 0.15 },
   fill: { total: 18, gk: 2, reserves: 2, juniors: 3 },
+  sale: { listed: 2, disc: [0.10, 0.20] }, // klub AI w zaległościach: do 2 najdroższych na liście transferowej, taniej o 10-20 % (Nov 26, 2026)
   TIER_L: { 1: 11.5, 2: 10, 3: 8.5, 4: 7.5, 5: 6.5, 6: 5.5, 7: 4.5 }, // siła ligi (jak LEAGUE_L w rollover.js) i niższych klas
 };
 
@@ -213,6 +214,29 @@ function clearArrears(game, D, id, date, out) {
 const boardMsg = (date, key, subject, body, priority = 'important') => createMessage({ date, key, category: 'board', from: 'Zarząd', priority, subject, body });
 
 /** 1. dnia miesiąca: ostrzeżenie, początek zaległości, wezwania i zakaz transferowy, ujemne punkty. */
+/**
+ * Sprzedaż przymusowa (klub AI w zaległościach): co miesiąc na liście transferowej najwyżej DEBT.sale.listed najdroższych
+ * zawodników klubu (bez wypożyczonych i świeżo zgłoszonych awaryjnie), cena wartość x (1 - 10..20 %). Kupcy biorą ich
+ * w oknie jak innych z listy (transfers.js aiBuy). Zwraca liczbę nowo wystawionych.
+ */
+export function distressSale(game, clubId, date) {
+  const M = game.market;
+  if (!M?.listed || clubId === game.clubId) return 0;
+  const squad = squadOf(game.world, clubId).filter((p) => !p.loan && !p.emergency && !p.transfer && (p.value ?? 0) > 0);
+  const already = squad.filter((p) => M.listed[p.id]?.distress).length;
+  const room = DEBT.sale.listed - already;
+  if (room <= 0) return 0;
+  const rng = new Rng(`sprzedaz-dlug:${game.seed}:${clubId}:${date}`);
+  let n = 0;
+  for (const p of squad.filter((x) => !M.listed[x.id]).sort((a, b) => (b.value ?? 0) - (a.value ?? 0)).slice(0, room)) {
+    const disc = DEBT.sale.disc[0] + rng.next() * (DEBT.sale.disc[1] - DEBT.sale.disc[0]);
+    M.listed[p.id] = { kind: 'sale', reasons: ['Klub ma zaległości w pensjach'], since: date, club: clubId, price: Math.round(((p.value ?? 0) * (1 - disc)) / 10000) * 10000, distress: true };
+    n++;
+  }
+  if (n) stat(ensureDebt(game), 'distressListed', n);
+  return n;
+}
+
 export function debtMonth(game, date) {
   const D = ensureDebt(game);
   const F = game.finance;
@@ -239,6 +263,7 @@ export function debtMonth(game, date) {
       continue;
     }
     s.months++;
+    if (!mine) distressSale(game, id, date); // klub AI sprzedaje najdroższych, żeby spłacić zaległości
     if (s.months === DEBT.noticeMonth) {
       const [y, m] = date.split('-').map(Number);
       s.deadline = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}-${String(DEBT.deadlineDay).padStart(2, '0')}`;
