@@ -9,7 +9,7 @@ import { ensureCareer } from '../src/career/careerSystem.js';
 import {
   ensureRequests, requestStatus, askBoard, verdictOf, requestScore, checkConditions, aiBudgetRequests,
   boardCaps, contractIssues, feeIssues, maxYearsFor, ownerScale, appealVeto, appealStatus, lowerGoal, goalTextFor,
-  fitOfferToCaps, REQ,
+  fitOfferToCaps, REQ, recordVeto, vetoExpired,
 } from '../src/career/boardRequests.js';
 import { offerForPlayer } from '../src/career/transfers.js';
 import { aiNegotiate } from '../src/career/negotiation.js';
@@ -387,4 +387,21 @@ test('Warunek: blisko celu reakcja zależy od właściciela i losu, daleko od ce
   R.conds.push({ id: 'far', date: `${SEASON_YEAR}-06-05`, season: SEASON_YEAR - 1, type: 'transfer', amount: 1000000, top: 1, by: `${SEASON_YEAR}-07-01`, status: 'open' });
   const [m] = checkConditions(g, `${SEASON_YEAR}-07-01`, { push: false });
   assert.match(m.body, /daleko od celu/);
+});
+
+test('Weto wygasa po zamknięciu okna, po 30 dniach poza oknem i od razu, gdy zawodnika nie ma', () => {
+  const g = fresh();
+  const pid = Object.keys(g.world.players).find((id) => g.world.players[id].clubId !== g.clubId);
+  const issues = [{ code: 'wage', over: 1, text: 'Za wysoka pensja.' }];
+  const { veto } = recordVeto(g, { playerId: pid, issues, date: '2026-07-10' });
+  assert.equal(vetoExpired(g, veto, '2026-07-20'), false, 'w trakcie okna weto trwa');
+  g.date = '2026-09-30';
+  assert.equal(ensureRequests(g).vetoes.length, 0, 'po zamknięciu okna weto znika');
+  const out = recordVeto(g, { playerId: pid, issues, date: '2026-10-10' }).veto;
+  assert.equal(vetoExpired(g, out, '2026-11-05'), false);
+  assert.equal(vetoExpired(g, out, '2026-11-10'), true, 'poza oknem: 30 dni');
+  delete g.world.players[pid];
+  assert.equal(vetoExpired(g, out, '2026-10-11'), true, 'zawodnika nie ma w grze');
+  g.date = '2026-10-11';
+  assert.equal(ensureRequests(g).vetoes.length, 0);
 });

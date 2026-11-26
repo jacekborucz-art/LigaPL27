@@ -363,6 +363,8 @@ Gdzie działa: `negotiationLimits` (src/ui/transfersView.js) zwraca progi w polu
 
 Odwołanie: raz na zawodnika w oknie (poza oknem: do otwarcia następnego), najwyżej dwa w sezonie; przycisk na ekranie rozmów, w karcie zawodnika na rynku i w panelu "Weta zarządu". Decyzja z tego samego S, w którym zamiast składnika kwoty jest -25 x przekroczenie progu (największe względne), a koszt to odstępne albo koszt kontraktu; zgoda od S >= 10. Zgoda kosztuje 3 punkty zaufania i zatwierdza dokładnie zawetowane warunki do końca okna (poza oknem na 30 dni), odmowa kosztuje 5.
 
+Wygasanie (od Nov 26, 2026, `vetoExpired`): weto z okna transferowego znika z panelu "Weta zarządu" po zamknięciu tego okna, weto spoza okna po 30 dniach, a od razu, gdy zawodnika nie ma już w grze. `ensureRequests` czyści listę przy każdym wczytaniu (także stare zapisy).
+
 Kluby AI: te same progi wieku, długości, pensji i kosztu kontraktu w `aiNegotiate` (budżet `{ wage, maxYears, total }`: oferta i przyjmowana kontroferta skracane do progu), przy zakupach (`aiBuy`: odstępne ponad progi wypada z listy kandydatów), przedłużeniach (`aiRenewals`) i kupnie zawodnika gracza (`answerIncoming`). Domyślna oferta AI (4/3/2/1 rok wg wieku) już mieści się w progach, więc zmienia się głównie przyjmowanie kontrofert i pensje najlepiej opłacanych.
 
 ## Infrastruktura

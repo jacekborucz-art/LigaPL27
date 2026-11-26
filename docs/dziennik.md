@@ -29,6 +29,11 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 26, 2026, profil A (komputer domowy), weta zarządu wygasają (v1.25 Beta)
+Zrobione: weta w Klub, Zarząd wisiały na zawsze (`recordVeto` bez wygasania). Teraz `vetoExpired` w `career/boardRequests.js`:
+po zamknięciu okna, poza oknem po 30 dniach, od razu gdy zawodnika nie ma w grze; `ensureRequests` czyści listę (stare zapisy też).
+Test w `tests/boardRequests.test.mjs`.
+
 ## Nov 26, 2026, profil A (komputer domowy), edytor: barwy klubów lig 1-4 (v1.25 Beta)
 Zrobione: formularz klubu w edytorze ma barwy 1-4 (`colorFieldsHtml` wspólne z IV ligą, `readClubForm`, `clubValues.colors`),
 zapis i datapack przez istniejące `editClub`/`editDataField`. Testy w `tests/editor.test.mjs`. Sprawdzone w przeglądarce.

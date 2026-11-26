@@ -118,7 +118,18 @@ export function ensureRequests(game) {
   R.appeals ??= { season: null, count: 0, players: {} };
   R.goalSeason ??= null; // sezon, w którym obniżono już cel
   R.ownerPaid ??= {}; // { [sezon]: kwota dopłat właściciela do płac }
+  if (game.date && R.vetoes.length) R.vetoes = R.vetoes.filter((v) => !vetoExpired(game, v, game.date)); // stare weta znikają (także w starych zapisach)
   return R;
+}
+
+/**
+ * Weto wygasa (Nov 26, 2026): z okna transferowego po jego zamknięciu, spoza okna po 30 dniach, od razu, gdy zawodnika
+ * nie ma już w grze. Wcześniej weta zostawały w panelu Zarządu na zawsze.
+ */
+export function vetoExpired(game, v, date = game.date) {
+  if (!game.world?.players?.[v.playerId]) return true;
+  const w = windowAt(v.date);
+  return date > (w ? w.to : addDaysIso(v.date, 30));
 }
 
 // ------------------------------------------------------------ Wskaźnik płac
