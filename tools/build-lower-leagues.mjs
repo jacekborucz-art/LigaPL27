@@ -151,9 +151,14 @@ const DROP4 = new Set([...DROP, 'gks', 'uks', 'lzs', 'mlks', 'glks', 'wks', 'crs
 const key4 = (name) => slug(name).split('-').filter((t) => t && !DROP4.has(t) && !/^\d{4}$/.test(t)).join('-');
 const genericStadium = (s) => /^(Boisko|Stadion( Gminny| Miejski| Leśny| Miejsko-Gminny)?|Kompleks Sportowy|Gminny Kompleks Sportowy) w(e)? [^,]+$/.test(s);
 const owner4 = parseOwner(read('iv_liga_kluby_stadiony.txt'));
+// Nazwy potwierdzone przez właściciela (Nov 26, 2026); identyfikatory bez zmian (zapisy gry)
+const RENAME4 = { 'piast-ilowa': 'KP Piast Iłowa', 'radomyslanka-radomysl': 'Radomyślanka Radomyśl Wielki', 'iskierka-szczecin': 'Iskierka Śmierdnica', 'gks-manowo': 'GKS Leśnik Manowo' };
+for (const c of l4.out) if (RENAME4[c.id]) c.name = RENAME4[c.id];
+// Ten sam klub pod inną nazwą w pliku właściciela
+const ALIAS4 = { 'GKS Raciborowice': 'Cement Raciborowice', 'Bruk-Bet Termalica II Nieciecza': 'Termalica II Nieciecza' };
 const unmatched4 = []; let stadiums4 = 0; let colors4 = 0;
 for (const o of owner4) {
-  const c = l4.out.find((x) => x.group === o.group && key4(x.name) === key4(o.name));
+  const c = l4.out.find((x) => x.group === o.group && key4(x.name) === key4(ALIAS4[o.name] ?? o.name));
   if (!c) { unmatched4.push(`grupa ${o.group}: ${o.name}`); continue; }
   c.colors = o.colors; colors4++;
   if (!genericStadium(o.stadium) && o.cap % 100 !== 0) { c.stadium = o.stadium; c.cap = o.cap; stadiums4++; }

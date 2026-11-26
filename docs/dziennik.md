@@ -29,6 +29,10 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 26, 2026, profil A (komputer domowy), IV liga: potwierdzone nazwy 6 klubów (v1.25 Beta)
+Zrobione: `RENAME4` i `ALIAS4` w `tools/build-lower-leagues.mjs` (identyfikatory bez zmian); barwy wszystkich 276 klubów,
+stadiony 57. KP Piast Iłowa, Radomyślanka Radomyśl Wielki, Iskierka Śmierdnica, GKS Leśnik Manowo.
+
 ## Nov 26, 2026, profil A (komputer domowy), IV liga, etap 1: podgląd 16 grup (v1.25 Beta)
 Zrobione (architekt Opus high; wdrożenie Opus high; sprawdzone):
 - Nowa kariera: 16 grup IV ligi (14/16/18 drużyn) read only w `game.season.l4` (wyniki z siły, Poisson; ok. 76 ms na sezon,

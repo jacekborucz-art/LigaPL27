@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-dab44aa077';
+const VERSION = 'v0.3-4feafbfba2';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -284,7 +284,7 @@ const FILES = [
   ['./src/data/attributes.js', '892bf10066'],
   ['./src/data/clubNames.js', '3a995fdbee'],
   ['./src/data/clubs_l3.js', 'd3a2685877'],
-  ['./src/data/clubs_l4.js', '593e4afd19'],
+  ['./src/data/clubs_l4.js', '527f712e9e'],
   ['./src/data/clubs_pl.js', 'bcc933599e'],
   ['./src/data/finanse_klubow.js', '6d44dc85bb'],
   ['./src/data/formations.js', 'fdc9ab1756'],

@@ -115,13 +115,12 @@ na poziom 6 i tyle samo awansów, rozmiary grup stałe, III liga 72, ligi 1-4 12
 
 - Plik właściciela `tools/data/iv_liga_kluby_stadiony.txt` (tekst z docx „Kluby IV ligi polskiej 2026 2027”),
   czytany przez `tools/build-lower-leagues.mjs`, który generuje `src/data/clubs_l4.js`.
-- Barwy: 270 z 276 klubów (dopasowanie nazw bez skrótów KS, GKS, LKS itd.). Stadion i pojemność: 56 klubów
-  (wpisy konkretne: nazwa obiektu i pojemność niezaokrąglona do setek; 57. taki wpis, Termalica II, nie ma
-  dopasowania nazwy).
-- Bez dopasowania (dane bez zmian, do decyzji właściciela): GKS Raciborowice (w grze Cement Raciborowice),
-  KP Piast Iłowa (Piast Iłowa), Bruk-Bet Termalica II Nieciecza (Termalica II Nieciecza), Radomyślanka Radomyśl
-  Wielki (Radomyślanka Radomyśl), Iskierka Śmierdnica (Iskierka Szczecin, niepewne), Leśnik Manowo (GKS Manowo, niepewne).
-- Skutek uboczny: 56 klubów z pojemnością ma finanse jak III liga przy awansie (`thirdLeagueData`, pole `cap`)
+- Barwy: wszystkie 276 klubów (dopasowanie nazw bez skrótów KS, GKS, LKS itd.). Stadion i pojemność: 57 klubów
+  (wpisy konkretne: nazwa obiektu i pojemność niezaokrąglona do setek).
+- Nazwy potwierdzone przez właściciela (Nov 26, 2026, `RENAME4` i `ALIAS4` w generatorze, identyfikatory bez zmian):
+  KP Piast Iłowa, Radomyślanka Radomyśl Wielki, Iskierka Śmierdnica, GKS Leśnik Manowo; Cement Raciborowice i Termalica II
+  Nieciecza zostają (w pliku właściciela jako GKS Raciborowice i Bruk-Bet Termalica II Nieciecza).
+- Skutek uboczny: 57 klubów z pojemnością ma finanse jak III liga przy awansie (`thirdLeagueData`, pole `cap`)
   i prawdziwą pojemność w meczach Pucharu Polski.
 
 ## Nie w etapie 1
