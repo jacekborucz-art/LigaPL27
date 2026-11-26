@@ -1,7 +1,8 @@
 // Ekran „Rozgrywki”: tabele 3 lig (strefy, forma), terminarz po kolejkach, statystyki, Puchar Polski.
 import { CLUBS_PL } from '../data/clubs_pl.js';
 import { COMPETITIONS } from '../config/competitions.js';
-import { standings, zonesFor } from '../season/standings.js';
+import { standings, zonesFor, clinchTags } from '../season/standings.js';
+import { reserveMayPlayIn } from '../season/leagues.js';
 import { anyClub, LEAGUE_COMPS } from '../season/season.js';
 import { compClubIds, isL3Comp, L3_COMPS, classKeyOfComp } from '../season/leagueComps.js';
 import { L3_GROUP_NAMES, clubById } from '../data/clubs_pl.js';
@@ -10,7 +11,7 @@ import { crestHtml } from './crest.js';
 import { esc, fmtDate, weekday, fmtDay } from './dom.js';
 import { renderEurope, EUROPE_TABS, ufxRow } from './europeView.js';
 import { renderNational } from './nationalView.js';
-import { renderFourthLeague } from './fourthLeagueView.js'; // IV liga: 16 grup wojewódzkich (docs/iv-liga.md)
+import { renderFourthLeague, clinchTagHtml } from './fourthLeagueView.js'; // IV liga: 16 grup wojewódzkich (docs/iv-liga.md)
 
 export const COMP_TABS = [['ekstraklasa', 'Ekstraklasa'], ['liga1', '1 Liga'], ['liga2', '2 Liga'], ['liga3', 'III liga'], ['liga4', 'IV liga'], ['pp', 'Puchar Polski'], ...EUROPE_TABS, ['NT', 'Reprezentacje'], ['HIST', 'Historia']];
 const clubsById = { get: (id) => clubById(id) }; // lista klubów zmienia się między sezonami (III i IV liga)
@@ -45,6 +46,9 @@ function tableView(game, comp) {
   const zoneOf = (pos) => zones.find((z) => pos >= z.from && pos <= z.to);
   const fx = game.fixtures.filter((f) => f.comp === comp);
   const { current } = currentRound(fx);
+  // Rezerwy nie awansują (w III lidze tylko, gdy mogą grać w 2 Lidze): jak przy barażach w src/season/season.js
+  const eligible = (id) => { const c = clubById(id); return !c?.parent || (tier === 4 && reserveMayPlayIn(3, clubById(c.parent)?.tier ?? anyClub(c.parent)?.tier ?? 1)); };
+  const tags = clinchTags(rows, fx, zones, { champion: tier === 1, eligible });
   return `<div class="cgrid cgrid--side"><div class="cgrid__main">
     <div class="tbl" role="table" aria-label="Tabela ${esc(COMPETITIONS[comp].name)}">
       <div class="tbl__row tbl__head" role="row"><span>#</span><span>Klub</span><span>M</span><span class="w">W</span><span class="w">R</span><span class="w">P</span><span>Bramki</span><span>Pkt</span><span class="w2">Forma</span></div>
@@ -52,7 +56,7 @@ function tableView(game, comp) {
         const z = zoneOf(r.pos);
         return `<div class="tbl__row ${r.id === game.clubId ? 'is-me' : ''}" role="row" data-zone="${z?.kind ?? ''}">
           <span class="tbl__pos">${r.pos}</span>
-          <span class="tbl__club">${crest(r.id)}<button class="club-link" data-act="club" data-club="${esc(r.id)}" title="Pokaż klub">${esc(name(r.id))}</button></span>
+          <span class="tbl__club">${crest(r.id)}<button class="club-link" data-act="club" data-club="${esc(r.id)}" title="Pokaż klub">${esc(name(r.id))}</button>${clinchTagHtml(tags.get(r.id))}</span>
           <span>${r.played}</span><span class="w">${r.wins}</span><span class="w">${r.draws}</span><span class="w">${r.losses}</span>
           <span>${r.gf}:${r.ga}</span><b${r.deducted ? ` title="${esc(`Kara: minus ${r.deducted} pkt (zaległości wobec zawodników albo brak licencji)`)}"` : ''}>${r.points}${r.deducted ? '*' : ''}</b><span class="w2">${formDots(r.form)}</span>
         </div>`;

@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-d198944b32';
+const VERSION = 'v0.3-05b8bb998e';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -340,14 +340,14 @@ const FILES = [
   ['./src/season/rollover.js', '1ac8f08706'],
   ['./src/season/schedule.js', 'a608f6730f'],
   ['./src/season/season.js', '700e27e1c1'],
-  ['./src/season/standings.js', '2b0b020c45'],
+  ['./src/season/standings.js', '793971fcf3'],
   ['./src/season/superCupEU.js', 'f728d6d300'],
   ['./src/season/suspension.js', '7671748aa6'],
   ['./src/season/thirdLeague.js', 'b37f1d8a44'],
   ['./src/season/uefa.js', '750aef61b1'],
   ['./src/season/uefaCoef.js', 'e978b7d220'],
   ['./src/season/worldNations.js', '6003d36e12'],
-  ['./src/styles/app.css', 'c12daf0bad'],
+  ['./src/styles/app.css', '4ab12c3527'],
   ['./src/styles/assistant.css', 'a1dd04f875'],
   ['./src/styles/base.css', 'f2fee58203'],
   ['./src/styles/club.css', '6615e08e49'],
@@ -390,7 +390,7 @@ const FILES = [
   ['./src/ui/careerView.js', '823345518a'],
   ['./src/ui/clubOffersView.js', 'c8cfdd04e1'],
   ['./src/ui/clubView.js', 'b06661d4d1'],
-  ['./src/ui/competitionsView.js', 'fcb50ccf7b'],
+  ['./src/ui/competitionsView.js', 'df4f985a0f'],
   ['./src/ui/contextMenu.js', '5590f7bc7f'],
   ['./src/ui/crest.js', '58e767edc7'],
   ['./src/ui/daySpeed.js', '73d29c5b52'],
@@ -399,7 +399,7 @@ const FILES = [
   ['./src/ui/europeView.js', '50817d42cc'],
   ['./src/ui/fixturesView.js', '8ad243c712'],
   ['./src/ui/formChart.js', '12324f252e'],
-  ['./src/ui/fourthLeagueView.js', 'a4706bd06e'],
+  ['./src/ui/fourthLeagueView.js', '5a591cbdcb'],
   ['./src/ui/infraView.js', '4518a9e3c7'],
   ['./src/ui/klubView.js', '4c58c654b7'],
   ['./src/ui/loansView.js', 'a695d82a14'],

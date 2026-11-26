@@ -61,3 +61,41 @@ export function zonesFor(tier, n = 18, k = 3) {
   if (tier === 4) return [{ from: 1, to: 1, kind: 'up', label: 'Awans do 2 Ligi' }, { from: 2, to: 2, kind: 'playoff', label: 'Baraże o 2 Ligę' }, { from: 15, to: 18, kind: 'down', label: 'Spadek do IV ligi (co najmniej 4 drużyny)' }];
   return [{ from: 1, to: 2, kind: 'up', label: 'Awans' }, { from: 3, to: 6, kind: 'playoff', label: 'Baraże o awans' }, { from: 13, to: 14, kind: 'playoff-down', label: 'Baraż o utrzymanie' }, { from: 15, to: 18, kind: 'down', label: 'Spadek' }];
 }
+
+/**
+ * Pewne rozstrzygnięcia w tabeli (Nov 26, 2026): mistrz, awans, baraże, spadek, gdy są już pewne matematycznie.
+ * Liczymy tylko punkty i zakładamy najgorszy przypadek przy równej liczbie punktów (mecze bezpośrednie i bilans mogą
+ * wypaść różnie), więc tag nigdy nie jest fałszywy, najwyżej pojawia się kolejkę później. Po ostatniej kolejce liczy się
+ * końcowa kolejność. rows: standings(...), fixtures: mecze tej tabeli (także nierozegrane), zones: zonesFor(...),
+ * opts: { champion: mistrz Polski (tylko Ekstraklasa), eligible: (id) => czy klub może awansować (rezerwy nie zawsze) }.
+ * Zwraca Map id -> { kind: 'champ'|'up'|'playoff'|'down', title }.
+ */
+export function clinchTags(rows, fixtures, zones, { champion = false, eligible = () => true } = {}) {
+  if (!fixtures.some((f) => f.played)) return new Map(); // przed sezonem kolejność jest umowna
+  const left = new Map(rows.map((r) => [r.id, 0]));
+  for (const f of fixtures) if (!f.played) for (const id of [f.home, f.away]) if (left.has(id)) left.set(id, left.get(id) + 1);
+  const done = [...left.values()].every((n) => n === 0);
+  const maxOf = (r) => r.points + 3 * left.get(r.id);
+  const elig = rows.filter((r) => eligible(r.id));
+  // Najgorsze i najlepsze możliwe miejsce w grupie: kto może dogonić (albo zrównać się), kto na pewno zostanie wyżej
+  const worst = (r, group) => (done ? group.indexOf(r) + 1 : 1 + group.filter((x) => x !== r && maxOf(x) >= r.points).length);
+  const best = (r, group) => (done ? group.indexOf(r) + 1 : 1 + group.filter((x) => x !== r && x.points > maxOf(r)).length);
+  const zone = (kind) => zones.filter((z) => z.kind === kind);
+  const out = new Map();
+  for (const r of rows) {
+    const ok = elig.includes(r);
+    if (champion && worst(r, rows) === 1) { out.set(r.id, { kind: 'champ', title: 'Mistrz Polski' }); continue; }
+    const up = zone('up')[0];
+    if (up && ok && worst(r, elig) <= up.to) { out.set(r.id, { kind: 'up', title: done ? 'Awans' : 'Pewny awans' }); continue; }
+    const down = zone('down')[0];
+    if (down && best(r, rows) >= down.from) { out.set(r.id, { kind: 'down', title: done ? 'Spadek' : 'Pewny spadek' }); continue; }
+    const po = zone('playoff')[0];
+    if (po && ok && worst(r, elig) <= po.to) {
+      out.set(r.id, { kind: 'playoff', title: done || best(r, elig) >= po.from ? 'Baraże o awans' : 'Pewne co najmniej baraże o awans' });
+      continue;
+    }
+    const pd = zone('playoff-down')[0];
+    if (pd && best(r, rows) >= pd.from && worst(r, rows) <= pd.to) out.set(r.id, { kind: 'playoff', title: 'Baraż o utrzymanie' });
+  }
+  return out;
+}

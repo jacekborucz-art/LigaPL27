@@ -29,6 +29,12 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 26, 2026, profil A (komputer domowy), tagi pewnych rozstrzygnięć w tabelach (v1.25 Beta)
+Zrobione: `clinchTags` (`season/standings.js`): mistrz (gwiazdka, tylko Ekstraklasa), awans, baraże, spadek, gdy pewne
+matematycznie (same punkty, remis punktowy = najgorszy przypadek, rezerwy bez awansu jak w barażach `season.js`), po sezonie
+z końcowej kolejności. Tagi w `ui/competitionsView.js` i `ui/fourthLeagueView.js` (`clinchTagHtml`), style `.tbl-tag` w app.css.
+Pulpit (mini tabela) bez tagów. Test `tests/clinchTags.test.mjs`. Sprawdzone w przeglądarce (PC i telefon).
+
 ## Nov 26, 2026, profil A (komputer domowy), studio pomeczowe: prawdziwe miejsce w tabeli (v1.25 Beta)
 Zrobione: `applyResultToTable` (`match/studio.js`) czytał punkty z pola `pts`, a `standings` ma `points`, więc „miejsce w tabeli”
 w studiu szło z bilansu bramek. Teraz `finishMatchday` liczy tabelę ligi po meczu (`tableAfter`, z meczami bezpośrednimi)

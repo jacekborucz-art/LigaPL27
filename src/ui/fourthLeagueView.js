@@ -5,7 +5,7 @@ import { VOIVODESHIPS, VOIV } from '../data/voivodeships.js';
 import { L3_GROUP_NAMES, clubById } from '../data/clubs_pl.js';
 import { anyClub } from '../season/season.js';
 import { voivOfClub } from '../season/leagues.js';
-import { zonesFor } from '../season/standings.js';
+import { zonesFor, clinchTags } from '../season/standings.js';
 import { l4Rows, l4GroupFixtures, l4GroupIndex, l4Eligible, fourthLeagueFinished } from '../season/fourthLeague.js';
 import { crestHtml } from './crest.js';
 import { esc, weekday, fmtDay, fmtDate } from './dom.js';
@@ -41,6 +41,14 @@ function picker(game, voiv) {
   }).join('')}</select></div>`;
 }
 
+const TAG_TXT = { up: 'AWANS', playoff: 'BARAŻE', down: 'SPADEK' };
+/** Tag pewnego rozstrzygnięcia za nazwą klubu (clinchTags): złota gwiazdka mistrza, awans, baraże, spadek. */
+export function clinchTagHtml(t) {
+  if (!t) return '';
+  return t.kind === 'champ' ? `<span class="tbl-tag tbl-tag--champ" title="${esc(t.title)}" aria-label="${esc(t.title)}">★</span>`
+    : `<span class="tbl-tag tbl-tag--${t.kind}" title="${esc(t.title)}">${TAG_TXT[t.kind]}</span>`;
+}
+
 function tableView(game, voiv) {
   const L = game.season.l4;
   const rows = l4Rows(L, voiv);
@@ -48,13 +56,14 @@ function tableView(game, voiv) {
   const zones = zonesFor(5, rows.length, v.minDown);
   const zoneOf = (pos) => zones.find((z) => pos >= z.from && pos <= z.to);
   const done = fourthLeagueFinished(L);
+  const tags = clinchTags(rows, l4GroupFixtures(L, l4GroupIndex(L, voiv)), zones, { eligible: l4Eligible });
   const champs = done ? VOIVODESHIPS.map((x) => [x, l4Rows(L, x.key).map((r) => r.id).find(l4Eligible)]) : [];
   return `<div class="cgrid cgrid--side"><div class="cgrid__main">
     <div class="tbl" role="table" aria-label="${esc(`Tabela IV ligi, grupa ${v.name}`)}">
       <div class="tbl__row tbl__head" role="row"><span>#</span><span>Klub</span><span>M</span><span class="w">W</span><span class="w">R</span><span class="w">P</span><span>Bramki</span><span>Pkt</span><span class="w2">Forma</span></div>
       ${rows.map((r) => `<div class="tbl__row ${r.id === game.clubId ? 'is-me' : ''}" role="row" data-zone="${zoneOf(r.pos)?.kind ?? ''}">
           <span class="tbl__pos">${r.pos}</span>
-          <span class="tbl__club">${crest(r.id)}${clubBtn(game, r.id)}</span>
+          <span class="tbl__club">${crest(r.id)}${clubBtn(game, r.id)}${clinchTagHtml(tags.get(r.id))}</span>
           <span>${r.played}</span><span class="w">${r.wins}</span><span class="w">${r.draws}</span><span class="w">${r.losses}</span>
           <span>${r.gf}:${r.ga}</span><b>${r.points}</b><span class="w2">${formDots(r.form)}</span>
         </div>`).join('')}
