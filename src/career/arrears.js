@@ -40,7 +40,9 @@ export const DEBT = {
   compMonths: 3, // odszkodowanie dla zawodnika: 3 miesięczne pensje jako dług klubu
   banMonth: 2, pointsFrom: 4, pointsEvery: 2, points: 3,
   licence: { maxTier: 3, ekPoints: 6, lowestTier: 4 },
-  bail: { seasons: 3, heavy: 0.15 },
+  // Dopłaty do długów klubów AI działają stale (AI wydaje mniej rozsądnie niż gracz; do czasu lepszej logiki wydatków AI,
+  // Nov 26, 2026); po sezonie z dopłatą właściciel z małą szansą odmawia (pAny + p x ciężkie sezony z rzędu, maks. pMax)
+  bail: { pAny: 0.008, p: 0.05, pMax: 0.15, heavy: 0.15 }, // pAny: każdy klub z dopłatą w sezonie; razem ok. 1 klub w tarapatach na 3-6 sezonów (symulacja)
   fill: { total: 18, gk: 2, reserves: 2, juniors: 3 },
   sale: { listed: 2, disc: [0.10, 0.20] }, // klub AI w zaległościach: do 2 najdroższych na liście transferowej, taniej o 10-20 % (Nov 26, 2026)
   TIER_L: { 1: 11.5, 2: 10, 3: 8.5, 4: 7.5, 5: 6.5, 6: 5.5, 7: 4.5 }, // siła ligi (jak LEAGUE_L w rollover.js) i niższych klas
@@ -75,8 +77,8 @@ export const licenceFailed = (game, clubId) => { const L = game.debt?.lic?.[club
 // ------------------------------------------------------------ Dopłaty właściciela do długów (kluby AI)
 /**
  * 1. dnia miesiąca: długi klubów AI pokrywa właściciel (a rezerw pierwsza drużyna) z zapasem na miesiąc pensji.
- * Sezon z dopłatą do długu ponad 15 % rocznych kosztów jest „ciężki”; po 3 ciężkich sezonach z rzędu właściciel
- * odmawia (do wyjścia klubu na plus na start sezonu albo zmiany właściciela). Miasto po wycofaniu wsparcia nie dopłaca.
+ * Sezon z dopłatą do długu ponad 15 % rocznych kosztów jest „ciężki”; po każdym takim sezonie właściciel z małą szansą
+ * (0,8 % przy każdej dopłacie + 5 % x ciężkie sezony z rzędu, maks. 15 %) odmawia dalszych dopłat (do wyjścia klubu na plus albo zmiany właściciela). Miasto po wycofaniu wsparcia nie dopłaca.
  */
 export function ownerBailouts(game, date) {
   const D = ensureDebt(game);
@@ -105,9 +107,11 @@ function closeBailouts(game, oldCosts, startCover = {}) {
   for (const [id, b] of Object.entries(D.bail)) {
     const cost = oldCosts[id] ?? 0;
     const heavy = cost > 0 && b.sum > DEBT.bail.heavy * cost;
+    const bailed = b.sum > 0;
     b.heavy = heavy ? (b.heavy ?? 0) + 1 : 0;
     b.sum = 0;
-    if (b.heavy >= DEBT.bail.seasons && !b.off) { b.off = true; stat(D, 'bailRefused'); }
+    const pRefuse = bailed ? DEBT.bail.pAny + (heavy ? Math.min(DEBT.bail.pMax, DEBT.bail.p * b.heavy) : 0) : 0;
+    if (pRefuse > 0 && !b.off && new Rng(`odmowa-doplat:${game.seed}:${id}:${SEASON_YEAR}`).chance(pRefuse)) { b.off = true; stat(D, 'bailRefused'); } // rzadkie tarapaty klubu AI
     const bal = game.finance.clubs[id]?.balance ?? 0;
     if (b.off && bal >= 0 && !heavy) { b.off = false; b.heavy = 0; }
   }

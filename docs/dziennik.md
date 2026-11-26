@@ -29,6 +29,15 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 26, 2026, profil A (komputer domowy), kluby AI: sprzedaż w długach, stałe dopłaty z rzadkimi tarapatami (v1.25 Beta)
+Zrobione (decyzje właściciela):
+- `distressSale` w `src/career/arrears.js`: klub AI w zaległościach wystawia co miesiąc do 2 najdroższych zawodników taniej
+  o 10-20 % (`DEBT.sale`). Symulacja 4 sezonów: rozwiązań kontraktów z winy klubu 243 -> 194.
+- Dopłaty do długów klubów AI stałe (bez limitu 3 sezonów); losowa odmowa właściciela po sezonie z dopłatą (`DEBT.bail`:
+  0,8 % + 5 % x ciężkie sezony, maks. 15 %), ok. 1 klub AI w tarapatach na 3-6 sezonów. Opis: `docs/wlasciciele-i-dlugi.md`.
+Zostało / dalej:
+- POPRAWKI.txt (NIE PILNE 6): rozsądniejsze wydatki klubów AI, potem ograniczenie ukrytych dopłat.
+
 ## Nov 26, 2026, profil A (komputer domowy), właściciele i długi (v1.25 Beta)
 Zrobione (eksperci finansów i prawa sportowego Sonnet medium; wdrożenie Opus high; sprawdzone):
 - Nowe `src/career/ownership.js` (odejście właściciela na koniec sezonu: typ, cechy, x1,15 po słabych latach, mnożnik ligi;

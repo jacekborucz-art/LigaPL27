@@ -134,9 +134,11 @@ i wyższe): nowy właściciel, przejęcie i wycofanie miasta, inwestor, zaległo
 - Na start sezonu właściciel uzupełnia saldo (także dług, jak dotąd, gracz i AI), chyba że klub zmienił właściciela
   (spłata części długu), miasto wycofało wsparcie albo właściciel odmówił.
 - Kluby AI: 1. dnia miesiąca dopłata do miesięcznych płac (jak dotąd; rezerwy od pierwszej drużyny).
-- Sezon, w którym właściciel pokrył dług ponad 15 % rocznych kosztów klubu, jest „ciężki”; po 3 ciężkich sezonach
-  z rzędu właściciel odmawia (do wyjścia klubu na plus na start sezonu albo zmiany właściciela). Klub gracza nie dostaje
-  comiesięcznych dopłat (jak dotąd).
+- Dopłaty do długów klubów AI działają stale (decyzja właściciela gry, Nov 26, 2026: AI wydaje mniej rozsądnie niż gracz;
+  do czasu lepszej logiki wydatków AI). Po każdym sezonie z dopłatą właściciel z małą szansą odmawia dalszych dopłat:
+  0,8 % + 5 % x ciężkie sezony z rzędu (dopłata ponad 15 % rocznych kosztów), najwyżej 15 % (`DEBT.bail`). Symulacja:
+  ok. 1 klub AI w tarapatach na 3-6 sezonów. Odmowa trwa do wyjścia klubu na plus albo zmiany właściciela. Klub gracza
+  nie dostaje comiesięcznych dopłat (jak dotąd).
 
 ## 4. Symulacja (5 sezonów, wszystkie ligi)
 
@@ -155,7 +157,7 @@ Nov 26, 2026, 3 ziarna (5, 7, 11) x 5 sezonów (2026/27-2030/31), wszystkie ligi
 | Nowe zaległości (kluby) | 0-6 | |
 | Rozwiązania kontraktów z winy klubu | 7-136 (kilka klubów w długich zaległościach) | |
 | Brak licencji | 0-3 | |
-| Kluby AI z dopłatą do długów | 42-70 (przed zmianą 43-73), odmowy po 3 ciężkich sezonach: 0 | |
+| Kluby AI z dopłatą do długów | 42-70 (przed zmianą 43-73), odmowy (wcześniej po 3 ciężkich sezonach): 0; po zmianie Nov 26, 2026 (losowo): 3 na 18 sezonów przy 0,5 %, docelowo 0,8 % | |
 | Mediana salda na start sezonu (Ekstraklasa / 1 Liga / 2 Liga / III liga, mln zł) | ok. 26-41 / 1,3-4,7 / 0,3-0,9 / 0,1 (przed zmianą 28-37 / 1,7-3,6 / 0,3-0,8 / 0,1) | stabilne |
 
 Wnioski: przy bazowych szansach z projektu (2/4/3/1 %) Ekstraklasa i 1 Liga mają mniej zmian niż cel, stąd mnożnik
