@@ -16,7 +16,8 @@ import { markUnlocksSeen, careerSummary } from './career/coachCareer.js'; // kar
 import './season/dailySystems.js';
 import { createSeason, compLabel, applyResult, fromEngineResult, squadFor, anyClub, LEAGUE_COMPS } from './season/season.js';
 import { standings, zonesFor } from './season/standings.js';
-import { renderCompetitions } from './ui/competitionsView.js';
+import { renderCompetitions, leagueClinch } from './ui/competitionsView.js';
+import { clinchTagHtml } from './ui/fourthLeagueView.js';
 import { fixturesPanelBody, renderFixtures } from './ui/fixturesView.js';
 import { mountDashMasonry } from './ui/masonry.js';
 import { rosterOf } from './career/staffMarket.js';
@@ -826,6 +827,7 @@ function dashFixtures(g) {
 function dashTable(g, club, table) {
   const zones = zonesFor(club.tier);
   const zoneOf = (pos) => zones.find((z) => pos >= z.from && pos <= z.to);
+  const tags = compOfClub(club) ? leagueClinch(g, compOfClub(club), table) : new Map(); // pewny mistrz, awans, baraże, spadek
   const n = table.length;
   const i = Math.max(0, table.findIndex((r) => r.id === g.clubId));
   // Najmniejsze okno tabeli wokół klubu, w którym wiersz się mieści: CSS pokazuje 7, 11 albo wszystkie wiersze
@@ -837,7 +839,7 @@ function dashTable(g, club, table) {
     const me = r.id === g.clubId;
     return `<tr class="${[me ? 'is-me' : '', tierCls(kOf(j))].filter(Boolean).join(' ')}"${z ? ` data-z="${z.kind}"` : ''}${me ? ' aria-current="true"' : ''}>
       <td class="dash-t__pos">${r.pos}</td>
-      <td class="dash-t__club"><span class="dash-t__cl">${crestHtml(c, { size: 20, clubsById })}<button class="club-link" data-act="club" data-club="${esc(c.id)}" title="Pokaż klub">${esc(c.name)}</button></span></td>
+      <td class="dash-t__club"><span class="dash-t__cl">${crestHtml(c, { size: 20, clubsById })}<button class="club-link" data-act="club" data-club="${esc(c.id)}" title="Pokaż klub">${esc(c.name)}</button>${clinchTagHtml(tags.get(r.id))}</span></td>
       <td>${r.played}</td><td>${r.goalDiff > 0 ? '+' : ''}${r.goalDiff}</td><td class="dash-t__pts">${r.points}</td>
     </tr>`;
   }).join('');

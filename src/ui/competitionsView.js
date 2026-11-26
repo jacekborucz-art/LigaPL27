@@ -38,6 +38,15 @@ function topScorers(game, comp, n = 5) {
   return list.length ? `<ol class="stat-list">${list.map((p) => `<li>${crest(p.clubId, 18)}<span>${esc(p.name)}<small>${esc(name(p.clubId))}</small></span><b>${p.season.g}</b></li>`).join('')}</ol>` : '<p class="hint">Jeszcze nikt nie strzelił gola.</p>';
 }
 
+/** Tagi pewnych rozstrzygnięć ligi (tabela w Rozgrywkach i na Pulpicie): Map id -> { kind, title }. */
+export function leagueClinch(game, comp, rows) {
+  const tier = COMPETITIONS[comp]?.tier;
+  if (!tier) return new Map();
+  // Rezerwy nie awansują (w III lidze tylko, gdy mogą grać w 2 Lidze): jak przy barażach w src/season/season.js
+  const eligible = (id) => { const c = clubById(id); return !c?.parent || (tier === 4 && reserveMayPlayIn(3, clubById(c.parent)?.tier ?? anyClub(c.parent)?.tier ?? 1)); };
+  return clinchTags(rows, game.fixtures.filter((f) => f.comp === comp), zonesFor(tier), { champion: tier === 1, eligible });
+}
+
 function tableView(game, comp) {
   const tier = COMPETITIONS[comp].tier;
   const ids = compClubIds(comp);
@@ -46,9 +55,7 @@ function tableView(game, comp) {
   const zoneOf = (pos) => zones.find((z) => pos >= z.from && pos <= z.to);
   const fx = game.fixtures.filter((f) => f.comp === comp);
   const { current } = currentRound(fx);
-  // Rezerwy nie awansują (w III lidze tylko, gdy mogą grać w 2 Lidze): jak przy barażach w src/season/season.js
-  const eligible = (id) => { const c = clubById(id); return !c?.parent || (tier === 4 && reserveMayPlayIn(3, clubById(c.parent)?.tier ?? anyClub(c.parent)?.tier ?? 1)); };
-  const tags = clinchTags(rows, fx, zones, { champion: tier === 1, eligible });
+  const tags = leagueClinch(game, comp, rows);
   return `<div class="cgrid cgrid--side"><div class="cgrid__main">
     <div class="tbl" role="table" aria-label="Tabela ${esc(COMPETITIONS[comp].name)}">
       <div class="tbl__row tbl__head" role="row"><span>#</span><span>Klub</span><span>M</span><span class="w">W</span><span class="w">R</span><span class="w">P</span><span>Bramki</span><span>Pkt</span><span class="w2">Forma</span></div>

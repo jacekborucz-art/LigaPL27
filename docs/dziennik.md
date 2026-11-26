@@ -29,6 +29,10 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 26, 2026, profil A (komputer domowy), tagi pewnych rozstrzygnięć także na Pulpicie (v1.25 Beta)
+Zrobione: wspólne `leagueClinch(game, comp, rows)` w `ui/competitionsView.js` (Rozgrywki i Pulpit), tagi w `dashTable` (`app.js`),
+style `.tbl-tag` dla `.dash-t__cl`, długa nazwa klubu skraca się z wielokropkiem. Sprawdzone w przeglądarce (PC 1366/1600, telefon).
+
 ## Nov 26, 2026, profil A (komputer domowy), tagi pewnych rozstrzygnięć w tabelach (v1.25 Beta)
 Zrobione: `clinchTags` (`season/standings.js`): mistrz (gwiazdka, tylko Ekstraklasa), awans, baraże, spadek, gdy pewne
 matematycznie (same punkty, remis punktowy = najgorszy przypadek, rezerwy bez awansu jak w barażach `season.js`), po sezonie

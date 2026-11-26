@@ -293,6 +293,7 @@
 .dash-t__club { text-align: left !important; }
 .dash-t__cl { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .dash-t__cl > span:last-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dash-t__cl .club-link { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* długa nazwa skraca się, tag zostaje widoczny */
 .dash-t__pts { padding-right: 14px !important; font: 700 var(--step-0)/1 var(--font-display); }
 .dash-t tr.is-me { background: color-mix(in srgb, var(--led) 22%, var(--surface)) !important; }
 .dash-t tr.is-me td { font-weight: 700; }
