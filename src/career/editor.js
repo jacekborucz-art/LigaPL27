@@ -410,7 +410,7 @@ export function clubCapacity(game, id) {
 export function clubValues(game, id) {
   const c = clubObj(id); const F = game.finance?.clubs?.[id];
   return {
-    name: c?.name ?? id, short: c?.short ?? '', stadium: c?.stadium ?? '', crest: c?.crest ?? '', capacity: clubCapacity(game, id),
+    name: c?.name ?? id, short: c?.short ?? '', stadium: c?.stadium ?? '', crest: c?.crest ?? '', capacity: clubCapacity(game, id), colors: [...(c?.colors ?? [])],
     balance: F?.balance ?? null, transferBudget: F?.transferBudget ?? null, wageBudget: F?.wageBudget ?? null,
   };
 }

@@ -198,25 +198,33 @@ const draftFor = (ed, key) => (ed.draft?.key === key ? ed.draft.v : null);
 
 /** Formularz klubu IV ligi (bez kadry): dwie barwy, nazwa stadionu i pojemność (datapack v8). */
 const hexOr = (x, d) => (/^#[0-9a-fA-F]{6}$/.test(String(x ?? '').trim()) ? String(x).trim().toLowerCase() : d);
+/**
+ * Pola barw klubu (kolor 1 i 2 wymagane, 3 i 4 opcjonalne, gra na razie ich nie używa). Te same identyfikatory pól
+ * (ed-l4-c1..4) w formularzu klubu lig 1-4 i IV ligi: jeden formularz naraz, synchronizacja wyboru koloru w app.js.
+ */
+function colorFieldsHtml(colors, errColors) {
+  const colorFld = (n) => {
+    const t = String(colors?.[n - 1] ?? '');
+    return `<div class="fld ed-fld"><label class="ed-fld__l" for="ed-l4-c${n}t">Barwa ${n}</label>
+      <div class="ed-color"><input id="ed-l4-c${n}" class="ed-color__pick" type="color" data-ed-color="${n}" value="${esc(hexOr(t, '#000000'))}" aria-label="Wybierz barwę ${n}">
+      <input id="ed-l4-c${n}t" type="text" data-ed-color="${n}" value="${esc(t.toUpperCase())}" maxlength="7" autocomplete="off" spellcheck="false"${errColors ? ' aria-invalid="true" aria-describedby="ed-l4-colors-err"' : ''}></div>
+      ${n === 1 ? '<p class="fld__help">Kolor w formacie #RRGGBB. Pierwsza barwa to główny kolor koszulek i tarczy.</p>' : n === 2 ? '<p class="fld__help">Druga barwa: drugi kolor koszulek i tarczy.</p>' : '<p class="fld__help">Opcjonalna, gra na razie jej nie używa. Puste pole: brak.</p>'}</div>`;
+  };
+  return [1, 2, 3, 4].map(colorFld).join('');
+}
+
 function l4Form(game, ed, id, c) {
   const orig = l4Original(game, id);
   const d = draftFor(ed, `l4:${id}`); const e = d ? ed.errors ?? {} : {};
   const v = d ?? { colors: [...(c.colors ?? [])], stadium: c.stadium ?? '', cap: c.cap ?? '' };
   const inPack = !!game.editor?.clubs?.[id];
-  const colorFld = (n) => {
-    const t = String(v.colors?.[n - 1] ?? '');
-    return `<div class="fld ed-fld"><label class="ed-fld__l" for="ed-l4-c${n}t">Barwa ${n}</label>
-      <div class="ed-color"><input id="ed-l4-c${n}" class="ed-color__pick" type="color" data-ed-color="${n}" value="${esc(hexOr(t, '#000000'))}" aria-label="Wybierz barwę ${n}">
-      <input id="ed-l4-c${n}t" type="text" data-ed-color="${n}" value="${esc(t.toUpperCase())}" maxlength="7" autocomplete="off" spellcheck="false"${e.colors ? ' aria-invalid="true" aria-describedby="ed-l4-colors-err"' : ''}></div>
-      ${n === 1 ? '<p class="fld__help">Kolor w formacie #RRGGBB. Pierwsza barwa to główny kolor koszulek i tarczy.</p>' : n === 2 ? '<p class="fld__help">Druga barwa: drugi kolor koszulek i tarczy.</p>' : '<p class="fld__help">Opcjonalna, gra na razie jej nie używa. Puste pole: brak.</p>'}</div>`;
-  };
   const nCap = orig?.cap ? orig.cap.toLocaleString('pl-PL') : '';
   return `<div class="ed-form" data-ed-form="l4">
     <div class="ed-form__top"><button class="btn btn--quiet btn--sm ed-close" data-act="ed-close">Wróć do listy</button></div>
     <header class="ed-form__head">${crest(c, 44)}<div><h2 id="ed-title" tabindex="-1">${esc(c.name)}</h2><p class="muted">${esc(l4Label(c))}${c.city ? `, ${esc(c.city)}` : ''}</p></div></header>
     ${msgHtml(ed)}${e.colors ? `<p class="ed-msg is-bad" id="ed-l4-colors-err">${esc(e.colors)}</p>` : ''}
     <div class="ed-grid">
-      ${colorFld(1)}${colorFld(2)}${colorFld(3)}${colorFld(4)}
+      ${colorFieldsHtml(v.colors, e.colors)}
       ${field('ed-l4-stadium', 'Nazwa stadionu', textIn('ed-l4-stadium', v.stadium, { max: LIMITS.stadium, err: e.stadium }), { err: e.stadium, help: orig?.stadium && orig.stadium !== v.stadium ? `Oryginał: ${esc(orig.stadium)}` : 'Puste pole: boisko klubu bez nazwy.' })}
       ${field('ed-l4-cap', 'Pojemność stadionu', textIn('ed-l4-cap', v.cap, { num: true, err: e.cap }), { err: e.cap, help: `Od ${LIMITS.capL4Min.toLocaleString('pl-PL')} do ${LIMITS.capMax.toLocaleString('pl-PL')} miejsc. Puste pole: ${nCap ? `wartość z danych (${nCap})` : 'brak danych o pojemności'}.` })}
     </div>
@@ -241,7 +249,7 @@ function clubForm(game, ed, id) {
   return `<div class="ed-form" data-ed-form="club">
     <div class="ed-form__top"><button class="btn btn--quiet btn--sm ed-close" data-act="ed-close">Wróć do listy</button></div>
     <header class="ed-form__head">${crest(c, 44)}<div><h2 id="ed-title" tabindex="-1">${esc(c.name)}</h2><p class="muted">${esc(leagueOf(c))}</p></div></header>
-    ${msgHtml(ed)}
+    ${msgHtml(ed)}${e.colors ? `<p class="ed-msg is-bad" id="ed-l4-colors-err">${esc(e.colors)}</p>` : ''}
     <div class="ed-grid">
       ${field('ed-name', 'Nazwa', textIn('ed-name', v.name, { max: LIMITS.name, err: e.name }), { err: e.name, help: orig('name') })}
       ${field('ed-short', 'Nazwa skrócona', textIn('ed-short', v.short, { max: LIMITS.short, err: e.short }), { err: e.short, help: orig('short') || 'Od 2 do 5 liter lub cyfr, np. na herbie.' })}
@@ -250,6 +258,7 @@ function clubForm(game, ed, id) {
         <div class="ed-crest">${c.crest ? crest(c, 44) : ''}<input id="ed-crest" type="file" data-act="ed-crest" data-id="${esc(id)}">
         ${c.crest ? `<button class="btn btn--quiet btn--sm" data-act="ed-crest-clear" data-id="${esc(id)}">Usuń własny herb</button>` : ''}</div>
         <p class="fld__help">Obrazek PNG, JPG albo WEBP, najlepiej kwadratowy z przezroczystym tłem. Trafia do datapacku, więc po wczytaniu pliku każdy ma ten sam herb.</p></div>
+      ${colorFieldsHtml(v.colors, e.colors)}
       ${field('ed-capacity', 'Pojemność stadionu', textIn('ed-capacity', v.capacity, { num: true, err: e.capacity }), { err: e.capacity, help: `Od ${LIMITS.capMin.toLocaleString('pl-PL')} do ${LIMITS.capMax.toLocaleString('pl-PL')} miejsc.` })}
       ${hasFin ? `${field('ed-balance', 'Saldo (zł)', textIn('ed-balance', v.balance, { num: true, err: e.balance }), { err: e.balance, help: `Teraz ${esc(fmtZl(cur.balance))}. Może być ujemne.` })}
       ${field('ed-tb', 'Budżet transferowy (zł)', textIn('ed-tb', v.transferBudget, { num: true, err: e.transferBudget }), { err: e.transferBudget, help: `Teraz ${esc(fmtZl(cur.transferBudget))}.` })}
@@ -499,7 +508,8 @@ export function renderEditor(game, ed) {
 const val = (root, id) => root?.querySelector(`#${id}`)?.value ?? '';
 
 function readClubForm(root, hasFin) {
-  const v = { name: val(root, 'ed-name'), short: val(root, 'ed-short'), stadium: val(root, 'ed-stadium'), capacity: val(root, 'ed-capacity') };
+  const v = { name: val(root, 'ed-name'), short: val(root, 'ed-short'), stadium: val(root, 'ed-stadium'), capacity: val(root, 'ed-capacity'),
+    colors: [val(root, 'ed-l4-c1t'), val(root, 'ed-l4-c2t'), val(root, 'ed-l4-c3t'), val(root, 'ed-l4-c4t')] }; // barwy klubu (colorFieldsHtml)
   if (hasFin) Object.assign(v, { balance: val(root, 'ed-balance'), transferBudget: val(root, 'ed-tb'), wageBudget: val(root, 'ed-wb') });
   return v;
 }

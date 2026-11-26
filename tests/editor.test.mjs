@@ -419,10 +419,18 @@ test('Widok edytora: zakładki, formularz klubu i zawodnika, zapis przez akcje, 
   assert.match(html, /id="ed-name"/);
   assert.match(html, /data-act="ed-cplayer"/);
   // Zapis z „formularza”: obiekt z querySelector jak w DOM
-  const fields = { 'ed-name': '<b>Legia</b>', 'ed-short': 'LEG', 'ed-stadium': '', 'ed-capacity': '31000', 'ed-balance': '1000000', 'ed-tb': '0', 'ed-wb': '50000' };
+  const [c1, c2] = clubById('legia').colors;
+  const fields = { 'ed-name': '<b>Legia</b>', 'ed-short': 'LEG', 'ed-stadium': '', 'ed-capacity': '31000', 'ed-balance': '1000000', 'ed-tb': '0', 'ed-wb': '50000', 'ed-l4-c1t': c1, 'ed-l4-c2t': c2 };
+  assert.match(html, /id="ed-l4-c1t"/, 'barwy w formularzu klubu ligi');
   const root = { querySelector: (sel) => ({ value: fields[sel.slice(1)] ?? '' }) };
   const r = handleEditorAction(g, ed, 'ed-save-club', { id: 'legia' }, root);
   assert.equal(r.save, true);
+  // Barwy klubu ligi: zmiana, opcjonalna 3. barwa, zapis w datapacku
+  fields['ed-l4-c1t'] = '#112233'; fields['ed-l4-c3t'] = '#445566';
+  assert.equal(handleEditorAction(g, ed, 'ed-save-club', { id: 'legia' }, root).save, true);
+  assert.deepEqual(clubById('legia').colors, ['#112233', c2.toUpperCase(), '#445566']);
+  assert.deepEqual(g.editor.clubs.legia.colors, ['#112233', c2.toUpperCase(), '#445566']);
+  fields['ed-l4-c1t'] = c1; fields['ed-l4-c3t'] = '';
   html = renderEditor(g, ed);
   assert.ok(html.includes('&lt;b&gt;Legia&lt;/b&gt;') && !html.includes('<b>Legia</b>'), 'nazwa w HTML przez esc');
   fields['ed-capacity'] = '5';

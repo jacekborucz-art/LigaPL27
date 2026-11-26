@@ -29,6 +29,10 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 26, 2026, profil A (komputer domowy), edytor: barwy klubów lig 1-4 (v1.25 Beta)
+Zrobione: formularz klubu w edytorze ma barwy 1-4 (`colorFieldsHtml` wspólne z IV ligą, `readClubForm`, `clubValues.colors`),
+zapis i datapack przez istniejące `editClub`/`editDataField`. Testy w `tests/editor.test.mjs`. Sprawdzone w przeglądarce.
+
 ## Nov 26, 2026, profil A (komputer domowy), edytor: kluby IV ligi i barwy 3-4 (v1.25 Beta)
 Zrobione (wdrożenie Sonnet medium, barwy 3-4: ja; sprawdzone):
 - Edytor: filtr „IV liga” (kluby 16 grup, w karierze z IV ligą też awansowane z poziomu 6), formularz tylko barwy, stadion,

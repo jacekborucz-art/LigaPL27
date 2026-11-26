@@ -25,7 +25,7 @@ Na PC lista jest po lewej, formularz po prawej. Na telefonie jedna kolumna: list
 | Nazwa skrócona | od 2 do 5 liter lub cyfr |
 | Nazwa stadionu | do 60 znaków, puste pole = brak nazwy |
 | Pojemność stadionu | liczba całkowita od 500 do 100 000 (klub IV ligi: od 100 do 100 000, puste pole = wartość z danych) |
-| Barwy klubu IV ligi | 2 wymagane i 2 opcjonalne kolory #RRGGBB (barwa 3 i 4 na później w grze, puste pomijane; wielkość liter bez znaczenia, zapis wielkimi) |
+| Barwy klubu (ligi 1-4 i IV liga) | 2 wymagane i 2 opcjonalne kolory #RRGGBB (barwa 3 i 4 na później w grze, puste pomijane; wielkość liter bez znaczenia, zapis wielkimi) |
 | Saldo | liczba całkowita od -1 000 000 000 do 10 000 000 000 zł |
 | Budżety (transferowy, płac) | liczba całkowita od 0 do 10 000 000 000 zł |
 | Imię, nazwisko | od 1 do 40 znaków |
@@ -50,6 +50,7 @@ Liczby (finanse, pojemność, atrybuty) są częścią zapisu gry, więc ustawia
 ## Klub IV ligi (Nov 26, 2026)
 
 Edytor zmienia dane klubów IV ligi (poziom 5, `src/data/clubs_l4.js`) i klubów poziomu 6, które awansowały do IV ligi w karierze (`game.leagueState.extra`, docs/iv-liga.md), ale tylko trzy pola:
+- Barwy klubów lig 1-4 (Nov 26, 2026): te same pola barw (1-2 wymagane, 3-4 opcjonalne) w formularzu klubu (`colorFieldsHtml`, `readClubForm`), zapis przez `editClub` w `game.editor.clubs[id].colors` i w datapacku jak przy IV lidze; Przywróć oryginał przywraca barwy z danych.
 - `colors`: 2 wymagane kolory (`#RRGGBB`), które czytają tarcze (`src/ui/crest.js`) i koszulki, oraz do 2 opcjonalnych (barwa 3 i 4: miejsce na później, gra ich jeszcze nie używa; 3. barwa z listy właściciela w danych III i IV ligi);
 - `stadium`: nazwa stadionu (do 60 znaków, puste pole = bez nazwy), pokazywana w karcie klubu IV ligi;
 - `cap`: pojemność (100 do 100 000), czytana przez dane finansowe klubu po awansie do III ligi (`clubFinanceData`) i w karcie klubu. Pole klubu z kadrą `capacity` to osobna sprawa (infrastruktura).
