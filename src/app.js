@@ -377,6 +377,11 @@ app.addEventListener('input', (ev) => {
     }
     return;
   }
+  if (ev.target.dataset?.edColor) { // barwa klubu IV ligi: wybór koloru i pole tekstowe pokazują to samo
+    const n = ev.target.dataset.edColor; const txt = app.querySelector(`#ed-l4-c${n}t`); const pick = app.querySelector(`#ed-l4-c${n}`);
+    if (ev.target.type === 'color') { if (txt) txt.value = ev.target.value.toUpperCase(); } else if (pick && /^#[0-9a-f]{6}$/i.test(ev.target.value.trim())) pick.value = ev.target.value.trim().toLowerCase();
+    return;
+  }
   const id = ev.target.id;
   if (id === 'ed-fq' || id === 'ed-rq') { // wolni zawodnicy do kadry klubu, sędziowie
     state.ed[id === 'ed-fq' ? 'fq' : 'rq'] = ev.target.value;
@@ -399,7 +404,7 @@ app.addEventListener('keydown', (ev) => {
   // Enter w polu formularza edytora = Zapisz zmiany
   if (ev.key !== 'Enter' || state.screen !== 'editor' || !ev.target.matches?.('[data-ed-form] input')) return;
   ev.preventDefault();
-  app.querySelector('[data-act="ed-save-club"], [data-act="ed-save-player"]')?.click();
+  app.querySelector('[data-act="ed-save-club"], [data-act="ed-save-l4"], [data-act="ed-save-player"]')?.click();
 });
 
 // Trening > Sztab: pola filtrów rynku i formularza oferty (data-st-field), Esc zamyka okno zwolnienia,

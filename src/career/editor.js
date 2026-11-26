@@ -13,6 +13,8 @@
 import { CLUBS_PL } from '../data/clubs_pl.js';
 import { CLUBS_L3 } from '../data/clubs_l3.js';
 import { CLUBS_L4 } from '../data/clubs_l4.js';
+import { knownClub } from '../season/leagues.js';
+import { level6Club } from '../data/level6.js';
 import { setCrestsHidden } from '../data/clubNames.js';
 import { rivalKey, setRivalOverrides, baseRivalry, listedRivalsOf } from '../data/kibice.js';
 import { NAT_NAMES, EU } from '../data/names.js';
@@ -52,7 +54,9 @@ export const PACK_TYPE = 'ligapl27-datapack';
 //      docs/dyrektor-sportowy.md); tylko nowa rola, plik v5 wczytuje się bez zmian
 //   7  v1.23 Beta: sztab poza fizjoterapeutą i dyrektorem na skali 1-12 (q i atrybuty, docs/sztab-atrybuty.md);
 //      plik v1-v6: wartości tych ról przeliczone ze skali 1-20 (x 11/16, 17 -> 12) i przycięte do 12 (MIGRATE[6])
-export const PACK_V = 7;
+//   8  barwy (colors: 2 wymagane i do 2 opcjonalnych kolorów #RRGGBB) i pojemność (cap) klubów IV ligi i poziomu 6 obok nazwy stadionu (docs/edytor.md);
+//      tylko nowe pola, plik v7 wczytuje się bez zmian (MIGRATE[7])
+export const PACK_V = 8;
 export const PACK_V_MIN = 1;
 export const SCOUT_REG_MAX = 3; // regionów na skauta w pliku
 /** Skaut w pliku v1-v4: stare atrybuty (POT, OCU, RYN) na 5 nowych; odchylenia sieci i charakteru z imienia osoby. */
@@ -79,6 +83,7 @@ const MIGRATE = {
   4: (d) => ({ ...d, clubs: migrateScoutClubs(d.clubs) }), // wersja 5: skaut z 5 atrybutami i regionami
   5: (d) => d, // wersja 6 tylko dodaje dyrektora sportowego w sekcji staff
   6: (d) => ({ ...d, clubs: rescaleStaffClubs(d.clubs) }), // wersja 7: sztab na skali 1-12
+  7: (d) => d, // wersja 8 tylko dodaje barwy i pojemność klubów IV ligi
 };
 /** Sekcja klubów pliku v1-v6: jakość i atrybuty sztabu (poza fizjoterapeutą i dyrektorem) na skali 1-12. */
 export function rescaleStaffClubs(clubs) {
@@ -99,12 +104,13 @@ export function rescaleStaffClubs(clubs) {
 }
 export const LIMITS = {
   name: 40, short: 5, stadium: 60,
-  capMin: 500, capMax: 100000,
+  capMin: 500, capMax: 100000, capL4Min: 100, // pojemność klubu IV ligi (dane mają od 180 miejsc)
   balanceMin: -1e9, moneyMax: 1e10,
   attrMin: 1, attrMax: 20,
   ageMin: 15, ageMax: 45,
 };
-export const CLUB_FIELDS = ['name', 'short', 'stadium', 'crest', 'capacity', 'balance', 'transferBudget', 'wageBudget', 'rivals'];
+export const CLUB_FIELDS = ['name', 'short', 'stadium', 'crest', 'colors', 'cap', 'capacity', 'balance', 'transferBudget', 'wageBudget', 'rivals'];
+const V8_CLUB_FIELDS = ['colors', 'cap']; // pola klubu dodane w wersji pliku 8 (starszy plik ich nie ma: nieznane klucze są pomijane)
 export const RIVALS_MAX = 12; // rywali na klub w pliku
 export const PLAYER_FIELDS = ['first', 'last', 'nat', 'pos', 'birthDate', 'attrs', 'pot', 'alt', 'injury', 'team'];
 // Pozycje dodatkowe (p.alt: biegłość 0-90 %, jak nauka pozycji na treningu, src/engine/positions.js): bez bramki
@@ -121,8 +127,24 @@ const ATTR_KEYS = Object.keys(ATTRS);
 const known = () => [...CLUBS_PL, ...CLUBS_L3];
 // Wszystkie polskie kluby (także IV liga z rezerwami): nazwy kariery zapisane w grze (game.names)
 const allClubs = () => [...CLUBS_PL, ...CLUBS_L3, ...CLUBS_L4];
-const ORIGINAL = new Map(allClubs().map((c) => [c.id, { name: c.name, short: c.short, stadium: c.stadium ?? null }]));
+const ORIGINAL = new Map(allClubs().map((c) => [c.id, { name: c.name, short: c.short, stadium: c.stadium ?? null, colors: c.colors ? [...c.colors] : null, cap: c.cap ?? null }]));
 const clubObj = (id) => known().find((c) => c.id === id) ?? null;
+// Klub IV ligi albo poziomu 6 (bez kadry w grze): obiekt z danych (CLUBS_L4 albo klub z leagueState.extra); edytujemy tylko
+// barwy, stadion i pojemność (datapack v8). baseObj: dowolny klub z danych gry (z kadrą albo bez).
+const l4Obj = (id) => (clubObj(id) ? null : knownClub(id));
+const baseObj = (id) => clubObj(id) ?? knownClub(id);
+/** Oryginalne dane klubu: z danych gry, a dla klubu z poziomu 6 liczone z zapisu gry (leagueState.extra). */
+function originalBasics(game, id) {
+  const o = ORIGINAL.get(id);
+  if (o) return o;
+  const d = game?.leagueState?.extra?.[id];
+  if (!d) return null;
+  const c = level6Club(id, d);
+  return { name: c.name, short: c.short, stadium: c.stadium ?? null, colors: [...c.colors], cap: c.cap ?? null };
+}
+/** Oryginalne barwy, stadion i pojemność klubu IV ligi (do formularza): { colors, stadium, cap } albo null. */
+export const l4Original = (game, id) => originalBasics(game, id);
+const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
 
 /** Przywraca oryginalne nazwy, skróty i stadiony wszystkich klubów. */
 export function restoreOriginals() {
@@ -133,6 +155,8 @@ export function restoreOriginals() {
     if (!o) continue;
     c.name = o.name; c.short = o.short;
     if (o.stadium == null) delete c.stadium; else c.stadium = o.stadium;
+    if (o.colors && JSON.stringify(c.colors) !== JSON.stringify(o.colors)) c.colors = [...o.colors];
+    if (o.cap == null) delete c.cap; else c.cap = o.cap;
     delete c.crest; // własny herb tylko z datapacku gry
   }
 }
@@ -162,18 +186,29 @@ export const originalOf = (id, field) => ORIGINAL.get(id)?.[field] ?? null;
 /** Nakłada zmiany z game.editor na wspólne obiekty klubów (po przywróceniu oryginałów). Wołać przy wczytaniu gry. */
 export function applyPack(game) {
   restoreOriginals();
+  for (const id of Object.keys(game?.leagueState?.extra ?? {})) { // kluby z poziomu 6 z zapisu: oryginał z danych zapisu
+    const c = knownClub(id); const o = originalBasics(game, id);
+    if (!c || !o) continue;
+    c.colors = [...o.colors];
+    if (o.stadium == null) delete c.stadium; else c.stadium = o.stadium;
+    if (o.cap == null) delete c.cap; else c.cap = o.cap;
+  }
   applySavedNames(game);
   const E = game?.editor;
   setCrestsHidden(!!E?.packLoaded); // gra z wczytanym datapackiem: tarcze w barwach zamiast herbów
   setRivalOverrides(E?.rivals); // najwięksi rywale z edytora (data/kibice.js)
   if (!E?.clubs) return;
   for (const [id, o] of Object.entries(E.clubs)) {
-    const c = clubObj(id);
+    const c = baseObj(id);
     if (!c || !o) continue;
-    if (typeof o.name === 'string' && o.name) c.name = o.name;
-    if (typeof o.short === 'string' && o.short) c.short = o.short;
+    if (clubObj(id)) { // nazwa, skrót i herb tylko klubów z kadrą (kluby IV ligi: barwy, stadion i pojemność)
+      if (typeof o.name === 'string' && o.name) c.name = o.name;
+      if (typeof o.short === 'string' && o.short) c.short = o.short;
+      if (typeof o.crest === 'string' && CREST_RE.test(o.crest)) c.crest = o.crest;
+    }
     if (typeof o.stadium === 'string') { if (o.stadium) c.stadium = o.stadium; else delete c.stadium; }
-    if (typeof o.crest === 'string' && CREST_RE.test(o.crest)) c.crest = o.crest;
+    if (Array.isArray(o.colors) && o.colors.length >= 2 && o.colors.length <= 4 && o.colors.every((x) => typeof x === 'string' && HEX_RE.test(x))) c.colors = [...o.colors];
+    if (Number.isInteger(o.cap)) c.cap = o.cap;
   }
 }
 
@@ -233,12 +268,30 @@ export function checkClub(src, { form = false } = {}) {
       : typeof s !== 'string' || !CREST_RE.test(s) ? { err: 'Herb: obrazek WEBP, PNG albo JPG.' }
         : s.length > CREST_MAX ? { err: 'Herb: obrazek jest za duży.' } : { v: s });
   }
+  if (src.colors !== undefined) put('colors', checkColors(src.colors));
+  if (src.cap !== undefined) { // klub IV ligi; puste pole formularza albo null = wartość z danych klubu
+    put('cap', src.cap === null || (form && String(src.cap).trim() === '') ? { v: null } : num(src.cap, { label: 'Pojemność stadionu', min: LIMITS.capL4Min, max: LIMITS.capMax, form }));
+  }
   if (src.capacity !== undefined) put('capacity', num(src.capacity, { label: 'Pojemność stadionu', min: LIMITS.capMin, max: LIMITS.capMax, form }));
   if (src.balance !== undefined) put('balance', num(src.balance, { label: 'Saldo', min: LIMITS.balanceMin, max: LIMITS.moneyMax, form }));
   if (src.transferBudget !== undefined) put('transferBudget', num(src.transferBudget, { label: 'Budżet transferowy', min: 0, max: LIMITS.moneyMax, form }));
   if (src.wageBudget !== undefined) put('wageBudget', num(src.wageBudget, { label: 'Budżet płac', min: 0, max: LIMITS.moneyMax, form }));
   if (src.rivals !== undefined) put('rivals', checkRivals(src.rivals));
   return { value, errors };
+}
+
+/** Barwy klubu: dokładnie dwa kolory #RRGGBB (wielkie litery po walidacji). */
+/** Barwy klubu: 2 wymagane i do 2 opcjonalnych (3. i 4. na później w grze; puste pola pomijane). */
+function checkColors(v) {
+  if (!Array.isArray(v) || v.length < 2 || v.length > 4) return { err: 'Barwy: od 2 do 4 kolorów w formacie #RRGGBB.' };
+  const out = [];
+  for (const [i, x] of v.entries()) {
+    const s = typeof x === 'string' ? x.trim() : '';
+    if (i >= 2 && !s) continue; // barwa 3 i 4: opcjonalne
+    if (!HEX_RE.test(s)) return { err: `Barwa ${i + 1}: kolor w formacie #RRGGBB, np. #2E8A4E.` };
+    out.push(s.toUpperCase());
+  }
+  return { v: out };
 }
 
 /** Rywale klubu z pliku: { id klubu: 0-3 } (0 = bez rywalizacji), znane kluby, najwyżej RIVALS_MAX. */
@@ -383,7 +436,7 @@ function setCapacity(game, id, cap) {
  */
 export function editClub(game, id, values) {
   const c = clubObj(id);
-  if (!c) return 0;
+  if (!c) return editL4Club(game, id, values);
   const E = ensureEditor(game);
   const rec = { ...(E.clubs[id] ?? {}) };
   const cur = clubValues(game, id);
@@ -393,6 +446,7 @@ export function editClub(game, id, values) {
     if (values[k] === undefined) continue;
     const v = values[k];
     if (k === 'rivals') { for (const [o, x] of Object.entries(v)) n += editRival(game, id, o, x); continue; } // pary w game.editor.rivals
+    if (k === 'colors' || k === 'cap') { n += editDataField(c, rec, ORIGINAL.get(id), k, v); continue; } // barwy i pojemność z danych klubu
     if (STATIC.includes(k)) {
       if (v !== cur[k]) n++;
       if (k === 'stadium' || k === 'crest') { if (v) c[k] = v; else delete c[k]; } else c[k] = v;
@@ -405,6 +459,44 @@ export function editClub(game, id, values) {
     if (k === 'capacity') setCapacity(game, id, v); else F[k] = v;
     rec[k] = v;
   }
+  if (Object.keys(rec).length) E.clubs[id] = rec; else delete E.clubs[id];
+  return n;
+}
+
+/**
+ * Barwy (colors) albo pojemność z danych klubu (cap, null = wartość z danych) w obiekcie klubu i we wpisie datapacku.
+ * Wartość równa oryginałowi usuwa wpis. Zwraca 1 przy zmianie, inaczej 0.
+ */
+function editDataField(c, rec, orig, k, v) {
+  if (k === 'colors') {
+    const was = JSON.stringify(c.colors);
+    c.colors = [...v];
+    if (JSON.stringify(orig?.colors) === JSON.stringify(v)) delete rec.colors; else rec.colors = [...v];
+    return was === JSON.stringify(v) ? 0 : 1;
+  }
+  const was = c.cap ?? null;
+  const t = v ?? orig?.cap ?? null;
+  if (t == null) delete c.cap; else c.cap = t;
+  if (t === (orig?.cap ?? null)) delete rec.cap; else rec.cap = t;
+  return was === t ? 0 : 1;
+}
+
+/** Zmiana klubu IV ligi albo poziomu 6 (values po checkClub): tylko barwy, stadion i pojemność. Zwraca liczbę zmienionych pól. */
+function editL4Club(game, id, values) {
+  const c = l4Obj(id);
+  if (!c) return 0;
+  const E = ensureEditor(game);
+  const rec = { ...(E.clubs[id] ?? {}) };
+  const orig = originalBasics(game, id);
+  let n = 0;
+  if (values.colors !== undefined) n += editDataField(c, rec, orig, 'colors', values.colors);
+  if (values.stadium !== undefined) {
+    const v = values.stadium;
+    if (v !== (c.stadium ?? '')) n++;
+    if (v) c.stadium = v; else delete c.stadium;
+    if (v === (orig?.stadium ?? '')) delete rec.stadium; else rec.stadium = v;
+  }
+  if (values.cap !== undefined) n += editDataField(c, rec, orig, 'cap', values.cap);
   if (Object.keys(rec).length) E.clubs[id] = rec; else delete E.clubs[id];
   return n;
 }
@@ -787,8 +879,12 @@ export function editPlayer(game, pid, values) {
 
 /** Usuwa klub z datapacku i przywraca oryginalną nazwę, skrót i stadion (liczby w grze zostają). */
 export function resetClub(game, id) {
-  const c = clubObj(id); const o = ORIGINAL.get(id);
-  if (c && o) { c.name = o.name; c.short = o.short; if (o.stadium == null) delete c.stadium; else c.stadium = o.stadium; delete c.crest; }
+  const c = baseObj(id); const o = originalBasics(game, id);
+  if (c && o) {
+    c.name = o.name; c.short = o.short; if (o.stadium == null) delete c.stadium; else c.stadium = o.stadium; delete c.crest;
+    if (o.colors) c.colors = [...o.colors];
+    if (o.cap == null) delete c.cap; else c.cap = o.cap; // barwy i pojemność z danych (klub IV ligi)
+  }
   if (game.editor?.clubs) delete game.editor.clubs[id];
 }
 
@@ -830,6 +926,12 @@ export function exportPack(game, now = new Date(), { full = false } = {}) {
     if (ppl.coach) { const r = checkCoach(ppl.coach); if (!Object.keys(r.errors).length) value.coach = r.value; }
     if (ppl.owner) { const r = checkOwner(ppl.owner); if (!Object.keys(r.errors).length) value.owner = r.value; }
     if (ppl.staff) { const r = checkStaff(ppl.staff); if (!Object.keys(r.errors).length) value.staff = r.value; }
+    Object.assign(value, checkClub({ colors: E.clubs[id]?.colors, cap: E.clubs[id]?.cap }).value); // barwy i pojemność z danych (klub z IV ligi po awansie)
+    if (Object.keys(value).length) clubs[id] = value;
+  }
+  for (const [id, rec] of Object.entries(E.clubs)) { // kluby IV ligi i poziomu 6 (bez kadry): tylko zmienione barwy, stadion i pojemność
+    if (clubs[id] || !l4Obj(id)) continue;
+    const { value } = checkClub({ colors: rec.colors, stadium: rec.stadium, cap: rec.cap });
     if (Object.keys(value).length) clubs[id] = value;
   }
   for (const [id, p] of Object.entries(game.world?.players ?? {})) {
@@ -862,6 +964,7 @@ export function parsePack(text) {
   if (!isObj(d) || d.type !== PACK_TYPE) throw new Error('To nie jest datapack LigaPL 27 (zapis gry wczytasz z ekranu startowego).');
   if (!Number.isInteger(d.v) || d.v < PACK_V_MIN) throw new Error(`Datapack ma nieznaną wersję ${esc0(d.v)}, a gra obsługuje wersje od ${PACK_V_MIN} do ${PACK_V}.`);
   if (d.v > PACK_V) throw new Error(`Datapack ma wersję ${d.v} z nowszej gry, a ta gra obsługuje wersje od ${PACK_V_MIN} do ${PACK_V}. Zaktualizuj grę.`);
+  const fileV = d.v; // wersja pliku przed migracją (pola colors i cap klubów są od wersji 8)
   for (let v = d.v; v < PACK_V; v++) d = MIGRATE[v](d); // starszy plik: migracja do bieżącej wersji
   if (d.seed !== undefined && d.seed !== null && !Number.isFinite(d.seed)) throw new Error('Datapack: nieprawidłowe ziarno świata.');
   if (d.clubs !== undefined && !isObj(d.clubs)) throw new Error('Datapack: sekcja klubów ma zły format.');
@@ -869,7 +972,7 @@ export function parsePack(text) {
   const clubs = {}; const players = {};
   for (const [id, o] of Object.entries(d.clubs ?? {})) {
     if (!ID_RE.test(id) || !isObj(o)) throw new Error('Datapack: zły wpis klubu.');
-    const src = Object.fromEntries(CLUB_FIELDS.filter((k) => o[k] !== undefined).map((k) => [k, o[k]]));
+    const src = Object.fromEntries(CLUB_FIELDS.filter((k) => o[k] !== undefined && (fileV >= 8 || !V8_CLUB_FIELDS.includes(k))).map((k) => [k, o[k]]));
     const r = checkClub(src);
     const bad = Object.values(r.errors)[0];
     if (bad) throw new Error(`Klub ${id}: ${bad}`);
@@ -930,7 +1033,7 @@ export function importPack(game, pack) {
   const out = { clubs: 0, clubsSkipped: 0, players: 0, playersSkipped: 0, otherWorld: false };
   ensureEditor(game).packLoaded = true; setCrestsHidden(true); // od wczytania pliku: tarcze w barwach zamiast herbów
   for (const [id, v] of Object.entries(pack.clubs)) {
-    if (!clubObj(id)) { out.clubsSkipped++; continue; }
+    if (!baseObj(id)) { out.clubsSkipped++; continue; }
     editClub(game, id, v); out.clubs++;
     if (v.coach) editCoach(game, id, v.coach);
     if (v.owner) editOwner(game, id, v.owner);

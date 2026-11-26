@@ -94,6 +94,9 @@
 .ed-crest { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
 .ed-crest input[type="file"] { min-width: 0; max-width: 100%; }
 .ed-fld { margin-bottom: var(--space-3); min-width: 0; }
+.ed-color { display: flex; gap: var(--space-2); align-items: center; }
+.ed-fld .ed-color__pick { flex: none; width: 56px; padding: 3px; cursor: pointer; }
+.ed-color input[type="text"] { flex: 1 1 auto; min-width: 0; font-family: var(--font-display); letter-spacing: .04em; text-transform: uppercase; }
 .ed-fld__l { display: block; margin-bottom: 4px; font: 700 var(--step-0)/1.2 var(--font-display); }
 .ed-fld input, .ed-fld select { min-height: var(--tap); font-size: var(--step-0); border: 2px solid var(--line); border-radius: var(--radius-s); background: var(--bg); color: var(--text); padding: 0 var(--space-3); width: 100%; }
 .ed-fld input:focus-visible, .ed-fld select:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; border-color: var(--text); }

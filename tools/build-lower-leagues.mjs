@@ -40,7 +40,7 @@ const COLOR = [
 ];
 function colorsOf(words) {
   const hex = words.split('-').map((w) => COLOR.find(([re]) => re.test(w.toLowerCase()))?.[1]).filter(Boolean);
-  if (hex.length >= 2) return hex.slice(0, 2);
+  if (hex.length >= 2) return hex.slice(0, 3); // 3. barwa z listy właściciela: opcjonalna, gra na razie jej nie używa
   return hex.length ? [hex[0], hex[0] === '#FFFFFF' ? '#111111' : '#FFFFFF'] : ['#2E8A4E', '#FFFFFF'];
 }
 function parseOwner(text) {

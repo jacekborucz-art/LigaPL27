@@ -29,6 +29,14 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 26, 2026, profil A (komputer domowy), edytor: kluby IV ligi i barwy 3-4 (v1.25 Beta)
+Zrobione (wdrożenie Sonnet medium, barwy 3-4: ja; sprawdzone):
+- Edytor: filtr „IV liga” (kluby 16 grup, w karierze z IV ligą też awansowane z poziomu 6), formularz tylko barwy, stadion,
+  pojemność (`editL4Club`, `checkColors`, `l4Form`), zapis w `game.editor.clubs[id] = { colors?, stadium?, cap? }`,
+  datapack wersja 8 (`PACK_V` 8, `MIGRATE[7]`), stare paczki bez zmian. Test `tests/editorL4.test.mjs`.
+- Barwy: 2 wymagane i 2 opcjonalne (3. i 4. na później, gra ich jeszcze nie używa); generator bierze 3. barwę z list
+  właściciela (III i IV liga, 126 klubów z 3 barwami).
+
 ## Nov 26, 2026, profil A (komputer domowy), IV liga: potwierdzone nazwy 6 klubów (v1.25 Beta)
 Zrobione: `RENAME4` i `ALIAS4` w `tools/build-lower-leagues.mjs` (identyfikatory bez zmian); barwy wszystkich 276 klubów,
 stadiony 57. KP Piast Iłowa, Radomyślanka Radomyśl Wielki, Iskierka Śmierdnica, GKS Leśnik Manowo.

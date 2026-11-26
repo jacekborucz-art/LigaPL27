@@ -10,6 +10,7 @@ Kod: `src/career/editor.js` (logika, walidacja, datapack), `src/ui/editorView.js
 2. Kliknij **Edytor**. Okno się zamyka, otwiera się pełny ekran edytora. **Wróć do gry** (albo Escape) wraca do gry.
 3. Zakładki:
    - **Kluby**: lista klubów z kadrą w grze, filtr ligi (Ekstraklasa, 1 Liga, 2 Liga, Wszystkie) i wyszukiwarka. Kliknięcie klubu otwiera formularz: nazwa, nazwa skrócona, nazwa stadionu, pojemność stadionu, saldo, budżet transferowy, budżet płac (tygodniowo). Pod formularzem kadra klubu; kliknięcie zawodnika otwiera jego formularz w tym samym oknie (przycisk „Wróć do klubu”).
+   - **Kluby, IV liga**: osobny filtr „IV liga” z klubami IV ligi (276 klubów z danych, w karierze z IV ligą aktualny skład 16 grup razem z klubami z poziomu 6 po awansie; opis wiersza „IV liga, grupa dolnośląska”, wyszukiwanie po nazwie, skrócie i mieście). Te kluby nie mają kadry w grze, więc formularz ma tylko: dwie barwy (wybór koloru i pole #RRGGBB), nazwę stadionu i pojemność stadionu, plus Zapisz zmiany i Przywróć oryginał. Nazwy, tarczy, finansów, kadry, ludzi i rywali tych klubów nie zmienisz. Zakres: [Klub IV ligi](#klub-iv-ligi-nov-26-2026).
    - **Zawodnicy**: wyszukiwanie po imieniu i nazwisku, filtr klubu i pozycji, najwyżej 100 wyników (od najwyższego OVR). Formularz: imię, nazwisko, narodowość, pozycja, data urodzenia, wszystkie atrybuty 1-20 w grupach jak w grze (techniczne, mentalne, fizyczne, bramkarskie) i potencjał (ukryty POT, 1-20, z dokładnością do 0,1).
    - **Datapack**: liczba zmienionych klubów i zawodników, eksport do pliku, wczytanie pliku, wyczyszczenie datapacku.
 4. **Zapisz zmiany** stosuje formularz w grze i zapisuje grę w slocie. Enter w polu formularza działa tak samo.
@@ -23,7 +24,8 @@ Na PC lista jest po lewej, formularz po prawej. Na telefonie jedna kolumna: list
 | Nazwa klubu | od 2 do 40 znaków |
 | Nazwa skrócona | od 2 do 5 liter lub cyfr |
 | Nazwa stadionu | do 60 znaków, puste pole = brak nazwy |
-| Pojemność stadionu | liczba całkowita od 500 do 100 000 |
+| Pojemność stadionu | liczba całkowita od 500 do 100 000 (klub IV ligi: od 100 do 100 000, puste pole = wartość z danych) |
+| Barwy klubu IV ligi | 2 wymagane i 2 opcjonalne kolory #RRGGBB (barwa 3 i 4 na później w grze, puste pomijane; wielkość liter bez znaczenia, zapis wielkimi) |
 | Saldo | liczba całkowita od -1 000 000 000 do 10 000 000 000 zł |
 | Budżety (transferowy, płac) | liczba całkowita od 0 do 10 000 000 000 zł |
 | Imię, nazwisko | od 1 do 40 znaków |
@@ -44,6 +46,17 @@ W polach liczbowych formularza można pisać spacje (np. `25 000`). Wszystkie te
 Liczby (finanse, pojemność, atrybuty) są częścią zapisu gry, więc ustawia się je raz: przy edycji albo imporcie.
 
 **Przywróć oryginał** (klub): wracają nazwa, skrót i stadion z danych gry, klub znika z datapacku; finanse i pojemność zostają takie, jak teraz. **Usuń z datapacku** (zawodnik): wpis znika, dane zawodnika w grze zostają. **Wyczyść datapack**: to samo dla wszystkich wpisów.
+
+## Klub IV ligi (Nov 26, 2026)
+
+Edytor zmienia dane klubów IV ligi (poziom 5, `src/data/clubs_l4.js`) i klubów poziomu 6, które awansowały do IV ligi w karierze (`game.leagueState.extra`, docs/iv-liga.md), ale tylko trzy pola:
+- `colors`: 2 wymagane kolory (`#RRGGBB`), które czytają tarcze (`src/ui/crest.js`) i koszulki, oraz do 2 opcjonalnych (barwa 3 i 4: miejsce na później, gra ich jeszcze nie używa; 3. barwa z listy właściciela w danych III i IV ligi);
+- `stadium`: nazwa stadionu (do 60 znaków, puste pole = bez nazwy), pokazywana w karcie klubu IV ligi;
+- `cap`: pojemność (100 do 100 000), czytana przez dane finansowe klubu po awansie do III ligi (`clubFinanceData`) i w karcie klubu. Pole klubu z kadrą `capacity` to osobna sprawa (infrastruktura).
+
+Zapis: `game.editor.clubs[id] = { colors?, stadium?, cap? }` (tylko pola różne od danych gry; wartość równa oryginałowi usuwa wpis). `applyPack` (przy każdym wczytaniu gry) przywraca oryginały (`ORIGINAL` pamięta też barwy i pojemność; klub z poziomu 6 liczy oryginał z `leagueState.extra`, bo obiekt jest tworzony od nowa przy każdym wczytaniu) i nakłada zmiany z `game.editor`. Klub z IV ligi, który awansuje do III ligi, zachowuje barwy, stadion i pojemność z datapacku.
+Przywróć oryginał (`resetClub`) usuwa wpis i przywraca barwy, stadion i pojemność z danych gry. Kod: `editL4Club` i `checkColors` w `src/career/editor.js`, formularz `l4Form` i lista `editorL4Clubs` w `src/ui/editorView.js`. Testy: `tests/editorL4.test.mjs`.
+Import: klub poziomu 6 spoza zapisu (np. z innej kariery) jest pomijany jako nieznany.
 
 ## Format datapacku
 
@@ -100,6 +113,8 @@ Eksport zawsze zapisuje najnowszą wersję i numer wersji gry (pole `game`, np. 
 | 5 | v1.20 Beta | skaut z 5 atrybutami (`DOS`, `OCE`, `RYN`, `SIE`, `CHA` zamiast `POT`, `OCU`, `RYN`) i regionami (`reg`: { region: 1-20 }, najwyżej 3, docs/skauting.md); `MIGRATE[4]` przelicza stare atrybuty skauta (jakość bez zmian), datapack zapisany w grze tak samo |
 | 6 | v1.23 Beta | dyrektor sportowy w sekcji `staff` (rola `dyrektor`, najwyżej 1 osoba, atrybuty `NEG`, `RYN`, `SIE`, `KAD` 1-20, docs/dyrektor-sportowy.md); klub z wakatem dostaje nową osobę z pliku; plik v5 wczytuje się bez zmian, plik v6 w starszej grze: komunikat o nowszej wersji |
 | 7 | v1.23 Beta | sztab poza fizjoterapeutą i dyrektorem na skali 1-12 (`q` i atrybuty, docs/sztab-atrybuty.md, rozdział „Skala 1-12”); pliki v1-v6: wartości tych ról przeliczone ze skali 1-20 (x 11/16, 17 -> 12) i przycięte do 12 przy wczytaniu; plik v7 w starszej grze: komunikat o nowszej wersji |
+| 8 | Nov 26, 2026 | barwy (`colors`: 2-4 kolory #RRGGBB, 3. i 4. opcjonalne) i pojemność (`cap`, 100-100 000, `null` = z danych) klubów IV ligi i poziomu 6 obok nazwy stadionu (rozdział „Klub IV ligi”); tylko nowe pola, migracja z wersji 7 bez zmian; plik v8 w starszej grze: komunikat o nowszej wersji |
+- Wersja 8 (barwy i pojemność klubów IV ligi) nie wymaga migracji (`MIGRATE[7]`): plik v1-v7 wczytuje się jak dotąd, bez zmian w IV lidze.
 - Nieznane klucze są pomijane. Zła wartość znanego pola (typ albo zakres jak w tabeli walidacji; liczby muszą być liczbami JSON) odrzuca cały plik z nazwą klubu lub zawodnika i pola.
 - Kluby: stosowane zawsze (identyfikatory klubów są wspólne dla wszystkich gier), nieznane identyfikatory pomijane.
 - Akademia: zawodnik od 19 lat na miejscu juniora (`<klub>-a1` ... `-a7`) po wczytaniu przechodzi do pierwszej drużyny (kontrakt rynkowy: 3 lata, 30+ 2 lata, 33+ rok), a przy pełnej kadrze (32) do wolnych (`fixAcademyAges` w `src/career/editor.js`). Kontrola `tools/check-datapack.mjs` ostrzega o takich wpisach.

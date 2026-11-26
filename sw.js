@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-4feafbfba2';
+const VERSION = 'v0.3-026d4940f2';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -186,7 +186,7 @@ const FILES = [
   ['./assets/icons/icon-512.png', '61fa2b9926'],
   ['./assets/icons/icon-maskable-512.png', '61fa2b9926'],
   ['./assets/icons/icon.svg', '59f03f0390'],
-  ['./src/app.js', 'ff9cabb4dd'],
+  ['./src/app.js', '9ff5069198'],
   ['./src/career/academy.js', '6429b69237'],
   ['./src/career/acclimatization.js', '3cd6d72f9f'],
   ['./src/career/arrears.js', '9a8dec4193'],
@@ -205,7 +205,7 @@ const FILES = [
   ['./src/career/contractBonus.js', '29055a6dd7'],
   ['./src/career/director.js', 'be4c4ed468'],
   ['./src/career/directorRotation.js', '29b75d0168'],
-  ['./src/career/editor.js', '5269b2dddd'],
+  ['./src/career/editor.js', 'cc47294169'],
   ['./src/career/fans.js', '329e0cfdc9'],
   ['./src/career/fansSystem.js', 'ced36b7dd1'],
   ['./src/career/finance.js', '193fda4c14'],
@@ -283,8 +283,8 @@ const FILES = [
   ['./src/data/V liga PL/v_liga_wielkopolskie.txt', 'edc97fdf8d'],
   ['./src/data/attributes.js', '892bf10066'],
   ['./src/data/clubNames.js', '3a995fdbee'],
-  ['./src/data/clubs_l3.js', 'd3a2685877'],
-  ['./src/data/clubs_l4.js', '527f712e9e'],
+  ['./src/data/clubs_l3.js', '3bcab58db7'],
+  ['./src/data/clubs_l4.js', '255847041f'],
   ['./src/data/clubs_pl.js', 'bcc933599e'],
   ['./src/data/finanse_klubow.js', '6d44dc85bb'],
   ['./src/data/formations.js', 'fdc9ab1756'],
@@ -353,7 +353,7 @@ const FILES = [
   ['./src/styles/club.css', '6615e08e49'],
   ['./src/styles/contextmenu.css', '55d14f38c2'],
   ['./src/styles/dashboard.css', 'e950cf99bc'],
-  ['./src/styles/editor.css', '769ecc0bb5'],
+  ['./src/styles/editor.css', 'c159dd4e0b'],
   ['./src/styles/fonts.css', '372f3ee1fc'],
   ['./src/styles/history.css', '6e342b15ec'],
   ['./src/styles/kariera.css', 'bda96390ca'],
@@ -395,7 +395,7 @@ const FILES = [
   ['./src/ui/crest.js', '58e767edc7'],
   ['./src/ui/daySpeed.js', '73d29c5b52'],
   ['./src/ui/dom.js', '0ce16300f6'],
-  ['./src/ui/editorView.js', '064fa44db2'],
+  ['./src/ui/editorView.js', 'df67950e1b'],
   ['./src/ui/europeView.js', '50817d42cc'],
   ['./src/ui/fixturesView.js', '8ad243c712'],
   ['./src/ui/formChart.js', '12324f252e'],

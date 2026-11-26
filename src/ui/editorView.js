@@ -4,6 +4,9 @@
 
 import { CLUBS_PL, LEAGUE_NAMES, leagueLabel } from '../data/clubs_pl.js';
 import { CLUBS_L3 } from '../data/clubs_l3.js';
+import { CLUBS_L4 } from '../data/clubs_l4.js';
+import { VOIV } from '../data/voivodeships.js';
+import { knownClub, voivOfClub } from '../season/leagues.js';
 import { ATTRS, ATTR_GROUPS, POS_NAMES } from '../data/attributes.js';
 import { NAT_NAMES } from '../data/names.js';
 import { GROUP } from '../career/squad.js';
@@ -16,7 +19,7 @@ import {
   packCounts, originalOf, peopleValues, checkCoach, checkOwner, checkStaff, editCoach, editOwner, editStaff,
   OWNER_LABELS, PERSON_AGE, ALT_MAX, ALT_POSITIONS,
   EDIT_SQUAD, squadSize, releaseBlock, releaseToFree, joinFromFree, freeAgents, checkNewPlayer, createFreePlayer, NEW_LEVEL,
-  REF_LIMITS, refValues, checkReferee, editReferee, INJURY_LIST, INJ_DAYS_MAX, rivalsOf, editRival, RIVALS_MAX,
+  REF_LIMITS, refValues, checkReferee, editReferee, INJURY_LIST, INJ_DAYS_MAX, rivalsOf, editRival, RIVALS_MAX, l4Original,
 } from '../career/editor.js';
 import { REF_ATTRS } from '../career/referees.js';
 import { proficiency } from '../engine/positions.js';
@@ -44,14 +47,29 @@ export function editorClubs(game) {
     .sort((a, b) => (a.tier ?? 9) - (b.tier ?? 9) || CLUBS_PL.indexOf(a) - CLUBS_PL.indexOf(b));
 }
 
+/**
+ * Kluby IV ligi do edycji barw, stadionu i pojemności (docs/edytor.md): skład grup z game.season.l4 (razem z klubami
+ * z poziomu 6 po awansie), bez IV ligi w sezonie (stare zapisy, testy) kluby z danych IV ligi (CLUBS_L4) na poziomie 5.
+ * Kolejność: województwa jak w grze, w grupie alfabetycznie.
+ */
+export function editorL4Clubs(game) {
+  const L = game.season?.l4;
+  const list = L ? L.groups.flatMap((G) => G.ids).map((id) => knownClub(id)) : CLUBS_L4.filter((c) => c.tier === 5);
+  const order = Object.keys(VOIV);
+  return list.filter(Boolean).sort((a, b) => order.indexOf(voivOfClub(a)) - order.indexOf(voivOfClub(b)) || String(a.name).localeCompare(String(b.name), 'pl'));
+}
+/** Opis ligi klubu IV ligi: „IV liga, grupa dolnośląska”. */
+const l4Label = (c) => `IV liga, grupa ${VOIV[voivOfClub(c)]?.name ?? '?'}`;
+
 // ------------------------------------------------------------ Listy
 export function clubListHtml(game, ed) {
   const q = fold(ed.q);
-  const all = editorClubs(game);
-  const rows = all.filter((c) => (ed.tier === 'all' || c.tier === ed.tier) && (!q || fold(c.name).includes(q) || fold(c.short).includes(q)));
+  const l4 = ed.tier === 5;
+  const all = l4 ? editorL4Clubs(game) : editorClubs(game);
+  const rows = all.filter((c) => (l4 || ed.tier === 'all' || c.tier === ed.tier) && (!q || fold(c.name).includes(q) || fold(c.short).includes(q) || (l4 && fold(c.city).includes(q))));
   if (!rows.length) return '<p class="ed-empty">Brak klubów dla tego filtra.</p>';
-  return `<ul class="ed-list">${rows.map((c) => `<li><button class="ed-row" data-act="ed-club" data-id="${esc(c.id)}" aria-current="${ed.club === c.id ? 'true' : 'false'}">
-    ${crest(c, 24)}<span class="ed-row__main"><b>${esc(c.name)}</b><small>${esc(leagueOf(c))}${game.editor?.clubs?.[c.id] ? ', zmieniony' : ''}</small></span></button></li>`).join('')}</ul>`;
+  return `${l4 ? `<p class="ed-count">${q ? `Znaleziono: ${rows.length}.` : `Kluby IV ligi: ${rows.length}. Zmienisz tylko barwy, stadion i pojemność.`}</p>` : ''}<ul class="ed-list">${rows.map((c) => `<li><button class="ed-row" data-act="ed-club" data-id="${esc(c.id)}" aria-current="${ed.club === c.id ? 'true' : 'false'}">
+    ${crest(c, 24)}<span class="ed-row__main"><b>${esc(c.name)}</b><small>${esc(l4 ? l4Label(c) : leagueOf(c))}${game.editor?.clubs?.[c.id] ? ', zmieniony' : ''}</small></span></button></li>`).join('')}</ul>`;
 }
 
 /** Wyniki wyszukiwania zawodników (najwyżej LIST_CAP, od najwyższego OVR). */
@@ -178,9 +196,41 @@ const textIn = (id, v, { max, num = false, err = '' } = {}) => `<input id="${id}
 const msgHtml = (ed) => (ed.msg ? `<p class="ed-msg${ed.errors ? ' is-bad' : ''}" role="status">${esc(ed.msg)}</p>` : '');
 const draftFor = (ed, key) => (ed.draft?.key === key ? ed.draft.v : null);
 
+/** Formularz klubu IV ligi (bez kadry): dwie barwy, nazwa stadionu i pojemność (datapack v8). */
+const hexOr = (x, d) => (/^#[0-9a-fA-F]{6}$/.test(String(x ?? '').trim()) ? String(x).trim().toLowerCase() : d);
+function l4Form(game, ed, id, c) {
+  const orig = l4Original(game, id);
+  const d = draftFor(ed, `l4:${id}`); const e = d ? ed.errors ?? {} : {};
+  const v = d ?? { colors: [...(c.colors ?? [])], stadium: c.stadium ?? '', cap: c.cap ?? '' };
+  const inPack = !!game.editor?.clubs?.[id];
+  const colorFld = (n) => {
+    const t = String(v.colors?.[n - 1] ?? '');
+    return `<div class="fld ed-fld"><label class="ed-fld__l" for="ed-l4-c${n}t">Barwa ${n}</label>
+      <div class="ed-color"><input id="ed-l4-c${n}" class="ed-color__pick" type="color" data-ed-color="${n}" value="${esc(hexOr(t, '#000000'))}" aria-label="Wybierz barwę ${n}">
+      <input id="ed-l4-c${n}t" type="text" data-ed-color="${n}" value="${esc(t.toUpperCase())}" maxlength="7" autocomplete="off" spellcheck="false"${e.colors ? ' aria-invalid="true" aria-describedby="ed-l4-colors-err"' : ''}></div>
+      ${n === 1 ? '<p class="fld__help">Kolor w formacie #RRGGBB. Pierwsza barwa to główny kolor koszulek i tarczy.</p>' : n === 2 ? '<p class="fld__help">Druga barwa: drugi kolor koszulek i tarczy.</p>' : '<p class="fld__help">Opcjonalna, gra na razie jej nie używa. Puste pole: brak.</p>'}</div>`;
+  };
+  const nCap = orig?.cap ? orig.cap.toLocaleString('pl-PL') : '';
+  return `<div class="ed-form" data-ed-form="l4">
+    <div class="ed-form__top"><button class="btn btn--quiet btn--sm ed-close" data-act="ed-close">Wróć do listy</button></div>
+    <header class="ed-form__head">${crest(c, 44)}<div><h2 id="ed-title" tabindex="-1">${esc(c.name)}</h2><p class="muted">${esc(l4Label(c))}${c.city ? `, ${esc(c.city)}` : ''}</p></div></header>
+    ${msgHtml(ed)}${e.colors ? `<p class="ed-msg is-bad" id="ed-l4-colors-err">${esc(e.colors)}</p>` : ''}
+    <div class="ed-grid">
+      ${colorFld(1)}${colorFld(2)}${colorFld(3)}${colorFld(4)}
+      ${field('ed-l4-stadium', 'Nazwa stadionu', textIn('ed-l4-stadium', v.stadium, { max: LIMITS.stadium, err: e.stadium }), { err: e.stadium, help: orig?.stadium && orig.stadium !== v.stadium ? `Oryginał: ${esc(orig.stadium)}` : 'Puste pole: boisko klubu bez nazwy.' })}
+      ${field('ed-l4-cap', 'Pojemność stadionu', textIn('ed-l4-cap', v.cap, { num: true, err: e.cap }), { err: e.cap, help: `Od ${LIMITS.capL4Min.toLocaleString('pl-PL')} do ${LIMITS.capMax.toLocaleString('pl-PL')} miejsc. Puste pole: ${nCap ? `wartość z danych (${nCap})` : 'brak danych o pojemności'}.` })}
+    </div>
+    <div class="ed-actions">
+      <button class="btn btn--primary" data-act="ed-save-l4" data-id="${esc(id)}">Zapisz zmiany</button>
+      ${inPack ? `<button class="btn btn--quiet" data-act="ed-reset-l4" data-id="${esc(id)}">Przywróć oryginał</button>` : ''}
+    </div>
+    <p class="ed-note">Dla klubów IV ligi edytor zmienia tylko barwy, stadion i pojemność. Barwy widać na tarczy i w koszulkach, stadion i pojemność w karcie klubu oraz po awansie do III ligi. Zmiany trafiają do datapacku.${inPack ? ' Przywróć oryginał: wracają barwy, stadion i pojemność z danych gry.' : ''}</p>
+  </div>`;
+}
+
 function clubForm(game, ed, id) {
   const c = clubObj(id);
-  if (!c) return '<p class="ed-empty">Nie ma takiego klubu.</p>';
+  if (!c) { const l = knownClub(id); return l ? l4Form(game, ed, id, l) : '<p class="ed-empty">Nie ma takiego klubu.</p>'; }
   const cur = clubValues(game, id);
   const v = draftFor(ed, `club:${id}`) ?? cur;
   const e = ed.draft?.key === `club:${id}` ? ed.errors ?? {} : {};
@@ -407,7 +457,7 @@ export function renderEditor(game, ed) {
   const tabs = `<div class="ed-tabs" role="tablist" aria-label="Edytor">${TABS.map(([k, l]) => `<button class="ed-tab" role="tab" data-act="ed-tab" data-tab="${k}" aria-selected="${ed.tab === k}">${esc(l)}</button>`).join('')}</div>`;
   let list = ''; let form = ''; let sel = false;
   if (ed.tab === 'clubs') {
-    const tiers = [[1, LEAGUE_NAMES[1]], [2, LEAGUE_NAMES[2]], [3, LEAGUE_NAMES[3]], [4, LEAGUE_NAMES[4]], ['all', 'Wszystkie']];
+    const tiers = [[1, LEAGUE_NAMES[1]], [2, LEAGUE_NAMES[2]], [3, LEAGUE_NAMES[3]], [4, LEAGUE_NAMES[4]], [5, 'IV liga'], ['all', 'Wszystkie']];
     list = `<div class="ed-filters">
       <div class="chips chips--sm chips--wrap" role="group" aria-label="Liga">${tiers.map(([t, l]) => `<button class="chip" data-act="ed-tier" data-t="${t}" aria-pressed="${ed.tier === t}">${esc(l)}</button>`).join('')}</div>
       <input class="ed-search" id="ed-q" type="search" placeholder="Szukaj klubu" aria-label="Szukaj klubu" value="${esc(ed.q)}" autocomplete="off"></div>
@@ -496,6 +546,16 @@ export function handleEditorAction(game, ed, act, data, root) {
     ed.errors = null; ed.draft = null; ed.msg = changed(n);
     return { save: n > 0 };
   }
+  if (act === 'ed-save-l4') { // klub IV ligi: barwy, stadion, pojemność
+    const id = data.id;
+    const raw = { colors: [val(root, 'ed-l4-c1t'), val(root, 'ed-l4-c2t'), val(root, 'ed-l4-c3t'), val(root, 'ed-l4-c4t')], stadium: val(root, 'ed-l4-stadium'), cap: val(root, 'ed-l4-cap') };
+    const r = checkClub(raw, { form: true });
+    if (Object.keys(r.errors).length) { ed.errors = r.errors; ed.draft = { key: `l4:${id}`, v: raw }; ed.msg = 'Popraw zaznaczone pola.'; return { focus: '[aria-invalid="true"]' }; }
+    const n = editClub(game, id, r.value);
+    ed.errors = null; ed.draft = null; ed.msg = changed(n);
+    return { save: n > 0 };
+  }
+  if (act === 'ed-reset-l4') { resetClub(game, data.id); clearMsg(); ed.msg = 'Przywrócono oryginalne barwy, stadion i pojemność klubu.'; return { save: true }; }
   if (act === 'ed-save-player') {
     const pid = data.id;
     const raw = readPlayerForm(root);
