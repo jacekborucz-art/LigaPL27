@@ -4,8 +4,10 @@ Stan: Nov 14, 2026. Od tej wersji III liga jest grywalna: 72 kluby w 4 grupach p
 trenerów, infrastrukturę, kibiców i cele zarządu. Można zacząć karierę w klubie III ligi, a klub gracza po spadku
 z 2 Ligi zostaje w grze. Liczby oznaczone [SZAC] to założenia do kalibracji.
 
-Numeracja poziomów w kodzie: Ekstraklasa 1, 1 Liga 2, 2 Liga 3, III liga 4, IV liga 5 (IV liga nie jest prowadzona,
-jej kluby grają tylko w Pucharze Polski z kadrą losowaną na mecz).
+Numeracja poziomów w kodzie: Ekstraklasa 1, 1 Liga 2, 2 Liga 3, III liga 4, IV liga 5, poziom 6 (V liga albo klasa
+okręgowa). W karierach rozpoczętych od Nov 26, 2026 IV liga gra 16 grup wojewódzkich bez kadr (wyniki, tabele, baraże,
+awanse i spadki: `docs/iv-liga.md`). W starszych zapisach IV liga nie jest prowadzona, jej kluby grają tylko w Pucharze
+Polski z kadrą losowaną na mecz.
 
 ## Dane
 
@@ -46,7 +48,10 @@ jej kluby grają tylko w Pucharze Polski z kadrą losowaną na mecz).
 3. Z 2 Ligi spadają miejsca 15-18 i przegrani baraży. Spadkowicz trafia do grupy swojego województwa i zachowuje
    kadrę oraz finanse (pensje obniżone klauzulą spadkową).
 4. Spadek do IV ligi: co najmniej miejsca 15-18 każdej grupy, a więcej, gdy grupa przyjmuje więcej spadkowiczów
-   z 2 Ligi (reguła zmienna PZPN). Każda grupa przyjmuje z IV ligi 4 kluby (po jednym z województwa, wybór z wagi
+   z 2 Ligi (reguła zmienna PZPN). Kariera z IV ligą (`docs/iv-liga.md`): z IV ligi awansuje zawsze 4 mistrzów
+   województw grupy, 5. miejsce dla zwycięzcy baraży IV ligi, dalsze wolne miejsca to utrzymanie najlepszych
+   spadkowiczów; za mało miejsc: spadają też 14. i 13. drużyna. Spadkowicz trafia do grupy IV ligi swojego
+   województwa. Stary zapis: każda grupa przyjmuje z IV ligi 4 kluby (po jednym z województwa, wybór z wagi
    klubu z losowością), a gdy po spadkach brakuje drużyn, więcej. Grupa liczy zawsze 18 drużyn.
 5. Kluby spadające do IV ligi tracą kadrę: zawodnicy poniżej 33 lat z OVR od 7 trafiają do wolnych, reszta znika.
    Klub gracza zostaje z kadrą do czasu zmiany pracy (gracz jest zwalniany i wybiera nowy klub).
@@ -54,8 +59,9 @@ jej kluby grają tylko w Pucharze Polski z kadrą losowaną na mecz).
 7. Kontrola po sezonie (`validateTiers`): po 18 klubów w ligach 1-3 i w każdej grupie III ligi, rezerwy niżej niż
    pierwsza drużyna i najwyżej w 2 Lidze.
 
-Uproszczenia: brak baraży o awans do III ligi między mistrzami IV ligi; liczba beniaminków z IV ligi na grupę jest
-stała (4), a nie zależna od podziału na województwa w danym sezonie. Grupa III ligi beniaminka z 2 Ligi wynika
+Uproszczenia (tylko stare zapisy bez IV ligi; w karierach z IV ligą nie obowiązują, `docs/iv-liga.md`): brak baraży
+o awans do III ligi między wicemistrzami IV ligi; liczba beniaminków z IV ligi na grupę jest stała (4), a nie zależna
+od podziału na województwa w danym sezonie. Grupa III ligi beniaminka z 2 Ligi wynika
 z regionu klubu w danych gry (`l3GroupFor`).
 
 ## Puchar Polski

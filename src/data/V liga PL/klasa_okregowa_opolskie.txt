@@ -1,0 +1,55 @@
+KLASA OKRĘGOWA - WOJEWÓDZTWO OPOLSKIE (OPOLSKI ZPN) - SEZON 2026/2027
+============================================================
+
+UWAGA: W województwie opolskim nie ma V ligi.
+Bezposrednio pod IV liga funkcjonuje klasa okręgowa.
+Plik obejmuje 2 grupy: opolska I i opolska II.
+
+FORMAT: nazwa druzyny | barwy | stadion | pojemnosc
+
+ZASADY UZUPELNIANIA BRAKUJACYCH DANYCH:
+- jesli nie udalo sie zweryfikowac barw: bialo-czerwono-czarne
+- jesli nie udalo sie zweryfikowac nazwy stadionu: stadion miejski
+- jesli nie udalo sie zweryfikowac pojemnosci: 1200
+
+Zrodlo list druzyn: 90minut.pl
+
+GRUPA OPOLSKA I
+----------------------------------------
+KS Krasiejów | bialo-czerwono-czarne | stadion miejski | 1200
+Źródło Krośnica | bialo-czerwono-czarne | stadion miejski | 1200
+Orzeł Źlinice | bialo-czerwono-czarne | stadion miejski | 1200
+TOR Dobrzeń Wielki | bialo-czerwono-czarne | stadion miejski | 1200
+Stal II Brzeg | bialo-czerwono-czarne | stadion miejski | 1200
+OKS Olesno | bialo-czerwono-czarne | stadion miejski | 1200
+Skalnik Gracze | bialo-czerwono-czarne | stadion miejski | 1200
+LZS Ligota Turawska | bialo-czerwono-czarne | stadion miejski | 1200
+LZS Mechnice | bialo-czerwono-czarne | stadion miejski | 1200
+Żubry Smarchowice Śląskie | bialo-czerwono-czarne | stadion miejski | 1200
+Chrząszcz Chrząszczyce | bialo-czerwono-czarne | stadion miejski | 1200
+Start Jełowa | bialo-czerwono-czarne | stadion miejski | 1200
+LZS Kuniów | bialo-czerwono-czarne | stadion miejski | 1200
+Motor Praszka | bialo-czerwono-czarne | stadion miejski | 1200
+Swornica Czarnowąsy | bialo-czerwono-czarne | stadion miejski | 1200
+Piast Strzelce Opolskie | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA OPOLSKA II
+----------------------------------------
+GKS Grodków | bialo-czerwono-czarne | stadion miejski | 1200
+Orzeł Branice | bialo-czerwono-czarne | stadion miejski | 1200
+Pogoń Prudnik | bialo-czerwono-czarne | stadion miejski | 1200
+Polonia Głubczyce | bialo-czerwono-czarne | stadion miejski | 1200
+Czarni Otmuchów | bialo-czerwono-czarne | stadion miejski | 1200
+Orzeł Reńska Wieś | bialo-czerwono-czarne | stadion miejski | 1200
+Union Ujazd | bialo-czerwono-czarne | stadion miejski | 1200
+KS Twardawa | bialo-czerwono-czarne | stadion miejski | 1200
+LZS Racławiczki | bialo-czerwono-czarne | stadion miejski | 1200
+Chemik Kędzierzyn-Koźle | bialo-czerwono-czarne | stadion miejski | 1200
+LZS II Starowice Dolne | bialo-czerwono-czarne | stadion miejski | 1200
+Unia Krapkowice | bialo-czerwono-czarne | stadion miejski | 1200
+Polonia Prószków | bialo-czerwono-czarne | stadion miejski | 1200
+GKS Głuchołazy | bialo-czerwono-czarne | stadion miejski | 1200
+LZS Raszowa | bialo-czerwono-czarne | stadion miejski | 1200
+KS Cisowa (Kędzierzyn-Koźle) | bialo-czerwono-czarne | stadion miejski | 1200
+
+Łącznie uwzględniono 32 drużyn w 2 grupach klasy okręgowej.

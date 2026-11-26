@@ -1,0 +1,94 @@
+KLASA OKRĘGOWA - WOJEWÓDZTWO DOLNOŚLĄSKIE - SEZON 2026/2027
+============================================================
+
+UWAGA: W województwie dolnośląskim nie ma V ligi.
+Bezposrednio pod IV liga funkcjonuje klasa okręgowa.
+Plik obejmuje WSZYSTKIE 4 grupy: Jelenia Góra, Legnica,
+Wałbrzych i Wrocław.
+
+FORMAT: nazwa druzyny | barwy | stadion | pojemnosc
+
+ZASADY UZUPELNIANIA BRAKUJACYCH DANYCH:
+- jesli nie udalo sie zweryfikowac barw: bialo-czerwono-czarne
+- jesli nie udalo sie zweryfikowac nazwy stadionu: stadion miejski
+- jesli nie udalo sie zweryfikowac pojemnosci: 1200
+
+Zrodlo list druzyn: 90minut.pl
+
+GRUPA JELENIA GÓRA
+----------------------------------------
+Twardy Świętoszów | bialo-czerwono-czarne | stadion miejski | 1200
+Apis Jędrzychowice | bialo-czerwono-czarne | stadion miejski | 1200
+Victoria Jelenia Góra | bialo-czerwono-czarne | stadion miejski | 1200
+KS Łomnica | bialo-czerwono-czarne | stadion miejski | 1200
+BKS Bobrzanie Bolesławiec | bialo-czerwono-czarne | stadion miejski | 1200
+Olimpia Kamienna Góra | bialo-czerwono-czarne | stadion miejski | 1200
+Orzeł Wojcieszów | bialo-czerwono-czarne | stadion miejski | 1200
+Łużyce Lubań | bialo-czerwono-czarne | stadion miejski | 1200
+Włókniarz Mirsk | bialo-czerwono-czarne | stadion miejski | 1200
+Włókniarz Leśna | bialo-czerwono-czarne | stadion miejski | 1200
+Chrobry Nowogrodziec | bialo-czerwono-czarne | stadion miejski | 1200
+Nysa Zgorzelec | bialo-czerwono-czarne | stadion miejski | 1200
+LZS Kościelnik | bialo-czerwono-czarne | stadion miejski | 1200
+Olimpia Kowary | bialo-czerwono-czarne | stadion miejski | 1200
+Górnik Węgliniec | bialo-czerwono-czarne | stadion miejski | 1200
+Stella Lubomierz | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA LEGNICA
+----------------------------------------
+Jaworzanka 1946 Jawor | bialo-czerwono-czarne | stadion miejski | 1200
+Sparta Grębocice | bialo-czerwono-czarne | stadion miejski | 1200
+Iskra Kochlice | bialo-czerwono-czarne | stadion miejski | 1200
+Górnik II Polkowice | bialo-czerwono-czarne | stadion miejski | 1200
+Sparta Rudna | bialo-czerwono-czarne | stadion miejski | 1200
+Sokół Jerzmanowa | bialo-czerwono-czarne | stadion miejski | 1200
+Unia Szklary Górne | bialo-czerwono-czarne | stadion miejski | 1200
+Chojnowianka Chojnów | bialo-czerwono-czarne | stadion miejski | 1200
+Gwardia Białołęka | bialo-czerwono-czarne | stadion miejski | 1200
+Wilkowianka Wilków | bialo-czerwono-czarne | stadion miejski | 1200
+Zryw Kłębanowice | bialo-czerwono-czarne | stadion miejski | 1200
+GKS Męcinka | bialo-czerwono-czarne | stadion miejski | 1200
+LZS Komorniki (k. Polkowic) | bialo-czerwono-czarne | stadion miejski | 1200
+Pogoń Góra | bialo-czerwono-czarne | stadion miejski | 1200
+Stal Chocianów | bialo-czerwono-czarne | stadion miejski | 1200
+Konfeks Legnica | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA WAŁBRZYCH
+----------------------------------------
+Bielawianka Bielawa | bialo-czerwono-czarne | stadion miejski | 1200
+Górnik Wałbrzych | bialo-czerwono-czarne | stadion miejski | 1200
+Górnik Nowe Miasto Wałbrzych | bialo-czerwono-czarne | stadion miejski | 1200
+Zamek Kamieniec Ząbkowicki | bialo-czerwono-czarne | stadion miejski | 1200
+Zdrój Jedlina Zdrój | bialo-czerwono-czarne | stadion miejski | 1200
+Zjednoczeni Żarów | bialo-czerwono-czarne | stadion miejski | 1200
+LKS Bystrzyca Górna | bialo-czerwono-czarne | stadion miejski | 1200
+Skałki Stolec | bialo-czerwono-czarne | stadion miejski | 1200
+Sparta Ziębice | bialo-czerwono-czarne | stadion miejski | 1200
+MKS Szczawno Zdrój | bialo-czerwono-czarne | stadion miejski | 1200
+Nysa Kłodzko | bialo-czerwono-czarne | stadion miejski | 1200
+Zieloni Mokrzeszów | bialo-czerwono-czarne | stadion miejski | 1200
+Lechia II Dzierżoniów | bialo-czerwono-czarne | stadion miejski | 1200
+Szczyt Boguszów-Gorce | bialo-czerwono-czarne | stadion miejski | 1200
+Włókniarz Głuszyca | bialo-czerwono-czarne | stadion miejski | 1200
+Delta Słupice | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA WROCŁAW
+----------------------------------------
+Barycz II Sułów | bialo-czerwono-czarne | stadion miejski | 1200
+Orzeł Pawłowice (Wrocław) | bialo-czerwono-czarne | stadion miejski | 1200
+Rokita 1946 Brzeg Dolny | bialo-czerwono-czarne | stadion miejski | 1200
+KS Żórawina | bialo-czerwono-czarne | stadion miejski | 1200
+Piast II Żmigród | bialo-czerwono-czarne | stadion miejski | 1200
+ZKS Polar Wrocław | bialo-czerwono-czarne | stadion miejski | 1200
+Parasol Wrocław | bialo-czerwono-czarne | stadion miejski | 1200
+Zenit Międzybórz | bialo-czerwono-czarne | stadion miejski | 1200
+Strzelinianka Strzelin | bialo-czerwono-czarne | stadion miejski | 1200
+Orzeł Marszowice | bialo-czerwono-czarne | stadion miejski | 1200
+Błysk Kuźniczysko | bialo-czerwono-czarne | stadion miejski | 1200
+Piast Żerniki (Wrocław) | bialo-czerwono-czarne | stadion miejski | 1200
+Polonia Trzebnica | bialo-czerwono-czarne | stadion miejski | 1200
+MKP Wołów | bialo-czerwono-czarne | stadion miejski | 1200
+KS Łozina | bialo-czerwono-czarne | stadion miejski | 1200
+Zorza Wilkszyn | bialo-czerwono-czarne | stadion miejski | 1200
+
+Łącznie uwzględniono 64 drużyn we wszystkich 4 grupach klasy okręgowej.

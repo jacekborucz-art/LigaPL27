@@ -7,6 +7,7 @@
 import { Rng, clamp } from '../core/rng.js';
 import { clubById } from '../data/clubs_pl.js';
 import { CLUBS_L4 } from '../data/clubs_l4.js';
+import { REGION_WOJ } from '../data/voivodeships.js';
 import { NATIONALITIES, randomName } from '../data/names.js';
 import { SEASON, SEASON_YEAR } from '../config/calendar2026.js';
 import { standings } from '../season/standings.js';
@@ -36,27 +37,7 @@ export const WOJ = {
 };
 const WOJ_KEYS = Object.keys(WOJ);
 
-/** Region klubu (pole `region` w danych klubów lig 1-4) -> województwo. Kluby IV ligi mają własne pole `voiv`. */
-const REGION_WOJ = {
-  warszawa: 'mazowiecka', poznan: 'wielkopolska', czestochowa: 'slaska', bialystok: 'podlaska', lodz: 'lodzka',
-  szczecin: 'zachodniopomorska', krakow: 'malopolska', slask: 'slaska', wroclaw: 'dolnoslaska', 'dolny-slask': 'dolnoslaska',
-  lublin: 'lubelska', kielce: 'swietokrzyska', radom: 'mazowiecka', plock: 'mazowiecka', trojmiasto: 'pomorska',
-  podkarpacie: 'podkarpacka', malopolska: 'malopolska', rzeszow: 'podkarpacka', bielsko: 'slaska', opole: 'opolska',
-  mazowsze: 'mazowiecka', lodzkie: 'lodzka', bydgoszcz: 'kujawsko-pomorska', pomorze: 'pomorska', kujawy: 'kujawsko-pomorska',
-  lubuskie: 'lubuska', wielkopolska: 'wielkopolska', suwalki: 'podlaska', 'minsk-mazowiecki': 'mazowiecka',
-  'nowy-dwor-mazowiecki': 'mazowiecka', sieradz: 'lodzka', zabki: 'mazowiecka', lowicz: 'lodzka', zambrow: 'podlaska',
-  elblag: 'warminsko-mazurska', 'lidzbark-warminski': 'warminsko-mazurska', 'tomaszow-mazowiecki': 'lodzka', mlawa: 'mazowiecka',
-  troszyn: 'mazowiecka', lomza: 'podlaska', 'sroda-wielkopolska': 'wielkopolska', stargard: 'zachodniopomorska', luzino: 'pomorska',
-  swiecie: 'kujawsko-pomorska', swarzedz: 'wielkopolska', koszalin: 'zachodniopomorska', czarnkow: 'wielkopolska',
-  kalisz: 'wielkopolska', torun: 'kujawsko-pomorska', gdansk: 'pomorska', 'nowy-staw': 'pomorska', swinoujscie: 'zachodniopomorska',
-  steszew: 'wielkopolska', wrzesnia: 'wielkopolska', kornik: 'wielkopolska', sosnowiec: 'slaska', katowice: 'slaska',
-  'bytom-odrzanski': 'lubuska', lubin: 'dolnoslaska', rybnik: 'slaska', legnica: 'dolnoslaska', 'jelenia-gora': 'dolnoslaska',
-  kluczbork: 'opolska', polkowice: 'dolnoslaska', sulow: 'dolnoslaska', 'goczalkowice-zdroj': 'slaska', brzeg: 'opolska',
-  'gorzow-wielkopolski': 'lubuska', gubin: 'lubuska', nysa: 'opolska', chelm: 'lubelska', 'ostrowiec-swietokrzyski': 'swietokrzyska',
-  zamosc: 'lubelska', debica: 'podkarpacka', polaniec: 'swietokrzyska', jedrzejow: 'swietokrzyska', skawina: 'malopolska',
-  starachowice: 'swietokrzyska', tarnobrzeg: 'podkarpacka', jaroslaw: 'podkarpacka', 'busko-zdroj': 'swietokrzyska',
-  'kolbuszowa-dolna': 'podkarpacka', 'biala-podlaska': 'lubelska', morawica: 'swietokrzyska', lubaczow: 'podkarpacka',
-};
+// Region klubu -> województwo: REGION_WOJ w src/data/voivodeships.js (wspólne z IV ligą)
 
 /** Nazwiska prawdziwych sędziów: bez nich w puli (sędziowie są fikcyjni). */
 export const REAL_REF_SURNAMES = new Set([

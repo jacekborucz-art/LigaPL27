@@ -29,6 +29,20 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 26, 2026, profil A (komputer domowy), IV liga, etap 1: podgląd 16 grup (v1.25 Beta)
+Zrobione (architekt Opus high; wdrożenie Opus high; sprawdzone):
+- Nowa kariera: 16 grup IV ligi (14/16/18 drużyn) read only w `game.season.l4` (wyniki z siły, Poisson; ok. 76 ms na sezon,
+  25 KB zapisu), terminarz na siatce III ligi, baraże wicemistrzów w makroregionach (9 i 13 czerwca), prawdziwe awanse
+  (4 mistrzów zawsze, 5. miejsce dla zwycięzcy baraży, reszta przez utrzymania/dodatkowe spadki; III liga zawsze 72),
+  spadki do właściwego województwa (`src/data/voivodeships.js`), poziom 6 („V liga” albo „klasa okręgowa”) z plików
+  właściciela `src/data/V liga PL/*.txt` czytanych przy starcie (`src/data/level6.js`, offline w sw.js); beniaminek w
+  `leagueState.extra`. Zakładka Rozgrywki, IV liga (Tabela, Kolejki, Baraże, karta klubu bez zawodników), 2 listy na sezon,
+  archiwum mistrzów i ruchów. Stare zapisy bez IV ligi (jak dawniej). Barwy 270 klubów i 56 stadionów z listy właściciela.
+- Kod: `src/season/fourthLeague.js`, `src/ui/fourthLeagueView.js`; opis `docs/iv-liga.md`; test `tests/fourthLeague.test.mjs`.
+Zostało / dalej:
+- etap 2 (grywalna grupa, przejęcie klubu z IV ligi) do dyskusji z właścicielem; 6 nazw z listy bez dopasowania
+  (GKS/Cement Raciborowice, KP Piast Iłowa, Termalica II, Radomyślanka, Iskierka, Manowo) do potwierdzenia.
+
 ## Nov 26, 2026, profil A (komputer domowy), kluby AI: sprzedaż w długach, stałe dopłaty z rzadkimi tarapatami (v1.25 Beta)
 Zrobione (decyzje właściciela):
 - `distressSale` w `src/career/arrears.js`: klub AI w zaległościach wystawia co miesiąc do 2 najdroższych zawodników taniej

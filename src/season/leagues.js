@@ -1,5 +1,7 @@
 // Przynależność klubów do lig w kolejnych sezonach (etap 10, PLAN 6; grywalna III liga: docs/iii-liga.md).
-// Stan: game.leagueState = { year, tiers: { id: 1..5 }, groups: { id: grupa III ligi 1-4 } }.
+// Stan: game.leagueState = { year, tiers: { id: 1..6 }, groups: { id: grupa III ligi 1-4 }, extra: { id: klub z poziomu 6 } }.
+// Poziom 6 (V liga albo klasa okręgowa) istnieje tylko w karierach z IV ligą (docs/iv-liga.md): kluby IV ligi po spadku
+// i beniaminkowie z plików właściciela (src/data/level6.js), zapisani w extra po pierwszym awansie do IV ligi.
 // Obiekty klubów (CLUBS_PL z III ligą, CLUBS_L4) są współdzielone przez całą grę, więc applyLeagueState() ustawia im
 // pola tier i group zgodnie z zapisem gry (i przywraca stan początkowy dla nowej gry). Lista CLUBS_PL zawiera po
 // tym kluby lig 1-4 (ze stałymi kadrami); kluby IV ligi (tier 5) są poza nią i grają tylko w Pucharze Polski.
@@ -8,6 +10,8 @@ import { Rng, clamp } from '../core/rng.js';
 import { CLUBS_PL, touchClubs, clubById } from '../data/clubs_pl.js';
 import { CLUBS_L4 } from '../data/clubs_l4.js';
 import { RESERVES, L3_GROUPS } from '../config/competitions.js';
+import { VOIVODESHIPS, VOIV, voivOfData } from '../data/voivodeships.js';
+import { level6Club, level6SaveData, level6Candidates } from '../data/level6.js';
 
 const BASE = CLUBS_PL.slice(); // 54 kluby lig 1-3 i 72 kluby III ligi (clubs_pl.js)
 const BASE_IDS = new Set(BASE.map((c) => c.id));
@@ -18,6 +22,19 @@ for (const c of ALL) {
   if (!('group0' in c)) c.group0 = c.group ?? null;
 }
 export const knownClub = (id) => KNOWN.get(id) ?? null;
+// Kluby z poziomu 6 z zapisu gry (leagueState.extra): dopisane do ALL i KNOWN, usuwane przy wczytaniu innej gry
+const EXTRA = new Set();
+function addExtra(id, data) {
+  if (KNOWN.has(id)) return KNOWN.get(id);
+  const c = level6Club(id, data);
+  ALL.push(c); KNOWN.set(id, c); EXTRA.add(id);
+  return c;
+}
+function registerExtras(S) {
+  if (EXTRA.size) { for (let i = ALL.length - 1; i >= 0; i--) if (EXTRA.has(ALL[i].id)) { KNOWN.delete(ALL[i].id); ALL.splice(i, 1); } EXTRA.clear(); }
+  for (const [id, d] of Object.entries(S?.extra ?? {})) addExtra(id, d);
+}
+const NAMES = () => new Set(ALL.map((c) => c.name.toLowerCase()));
 
 // Grupa III ligi według województwa klubu (regiony z clubs_pl.js; kluby z III i IV ligi mają grupę w danych).
 const REGION_GROUP = {
@@ -35,6 +52,7 @@ export function l3GroupFor(club) {
 }
 
 export function applyLeagueState(game) {
+  registerExtras(game?.leagueState); // kluby z poziomu 6 z zapisu (albo żadne: nowa gra, stary zapis)
   // Powrót do stanu początkowego
   for (const c of ALL) { c.tier = c.tier0; if (c.group0 == null) delete c.group; else c.group = c.group0; delete c.dyn; }
   const S = game?.leagueState;
@@ -64,6 +82,17 @@ export function reserveMayPlayIn(reserveTier, parentTier) {
 const VOIVS = (() => { const m = {}; for (const c of CLUBS_L4) (m[c.l3group] ??= new Set()).add(c.voiv); return Object.fromEntries(Object.entries(m).map(([g, s]) => [g, [...s].sort()])); })();
 const hash = (s) => { let h = 7; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; };
 const voivOf = (c, g) => c.voiv ?? VOIVS[g][hash(c.id) % VOIVS[g].length];
+/** Województwo klubu (grupa IV ligi): pole voiv, region klubu lig 1-4 (src/data/voivodeships.js), w ostateczności stałe z id. */
+export function voivOfClub(c) {
+  if (!c) return null;
+  return voivOfData(c) ?? voivOf(c, l3GroupFor(c));
+}
+/** Kluby IV ligi (poziom 5) według województw: { voiv: [id...] } w kolejności danych (po applyLeagueState). */
+export function fourthLeagueMembers() {
+  const out = Object.fromEntries(VOIVODESHIPS.map((v) => [v.key, []]));
+  for (const c of ALL) if (c.tier === 5) (out[voivOfClub(c)] ??= []).push(c.id);
+  return out;
+}
 
 /**
  * Ruchy między ligami po sezonie.
@@ -73,9 +102,13 @@ const voivOf = (c, g) => c.voiv ?? VOIVS[g][hash(c.id) % VOIVS[g].length];
  * opts.semis: pary półfinałów do symulacji (domyślnie losowanie).
  * opts.licence: kluby bez licencji { id: o ile klas niżej (1-2) } (src/career/arrears.js): klub na końcu tabeli swojej
  * ligi (spada zamiast ostatniego sportowo, nie awansuje); 2 klasy: dalej o klasę, a najlepszy spadkowicz tej ligi zostaje.
- * Zwraca { tiers: { id: nowa liga 1-5 }, groups: { id: grupa III ligi }, promoted, relegated, l3Up, l3Runners, l3Playoff, notes }.
+ * opts.l4: IV liga z wynikami (kariery z IV ligą, docs/iv-liga.md) { tables: { voiv: [id...] }, playoff: { 1..4: { w, ru } }, seed }:
+ * do III ligi 4 mistrzów województw na grupę, zwycięzca baraży przy wolnym miejscu, skład grup IV ligi i poziom 6.
+ * Bez l4 (stare zapisy, testy): dotychczasowe uzupełnienie III ligi losowaniem z wagi.
+ * Zwraca { tiers: { id: nowa liga 1-6 }, groups: { id: grupa III ligi }, promoted, relegated, l3Up, l3Runners, l3Playoff, notes }
+ * oraz z l4: { l4Up, l4Playoff, l4Down, l4In, l4Short, extra }.
  */
-export function computeMoves(tables, playoffWinners, groupTables, rng, { l3Playoff = null, licence = null } = {}) {
+export function computeMoves(tables, playoffWinners, groupTables, rng, { l3Playoff = null, licence = null, l4 = null } = {}) {
   const lic = Object.entries(licence ?? {}).filter(([, n]) => n > 0);
   if (lic.length) {
     tables = { ...tables };
@@ -170,7 +203,7 @@ export function computeMoves(tables, playoffWinners, groupTables, rng, { l3Playo
 
   // Skład grup III ligi na nowy sezon: spadkowicze z 2 Ligi do grupy swojego województwa, spadek do IV ligi co najmniej
   // z miejsc 15-18 i więcej, gdy grupa przyjmuje więcej spadkowiczów; uzupełnienie do 18 z IV ligi (4 województwa grupy)
-  if (groupsIn.length) {
+  if (groupsIn.length && !l4) {
     const PROMO_IV = 4; // beniaminkowie z IV ligi na grupę (zwycięzcy grup wojewódzkich) [uproszczenie]
     const thisDown = new Set();
     for (const g of groupsIn) {
@@ -202,7 +235,114 @@ export function computeMoves(tables, playoffWinners, groupTables, rng, { l3Playo
       }
     }
   }
-  return { tiers: tier, groups: group, promoted, relegated, l3Up: winners, l3Runners: runners, l3Playoff: po, notes };
+  const l4out = groupsIn.length && l4 ? fourthLeagueMoves({ groupsIn, groupTables, tier, group, promoted, relegated, notes, l4, rng, parentOf }) : null;
+  return { tiers: tier, groups: group, promoted, relegated, l3Up: winners, l3Runners: runners, l3Playoff: po, notes, ...(l4out ?? {}) };
+}
+
+/**
+ * Kariera z IV ligą (docs/iv-liga.md, rozdz. 4): skład grup III ligi i IV ligi na nowy sezon.
+ * III liga, każda grupa g: spadek co najmniej z miejsc 15-18; wolne miejsca = 18 - zostający - spadkowicze z 2 Ligi.
+ * Zawsze 4 mistrzów województw (za mało miejsc: spadają też 14., potem 13.), piąte miejsce dla zwycięzcy baraży
+ * makroregionu, kolejne: utrzymanie najlepszych spadkowiczów (15., potem 16.). III liga ma zawsze 72 kluby.
+ * IV liga, każde województwo: spadek do poziomu 6 co najmniej minDown + nadwyżka spadkowiczów z III ligi nad awansami,
+ * rezerwy niżej niż pierwsza drużyna (przeniesienie administracyjne liczy się jako spadek), beniaminkowie z poziomu 6
+ * do docelowego rozmiaru grupy (losowanie z wagi); pusta pula: utrzymanie najlepszych spadkowiczów.
+ */
+function fourthLeagueMoves({ groupsIn, groupTables, tier, group, promoted, relegated, notes, l4, rng, parentOf }) {
+  const tierNow = (id) => tier[id] ?? KNOWN.get(id)?.tier ?? 6;
+  const ok4 = (id) => { const p = parentOf(id); return !p || reserveMayPlayIn(4, tierNow(p)); };
+  const tables = l4.tables ?? {};
+  const inL4 = new Set(Object.values(tables).flat());
+  const l4Up = []; const l4Playoff = [];
+  // ---- III liga
+  for (const g of groupsIn) {
+    const table = groupTables[g];
+    const stay = table.filter((id) => tier[id] === 4);
+    const inG = Object.keys(tier).filter((id) => tier[id] === 4 && group[id] == null && l3GroupFor(KNOWN.get(id)) === g);
+    const bottom = new Set(table.slice(14));
+    const kept = stay.filter((id) => !bottom.has(id));
+    const down = stay.filter((id) => bottom.has(id)); // 15. miejsce pierwsze
+    let seats = 18 - kept.length - inG.length;
+    while (seats < 4 && kept.length) { down.unshift(kept.pop()); seats++; } // za mało miejsc: spadają 14., potem 13.
+    const voivs = VOIVODESHIPS.filter((v) => v.l3group === g).map((v) => v.key);
+    const champs = voivs.map((v) => (tables[v] ?? []).find((id) => tier[id] == null && ok4(id))).filter(Boolean);
+    const ins = [];
+    for (const id of champs) if (seats > 0) { ins.push(id); l4Up.push(id); seats--; }
+    const P = l4.playoff?.[g];
+    if (P?.w) {
+      const up = seats > 0 && tier[P.w] == null && !ins.includes(P.w) && ok4(P.w);
+      if (up) { ins.push(P.w); seats--; }
+      l4Playoff.push({ g, id: P.w, up });
+    }
+    // Województwo bez uprawnionego mistrza: finalista baraży
+    if (champs.length < voivs.length && seats > 0 && P?.ru && tier[P.ru] == null && !ins.includes(P.ru) && ok4(P.ru)) { ins.push(P.ru); seats--; }
+    while (seats > 0 && down.length) { const id = down.shift(); kept.push(id); seats--; notes.push({ id, kind: 'reprieve', tier: 4 }); }
+    // Ostatecznie (praktycznie nie występuje): kolejne uprawnione kluby z tabel województw makroregionu
+    for (let k = 0; seats > 0 && k < 20; k++) {
+      for (const v of voivs) {
+        const id = (tables[v] ?? []).find((x) => tier[x] == null && ok4(x) && !ins.includes(x));
+        if (id && seats > 0) { ins.push(id); seats--; }
+      }
+    }
+    for (const id of down) { tier[id] = 5; relegated[5].push(id); }
+    for (const id of [...kept, ...inG]) group[id] = g;
+    for (const id of ins) { tier[id] = 4; group[id] = g; promoted[4].push(id); }
+  }
+  // ---- IV liga i poziom 6
+  const l4Down = {}; const l4In = {}; const l4Short = {}; const extra = {};
+  const names = NAMES();
+  const down6 = new Set();
+  const parentTier = (id) => { const p = parentOf(id); if (!p) return null; if (down6.has(p)) return 6; return tier[p] ?? (inL4.has(p) ? 5 : KNOWN.get(p)?.tier ?? 1); };
+  const reserveOk5 = (id) => { const pt = parentTier(id); return pt == null || reserveMayPlayIn(5, pt); };
+  for (const v of VOIVODESHIPS) {
+    const table = tables[v.key] ?? [];
+    const up = table.filter((id) => tier[id] != null && tier[id] <= 4);
+    let stay = table.filter((id) => tier[id] == null || tier[id] >= 5);
+    let incoming = Object.keys(tier).filter((id) => tier[id] === 5 && !inL4.has(id) && voivOfClub(KNOWN.get(id)) === v.key);
+    // Rezerwy, których pierwsza drużyna gra w IV lidze albo niżej: przeniesienie administracyjne na poziom 6
+    const forced = [...stay, ...incoming].filter((id) => !reserveOk5(id));
+    stay = stay.filter((id) => !forced.includes(id)); incoming = incoming.filter((id) => !forced.includes(id));
+    for (const id of forced) notes.push({ id, kind: 'reserve', from: 5, to: 6 });
+    const need = v.minDown + Math.max(0, incoming.length - up.length);
+    const sport = [];
+    for (let k = Math.max(0, need - forced.length); k > 0 && stay.length; k--) sport.unshift(stay.pop()); // najwyższe miejsce pierwsze
+    for (const id of [...forced, ...sport]) down6.add(id);
+    let n = stay.length + incoming.length;
+    while (n > v.size && stay.length) { const id = stay.pop(); sport.unshift(id); down6.add(id); n--; }
+    // Beniaminkowie z poziomu 6: spadkowicze z IV ligi z wcześniejszych sezonów i kluby z pliku właściciela
+    let want = v.size - n;
+    const pool = ALL.filter((c) => c.tier === 6 && tier[c.id] == null && !down6.has(c.id) && voivOfClub(c) === v.key && reserveOk5(c.id))
+      .map((c) => ({ id: c.id, w: c.weight ?? 1 }));
+    for (const e of level6Candidates(v.key, l4.seed ?? 0, (id, nm) => KNOWN.has(id) || names.has(nm.toLowerCase()))) pool.push({ id: e.id, w: level6SaveData(e, v.key).w, e });
+    const ups = [];
+    while (want > 0 && pool.length) {
+      const x = rng.weighted(pool, (c) => c.w ** 2.2);
+      pool.splice(pool.indexOf(x), 1);
+      if (x.e) { extra[x.id] = level6SaveData(x.e, v.key); addExtra(x.id, extra[x.id]); names.add(x.e.name.toLowerCase()); }
+      tier[x.id] = 5; ups.push(x.id); want--;
+    }
+    // Pusta pula: utrzymanie najlepszych spadkowiczów sportowych tego sezonu
+    while (want > 0 && sport.length) { const id = sport.shift(); down6.delete(id); stay.push(id); want--; notes.push({ id, kind: 'reprieve', tier: 5 }); }
+    if (want > 0) l4Short[v.key] = v.size - want;
+    const downs = [...forced, ...sport];
+    for (const id of downs) tier[id] = 6;
+    for (const id of [...stay, ...incoming]) tier[id] = 5;
+    l4Down[v.key] = downs; l4In[v.key] = ups;
+  }
+  // Rezerwy, których pierwsza drużyna spadła na poziom 6 w tym samym sezonie (rzadkie): też na poziom 6
+  for (const v of VOIVODESHIPS) {
+    for (const id of Object.keys(tier).filter((x) => tier[x] === 5 && voivOfClub(KNOWN.get(x)) === v.key && !reserveOk5(x))) {
+      tier[id] = 6; l4Down[v.key].push(id); notes.push({ id, kind: 'reserve', from: 5, to: 6 });
+    }
+  }
+  return { l4Up, l4Playoff, l4Down, l4In, l4Short, extra };
+}
+
+/** Rozmiary grup IV ligi po zmianach (tiers: pełna mapa poziomów albo odstępstwa od danych): { voiv: liczba klubów }. */
+export function fourthLeagueSizes(tiers) {
+  const out = Object.fromEntries(VOIVODESHIPS.map((v) => [v.key, 0]));
+  for (const c of ALL) if ((tiers[c.id] ?? c.tier0) === 5) out[voivOfClub(c)] = (out[voivOfClub(c)] ?? 0) + 1;
+  return out;
 }
 
 /** Kontrola po zmianach: po 18 klubów w ligach 1-3 i w każdej grupie III ligi, rezerwy niżej niż pierwsza drużyna i najwyżej w 2 Lidze. */

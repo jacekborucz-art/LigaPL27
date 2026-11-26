@@ -50,6 +50,7 @@ import { ensureUefaCoef } from './season/uefaCoef.js';
 import { ensureNational, ensureIntl } from './season/nationalSystem.js';
 import { applySeasonState } from './season/rollover.js';
 import { ensureThirdLeague } from './season/thirdLeague.js';
+import { loadLevel6 } from './data/level6.js'; // pula poziomu 6 (IV liga, docs/iv-liga.md): pliki z src/data/V liga PL
 import { ensureTraining, trainingMatchInput, teamCohesion } from './training/index.js';
 import { cancelShortFriendlies } from './training/friendlies.js';
 import { renderTraining, handleTrainingAction, isTrainingAction } from './ui/trainingView.js';
@@ -662,7 +663,7 @@ function renderTab(tab, g, club) {
     return withCard(renderTransfers(g, state));
   }
   if (tab === 'klub') return renderClubHub(g, state);
-  if (tab === 'rozgrywki') return renderCompetitions(g, { comp: state.cComp ?? compOfClub(club) ?? 'ekstraklasa', view: state.cView, round: state.cRound, filter: state.uFilter, draw: state.uDraw, rank: state.uRank, rankCc: state.uRankCc, rankAll: state.uRankAll });
+  if (tab === 'rozgrywki') return renderCompetitions(g, { comp: state.cComp ?? compOfClub(club) ?? 'ekstraklasa', view: state.cView, round: state.cRound, filter: state.uFilter, draw: state.uDraw, rank: state.uRank, rankCc: state.uRankCc, rankAll: state.uRankAll, l4Voiv: state.l4Voiv, l4Club: state.l4Club });
   if (tab === 'kadra') {
     if (state.ma) return renderMatchAnalysis(g, state.ma); // analiza meczu albo archiwum (Skład i taktyka, Analizy meczów)
     // Rezerwy: podzakładka tylko w klubie z grywalnymi rezerwami (po zmianie klubu powrót do „Zawodnicy”)
@@ -1269,6 +1270,7 @@ async function playMyMatch() {
 // ---------- Upływ dni ----------
 async function runDays() {
   const g = state.game;
+  if (g.season?.l4) await loadLevel6(); // IV liga: pula beniaminków z plików przed końcem sezonu (raz, potem z pamięci)
   state.running = true;
   renderHub();
   const squadKey = () => (g.world?.clubs?.[g.clubId]?.squad ?? []).join(',');
@@ -1654,7 +1656,8 @@ async function newGame(slot, clubId, profile = null) {
   };
   // Profil trenera: tylko w zapisie gry na tym urządzeniu (gra nie wysyła danych do sieci)
   if (profile) game.manager = { profile };
-  game.season = createSeason(seed, { playerClub: clubId });
+  await loadLevel6(); // IV liga i poziom 6: pliki właściciela wczytane raz na start kariery
+  game.season = createSeason(seed, { playerClub: clubId, l4Seed: seed }); // nowa kariera: IV liga z wynikami (docs/iv-liga.md)
   game.fixtures = game.season.fixtures;
   game.world = generateWorld(seed);
   game.names = clubNamesSnapshot(); // nazwy klubów kariery (zapis i plik JSON), niezależne od przyszłych zmian nazw w grze
@@ -2032,7 +2035,8 @@ async function dispatchAct(el, { root = app } = {}) {
     if (act === 'stop') state.running = false;
     if (act === 'playnow') await playMyMatch();
     if (act === 'resultdone') { state.screen = 'hub'; state.tab = 'pulpit'; render(); }
-    if (act === 'ccomp') { state.cComp = el.dataset.c; state.cRound = null; state.uDraw = null; render(); }
+    if (act === 'ccomp') { state.cComp = el.dataset.c; state.cRound = null; state.uDraw = null; state.l4Club = null; render(); }
+    if (act === 'l4club') { state.l4Club = el.dataset.club || null; render(); if (state.l4Club) app.querySelector('.l4-card')?.scrollIntoView({ block: 'nearest' }); } // IV liga: prosta karta klubu
     if (act === 'ufilter') { state.uFilter = el.dataset.f; render(); }
     if (act === 'urank') { state.uRank = el.dataset.k; render(); }
     if (act === 'urankall') { state.uRankAll = true; render(); }
@@ -2271,6 +2275,12 @@ app.addEventListener('focusout', (ev) => {
   setFieldError(app, k, state.nc.errors[k]);
 });
 app.addEventListener('change', (ev) => {
+  if (ev.target.id !== 'l4-voiv' || !state.game) return;
+  state.l4Voiv = ev.target.value; state.l4Club = null; state.cRound = null;
+  render();
+  app.querySelector('#l4-voiv')?.focus({ preventScroll: true });
+});
+app.addEventListener('change', (ev) => {
   if (ev.target.id !== 'nc-nat' || !state.nc || !isNationality(ev.target.value)) return;
   state.nc.nat = ev.target.value;
   updateCoachPreview(app, state.nc);
@@ -2393,6 +2403,7 @@ try {
 } catch { /* bez pamięci przeglądarki */ }
 
 applyTheme(state.theme);
+loadLevel6().catch(() => {}); // IV liga: pliki poziomu 6 w tle od startu (nowa kariera i pętla dni czekają na nie)
 Promise.resolve(render()).then(() => {
   document.body.dataset.ready = '1';
   if (loadAfterReload) { dispatchAct({ dataset: { act: 'load', slot: loadAfterReload } }); return; }

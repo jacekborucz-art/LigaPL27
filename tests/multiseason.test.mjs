@@ -12,13 +12,15 @@ import { runDecision } from '../src/core/decisions.js';
 import { SEASON, SEASON_YEAR, DOMESTIC } from '../src/config/calendar2026.js';
 import { computeMoves, validateTiers, reserveMayPlayIn } from '../src/season/leagues.js';
 import { applySeasonState } from '../src/season/rollover.js';
+import { loadLevel6 } from '../src/data/level6.js';
+import { VOIVODESHIPS } from '../src/data/voivodeships.js';
 import '../src/season/dailySystems.js';
 
-function newGame(clubId, seed) {
+function newGame(clubId, seed, { l4 = false } = {}) {
   applySeasonState({});
   const g = { seed, clubId, date: '2026-07-01', season: '2026/27', inbox: [] };
   g.world = generateWorld(seed);
-  g.season = createSeason(seed, { playerClub: clubId });
+  g.season = createSeason(seed, { playerClub: clubId, ...(l4 ? { l4Seed: seed } : {}) }); // l4: kariera z IV ligą (docs/iv-liga.md)
   g.fixtures = g.season.fixtures;
   g.tactics = createTactics(squadOf(g.world, clubId), { benchSize: 12 });
   ensureCareer(g);
@@ -39,8 +41,9 @@ function playTo(g, until, onSeason) {
   }
 }
 
-test('Trzy sezony: ligi po 18 klubów, reguły rezerw, kadry i finanse w normie, kalendarz kolejnych lat', () => {
-  const g = newGame('widzew', 31);
+test('Trzy sezony: ligi po 18 klubów, reguły rezerw, kadry i finanse w normie, kalendarz kolejnych lat, IV liga', async () => {
+  await loadLevel6(); // pula poziomu 6 (src/data/V liga PL)
+  const g = newGame('widzew', 31, { l4: true });
   const checks = [];
   playTo(g, '2029-07-03', (game) => {
     const tiers = Object.fromEntries(CLUBS_PL.filter((c) => c.tier <= 4).map((c) => [c.id, c.tier]));
@@ -48,6 +51,11 @@ test('Trzy sezony: ligi po 18 klubów, reguły rezerw, kadry i finanse w normie,
     assert.deepEqual(validateTiers(tiers, groups), [], SEASON);
     for (const t of [1, 2, 3]) assert.equal(CLUBS_PL.filter((c) => c.tier === t).length, 18, `${SEASON} liga ${t}`);
     for (const gr of [1, 2, 3, 4]) assert.equal(CLUBS_PL.filter((c) => c.tier === 4 && c.group === gr).length, 18, `${SEASON} III liga grupa ${gr}`);
+    // IV liga: 276 klubów w 16 grupach stałej wielkości, żaden klub w dwóch grupach ani w ligach 1-4
+    const l4ids = game.season.l4.groups.flatMap((G) => G.ids);
+    assert.equal(l4ids.length, 276, `${SEASON} IV liga`); assert.equal(new Set(l4ids).size, 276);
+    for (const v of VOIVODESHIPS) assert.equal(game.season.l4.groups.find((G) => G.voiv === v.key).ids.length, v.size, `${SEASON} ${v.key}`);
+    assert.ok(l4ids.every((id) => !CLUBS_PL.some((c) => c.id === id && c.tier <= 4)), `${SEASON}: IV liga poza ligami 1-4`);
     // Każdy klub ligowy (z III ligą) ma stałą kadrę, nikt nie jest w dwóch kadrach
     const seen = new Set();
     for (const c of CLUBS_PL.filter((x) => x.tier <= 4)) {
@@ -75,6 +83,7 @@ test('Trzy sezony: ligi po 18 klubów, reguły rezerw, kadry i finanse w normie,
   for (const a of g.archive) {
     assert.ok(a.champion && a.cup, `${a.season}: mistrz i zdobywca PP`);
     assert.ok(a.uefa.LM && a.uefa.LE && a.uefa.LK, `${a.season}: zwycięzcy pucharów`);
+    assert.ok(Object.keys(a.l4?.champ ?? {}).length === 16 && a.l4.up.length >= 16, `${a.season}: mistrzowie i awanse IV ligi`);
   }
   // Lista dostępu z rankingu sprzed roku: pierwszy przydział z 12. miejsca Polski po sezonie 2025/26
   assert.equal(g.archive[0].polandAccessRank, 12);

@@ -1438,6 +1438,19 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
 .ccard { padding: 12px 14px 14px; border-radius: var(--radius-m); background: var(--surface); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
 .ccard h3 { display: flex; align-items: baseline; gap: 8px; margin-top: 0; }
 .ccard .ufxlist { border: 0; border-radius: var(--radius-s); }
+/* IV liga (src/ui/fourthLeagueView.js): wybór grupy wojewódzkiej i prosta karta klubu bez zawodników */
+.l4-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px var(--space-3); margin: 0 0 var(--space-3); }
+.l4-pick label { font-size: var(--step--1); font-weight: 600; color: var(--text-muted); }
+.l4-pick select { flex: 1 1 220px; max-width: 380px; min-height: 44px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--surface); color: var(--text); font: inherit; }
+.l4-card { margin-bottom: var(--space-4); }
+.l4-card__head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.l4-card__head > div { flex: 1; min-width: 0; }
+.l4-card__head h3 { margin: 0; }
+.l4-card__head p { margin: 2px 0 0; font-size: var(--step--1); }
+.l4-card h4 { margin: var(--space-3) 0 6px; font: 700 var(--step-0)/1.2 var(--font-display); }
+.l4-card .form { margin-left: 6px; vertical-align: middle; }
+.l4-card__body { display: grid; gap: 0 var(--space-5); grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 900px) { .l4-card__body { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .l4-card__body > div > h4:first-child { margin-top: 0; } }
 .nt-grid { display: grid; gap: var(--space-3); grid-template-columns: minmax(0, 1fr); }
 .nt-grid > p, .nt-grid > .legend { grid-column: 1 / -1; margin: 0; }
 .nt-grid > .stat-sec { margin: 0; }

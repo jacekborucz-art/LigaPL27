@@ -8,7 +8,8 @@ const walk = (d) => fs.readdirSync(d, { withFileTypes: true })
   .flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
 const files = [...walk(path.join(root, 'src')), ...walk(path.join(root, 'assets'))]
   .map((f) => `./${path.relative(root, f).split(path.sep).join('/')}`)
-  .filter((f) => /\.(js|css|json|woff2|webp|png|svg)$/.test(f))
+  // Pliki poziomu 6 IV ligi (src/data/V liga PL, czytane w grze przez fetch w src/data/level6.js), bez readme
+  .filter((f) => /\.(js|css|json|woff2|webp|png|svg)$/.test(f) || /^\.\/src\/data\/V liga PL\/(v_liga|klasa_okregowa)_[a-z_]+\.txt$/.test(f))
   .sort();
 
 const swPath = path.join(root, 'sw.js');

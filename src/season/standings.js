@@ -53,8 +53,9 @@ export function standings(fixtures, clubIds, { tieBreak = ['points', 'h2hPoints'
   return list.map((r, i) => ({ ...r, pos: i + 1 }));
 }
 
-/** Strefy tabeli do kolorowania (awans, baraże, puchary, spadek). */
-export function zonesFor(tier) {
+/** Strefy tabeli do kolorowania (awans, baraże, puchary, spadek). IV liga: n drużyn w grupie, k najmniej spadków. */
+export function zonesFor(tier, n = 18, k = 3) {
+  if (tier === 5) return [{ from: 1, to: 1, kind: 'up', label: 'Awans do III ligi' }, { from: 2, to: 2, kind: 'playoff', label: 'Baraże o III ligę (makroregion)' }, { from: n - k + 1, to: n, kind: 'down', label: `Spadek (co najmniej ${k} drużyny, więcej, gdy z III ligi spadnie więcej klubów z województwa)` }];
   if (tier === 1) return [{ from: 1, to: 2, kind: 'europe-cl', label: 'Liga Mistrzów (eliminacje)' }, { from: 3, to: 4, kind: 'europe', label: 'Liga Konferencji (eliminacje)' }, { from: 16, to: 18, kind: 'down', label: 'Spadek' }];
   if (tier === 2) return [{ from: 1, to: 2, kind: 'up', label: 'Awans' }, { from: 3, to: 6, kind: 'playoff', label: 'Baraże o awans' }, { from: 16, to: 18, kind: 'down', label: 'Spadek' }];
   if (tier === 4) return [{ from: 1, to: 1, kind: 'up', label: 'Awans do 2 Ligi' }, { from: 2, to: 2, kind: 'playoff', label: 'Baraże o 2 Ligę' }, { from: 15, to: 18, kind: 'down', label: 'Spadek do IV ligi (co najmniej 4 drużyny)' }];

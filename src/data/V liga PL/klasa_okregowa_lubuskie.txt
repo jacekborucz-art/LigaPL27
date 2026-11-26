@@ -1,0 +1,54 @@
+KLASA OKRĘGOWA - WOJEWÓDZTWO LUBUSKIE (LUBUSKI ZPN) - SEZON 2026/2027
+============================================================
+
+UWAGA: W województwie lubuskim nie ma V ligi.
+Bezposrednio pod IV liga funkcjonuje klasa okręgowa.
+Plik obejmuje 2 grupy: Gorzów Wielkopolski i Zielona Góra.
+
+FORMAT: nazwa druzyny | barwy | stadion | pojemnosc
+
+ZASADY UZUPELNIANIA BRAKUJACYCH DANYCH:
+- jesli nie udalo sie zweryfikowac barw: bialo-czerwono-czarne
+- jesli nie udalo sie zweryfikowac nazwy stadionu: stadion miejski
+- jesli nie udalo sie zweryfikowac pojemnosci: 1200
+
+Zrodlo list druzyn: 90minut.pl
+
+GRUPA GORZÓW WIELKOPOLSKI
+----------------------------------------
+Lubuszanin Drezdenko | bialo-czerwono-czarne | stadion miejski | 1200
+Orzeł Międzyrzecz | bialo-czerwono-czarne | stadion miejski | 1200
+Warta Słońsk | bialo-czerwono-czarne | stadion miejski | 1200
+KS Stilon II Gorzów Wielkopolski | bialo-czerwono-czarne | stadion miejski | 1200
+LZS Bobrówko | bialo-czerwono-czarne | stadion miejski | 1200
+Sokół Gościm | bialo-czerwono-czarne | stadion miejski | 1200
+Uran Trzebicz | bialo-czerwono-czarne | stadion miejski | 1200
+Spartak Deszczno | bialo-czerwono-czarne | stadion miejski | 1200
+Warta II Gorzów Wielkopolski | bialo-czerwono-czarne | stadion miejski | 1200
+Spójnia Ośno Lubuskie | bialo-czerwono-czarne | stadion miejski | 1200
+Czarni Witnica | bialo-czerwono-czarne | stadion miejski | 1200
+Radowiak Drezdenko | bialo-czerwono-czarne | stadion miejski | 1200
+Zorza Kowalów | bialo-czerwono-czarne | stadion miejski | 1200
+Pionier Zwierzyn (k. Strzelec Krajeńskich) | bialo-czerwono-czarne | stadion miejski | 1200
+Toroma Torzym | bialo-czerwono-czarne | stadion miejski | 1200
+GKP Kłodawa | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA ZIELONA GÓRA
+----------------------------------------
+Tęcza Krosno Odrzańskie | bialo-czerwono-czarne | stadion miejski | 1200
+Zorza Ochla | bialo-czerwono-czarne | stadion miejski | 1200
+ŁKS Łęknica | bialo-czerwono-czarne | stadion miejski | 1200
+Czarni Drągowina | bialo-czerwono-czarne | stadion miejski | 1200
+TS Przylep (Zielona Góra) | bialo-czerwono-czarne | stadion miejski | 1200
+KP Świdnica | bialo-czerwono-czarne | stadion miejski | 1200
+Pogoń Wężyska | bialo-czerwono-czarne | stadion miejski | 1200
+Relaks Grabice | bialo-czerwono-czarne | stadion miejski | 1200
+Cargovia Kargowa | bialo-czerwono-czarne | stadion miejski | 1200
+Zjednoczeni Brody | bialo-czerwono-czarne | stadion miejski | 1200
+Czarni Pałck | bialo-czerwono-czarne | stadion miejski | 1200
+Unia Kunice (Żary) | bialo-czerwono-czarne | stadion miejski | 1200
+Budowlani Lubsko | bialo-czerwono-czarne | stadion miejski | 1200
+Błękitni Ołobok | bialo-czerwono-czarne | stadion miejski | 1200
+Bóbr Bobrowice | bialo-czerwono-czarne | stadion miejski | 1200
+
+Łącznie uwzględniono 31 drużyn w 2 grupach klasy okręgowej.

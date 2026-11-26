@@ -47,7 +47,7 @@ function parseOwner(text) {
   const out = [];
   let group = 0;
   for (const line of text.split(/\r?\n/)) {
-    if (/^Grupa\s+[IV]+/i.test(line)) { group++; continue; }
+    if (/^Grupa\s+[IVX]+/i.test(line)) { group++; continue; }
     if (/^Uwagi/i.test(line)) break;
     const m = line.match(/^(.+?)\s+\(([^)]+)\)\s+[–-]\s+(.+?)\s+\(([\d\s ]+)\s+miejsc\)\s*$/);
     if (!m || !group) continue;
@@ -143,7 +143,24 @@ if (missing.length || unused.length || owner.length !== 72) {
   process.exit(1);
 }
 
+// IV liga (docs/iv-liga.md, decyzja właściciela D11): plik właściciela tools/data/iv_liga_kluby_stadiony.txt (tekst z docx
+// „Kluby IV ligi polskiej 2026 2027”). Nazwy i identyfikatory bez zmian. Barwy dla każdego dopasowanego klubu; stadion
+// i pojemność tylko dla wpisów konkretnych (nazwa obiektu, nie „Boisko w X” / „Stadion Miejski w X”, i pojemność
+// niezaokrąglona do setek): 57 wpisów. Niedopasowane wpisy (inna nazwa w liście tabel) zostają bez zmian i są wypisane.
+const DROP4 = new Set([...DROP, 'gks', 'uks', 'lzs', 'mlks', 'glks', 'wks', 'crs']);
+const key4 = (name) => slug(name).split('-').filter((t) => t && !DROP4.has(t) && !/^\d{4}$/.test(t)).join('-');
+const genericStadium = (s) => /^(Boisko|Stadion( Gminny| Miejski| Leśny| Miejsko-Gminny)?|Kompleks Sportowy|Gminny Kompleks Sportowy) w(e)? [^,]+$/.test(s);
+const owner4 = parseOwner(read('iv_liga_kluby_stadiony.txt'));
+const unmatched4 = []; let stadiums4 = 0; let colors4 = 0;
+for (const o of owner4) {
+  const c = l4.out.find((x) => x.group === o.group && key4(x.name) === key4(o.name));
+  if (!c) { unmatched4.push(`grupa ${o.group}: ${o.name}`); continue; }
+  c.colors = o.colors; colors4++;
+  if (!genericStadium(o.stadium) && o.cap % 100 !== 0) { c.stadium = o.stadium; c.cap = o.cap; stadiums4++; }
+}
+console.log(`IV liga, plik właściciela: ${owner4.length} wpisów, barwy ${colors4}, stadiony ${stadiums4}, bez dopasowania ${unmatched4.length}:\n  ${unmatched4.join('\n  ')}`);
+
 const header = (t, n, g, extra) => `// WYGENEROWANO: node tools/build-lower-leagues.mjs (źródło: tools/data). Nie edytuj ręcznie.\n// ${t}: ${n} drużyn w ${g} grupach. ${extra} Siła L [SZAC].\n`;
 fs.writeFileSync(path.join(root, 'src/data/clubs_l3.js'), `${header('III liga 2026/27', l3.out.length, l3.groups, 'Stałe kadry (od wersji z grywalną III ligą); nazwy, barwy, stadiony i pojemności z tools/data/iii_liga_kluby_stadiony.txt.')}\nexport const CLUBS_L3 = [\n${l3.out.map((c) => `  ${JSON.stringify(c)},`).join('\n')}\n];\n`);
-fs.writeFileSync(path.join(root, 'src/data/clubs_l4.js'), `${header('IV liga 2026/27', l4.out.length, l4.groups, 'Kadry losowane na mecz (src/world/ephemeral.js); l3group: grupa III ligi województwa.')}\nexport const CLUBS_L4 = [\n${l4.out.map((c) => `  ${JSON.stringify(c)},`).join('\n')}\n];\n`);
+fs.writeFileSync(path.join(root, 'src/data/clubs_l4.js'), `${header('IV liga 2026/27', l4.out.length, l4.groups, 'Kadry losowane na mecz (src/world/ephemeral.js); l3group: grupa III ligi województwa; barwy i część stadionów z tools/data/iv_liga_kluby_stadiony.txt.')}\nexport const CLUBS_L4 = [\n${l4.out.map((c) => `  ${JSON.stringify(c)},`).join('\n')}\n];\n`);
 console.log(`III liga: ${l3.out.length} drużyn (${l3.out.filter((c) => c.parent).length} rezerw), IV liga: ${l4.out.length} drużyn (${l4.out.filter((c) => c.parent).length} rezerw)`);

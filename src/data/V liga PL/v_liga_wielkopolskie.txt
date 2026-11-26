@@ -1,0 +1,73 @@
+V LIGA RED BOX - WOJEWÓDZTWO WIELKOPOLSKIE (WIELKOPOLSKI ZPN) - SEZON 2026/2027
+============================================================
+
+UWAGA: W województwie wielkopolskim istnieje V liga.
+Plik obejmuje 3 grupy: wielkopolska I, II i III.
+
+FORMAT: nazwa druzyny | barwy | stadion | pojemnosc
+
+ZASADY UZUPELNIANIA BRAKUJACYCH DANYCH:
+- jesli nie udalo sie zweryfikowac barw: bialo-czerwono-czarne
+- jesli nie udalo sie zweryfikowac nazwy stadionu: stadion miejski
+- jesli nie udalo sie zweryfikowac pojemnosci: 1200
+
+Zrodlo list druzyn: 90minut.pl
+
+GRUPA WIELKOPOLSKA I
+----------------------------------------
+Warta Międzychód | bialo-czerwono-czarne | stadion miejski | 1200
+Nasza Dyskobolia Grodzisk Wielkopolski | bialo-czerwono-czarne | stadion miejski | 1200
+Wełna Skoki | bialo-czerwono-czarne | stadion miejski | 1200
+KP Piła | bialo-czerwono-czarne | stadion miejski | 1200
+Lubuszanin Trzcianka | bialo-czerwono-czarne | stadion miejski | 1200
+Sparta Oborniki | bialo-czerwono-czarne | stadion miejski | 1200
+Tarnovia Tarnowo Podgórne | bialo-czerwono-czarne | stadion miejski | 1200
+Kłos Gałowo | bialo-czerwono-czarne | stadion miejski | 1200
+Zamek Gołańcz | bialo-czerwono-czarne | stadion miejski | 1200
+Obra Zbąszyń | bialo-czerwono-czarne | stadion miejski | 1200
+Sparta Złotów | bialo-czerwono-czarne | stadion miejski | 1200
+Polonia Jastrowie | bialo-czerwono-czarne | stadion miejski | 1200
+Korona Stróżewo | bialo-czerwono-czarne | stadion miejski | 1200
+Sparta Szamotuły | bialo-czerwono-czarne | stadion miejski | 1200
+GKS Golęczewo | bialo-czerwono-czarne | stadion miejski | 1200
+Noteć Dziembowo | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA WIELKOPOLSKA II
+----------------------------------------
+UKS Śrem | bialo-czerwono-czarne | stadion miejski | 1200
+Pompa Team Jarosławiec | bialo-czerwono-czarne | stadion miejski | 1200
+Wilki Wilczyn | bialo-czerwono-czarne | stadion miejski | 1200
+Stella Luboń | bialo-czerwono-czarne | stadion miejski | 1200
+Wiara Lecha Poznań | bialo-czerwono-czarne | stadion miejski | 1200
+Polonia II Środa Wielkopolska | bialo-czerwono-czarne | stadion miejski | 1200
+Unia II Swarzędz | bialo-czerwono-czarne | stadion miejski | 1200
+Kłos Zaniemyśl | bialo-czerwono-czarne | stadion miejski | 1200
+Warta II Poznań | bialo-czerwono-czarne | stadion miejski | 1200
+Olimpia Koło | bialo-czerwono-czarne | stadion miejski | 1200
+SKP Słupca | bialo-czerwono-czarne | stadion miejski | 1200
+1922 Lechia Kostrzyn | bialo-czerwono-czarne | stadion miejski | 1200
+Poznańska 13 Poznań | bialo-czerwono-czarne | stadion miejski | 1200
+Polanin Strzałkowo | bialo-czerwono-czarne | stadion miejski | 1200
+Tulisia Tuliszków | bialo-czerwono-czarne | stadion miejski | 1200
+Polonus Kazimierz Biskupi | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA WIELKOPOLSKA III
+----------------------------------------
+Jarota Jarocin | bialo-czerwono-czarne | stadion miejski | 1200
+Orzeł Kawęczyn | bialo-czerwono-czarne | stadion miejski | 1200
+Korona Piaski | bialo-czerwono-czarne | stadion miejski | 1200
+Centra Ostrów Wielkopolski | bialo-czerwono-czarne | stadion miejski | 1200
+LKS Jankowy | bialo-czerwono-czarne | stadion miejski | 1200
+Krobianka Krobia | bialo-czerwono-czarne | stadion miejski | 1200
+Rawia Rawicz | bialo-czerwono-czarne | stadion miejski | 1200
+Polonia 1912 II/Dąb Zaborowo (Leszno) | bialo-czerwono-czarne | stadion miejski | 1200
+KKS 1925 II Kalisz | bialo-czerwono-czarne | stadion miejski | 1200
+Zawisza Łęka Opatowska | bialo-czerwono-czarne | stadion miejski | 1200
+Sokół Bralin | bialo-czerwono-czarne | stadion miejski | 1200
+Polonia 1908 Marcinki Kępno | bialo-czerwono-czarne | stadion miejski | 1200
+Tęcza/Osa Osieczna | bialo-czerwono-czarne | stadion miejski | 1200
+Orla Jutrosin | bialo-czerwono-czarne | stadion miejski | 1200
+Dąbroczanka Pępowo | bialo-czerwono-czarne | stadion miejski | 1200
+Korona Wilkowice | bialo-czerwono-czarne | stadion miejski | 1200
+
+Łącznie uwzględniono 48 drużyn w 3 grupach V ligi.

@@ -1,0 +1,112 @@
+KLASA OKRĘGOWA - WOJEWÓDZTWO PODKARPACKIE (PODKARPACKI ZPN) - SEZON 2026/2027
+============================================================
+
+UWAGA: W województwie podkarpackim nie ma V ligi.
+Bezposrednio pod IV liga funkcjonuje klasa okręgowa.
+Plik obejmuje 5 grup: Dębica, Jarosław, Krosno, Rzeszów i Stalowa Wola.
+
+FORMAT: nazwa druzyny | barwy | stadion | pojemnosc
+
+ZASADY UZUPELNIANIA BRAKUJACYCH DANYCH:
+- jesli nie udalo sie zweryfikowac barw: bialo-czerwono-czarne
+- jesli nie udalo sie zweryfikowac nazwy stadionu: stadion miejski
+- jesli nie udalo sie zweryfikowac pojemnosci: 1200
+
+Zrodlo list druzyn: 90minut.pl
+
+GRUPA DĘBICA
+----------------------------------------
+Stal II Mielec | bialo-czerwono-czarne | stadion miejski | 1200
+Kolbuszowianka Kolbuszowa | bialo-czerwono-czarne | stadion miejski | 1200
+Lechia Sędziszów Małopolski | bialo-czerwono-czarne | stadion miejski | 1200
+LKS Głowaczowa | bialo-czerwono-czarne | stadion miejski | 1200
+Atut Podborze | bialo-czerwono-czarne | stadion miejski | 1200
+Victoria Czermin | bialo-czerwono-czarne | stadion miejski | 1200
+Dąbrówka Stara Jastrząbka | bialo-czerwono-czarne | stadion miejski | 1200
+Igloopol II Dębica | bialo-czerwono-czarne | stadion miejski | 1200
+Chemik Pustków | bialo-czerwono-czarne | stadion miejski | 1200
+Piast Wadowice Górne | bialo-czerwono-czarne | stadion miejski | 1200
+Kamieniarz Golemki | bialo-czerwono-czarne | stadion miejski | 1200
+Brzostowianka Brzostek | bialo-czerwono-czarne | stadion miejski | 1200
+Inter Gnojnica | bialo-czerwono-czarne | stadion miejski | 1200
+Smoczanka Mielec | bialo-czerwono-czarne | stadion miejski | 1200
+LKS Pustków | bialo-czerwono-czarne | stadion miejski | 1200
+Florian Ostrowy Tuszowskie | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA JAROSŁAW
+----------------------------------------
+Czuwaj Przemyśl | bialo-czerwono-czarne | stadion miejski | 1200
+Orzeł Przeworsk | bialo-czerwono-czarne | stadion miejski | 1200
+KS Arłamów | bialo-czerwono-czarne | stadion miejski | 1200
+Gorliczanka Gorliczyna | bialo-czerwono-czarne | stadion miejski | 1200
+MKS Kańczuga | bialo-czerwono-czarne | stadion miejski | 1200
+Zdrój Horyniec | bialo-czerwono-czarne | stadion miejski | 1200
+Start Lisie Jamy | bialo-czerwono-czarne | stadion miejski | 1200
+Płomień Morawsko | bialo-czerwono-czarne | stadion miejski | 1200
+Wólczanka Wólka Pełkińska | bialo-czerwono-czarne | stadion miejski | 1200
+Wiraż Chłopice | bialo-czerwono-czarne | stadion miejski | 1200
+Promyk Urzejowice | bialo-czerwono-czarne | stadion miejski | 1200
+Piast Tuczempy | bialo-czerwono-czarne | stadion miejski | 1200
+Czarni Pawłosiów | bialo-czerwono-czarne | stadion miejski | 1200
+Sanoczanka Święte | bialo-czerwono-czarne | stadion miejski | 1200
+Orzeł Torki | bialo-czerwono-czarne | stadion miejski | 1200
+Start Pruchnik | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA KROSNO
+----------------------------------------
+Wiki Sanok | bialo-czerwono-czarne | stadion miejski | 1200
+Tempo Nienaszów | bialo-czerwono-czarne | stadion miejski | 1200
+Zgoda Zarszyn | bialo-czerwono-czarne | stadion miejski | 1200
+Przełęcz Dukla | bialo-czerwono-czarne | stadion miejski | 1200
+Partyzant Targowiska | bialo-czerwono-czarne | stadion miejski | 1200
+Nafta Jedlicze | bialo-czerwono-czarne | stadion miejski | 1200
+Ekoball II Sanok | bialo-czerwono-czarne | stadion miejski | 1200
+Zamczysko Odrzykoń | bialo-czerwono-czarne | stadion miejski | 1200
+Przełom Besko | bialo-czerwono-czarne | stadion miejski | 1200
+Bieszczady Ustrzyki Dolne | bialo-czerwono-czarne | stadion miejski | 1200
+Zamczysko Mrukowa | bialo-czerwono-czarne | stadion miejski | 1200
+Ostoja Kołaczyce | bialo-czerwono-czarne | stadion miejski | 1200
+Start Rymanów | bialo-czerwono-czarne | stadion miejski | 1200
+Iwonka Iwonicz | bialo-czerwono-czarne | stadion miejski | 1200
+Strzelec Frysztak | bialo-czerwono-czarne | stadion miejski | 1200
+Brzozovia Brzozów | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA RZESZÓW
+----------------------------------------
+GKS Trzebownisko | bialo-czerwono-czarne | stadion miejski | 1200
+Włókniarz Rakszawa | bialo-czerwono-czarne | stadion miejski | 1200
+Orzeł Wólka Niedźwiedzka | bialo-czerwono-czarne | stadion miejski | 1200
+Rzemieślnik Strażów | bialo-czerwono-czarne | stadion miejski | 1200
+Iskra Zgłobień | bialo-czerwono-czarne | stadion miejski | 1200
+KS Zaczernie | bialo-czerwono-czarne | stadion miejski | 1200
+LKS Jasionka | bialo-czerwono-czarne | stadion miejski | 1200
+Błękit Żołynia | bialo-czerwono-czarne | stadion miejski | 1200
+Głogovia Głogów Małopolski | bialo-czerwono-czarne | stadion miejski | 1200
+Jedność Niechobrz | bialo-czerwono-czarne | stadion miejski | 1200
+Herkules Trzebuska | bialo-czerwono-czarne | stadion miejski | 1200
+KS Przybyszówka (Rzeszów) | bialo-czerwono-czarne | stadion miejski | 1200
+Błażowianka Błażowa | bialo-czerwono-czarne | stadion miejski | 1200
+Zorza Trzeboś | bialo-czerwono-czarne | stadion miejski | 1200
+Sokół Sokołów Małopolski | bialo-czerwono-czarne | stadion miejski | 1200
+Strumyk Malawa | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA STALOWA WOLA
+----------------------------------------
+Sokół Kamień | bialo-czerwono-czarne | stadion miejski | 1200
+Stal Nowa Dęba | bialo-czerwono-czarne | stadion miejski | 1200
+ŁKS Łowisko | bialo-czerwono-czarne | stadion miejski | 1200
+Stal II Stalowa Wola | bialo-czerwono-czarne | stadion miejski | 1200
+Olimpia Pysznica | bialo-czerwono-czarne | stadion miejski | 1200
+Unia Nowa Sarzyna | bialo-czerwono-czarne | stadion miejski | 1200
+Słowianin Grębów | bialo-czerwono-czarne | stadion miejski | 1200
+LZS Ździary | bialo-czerwono-czarne | stadion miejski | 1200
+Podlesianka Kamień | bialo-czerwono-czarne | stadion miejski | 1200
+Siarka II Tarnobrzeg | bialo-czerwono-czarne | stadion miejski | 1200
+Sparta Jeżowe | bialo-czerwono-czarne | stadion miejski | 1200
+Dolina-Tanew Wólka Tanewska | bialo-czerwono-czarne | stadion miejski | 1200
+Stal Gorzyce | bialo-czerwono-czarne | stadion miejski | 1200
+Łęg Stany | bialo-czerwono-czarne | stadion miejski | 1200
+Czarni Lipa | bialo-czerwono-czarne | stadion miejski | 1200
+LZS Kotowa Wola | bialo-czerwono-czarne | stadion miejski | 1200
+
+Łącznie uwzględniono 80 drużyn w 5 grupach klasy okręgowej.

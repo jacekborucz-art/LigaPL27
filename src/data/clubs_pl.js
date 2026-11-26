@@ -10,6 +10,7 @@
 import { CLUBS_L3 } from './clubs_l3.js';
 import { CLUBS_L4 } from './clubs_l4.js';
 import { applyClubNames } from './clubNames.js';
+import { VOIV } from './voivodeships.js';
 
 export const TIERS = { EK: 1, L1: 2, L2: 3, L3: 4 };
 
@@ -18,11 +19,13 @@ export const LEAGUE_NAMES = {
   2: '1 Liga',
   3: '2 Liga',
   4: 'III liga',
+  5: 'IV liga',
+  6: 'klasa okręgowa', // poziom 6 tylko w karierach z IV ligą; w 4 województwach V liga (leagueLabel)
 };
 /** Numery grup III ligi (PZPN): I-IV. */
 export const L3_GROUP_NAMES = { 1: 'I', 2: 'II', 3: 'III', 4: 'IV' };
 /** Nazwa ligi klubu, w III lidze z grupą („III liga, grupa II”). */
-export const leagueLabel = (club) => (club?.tier === 4 && club.group ? `III liga, grupa ${L3_GROUP_NAMES[club.group] ?? club.group}` : LEAGUE_NAMES[club?.tier] ?? 'IV liga');
+export const leagueLabel = (club) => (club?.tier === 4 && club.group ? `III liga, grupa ${L3_GROUP_NAMES[club.group] ?? club.group}` : club?.tier === 6 ? VOIV[club.voiv]?.l6 ?? LEAGUE_NAMES[6] : LEAGUE_NAMES[club?.tier] ?? 'IV liga');
 
 const c = (id, name, short, tier, L, prestige, coach, colors, region, extra = {}) => ({
   id, name, short, tier, L, prestige, coach, colors, region, ...extra,

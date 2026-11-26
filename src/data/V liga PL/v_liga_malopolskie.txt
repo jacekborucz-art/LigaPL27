@@ -1,0 +1,53 @@
+V LIGA - WOJEWÓDZTWO MAŁOPOLSKIE (MAŁOPOLSKI ZPN) - SEZON 2026/2027
+============================================================
+
+Plik obejmuje 2 grupy V ligi: małopolska wschód i małopolska zachód.
+
+FORMAT: nazwa druzyny | barwy | stadion | pojemnosc
+
+ZASADY UZUPELNIANIA BRAKUJACYCH DANYCH:
+- jesli nie udalo sie zweryfikowac barw: bialo-czerwono-czarne
+- jesli nie udalo sie zweryfikowac nazwy stadionu: stadion miejski
+- jesli nie udalo sie zweryfikowac pojemnosci: 1200
+
+Zrodlo list druzyn: 90minut.pl
+
+GRUPA MAŁOPOLSKA WSCHÓD
+----------------------------------------
+Poprad Rytro | bialo-czerwono-czarne | stadion miejski | 1200
+Wisła Czarny Dunajec | bialo-czerwono-czarne | stadion miejski | 1200
+Turbacz Mszana Dolna | bialo-czerwono-czarne | stadion miejski | 1200
+Gród Podegrodzie | bialo-czerwono-czarne | stadion miejski | 1200
+Podhale II Nowy Targ | bialo-czerwono-czarne | stadion miejski | 1200
+Dunajec Nowy Sącz | bialo-czerwono-czarne | stadion miejski | 1200
+Dąbrovia Dąbrowa Tarnowska | bialo-czerwono-czarne | stadion miejski | 1200
+Sokół Słopnice | bialo-czerwono-czarne | stadion miejski | 1200
+Tarnovia Tarnów | bialo-czerwono-czarne | stadion miejski | 1200
+MLKS Żabno | bialo-czerwono-czarne | stadion miejski | 1200
+KS Nowa Jastrząbka-Żukowice | bialo-czerwono-czarne | stadion miejski | 1200
+Łosoś Łososina Dolna | bialo-czerwono-czarne | stadion miejski | 1200
+Okocimski KS Brzesko | bialo-czerwono-czarne | stadion miejski | 1200
+LKS Gnojnik | bialo-czerwono-czarne | stadion miejski | 1200
+Kolejarz Stróże | bialo-czerwono-czarne | stadion miejski | 1200
+Orawa Jabłonka | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA MAŁOPOLSKA ZACHÓD
+----------------------------------------
+Wróblowianka Wróblowice (Kraków) | bialo-czerwono-czarne | stadion miejski | 1200
+Orzeł Myślenice | bialo-czerwono-czarne | stadion miejski | 1200
+Niwa Nowa Wieś | bialo-czerwono-czarne | stadion miejski | 1200
+Michałowianka Michałowice | bialo-czerwono-czarne | stadion miejski | 1200
+Garbarnia Kraków | bialo-czerwono-czarne | stadion miejski | 1200
+Radziszowianka Radziszów | bialo-czerwono-czarne | stadion miejski | 1200
+Tempo Białka | bialo-czerwono-czarne | stadion miejski | 1200
+Puszcza II Niepołomice | bialo-czerwono-czarne | stadion miejski | 1200
+KS Chełmek | bialo-czerwono-czarne | stadion miejski | 1200
+Świt Krzeszowice | bialo-czerwono-czarne | stadion miejski | 1200
+Sokół Kocmyrzów Baranówka | bialo-czerwono-czarne | stadion miejski | 1200
+Kmita Zabierzów | bialo-czerwono-czarne | stadion miejski | 1200
+MKS Trzebinia | bialo-czerwono-czarne | stadion miejski | 1200
+LKS Bobrek | bialo-czerwono-czarne | stadion miejski | 1200
+Kabel Kraków | bialo-czerwono-czarne | stadion miejski | 1200
+Przebój Wolbrom | bialo-czerwono-czarne | stadion miejski | 1200
+
+Łącznie uwzględniono 32 drużyn w 2 grupach V ligi.

@@ -93,7 +93,7 @@ function fakeTables() {
   return { tables: { 1: t(1), 2: t(2), 3: t(3) }, groupTables };
 }
 
-test('Koniec sezonu: po 18 w ligach 1-3 i w każdej grupie III ligi, IV liga uzupełnia grupy z województw', () => {
+test('Koniec sezonu (stary zapis bez IV ligi, D1): po 18 w ligach 1-3 i w każdej grupie III ligi, IV liga uzupełnia grupy z województw', () => {
   for (const seed of ['a', 'b', 'c', 'd']) {
     const { tables, groupTables } = fakeTables();
     const m = computeMoves(tables, {}, groupTables, new Rng(`ruchy:${seed}`));
@@ -115,6 +115,31 @@ test('Koniec sezonu: po 18 w ligach 1-3 i w każdej grupie III ligi, IV liga uzu
     assert.equal(m.l3Playoff.length, 2);
     for (const x of m.l3Playoff) assert.ok([x.keeper, x.challenger].includes(x.winner));
   }
+});
+
+test('Koniec sezonu w karierze z IV ligą (docs/iv-liga.md): dokładnie 4 mistrzów województw na grupę III ligi, baraż przy wolnym miejscu', async () => {
+  const { loadLevel6 } = await import('../src/data/level6.js');
+  const F = await import('../src/season/fourthLeague.js');
+  const { VOIVODESHIPS } = await import('../src/data/voivodeships.js');
+  await loadLevel6();
+  const g = { seed: 12, clubId: null, season: createSeason(12, { l4Seed: 12 }) };
+  F.playFourthLeagueUntil(g, '2027-06-30');
+  const l4 = F.fourthLeagueResults(g);
+  for (const seed of ['a', 'b']) {
+    const { tables, groupTables } = fakeTables();
+    const m = computeMoves(tables, {}, groupTables, new Rng(`ruchy:${seed}`), { l4 });
+    assert.deepEqual(validateTiers(Object.fromEntries(Object.entries(m.tiers).filter(([, t]) => t <= 4)), m.groups), [], seed);
+    for (const g3 of [1, 2, 3, 4]) {
+      const champs = VOIVODESHIPS.filter((v) => v.l3group === g3).map((v) => l4.tables[v.key].find(F.l4Eligible));
+      assert.equal(champs.length, 4);
+      for (const id of champs) { assert.equal(m.tiers[id], 4, id); assert.equal(m.groups[id], g3, `${id}: grupa z województwa`); }
+      // Bez zwycięzców baraży IV ligi (brak meczów baraży): z IV ligi tylko 4 mistrzów, chyba że brakuje miejsc do 18
+      const fromL4 = m.promoted[4].filter((id) => m.groups[id] === g3);
+      assert.deepEqual(fromL4.sort(), champs.slice().sort(), `grupa ${g3}`);
+    }
+    assert.equal(m.l4Up.length, 16);
+  }
+  applySeasonState({});
 });
 
 test('Spadkowicze z 2 Ligi trafiają do grupy swojego województwa, grupa odsyła więcej do IV ligi', () => {

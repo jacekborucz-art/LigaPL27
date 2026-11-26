@@ -1,0 +1,55 @@
+KLASA OKRĘGOWA - WOJEWÓDZTWO WARMIŃSKO-MAZURSKIE (WARMIŃSKO-MAZURSKI ZPN) - SEZON 2026/2027
+============================================================
+
+UWAGA: W województwie warmińsko-mazurskim nie ma V ligi.
+Bezposrednio pod IV liga funkcjonuje klasa okręgowa.
+Plik obejmuje 2 grupy: warmińsko-mazurska I i II.
+
+FORMAT: nazwa druzyny | barwy | stadion | pojemnosc
+
+ZASADY UZUPELNIANIA BRAKUJACYCH DANYCH:
+- jesli nie udalo sie zweryfikowac barw: bialo-czerwono-czarne
+- jesli nie udalo sie zweryfikowac nazwy stadionu: stadion miejski
+- jesli nie udalo sie zweryfikowac pojemnosci: 1200
+
+Zrodlo list druzyn: 90minut.pl
+
+GRUPA WARMIŃSKO-MAZURSKA I
+----------------------------------------
+Mrągowia Mrągowo | bialo-czerwono-czarne | stadion miejski | 1200
+Gwardia Szczytno | bialo-czerwono-czarne | stadion miejski | 1200
+Orlęta Reszel | bialo-czerwono-czarne | stadion miejski | 1200
+Mazur Pisz | bialo-czerwono-czarne | stadion miejski | 1200
+Olimpia Olsztynek | bialo-czerwono-czarne | stadion miejski | 1200
+Orzeł Janowiec Kościelny | bialo-czerwono-czarne | stadion miejski | 1200
+GKS Stawiguda | bialo-czerwono-czarne | stadion miejski | 1200
+Czarni Olecko | bialo-czerwono-czarne | stadion miejski | 1200
+Stomil II Olsztyn | bialo-czerwono-czarne | stadion miejski | 1200
+Victoria Bartoszyce | bialo-czerwono-czarne | stadion miejski | 1200
+Orzeł Czerwonka | bialo-czerwono-czarne | stadion miejski | 1200
+Błękitni Pasym | bialo-czerwono-czarne | stadion miejski | 1200
+Vęgoria Węgorzewo | bialo-czerwono-czarne | stadion miejski | 1200
+Mazur Wydminy | bialo-czerwono-czarne | stadion miejski | 1200
+Śniardwy Orzysz | bialo-czerwono-czarne | stadion miejski | 1200
+GKS Kozłowo | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA WARMIŃSKO-MAZURSKA II
+----------------------------------------
+Constract Lubawa | bialo-czerwono-czarne | stadion miejski | 1200
+Błękitni Orneta | bialo-czerwono-czarne | stadion miejski | 1200
+Ossa Biskupiec Pomorski | bialo-czerwono-czarne | stadion miejski | 1200
+MKS Działdowo | bialo-czerwono-czarne | stadion miejski | 1200
+Olimpia II Elbląg | bialo-czerwono-czarne | stadion miejski | 1200
+Huragan Morąg | bialo-czerwono-czarne | stadion miejski | 1200
+Jeziorak Iława | bialo-czerwono-czarne | stadion miejski | 1200
+Dąb Kadyny | bialo-czerwono-czarne | stadion miejski | 1200
+Płomień Turznica | bialo-czerwono-czarne | stadion miejski | 1200
+Motor Lubawa | bialo-czerwono-czarne | stadion miejski | 1200
+Wałsza Pieniężno | bialo-czerwono-czarne | stadion miejski | 1200
+GSZS Rybno | bialo-czerwono-czarne | stadion miejski | 1200
+KS Tyrowo | bialo-czerwono-czarne | stadion miejski | 1200
+Radomniak Radomno | bialo-czerwono-czarne | stadion miejski | 1200
+MKS Miłakowo | bialo-czerwono-czarne | stadion miejski | 1200
+Drwęca Nowe Miasto Lubawskie | bialo-czerwono-czarne | stadion miejski | 1200
+
+Łącznie uwzględniono 32 drużyn w 2 grupach klasy okręgowej.

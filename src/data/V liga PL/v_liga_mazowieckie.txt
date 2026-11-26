@@ -1,0 +1,49 @@
+V LIGA - WOJEWÓDZTWO MAZOWIECKIE - SEZON 2026/2027
+============================================================
+
+FORMAT: nazwa druzyny | barwy | stadion | pojemnosc
+
+ZASADY UZUPELNIANIA BRAKUJACYCH DANYCH:
+- jesli nie udalo sie zweryfikowac barw: bialo-czerwono-czarne
+- jesli nie udalo sie zweryfikowac nazwy stadionu: stadion miejski
+- jesli nie udalo sie zweryfikowac pojemnosci: 1200
+
+Zrodlo list druzyn: 90minut.pl
+
+GRUPA 1
+----------------------------------------
+Ożarowianka Ożarów Mazowiecki | bialo-czerwono-czarne | stadion miejski | 1200
+Narew Ostrołęka | bialo-czerwono-czarne | stadion miejski | 1200
+Drukarz Warszawa | bialo-czerwono-czarne | stadion miejski | 1200
+Naprzód Zielonki | bialo-czerwono-czarne | stadion miejski | 1200
+Huragan Wołomin | bialo-czerwono-czarne | stadion miejski | 1200
+PAF Płońsk | bialo-czerwono-czarne | stadion miejski | 1200
+Białe Orły Warszawa | bialo-czerwono-czarne | stadion miejski | 1200
+Bug Wyszków | bialo-czerwono-czarne | stadion miejski | 1200
+Znicz II Pruszków | bialo-czerwono-czarne | stadion miejski | 1200
+Marcovia Marki | bialo-czerwono-czarne | stadion miejski | 1200
+Escola Varsovia Warszawa | bialo-czerwono-czarne | stadion miejski | 1200
+Gladiator Słoszewo | bialo-czerwono-czarne | stadion miejski | 1200
+Błękitni Gąbin | bialo-czerwono-czarne | stadion miejski | 1200
+Sokół Serock | bialo-czerwono-czarne | stadion miejski | 1200
+Wicher Kobyłka | bialo-czerwono-czarne | stadion miejski | 1200
+Kasztelan Sierpc | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA 2
+----------------------------------------
+Józefovia Józefów | bialo-czerwono-czarne | stadion miejski | 1200
+Wilga Garwolin | bialo-czerwono-czarne | stadion miejski | 1200
+Pilica Białobrzegi | bialo-czerwono-czarne | stadion miejski | 1200
+Żyrardowianka Żyrardów | bialo-czerwono-czarne | stadion miejski | 1200
+Ursus II Warszawa | bialo-czerwono-czarne | stadion miejski | 1200
+Drogowiec Jedlińsk | bialo-czerwono-czarne | stadion miejski | 1200
+Radomiak II Radom | bialo-czerwono-czarne | stadion miejski | 1200
+Jodła Jedlnia-Letnisko | bialo-czerwono-czarne | stadion miejski | 1200
+Powiślanka Lipsko | bialo-czerwono-czarne | stadion miejski | 1200
+Tygrys Huta Mińska | bialo-czerwono-czarne | stadion miejski | 1200
+Champion Warszawa | bialo-czerwono-czarne | stadion miejski | 1200
+Proch Pionki | bialo-czerwono-czarne | stadion miejski | 1200
+LKS Chlebnia | bialo-czerwono-czarne | stadion miejski | 1200
+Perła Złotokłos | bialo-czerwono-czarne | stadion miejski | 1200
+Pogoń II Siedlce | bialo-czerwono-czarne | stadion miejski | 1200
+Wektra Zbuczyn | bialo-czerwono-czarne | stadion miejski | 1200

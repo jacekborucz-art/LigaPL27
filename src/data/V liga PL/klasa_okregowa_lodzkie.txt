@@ -1,0 +1,92 @@
+KLASA OKRĘGOWA - WOJEWÓDZTWO ŁÓDZKIE (ŁÓDZKI ZPN) - SEZON 2026/2027
+============================================================
+
+UWAGA: W województwie łódzkim nie ma V ligi.
+Bezposrednio pod IV liga funkcjonuje klasa okręgowa.
+Plik obejmuje 4 grupy: Łódź, Piotrków Trybunalski, Sieradz i Skierniewice.
+
+FORMAT: nazwa druzyny | barwy | stadion | pojemnosc
+
+ZASADY UZUPELNIANIA BRAKUJACYCH DANYCH:
+- jesli nie udalo sie zweryfikowac barw: bialo-czerwono-czarne
+- jesli nie udalo sie zweryfikowac nazwy stadionu: stadion miejski
+- jesli nie udalo sie zweryfikowac pojemnosci: 1200
+
+Zrodlo list druzyn: 90minut.pl
+
+GRUPA ŁÓDŹ
+----------------------------------------
+PTC Pabianice | bialo-czerwono-czarne | stadion miejski | 1200
+Zawisza Rzgów | bialo-czerwono-czarne | stadion miejski | 1200
+Ner Poddębice | bialo-czerwono-czarne | stadion miejski | 1200
+GKS Ksawerów | bialo-czerwono-czarne | stadion miejski | 1200
+LKS Różyca | bialo-czerwono-czarne | stadion miejski | 1200
+ŁAF Łódź | bialo-czerwono-czarne | stadion miejski | 1200
+Iskra Dobroń | bialo-czerwono-czarne | stadion miejski | 1200
+Teofilek Łódź | bialo-czerwono-czarne | stadion miejski | 1200
+KAS Konstantynów Łódzki | bialo-czerwono-czarne | stadion miejski | 1200
+Boruta II Zgierz | bialo-czerwono-czarne | stadion miejski | 1200
+AKS SMS II Łódź | bialo-czerwono-czarne | stadion miejski | 1200
+Rosa Rosanów | bialo-czerwono-czarne | stadion miejski | 1200
+Włókniarz Zgierz | bialo-czerwono-czarne | stadion miejski | 1200
+Bzura Ozorków | bialo-czerwono-czarne | stadion miejski | 1200
+PSV Łódź | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA PIOTRKÓW TRYBUNALSKI
+----------------------------------------
+Omega Kleszczów | bialo-czerwono-czarne | stadion miejski | 1200
+Włókniarz Zelów | bialo-czerwono-czarne | stadion miejski | 1200
+Stal Niewiadów | bialo-czerwono-czarne | stadion miejski | 1200
+Polonia Gorzędów | bialo-czerwono-czarne | stadion miejski | 1200
+Skalnik Sulejów | bialo-czerwono-czarne | stadion miejski | 1200
+Gerlach Drzewica | bialo-czerwono-czarne | stadion miejski | 1200
+Świt Kamieńsk | bialo-czerwono-czarne | stadion miejski | 1200
+Szczerbiec Wolbórz | bialo-czerwono-czarne | stadion miejski | 1200
+GKS II Bełchatów | bialo-czerwono-czarne | stadion miejski | 1200
+Włókniarz Moszczenica | bialo-czerwono-czarne | stadion miejski | 1200
+Ceramika II Opoczno | bialo-czerwono-czarne | stadion miejski | 1200
+Lechia II Tomaszów Mazowiecki | bialo-czerwono-czarne | stadion miejski | 1200
+GUKS Gorzkowice | bialo-czerwono-czarne | stadion miejski | 1200
+Piast Gmina Lgota Wielka | bialo-czerwono-czarne | stadion miejski | 1200
+Wolanka Wola Krzysztoporska | bialo-czerwono-czarne | stadion miejski | 1200
+EBE SPN Bełchatów | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA SIERADZ
+----------------------------------------
+WKS 1957 Wieluń | bialo-czerwono-czarne | stadion miejski | 1200
+Jutrzenka Warta | bialo-czerwono-czarne | stadion miejski | 1200
+Warta II Sieradz | bialo-czerwono-czarne | stadion miejski | 1200
+UKS Galewice | bialo-czerwono-czarne | stadion miejski | 1200
+TS Janiszewice | bialo-czerwono-czarne | stadion miejski | 1200
+Warta Działoszyn | bialo-czerwono-czarne | stadion miejski | 1200
+Warta Osjaków | bialo-czerwono-czarne | stadion miejski | 1200
+Piast Błaszki | bialo-czerwono-czarne | stadion miejski | 1200
+Prosna Wieruszów | bialo-czerwono-czarne | stadion miejski | 1200
+Pogoń Zduńska Wola | bialo-czerwono-czarne | stadion miejski | 1200
+Zawisza Pajęczno | bialo-czerwono-czarne | stadion miejski | 1200
+UMKS Korab Łask | bialo-czerwono-czarne | stadion miejski | 1200
+Astoria Szczerców | bialo-czerwono-czarne | stadion miejski | 1200
+Złoczevia Złoczew | bialo-czerwono-czarne | stadion miejski | 1200
+LUKS Bałucz | bialo-czerwono-czarne | stadion miejski | 1200
+Olimpia Karsznice (Zduńska Wola) | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA SKIERNIEWICE
+----------------------------------------
+Unia II Skierniewice | bialo-czerwono-czarne | stadion miejski | 1200
+Start Brzeziny | bialo-czerwono-czarne | stadion miejski | 1200
+Mazovia Rawa Mazowiecka | bialo-czerwono-czarne | stadion miejski | 1200
+Pogoń Bełchów | bialo-czerwono-czarne | stadion miejski | 1200
+Witonianka Witonia | bialo-czerwono-czarne | stadion miejski | 1200
+Orlęta Cielądz | bialo-czerwono-czarne | stadion miejski | 1200
+UKS SMS Łódź | bialo-czerwono-czarne | stadion miejski | 1200
+SAP Andrespolia Wiśniowa Góra | bialo-czerwono-czarne | stadion miejski | 1200
+KKS Koluszki | bialo-czerwono-czarne | stadion miejski | 1200
+LKS Gałkówek | bialo-czerwono-czarne | stadion miejski | 1200
+Olimpia Chąśno | bialo-czerwono-czarne | stadion miejski | 1200
+Laktoza Łyszkowice | bialo-czerwono-czarne | stadion miejski | 1200
+Widok Skierniewice | bialo-czerwono-czarne | stadion miejski | 1200
+Korona Wejsce | bialo-czerwono-czarne | stadion miejski | 1200
+Jutrzenka Drzewce | bialo-czerwono-czarne | stadion miejski | 1200
+Juvenia Wysokienice | bialo-czerwono-czarne | stadion miejski | 1200
+
+Łącznie uwzględniono 63 drużyn w 4 grupach klasy okręgowej.

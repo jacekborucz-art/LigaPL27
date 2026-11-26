@@ -1,0 +1,36 @@
+KLASA OKRĘGOWA - WOJEWÓDZTWO PODLASKIE (PODLASKI ZPN) - SEZON 2026/2027
+============================================================
+
+UWAGA: W województwie podlaskim nie ma V ligi.
+Bezposrednio pod IV liga funkcjonuje klasa okręgowa.
+Plik obejmuje 1 grupę: podlaska.
+
+FORMAT: nazwa druzyny | barwy | stadion | pojemnosc
+
+ZASADY UZUPELNIANIA BRAKUJACYCH DANYCH:
+- jesli nie udalo sie zweryfikowac barw: bialo-czerwono-czarne
+- jesli nie udalo sie zweryfikowac nazwy stadionu: stadion miejski
+- jesli nie udalo sie zweryfikowac pojemnosci: 1200
+
+Zrodlo list druzyn: 90minut.pl
+
+GRUPA PODLASKA
+----------------------------------------
+KS II Wasilków | bialo-czerwono-czarne | stadion miejski | 1200
+Jagiellonia III Białystok | bialo-czerwono-czarne | stadion miejski | 1200
+MOSP Białystok | bialo-czerwono-czarne | stadion miejski | 1200
+Orzeł Kolno | bialo-czerwono-czarne | stadion miejski | 1200
+Unia 1976 Ciechanowiec | bialo-czerwono-czarne | stadion miejski | 1200
+Orlęta Czyżew | bialo-czerwono-czarne | stadion miejski | 1200
+Wigry II Suwałki | bialo-czerwono-czarne | stadion miejski | 1200
+Pogoń Łapy | bialo-czerwono-czarne | stadion miejski | 1200
+Cresovia Siemiatycze | bialo-czerwono-czarne | stadion miejski | 1200
+Rudnia Zabłudów | bialo-czerwono-czarne | stadion miejski | 1200
+Sparta Augustów | bialo-czerwono-czarne | stadion miejski | 1200
+Sokół 1946 Sokółka | bialo-czerwono-czarne | stadion miejski | 1200
+Narew Choroszcz | bialo-czerwono-czarne | stadion miejski | 1200
+Puszcza Hajnówka | bialo-czerwono-czarne | stadion miejski | 1200
+Sparta 1951 Szepietowo | bialo-czerwono-czarne | stadion miejski | 1200
+GKS Gródek | bialo-czerwono-czarne | stadion miejski | 1200
+
+Łącznie uwzględniono 16 drużyn w 1 grupie klasy okręgowej.

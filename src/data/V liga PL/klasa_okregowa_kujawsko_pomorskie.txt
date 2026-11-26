@@ -1,0 +1,55 @@
+KLASA OKRĘGOWA - WOJEWÓDZTWO KUJAWSKO-POMORSKIE - SEZON 2026/2027
+============================================================
+
+UWAGA: W województwie kujawsko-pomorskim nie ma V ligi.
+Bezposrednio pod IV liga funkcjonuje klasa okręgowa.
+Plik obejmuje 2 grupy: kujawsko-pomorska I i kujawsko-pomorska II.
+
+FORMAT: nazwa druzyny | barwy | stadion | pojemnosc
+
+ZASADY UZUPELNIANIA BRAKUJACYCH DANYCH:
+- jesli nie udalo sie zweryfikowac barw: bialo-czerwono-czarne
+- jesli nie udalo sie zweryfikowac nazwy stadionu: stadion miejski
+- jesli nie udalo sie zweryfikowac pojemnosci: 1200
+
+Zrodlo list druzyn: 90minut.pl
+
+GRUPA I
+----------------------------------------
+Legia Chełmża | bialo-czerwono-czarne | stadion miejski | 1200
+Pomorzanin Serock | bialo-czerwono-czarne | stadion miejski | 1200
+Grom Osie | bialo-czerwono-czarne | stadion miejski | 1200
+Polonia Bydgoszcz | bialo-czerwono-czarne | stadion miejski | 1200
+Wisła Gruczno | bialo-czerwono-czarne | stadion miejski | 1200
+Gryf Sicienko | bialo-czerwono-czarne | stadion miejski | 1200
+Olimpia II Grudziądz | bialo-czerwono-czarne | stadion miejski | 1200
+LKS Dąbrowa Chełmińska | bialo-czerwono-czarne | stadion miejski | 1200
+Elana II Toruń | bialo-czerwono-czarne | stadion miejski | 1200
+Drwęca Golub-Dobrzyń | bialo-czerwono-czarne | stadion miejski | 1200
+MUKS CWZS Bydgoszcz | bialo-czerwono-czarne | stadion miejski | 1200
+Tucholanka Tuchola | bialo-czerwono-czarne | stadion miejski | 1200
+Wda II Świecie | bialo-czerwono-czarne | stadion miejski | 1200
+Chełminianka Chełmno | bialo-czerwono-czarne | stadion miejski | 1200
+Promień Kowalewo Pomorskie | bialo-czerwono-czarne | stadion miejski | 1200
+Victoria Lisewo | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA II
+----------------------------------------
+Start Stawki | bialo-czerwono-czarne | stadion miejski | 1200
+Włocłavia Włocławek | bialo-czerwono-czarne | stadion miejski | 1200
+Spójnia Białe Błota | bialo-czerwono-czarne | stadion miejski | 1200
+Unia Gniewkowo | bialo-czerwono-czarne | stadion miejski | 1200
+Noteć Łabiszyn | bialo-czerwono-czarne | stadion miejski | 1200
+Czarni Nakło nad Notecią | bialo-czerwono-czarne | stadion miejski | 1200
+Cukrownik Fabianki | bialo-czerwono-czarne | stadion miejski | 1200
+Kujawiak Kruszyn | bialo-czerwono-czarne | stadion miejski | 1200
+Pałuczanka Żnin | bialo-czerwono-czarne | stadion miejski | 1200
+Gopło Kruszwica | bialo-czerwono-czarne | stadion miejski | 1200
+Piast Kołodziejewo | bialo-czerwono-czarne | stadion miejski | 1200
+Notecianka Pakość | bialo-czerwono-czarne | stadion miejski | 1200
+Orzeł Służewo | bialo-czerwono-czarne | stadion miejski | 1200
+Lider Włocławek | bialo-czerwono-czarne | stadion miejski | 1200
+LTP Lubanie | bialo-czerwono-czarne | stadion miejski | 1200
+Kujawianka Izbica Kujawska | bialo-czerwono-czarne | stadion miejski | 1200
+
+Łącznie uwzględniono 32 drużyn w 2 grupach klasy okręgowej.

@@ -1,0 +1,89 @@
+KLASA OKRĘGOWA - WOJEWÓDZTWO LUBELSKIE (LUBELSKI ZPN) - SEZON 2026/2027
+============================================================
+
+UWAGA: W województwie lubelskim nie ma V ligi.
+Bezposrednio pod IV liga funkcjonuje klasa okręgowa.
+Plik obejmuje 4 grupy: Biała Podlaska, Chełm, Lublin i Zamość.
+
+FORMAT: nazwa druzyny | barwy | stadion | pojemnosc
+
+ZASADY UZUPELNIANIA BRAKUJACYCH DANYCH:
+- jesli nie udalo sie zweryfikowac barw: bialo-czerwono-czarne
+- jesli nie udalo sie zweryfikowac nazwy stadionu: stadion miejski
+- jesli nie udalo sie zweryfikowac pojemnosci: 1200
+
+Zrodlo list druzyn: 90minut.pl
+
+GRUPA BIAŁA PODLASKA
+----------------------------------------
+Podlasie II Biała Podlaska | bialo-czerwono-czarne | stadion miejski | 1200
+Victoria Parczew | bialo-czerwono-czarne | stadion miejski | 1200
+Grom Kąkolewnica | bialo-czerwono-czarne | stadion miejski | 1200
+LKS Milanów | bialo-czerwono-czarne | stadion miejski | 1200
+Huragan Międzyrzec Podlaski | bialo-czerwono-czarne | stadion miejski | 1200
+Az-Bud Komarówka Podlaska | bialo-czerwono-czarne | stadion miejski | 1200
+Orzeł Czemierniki | bialo-czerwono-czarne | stadion miejski | 1200
+Lutnia Piszczac | bialo-czerwono-czarne | stadion miejski | 1200
+Granica Terespol | bialo-czerwono-czarne | stadion miejski | 1200
+ŁKS Łazy | bialo-czerwono-czarne | stadion miejski | 1200
+LZS Sielczyk (Biała Podlaska) | bialo-czerwono-czarne | stadion miejski | 1200
+KS Drelów | bialo-czerwono-czarne | stadion miejski | 1200
+Orlęta II Łuków | bialo-czerwono-czarne | stadion miejski | 1200
+Absolwent Domaszewnica | bialo-czerwono-czarne | stadion miejski | 1200
+Unia Krzywda | bialo-czerwono-czarne | stadion miejski | 1200
+Sokół Adamów | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA CHEŁM
+----------------------------------------
+Eko Różanka | bialo-czerwono-czarne | stadion miejski | 1200
+Granica Dorohusk | bialo-czerwono-czarne | stadion miejski | 1200
+Ogniwo Wierzbica | bialo-czerwono-czarne | stadion miejski | 1200
+Frassati Fajsławice | bialo-czerwono-czarne | stadion miejski | 1200
+Ruch Izbica | bialo-czerwono-czarne | stadion miejski | 1200
+Chełmianka II Chełm | bialo-czerwono-czarne | stadion miejski | 1200
+Vitrum Wola Uhruska | bialo-czerwono-czarne | stadion miejski | 1200
+Włodawianka Włodawa | bialo-czerwono-czarne | stadion miejski | 1200
+Hetman Żółkiewka | bialo-czerwono-czarne | stadion miejski | 1200
+Orzeł Srebrzyszcze | bialo-czerwono-czarne | stadion miejski | 1200
+Brat Siennica Nadolna | bialo-czerwono-czarne | stadion miejski | 1200
+Kłos Gmina Chełm | bialo-czerwono-czarne | stadion miejski | 1200
+Unia Rejowiec | bialo-czerwono-czarne | stadion miejski | 1200
+GKS Łopiennik | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA LUBLIN
+----------------------------------------
+KS Drzewce | bialo-czerwono-czarne | stadion miejski | 1200
+Hetman Gołąb | bialo-czerwono-czarne | stadion miejski | 1200
+Polesie Kock | bialo-czerwono-czarne | stadion miejski | 1200
+POM Iskra Piotrowice | bialo-czerwono-czarne | stadion miejski | 1200
+Wiara Łęczna | bialo-czerwono-czarne | stadion miejski | 1200
+Cisy Nałęczów | bialo-czerwono-czarne | stadion miejski | 1200
+Opolanin Opole Lubelskie | bialo-czerwono-czarne | stadion miejski | 1200
+Stal Poniatowa | bialo-czerwono-czarne | stadion miejski | 1200
+Orion Niedrzwica Duża | bialo-czerwono-czarne | stadion miejski | 1200
+Sygnał Lublin | bialo-czerwono-czarne | stadion miejski | 1200
+Trawena Trawniki | bialo-czerwono-czarne | stadion miejski | 1200
+Amator Rososz-Leopoldów | bialo-czerwono-czarne | stadion miejski | 1200
+LKS Kamionka (k. Lublina) | bialo-czerwono-czarne | stadion miejski | 1200
+Piaskovia Piaski | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA ZAMOŚĆ
+----------------------------------------
+Graf Chodywańce | bialo-czerwono-czarne | stadion miejski | 1200
+Tanew Majdan Stary | bialo-czerwono-czarne | stadion miejski | 1200
+Gryf Gmina Zamość | bialo-czerwono-czarne | stadion miejski | 1200
+BKS Bodaczów | bialo-czerwono-czarne | stadion miejski | 1200
+Sokół Zwierzyniec | bialo-czerwono-czarne | stadion miejski | 1200
+Pogoń 96 Łaszczówka | bialo-czerwono-czarne | stadion miejski | 1200
+Igros Krasnobród | bialo-czerwono-czarne | stadion miejski | 1200
+Kryształ Werbkowice | bialo-czerwono-czarne | stadion miejski | 1200
+Omega Stary Zamość | bialo-czerwono-czarne | stadion miejski | 1200
+Korona Łaszczów | bialo-czerwono-czarne | stadion miejski | 1200
+Andoria Mircze | bialo-czerwono-czarne | stadion miejski | 1200
+Huragan Hrubieszów | bialo-czerwono-czarne | stadion miejski | 1200
+Olimpiakos Tarnogród | bialo-czerwono-czarne | stadion miejski | 1200
+Błękitni Obsza | bialo-czerwono-czarne | stadion miejski | 1200
+Huczwa Tyszowce | bialo-czerwono-czarne | stadion miejski | 1200
+Sparta Łabunie | bialo-czerwono-czarne | stadion miejski | 1200
+
+Łącznie uwzględniono 60 drużyn w 4 grupach klasy okręgowej.

@@ -16,7 +16,8 @@ import { standings } from './standings.js';
 import { createCup, drawRound, winnerOf, tieWinner, superCupFixture, PP_ROUNDS, PP_NAMES, moodResult, compRank, tieMood } from './cup.js';
 import { LEAGUE_COMPS, TIER_COMP, L3_COMPS, isL3Comp, compOfClub, compClubIds, classKeyOfComp, LEAGUE_CLASS_KEYS, rulesCompOfClass } from './leagueComps.js';
 import { familySquad, matchGuests, noteFamilyMatch, serveFamilySuspensions, closeFixture } from '../career/reserves.js';
-import { reserveMayPlayIn } from './leagues.js';
+import { reserveMayPlayIn, knownClub } from './leagues.js';
+import { buildFourthLeague } from './fourthLeague.js'; // IV liga bez kadr (docs/iv-liga.md)
 import { squadOf } from '../world/worldGen.js';
 import { ephemeralSquad } from '../world/ephemeral.js';
 import { quickMatch, quickKnockout, QS } from '../engine/quickSim.js';
@@ -40,7 +41,7 @@ import { quickEvents, engineEvents, packReport, LEAVE } from './matchReport.js';
 export { LEAGUE_COMPS, L3_COMPS, isL3Comp, compOfClub, compClubIds };
 const ALL_CLUBS = [...CLUBS_PL, ...CLUBS_L3, ...CLUBS_L4, ...UEFA_CLUBS];
 const CLUB_INDEX = new Map(ALL_CLUBS.map((c) => [c.id, c]));
-export const anyClub = (id) => CLUB_INDEX.get(id) ?? null;
+export const anyClub = (id) => CLUB_INDEX.get(id) ?? knownClub(id); // knownClub: kluby z poziomu 6 z zapisu gry
 // Rejestr kartek i pauz: liga per klasa (ekstraklasa, liga1, liga2, liga3), baraże w klasie klubu (clubId), PP 'cup', UEFA 'uefa'
 export const suspKey = (comp, clubId = null) => classKeyOfComp(comp, clubId ? tierOf(clubId) : null);
 
@@ -59,7 +60,8 @@ function busyFactory(superCup) {
   return (club, date) => (busy.get(club) ?? []).some((d) => near(d, date));
 }
 
-export function createSeason(seed, { playerClub = null, superCup = ['lech', 'gornik-zabrze'], holder, uefaHolders = HOLDERS_2026 } = {}) {
+/** l4Seed: ziarno gry w karierze z IV ligą (docs/iv-liga.md): terminarz 16 grup w season.l4; bez niego (stare zapisy) brak IV ligi. */
+export function createSeason(seed, { playerClub = null, superCup = ['lech', 'gornik-zabrze'], holder, uefaHolders = HOLDERS_2026, l4Seed = null } = {}) {
   const rng = new Rng(`sezon:${seed}`);
   const busy = busyFactory(superCup);
   const fixtures = [];
@@ -84,7 +86,7 @@ export function createSeason(seed, { playerClub = null, superCup = ['lech', 'gor
   if (superCupEU && (clubById(superCupEU.home) || clubById(superCupEU.away))) fixtures.push(superCupEUFixture(superCupEU));
   fixtures.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
   // Puchary UEFA: losowania i mecze dzień po dniu (src/season/europe.js)
-  return { fixtures, cup, playoffs: {}, seasonId: SEASON, superCup, superCupEU, uefa: createUefa(seed, holder ? { holder } : {}) };
+  return { fixtures, cup, playoffs: {}, seasonId: SEASON, superCup, superCupEU, uefa: createUefa(seed, holder ? { holder } : {}), ...(l4Seed != null ? { l4: buildFourthLeague(l4Seed, SEASON_YEAR) } : {}) };
 }
 
 /** Terminy kolejek III ligi: weekendy, środa tylko poza oknami rund Pucharu Polski (docs/iii-liga.md). */

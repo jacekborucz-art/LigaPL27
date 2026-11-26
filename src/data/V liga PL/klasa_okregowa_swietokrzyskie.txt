@@ -1,0 +1,36 @@
+KLASA OKRĘGOWA - WOJEWÓDZTWO ŚWIĘTOKRZYSKIE (ŚWIĘTOKRZYSKI ZPN) - SEZON 2026/2027
+============================================================
+
+UWAGA: W województwie świętokrzyskim nie ma V ligi.
+Bezposrednio pod IV liga funkcjonuje klasa okręgowa.
+Plik obejmuje 1 grupę: świętokrzyska.
+
+FORMAT: nazwa druzyny | barwy | stadion | pojemnosc
+
+ZASADY UZUPELNIANIA BRAKUJACYCH DANYCH:
+- jesli nie udalo sie zweryfikowac barw: bialo-czerwono-czarne
+- jesli nie udalo sie zweryfikowac nazwy stadionu: stadion miejski
+- jesli nie udalo sie zweryfikowac pojemnosci: 1200
+
+Zrodlo list druzyn: 90minut.pl
+
+GRUPA ŚWIĘTOKRZYSKA
+----------------------------------------
+Nida Pińczów | bialo-czerwono-czarne | stadion miejski | 1200
+Partyzant Radoszyce | bialo-czerwono-czarne | stadion miejski | 1200
+Łysica Bodzentyn | bialo-czerwono-czarne | stadion miejski | 1200
+GKS Górno | bialo-czerwono-czarne | stadion miejski | 1200
+GOKiS Masłów | bialo-czerwono-czarne | stadion miejski | 1200
+Pogoń 1945 Staszów | bialo-czerwono-czarne | stadion miejski | 1200
+Unia Sędziszów | bialo-czerwono-czarne | stadion miejski | 1200
+Wisła Sandomierz | bialo-czerwono-czarne | stadion miejski | 1200
+Astra Piekoszów | bialo-czerwono-czarne | stadion miejski | 1200
+Star II Starachowice | bialo-czerwono-czarne | stadion miejski | 1200
+Kamienna Brody | bialo-czerwono-czarne | stadion miejski | 1200
+Lechia Strawczyn | bialo-czerwono-czarne | stadion miejski | 1200
+LZS Samborzec | bialo-czerwono-czarne | stadion miejski | 1200
+Zenit Chmielnik | bialo-czerwono-czarne | stadion miejski | 1200
+Partyzant Wodzisław | bialo-czerwono-czarne | stadion miejski | 1200
+Victoria Mniów | bialo-czerwono-czarne | stadion miejski | 1200
+
+Łącznie uwzględniono 16 drużyn w 1 grupie klasy okręgowej.

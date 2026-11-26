@@ -1,0 +1,74 @@
+KLASA OKRĘGOWA - WOJEWÓDZTWO POMORSKIE (POMORSKI ZPN) - SEZON 2026/2027
+============================================================
+
+UWAGA: W województwie pomorskim nie ma V ligi.
+Bezposrednio pod IV liga funkcjonuje klasa okręgowa.
+Plik obejmuje 3 grupy: Gdańsk I, Gdańsk II i Słupsk.
+
+FORMAT: nazwa druzyny | barwy | stadion | pojemnosc
+
+ZASADY UZUPELNIANIA BRAKUJACYCH DANYCH:
+- jesli nie udalo sie zweryfikowac barw: bialo-czerwono-czarne
+- jesli nie udalo sie zweryfikowac nazwy stadionu: stadion miejski
+- jesli nie udalo sie zweryfikowac pojemnosci: 1200
+
+Zrodlo list druzyn: 90minut.pl
+
+GRUPA GDAŃSK I
+----------------------------------------
+Tylko Lechia Gdańsk | bialo-czerwono-czarne | stadion miejski | 1200
+Bałtyk Gdynia | bialo-czerwono-czarne | stadion miejski | 1200
+Salos Rumia | bialo-czerwono-czarne | stadion miejski | 1200
+GKS Kolbudy | bialo-czerwono-czarne | stadion miejski | 1200
+Wikęd II Luzino | bialo-czerwono-czarne | stadion miejski | 1200
+KS Chwaszczyno | bialo-czerwono-czarne | stadion miejski | 1200
+Latarnik Choczewo | bialo-czerwono-czarne | stadion miejski | 1200
+Orzeł Trąbki Wielkie | bialo-czerwono-czarne | stadion miejski | 1200
+MKS Władysławowo | bialo-czerwono-czarne | stadion miejski | 1200
+AP GKS Kowale | bialo-czerwono-czarne | stadion miejski | 1200
+Orlęta Reda | bialo-czerwono-czarne | stadion miejski | 1200
+Jaguar II Gdańsk | bialo-czerwono-czarne | stadion miejski | 1200
+Gedania II Gdańsk | bialo-czerwono-czarne | stadion miejski | 1200
+Orzeł Straszyn | bialo-czerwono-czarne | stadion miejski | 1200
+Amator Kiełpino | bialo-czerwono-czarne | stadion miejski | 1200
+Osiczanka Osice | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA GDAŃSK II
+----------------------------------------
+Pomezania Malbork | bialo-czerwono-czarne | stadion miejski | 1200
+Gryf Tczew | bialo-czerwono-czarne | stadion miejski | 1200
+Żuławy Nowy Dwór Gdański | bialo-czerwono-czarne | stadion miejski | 1200
+Kaszubia Kościerzyna | bialo-czerwono-czarne | stadion miejski | 1200
+Pogoń Prabuty | bialo-czerwono-czarne | stadion miejski | 1200
+Styna Godziszewo | bialo-czerwono-czarne | stadion miejski | 1200
+Wietcisa Skarszewy | bialo-czerwono-czarne | stadion miejski | 1200
+GDKiS Ostaszewo | bialo-czerwono-czarne | stadion miejski | 1200
+Rodło Kwidzyn | bialo-czerwono-czarne | stadion miejski | 1200
+Supra Kwidzyn | bialo-czerwono-czarne | stadion miejski | 1200
+Centrum Pelplin | bialo-czerwono-czarne | stadion miejski | 1200
+KS Skorzewo | bialo-czerwono-czarne | stadion miejski | 1200
+Relax Ryjewo | bialo-czerwono-czarne | stadion miejski | 1200
+Victoria Kaliska | bialo-czerwono-czarne | stadion miejski | 1200
+Kolejarz Chojnice | bialo-czerwono-czarne | stadion miejski | 1200
+Błękitni Stare Pole | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA SŁUPSK
+----------------------------------------
+Bytovia Bytów | bialo-czerwono-czarne | stadion miejski | 1200
+Sokół Wyczechy | bialo-czerwono-czarne | stadion miejski | 1200
+Piast Człuchów | bialo-czerwono-czarne | stadion miejski | 1200
+Stal Jezierzyce | bialo-czerwono-czarne | stadion miejski | 1200
+Lew Lębork | bialo-czerwono-czarne | stadion miejski | 1200
+Gryf II Słupsk | bialo-czerwono-czarne | stadion miejski | 1200
+Skotawia Dębnica Kaszubska | bialo-czerwono-czarne | stadion miejski | 1200
+Jantar Ustka | bialo-czerwono-czarne | stadion miejski | 1200
+Start Miastko | bialo-czerwono-czarne | stadion miejski | 1200
+KS Włynkówko | bialo-czerwono-czarne | stadion miejski | 1200
+Słupia Kobylnica | bialo-czerwono-czarne | stadion miejski | 1200
+Myśliwiec Tuchomie | bialo-czerwono-czarne | stadion miejski | 1200
+Kaszubia Studzienice | bialo-czerwono-czarne | stadion miejski | 1200
+Granit Kończewo | bialo-czerwono-czarne | stadion miejski | 1200
+Pomorze Potęgowo | bialo-czerwono-czarne | stadion miejski | 1200
+Start Łeba | bialo-czerwono-czarne | stadion miejski | 1200
+
+Łącznie uwzględniono 48 drużyn w 3 grupach klasy okręgowej.

@@ -20,6 +20,9 @@ export const DOMESTIC = {
   // Mecze w soboty i niedziele (jedna kolejka w środę, gdy brakuje weekendów). Baraże: półfinały wicemistrzów grup
   // (jeden mecz), potem dwumecz z 13. i 14. drużyną 2 Ligi (pierwszy mecz u drużyny z III ligi).
   liga3: { start: '2026-07-31', autumnEnd: '2026-11-29', springStart: '2027-02-26', end: '2027-06-06', playoffSemis: '2027-06-09', playoffLeg1: '2027-06-13', playoffLeg2: '2027-06-16', sure: false },
+  // IV liga [SZAC] (docs/iv-liga.md): kolejki w terminach III ligi (mniejsze grupy zaczynają później), baraże wicemistrzów
+  // województw w makroregionie: półfinał i finał po jednym meczu, dogrywka i karne.
+  liga4: { playoffSemis: '2027-06-09', playoffFinal: '2027-06-13', sure: false },
   pucharPolski: {
     rounds: [
       { id: 'PRE', date: '2026-08-05', window: ['2026-08-04', '2026-08-06'], sure: false },

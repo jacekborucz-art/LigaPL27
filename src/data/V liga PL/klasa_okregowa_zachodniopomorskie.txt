@@ -1,0 +1,93 @@
+KLASA OKRĘGOWA - WOJEWÓDZTWO ZACHODNIOPOMORSKIE (ZACHODNIOPOMORSKI ZPN) - SEZON 2026/2027
+============================================================
+
+UWAGA: W województwie zachodniopomorskim nie ma V ligi.
+Bezposrednio pod IV liga funkcjonuje klasa okręgowa.
+Plik obejmuje 4 grupy: zachodniopomorska I, II, III i IV.
+
+FORMAT: nazwa druzyny | barwy | stadion | pojemnosc
+
+ZASADY UZUPELNIANIA BRAKUJACYCH DANYCH:
+- jesli nie udalo sie zweryfikowac barw: bialo-czerwono-czarne
+- jesli nie udalo sie zweryfikowac nazwy stadionu: stadion miejski
+- jesli nie udalo sie zweryfikowac pojemnosci: 1200
+
+Zrodlo list druzyn: 90minut.pl
+
+GRUPA ZACHODNIOPOMORSKA I
+----------------------------------------
+Pomorzanin 1964 Nowogard | bialo-czerwono-czarne | stadion miejski | 1200
+Polonia Płoty | bialo-czerwono-czarne | stadion miejski | 1200
+Rega Trzebiatów | bialo-czerwono-czarne | stadion miejski | 1200
+Ina Goleniów | bialo-czerwono-czarne | stadion miejski | 1200
+Masovia Maszewo | bialo-czerwono-czarne | stadion miejski | 1200
+AP Kotwica Kołobrzeg | bialo-czerwono-czarne | stadion miejski | 1200
+Gryf Kamień Pomorski | bialo-czerwono-czarne | stadion miejski | 1200
+Prawobrzeże Świnoujście | bialo-czerwono-czarne | stadion miejski | 1200
+Flota II Świnoujście | bialo-czerwono-czarne | stadion miejski | 1200
+Iskra Golczewo | bialo-czerwono-czarne | stadion miejski | 1200
+Bizon Cerkwica | bialo-czerwono-czarne | stadion miejski | 1200
+Korona Stuchowo | bialo-czerwono-czarne | stadion miejski | 1200
+Pomorzanin Sławoborze | bialo-czerwono-czarne | stadion miejski | 1200
+Światowid 63 Łobez | bialo-czerwono-czarne | stadion miejski | 1200
+Olimp Gościno | bialo-czerwono-czarne | stadion miejski | 1200
+Jantar Dziwnów | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA ZACHODNIOPOMORSKA II
+----------------------------------------
+Rybak Trzebież | bialo-czerwono-czarne | stadion miejski | 1200
+Stal Szczecin | bialo-czerwono-czarne | stadion miejski | 1200
+Energetyk Gryfino | bialo-czerwono-czarne | stadion miejski | 1200
+Osadnik Myślibórz | bialo-czerwono-czarne | stadion miejski | 1200
+GKS Kołbacz | bialo-czerwono-czarne | stadion miejski | 1200
+KS Wołczkowo-Bezrzecze | bialo-czerwono-czarne | stadion miejski | 1200
+Jeziorak Załom (Szczecin) | bialo-czerwono-czarne | stadion miejski | 1200
+Odra Chojna | bialo-czerwono-czarne | stadion miejski | 1200
+Morzycko Moryń | bialo-czerwono-czarne | stadion miejski | 1200
+Mierzynianka Mierzyn | bialo-czerwono-czarne | stadion miejski | 1200
+Hutnik Szczecin | bialo-czerwono-czarne | stadion miejski | 1200
+Iskra Banie | bialo-czerwono-czarne | stadion miejski | 1200
+Kasta/Żaki Szczecin | bialo-czerwono-czarne | stadion miejski | 1200
+FASE Szczecin | bialo-czerwono-czarne | stadion miejski | 1200
+Okręt Szczecin | bialo-czerwono-czarne | stadion miejski | 1200
+GKS Kołbaskowo/Przecław | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA ZACHODNIOPOMORSKA III
+----------------------------------------
+Gryf Polanów | bialo-czerwono-czarne | stadion miejski | 1200
+Darłovia Darłowo | bialo-czerwono-czarne | stadion miejski | 1200
+Sokół Karlino | bialo-czerwono-czarne | stadion miejski | 1200
+Wieża Postomino | bialo-czerwono-czarne | stadion miejski | 1200
+Victoria Sianów | bialo-czerwono-czarne | stadion miejski | 1200
+Zefir Wyszewo | bialo-czerwono-czarne | stadion miejski | 1200
+Iskra Białogard | bialo-czerwono-czarne | stadion miejski | 1200
+Gwardia II Koszalin | bialo-czerwono-czarne | stadion miejski | 1200
+Pogoń Połczyn Zdrój | bialo-czerwono-czarne | stadion miejski | 1200
+Głaz Tychowo | bialo-czerwono-czarne | stadion miejski | 1200
+Zawisza Grzmiąca | bialo-czerwono-czarne | stadion miejski | 1200
+Mechanik Bobolice | bialo-czerwono-czarne | stadion miejski | 1200
+Sława Sławno | bialo-czerwono-czarne | stadion miejski | 1200
+Bajgiel Będzino | bialo-czerwono-czarne | stadion miejski | 1200
+Pogoń Wierzchowo | bialo-czerwono-czarne | stadion miejski | 1200
+LZS Kowalewice | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA ZACHODNIOPOMORSKA IV
+----------------------------------------
+Unia Dolice | bialo-czerwono-czarne | stadion miejski | 1200
+Zorza Dobrzany | bialo-czerwono-czarne | stadion miejski | 1200
+Kluczevia II Stargard | bialo-czerwono-czarne | stadion miejski | 1200
+Błękitni II Stargard | bialo-czerwono-czarne | stadion miejski | 1200
+Sokół Pyrzyce | bialo-czerwono-czarne | stadion miejski | 1200
+Calisia Kalisz Pomorski | bialo-czerwono-czarne | stadion miejski | 1200
+Klon Krzęcin | bialo-czerwono-czarne | stadion miejski | 1200
+Kłos Pełczyce | bialo-czerwono-czarne | stadion miejski | 1200
+Rolpol Rossow Chlebowo | bialo-czerwono-czarne | stadion miejski | 1200
+Mechanik Warnice | bialo-czerwono-czarne | stadion miejski | 1200
+Błękitni Pomierzyn | bialo-czerwono-czarne | stadion miejski | 1200
+Remor Recz | bialo-czerwono-czarne | stadion miejski | 1200
+Olimp Złocieniec | bialo-czerwono-czarne | stadion miejski | 1200
+Dąbrovia Stara Dąbrowa | bialo-czerwono-czarne | stadion miejski | 1200
+Piast Karsko | bialo-czerwono-czarne | stadion miejski | 1200
+Piast Chociwel | bialo-czerwono-czarne | stadion miejski | 1200
+
+Łącznie uwzględniono 64 drużyn w 4 grupach klasy okręgowej.

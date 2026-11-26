@@ -46,6 +46,7 @@ import { ownershipRollover, noteOwnerCrisis, newOwnerCoaches, newOwnerBoard, own
 import { licenceVerdicts, licenceFailed, debtNewSeason, transferBan, emergencySquadFill } from '../career/arrears.js'; // długi, zaległości, licencja
 import { goalText } from '../career/board.js';
 import { setPointDeductions } from './standings.js';
+import { fourthLeagueResults, fourthLeagueArchive, fourthLeagueSeasonLines } from './fourthLeague.js'; // IV liga (docs/iv-liga.md)
 
 const TIER_COMP = { 1: 'ekstraklasa', 2: 'liga1', 3: 'liga2' };
 const fmtCoef = (x) => (Math.round(x * 1000) / 1000).toFixed(3).replace('.', ',');
@@ -87,7 +88,8 @@ export function seasonResults(game) {
   const cup = { winner: game.season.cup?.champion ?? (ppF ? winnerOf(ppF) : null), runnerUp: ppF ? [ppF.home, ppF.away].find((x) => x !== winnerOf(ppF)) : null };
   const U = game.season.uefa;
   const uefa = U ? Object.fromEntries(Object.entries(U.comps).map(([k, c]) => [k, c.champion])) : {};
-  return { tables, rows, groupTables, groupRows, playoffWinners, l3Playoff, cup, uefa };
+  const l4 = fourthLeagueResults(game); // IV liga: tabele 16 grup i zwycięzcy baraży (tylko kariery z IV ligą)
+  return { tables, rows, groupTables, groupRows, playoffWinners, l3Playoff, cup, uefa, l4 };
 }
 
 // ------------------------------------------------------------ Puchary na kolejny sezon
@@ -250,7 +252,7 @@ export function rolloverSeason(game) {
   // Ruchy między ligami (III liga z tabel grup i baraży, IV liga: uzupełnienie grup, docs/iii-liga.md)
   // Kluby bez licencji (zaległości wobec zawodników 30 czerwca, src/career/arrears.js): spadek albo kara punktowa
   const lic = licenceVerdicts(game, oldYear);
-  const moves = computeMoves(res.tables, res.playoffWinners, res.groupTables, rng.fork('ligi'), { l3Playoff: res.l3Playoff, licence: lic.drops });
+  const moves = computeMoves(res.tables, res.playoffWinners, res.groupTables, rng.fork('ligi'), { l3Playoff: res.l3Playoff, licence: lic.drops, l4: res.l4 });
   const tiers4 = Object.fromEntries(Object.entries(moves.tiers).filter(([, t]) => t <= 4));
   const errors = validateTiers(tiers4, moves.groups);
   const europe = polandNextSeason(game, res);
@@ -270,6 +272,7 @@ export function rolloverSeason(game) {
     l3: Object.fromEntries(L3_GROUPS.map((g) => [g, res.groupRows[g].map((r) => ({ id: r.id, pts: r.points, gd: r.gf - r.ga }))])),
     l3Playoff: (moves.l3Playoff ?? []).map((x) => ({ keeper: x.keeper, challenger: x.challenger, winner: x.winner })),
     user: uid ? { club: uid, tier: userTier, pos: userPos, ...(userTier === 4 ? { group: userGroup } : {}) } : null, promoted: moves.promoted, relegated: moves.relegated, polandRank: europe.rankNow, polandAccessRank: europe.rank,
+    ...(res.l4 ? { l4: fourthLeagueArchive(res.l4, moves) } : {}), // IV liga: mistrzowie i ruchy (bez tabel)
   }].slice(-15);
 
   // Nowy sezon: kalendarz, ligi. Zapis tylko odstępstw od danych (kluby w innej lidze lub grupie niż na start gry)
@@ -283,6 +286,8 @@ export function rolloverSeason(game) {
     tiers: Object.fromEntries(Object.entries(merged).filter(([id, t]) => knownClub(id) && knownClub(id).tier0 !== t)),
     groups: Object.fromEntries(Object.entries(moves.groups).filter(([id]) => merged[id] === 4 && (knownClub(id)?.tier0 !== 4 || knownClub(id)?.group0 !== moves.groups[id]))),
     ...(userDown ? { keep: [uid] } : {}),
+    // Kluby z poziomu 6 (pliki właściciela), które grały w IV lidze: dane w zapisie, niezależne od plików
+    ...(prev.extra || Object.keys(moves.extra ?? {}).length ? { extra: { ...prev.extra, ...moves.extra } } : {}),
   };
   game.seasonYear = year;
   coachesNewSeason(game, year); // trenerzy AI: rok starsi, doświadczenie albo spadek formy (career/coaches.js)
@@ -392,7 +397,7 @@ export function rolloverSeason(game) {
   Object.assign(game.market, { listed: {}, talks: {}, offers: [], userListed: {}, history: game.market.history.slice(0, 150) });
   const champion = res.tables[1][0];
   const cupWinner = res.cup.winner && res.cup.winner !== champion ? res.cup.winner : res.tables[1][1];
-  game.season = createSeason(`${game.seed}:${year}`, { playerClub: uid && !fired ? uid : null, superCup: [champion, cupWinner], holder: res.uefa.LM ?? undefined, uefaHolders: res.uefa });
+  game.season = createSeason(`${game.seed}:${year}`, { playerClub: uid && !fired ? uid : null, superCup: [champion, cupWinner], holder: res.uefa.LM ?? undefined, uefaHolders: res.uefa, l4Seed: res.l4 ? game.seed : null });
   game.season.polishEurope = polishEurope;
   game.fixtures = game.season.fixtures;
   // Długi: dopłaty właścicieli podsumowane, zaległości spłacone przez nowego właściciela, kara za brak licencji
@@ -413,7 +418,7 @@ export function rolloverSeason(game) {
       `Awans do 1 Ligi: ${list(moves.promoted[2])}. Spadek z 1 Ligi: ${list(moves.relegated[3])}.`,
       `Awans do 2 Ligi z III ligi: ${list(moves.promoted[3])}. Spadek do III ligi: ${list(moves.relegated[4])}.`,
       ...(moves.l3Playoff ?? []).map((x) => `Baraż o 2 Ligę: ${name(x.keeper)} - ${name(x.challenger)}, wygrywa ${name(x.winner)}.`),
-      `Awans do III ligi z IV ligi: ${list(moves.promoted[4])}. Spadek do IV ligi: ${list(moves.relegated[5])}.`,
+      ...(moves.l4Down ? [`Spadek z III ligi do IV ligi: ${list(moves.relegated[5])}.`, ...fourthLeagueSeasonLines(moves)] : [`Awans do III ligi z IV ligi: ${list(moves.promoted[4])}. Spadek do IV ligi: ${list(moves.relegated[5])}.`]),
       ...moves.notes.filter((n) => n.kind === 'reserve').map((n) => `${name(n.id)}: przeniesienie administracyjne (rezerwy muszą grać niżej niż pierwsza drużyna).`),
       ...moves.notes.filter((n) => n.kind === 'licence').map((n) => `${name(n.id)}: brak licencji (zaległości wobec zawodników), gra niżej: ${leagueLabel({ tier: n.to })}.`),
       ...Object.keys(lic.points).map((id) => `${name(id)}: brak licencji (zaległości wobec zawodników), zaczyna sezon z karą ${lic.points[id]} punktów.`),

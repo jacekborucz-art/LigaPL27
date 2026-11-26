@@ -1,0 +1,54 @@
+V LIGA - WOJEWÓDZTWO ŚLĄSKIE (ŚLĄSKI ZPN) - SEZON 2025/2026
+============================================================
+
+UWAGA: W województwie śląskim istnieje V liga.
+Plik obejmuje 2 grupy: śląska I i śląska II.
+
+FORMAT: nazwa druzyny | barwy | stadion | pojemnosc
+
+ZASADY UZUPELNIANIA BRAKUJACYCH DANYCH:
+- jesli nie udalo sie zweryfikowac barw: bialo-czerwono-czarne
+- jesli nie udalo sie zweryfikowac nazwy stadionu: stadion miejski
+- jesli nie udalo sie zweryfikowac pojemnosci: 1200
+
+Zrodlo list druzyn: 90minut.pl
+
+GRUPA ŚLĄSKA I
+----------------------------------------
+Gwarek Ornontowice | bialo-czerwono-czarne | stadion miejski | 1200
+Zagłębie II Sosnowiec | bialo-czerwono-czarne | stadion miejski | 1200
+Pilica Koniecpol | bialo-czerwono-czarne | stadion miejski | 1200
+CKS Czeladź (2) | bialo-czerwono-czarne | stadion miejski | 1200
+Górnik Piaski (Czeladź) | bialo-czerwono-czarne | stadion miejski | 1200
+Orzeł Miedary | bialo-czerwono-czarne | stadion miejski | 1200
+Sarmacja Będzin | bialo-czerwono-czarne | stadion miejski | 1200
+Unia Rędziny | bialo-czerwono-czarne | stadion miejski | 1200
+Liswarta Krzepice | bialo-czerwono-czarne | stadion miejski | 1200
+Odra Miasteczko Śląskie | bialo-czerwono-czarne | stadion miejski | 1200
+Śląsk Świętochłowice | bialo-czerwono-czarne | stadion miejski | 1200
+Unia Dąbrowa Górnicza | bialo-czerwono-czarne | stadion miejski | 1200
+AKS Mikołów | bialo-czerwono-czarne | stadion miejski | 1200
+Jedność 32 Przyszowice | bialo-czerwono-czarne | stadion miejski | 1200
+Start Sierakowice | bialo-czerwono-czarne | stadion miejski | 1200
+Zieloni Żarki | bialo-czerwono-czarne | stadion miejski | 1200
+
+GRUPA ŚLĄSKA II
+----------------------------------------
+Rekord II Bielsko-Biała | bialo-czerwono-czarne | stadion miejski | 1200
+LKS Czaniec | bialo-czerwono-czarne | stadion miejski | 1200
+LKS II Goczałkowice Zdrój | bialo-czerwono-czarne | stadion miejski | 1200
+Start Mszana | bialo-czerwono-czarne | stadion miejski | 1200
+LKS Tworków | bialo-czerwono-czarne | stadion miejski | 1200
+Forteca Świerklany | bialo-czerwono-czarne | stadion miejski | 1200
+Stal-Śrubiarnia Żywiec | bialo-czerwono-czarne | stadion miejski | 1200
+Tempo Puńców | bialo-czerwono-czarne | stadion miejski | 1200
+Beskid 09 Skoczów | bialo-czerwono-czarne | stadion miejski | 1200
+Błyskawica Drogomyśl | bialo-czerwono-czarne | stadion miejski | 1200
+GLKS Wilkowice | bialo-czerwono-czarne | stadion miejski | 1200
+BKS Stal Bielsko-Biała | bialo-czerwono-czarne | stadion miejski | 1200
+MKS Lędziny | bialo-czerwono-czarne | stadion miejski | 1200
+Pasjonat Dankowice | bialo-czerwono-czarne | stadion miejski | 1200
+Góral Istebna | bialo-czerwono-czarne | stadion miejski | 1200
+Pniówek Pawłowice | bialo-czerwono-czarne | stadion miejski | 1200
+
+Łącznie uwzględniono 32 drużyn w 2 grupach V ligi.

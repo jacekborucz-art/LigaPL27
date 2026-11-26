@@ -21,7 +21,7 @@ const BASE = new URL('./perf-baseline.json', import.meta.url);
 const t0 = performance.now();
 const g = { seed: Number(seedArg), clubId: club, date: '2026-07-01', season: '2026/27', inbox: [] };
 g.world = generateWorld(g.seed);
-g.season = createSeason(g.seed, { playerClub: club });
+g.season = createSeason(g.seed, { playerClub: club, l4Seed: g.seed }); // nowa kariera: z IV ligą (docs/iv-liga.md)
 g.fixtures = g.season.fixtures;
 g.tactics = createTactics(squadOf(g.world, club));
 TR.ensureTraining?.(g); CS.ensureCareer?.(g);
