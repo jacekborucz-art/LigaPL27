@@ -131,6 +131,7 @@ export function captainWeek(game, date) {
     let leader = null; let lb = -1;
     for (const p of core) {
       if (p.persona !== 'Lider' && (p.attr?.LID ?? 0) < CAPT.snubLid) continue;
+      if (p.injuryDays > 0) continue; // kontuzjowany nie oczekuje opaski (Nov 26, 2026): licznik i niezadowolenie znikają
       const b = captainBase(p);
       if (b > lb) { lb = b; leader = p; }
     }

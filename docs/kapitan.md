@@ -63,6 +63,7 @@ Test: `tests/captain.test.mjs`.
 - Naturalny lider (najwyższe B wśród podstawowych z osobowością Lider albo LID 15+) bez opaski, gdy kapitan ma B poniżej
   0,8 B lidera: -0,3 morale co tydzień, po 6 tygodniach niezadowolenie (`p.capSnub`, `p.capSnubU`; chętniej rozmawia
   o odejściu, `PM.snubbed` +0,1). Opaska dla lidera albo lepszy kapitan zdejmuje karę i to niezadowolenie.
+  Kontuzjowany zawodnik nie jest pominiętym liderem (od Nov 26, 2026): licznik i niezadowolenie znikają, po powrocie liczą się od nowa.
 - Kapitan poniżej 21 lat: C x0,75, zawodnicy 30+ -0,1 morale w pierwszy poniedziałek miesiąca.
 - Dwie zmiany opaski z wyboru w odstępie poniżej 6 tygodni: -0,1 morale całej kadry co tydzień przez 6 tygodni od ostatniej
   zmiany. Pierwszy wybór w zapisie i wybór następcy po odejściu kapitana z klubu się nie liczą.

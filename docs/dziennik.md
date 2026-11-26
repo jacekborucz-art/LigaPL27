@@ -29,6 +29,10 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 26, 2026, profil A (komputer domowy), kontuzjowany lider nie jest pominięty (v1.25 Beta)
+Zrobione: `captainWeek` (`career/captaincy.js`) pomija kontuzjowanych przy wyborze naturalnego lidera, więc kontuzjowany
+nie traci morale za brak opaski, a jego niezadowolenie z tego powodu znika. Test w `tests/captain.test.mjs`.
+
 ## Nov 26, 2026, profil A (komputer domowy), weta zarządu wygasają (v1.25 Beta)
 Zrobione: weta w Klub, Zarząd wisiały na zawsze (`recordVeto` bez wygasania). Teraz `vetoExpired` w `career/boardRequests.js`:
 po zamknięciu okna, poza oknem po 30 dniach, od razu gdy zawodnika nie ma w grze; `ensureRequests` czyści listę (stare zapisy też).

@@ -179,3 +179,16 @@ test('Młody kapitan: weterani tracą morale raz w miesiącu; częste zmiany opa
   captainWeek(h, '2026-11-23');
   assert.equal(h.world.players.X2.morale, 12 + CAPT.change, 'druga zmiana w 6 tygodni');
 });
+
+test('Kontuzjowany lider nie czuje się pominięty: licznik, kara morale i niezadowolenie znikają', () => {
+  const g = club('W');
+  const L = g.world.players.L;
+  for (const d of mondays(6)) captainWeek(g, d);
+  assert.ok(L.unhappy && L.capSnub === 6);
+  L.injuryDays = 40;
+  const m = L.morale;
+  captainWeek(g, '2026-12-14');
+  assert.ok(!L.unhappy && !L.capSnub && !L.capSnubU);
+  captainWeek(g, '2026-12-21');
+  assert.equal(L.morale, m, 'bez kary w czasie urazu');
+});
