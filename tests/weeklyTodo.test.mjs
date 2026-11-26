@@ -277,3 +277,20 @@ test('wydajność: 100 przeliczeń listy na pełnej kadrze poniżej 1 s', () => 
   for (let i = 0; i < 100; i++) { g.todo.rev++; buildWeeklyTodo(g); }
   assert.ok(performance.now() - t0 < 1000, `${Math.round(performance.now() - t0)} ms`);
 });
+
+test('Rozmowa z zawodnikiem znika z listy od razu, także gdy dziennik rozmów jest pełny (20 wpisów z tego dnia)', () => {
+  const g = fresh();
+  setAll(g, 20);
+  const ps = squadOf(g.world, g.clubId).filter((p) => !p.injuryDays).slice(0, 2);
+  for (const p of ps) p.unhappy = true;
+  const T = (g.talks ??= { lastMeeting: null, tones: [], log: [], perPlayer: {} });
+  T.perPlayer ??= {};
+  const talk = (p) => { T.perPlayer[p.id] = [...(T.perPlayer[p.id] ?? []), { date: g.date, kind: 'role' }]; T.log = [{ date: g.date, kind: 'talk', playerId: p.id, talk: 'role' }, ...T.log].slice(0, 20); };
+  T.log = Array.from({ length: 20 }, () => ({ date: g.date, kind: 'talk', playerId: 'inny', talk: 'praise' }));
+  const keys = () => buildWeeklyTodo(g).items.map((x) => x.key);
+  assert.ok(keys().includes(`rozmowa:${ps[0].id}`) && keys().includes(`rozmowa:${ps[1].id}`));
+  talk(ps[0]);
+  assert.ok(!keys().includes(`rozmowa:${ps[0].id}`), 'po rozmowie sprawa znika');
+  talk(ps[1]);
+  assert.ok(!keys().includes(`rozmowa:${ps[1].id}`), 'druga rozmowa tego samego dnia też');
+});

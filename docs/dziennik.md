@@ -29,6 +29,11 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 26, 2026, profil A (komputer domowy), Pulpit: odbyta rozmowa znika z listy (v1.25 Beta)
+Zrobione: podpis pamięci podręcznej `buildWeeklyTodo` (`career/weeklyTodo.js` `signature`) brał tylko długość dziennika rozmów
+(limit 20) i datę pierwszego wpisu, więc przy pełnym dzienniku druga rozmowa tego samego dnia nie odświeżała listy.
+Teraz także zawodnik i rodzaj ostatniej rozmowy. Test w `tests/weeklyTodo.test.mjs`.
+
 ## Nov 26, 2026, profil A (komputer domowy), kontuzjowany lider nie jest pominięty (v1.25 Beta)
 Zrobione: `captainWeek` (`career/captaincy.js`) pomija kontuzjowanych przy wyborze naturalnego lidera, więc kontuzjowany
 nie traci morale za brak opaski, a jego niezadowolenie z tego powodu znika. Test w `tests/captain.test.mjs`.

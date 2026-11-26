@@ -373,7 +373,7 @@ function signature(game, date) {
   const inbox = game.inbox ?? [];
   const open = inbox.filter((m) => !m.resolved && m.actions?.length).length;
   const st = staffOf(game, game.clubId);
-  return [date, game.clubId, S.rev, inbox.length, open, game.talks?.lastMeeting ?? '', game.talks?.log?.length ?? 0, game.talks?.log?.[0]?.date ?? '',
+  return [date, game.clubId, S.rev, inbox.length, open, game.talks?.lastMeeting ?? '', game.talks?.log?.length ?? 0, game.talks?.log?.[0]?.date ?? '', game.talks?.log?.[0]?.playerId ?? '', game.talks?.log?.[0]?.talk ?? '',
     (game.training?.camps ?? []).length, (game.market?.offers ?? []).filter((o) => o.status === 'open').map((o) => `${o.id}${o.expires}`).join(), (game.sponsors?.clubs?.[game.clubId]?.offers ?? []).map((o) => o.id).join(), game.squadLimit?.case?.id ?? '',
     (game.tactics?.xi ?? []).join(), Object.values(st).map((s) => s?.q).join(), sq, openProposals(game).map((x) => `${x.id}${x.status}`).join()].join('|');
 }
