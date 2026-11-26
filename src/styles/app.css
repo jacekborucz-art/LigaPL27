@@ -894,16 +894,16 @@ body.is-tdragging, body.is-tdragging * { cursor: grabbing !important; user-selec
   .tac__pitch .pitch2 { flex: none; max-width: min(460px, max(260px, calc((100dvh - var(--hub-top, 0px) - 330px) * .68))); }
   .tac__lists > * { min-width: 0; }
 }
-/* Duży PC: boisko | pierwszy skład | ławka; pod składem pas rezerw, pod ławką zawodnicy spoza kadry.
+/* Duży PC: boisko | pierwszy skład | ławka; pod składem zawodnicy spoza kadry i pas rezerw, ławka obok składu.
    Tablet dotykowy (wysokie wiersze pod palec) dopiero od 1500 px, inaczej listy są za wąskie i ucinają nazwiska. */
 @media (min-width: 1280px) and (pointer: fine), (min-width: 1500px) {
   .hub__main:has(.tac) { max-width: 1440px; }
   .tac {
     grid-template-columns: minmax(300px, 360px) minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas: "form form form" "hint legend legend" "pitch xi out" "pitch bench out" "pitch rz out";
+    grid-template-areas: "form form form" "hint legend legend" "pitch xi bench" "pitch out bench" "pitch rz bench";
     grid-template-rows: auto auto auto auto 1fr; row-gap: var(--space-3);
   }
-  /* Opis formacji w jednej linii z legendą, pierwszy skład wyrównany do góry z boiskiem; ławka pod składem, poza kadrą obok składu */
+  /* Opis formacji w jednej linii z legendą, pierwszy skład wyrównany do góry z boiskiem; poza kadrą pod składem, ławka obok składu */
   .tac__form { display: contents; }
   .tac__form .chips { grid-area: form; }
   .tac__form .tac__hintrow { grid-area: hint; align-self: start; }
