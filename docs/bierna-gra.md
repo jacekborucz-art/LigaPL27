@@ -630,7 +630,7 @@ Ten sam skrypt i te same ziarna co w 10.2 (punkty na mecz do zwolnienia, x34) [S
 
 | Liga | Przed rundą 3 | Runda 3 (2 Liga: przewaga 0,18, autorytet x1,5) | Po kalibracji 2 Ligi (0,21, x1,6) |
 |---|---|---|---|
-| 2 Liga | -9,3 (błąd 2,0) | -15,8 (2,9), zwolnieni 30 z 32 | w toku |
+| 2 Liga | -9,3 (błąd 2,0) | -15,8 (2,9), zwolnieni 30 z 32 | -17,4 (2,8), zwolnieni 31 z 32 |
 | III liga | -10,4 (2,8) | -22,4 (2,7), zwolnieni 28 z 28 | bez zmian |
 
 Morale drużyny biernego gracza w 2 Lidze: 7,9 przed, 5,4 po. Gracz aktywny i Ekstraklasa: jeszcze niezmierzone.
