@@ -30,6 +30,9 @@ export const AUTH = {
   squad: { base: 0.5, from: 9, per: 6, min: 0.5, max: 1.2 },
   // Wpływ na siłę w meczu (pkt atrybutu na zawodnika): poniżej 0,5 x0,75 (do -0,3), powyżej x0,45 x kadra (do +0,2)
   neg: 0.75, pos: 0.45, min: -0.3, max: 0.2,
+  // Zależność szatni od trenera według poziomu ligi (runda 3, Nov 27, 2026): w niższych ligach mniej liderów
+  // i samodyscypliny, więc kara i premia rosną (2 Liga do -0,45, III liga do -0,51)
+  dep: { 1: 1, 2: 1.15, 3: 1.5, 4: 1.7, 5: 1.7 },
   lowAt: 0.3, highAt: 0.75, // wiadomości asystenta
 };
 
@@ -73,11 +76,15 @@ export function squadFactor(L) {
   return clamp(Q.base + ((L ?? Q.from) - Q.from) / Q.per, Q.min, Q.max);
 }
 
-/** Premia albo kara autorytetu w meczu (pkt atrybutu na zawodnika). L: siła kadry klubu (premia), kara bez zależności. */
-export function authorityTerm(v, L = null) {
+/**
+ * Premia albo kara autorytetu w meczu (pkt atrybutu na zawodnika). L: siła kadry klubu (premia), kara bez zależności.
+ * tier: poziom ligi klubu (mnożnik AUTH.dep dla kary i premii; brak = Ekstraklasa).
+ */
+export function authorityTerm(v, L = null, tier = null) {
   const d = (v ?? AUTH.start) - 0.5;
-  const t = d < 0 ? AUTH.neg * d : AUTH.pos * d * (L == null ? 1 : squadFactor(L));
-  return Math.round(clamp(t, AUTH.min, AUTH.max) * 1000) / 1000;
+  const k = PASSIVE.r3 ? AUTH.dep[tier] ?? 1 : 1; // przed rundą 3: bez mnożnika ligi
+  const t = k * (d < 0 ? AUTH.neg * d : AUTH.pos * d * (L == null ? 1 : squadFactor(L)));
+  return Math.round(clamp(t, k * AUTH.min, k * AUTH.max) * 1000) / 1000;
 }
 
 export function authorityLabel(v) {
@@ -115,7 +122,7 @@ export function authorityOf(game, clubId) {
 
 registerModifier({
   id: 'coachAuthority', scope: 'player', label: 'Autorytet trenera',
-  apply: (p) => { const g = activeGame(); return g && p.clubId === g.clubId ? authorityTerm(authorityOf(g, p.clubId), clubById(p.clubId)?.L) : 0; },
+  apply: (p) => { const g = activeGame(); return g && p.clubId === g.clubId ? authorityTerm(authorityOf(g, p.clubId), clubById(p.clubId)?.L, clubById(p.clubId)?.tier) : 0; },
 });
 
 registerDailySystem({

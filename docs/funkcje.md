@@ -74,7 +74,7 @@ Zakładki: Zawodnicy, Skład i taktyka, Rezerwy, Rozmowy, Raport ogólny.
 - **Ławka rezerwowych**: rozmiar ławki zależny od rozgrywek, rezerwowy bramkarz i pokrycie pozycji, automat dla asystenta i AI; Skład i taktyka; `engine/lineup.js`; dok. `sklad-lawki.md`.
 - **Instrukcje indywidualne zawodników**: rola i polecenie dla zawodnika z ukrytą jakością wykonania i konfliktem z planem drużyny, tabela wszystkich zawodników, zmiana w trakcie meczu; Skład i taktyka (przycisk Instrukcje indywidualne), mecz; `engine/match/playerInstr.js`, `ui/playerInstrView.js`, `data/playerInstructions.js`; dok. `instrukcje-indywidualne.md`; od v1.18 Beta.
 - **Strzałki ruchu zawodników**: kierunek w ataku rysowany prawym przyciskiem myszy na boisku (też w meczu), skutki w silniku, na PC; Skład i taktyka, Zmiany i taktyka; `ui/tacticsArrows.js`, `ui/arrowsView.js`, `ui/tacticsMoves.js`; dok. `strzalki-ruchu.md`; od v1.19 Beta.
-- **Przewidywalność taktyki**: rywale oglądają nasze mecze, stały schemat osłabia drużynę; Skład i taktyka; `training/scouting.js`; dok. `bierna-gra.md`.
+- **Przewidywalność taktyki**: rywale oglądają nasze mecze, stały schemat osłabia drużynę; trener AI sam ogląda rywala i ma kontrplan na stały schemat gracza (od Nov 27, 2026); Skład i taktyka; `training/scouting.js`; dok. `bierna-gra.md` rozdz. 10.
 - **Błędy i ostrzeżenia składu**: brak bramkarza, gra poza pozycją, pauzy; pod boiskiem; `engine/lineup.js`, `engine/positions.js`; dok. PLAN 3.2; od v1.15 Beta zamiast panelu Siła składu.
 - **Analizy meczów (archiwum)**: pełne analizy pomeczowe sztabu; Skład i taktyka, Analizy meczów; `career/postMatchReport.js`, `app.js` (renderMatchAnalysis); dok. `analiza-pomeczowa.md`; od v1.18 Beta.
 - **Skład na tablecie**: boisko i szeroka lista w dwóch kolumnach; Skład i taktyka; `ui/tacticsView.js`; od v1.19 Beta.
@@ -225,7 +225,8 @@ Zakładki: Finanse, Sponsorzy, Infrastruktura, Zarząd, Kariera.
 - **Kibice**: nastroje, presja na trenera i zarząd, drabina protestów, frekwencja, kary dyscyplinarne za zachowanie; Klub, Zarząd, mecze; `career/fans.js`, `career/fansSystem.js`, `data/kibice.js`; dok. `kibice.md`.
 - **Rywale klubów**: największe rywalizacje (intensywność 0-3) wpływają na kibiców, odprawy i rangę meczu; mecze, Edytor; `data/kibice.js`, `career/fans.js`; od v1.19 Beta w edytorze.
 - **Organiczna trudność**: świat reaguje na sukcesy trenera, bez suwaka trudności i ukrytych premii dla AI; cała gra; `career/threat.js`; dok. `balans.md`.
-- **Gra bierna kosztuje punkty**: brak rozmów, monotonny trening i przewidywalna taktyka obniżają wyniki; cała gra; `training/variety.js`, `training/scouting.js`, `career/authority.js`; dok. `bierna-gra.md`.
+- **Gra bierna kosztuje punkty**: brak rozmów, monotonny trening i przewidywalna taktyka obniżają wyniki; autorytet trenera waży więcej w niższych ligach (od Nov 27, 2026); cała gra; `training/variety.js`, `training/scouting.js`, `career/authority.js`; dok. `bierna-gra.md`.
+- **Przygotowanie pod rywala (analiza wideo)**: wynik losowy (zysk, bez efektu, strata); zajęcia dodane przez gracza mają szanse z doświadczenia trenera, z planu asystenta z umiejętności asystenta, trener AI z atrybutu SKL; przewaga AI w analizie rywala gracza losowana od 0 do granicy według ligi (wyjątek w `CLAUDE.md`); wyłącznik `PASSIVE.r3`; Trening; `training/prep.js`, `training/cohesion.js`; dok. `bierna-gra.md` rozdz. 10; od Nov 27, 2026.
 - **Kariera trenera (panel)**: reputacja trenera, popularność wśród kibiców i mediów, historia sezonów, rekordy, ścieżka klubów, 20 odznak z gablotą, okno odblokowania trofeum; Klub, Kariera; `career/coachCareer.js`, `ui/careerView.js`, `ui/badges.js`; dok. `kariera-trenera.md`; od v1.19 Beta.
 
 ## 9. Kariera trenera i rynek pracy

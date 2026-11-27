@@ -42,7 +42,7 @@ export const SESSIONS = {
   regeneracja: { name: 'Regeneracja', icon: 'Rg', group: 'none', attrs: [], dev: 0, fat: 0, load: 0.3, inj: 0.1, legs: -0.5, sharp: 0, morale: 0.03,
     recover: 1, text: 'Basen, rozciąganie, masaż. Przywraca świeżość i zdejmuje ciężkie nogi.' },
   wideo: { name: 'Analiza wideo rywala', icon: 'V', group: 'mental', attrs: ['DEC', 'WIZ'], dev: 0.2, fat: 0, load: 0.1, inj: 0, legs: 0, sharp: 0, morale: 0,
-    prep: 1, noIntensity: true, text: 'Analityk pokazuje mocne i słabe strony najbliższego rywala. Mały bonus na ten mecz.' },
+    prep: 1, noIntensity: true, text: 'Mocne i słabe strony najbliższego rywala. Wynik nie jest pewny: zajęcia dodane przez Ciebie przygotowujesz sam (szansa rośnie z doświadczeniem), zajęcia z planu asystenta zależą od asystenta i częściej chybiają.' },
   odprawa: { name: 'Odprawa taktyczna', icon: 'Od', group: 'mental', attrs: ['DEC'], dev: 0.1, fat: 0, load: 0.05, inj: 0, legs: 0, sharp: 0, morale: 0.12,
     instr: 1.5, know: 0.5, noIntensity: true, text: 'Omówienie planu na mecz i instrukcji. Utrwala instrukcje, lekko podnosi morale.' },
 };

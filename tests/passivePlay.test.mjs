@@ -81,10 +81,12 @@ test('Przewidywalność: urozmaicony plan zmniejsza premię, nieoczekiwany plan 
 test('Przewidywalność: jakość analityka i trenera rywala skaluje premię', () => {
   const g = newGame();
   play(g, Array(8).fill('base'));
+  PASSIVE.r3 = false; // skala analityka bez podłogi trenera i kontrplanu (runda 3: osobny test w passiveR3.test.mjs)
   g.training.staff[OPP].analityk.q = 4;
   const weak = scoutEdge(g, OPP, g.clubId);
   g.training.staff[OPP].analityk.q = 18;
   const strong = scoutEdge(g, OPP, g.clubId);
+  PASSIVE.r3 = true;
   assert.ok(strong > weak * 2, `analityk 4: ${weak}, analityk 18: ${strong}`);
   const coach = g.coaches?.[OPP];
   if (coach) {

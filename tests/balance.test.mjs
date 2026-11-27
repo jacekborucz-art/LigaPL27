@@ -13,6 +13,7 @@ import { clubById } from '../src/data/clubs_pl.js';
 import '../src/season/dailySystems.js';
 import { attachTraining } from '../src/training/index.js';
 import { prepTerm } from '../src/training/cohesion.js';
+import { PASSIVE } from '../src/training/scouting.js';
 import { managerThreat } from '../src/career/threat.js';
 import { boardGoal, seasonGoalFor } from '../src/career/board.js';
 import { matchTactics } from '../src/match/matchday.js';
@@ -54,12 +55,21 @@ test('Pasywny gracz: składniki treningu w dniu meczu podobne jak w tym samym kl
     g.date = saved;
     return Object.fromEntries(TRAINING_TERMS.map((k) => [k, b[k] ?? 0]));
   };
-  const user = probe(newGame(club));
-  const ai = probe(newGame('slask-ii')); // inny klub gracza, Widzew prowadzi AI
   const sum = (o) => Object.values(o).reduce((s, v) => s + v, 0);
+  // Przed rundą 3 (PASSIVE.r3 = false): pewna analiza, pasywny gracz jak AI
+  PASSIVE.r3 = false;
+  try {
+    const user = probe(newGame(club));
+    const ai = probe(newGame('slask-ii')); // inny klub gracza, Widzew prowadzi AI
+    const diff = sum(user) - sum(ai);
+    assert.ok(Math.abs(diff) < 0.15, `gracz ${JSON.stringify(user)} AI ${JSON.stringify(ai)} różnica ${diff.toFixed(3)}`);
+    assert.ok(ai.trainingPrep > 0, 'klub AI też analizuje rywala');
+  } finally { PASSIVE.r3 = true; }
+  // Runda 3: analiza jest losowa, plan asystenta częściej chybia; pasywny gracz nie może być wyraźnie przed AI
+  const user = probe(newGame(club));
+  const ai = probe(newGame('slask-ii'));
   const diff = sum(user) - sum(ai);
-  assert.ok(Math.abs(diff) < 0.15, `gracz ${JSON.stringify(user)} AI ${JSON.stringify(ai)} różnica ${diff.toFixed(3)}`);
-  assert.ok(ai.trainingPrep > 0, 'klub AI też analizuje rywala');
+  assert.ok(diff < 0.15, `runda 3: gracz ${JSON.stringify(user)} AI ${JSON.stringify(ai)} różnica ${diff.toFixed(3)}`);
 });
 
 test('Skala ocen: oceny z pełnego silnika po przeliczeniu mają średnią jak mecze w tle', () => {
@@ -103,12 +113,14 @@ test('Organiczna trudność: drużyna grająca ponad stan jest groźna, przecię
   const oppId = f.home === 'gks-katowice' ? f.away : f.home;
   g.training.staff[oppId].analityk.q = 12;
   g.date = f.date;
+  PASSIVE.r3 = false; // mnożnik groźnej drużyny na pewnej premii sprzed rundy 3 (w rundzie 3 mnoży tylko trafioną analizę)
   const p = squadOf(g.world, oppId)[0];
   const calm = prepTerm(g, p);
   assert.ok(calm > 0.1 && calm < 0.12, `analiza rywala AI ${calm}`);
   g.archive = [{ champion: 'gks-katowice', cup: null }];
   g.date = addDays(f.date, 0); g.fixtures = [...g.fixtures]; // nowy dzień w pamięci podręcznej
   const wary = prepTerm({ ...g }, p);
+  PASSIVE.r3 = true;
   assert.ok(wary > calm * 1.2, `po tytule rywale przygotowują się lepiej: ${calm} -> ${wary}`);
 });
 

@@ -170,7 +170,7 @@ export function processUserDay(game, date, rng) {
 
   const nextFix = ctx.next ? (game.fixtures || []).find((f) => f.date === ctx.next && (f.home === clubId || f.away === clubId)) : null;
   const nextMatch = nextFix ? { date: nextFix.date, opp: nextFix.home === clubId ? nextFix.away : nextFix.home } : null;
-  for (const s of day.sessions) applySessionToClub(game, clubId, s, date, nextMatch, campQ);
+  for (const s of day.sessions) applySessionToClub(game, clubId, s, date, nextMatch, campQ, day.auto !== false);
 
   const injuries = [];
   let freshSum = 0; let acwrSum = 0; let n = 0;
