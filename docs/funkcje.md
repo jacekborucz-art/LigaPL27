@@ -108,7 +108,7 @@ Zakładki: Zawodnicy, Skład i taktyka, Rezerwy, Rozmowy, Raport ogólny.
 - **Katalog sytuacji meczowych**: 110 sytuacji z zachowaniem trenera i przepisami; mecz; `engine/match/core.js`; dok. `sytuacje-meczowe.md`.
 - **Mecze w tle (szybka symulacja)**: wyniki innych meczów liczone lekko z siły drużyn, ze strzelcami, kartkami i kontuzjami; cała gra; `engine/quickSim.js`, `season/season.js`; dok. PLAN 4.2.
 - **Siła drużyny na mecz**: liczona z zawodników, którzy naprawdę mogą zagrać (kontuzje, kartki, powołania); `engine/teamStrength.js`.
-- **Rejestr modyfikatorów**: jedno miejsce, w którym stan zawodnika, drużyny i meczu zmienia siłę (zgranie, morale, aklimatyzacja i inne); `engine/modifiers.js`; dok. PLAN 4.1.
+- **Rejestr modyfikatorów (jeden potok czynników meczu)**: wszystkie czynniki siły i warunków meczu w jednym potoku etapów (atrybuty w strefach, pozycja, stan zawodnika przed meczem i w meczu, drużyna, starcie planów, pogoda, sędzia, kibice), każdy z opisem, zakresem i wyłącznikiem, z rozbiciem wkładu w meczu (M.ledger); wyniki meczów bez zmian (krok 1 projektu Walka taktyk, test bit w bit); `engine/modifiers.js`, `engine/pipeline.js`; dok. `walka-taktyk.md`, PLAN 4.1.
 - **Zmęczenie w meczu**: zmęczeni zawodnicy są wolniejsi, popełniają błędy i częściej faulują; mecz; `engine/match/teams.js`; dok. `zmeczenie.md`.
 - **Gra poza pozycją i bez bramkarza**: kary za grę poza pozycją, dowolne ustawienie w osłabieniu, bramkarz przy czerwonej i urazie; mecz; `engine/positions.js`; dok. PLAN 3.2, `taktyka-i-urazy.md`.
 - **Lekkie urazy (gra z bólem)**: zawodnik gra dalej z niższą formą, widoczny na boisku; mecz; `engine/match/core.js`; dok. `taktyka-i-urazy.md`.

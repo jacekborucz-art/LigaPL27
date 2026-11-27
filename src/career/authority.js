@@ -114,7 +114,7 @@ export function authorityOf(game, clubId) {
 }
 
 registerModifier({
-  id: 'coachAuthority', scope: 'player', label: 'Autorytet trenera',
+  id: 'coachAuthority', scope: 'player', group: 'psyche', range: [-0.3, 0.2], label: 'Autorytet trenera',
   apply: (p) => { const g = activeGame(); return g && p.clubId === g.clubId ? authorityTerm(authorityOf(g, p.clubId), clubById(p.clubId)?.L) : 0; },
 });
 

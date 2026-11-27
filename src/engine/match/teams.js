@@ -3,8 +3,9 @@
 
 import { formationById, FORMATIONS } from '../../data/formations.js';
 import { INSTRUCTIONS } from '../../data/instructions.js';
-import { proficiency, posEff, goalkeeperSlotModifiers, errorMul } from '../positions.js';
-import { evaluate } from '../modifiers.js';
+import { goalkeeperSlotModifiers } from '../positions.js';
+import { attrZones, slotEff, slotMx, playerBase, liveFill, teamFill, captainTerm, newMatchupCache } from '../pipeline.js';
+import { zoneRatings, condPenalty, onPitch, hungerOf, teamHunger } from './factors.js';
 import { clamp, Rng } from '../../core/rng.js';
 import { K, ROLE_SHARE, ZONE_N, FATIGUE_ROLE, KNOCK, FATIGUE, INSTR_NUM, SAT } from './constants.js';
 import { cleanPlayerInstrMap } from '../../data/playerInstructions.js';
@@ -13,15 +14,8 @@ import { captainPower, baseStakes, CAPTAIN } from '../captain.js';
 
 const a = (p, k) => p.attr?.[k] ?? p.ovr ?? 10;
 
-/** Oceny zawodnika w strefach z atrybutów (stałe na cały mecz). */
-export function zoneRatings(p) {
-  return {
-    DEF: (3 * a(p, 'ODB') + 3 * a(p, 'UST') + 1.5 * a(p, 'GLO') + a(p, 'SIL') + a(p, 'SZY') + a(p, 'DEC') + 0.5 * a(p, 'OPA') + 0.5 * a(p, 'SKO') + 0.5 * a(p, 'AGR')) / 12,
-    MID: (3 * a(p, 'POD') + 2 * a(p, 'DEC') + 2 * a(p, 'TEC') + 1.5 * a(p, 'WIZ') + 1.5 * a(p, 'PRA') + a(p, 'WYT') + a(p, 'ODB') + 0.5 * a(p, 'UST')) / 12.5,
-    ATT: (3 * a(p, 'WYK') + 2 * a(p, 'RUC') + 1.5 * a(p, 'TEC') + 1.5 * a(p, 'DRY') + 1.5 * a(p, 'SZY') + a(p, 'OPA') + a(p, 'GLO') + 0.5 * a(p, 'DYS') + 0.5 * a(p, 'ZWI') + 0.5 * a(p, 'DOS')) / 13,
-    GK: (3 * a(p, 'REF') + 2 * a(p, 'UST') + 1.5 * a(p, 'CHW') + 1.5 * a(p, 'JNJ') + a(p, 'WYJ') + a(p, 'OPA')) / 10,
-  };
-}
+// Czyste funkcje czynników przeniesione do factors.js (potok etapów, src/engine/pipeline.js); eksport bez zmian
+export { zoneRatings, condPenalty, onPitch, hungerOf, teamHunger };
 
 // ------------------------------------------------------------ Lekkie urazy (gra z bólem)
 /** Kod typu lekkiego urazu z nazwy (KNOCK.types); nieznany lekki uraz liczy się jak stłuczenie. */
@@ -50,19 +44,23 @@ export function makeKnock(name, minute, { pre = false, days = 0 } = {}) {
 }
 
 function mkPlayer(p, slot, side, rng, ctx, Z = 0) {
+  // Etap rng: losowanie dyspozycji dnia zostaje tutaj (ta sama kolejność losowań); liczba wchodzi do etapu player
   const dayForm = rng.gauss(0, Math.max(0.2, 0.9 - 0.035 * (p.hidden?.KON ?? 10)));
-  const waz = ctx.rank >= 2 ? 0.04 * ((p.hidden?.WAZ ?? 10) - 10) : 0;
   // Uraz sprzed meczu, z którym zawodnik gra z bólem: kara do formy daje modyfikator playingInjured (modifiers.js)
   const knock = p.playingInjured && p.injuryDays > 0 ? makeKnock(p.injury?.name ?? 'stłuczenie', 0, { pre: true, days: p.injuryDays }) : null;
   const cap = captainPower(p, ctx.date ?? null); // kapitan i wicekapitan (src/engine/captain.js): siła C i efekt E
+  // Etap player (stan zawodnika + dyspozycja dnia + ranga x WAZ), suma w tej samej kolejności co dawniej; rozbicie w parts
+  const pb = playerBase(p, ctx.rank, dayForm);
   return {
-    id: p.id, p, slot, side, R: zoneRatings(p), base: evaluate('player', p, { inMatch: true }).total + dayForm + waz, dayForm,
+    id: p.id, p, slot, side, R: attrZones(p), base: pb.total, parts: pb.parts, dayForm,
     cond: p.fresh ?? 95, on: !!slot, sentOff: false, subbedOff: false, injury: null, treatedUntil: -1,
     Z, yc: 0, minOn: slot ? 0 : null, minOff: null,
     ev: 0, g: 0, ast: 0, sh: 0, sot: 0, kp: 0, tk: 0, saves: 0, fouls: 0, offs: 0,
     fit: null, prevSlot: null, bookChecked: false, knock, slotIdx: -1, redCode: null,
     pi: null, piDraw: null, // instrukcje indywidualne (playerInstr.js): efekty i losowania na mecz
     capC: cap.C, capE: cap.E,
+    // Potok (pipeline.js): etap slot (pamięć na slot) i wkłady etapu live w tej minucie
+    mxS: null, mxP: null, mxSd: null, mxPos: 1, mxErr: 1, live: [], liveIds: [], liveN: 0,
   };
 }
 
@@ -172,6 +170,8 @@ export function buildTeam(side, cfg, rng, ctx, seed = 'mecz') {
     tacLog: [{ min: -99, formation: cfg.tactics.formation, instr: { ...cfg.tactics.instructions } }],
     // Kapitan (docs/kapitan.md): opaska klubu (cfg.captainId, inaczej kapitan z taktyki), efekt E w tej minucie, stawka S
     capId: cfg.captainId ?? cfg.tactics.captain ?? null, capX: null, capE: 0, capES: 0, capOff: null, capGoal: -99, capS0: baseStakes(ctx),
+    // Potok (pipeline.js): znacznik stanu stref (zv), pamięć starcia planów (mu), kontekst etapu team, wkłady do stref
+    zv: 0, mu: newMatchupCache(), mctx: { inMatch: true, M: null, xs: null }, tTerms: [], tIds: [], tN: 0,
   };
   T.capX = [...players, ...bench].find((x) => x.id === T.capId) ?? null;
   if (!T.capX?.on) T.capOff = -99; // kapitan poza jedenastką od początku: wicekapitan od pierwszej minuty, bez szoku
@@ -197,9 +197,7 @@ export function updateCaptain(T, M) {
       T.capE = best ? CAPTAIN.deputy * best.capE : 0;
     }
   }
-  let S = T.capS0;
-  if (M.minute >= CAPTAIN.lateFrom && Math.abs(M.score[0] - M.score[1]) <= 1) S = Math.max(S, CAPTAIN.stakes.late);
-  T.capES = S >= CAPTAIN.sFrom ? T.capE * S : 0;
+  T.capES = captainTerm(T, M); // E x S przy stawce: wpis 'captain' etapu team (pipeline.js)
 }
 
 const shareCache = new Map();
@@ -213,7 +211,6 @@ export function formationShares(formation) {
   return shareCache.get(formation.id);
 }
 
-export const onPitch = (T, minute = 0) => T.players.filter((x) => x.on && !x.sentOff && x.treatedUntil < minute);
 export const goalkeeper = (T) => T.players.find((x) => x.on && !x.sentOff && x.slot?.pos === 'BR');
 
 /** Tolerancja zmęczenia zawodnika na mecz (FATIGUE.tol): stała z atrybutów + los z osobnego ziarna (bez zmiany losowań meczu). */
@@ -224,50 +221,14 @@ export function fatigueTolerance(p, seed) {
   const k = 1 - T.pra * (pra - 10) - T.opa * (a(p, 'OPA') - 10) - T.wyt * (wyt - 10) + new Rng(`zmeczenie:${seed}:${p.id}`).gauss(0, sd);
   return clamp(k, T.min, T.max);
 }
-/** Skala 1-20 na 0-1. */
-const t01 = (v) => clamp(((v ?? 10) - 1) / 19, 0, 1);
 /**
- * Głód goli zawodnika (SAT.w) bez ego: pracowitość, ambicja, profesjonalizm, przywództwo, regularność (0-1 względem wag).
- * Cechy charakteru z p.traits (career/personality.js), bez nich ukryte atrybuty albo środek skali.
+ * Efektywna wartość zawodnika w strefie: skuteczność na slocie (etap slot) x R + stan (etap player) + wkłady etapu
+ * live z tej minuty (zaangażowanie, kondycja), dodawane po kolei. Wymaga slotMx(x) i liveFill(x) w tej minucie.
  */
-export function hungerOf(p) {
-  const W = SAT.w; const tr = p.traits ?? {}; const h = p.hidden ?? {};
-  return W.PRA * t01(a(p, 'PRA')) + W.amb * t01(tr.ambition) + W.prf * t01(tr.professionalism ?? h.PRF) + W.LID * t01(a(p, 'LID')) + W.KON * t01(h.KON);
-}
-/**
- * Głód goli drużyny H (0-1) w danej minucie: zawodnicy na boisku z wagą pozycji, ego tylko u ofensywnych, kapitan (E),
- * los na mecz (T.satLuck), szum co 15 min (osobne ziarno), okrzyk z SAT. Wynik w pamięci na minutę.
- */
-export function teamHunger(T, M) {
-  if (T.satMin === M.minute) return T.satH;
-  const xs = onPitch(T, M.minute);
-  let sw = 0; let sh = 0;
-  for (const x of xs) {
-    const w = SAT.pos[x.slot.pos] ?? 1;
-    const ego = SAT.egoPos.includes(x.slot.pos) ? t01(x.p.traits?.ego) : 0.5;
-    sw += w; sh += w * ((x.hung ?? hungerOf(x.p)) + SAT.w.ego * ego);
-  }
-  let H = sw ? sh / sw : 0.5;
-  H += SAT.cap * (T.capE ?? 0); // kapitan pilnuje koncentracji (docs/kapitan.md), zamiast premii za LID najlepszego lidera
-  const blk = Math.floor(M.minute / SAT.noiseEvery);
-  if (T.satBlk !== blk) { T.satBlk = blk; T.satNoise = clamp(new Rng(`glod:${T.satSeed}:${blk}`).gauss(0, SAT.noise), -SAT.noise * 2, SAT.noise * 2); }
-  H += (T.satLuck ?? 0) + (T.satNoise ?? 0);
-  if (T.shout?.hunger && M.minute < T.shout.until) H += T.shout.hunger;
-  T.satMin = M.minute; T.satH = clamp(H, 0, 1);
-  return T.satH;
-}
-
-/** Kara kondycji do atrybutów: -(0,04 d + 0,008 d²) x tolerancja zawodnika, d = 85 - kondycja (FATIGUE). */
-export function condPenalty(x) {
-  const d = FATIGUE.penFrom - x.cond;
-  return d > 0 ? -(FATIGUE.penLin * d + FATIGUE.penQuad * d * d) * (x.fatK ?? 1) : 0;
-}
-
-/** Efektywna wartość zawodnika w strefie: posEff * R + przesunięcia stanu. */
 function eff(x, zone) {
-  const prof = proficiency(x.p, x.slot.pos, x.slot.side);
-  const condPen = condPenalty(x);
-  return posEff(prof) * x.R[zone] + x.base + 0.035 * x.Z + condPen;
+  let v = x.mxPos * x.R[zone] + x.base;
+  for (let i = 0; i < x.liveN; i++) v += x.live[i];
+  return v;
 }
 
 const ATT_LINE = new Set(['NAP', 'SN', 'BP', 'OP']);
@@ -279,7 +240,7 @@ export const paceOf = (x) => a(x.p, 'SZY') * condSpeed(x.cond);
 /** Ryzyko błędu obrońcy: gra poza pozycją (errorMul) razy zmęczenie. 1 = brak dodatkowego ryzyka. */
 export function errFactor(x) {
   const tired = x.cond < FATIGUE.errFrom ? 1 + FATIGUE.errPerPt * (FATIGUE.errFrom - x.cond) : 1;
-  return errorMul(proficiency(x.p, x.slot.pos, x.slot.side), true) * tired;
+  return slotMx(x).mxErr * tired; // błędy poza pozycją: etap slot (pipeline.js)
 }
 const avgOf = (xs, f, dflt) => (xs.length ? xs.reduce((s, x) => s + f(x), 0) / xs.length : dflt);
 
@@ -297,6 +258,8 @@ function updatePace(T, xs) {
 
 /** Przeliczenie stref drużyny (co minutę, tanio: 11 zawodników). */
 export function updateZones(T, M) {
+  T.zv++; // nowy stan drużyny: starcie planów (etap matchup) liczy się od nowa
+  T.mctx.M = M;
   const w = T.tac.adapt ? Math.min(1, (M.minute - T.tac.t0) / T.tac.adapt) : 1;
   T.P = T.Pbase = lerpParams(T.tac.from, T.tac.to, w, T.tac.buf);
   // Instrukcje indywidualne: przesunięcie parametrów drużyny o 1/10 na zawodnika (bez instrukcji nic się nie liczy)
@@ -305,14 +268,16 @@ export function updateZones(T, M) {
     if (T.piShift) T.P = applyShift(T.Pbase, T.piShift, T.piBuf, T.Pbase !== T.tac.buf, T.piMemo);
   }
   const xs = onPitch(T, M.minute);
-  const missing = 11 - xs.length;
-  const cohesion = (100 - T.S) * 0.015;
+  T.mctx.xs = xs;
   // Kilku lekko kontuzjowanych naraz: partnerzy asekurują i biegają za nich, drużyna traci organizację.
   // Kara od drugiego zawodnika, rośnie szybciej niż liniowo, ograniczona (KNOCK.teamMax < kara za brak zawodnika).
   let knocked = 0;
   for (const x of xs) if (x.knock && !x.knock.aggravated) knocked++;
   T.knocked = knocked;
   T.knockPen = knocked >= 2 ? Math.min(KNOCK.teamMax, KNOCK.team * (knocked - 1) ** KNOCK.teamExp) : 0;
+  // Potok: etap slot i live zawodników, etap team drużyny (osłabienie, spójność, kilku z bólem) na tę minutę
+  for (const x of xs) { slotMx(x); liveFill(x); }
+  teamFill(T);
   const zones = { DEF: 0, MID: 0, ATT: 0 };
   for (const x of xs) {
     let share = ROLE_SHARE[x.slot.pos] ?? ROLE_SHARE.ŚP;
@@ -320,13 +285,15 @@ export function updateZones(T, M) {
     for (const zn of ['DEF', 'MID', 'ATT']) if (share[zn]) zones[zn] += share[zn] * eff(x, zn);
   }
   // Strefa = średnia ważona udziałami ról całej formacji (11 slotów), z łagodnym wpływem kształtu
-  // formacji (wykładnik 0.15). Brakujący zawodnicy obniżają licznik i dają karę za osłabienie.
+  // formacji (wykładnik 0.15). Brakujący zawodnicy obniżają licznik; wkłady etapu team (kanał zone.field) po kolei.
   const fs = formationShares(T.formation);
   for (const zn of ['DEF', 'MID', 'ATT']) {
-    zones[zn] = (zones[zn] / fs[zn]) * (fs[zn] / ZONE_N[zn]) ** 0.15 - missing * K.shortHanded - cohesion - T.knockPen;
+    let v = (zones[zn] / fs[zn]) * (fs[zn] / ZONE_N[zn]) ** 0.15;
+    for (let i = 0; i < T.tN; i++) v += T.tTerms[i];
+    zones[zn] = v;
   }
   const gk = goalkeeper(T);
-  if (gk && gk.p.pos === 'BR') { zones.GK = eff(gk, 'GK'); T.gkMods = { goalMul: 1 }; }
+  if (gk && gk.p.pos === 'BR') { slotMx(gk); liveFill(gk); zones.GK = eff(gk, 'GK'); T.gkMods = { goalMul: 1 }; }
   else {
     zones.GK = gk ? gk.R.GK + gk.base : 3;
     const mods = goalkeeperSlotModifiers(gk?.p ?? { pos: 'NAP' });
@@ -354,7 +321,7 @@ export function updateCondition(T, M) {
   for (const x of onPitch(T, M.minute)) {
     const role = FATIGUE_ROLE[x.slot.pos] ?? 1;
     const mid = ['DP', 'ŚP', 'OP', 'BP'].includes(x.slot.pos) ? P.fatMidMul : 1;
-    const dK = 0.22 * P.fatMul * mid * role * (1.4 - 0.04 * a(x.p, 'WYT')) * (M.ctx.weather?.fat ?? 1) * ((x.p.age ?? 25) >= 31 ? 1.1 : 1)
+    const dK = 0.22 * P.fatMul * mid * role * (1.4 - 0.04 * a(x.p, 'WYT')) * M.mx.wFat * ((x.p.age ?? 25) >= 31 ? 1.1 : 1)
       * (x.knock && !x.knock.aggravated ? KNOCK.fatigue : 1) * (x.pi?.fat ?? 1);
     const drain = T.shout?.drain && M.minute < T.shout.until ? T.shout.drain : 0; // okrzyk „Nie odpuszczamy!”: wysiłek kosztuje kondycję
     x.cond = Math.max(20, x.cond - dK - drain);
@@ -376,7 +343,7 @@ export function slotFit(x, slot) {
   if (v !== v) { // NaN: jeszcze nie liczone
     const sh = ROLE_SHARE[slot.pos] ?? ROLE_SHARE.ŚP;
     const z = (sh.DEF * x.R.DEF + sh.MID * x.R.MID + sh.ATT * x.R.ATT) / (sh.DEF + sh.MID + sh.ATT);
-    v = fit[key] = posEff(proficiency(x.p, slot.pos, slot.side)) * z;
+    v = fit[key] = slotEff(x.p, slot) * z; // skuteczność na slocie: etap slot (pipeline.js)
   }
   return v;
 }

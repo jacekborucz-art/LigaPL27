@@ -4,12 +4,15 @@
 // Używają tego zarówno szybka symulacja (mecze w tle), jak i raport w studiu przedmeczowym.
 
 import { clamp } from '../core/rng.js';
-import { proficiency, posEff, goalkeeperSlotModifiers } from './positions.js';
+import { proficiency, goalkeeperSlotModifiers } from './positions.js';
 import { GROUP, isAvailable } from '../career/squad.js';
 import { evaluate } from './modifiers.js';
+import { slotEff } from './pipeline.js';
 
 export const DEFAULT_SHAPE = { GK: 1, DEF: 4, MID: 4, ATT: 2 };
 const SLOT_POS = { GK: 'BR', DEF: 'ŚO', MID: 'ŚP', ATT: 'NAP' };
+// Slot grupy dla etapu slot potoku (pozycja bez strony, jak proficiency(p, pos)); prof wpisuje effective() przed odczytem
+const GROUP_SLOT = Object.fromEntries(Object.entries(SLOT_POS).map(([g, pos]) => [g, { pos, side: undefined, prof: undefined }]));
 
 /** Wpływ stanu zawodnika w punktach atrybutu: suma z rejestru modyfikatorów (modifiers.js). */
 export function conditionTerms(p, ctx = {}) {
@@ -18,8 +21,11 @@ export function conditionTerms(p, ctx = {}) {
 
 function effective(p, group, ctx) {
   const prof = proficiency(p, SLOT_POS[group]);
+  const slot = GROUP_SLOT[group];
+  slot.prof = prof; // biegłość już policzona: wpis 'position' jej nie liczy drugi raz
+  const k = slotEff(p, slot); // etap slot: skuteczność na pozycji
   const t = conditionTerms(p, ctx);
-  return { value: p.ovr * posEff(prof) + t.total, prof, terms: t.parts };
+  return { value: p.ovr * k + t.total, prof, posK: k, terms: t.parts };
 }
 
 /**
@@ -74,8 +80,9 @@ export function teamRating(squad, ctx = {}) {
 export function lineupRating(entries, squad = [], ctx = {}) {
   const xi = entries.map(({ player, slot }) => {
     const prof = proficiency(player, slot.pos, slot.side);
+    const k = slotEff(player, slot);
     const t = conditionTerms(player, ctx);
-    return { player, group: GROUP[slot.pos] ?? 'MID', value: player.ovr * posEff(prof) + t.total, prof, terms: t.parts, slot };
+    return { player, group: GROUP[slot.pos] ?? 'MID', value: player.ovr * k + t.total, prof, posK: k, terms: t.parts, slot };
   });
   const missing = squad.filter((p) => !isAvailable(p)).map((p) => ({ player: p, reason: 'niedostępny' }));
   return ratingFromPicked(xi, missing, squad, ctx);
@@ -84,23 +91,23 @@ export function lineupRating(entries, squad = [], ctx = {}) {
 function ratingFromPicked(xi, missing, squad, ctx) {
   const by = (g) => xi.filter((x) => x.group === g);
   const mean = (arr, f = (x) => x.value) => (arr.length ? arr.reduce((s, x) => s + f(x), 0) / arr.length : 0);
-  // Pewność siebie z tabeli i decyzje trenera w meczu w tle (career/coaches.js quickCoachTerm), w punktach atrybutu
-  const extra = (ctx.tableTerm || 0) + (ctx.coachTerm || 0);
+  // Etap team potoku (pipeline.js): pewność siebie z tabeli i decyzje trenera w meczu w tle (zone.all, do wszystkich
+  // stref), niepełny skład (zone.field, obniża DEF/MID/ATT); dawne wpisy punktowe zakresu team (pts) jak dotąd
+  const teamMods = evaluate('team', { xi, squad }, ctx);
+  const extra = teamMods.ch['zone.all'] ?? 0;
+  const field = teamMods.ch['zone.field'] ?? 0;
   const gkEntry = by('GK')[0];
   const gkMods = gkEntry ? goalkeeperSlotModifiers(gkEntry.player) : goalkeeperSlotModifiers({ pos: 'NAP' });
   const shooters = [...by('ATT'), ...by('MID')];
-  const FIN = mean(shooters, (x) => (x.player.attr?.WYK ?? x.player.ovr) * posEff(x.prof)) + extra;
-  // Niepełny skład (mniej niż 11) obniża strefy proporcjonalnie.
-  const shortPenalty = Math.max(0, 11 - xi.length) * 0.9;
+  const FIN = mean(shooters, (x) => (x.player.attr?.WYK ?? x.player.ovr) * x.posK) + extra;
   const zones = {
     GK: (gkEntry ? gkEntry.value : 4) + extra,
-    DEF: mean(by('DEF')) + extra - shortPenalty,
-    MID: mean(by('MID')) + extra - shortPenalty,
-    ATT: mean(by('ATT')) + extra - shortPenalty,
+    DEF: mean(by('DEF')) + extra + field,
+    MID: mean(by('MID')) + extra + field,
+    ATT: mean(by('ATT')) + extra + field,
     FIN,
   };
   const avg = (k) => mean(xi, (x) => x.terms[k] ?? 0);
-  const teamMods = evaluate('team', { xi, squad }, ctx);
   for (const k of ['GK', 'DEF', 'MID', 'ATT', 'FIN']) zones[k] += teamMods.total;
   return {
     zones,
@@ -109,10 +116,10 @@ function ratingFromPicked(xi, missing, squad, ctx) {
     missing,
     breakdown: {
       base: mean(xi, (x) => x.player.ovr),
-      positionLoss: mean(xi, (x) => x.player.ovr * (1 - posEff(x.prof))),
+      positionLoss: mean(xi, (x) => x.player.ovr * (1 - x.posK)),
       ...Object.fromEntries(Object.keys(xi[0]?.terms ?? {}).map((k) => [k, avg(k)])),
       ...teamMods.parts,
-      table: ctx.tableTerm || 0, coach: ctx.coachTerm || 0, missingCount: missing.length,
+      table: teamMods.chParts.tableConfidence?.['zone.all'] ?? 0, coach: teamMods.chParts.coachDecisions?.['zone.all'] ?? 0, missingCount: missing.length,
     },
   };
 }

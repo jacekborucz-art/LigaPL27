@@ -58,7 +58,7 @@ export const acclimLabel = (lvl) => (lvl >= 85 ? 'prawie pełna' : lvl >= 60 ? '
 
 // Silnik: brak aklimatyzacji to do -0,6 punktu (słabsze zrozumienie z kolegami i taktyki)
 registerModifier({
-  id: 'acclim', scope: 'player', label: 'Aklimatyzacja',
+  id: 'acclim', scope: 'player', group: 'acclim', range: [-0.6, 0], label: 'Aklimatyzacja',
   apply: (p) => (p.acclim ? -ACCLIM.MAX_PENALTY * (1 - clamp(p.acclim.level, 0, 100) / 100) : 0),
 });
 

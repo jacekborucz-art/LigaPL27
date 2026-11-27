@@ -29,6 +29,28 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 27, 2026, agent silnika meczu (worktree, gałąź worktree-agent-a02ef62888482cf43), jeden commit bez pusha (v1.25 Beta, bez zmiany wersji)
+Zrobione:
+- Krok 1 projektu Walka taktyk (`docs/walka-taktyk.md`): rejestr `engine/modifiers.js` to potok etapów attr, slot, player,
+  live, team, plan, matchup, match, rng z kanałami (sumy i iloczyny), wpisy z label, group, range, when, mode, order.
+  Wbudowane wpisy silnika w nowym `engine/pipeline.js` (wzory w `engine/match/factors.js`): wagi stref, pozycja i błędy,
+  dyspozycja dnia, WAZ, zaangażowanie, kondycja, osłabienie, spójność, kilku z bólem, kapitan, głód goli, pewność z tabeli,
+  decyzje trenera w tle, niepełny skład w tle, rodzaje akcji i kontry (matchup), pogoda, sędzia, ranga, kibice.
+- Silnik czyta gotowe wartości (`M.mx`, `x.mxPos`, `x.live`, `T.tTerms`, pamięć `T.mu`); `M.ledger` i `ledgerSummary`
+  (zrealizowany wkład wpisów, bez wpływu na wynik); `setModifierEnabled` jako wyłącznik.
+- Dla gracza nic się nie zmienia: test bit w bit `tests/enginePipeline.test.mjs` (210 meczów pełnego silnika, 126 kadr
+  teamRating i lineupRating, 120 meczów w tle, krótki sezon z dwoma dniami meczowymi): wszystkie skróty równe złotym
+  sprzed zmian. Nowy `tests/modifiers.test.mjs`. `npm test` zielony, `npm run perf` +1,7 % (w szumie).
+Decyzje i pułapki:
+- Kolejność działań zmiennoprzecinkowych: wkłady dodawane po kolei (`channelTerms`), mnożniki warunków w tych samych
+  miejscach wzorów; dyspozycja dnia i WAZ na końcu sumy etapu player (order 90, 91). Rejestr nie losuje.
+- Plan (tacticParams, instrukcje indywidualne), kara lekkiego urazu w meczu, bramkarz z pola i model meczów w tle (atut
+  boiska, sędzia, kapitan) zostały poza potokiem: lista i powody w `docs/walka-taktyk.md` rozdz. 3.3.
+- Zmiana liczb silnika zmienia skróty w `tests/enginePipeline.golden.json`: zapisuj nowe świadomie (rozdz. 3.4).
+Zostało / dalej:
+- Krok 2: niespójności z `docs/walka-taktyk.md` rozdz. 5 (granice stanu, świeżość, gra z urazem w procentach ovr,
+  kondycja bez granicy, atut boiska i sędzia w meczach w tle, wybór składu bez potoku).
+
 ## Nov 26, 2026, profil A (komputer domowy), tagi pewnych rozstrzygnięć także na Pulpicie (v1.25 Beta)
 Zrobione: wspólne `leagueClinch(game, comp, rows)` w `ui/competitionsView.js` (Rozgrywki i Pulpit), tagi w `dashTable` (`app.js`),
 style `.tbl-tag` dla `.dash-t__cl`, długa nazwa klubu skraca się z wielokropkiem. Sprawdzone w przeglądarce (PC 1366/1600, telefon).
