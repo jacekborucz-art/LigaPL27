@@ -29,6 +29,27 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 27, 2026, profil B (sesja chmurowa), bierna gra w niższych ligach, runda 3 (v1.25.1 Beta)
+Zrobione:
+- Analiza wideo rywala ma losowy wynik (zysk, bez efektu, strata) zamiast pewnej premii: nowy `training/prep.js`.
+  Zajęcia dodane przez gracza: szanse z doświadczenia (mecze w karierze), z planu asystenta: z asystenta (TAK),
+  trener AI: z SKL. Trener AI zawsze sam ogląda rywala (`cohesion.js` `aiPrepToday`).
+- Przewaga AI w analizie rywala gracza X x U^2 (X: 1 Liga 0,08, 2 Liga i niżej 0,21, Ekstraklasa 0), wyjątek w `CLAUDE.md`.
+- Kontrplan trenera AI na stały schemat gracza (+0,1) i analiza trenera AI bez analityka (`scouting.js`), `edgeMax` 0,5.
+- Autorytet trenera waży więcej w niższych ligach (`authority.js` `AUTH.dep`).
+- Wszystko za wyłącznikiem `PASSIVE.r3` (`training/scouting.js`): false przywraca stare liczenie. Opis każdej zmiany
+  i instrukcja cofnięcia: `docs/bierna-gra.md` rozdz. 10.
+- Pomiar [SYM] (skrypt klikający jak interfejs, 32 kluby, ziarna 1-2): bierny gracz wobec AI przed: 2 Liga -9,3,
+  III liga -10,4 pkt na sezon; po (z 2 Ligą 0,18 i x1,5): 2 Liga -15,8, III liga -22,4. Potem 2 Liga podkręcona
+  na prośbę właściciela (przewaga 0,21, autorytet x1,6), wynik w rozdz. 10.5.
+Decyzje i pułapki:
+- Stary skrypt biernej gry bez odpraw i konferencji zaniżał stratę (autorytet nie spadał). Mierzyć tylko skryptem
+  zgodnym z interfejsem (odprawy z zalecanym tonem, „Dalej” rozlicza pominiętą konferencję).
+- Gracza aktywnego i Ekstraklasy po zmianach nie zmierzono.
+Zostało / dalej:
+- Pomiar gracza aktywnego (cel: na poziomie AI) i Ekstraklasy (cel: ok. -12 do -15).
+- Kontrplan jako prawdziwa zmiana instrukcji AI w silniku (dziś premia), po teście, które kontry działają.
+
 ## Nov 26, 2026, profil A (komputer domowy), tagi pewnych rozstrzygnięć także na Pulpicie (v1.25 Beta)
 Zrobione: wspólne `leagueClinch(game, comp, rows)` w `ui/competitionsView.js` (Rozgrywki i Pulpit), tagi w `dashTable` (`app.js`),
 style `.tbl-tag` dla `.dash-t__cl`, długa nazwa klubu skraca się z wielokropkiem. Sprawdzone w przeglądarce (PC 1366/1600, telefon).

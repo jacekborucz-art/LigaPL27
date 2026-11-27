@@ -10,7 +10,8 @@ import { COH, SESSIONS, INTENSITY, CAMP, staffMul } from './config.js';
 import { staffA } from './staff.js';
 import { aiClubZ } from './state.js';
 import { managerThreat, THREAT } from '../career/threat.js';
-import { scoutEdge, fpKey, rehearsed, SCOUT } from './scouting.js';
+import { scoutEdge, fpKey, rehearsed, SCOUT, PASSIVE } from './scouting.js';
+import { rollPrep, aiScoutAdvantage } from './prep.js';
 
 const W = COH.weights;
 const r1 = (v) => Math.round(v * 10) / 10;
@@ -55,7 +56,7 @@ export function teamCohesion(game, clubId = game.clubId, tactics = clubId === ga
 }
 
 /** Efekt zajęć na zgranie klubu (raz na zajęcia, nie na zawodnika). */
-export function applySessionToClub(game, clubId, session, date, nextMatch, campQ = 0) {
+export function applySessionToClub(game, clubId, session, date, nextMatch, campQ = 0, auto = true) {
   const c = game.training.clubs[clubId];
   const def = SESSIONS[session.type];
   const tac = staffMul.tac(staffA(game, clubId, 'asystent', 'TAK'));
@@ -64,9 +65,15 @@ export function applySessionToClub(game, clubId, session, date, nextMatch, campQ
   if (def.fam) c.fam[form] = Math.min(100, famOf(c, form) + def.fam * im * tac);
   if (def.instr) c.instr = Math.min(100, c.instr + def.instr * im * tac);
   if (def.sp) c.sp = Math.min(100, c.sp + def.sp * im * tac);
-  if (def.prep && nextMatch && nextMatch.date > date) {
+  // Analiza rywala: wynik losowany raz na mecz (prep.js). Zajęcia z planu asystenta przygotowuje asystent,
+  // zajęcia dodane albo zmienione ręcznie trener gracza; własna analiza zastępuje analizę asystenta, kolejne nie losują drugi raz
+  if (def.prep && nextMatch && nextMatch.date > date && !PASSIVE.r3) { // przed rundą 3: pewna premia 0,04 + 0,006 q
     const v = staffMul.prep(staffA(game, clubId, 'analityk', 'RYW'));
     if (!c.prep || c.prep.date !== nextMatch.date || c.prep.v < v) c.prep = { date: nextMatch.date, opp: nextMatch.opp, v: Math.round(v * 1000) / 1000 };
+  } else if (def.prep && nextMatch && nextMatch.date > date) {
+    const by = auto ? 'asst' : 'self';
+    const same = c.prep && c.prep.date === nextMatch.date;
+    if (!same || (c.prep.by !== 'self' && by === 'self')) c.prep = { date: nextMatch.date, opp: nextMatch.opp, ...rollPrep(game, clubId, nextMatch.date, by) };
   }
 }
 
@@ -131,10 +138,10 @@ export function aiSessionToClub(c, session, tac, campQ = 0) {
 }
 
 /**
- * Bonus z analizy wideo rywala (tylko w dniu meczu, na który była analiza).
- * Klub gracza: z zajęć „Analiza wideo rywala” w planie (c.prep). Klub AI: ten sam plan co domyślny plan asystenta
- * (analiza dzień przed meczem, gdy analityk ma jakość co najmniej 5), więc w dniu meczu dostaje tę samą premię
- * 0.04 + 0.006 q. Przeciw groźnej drużynie gracza (career/threat.js) analiza jest staranniejsza: do x2.
+ * Bonus z analizy wideo rywala (tylko w dniu meczu, na który była analiza), może być ujemny (prep.js).
+ * Klub gracza: z zajęć „Analiza wideo rywala” w planie (c.prep): plan asystenta albo własna decyzja trenera.
+ * Klub AI: trener zawsze sam ogląda rywala (szanse z atrybutu SKL), zysk przeciw groźnej drużynie gracza
+ * (career/threat.js) do x2, do tego przewaga AI w analizie rywala gracza (aiScoutAdvantage) i przewidywalność.
  */
 export function prepTerm(game, p) {
   const c = game?.training?.clubs?.[p.clubId];
@@ -154,7 +161,7 @@ function userScoutToday(game, oppId) {
   return v;
 }
 
-const AI_PREP_MIN_ANALYST = 5;
+const AI_PREP_MIN_ANALYST = 5; // tylko przed rundą 3 (PASSIVE.r3 = false)
 const aiPrepCache = new WeakMap();
 /** Premie analizy klubów AI grających dziś: Map clubId -> punkty (liczone raz na dzień). */
 export function aiPrepToday(game) {
@@ -170,10 +177,19 @@ export function aiPrepToday(game) {
       if (id === game.clubId || !game.training?.clubs?.[id]) continue;
       // Rozpracowany (albo nieczytelny) schemat rywala: docs/bierna-gra.md, ta sama reguła dla gracza i AI
       const edge = scoutEdge(game, id, opp);
-      const q = staffA(game, id, 'analityk', 'RYW'); // rozpracowanie rywala
-      if (q < AI_PREP_MIN_ANALYST) { if (edge) map.set(id, edge); continue; }
-      const mul = opp === game.clubId ? 1 + THREAT.prepMul * managerThreat(game) : 1;
-      map.set(id, Math.round((staffMul.prep(q) * mul + edge) * 1000) / 1000);
+      if (!PASSIVE.r3) { // przed rundą 3: pewna premia przy analityku od 5
+        const q = staffA(game, id, 'analityk', 'RYW');
+        if (q < AI_PREP_MIN_ANALYST) { if (edge) map.set(id, edge); continue; }
+        const mul = opp === game.clubId ? 1 + THREAT.prepMul * managerThreat(game) : 1;
+        map.set(id, Math.round((staffMul.prep(q) * mul + edge) * 1000) / 1000);
+        continue;
+      }
+      const vsUser = opp === game.clubId;
+      const roll = rollPrep(game, id, game.date, 'ai');
+      const mul = vsUser && roll.v > 0 ? 1 + THREAT.prepMul * managerThreat(game) : 1;
+      const adv = vsUser ? aiScoutAdvantage(game, id, game.date) : 0;
+      const v = Math.round((roll.v * mul + edge + adv) * 1000) / 1000;
+      if (v) map.set(id, v);
     }
   }
   aiPrepCache.set(game, { date: game.date, n, clubId: game.clubId, tk, map });

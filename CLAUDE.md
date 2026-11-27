@@ -33,6 +33,8 @@ z pozycji, dopiero potem kod. Każda nowa lub zmieniona funkcja dopisuje albo po
 ## Zasady gry (nie łamać)
 - Bez kont, logowania, serwera, Google Drive i Web Share.
 - Bez sztucznych sufitów i suwaków trudności: wynik = mechanika + RNG. Gracz i AI mają te same zasady.
+  Wyjątek (decyzja właściciela, Nov 27, 2026): losowa przewaga AI w analizie rywala gracza od 0 do granicy według ligi
+  (`PREP.adv` w `src/training/prep.js`, `docs/bierna-gra.md` rozdz. 10; wyłącznik `PASSIVE.r3`).
 - Nie zawyżać siły polskiej piłki na arenie międzynarodowej.
 
 ## Przed każdym commitem

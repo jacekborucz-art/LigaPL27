@@ -567,6 +567,74 @@ Jak to czytać:
 3. Zaangażowany gracz zyskuje częściowo przez obozy (istniejąca mechanika). Bez obozów jego przewaga byłaby mniejsza;
    osobnego pomiaru bez obozów nie robiłem.
 
+## 10. Runda 3: niższe ligi, przygotowanie pod rywala i przewaga AI (Nov 27, 2026)
+
+### 10.1 Zgłoszenie i decyzje właściciela
+
+- Zgłoszenie: w 2 Lidze i III lidze bierny gracz (tylko „Dalej” i „Pokaż wynik”) kończył sezony na 3., 3. i 6. miejscu.
+  Właściciel: w niższych ligach gra się ciężej, więcej walki; liczy się taktyka, motywacja i trening, parametry na końcu.
+  Transfery AI odrzucone jako rozwiązanie.
+- Cel B: bierny gracz traci ok. 20 pkt na sezon wobec tego samego klubu pod AI (dolna połowa tabeli, zwykle zwolnienie).
+  Aktywny i trafny gracz jest na poziomie AI albo trochę wyżej.
+- Trener AI zawsze sam ogląda rywala i ma kontrplan na stały schemat gracza.
+- Przewaga AI w analizie rywala gracza: losowana od 0 do granicy, przy każdym meczu z graczem (także gdy gracz
+  zmienia taktykę). Świadomy wyjątek od zasady „te same reguły”, wpisany w `CLAUDE.md`.
+- Analiza wideo przestaje być pewną premią wszędzie (także w Ekstraklasie). Wynik zawsze jest losowy: zysk, bez efektu
+  albo strata (strata mniejsza niż zysk). Własna praca trenera daje lepsze szanse niż asystent; szanse trenera gracza
+  rosną z doświadczeniem (mecze w karierze), asystenta z umiejętnością, trenera AI z atrybutem SKL.
+- Zwolnienie biernego gracza w pierwszym sezonie: akceptowane.
+
+### 10.2 Pomiar przed zmianami [SYM]
+
+- Skrypt klikający jak interfejs (zalecane odprawy przed meczem i w przerwie, pominięte konferencje, „Pokaż wynik”),
+  32 kluby (16 z 2 Ligi, 16 z III ligi), ziarna 1-2, punkty na mecz do zwolnienia przeliczone na 34 mecze:
+  2 Liga -9,3 pkt (błąd 2,0), III liga -10,4 (2,8) wobec AI. Zwolnienie w 1. sezonie: 42 z 62 przebiegów.
+- Wcześniejszy skrypt bez odpraw i konferencji pokazywał -5,9 i -3,4: zaniżał stratę (autorytet nie spadał, bo
+  `authorityWeek` nic nie robi bez rozliczonych konferencji).
+- Przyczyny (panel: trener niższych lig, psycholog, trener od treningu, projektant balansu, weryfikacja w kodzie):
+  plan asystenta sam dodawał wideo w MD-1 (`training/plan.js` `autoDay`), więc bierny gracz miał pewną premię
+  analizy jak aktywny; premia za rozpracowany schemat zależała prawie tylko od analityka (2 Liga ok. +0,085);
+  plan AI (`match/aiPlan.js`) nie patrzy na taktykę gracza; kara autorytetu była taka sama w każdej lidze.
+
+### 10.3 Zmiany (wszystkie za wyłącznikiem `PASSIVE.r3` w `src/training/scouting.js`)
+
+| Zmiana | Plik, funkcja | Przed rundą 3 | Runda 3 |
+|---|---|---|---|
+| Losowe przygotowanie pod rywala | nowy `src/training/prep.js` (`PREP`, `prepOdds`, `rollPrep`), `training/cohesion.js` `applySessionToClub` (nowy parametr `auto`), `training/sessions.js` (przekazuje `day.auto`) | wideo daje pewną premię 0,04 + 0,006 q (analityk) | wynik losowany raz na mecz: zysk podstawa x 0,6-1,4, strata podstawa x 0,3-0,8, podstawa = max(0,1; 0,04 + 0,006 q) |
+| Kto przygotowuje | `prep.js` `prepOdds` | bez znaczenia | zajęcia dodane albo zmienione ręcznie: trener gracza (zysk 55 % -> 75 %, strata 15 % -> 5 % od 0 do 300 meczów w karierze); z planu asystenta: asystent TAK (5: zysk 25 %, strata 45 %; 20: 50 % i 20 %); trener AI: SKL na tej samej skali co doświadczenie gracza |
+| Trener AI sam ogląda rywala | `cohesion.js` `aiPrepToday` | premia tylko przy analityku od 5 | zawsze losowanie trenera AI; mnożnik groźnej drużyny (threat.js) tylko na zysk |
+| Przewaga AI w analizie rywala gracza | `prep.js` `aiScoutAdvantage`, `PREP.adv`; doliczana w `aiPrepToday` | brak | X x U^2 (U jednostajne 0-1, średnio X/3), X: Ekstraklasa 0, 1 Liga 0,08, 2 Liga, III i IV liga 0,21 (2 Liga po kalibracji z 0,18); tylko kluby AI przeciw graczowi |
+| Analiza trenera AI bez analityka | `training/scouting.js` `analysisQuality`, `SCOUT.coachQ` | jakość z analityka (2 Liga ok. 0,26) | co najmniej 0,45 + 0,2 s(SKL) dla klubów AI |
+| Kontrplan na stały schemat gracza | `scouting.js` `counterPlan`, `scoutEdge`, `SCOUT.counter`; tekst w `scoutingNote` | brak | +0,1, gdy znajomość schematu od 0,6 i dziś ten sam plan (zgodność od 0,8) |
+| Górna granica premii za rozpracowanie | `SCOUT.edgeMax` | 0,4 (`SCOUT.edgeMaxR2`) | 0,5 |
+| Autorytet zależny od ligi | `career/authority.js` `authorityTerm` (nowy parametr `tier`), `AUTH.dep` | mnożnik 1 | kara i premia x 1 / 1,15 / 1,6 / 1,7 / 1,7 (2 Liga po kalibracji z 1,5) (Ekstraklasa, 1 Liga, 2 Liga, III liga, IV liga) |
+| Teksty | `training/config.js` (opis zajęć wideo), `ui/trainingView.js` (opis analityka) | „Mały bonus na ten mecz” | wynik niepewny, kto przygotowuje |
+
+Testy: nowy `tests/passiveR3.test.mjs`; `tests/balance.test.mjs` i `tests/passivePlay.test.mjs` sprawdzają stare
+zachowanie z `PASSIVE.r3 = false`, a w `balance.test.mjs` dodatkowo, że pasywny gracz nie jest wyraźnie przed AI.
+
+### 10.4 Jak cofnąć
+
+1. Całość od razu: w `src/training/scouting.js` ustaw `PASSIVE.r3: false`. Gra liczy wtedy dokładnie jak przed rundą 3
+   (stare gałęzie kodu zostały w `cohesion.js` `applySessionToClub` i `aiPrepToday`, `scouting.js`, `authority.js`).
+   Zapisy gier nie wymagają zmian: nowe pole `c.prep.kind`/`c.prep.by` jest ignorowane, a premia wygasa po meczu.
+2. Pojedyncza zmiana: przewaga AI `PREP.adv` na 0; kontrplan `SCOUT.counter.v` na 0; analiza trenera AI
+   `SCOUT.coachQ.base` i `.skl` na 0; granica `SCOUT.edgeMax` na 0,4; autorytet `AUTH.dep` na same 1;
+   losowe przygotowanie tylko razem z całością (wyłącznik).
+3. Całkowite usunięcie kodu: commit rundy 3 (`git show` commita z opisem o analizie rywala w niższych ligach)
+   zmienia tylko pliki z tabeli 10.3, `docs/`, `CLAUDE.md` i `sw.js`; `git revert` tego commita przywraca stan.
+
+### 10.5 Kalibracja po zmianach
+
+Ten sam skrypt i te same ziarna co w 10.2 (punkty na mecz do zwolnienia, x34) [SYM]:
+
+| Liga | Przed rundą 3 | Runda 3 (2 Liga: przewaga 0,18, autorytet x1,5) | Po kalibracji 2 Ligi (0,21, x1,6) |
+|---|---|---|---|
+| 2 Liga | -9,3 (błąd 2,0) | -15,8 (2,9), zwolnieni 30 z 32 | w toku |
+| III liga | -10,4 (2,8) | -22,4 (2,7), zwolnieni 28 z 28 | bez zmian |
+
+Morale drużyny biernego gracza w 2 Lidze: 7,9 przed, 5,4 po. Gracz aktywny i Ekstraklasa: jeszcze niezmierzone.
+
 ## Źródła
 
 - A1. M. Kędziorek, „Wykorzystanie analizy w procesie treningowym na podstawie doświadczeń własnych” (Wielkopolski ZPN, 2015), PDF: https://wielkopolskizpn.pl/files/document/397/wykorzystanie-analizy-w-procesie-treningowym-na-podstawie-doswiadczen-wlasnych-maciej-kedziorek-2015.pdf (znam z opisu wyszukiwarki; host niedostępny z sesji, w której powstał dokument).

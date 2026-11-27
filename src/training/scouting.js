@@ -12,7 +12,9 @@ import { staffA } from './staff.js';
 import { coachOf, coachSkill } from '../career/coaches.js';
 
 /** Wyłącznik do pomiarów balansu (te same ziarna z mechaniką i bez niej). */
-export const PASSIVE = { enabled: true, scout: true, attention: true, variety: true, authority: true };
+// r3: runda 3 (Nov 27, 2026, docs/bierna-gra.md rozdz. 10): kontrplan i analiza trenera AI, losowe przygotowanie
+// pod rywala (prep.js), przewaga AI w analizie, autorytet zależny od ligi. false = dokładnie zachowanie sprzed rundy 3.
+export const PASSIVE = { enabled: true, scout: true, attention: true, variety: true, authority: true, r3: true };
 
 export const SCOUT = {
   window: 8, // ile ostatnich meczów o stawkę oglądają analitycy rywala
@@ -22,7 +24,11 @@ export const SCOUT = {
   w: { formation: 0.3, pressing: 0.15, passing: 0.15, line: 0.12, mentality: 0.12, tempo: 0.08, counter: 0.08 },
   max: 0.6, // premia przy pełnej znajomości schematu i analizie jakości 1 (pkt atrybutu na zawodnika)
   neutral: 0.45, // znajomość, przy której premii nie ma (przeciętny trener AI zmienia plan tak często)
-  edgeMin: -0.08, edgeMax: 0.4, // zakres premii: zaskoczenie rywala do -0,08, rozpracowany schemat do +0,4
+  edgeMin: -0.08, edgeMax: 0.5, edgeMaxR2: 0.4, // zakres premii: zaskoczenie do -0,08, rozpracowany schemat do +0,5 (przed rundą 3: 0,4)
+  // Trener AI sam ogląda rywala (runda 3, Nov 27, 2026): jakość analizy co najmniej 0,45 + 0,2 s(SKL), także bez analityka
+  coachQ: { base: 0.45, skl: 0.2 },
+  // Kontrplan trenera AI na rozpracowany stały schemat gracza (znajomość od 0,6 i dziś ten sam plan): +0,1
+  counter: { base: 0.6, match: 0.8, v: 0.1 },
   qMin: 0.15, qMax: 1.3, // jakość analizy: analityk 3 -> ok. 0,15, analityk 15 -> 1, do 1,3 z dobrym trenerem
   aiFam: { base: 0.45, skl: 0.2, tak: 0.1, min: 0.25, max: 0.7 }, // przewidywalność klubu AI z trenera
   warnAt: 0.6, clearAt: 0.4, // wiadomość analityka: schemat rozpracowany / znów nieczytelny
@@ -118,6 +124,7 @@ export function analysisQuality(game, clubId) {
   if (clubId !== game?.clubId) {
     const c = coachOf(game, clubId);
     if (c) v *= 1 + 0.25 * coachSkill(c.a.SKL) + 0.1 * coachSkill(c.a.TAK);
+    if (PASSIVE.r3) v = Math.max(v, SCOUT.coachQ.base + SCOUT.coachQ.skl * (c ? coachSkill(c.a.SKL) : 0)); // trener sam ogląda rywala
   }
   return r3(clamp(v, SCOUT.qMin, SCOUT.qMax));
 }
@@ -126,8 +133,15 @@ export function analysisQuality(game, clubId) {
 export function scoutEdge(game, scoutId, targetId) {
   if (!PASSIVE.enabled || !PASSIVE.scout || !game || !scoutId || !targetId) return 0;
   const fam = familiarityOf(game, targetId);
-  const e = SCOUT.max * analysisQuality(game, scoutId) * (fam - SCOUT.neutral);
-  return r3(clamp(e, SCOUT.edgeMin, SCOUT.edgeMax));
+  let e = SCOUT.max * analysisQuality(game, scoutId) * (fam - SCOUT.neutral);
+  if (PASSIVE.r3 && targetId === game.clubId && scoutId !== game.clubId && counterPlan(game)) e += SCOUT.counter.v;
+  return r3(clamp(e, SCOUT.edgeMin, PASSIVE.r3 ? SCOUT.edgeMax : SCOUT.edgeMaxR2));
+}
+
+/** Czy trener AI ma kontrplan na schemat gracza: schemat rozpracowany i dziś gramy tak samo. */
+export function counterPlan(game, tactics = game?.tactics) {
+  const u = userFamiliarity(game, tactics);
+  return u.base >= SCOUT.counter.base && u.match >= SCOUT.counter.match;
 }
 
 /** Klucz odcisku (pamięć podręczna premii w dniu meczu zależy od taktyki gracza). */
@@ -167,7 +181,8 @@ export function scoutingNote(game, oppId, tactics = game.tactics) {
   const q = staffA(game, oppId, 'analityk', 'RYW');
   const staff = q >= 14 ? 'Rywal ma mocny dział analiz' : q >= 8 ? 'Sztab rywala analizuje przeciwników' : 'Rywal ma skromny sztab analityków';
   if (u.base >= SCOUT.warnAt && u.match >= 0.9 && edge > 0.05) {
-    return { level: 'known', edge, text: `${staff} i zna nasz schemat (${describeFp(u.pred)}): gramy tak od kilku meczów. Inny plan na ten mecz utrudni im zadanie.` };
+    const plan = PASSIVE.r3 && counterPlan(game, tactics) ? ' Trener rywala ustawił drużynę pod nasz sposób gry.' : '';
+    return { level: 'known', edge, text: `${staff} i zna nasz schemat (${describeFp(u.pred)}): gramy tak od kilku meczów.${plan} Inny plan na ten mecz utrudni im zadanie.` };
   }
   if (u.base >= SCOUT.warnAt && u.match < 0.7) {
     return { level: 'surprise', edge, text: `Rywal szykował się na nasz zwykły schemat (${describeFp(u.pred)}). Dzisiejszy plan powinien go zaskoczyć.` };
