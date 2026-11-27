@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-43b07bc754';
+const VERSION = 'v0.3-e9866e91ba';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -192,7 +192,7 @@ const FILES = [
   ['./src/career/arrears.js', '9a8dec4193'],
   ['./src/career/assistantReport.js', '1299952ba2'],
   ['./src/career/attention.js', '22c71f439f'],
-  ['./src/career/authority.js', '7cceeaaf58'],
+  ['./src/career/authority.js', '58656f4fc3'],
   ['./src/career/board.js', '8f3c95105a'],
   ['./src/career/boardRequests.js', 'fd7f3a5cbe'],
   ['./src/career/captaincy.js', '2a2fe4e0ee'],
@@ -371,15 +371,16 @@ const FILES = [
   ['./src/styles/transfers.css', '03d14fa29b'],
   ['./src/training/aiClubs.js', '9ae7800183'],
   ['./src/training/camps.js', '751dd1d81f'],
-  ['./src/training/cohesion.js', 'c573149821'],
-  ['./src/training/config.js', 'fd2654df41'],
+  ['./src/training/cohesion.js', '7e4108fece'],
+  ['./src/training/config.js', '330ecf07e9'],
   ['./src/training/development.js', '741e3854bd'],
   ['./src/training/friendlies.js', '752e6fc16e'],
   ['./src/training/index.js', '21d1c253ff'],
   ['./src/training/load.js', '029d414e92'],
   ['./src/training/plan.js', 'ff0d7b9ed5'],
-  ['./src/training/scouting.js', '540d54be96'],
-  ['./src/training/sessions.js', 'e6599d4c82'],
+  ['./src/training/prep.js', 'ea7434c99e'],
+  ['./src/training/scouting.js', 'c1cc971e6d'],
+  ['./src/training/sessions.js', 'b2c4b2ecc8'],
   ['./src/training/staff.js', '0debf30020'],
   ['./src/training/state.js', '8577a26767'],
   ['./src/training/variety.js', '31ec815b77'],
@@ -434,7 +435,7 @@ const FILES = [
   ['./src/ui/talksView.js', '4a00b34822'],
   ['./src/ui/teamReportView.js', 'c01abc57b6'],
   ['./src/ui/todoView.js', 'bd4d7aa1c4'],
-  ['./src/ui/trainingView.js', '58ad4a6399'],
+  ['./src/ui/trainingView.js', '90571904b9'],
   ['./src/ui/transferDealsView.js', '7aadd7cfb8'],
   ['./src/ui/transfersView.js', '095c172472'],
   ['./src/world/ephemeral.js', '216b6bcdd9'],
