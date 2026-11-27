@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-cb7d928926';
+const VERSION = 'v0.3-51cddee976';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -188,11 +188,11 @@ const FILES = [
   ['./assets/icons/icon.svg', '59f03f0390'],
   ['./src/app.js', 'af8043380c'],
   ['./src/career/academy.js', '6429b69237'],
-  ['./src/career/acclimatization.js', '3cd6d72f9f'],
+  ['./src/career/acclimatization.js', '1539b3543c'],
   ['./src/career/arrears.js', '9a8dec4193'],
   ['./src/career/assistantReport.js', '1299952ba2'],
   ['./src/career/attention.js', '22c71f439f'],
-  ['./src/career/authority.js', '7be1ca02da'],
+  ['./src/career/authority.js', 'cf181a3f88'],
   ['./src/career/board.js', '8f3c95105a'],
   ['./src/career/boardRequests.js', 'fd7f3a5cbe'],
   ['./src/career/captaincy.js', '2a2fe4e0ee'],
@@ -216,7 +216,7 @@ const FILES = [
   ['./src/career/lateJoins.js', 'b0d7b72a7d'],
   ['./src/career/leagueNews.js', '74a808d449'],
   ['./src/career/loans.js', 'd7aad00962'],
-  ['./src/career/mindset.js', 'bfb5eb974c'],
+  ['./src/career/mindset.js', '7316ddbf69'],
   ['./src/career/morale.js', '1e6b279832'],
   ['./src/career/moveWish.js', '5934884415'],
   ['./src/career/negotiation.js', '4831625475'],
@@ -305,16 +305,18 @@ const FILES = [
   ['./src/engine/match/coach.js', '194df3bbb1'],
   ['./src/engine/match/constants.js', '3fbe50a056'],
   ['./src/engine/match/control.js', 'cfc35b73b8'],
-  ['./src/engine/match/core.js', '3bb2a21090'],
+  ['./src/engine/match/core.js', 'c82e613010'],
+  ['./src/engine/match/factors.js', '79e52f133f'],
   ['./src/engine/match/match.js', 'd1ed756f73'],
   ['./src/engine/match/playerInstr.js', '98cd40e95e'],
   ['./src/engine/match/rules.js', 'd5cc299ded'],
-  ['./src/engine/match/teams.js', '57b90acf3a'],
+  ['./src/engine/match/teams.js', '1c6ff76f21'],
   ['./src/engine/matchStats.js', '71542c9b3b'],
-  ['./src/engine/modifiers.js', 'cf8f446d97'],
+  ['./src/engine/modifiers.js', '68c74863b8'],
+  ['./src/engine/pipeline.js', 'a37b612325'],
   ['./src/engine/positions.js', 'ee736ff7cc'],
   ['./src/engine/quickSim.js', 'e6cf296c22'],
-  ['./src/engine/teamStrength.js', '48334cd7ed'],
+  ['./src/engine/teamStrength.js', '6a662df23a'],
   ['./src/match/aiPlan.js', '2f958da775'],
   ['./src/match/briefings.js', '846691a006'],
   ['./src/match/matchday.js', 'c6297f2243'],
@@ -375,7 +377,7 @@ const FILES = [
   ['./src/training/config.js', '330ecf07e9'],
   ['./src/training/development.js', '741e3854bd'],
   ['./src/training/friendlies.js', '752e6fc16e'],
-  ['./src/training/index.js', '21d1c253ff'],
+  ['./src/training/index.js', '618dbc5ead'],
   ['./src/training/load.js', '029d414e92'],
   ['./src/training/plan.js', 'ff0d7b9ed5'],
   ['./src/training/prep.js', '87ea6b6202'],

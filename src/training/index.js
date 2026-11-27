@@ -137,10 +137,10 @@ export const DAILY_SYSTEM = {
 };
 
 export const MODIFIERS = [
-  { id: 'trainingCohesion', scope: 'player', label: 'Zgranie drużyny', apply: (p) => cohesionTerm(activeGame(), p) },
-  { id: 'trainingPrep', scope: 'player', label: 'Analiza rywala', apply: (p) => prepTerm(activeGame(), p) },
+  { id: 'trainingCohesion', scope: 'player', group: 'team', range: [-0.4, 0.28], label: 'Zgranie drużyny', apply: (p) => cohesionTerm(activeGame(), p) },
+  { id: 'trainingPrep', scope: 'player', group: 'team', range: [-0.25, 1.2], /* runda 3: losowa analiza, kontrplan, przewaga AI (prep.js) */ label: 'Analiza rywala', apply: (p) => prepTerm(activeGame(), p) },
   {
-    id: 'trainingLoad', scope: 'player', label: 'Obciążenie treningowe',
+    id: 'trainingLoad', scope: 'player', group: 'body', range: [-1, 0], label: 'Obciążenie treningowe',
     apply: (p) => {
       const g = activeGame();
       if (p.training && (!g || p.clubId === g.clubId)) return legsTerm(p.training) + overloadTerm(p.training);
@@ -148,9 +148,9 @@ export const MODIFIERS = [
       return g ? legsTerm(g.training?.clubs?.[p.clubId]) + aiOverload(p) : 0;
     },
   },
-  { id: 'trainingCamp', scope: 'player', label: 'Forma bazowa (obóz)', apply: (p) => campTerm(activeGame(), p) },
+  { id: 'trainingCamp', scope: 'player', group: 'body', range: [-0.4, 0.4], label: 'Forma bazowa (obóz)', apply: (p) => campTerm(activeGame(), p) },
   {
-    id: 'trainingSetPieces', scope: 'player', label: 'Stałe fragmenty (trening)',
+    id: 'trainingSetPieces', scope: 'player', group: 'team', range: [-0.03, 0.06], label: 'Stałe fragmenty (trening)',
     enabled: (ctx) => !ctx.inMatch, // w pełnym silniku działa przez dane wejściowe (trainingMatchInput)
     apply: (p) => { const c = activeGame()?.training?.clubs?.[p.clubId]; return c ? 0.05 * setPieceEdge(c) : 0; },
   },

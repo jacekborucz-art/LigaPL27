@@ -4,7 +4,8 @@
 
 import { Rng, clamp } from '../../core/rng.js';
 import { K, SHOOT_W, FOUL_W, INJURY_TYPES, RED_REASONS, KNOCK, FATIGUE, SAT } from './constants.js';
-import { buildTeam, updateZones, updateCondition, onPitch, goalkeeper, fieldPlayers, slotFit, makeKnock, errFactor, condPenalty, teamHunger, updateCaptain } from './teams.js';
+import { buildTeam, updateZones, updateCondition, onPitch, goalkeeper, fieldPlayers, slotFit, makeKnock, errFactor, updateCaptain } from './teams.js';
+import { matchFactors, matchupWeights, matchupBrk, liveAdd, hungerNow, newLedger, ledgerMinute, ledgerAction } from '../pipeline.js';
 import { CAPTAIN } from '../captain.js';
 import { matchRules, unlimitedSubs, UNLIMITED } from './rules.js';
 
@@ -29,13 +30,16 @@ const last = (x) => x.p.last ?? x.p.name;
 export function createMatch(cfg) {
   const ctx = { neutral: false, rank: 0, var: true, refStrict: 1, attendance: 0.8, knockout: false, weather: {}, ...cfg.ctx };
   const rng = new Rng(cfg.seed ?? 'mecz');
+  // Etap match potoku (pipeline.js): pogoda, sędzia, ranga, kibice; raz na mecz, silnik czyta gotowe liczby z M.mx
+  const mx = matchFactors(ctx);
   const M = {
     ctx, rng, tick: 0, half: 1, phase: 'play', minute: 0, elapsed: 0, length: 45, added: null,
     score: [0, 0], events: [], momentum: [], possession: [], halfTimeScore: null,
     halfCounts: freshCounts(), addedTimes: [], extraTime: false, shootout: null, ended: false,
     ai: 0, emptyNet: false, addedExtra: 0, abandoned: null,
-    hfa: ctx.neutral ? 0 : 0.7 + 0.3 * ctx.attendance,
+    hfa: mx.hfa, mx,
     rules: matchRules(ctx),
+    ledger: newLedger(mx), // zrealizowany wkład wpisów potoku (raporty), bez wpływu na wynik
   };
   M.teams = [buildTeam(0, cfg.home, rng, ctx, cfg.seed ?? 'mecz'), buildTeam(1, cfg.away, rng, ctx, cfg.seed ?? 'mecz')];
   if (unlimitedSubs(M)) for (const T of M.teams) { T.subsLimit = UNLIMITED; T.windowsLimit = UNLIMITED; }
@@ -45,7 +49,7 @@ export function createMatch(cfg) {
     T.baseInstr = { ...T.tactics.instructions };
     T.plannedSubs = rng.weighted([3, 4, 5], (n) => ({ 3: 0.25, 4: 0.4, 5: 0.35 })[n]);
   }
-  for (const T of M.teams) T.strDiff = T.str0 - M.teams[1 - T.side].str0 + (ctx.neutral ? 0 : T.side === 0 ? 0.3 : -0.3);
+  for (const T of M.teams) T.strDiff = T.str0 - M.teams[1 - T.side].str0 + (T.side === 0 ? mx.home : -mx.home); // atut boiska (wpis crowd)
   emit(M, 'kickoff', null, null, { text: 'Sędzia rozpoczyna mecz.' });
   return M;
 }
@@ -87,9 +91,9 @@ function satAct(M, side) {
   const diff = M.score[side] - M.score[1 - side];
   if (diff >= 2 && M.minute >= (diff >= 3 ? SAT.from3 : SAT.from2)) {
     const slack = diff >= 3 ? 1 : SAT.slack2;
-    return 1 - SAT.smax * slack * (1 - teamHunger(M.teams[side], M));
+    return 1 - SAT.smax * slack * (1 - hungerNow(M.teams[side], M)); // głód goli: wpis 'hunger' etapu team
   }
-  if (diff <= -2 && M.minute >= SAT.trailFrom) return 1 - SAT.trail * (1 - teamHunger(M.teams[side], M));
+  if (diff <= -2 && M.minute >= SAT.trailFrom) return 1 - SAT.trail * (1 - hungerNow(M.teams[side], M));
   return 1;
 }
 
@@ -101,7 +105,7 @@ function rateEv(x, v) { if (x) x.ev += v; }
 
 // ------------------------------------------------------------ Fazy minuty
 function phaseTeams(M) {
-  for (const T of M.teams) { updateCaptain(T, M); updateCondition(T, M); updateZones(T, M); T.threat = 0; }
+  for (const T of M.teams) { updateCaptain(T, M); updateCondition(T, M); updateZones(T, M); T.threat = 0; ledgerMinute(M, T, T.mctx.xs); }
 }
 
 function phasePossession(M) {
@@ -145,10 +149,9 @@ function offside(M, at) {
 
 function phaseFoul(M) {
   const ai = M.ai;
-  const r = M.ctx.refStrict;
-  const rankFoul = M.ctx.rank >= 2 ? 1.1 : 1;
+  const mx = M.mx; // warunki meczu z potoku: pogoda, ranga, sędzia (pipeline.js matchFactors)
   const tw = M.teams.map((T) => (T.P.timewasting && M.score[T.side] > M.score[1 - T.side]));
-  const baseFoul = K.foulTick * (M.ctx.weather.foul ?? 1) * rankFoul * (1.1 - 0.1 * r);
+  const baseFoul = K.foulTick * mx.wFoul * mx.rankFoul * mx.refFoul;
   // Kapitan przy stawce (docs/kapitan.md): drużyna rzadziej fauluje, x(1 - 0,10 E S); udział fauli obu drużyn wg tych mnożników
   const cf = M.teams.map((T) => 1 - CAPTAIN.foul * T.capES);
   const calm = cf[0] !== 1 || cf[1] !== 1;
@@ -163,10 +166,10 @@ function phaseFoul(M) {
     emit(M, 'foul', fi, x);
     emit(M, 'freeKick', 1 - fi, null);
     const sm = shoutMods(ft, M);
-    const cm = (fi === 0 ? K.homeCardMul : K.awayCardMul) ** (M.hfa ? 1 : 0) * r * (0.7 + 0.03 * (x.p.hidden?.TMP ?? 10))
-      * (M.ctx.rank >= 2 ? 1.15 : 1) * (M.minute > 80 ? 1.15 : 1) * (sm.yellowMul ?? 1) * (1 + 0.03 * Math.max(0, x.Z)) * (1 - CAPTAIN.card * ft.capES);
+    const cm = (fi === 0 ? K.homeCardMul : K.awayCardMul) ** (M.hfa ? 1 : 0) * mx.refCard * (0.7 + 0.03 * (x.p.hidden?.TMP ?? 10))
+      * mx.rankCard * (M.minute > 80 ? 1.15 : 1) * (sm.yellowMul ?? 1) * (1 + 0.03 * Math.max(0, x.Z)) * (1 - CAPTAIN.card * ft.capES);
     let carded = false;
-    if (M.rng.next() < K.redPerFoul * cm * Math.sqrt(r) * ft.P.redPerFoul * ft.P.redMul * (x.pi?.rc ?? 1)) {
+    if (M.rng.next() < K.redPerFoul * cm * mx.refRed * ft.P.redPerFoul * ft.P.redMul * (x.pi?.rc ?? 1)) {
       straightRed(M, ft, x, M.rng.weighted(['sfp', 'violent', 'dogso'], (k) => ({ sfp: 0.6, violent: 0.15, dogso: 0.25 })[k]));
       carded = true;
     } else if (M.rng.next() < K.yellowPerFoul * cm * ft.P.yellowPerFoul * (x.yc ? K.bookedYellowMul : 1) * (x.pi?.yc ?? 1)) {
@@ -349,22 +352,24 @@ function phaseAction(M) {
   const mom = momentumAvg(M, ai);
   const pAct = K.pAction * (M.hfa ? (ai === 0 ? K.homeCreate : K.awayCreate) ** M.hfa : 1) * A.P.pActMul * D.P.oppPActMul
     * gsA.act * (smA.actMul ?? 1) * (1 + K.lateRamp * Math.max(0, M.minute - 55)) * Math.exp(K.kCreate * delta)
-    * (1 + K.momentumAct * mom) * (M.ctx.weather.act ?? 1);
+    * (1 + K.momentumAct * mom) * M.mx.wAct;
   if (M.rng.next() >= pAct) return;
   A.threat += 1;
-  const type = pickType(M, A, D);
+  const type = pickType(M, A, D); // etap matchup: wagi rodzajów akcji
   // Rzut karny
   // Karny podyktowany przez sędziego zostaje (VAR sprawdza tylko sytuacje, w których sędzia nie gwizdał)
-  if (M.rng.next() < K.penPerAction * D.P.penMul * (0.85 + 0.15 * M.ctx.refStrict) * dribblePen(A) * (1 - CAPTAIN.foul * D.capES)) { // faul w polu karnym: kapitan przy stawce
+  if (M.rng.next() < K.penPerAction * D.P.penMul * M.mx.refPen * dribblePen(A) * (1 - CAPTAIN.foul * D.capES)) { // faul w polu karnym: kapitan przy stawce
     awardPenalty(M, ai);
     return;
   }
-  const brk = K.brkBase[type] + K.kBreak * delta + A.P.brk + counterBonus(M, A, D, type);
+  const cb = matchupBrk(A, D, type); // etap matchup: kontry taktyczne (pipeline.js), gotowe na czas stanu drużyn
+  ledgerAction(M, ai, type, cb);
+  const brk = K.brkBase[type] + K.kBreak * delta + A.P.brk + cb;
   if (M.rng.next() < sig(brk)) {
     if (type === 'KON' && tacticalFoul(M, A, D)) return;
     A.threat += 3;
     const header = type === 'SKR' && M.rng.next() < 0.45;
-    shot(M, ai, drawXg(M, K.xg[type]) * (type === 'DYS' ? (M.ctx.weather.dys ?? 1) : 1), type, header);
+    shot(M, ai, drawXg(M, K.xg[type]) * (type === 'DYS' ? M.mx.wDys : 1), type, header);
   } else if (M.rng.next() < K.failCorner[type]) {
     corner(M, ai);
   } else if (M.rng.next() < K.failOffside[type]) {
@@ -406,7 +411,7 @@ function awardPenalty(M, ai, { culprit = null, fouled = null, byVar = false, han
   fouler.fouls++;
   emit(M, 'foul', 1 - ai, fouler);
   emit(M, 'penalty', ai, victim, { byVar, hand, foulerId: fouler.id, pause: 3, text: hand ? `Rzut karny! Zagranie ręką: ${last(fouler)}.` : `Rzut karny! Faul: ${last(fouler)}, poszkodowany: ${last(victim)}.` });
-  if (M.rng.next() < 0.1 * M.ctx.refStrict) card(M, D, fouler, 'faul w polu karnym');
+  if (M.rng.next() < M.mx.refPenCard) card(M, D, fouler, 'faul w polu karnym');
   penaltyKick(M, ai);
 }
 
@@ -429,7 +434,7 @@ function tacticalFoul(M, A, D) {
   emit(M, 'foul', D.side, x, { tactical: true });
   emit(M, 'freeKick', A.side, null);
   if (M.rng.next() < K.tacFoulDogso) straightRed(M, D, x, 'dogso');
-  else if (M.rng.next() < K.tacFoulYellow * Math.sqrt(M.ctx.refStrict) * (1 - CAPTAIN.card * D.capES)) card(M, D, x, 'faul taktyczny, przerwanie kontry');
+  else if (M.rng.next() < K.tacFoulYellow * M.mx.refTacCard * (1 - CAPTAIN.card * D.capES)) card(M, D, x, 'faul taktyczny, przerwanie kontry');
   return true;
 }
 
@@ -470,36 +475,11 @@ function defError(M, ai, A, D) {
 function dribblePen(A) { return (1 + 0.04 * (A.avg('DRY') - 11)) * A.P.penDrawMul; } // penDrawMul: drybling zawodników (instrukcje)
 
 function pickType(M, A, D) {
-  const w = {};
-  for (const t of Object.keys(K.typeW)) {
-    let v = K.typeW[t] * (A.P.act[t] ?? 1) * (D.P.oppAct[t] ?? 1);
-    if (t === 'KON') {
-      v *= D.P.counterVulnMul;
-      if (A.P.konVsAttack > 1 && (D.P.mentality >= 1 || D.P.line === 'high')) v *= A.P.konVsAttack / 1.2;
-    }
-    w[t] = v;
-  }
+  const w = matchupWeights(A, D); // wpis 'typeMix' etapu matchup (factors.js typeWeights)
   return M.rng.weighted(Object.keys(w), (k) => w[k]);
 }
 
-/** Kontry taktyczne (4.2): bonus do przełamania, maks. +-0.5. */
-function counterBonus(M, A, D, type) {
-  let b = 0;
-  const tecA = A.avg('TEC');
-  // Liczby z INSTR_NUM: 1 = cała drużyna (wysoki pressing, krótkie podania, twardy lub łagodny odbiór), ułamek od zawodników
-  if (D.P.pressHigh && A.P.shortPass) b += D.P.pressHigh * A.P.shortPass * (tecA >= 12 ? 0.35 * Math.min(1, (tecA - 12) / 3) : -0.3 * Math.min(1, (12 - tecA) / 3));
-  if (type === 'SKR') b += 0.25 * (A.P.W - D.P.W);
-  if (type === 'KON' && A.P.konVsAttack > 1 && (D.P.line === 'high' || D.P.mentality >= 1)) {
-    b += 0.4 * clamp(((A.pace?.team ?? A.avg('SZY')) - (D.pace?.team ?? D.avg('SZY')) + 3) / 6, 0, 1); // szybkość z kondycją
-  }
-  if (D.P.tackleHard && A.avg('DRY') >= 13) b -= 0.2 * D.P.tackleHard;
-  if (D.P.tackleSoft) b += 0.2 * D.P.tackleSoft * clamp((A.avg('DRY') - 11) / 4, 0, 1);
-  if (type === 'POZ' && D.P.DvsPOZ) b -= D.P.DvsPOZ;
-  if (type === 'KON' && D.P.DvsKON) b -= D.P.DvsKON;
-  if (A.P.brkPerTec) b += A.P.brkPerTec * (tecA - 11);
-  if (A.P.brkPerAerial) b += A.P.brkPerAerial * ((A.avg('GLO') + A.avg('SIL')) / 2 - 11);
-  return clamp(b, -0.5, 0.5);
-}
+// Kontry taktyczne (4.2): factors.js counterBonus, wpis 'counters' etapu matchup (pipeline.js).
 
 function drawXg(M, table) {
   let x = M.rng.next();
@@ -510,8 +490,8 @@ function drawXg(M, table) {
 
 function finishing(x, type, header) {
   const main = header ? attr(x, 'GLO') : type === 'DYS' ? attr(x, 'DYS') : attr(x, 'WYK');
-  const condPen = condPenalty(x);
-  return 0.6 * main + 0.25 * attr(x, 'OPA') + 0.15 * attr(x, 'TEC') + x.base + 0.035 * x.Z + condPen;
+  // Stan w chwili strzału: etap live liczony teraz (zaangażowanie mogło się zmienić w tej minucie), po kolei jak dawniej
+  return liveAdd(0.6 * main + 0.25 * attr(x, 'OPA') + 0.15 * attr(x, 'TEC') + x.base, x);
 }
 
 // kind w zdarzeniach strzałów: typ akcji (POZ, SKR, KON, DYS, SP, FK, PEN), widoczny dla trenera na ławce (coach.js)
@@ -542,7 +522,7 @@ function shot(M, ai, xg, type, header, forced = null) {
   const gk = M.emptyNet ? null : goalkeeper(D);
   const F = finishing(s, type, header);
   const pg = M.emptyNet ? Math.min(0.95, xg * 1.25)
-    : Math.min(0.95, xg * Math.exp(K.kFin * (F - D.zones.GK + K.finOffset)) * (M.ctx.weather.conv ?? 1) * D.gkMods.goalMul);
+    : Math.min(0.95, xg * Math.exp(K.kFin * (F - D.zones.GK + K.finOffset)) * M.mx.wConv * D.gkMods.goalMul);
   if (assister) { assister.kp++; rateEv(assister, 0.15); emit(M, 'keyPass', ai, assister); }
   if (M.rng.next() < pg) { goal(M, ai, s, assister, xg, type === 'PEN' ? 'PEN' : header ? 'HEAD' : type); return; }
   if (xg >= 0.3) rateEv(s, -0.3);
@@ -784,7 +764,7 @@ function phaseInjuries(M) {
   for (const T of M.teams) {
     for (const x of onPitch(T, M.minute)) {
       const m = (1.5 - 0.05 * (x.p.hidden?.ODP ?? 10)) * (x.cond < 50 ? 2 : x.cond < 70 ? 1.4 : 1)
-        * ((x.p.age ?? 25) >= 33 ? 1.3 : (x.p.age ?? 25) >= 30 ? 1.15 : 1) * (M.ctx.weather.inj ?? 1);
+        * ((x.p.age ?? 25) >= 33 ? 1.3 : (x.p.age ?? 25) >= 30 ? 1.15 : 1) * M.mx.wInj;
       if (M.rng.next() < K.injTick * m * 0.4) injure(M, T, x, false); // 40 % urazów widocznych w meczu
     }
     if (T.knocked) knockRisk(M, T);
@@ -801,7 +781,7 @@ function knockRisk(M, T) {
     const k = x.knock;
     if (!k || k.aggravated || k.since === M.minute) continue;
     const t = KNOCK.types[k.type] ?? KNOCK.types.contusion;
-    const p = t.agg * extra * (x.cond < 70 ? KNOCK.aggTired : 1) * ((x.p.age ?? 25) >= 30 ? KNOCK.aggAge : 1) * (T.P.fatMul ?? 1) * (M.ctx.weather.inj ?? 1);
+    const p = t.agg * extra * (x.cond < 70 ? KNOCK.aggTired : 1) * ((x.p.age ?? 25) >= 30 ? KNOCK.aggAge : 1) * (T.P.fatMul ?? 1) * M.mx.wInj;
     if (M.rng.next() < p) aggravate(M, T, x);
   }
 }

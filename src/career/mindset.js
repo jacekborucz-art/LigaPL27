@@ -143,7 +143,7 @@ export function suitcaseEffect(p) {
 }
 
 registerModifier({
-  id: 'transferMind', scope: 'player', label: 'Głowa w transferze',
+  id: 'transferMind', scope: 'player', group: 'psyche', range: [-0.4, 0.05], label: 'Głowa w transferze',
   apply: (p) => (p.preContract && p.preContract.club !== p.clubId ? suitcaseEffect(p) : 0)
     + (p.moveWish?.stage === 'oficjalna' && p.moveWish.reacted === 'refuse' ? -0.15 : 0),
 });
