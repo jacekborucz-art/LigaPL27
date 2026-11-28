@@ -1,6 +1,7 @@
 // Strażnik „bit w bit” projektu Walka taktyk (docs/walka-taktyk.md, krok 1). Pełny silnik (210 meczów ze stałymi
 // ziarnami), siła drużyn (teamRating, lineupRating), mecze w tle (quickMatch) i krótki przebieg sezonu z dniem
-// meczowym muszą dać dokładnie te same skróty co przed przeniesieniem czynników do potoku etapów.
+// meczowym muszą dać dokładnie te same skróty co zapisane złote skróty (od Nov 28, 2026: krok 2, wyłączniki ENGINE2
+// włączone; skróty kroku 1 sprawdza tests/engine2.test.mjs z wyłącznikami false).
 // Zmiana liczb silnika (balans, nowy czynnik) zmienia skróty: wtedy świadomie zapisz nowe (tests/enginePipeline.golden.json,
 // skrypt w docs/walka-taktyk.md) i opisz zmianę w dzienniku. Pomocnicze: tests/pipelineGolden.mjs.
 
@@ -11,7 +12,7 @@ import { goldenMatch, matchDigest, ratingDigests, quickDigests, seasonDigest, h3
 
 const GOLD = JSON.parse(fs.readFileSync(new URL('./enginePipeline.golden.json', import.meta.url), 'utf8'));
 
-test(`Pełny silnik: ${N_MATCHES} meczów ze stałymi ziarnami daje te same zdarzenia, wynik, statystyki i oceny co przed potokiem`, () => {
+test(`Pełny silnik: ${N_MATCHES} meczów ze stałymi ziarnami daje te same zdarzenia, wynik, statystyki i oceny co złote skróty`, () => {
   assert.equal(GOLD.matches.length, N_MATCHES);
   const diff = [];
   for (let i = 0; i < N_MATCHES; i++) {

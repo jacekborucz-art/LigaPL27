@@ -44,6 +44,8 @@ import { isAvailable } from '../career/squad.js';
 import { compClubIds } from '../season/leagueComps.js';
 import { clubCaptainId, fixtureStakes, withClubCaptain, captainInfo } from '../career/captaincy.js'; // kapitan (docs/kapitan.md)
 import { matchReferee } from '../career/referees.js';
+import { ENGINE2 } from '../engine/engine2.js'; // wyłączniki kroku 2 Walki taktyk
+import { fixtureConditions } from '../season/conditions.js'; // warunki meczu: podróż, derby, presja tabeli
 import { recordMatchReport } from '../career/postMatchReport.js'; // analiza pomeczowa sztabu (docs/analiza-pomeczowa.md)
 
 
@@ -479,6 +481,10 @@ export function kickOff(game, S) {
   Object.assign(mine, trainingMatchInput(game, game.clubId, mine));
   Object.assign(theirs, trainingMatchInput(game, S.oppId, theirs));
   S.startTactics = { formation: mine.tactics.formation, instructions: { ...(mine.tactics.instructions ?? {}) } }; // odcisk dla analityków rywali
+  // Warunki meczu (krok 2 Walki taktyk, src/season/conditions.js): podróż gości, derby, presja tabeli, murawa, poziom ligi;
+  // te same liczby dostaje mecz w tle (season.js playQuick). Bez wyłączników ENGINE2 silnik ich nie czyta.
+  const cond = ENGINE2.conditions || ENGINE2.unify ? fixtureConditions(game, S.f, S.pre.preview.rank.level) : null;
+  if (cond) { mine.pressure = cond.pressure[S.userSide]; theirs.pressure = cond.pressure[1 - S.userSide]; }
   S.M = createMatch({
     seed: `${game.seed}:${S.f.id}`,
     home: S.userSide === 0 ? mine : theirs,
@@ -488,6 +494,7 @@ export function kickOff(game, S) {
       stakes: fixtureStakes(S.f, S.pre.preview.rank.level, S.pre.preview.rank.tags ?? []), // stawka dla kapitana (docs/kapitan.md)
       concussionSubs: false, // zmiany po wstrząśnieniu mózgu: flaga rozgrywek (UEFA ich nie stosuje, brak potwierdzenia dla Ekstraklasy)
       attendance: S.pre.conditions.attendance.fill, weather: engineWeather(S.weather, S.pitch),
+      ...(cond ? { pitch: S.pitch, derby: cond.derby, travelKm: cond.travelKm, tier: cond.tier } : {}),
       knockout: knockoutCtx(S.f),
       // Sparing: zasady uzgodnione przy planowaniu (fixture.friendlyRules), zmiany zaplanowane przed meczem
       friendlyRules: S.f.comp === 'friendly' ? { ...(S.f.friendlyRules ?? {}), plannedSubs: S.plannedSubs?.length ? { [S.userSide]: S.plannedSubs } : null } : undefined,

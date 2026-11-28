@@ -12,6 +12,7 @@ import { aiClubZ } from './state.js';
 import { managerThreat, THREAT } from '../career/threat.js';
 import { scoutEdge, fpKey, rehearsed, SCOUT, PASSIVE } from './scouting.js';
 import { rollPrep, aiScoutAdvantage } from './prep.js';
+import { ENGINE2, STATE } from '../engine/engine2.js';
 
 const W = COH.weights;
 const r1 = (v) => Math.round(v * 10) / 10;
@@ -212,7 +213,9 @@ export function trainingMatchInput(game, clubId, cfg = {}) {
   const tactics = clubId === game.clubId ? cfg.tactics ?? game.tactics : null;
   const coh = teamCohesion(game, clubId, tactics);
   const d = setPieceEdge(c);
-  const out = { cohesion: coh.sStart };
+  // Krok 2 Walki taktyk (ENGINE2.state): zgranie liczy się raz, przez wpis trainingCohesion (też w meczach w tle);
+  // start spójności w meczu stały (dawniej 70 + 0,3 x zgranie, czyli drugi raz to samo zgranie)
+  const out = { cohesion: ENGINE2.state ? STATE.cohesionStart : coh.sStart };
   if (cfg.squad && Math.abs(d) >= 0.05) {
     out.squad = cfg.squad.map((p) => ({
       ...p,

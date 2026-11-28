@@ -21,6 +21,8 @@ import { buildFourthLeague } from './fourthLeague.js'; // IV liga bez kadr (docs
 import { squadOf } from '../world/worldGen.js';
 import { ephemeralSquad } from '../world/ephemeral.js';
 import { quickMatch, quickKnockout, QS } from '../engine/quickSim.js';
+import { ENGINE2, STATE } from '../engine/engine2.js';
+import { fixtureConditions } from './conditions.js'; // warunki meczu (krok 2 Walki taktyk)
 import { CAPTAIN } from '../engine/captain.js';
 import { tableConfidence } from '../engine/teamStrength.js';
 import { afterMatchDelta, applyMorale, weeklyDrift, recordMoraleWeek, talkFollowUp } from '../career/morale.js';
@@ -239,6 +241,13 @@ export function playQuick(game, f, rng, cache = new Map()) {
     home.qsMul = tilt; away.qsMul = 1 / tilt;
   }
   const ctx = { neutral: !!f.neutral, refStrict: refStrictFor(game, f) }; // sędzia z puli (src/career/referees.js), średnia listy 1,0
+  if (ENGINE2.conditions || ENGINE2.unify) {
+    // Krok 2: te same warunki co pełny silnik (src/season/conditions.js): frekwencja, podróż, derby, presja tabeli, ranga
+    const c = fixtureConditions(game, f, rank, cache);
+    Object.assign(ctx, { rank, derby: c.derby, travelKm: c.travelKm, attendance: c.attendance, tier: c.tier });
+    home.pressure = c.pressure[0]; away.pressure = c.pressure[1];
+    home.tier = anyClub(f.home)?.tier ?? null; away.tier = anyClub(f.away)?.tier ?? null;
+  }
   const r = f.knockout ? quickKnockout(home, away, ctx, rng, f.knockout) : quickMatch(home, away, ctx, rng);
   // Zawodnicy w meczu: jedenastka z symulacji; kartki rozdzielone wg agresji, asysty do partnerów
   const lineups = r.xi;
@@ -468,6 +477,7 @@ export function applyResult(game, f, res, rng) {
       }
       const x = played.get(p.id);
       const friendly = f.comp === 'friendly'; // sparing: bez statystyk sezonu, formy, kartek i pauz
+      if (x && p.rust) { if (p.rust.left > 1) p.rust.left--; else delete p.rust; } // powrót po kontuzji: kolejny mecz za nim
       if (missed) { const s0 = (p.season ??= { apps: 0, subs: 0, min: 0, g: 0, a: 0, yc: 0, rc: 0, rating: 0, motm: 0, cs: 0 }); s0.miss = (s0.miss ?? 0) + 1; }
       if (!friendly) p.morale = applyMorale(p.morale ?? 12, afterMatchDelta({ result, tie, strengthDiff: diff, derby: f.derby, rival, lossStreak, played: !!x, rating: x?.rating, isRegular: (p.season?.apps ?? 0) >= 5, capE }));
       if (!x) continue;
@@ -738,6 +748,9 @@ registerDailySystem({
         p.injuryDays--;
         if (p.injuryDays === 0) {
           if ((p.injury?.days ?? 0) > 28) p.sharp = 30;
+          // Powrót po kontuzji (krok 2, engine/modifiers.js rustOf): „rdza” na kilka meczów zależnie od długości przerwy
+          const L = p.injury?.days ?? 0;
+          if (L >= STATE.rust.fromDays) { const n = L >= 60 ? 4 : L >= 28 ? 3 : L >= 14 ? 2 : 1; p.rust = { days: L, n, left: n }; }
           if (p.clubId === game.clubId && p.squad !== 'Y') messages.push(msg(date, ['info', `${p.name} wraca do gry`, `${p.name} jest już zdrowy i gotowy do gry.`], `back:${p.id}:${date}`));
           p.injury = null;
         }

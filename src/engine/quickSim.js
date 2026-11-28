@@ -7,6 +7,8 @@
 
 import { clamp } from '../core/rng.js';
 import { teamRating } from './teamStrength.js';
+import { matchFactors } from './pipeline.js';
+import { ENGINE2 } from './engine2.js';
 
 export const QS = {
   BETA: 0.225, MU_H: 1.50, MU_A: 1.19, MU_N: 1.34, RHO: -0.10,
@@ -19,6 +21,13 @@ export const QS = {
   CORNERS_PER_SHOT: 0.4,
   CAP: 0.025, // kapitan w meczu o stawkę (season.js playQuick): średnie goli x exp(+-0,025 x S x różnica E), docs/kapitan.md
   YELLOW_H: 1.16, YELLOW_A: 1.49, RED: 0.038, INJ: 0.19, // żółte -15% jak w pełnym silniku (Nov 25, 2026); INJ: kontuzje na drużynę (Nov 25, 2026: 0,45 -> 0,19 na prośbę właściciela, ok. 0,38 na mecz, mniej niż pełny silnik 0,52); kartki -10%, potem -20% w meczach w tle (Nov 17, 2026); RED to bezpośrednie czerwone, drugie żółte dochodzą w playQuick (razem ok. 0,15/mecz jak pełny silnik)
+  // Krok 2 (ENGINE2.unify, docs/walka-taktyk.md rozdz. 7): atut boiska z wartości terenu jak w pełnym silniku (wpis terrain):
+  // średnie goli MU_C x exp(+-HFA_K x hfa); przy hfa = HFA_REF (typowa wartość dawnego modelu, 0,7 + 0,3 x 0,6) dawne MU_H i MU_A.
+  MU_C: Math.sqrt(1.5 * 1.19), HFA_REF: 0.88, HFA_K: 0.5 * Math.log(1.5 / 1.19) / 0.88,
+  PEN_SHARE: 0.08, // udział karnych w golach: surowość sędziego zmienia liczbę karnych (kanał pen) jak w pełnym silniku
+  // Zawodnik z pola w bramce: część kary goalMul. Pomiar [SYM] (Nov 28, 2026): pełny silnik (połowa goalMul + niska ocena
+  // bramkarska) traci 2,09 razy więcej goli, mecz w tle z całą karą 2,06 razy, z połową 1,59 razy: zostaje cała kara
+  GK_SHARE: 1,
 };
 
 /** Średnie bramek z sił stref (wzór eksperta). */
@@ -27,6 +36,24 @@ export function expectedGoals(H, A, ctx = {}) {
   const def = (T) => 0.65 * T.DEF + 0.35 * T.MID;
   const dH = 0.75 * (atk(H.zones) - def(A.zones)) + 0.15 * (H.zones.MID - A.zones.MID) + 0.10 * (H.zones.FIN - A.zones.GK);
   const dA = 0.75 * (atk(A.zones) - def(H.zones)) + 0.15 * (A.zones.MID - H.zones.MID) + 0.10 * (A.zones.FIN - H.zones.GK);
+  const mx = ctx.mx;
+  if (ENGINE2.unify || (mx && ENGINE2.conditions)) {
+    // Krok 2: warunki z tego samego etapu match co pełny silnik (ctx.mx = matchFactors). Derby: mniejsza różnica klas
+    // (gap); unify: atut boiska z terenu, sędzia przez karne, bramkarz z pola jak w pełnym silniku
+    const gap = ENGINE2.conditions ? mx?.gap ?? 1 : 1;
+    const eH = gap * dH; const eA = gap * dA;
+    let muH = ctx.neutral ? QS.MU_N : QS.MU_H; let muA = ctx.neutral ? QS.MU_N : QS.MU_A;
+    let pen = 1; let gm = (m) => m;
+    if (ENGINE2.unify) {
+      const hfa = ctx.neutral ? 0 : mx?.hfa ?? QS.HFA_REF;
+      if (!ctx.neutral) { muH = QS.MU_C * Math.exp(QS.HFA_K * hfa); muA = QS.MU_C * Math.exp(-QS.HFA_K * hfa); }
+      pen = 1 + QS.PEN_SHARE * ((mx?.pen ?? 1) - 1);
+      gm = (m) => 1 + (m - 1) * QS.GK_SHARE;
+    }
+    const lH = muH * Math.exp(QS.BETA_CLUB * eH) * (H.qsMul ?? 1) * gm(A.gkMods.goalMul) * pen;
+    const lA = muA * Math.exp(QS.BETA_CLUB * eA) * (A.qsMul ?? 1) * gm(H.gkMods.goalMul) * pen;
+    return { lH, lA, dH, dA };
+  }
   const muH = ctx.neutral ? QS.MU_N : QS.MU_H;
   const muA = ctx.neutral ? QS.MU_N : QS.MU_A;
   // Rywal bez prawdziwego bramkarza: każdy celny strzał wpada częściej (positions.js).
@@ -106,8 +133,13 @@ function pickScorers(team, goals, rng) {
  * Zwraca wynik, statystyki wynikające z modelu i rozbicie sił (do raportu i testów).
  */
 export function quickMatch(home, away, ctx, rng) {
-  const H = { ...teamRating(home.squad, { tableTerm: home.tableTerm, coachTerm: home.coachTerm }), qsMul: home.qsMul };
-  const A = { ...teamRating(away.squad, { tableTerm: away.tableTerm, coachTerm: away.coachTerm }), qsMul: away.qsMul };
+  // Krok 2: warunki meczu (etap match potoku, jak w pełnym silniku) i kontekst drużyny dla stanu zawodników:
+  // ranga (stawka x WAZ), poziom ligi, presja tabeli. Bez wyłączników ENGINE2: jak w kroku 1.
+  const k2 = ENGINE2.unify || ENGINE2.conditions;
+  if (k2 && !ctx.mx) ctx = { ...ctx, mx: matchFactors({ refStrict: 1, rank: 0, ...ctx }, false) };
+  const tc = (s) => (k2 ? { tableTerm: s.tableTerm, coachTerm: s.coachTerm, rank: ctx.rank ?? 0, tier: s.tier, pressure: s.pressure ?? 0 } : { tableTerm: s.tableTerm, coachTerm: s.coachTerm });
+  const H = { ...teamRating(home.squad, tc(home)), qsMul: home.qsMul };
+  const A = { ...teamRating(away.squad, tc(away)), qsMul: away.qsMul };
   const { lH, lA, dH, dA } = expectedGoals(H, A, ctx);
   const [gH, gA] = sampleScore(lH, lA, rng);
 
@@ -119,6 +151,10 @@ export function quickMatch(home, away, ctx, rng) {
   const possH = Math.round(clamp(100 / (1 + Math.exp(-0.20 * (H.zones.MID - A.zones.MID))) + rng.gauss(0, 2), 25, 75));
   const ref = ctx.refStrict ?? 1;
   const [agH, agA] = ctx.aggression ?? [1, 1];
+  // Kartki (krok 2, unify): kanały fauli i kartek etapu match (sędzia, ranga, derby, murawa) jak w pełnym silniku
+  const mx = ctx.mx;
+  const yMul = ENGINE2.unify && mx ? mx.foul * mx.card : ref;
+  const rMul = ENGINE2.unify && mx ? mx.foul * mx.card * mx.red : ref ** 1.5;
 
   return {
     score: [gH, gA],
@@ -127,8 +163,8 @@ export function quickMatch(home, away, ctx, rng) {
     onTarget: [onH, onA],
     possession: [possH, 100 - possH],
     corners: [rng.poisson(sH * QS.CORNERS_PER_SHOT), rng.poisson(sA * QS.CORNERS_PER_SHOT)],
-    yellow: [rng.poisson(QS.YELLOW_H * ref * agH), rng.poisson(QS.YELLOW_A * ref * agA)],
-    red: [rng.poisson(QS.RED * ref ** 1.5 * agH), rng.poisson(QS.RED * ref ** 1.5 * agA)],
+    yellow: [rng.poisson(QS.YELLOW_H * yMul * agH), rng.poisson(QS.YELLOW_A * yMul * agA)],
+    red: [rng.poisson(QS.RED * rMul * agH), rng.poisson(QS.RED * rMul * agA)],
     scorers: [pickScorers(H, gH, rng), pickScorers(A, gA, rng)],
     injuries: [rng.poisson(QS.INJ), rng.poisson(QS.INJ)],
     model: { lH, lA, dH, dA, home: H.breakdown, away: A.breakdown, missing: [H.missing.length, A.missing.length] },

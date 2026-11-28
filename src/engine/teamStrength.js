@@ -19,12 +19,12 @@ export function conditionTerms(p, ctx = {}) {
   return evaluate('player', p, ctx);
 }
 
-function effective(p, group, ctx) {
+function effective(p, group, ctx, terms = null) {
   const prof = proficiency(p, SLOT_POS[group]);
   const slot = GROUP_SLOT[group];
   slot.prof = prof; // biegłość już policzona: wpis 'position' jej nie liczy drugi raz
   const k = slotEff(p, slot); // etap slot: skuteczność na pozycji
-  const t = conditionTerms(p, ctx);
+  const t = terms ?? conditionTerms(p, ctx); // stan zawodnika nie zależy od grupy: pickXI liczy go raz na zawodnika
   return { value: p.ovr * k + t.total, prof, posK: k, terms: t.parts };
 }
 
@@ -44,7 +44,7 @@ export function pickXI(squad, shape = DEFAULT_SHAPE, ctx = {}) {
   const eff = (p, group) => {
     let m = memo.get(p);
     if (!m) memo.set(p, (m = {}));
-    return m[group] ?? (m[group] = effective(p, group, ctx));
+    return m[group] ?? (m[group] = effective(p, group, ctx, (m.t ??= conditionTerms(p, ctx))));
   };
   const fill = (group, allowOthers) => {
     const cands = pool

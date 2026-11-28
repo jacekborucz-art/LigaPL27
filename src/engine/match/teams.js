@@ -11,6 +11,7 @@ import { K, ROLE_SHARE, ZONE_N, FATIGUE_ROLE, KNOCK, FATIGUE, INSTR_NUM, SAT } f
 import { cleanPlayerInstrMap } from '../../data/playerInstructions.js';
 import { refreshPI, clearPI, applyShift, shiftedShare, validatePlayerInstr, mergePlayerInstr, PI } from './playerInstr.js';
 import { captainPower, baseStakes, CAPTAIN } from '../captain.js';
+import { ENGINE2, STATE } from '../engine2.js';
 
 const a = (p, k) => p.attr?.[k] ?? p.ovr ?? 10;
 
@@ -43,17 +44,29 @@ export function makeKnock(name, minute, { pre = false, days = 0 } = {}) {
   return { name, type: knockTypeOf(name), since: minute, pre, aggravated: false, aggravatedAt: null, days };
 }
 
-function mkPlayer(p, slot, side, rng, ctx, Z = 0) {
-  // Etap rng: losowanie dyspozycji dnia zostaje tutaj (ta sama kolejność losowań); liczba wchodzi do etapu player
-  const dayForm = rng.gauss(0, Math.max(0.2, 0.9 - 0.035 * (p.hidden?.KON ?? 10)));
+/**
+ * Kondycja na start meczu. Krok 1: świeżość sprzed meczu (zmęczony od pierwszej minuty z karą kondycji bez granicy).
+ * Krok 2 (ENGINE2.state): zmęczenie sprzed meczu liczy wpis fresh w puli ciała (granica -1,5, jak w meczach w tle),
+ * a kondycja startuje bliżej wypoczęcia: 95 - STATE.condStart x (95 - świeżość), więc zmęczony słabnie wcześniej w meczu.
+ */
+export function startCond(p) {
+  const f = p.fresh ?? 95;
+  return ENGINE2.state && f < 95 ? 95 - STATE.condStart * (95 - f) : f;
+}
+
+function mkPlayer(p, slot, side, rng, ctx, Z = 0, t = ctx) {
+  // Etap rng: losowanie dyspozycji dnia zostaje tutaj (ta sama kolejność losowań); liczba wchodzi do etapu player.
+  // Krok 2 (warunki): w derbach większy rozrzut dyspozycji (t.dfMul z wpisu derby), ta sama liczba losowań
+  let dayForm = rng.gauss(0, Math.max(0.2, 0.9 - 0.035 * (p.hidden?.KON ?? 10)));
+  if (t.dfMul && t.dfMul !== 1) dayForm *= t.dfMul;
   // Uraz sprzed meczu, z którym zawodnik gra z bólem: kara do formy daje modyfikator playingInjured (modifiers.js)
   const knock = p.playingInjured && p.injuryDays > 0 ? makeKnock(p.injury?.name ?? 'stłuczenie', 0, { pre: true, days: p.injuryDays }) : null;
   const cap = captainPower(p, ctx.date ?? null); // kapitan i wicekapitan (src/engine/captain.js): siła C i efekt E
   // Etap player (stan zawodnika + dyspozycja dnia + ranga x WAZ), suma w tej samej kolejności co dawniej; rozbicie w parts
-  const pb = playerBase(p, ctx.rank, dayForm);
+  const pb = playerBase(p, t, dayForm);
   return {
     id: p.id, p, slot, side, R: attrZones(p), base: pb.total, parts: pb.parts, dayForm,
-    cond: p.fresh ?? 95, on: !!slot, sentOff: false, subbedOff: false, injury: null, treatedUntil: -1,
+    cond: startCond(p), on: !!slot, sentOff: false, subbedOff: false, injury: null, treatedUntil: -1,
     Z, yc: 0, minOn: slot ? 0 : null, minOff: null,
     ev: 0, g: 0, ast: 0, sh: 0, sot: 0, kp: 0, tk: 0, saves: 0, fouls: 0, offs: 0,
     fit: null, prevSlot: null, bookChecked: false, knock, slotIdx: -1, redCode: null,
@@ -132,17 +145,19 @@ export function buildTeam(side, cfg, rng, ctx, seed = 'mecz') {
   const playerInstr = cleanPlayerInstrMap(cfg.tactics.playerInstr);
   const formation = formationById(cfg.tactics.formation);
   const z = cfg.zStart || {};
+  // Kontekst drużyny dla etapu player (krok 2): ranga meczu, poziom ligi klubu, presja tabeli, rozrzut dyspozycji (derby)
+  const tctx = { rank: ctx.rank, tier: cfg.club?.tier ?? null, pressure: cfg.pressure ?? 0, dfMul: ctx.dfMul ?? 1 };
   const players = cfg.tactics.xi
     .map((id, i) => {
       if (!byId.get(id)) return null;
-      const x = mkPlayer(byId.get(id), formation.slots[i], side, rng, ctx, z[id] ?? 0);
+      const x = mkPlayer(byId.get(id), formation.slots[i], side, rng, ctx, z[id] ?? 0, tctx);
       x.slotIdx = i;
       x.fatK = fatigueTolerance(x.p, seed);
       x.hung = hungerOf(x.p);
       return x;
     })
     .filter(Boolean);
-  const bench = cfg.tactics.bench.map((id) => byId.get(id)).filter(Boolean).map((p) => { const x = mkPlayer(p, null, side, rng, ctx, z[p.id] ?? 0); x.fatK = fatigueTolerance(p, seed); x.hung = hungerOf(p); return x; });
+  const bench = cfg.tactics.bench.map((id) => byId.get(id)).filter(Boolean).map((p) => { const x = mkPlayer(p, null, side, rng, ctx, z[p.id] ?? 0, tctx); x.fatK = fatigueTolerance(p, seed); x.hung = hungerOf(p); return x; });
   const params = tacticParams(formation, cfg.tactics.instructions);
   const T = {
     side, club: cfg.club, ai: !!cfg.ai, coach: cfg.coach ?? 'P',

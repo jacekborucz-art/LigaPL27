@@ -257,12 +257,16 @@ test('Przerwa sparingu: druga jedenastka asystenta wg planu rotacji, zmiany powr
   const list = secondEleven(S);
   assert.ok(list.length >= 8, `${list.length} zmian`);
   assert.ok(list.every((a) => a.type === 'sub' && a.outName && a.inName));
-  const keep = list.slice(1); // gracz zostawia jednego zawodnika na boisku
   const T = S.M.teams[S.userSide];
+  // Gracz zostawia na boisku jednego zawodnika, który jeszcze gra; zmiany za kontuzjowanych pomija (kontuzjowany nie wraca
+  // z ławki, a propozycja zmiany za niego bywa pierwsza na liście)
+  const fit = list.filter((a) => T.players.some((x) => x.id === a.outId && x.on && !x.injury));
+  const left = fit[0];
+  const keep = fit.slice(1);
   const r = applySecondEleven(S, keep);
   assert.equal(r.done + r.errors.length, keep.length);
   assert.ok(r.done >= keep.length - 1);
-  assert.ok(T.players.some((x) => x.id === list[0].outId && x.on), 'odznaczony gra dalej');
+  assert.ok(T.players.some((x) => x.id === left.outId && x.on), 'odznaczony gra dalej');
   // Zmiany powrotne: zmienieni są na ławce i mogą wrócić
   const back = T.bench.filter((x) => x.rolledOff > 0);
   assert.equal(back.length, r.done);

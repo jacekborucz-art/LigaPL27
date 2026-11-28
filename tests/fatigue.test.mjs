@@ -8,6 +8,7 @@ import { createMatch, runToEnd } from '../src/engine/match/match.js';
 import { condSpeed, hungerOf, teamHunger, fatigueTolerance } from '../src/engine/match/teams.js';
 import { shout } from '../src/engine/match/match.js';
 import { SAT } from '../src/engine/match/constants.js';
+import { ENGINE2, setEngine2 } from '../src/engine/engine2.js';
 
 const world = generateWorld(42);
 const EK = CLUBS_PL.filter((c) => c.tier === 1);
@@ -43,11 +44,23 @@ test('Świeże składy: na starcie szybkość równa atrybutom, brak dodatkowego
 });
 
 test('Zmęczeni goście: więcej błędów w obronie, więcej fauli, częściej przegrywają (400 meczów)', () => {
+  // Krok 1 (kondycja startuje od świeżości sprzed meczu, kara bez granicy)
+  const keep = ENGINE2.state;
+  setEngine2({ state: false });
+  try {
+    const fresh = series(400, 95);
+    const tired = series(400, 62);
+    assert.ok(tired.err > fresh.err * 3 && tired.err >= 20, `błędy obrony: świeży ${fresh.err}, zmęczeni ${tired.err}`);
+    assert.ok(tired.foulsAway > fresh.foulsAway * 1.05, `faule: świeży ${fresh.foulsAway}, zmęczeni ${tired.foulsAway}`);
+    assert.ok(tired.homeW > fresh.homeW * 1.15, `wygrane gospodarzy: ${fresh.homeW} -> ${tired.homeW}`);
+  } finally { setEngine2({ state: keep }); }
+});
+
+test('Krok 2: zmęczeni goście słabną wcześniej w meczu, ale zmęczenie sprzed meczu ma granicę puli ciała (400 meczów)', () => {
   const fresh = series(400, 95);
   const tired = series(400, 62);
-  assert.ok(tired.err > fresh.err * 3 && tired.err >= 20, `błędy obrony: świeży ${fresh.err}, zmęczeni ${tired.err}`);
-  assert.ok(tired.foulsAway > fresh.foulsAway * 1.05, `faule: świeży ${fresh.foulsAway}, zmęczeni ${tired.foulsAway}`);
-  assert.ok(tired.homeW > fresh.homeW * 1.15, `wygrane gospodarzy: ${fresh.homeW} -> ${tired.homeW}`);
+  assert.ok(tired.err > fresh.err && tired.foulsAway > fresh.foulsAway, `błędy ${fresh.err} -> ${tired.err}, faule ${fresh.foulsAway} -> ${tired.foulsAway}`);
+  assert.ok(tired.homeW > fresh.homeW * 1.05 && tired.homeW < fresh.homeW * 1.6, `wygrane gospodarzy: ${fresh.homeW} -> ${tired.homeW}`);
 });
 
 test('Napastnik na środku obrony popełnia błędy częściej niż nominalny obrońca', () => {

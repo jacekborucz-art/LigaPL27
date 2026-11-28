@@ -15,6 +15,14 @@ import { createMatch, runToEnd } from '../src/engine/match/match.js';
 import { generateWorld, squadOf } from '../src/world/worldGen.js';
 import { createTactics } from '../src/engine/lineup.js';
 import { clubById } from '../src/data/clubs_pl.js';
+import { ENGINE2, setEngine2 } from '../src/engine/engine2.js';
+
+/** Fragment testu z liczbami kroku 1 (wyłączniki kroku 2 na false), potem przywrócenie wyłączników. */
+function step1(fn) {
+  const keep = { ...ENGINE2 };
+  setEngine2({ pipeFix: false, state: false, conditions: false, unify: false });
+  try { return fn(); } finally { setEngine2(keep); }
+}
 
 const WHEN = ['start', 'minute', 'change', 'action'];
 const world = generateWorld(3);
@@ -63,7 +71,7 @@ test('Suma rozbicia = suma: parts daje total, chParts składa się w ch, szybka 
   }
   const inMatch = evaluate('player', player(), { inMatch: true, rank: 3, dayForm: 0.37 });
   assert.equal(inMatch.parts.dayForm, 0.37);
-  assert.ok(Math.abs(inMatch.parts.waz - 0.24) < 1e-12);
+  step1(() => assert.ok(Math.abs(evaluate('player', player(), { inMatch: true, rank: 3, dayForm: 0.37 }).parts.waz - 0.24) < 1e-12));
   assert.equal(evaluate('player', player(), {}).parts.dayForm, undefined, 'poza meczem bez dyspozycji dnia');
   // Iloczyny etapu match: chParts składa się w ch
   const ctx = { neutral: false, rank: 2, refStrict: 1.2, attendance: 0.5, weather: { conv: 1.06, foul: 1.08, inj: 1.05, dys: 1.15 } };
@@ -72,8 +80,10 @@ test('Suma rozbicia = suma: parts daje total, chParts składa się w ch, szybka 
   assert.equal(m.ch.foul, foul);
   assert.equal(channel('match', 'foul', ctx, ctx), m.ch.foul);
   // Sumy etapu team (mecze w tle): zone.all = pewność z tabeli + decyzje trenera
-  const t = evaluate('team', { xi: [], squad: [] }, { tableTerm: 0.1, coachTerm: -0.04 });
-  assert.equal(t.ch['zone.all'], t.chParts.tableConfidence['zone.all'] + t.chParts.coachDecisions['zone.all']);
+  step1(() => {
+    const t = evaluate('team', { xi: [], squad: [] }, { tableTerm: 0.1, coachTerm: -0.04 });
+    assert.equal(t.ch['zone.all'], t.chParts.tableConfidence['zone.all'] + t.chParts.coachDecisions['zone.all']);
+  });
 });
 
 test('Wyłączenie wpisu zmienia wynik tylko o jego wkład; włączenie przywraca liczby bit w bit', () => {
@@ -87,14 +97,16 @@ test('Wyłączenie wpisu zmienia wynik tylko o jego wkład; włączenie przywrac
   } finally { setModifierEnabled('player', 'morale', true); }
   assert.equal(evaluate('player', p, {}).total, before.total);
 
-  // Siła drużyny: wpis pewności z tabeli dodaje dokładnie swój wkład do każdej strefy
-  const r0 = teamRating(squad, { tableTerm: 0.12 });
-  setModifierEnabled('team', 'tableConfidence', false);
-  let r1;
-  try { r1 = teamRating(squad, { tableTerm: 0.12 }); } finally { setModifierEnabled('team', 'tableConfidence', true); }
-  for (const k of ['GK', 'DEF', 'MID', 'ATT', 'FIN']) assert.ok(Math.abs(r0.zones[k] - r1.zones[k] - 0.12) < 1e-9, k);
-  assert.equal(r1.breakdown.table, 0);
-  assert.deepEqual(teamRating(squad, { tableTerm: 0.12 }).zones, r0.zones);
+  // Siła drużyny: wpis pewności z tabeli dodaje dokładnie swój wkład do każdej strefy (krok 1; w kroku 2 unify go wyłącza)
+  step1(() => {
+    const r0 = teamRating(squad, { tableTerm: 0.12 });
+    setModifierEnabled('team', 'tableConfidence', false);
+    let r1;
+    try { r1 = teamRating(squad, { tableTerm: 0.12 }); } finally { setModifierEnabled('team', 'tableConfidence', true); }
+    for (const k of ['GK', 'DEF', 'MID', 'ATT', 'FIN']) assert.ok(Math.abs(r0.zones[k] - r1.zones[k] - 0.12) < 1e-9, k);
+    assert.equal(r1.breakdown.table, 0);
+    assert.deepEqual(teamRating(squad, { tableTerm: 0.12 }).zones, r0.zones);
+  });
 
   // Unregister i ponowna rejestracja tego samego wpisu: te same liczby
   const entry = getModifier('player', 'sharp');

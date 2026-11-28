@@ -6,6 +6,8 @@ import { Rng, clamp } from '../../core/rng.js';
 import { K, SHOOT_W, FOUL_W, INJURY_TYPES, RED_REASONS, KNOCK, FATIGUE, SAT } from './constants.js';
 import { buildTeam, updateZones, updateCondition, onPitch, goalkeeper, fieldPlayers, slotFit, makeKnock, errFactor, updateCaptain } from './teams.js';
 import { matchFactors, matchupWeights, matchupBrk, liveAdd, hungerNow, newLedger, ledgerMinute, ledgerAction } from '../pipeline.js';
+import { registryVersion } from '../modifiers.js';
+import { ENGINE2, STATE } from '../engine2.js';
 import { CAPTAIN } from '../captain.js';
 import { matchRules, unlimitedSubs, UNLIMITED } from './rules.js';
 
@@ -32,12 +34,13 @@ export function createMatch(cfg) {
   const rng = new Rng(cfg.seed ?? 'mecz');
   // Etap match potoku (pipeline.js): pogoda, sędzia, ranga, kibice; raz na mecz, silnik czyta gotowe liczby z M.mx
   const mx = matchFactors(ctx);
+  if (mx.dfMul !== 1) ctx.dfMul = mx.dfMul; // derby (krok 2): rozrzut dyspozycji dnia zawodników (mkPlayer)
   const M = {
     ctx, rng, tick: 0, half: 1, phase: 'play', minute: 0, elapsed: 0, length: 45, added: null,
     score: [0, 0], events: [], momentum: [], possession: [], halfTimeScore: null,
     halfCounts: freshCounts(), addedTimes: [], extraTime: false, shootout: null, ended: false,
     ai: 0, emptyNet: false, addedExtra: 0, abandoned: null,
-    hfa: mx.hfa, mx,
+    hfa: mx.hfa, mx, mxV: registryVersion(),
     rules: matchRules(ctx),
     ledger: newLedger(mx), // zrealizowany wkład wpisów potoku (raporty), bez wpływu na wynik
   };
@@ -105,12 +108,15 @@ function rateEv(x, v) { if (x) x.ev += v; }
 
 // ------------------------------------------------------------ Fazy minuty
 function phaseTeams(M) {
+  // Krok 2 (pipeFix): wyłącznik wpisu warunków w trakcie meczu działa od następnej minuty (pamięć zależna od wersji rejestru)
+  if (ENGINE2.pipeFix && M.mxV !== registryVersion()) { M.mx = matchFactors(M.ctx); M.hfa = M.mx.hfa; M.mxV = registryVersion(); }
   for (const T of M.teams) { updateCaptain(T, M); updateCondition(T, M); updateZones(T, M); T.threat = 0; ledgerMinute(M, T, T.mctx.xs); }
 }
 
 function phasePossession(M) {
   const [H, A] = M.teams;
-  const logit = K.posK * (H.zones.MID - A.zones.MID) + K.posHome * M.hfa + H.P.pos - A.P.pos + A.P.oppPos - H.P.oppPos
+  // gap: derby zmniejszają różnicę klas (krok 2, wpis derby; poza derbami 1)
+  const logit = K.posK * (H.zones.MID - A.zones.MID) * M.mx.gap + K.posHome * M.hfa + H.P.pos - A.P.pos + A.P.oppPos - H.P.oppPos
     + 0.08 * (H.central - A.central)
     + CAPTAIN.pos * (H.capES - A.capES); // kapitan przy stawce: mniej strat przy podaniu, dłużej przy piłce (docs/kapitan.md)
   const pH = clamp(sig(logit), K.posClamp[0], K.posClamp[1]);
@@ -125,7 +131,7 @@ function phasePossession(M) {
     if (!n) continue;
     const O = M.teams[1 - T.side];
     let acc = clamp(K.passAcc + 0.012 * (T.avg('POD') - 11) + 0.006 * (T.avg('TEC') - 11)
-      + T.P.passAcc - 0.03 * O.P.pressHigh, 0.6, 0.93);
+      + T.P.passAcc - 0.03 * O.P.pressHigh + (M.mx.passAcc ? M.mx.passAcc * (1 + T.P.shortPass) : 0), 0.6, 0.93); // murawa: krótkie podania tracą najwięcej
     if (T.capES) acc = 1 - (1 - acc) * (1 - CAPTAIN.passErr * T.capES); // kapitan przy stawce: mniej strat (docs/kapitan.md)
     let ok = 0;
     for (let i = 0; i < n; i++) if (M.rng.next() < acc) ok++;
@@ -348,7 +354,7 @@ function phaseAction(M) {
   const smA = shoutMods(A, M); const smD = shoutMods(D, M);
   // Obrona broniącej drużyny: instrukcje (nastawienie, agresja), stan meczu od 65', okrzyk
   const dD = D.P.D + gsD.D + (smD.D ?? 0);
-  const delta = (0.55 * A.zones.ATT + 0.45 * A.zones.MID) - (0.65 * D.zones.DEF + 0.35 * D.zones.MID) - dD + paceTerm(M, ai, A, D);
+  const delta = ((0.55 * A.zones.ATT + 0.45 * A.zones.MID) - (0.65 * D.zones.DEF + 0.35 * D.zones.MID) - dD + paceTerm(M, ai, A, D)) * M.mx.gap;
   const mom = momentumAvg(M, ai);
   const pAct = K.pAction * (M.hfa ? (ai === 0 ? K.homeCreate : K.awayCreate) ** M.hfa : 1) * A.P.pActMul * D.P.oppPActMul
     * gsA.act * (smA.actMul ?? 1) * (1 + K.lateRamp * Math.max(0, M.minute - 55)) * Math.exp(K.kCreate * delta)
@@ -364,7 +370,7 @@ function phaseAction(M) {
   }
   const cb = matchupBrk(A, D, type); // etap matchup: kontry taktyczne (pipeline.js), gotowe na czas stanu drużyn
   ledgerAction(M, ai, type, cb);
-  const brk = K.brkBase[type] + K.kBreak * delta + A.P.brk + cb;
+  const brk = K.brkBase[type] + K.kBreak * delta + A.P.brk + cb + M.mx.brk[type]; // murawa (krok 2): technika i walka wg rodzaju akcji
   if (M.rng.next() < sig(brk)) {
     if (type === 'KON' && tacticalFoul(M, A, D)) return;
     A.threat += 3;
@@ -718,7 +724,10 @@ export function injure(M, T, x, contact = false, opts = {}) {
   if (inj.playable) {
     // Lekki uraz (gra z bólem): kara do formy wg typu, stan widoczny w x.knock (biały krzyżyk w UI)
     x.knock = makeKnock(inj.name, M.minute, { days: inj.days });
-    x.base -= (KNOCK.types[x.knock.type]?.pen ?? 0.045) * x.p.ovr;
+    // Krok 2 (state): kara w punktach atrybutu (dawniej procent ovr: silniejszy tracił więcej); pipeFix: widać ją w M.ledger
+    const kp = (KNOCK.types[x.knock.type]?.pen ?? 0.045) * (ENGINE2.state ? STATE.knockRef : x.p.ovr);
+    x.base -= kp;
+    if (ENGINE2.pipeFix) x.kPen = (x.kPen ?? 0) + kp;
   } else { x.on = false; if (!gk) T.injuredOff.push(x); } // musi zejść; drużyna gra w osłabieniu do zmiany
   const concussion = /wstrząśnienie/.test(inj.name);
   emit(M, 'injury', T.side, x, {

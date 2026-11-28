@@ -29,6 +29,46 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 28, 2026, agent silnika meczu (worktree, gałąź worktree-agent-a2dcc9ec768a8e3bf), jeden commit bez pusha (v1.25.1 Beta, bez zmiany wersji)
+Zrobione:
+- Krok 2 projektu Walka taktyk (`docs/walka-taktyk.md` rozdz. 7), cztery wyłączniki w `src/engine/engine2.js`
+  (`ENGINE2 = { pipeFix, state, conditions, unify }`); wszystkie false = bit w bit krok 1 (`tests/engine2.test.mjs`
+  na złotych skrótach kroku 1 w `tests/enginePipeline.step1.golden.json`).
+- pipeFix: tryb wpisów w etapach match i slot, filtr po jednym kanale (strefy, act.*), etap match czyta sumę kanału
+  (nowy wpis warunków bez zmian w `core.js`), pamięci `M.mx`, `x.mxPos`, `T.mu` zależne od wersji rejestru, neutralne
+  strefy po wyłączeniu `zoneRatings`, kara lekkiego urazu w `M.ledger` (`knockInMatch`).
+- state: pule stanu (psychika +0,7 / -0,8 z nowym „na gazie”, ciało 0 / -1,5 ze świeżością, mocniejszą ostrością i
+  „rdzą” po kontuzji `p.rust`, aklimatyzacja 0 / -0,6, suma +1,0 / -2,0, x1,00-1,20 wg ligi, wpis `statePool`), gra
+  z urazem i lekki uraz w meczu w punktach, kondycja na start meczu `startCond` (zmęczenie sprzed meczu w puli ciała),
+  zgranie liczone raz (start spójności 85).
+- conditions: atut boiska jako wartość terenu (frekwencja, podróż gości z odległości województw, murawa), derby
+  (`fans.js` rivalry), murawa w grze, stawka x WAZ i opanowanie z presją tabeli w ostatnich 6 kolejkach; nowy
+  `src/season/conditions.js` (`fixtureConditions`) dla `kickOff` i `playQuick`.
+- unify: mecze w tle biorą atut boiska z tego samego wpisu `terrain`, sędziego przez karne i kanały kartek, stawkę x WAZ;
+  pewność z tabeli wyłączona (dublowała psychikę). Bramkarz z pola: zmierzone, bez zmian.
+- Kalibracja [SYM] (6 sezonów, próbki pełnego silnika na każdym meczu ligowym): gole na mecz bez zmian (Ekstraklasa pełny silnik 2,84,
+  w tle 2,82), gospodarze 43-45 %, remisy 24,6-25,8 %, żółte +0,05 do +0,12 na mecz; tabele Ekstraklasy węższe
+  (mistrz 71,0 zamiast 76,8 pkt, odchylenie punktów 12,3 zamiast 15,3).
+- Puchary: polskie kluby 1,37 pkt/mecz wobec 1,36 przed (bez poprawy). Bierna gra: 2 Liga -15,1 pkt/sezon (przed -17,4), III liga -23,6 (przed -22,4),
+  w granicach błędu ok. 2,5. Wydajność: sezon +3,5 % (limit 5 %), mecze w tle +12 %.
+- Złote skróty: nowe `tests/enginePipeline.golden.json` (`node tools/golden-save.mjs`): zmienione wszystkie 210 meczów, siła drużyn,
+  mecze w tle i krótki sezon (celowo: stan, warunki, atut boiska); skróty kroku 1 w `tests/enginePipeline.step1.golden.json`.
+Decyzje i pułapki:
+- Zmęczenie sprzed meczu: dawniej kondycja startowała od świeżości bez granicy (drużyna ze świeżością 70: -1,19 pkt/mecz
+  w pełnym silniku, w tle -0,12); teraz -0,37 i -0,16. `tests/fatigue.test.mjs` sprawdza stary wariant
+  z `state: false` i nowy osobno.
+- Wpis `statePool` czyta wkłady wcześniejszych wpisów (`needsParts`); `channel` i `channelTerms` liczą wtedy przez `evaluate`.
+- `tests/modifiers.test.mjs`: liczby kroku 1 (WAZ 0,24, pewność z tabeli) sprawdzane z wyłącznikami false (`step1`).
+- Testy dopasowane do kroku 2: `tests/training.test.mjs` (zgranie: start spójności stały), `tests/friendlyUi.test.mjs`
+  (druga jedenastka pomija zmianę za kontuzjowanego), `tests/playerInstr.test.mjs` (złoty test z wyłącznikami false),
+  `tests/strzalki.test.mjs` (OP:fo i OP:o bez progu zysku: w szumie także w kroku 1, liczby w komentarzu).
+- `npm test`: przechodzi wszystko poza testem czasu „Pełny sezon z pucharami ... poniżej 15 s” przy równoległym
+  `npm test` na tym komputerze; ten sam test nie przechodzi też na kodzie sprzed kroku 2 (15,7 s), osobno przechodzi (37,8 s na 3 sezony).
+- Pakiet dla znawcy futbolu poza repozytorium: `scratchpad/krok2/review/przeglad-krok2.md`.
+Zostało / dalej:
+- Przegląd znawcy futbolu (pakiet), poprawki liczb `STATE` i `COND`, potem scalenie i krok 3 (cechy taktyki).
+- Tabele Ekstraklasy węższe niż przed krokiem 2 (mistrz 71 zamiast 77 pkt, 6 sezonów): obserwować na większej próbie.
+
 ## Nov 27, 2026, agent silnika meczu (worktree, gałąź worktree-agent-a02ef62888482cf43), jeden commit bez pusha (v1.25 Beta, bez zmiany wersji)
 Zrobione:
 - Krok 1 projektu Walka taktyk (`docs/walka-taktyk.md`): rejestr `engine/modifiers.js` to potok etapów attr, slot, player,

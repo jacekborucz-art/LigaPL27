@@ -15,8 +15,11 @@ import { formationById } from '../src/data/formations.js';
 import { CLUBS_PL, clubById } from '../src/data/clubs_pl.js';
 import { squadOf } from '../src/world/worldGen.js';
 import { Rng } from '../src/core/rng.js';
+import { ENGINE2, setEngine2 } from '../src/engine/engine2.js';
 
 // Skróty meczów sprzed instrukcji indywidualnych (Nov 18, 2026, tests/piHelpers.mjs przed zmianą silnika)
+// Krok 2 Walki taktyk (Nov 28, 2026): wzorce sprawdzane z wyłącznikami ENGINE2 false (liczby kroku 1); krok 2 pilnują
+// złote skróty tests/enginePipeline.golden.json
 // Wzorce przeliczone po celowych zmianach silnika (żółte -15%, zmęczenie z tolerancją, stałe fragmenty, nasycenie golami, kapitan, Nov 25, 2026, kartki na ławce)
 const GOLD = {
   user: [
@@ -41,9 +44,13 @@ const withPI = (id, playerInstr, extra = {}) => side(id, { tactics: { ...tac[id]
 const slotOf = (id, pid) => formationById(tac[id].formation).slots[tac[id].xi.indexOf(pid)];
 
 test('Złoty test: bez instrukcji indywidualnych dziennik zdarzeń i stan RNG jak przed zmianą (50 + 50 meczów)', () => {
-  assert.deepEqual(goldenHashes('user'), GOLD.user, 'mecze bez AI, ze zmianą instrukcji drużyny w 30. min');
-  AI_RULES.softTackleBooked = false; // reguła AI v1 to celowa zmiana zachowania trenera AI
-  try { assert.deepEqual(goldenHashes('ai'), GOLD.ai, 'mecze AI bez nowej reguły'); } finally { AI_RULES.softTackleBooked = true; }
+  const keep = { ...ENGINE2 };
+  setEngine2({ pipeFix: false, state: false, conditions: false, unify: false });
+  try {
+    assert.deepEqual(goldenHashes('user'), GOLD.user, 'mecze bez AI, ze zmianą instrukcji drużyny w 30. min');
+    AI_RULES.softTackleBooked = false; // reguła AI v1 to celowa zmiana zachowania trenera AI
+    try { assert.deepEqual(goldenHashes('ai'), GOLD.ai, 'mecze AI bez nowej reguły'); } finally { AI_RULES.softTackleBooked = true; }
+  } finally { setEngine2(keep); }
 });
 
 test('Instrukcja równa instrukcji drużyny nic nie zmienia; instrukcje nie zużywają RNG meczu przy tworzeniu', () => {

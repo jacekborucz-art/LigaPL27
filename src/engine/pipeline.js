@@ -6,7 +6,9 @@
 // Wkład, który silnik dodaje do swojej wartości, idzie po kolei (channelTerms), żeby kolejność działań
 // zmiennoprzecinkowych była ta sama co przed potokiem.
 
-import { registerModifier, evaluate, channel, channelTerms, entriesFor } from './modifiers.js';
+import { registerModifier, evaluate, channel, channelTerms, entriesFor, registryVersion } from './modifiers.js';
+import { ENGINE2, COND, tierMul } from './engine2.js';
+import { clamp } from '../core/rng.js';
 import { proficiency, posEff, errorMul } from './positions.js';
 import { K } from './match/constants.js';
 import { CAPTAIN } from './captain.js';
@@ -39,10 +41,21 @@ registerModifier({
   mode: 'match', enabled: (ctx) => ctx.dayForm !== undefined,
   apply: (p, ctx) => ctx.dayForm,
 });
+// Krok 2 (ENGINE2.conditions): stawka = max(ranga 2+, presja tabeli 0-1) x psychika (WAZ i opanowanie OPA), granica
+// +-0,4, x mnożnik ligi; ENGINE2.unify: także w meczach w tle (ranga z quickRank). Wyłączone: jak w kroku 1.
+export function stakesTerm(p, ctx) {
+  if (!ENGINE2.conditions) return ctx.rank >= 2 ? 0.04 * ((p.hidden?.WAZ ?? 10) - 10) : 0;
+  const S = ctx.rank >= 2 ? 1 : ctx.pressure || 0;
+  if (!S) return 0;
+  const waz = p.hidden?.WAZ ?? 10;
+  const C = COND.stakes;
+  const opa = p.attr?.OPA ?? p.ovr ?? 10;
+  return clamp(S * (C.waz * (waz - 10) + C.opa * (opa - 10)), -C.cap, C.cap) * tierMul(ctx.tier);
+}
 registerModifier({
-  id: 'waz', stage: 'player', group: 'psyche', label: 'Ważne mecze (ranga x WAZ)', range: [-0.36, 0.4], order: 91,
-  mode: 'match',
-  apply: (p, ctx) => (ctx.rank >= 2 ? 0.04 * ((p.hidden?.WAZ ?? 10) - 10) : 0),
+  id: 'waz', stage: 'player', group: 'psyche', label: 'Stawka meczu (ranga, presja tabeli) x WAZ i opanowanie', range: [-0.48, 0.48], order: 91,
+  enabled: (ctx) => ctx.inMatch || ENGINE2.unify, // krok 1: tylko pełny silnik (dawny mode 'match')
+  apply: (p, ctx) => stakesTerm(p, ctx),
 });
 
 // ------------------------------------------------------------ live: stan w meczu (co minutę), subject: zawodnik meczowy x
@@ -85,6 +98,8 @@ registerModifier({
 // Mecze w tle i raporty (teamStrength.js, subject: { xi, squad }, ctx z teamRating): zone.all do wszystkich stref
 registerModifier({
   id: 'tableConfidence', stage: 'team', group: 'conditions', label: 'Pewność siebie z tabeli', range: [-0.15, 0.15], channel: 'zone.all', mode: 'quick',
+  // krok 2 (unify): wyłączone; pewność siebie liczy pula psychiki (forma, morale, „na gazie”), jak w pełnym silniku
+  enabled: () => !ENGINE2.unify,
   apply: (s, ctx) => ctx.tableTerm || 0,
 });
 registerModifier({
@@ -122,7 +137,8 @@ registerModifier({
   channels: ['foul', 'card', 'red', 'pen', 'penCard', 'tacCard'],
   apply: (c) => {
     const r = c.refStrict;
-    return { foul: 1.1 - 0.1 * r, card: r, red: Math.sqrt(r), pen: 0.85 + 0.15 * r, penCard: 0.1 * r, tacCard: Math.sqrt(r) };
+    // penCard: krok 1 szansa 0,1 x r; krok 2 (pipeFix) mnożnik r, a 0,1 dokłada matchFactors (neutralny kanał = 1)
+    return { foul: 1.1 - 0.1 * r, card: r, red: Math.sqrt(r), pen: 0.85 + 0.15 * r, penCard: ENGINE2.pipeFix ? r : 0.1 * r, tacCard: Math.sqrt(r) };
   },
 });
 registerModifier({
@@ -131,7 +147,39 @@ registerModifier({
 });
 registerModifier({
   id: 'crowd', stage: 'match', group: 'conditions', label: 'Kibice i atut boiska', range: [0, 1], channels: ['hfa', 'home'],
+  enabled: () => !ENGINE2.conditions, // krok 2: zastąpione wartością terenu (terrain)
   apply: (c) => ({ hfa: c.neutral ? 0 : 0.7 + 0.3 * c.attendance, home: c.neutral ? 0 : 0.3 }),
+});
+
+// Krok 2 (ENGINE2.conditions): warunki meczu. Kontekst c: attendance 0-1, travelKm (podróż gości), pitch (murawa
+// z matchday.js), derby (intensywność 0-3, career/fans.js rivalry), tier (poziom ligi gospodarza), neutral.
+/** Atut boiska jako jedna wartość terenu (0 na neutralnym): frekwencja, podróż gości, murawa znana gospodarzom. */
+export function terrainHfa(c) {
+  if (c.neutral) return 0;
+  const H = COND.hfa;
+  const travel = clamp((c.travelKm ?? H.travelKm * 0.75) / H.travelKm, 0, 1);
+  return (H.base + H.fill * (c.attendance ?? 0.8) + H.travel * travel + (H.pitch[c.pitch] ?? 0)) * tierMul(c.tier);
+}
+registerModifier({
+  id: 'terrain', stage: 'match', group: 'conditions', label: 'Atut boiska (frekwencja, podróż, murawa)', range: [0, 1.32], channels: ['hfa', 'home'],
+  enabled: () => ENGINE2.conditions,
+  apply: (c) => { const h = terrainHfa(c); return { hfa: h, home: COND.home * h / 0.88 }; },
+});
+registerModifier({
+  id: 'derby', stage: 'match', group: 'conditions', label: 'Derby (faule, kartki, mniejsza różnica klas)', range: [0.78, 1.25],
+  channels: ['foul', 'card', 'gap', 'dfMul'], enabled: (c) => ENGINE2.conditions && c.derby > 0,
+  apply: (c) => {
+    const v = Math.min(3, c.derby) * tierMul(c.tier); const D = COND.derby;
+    return { foul: 1 + D.foul * v, card: 1 + D.card * v, gap: 1 - D.gap * v, dfMul: 1 + D.dayForm * v };
+  },
+});
+registerModifier({
+  id: 'pitch', stage: 'match', group: 'conditions', label: 'Murawa (technika, krótkie podania, walka)', range: [-0.14, 1.07],
+  channels: ['passAcc', 'brk.POZ', 'brk.SKR', 'foul'], enabled: (c) => ENGINE2.conditions && !!COND.pitch[c.pitch],
+  apply: (c) => {
+    const P = COND.pitch[c.pitch]; const m = tierMul(c.tier);
+    return { passAcc: (P.passAcc ?? 0) * m, 'brk.POZ': (P.brkPOZ ?? 0) * m, 'brk.SKR': (P.brkSKR ?? 0) * m, foul: 1 + ((P.foul ?? 1) - 1) * m };
+  },
 });
 
 // ------------------------------------------------------------ Odczyt dla silnika
@@ -139,13 +187,18 @@ const MATCH_CTX = Object.freeze({ inMatch: true });
 
 /** Oceny w strefach zawodnika (etap attr), raz na mecz. */
 export function attrZones(p) {
-  // Suma kanałów zone.* wpisów etapu (od 0, w kolejności wpisów; jak evaluate(...).ch), bez alokacji rozbicia
+  // Suma kanałów zone.* wpisów etapu (od 0, w kolejności wpisów; jak evaluate(...).ch), bez alokacji rozbicia.
+  // Krok 2 (pipeFix): wszystkie wpisy etapu (także z jednym kanałem stref); bez wpisów: wartość neutralna (ovr).
   const R = { DEF: 0, MID: 0, ATT: 0, GK: 0 };
-  for (const m of entriesFor('attr', 'zone.DEF', true)) {
+  let any = false;
+  for (const m of entriesFor('attr', ENGINE2.pipeFix ? '*' : 'zone.DEF', true)) {
     if (m.enabled && !m.enabled(MATCH_CTX)) continue;
     const r = m.apply(p, MATCH_CTX);
+    if (r === null || typeof r !== 'object') continue;
     R.DEF += r['zone.DEF'] ?? 0; R.MID += r['zone.MID'] ?? 0; R.ATT += r['zone.ATT'] ?? 0; R.GK += r['zone.GK'] ?? 0;
+    any = true;
   }
+  if (!any && ENGINE2.pipeFix) { const v = p.ovr ?? 10; R.DEF = v; R.MID = v; R.ATT = v; R.GK = v; }
   return R;
 }
 
@@ -158,17 +211,28 @@ export const slotEff = (p, slot) => channel('slot', 'pos', p, slot);
  */
 export function slotMx(x) {
   const s = x.slot;
-  if (x.mxS !== s || x.mxP !== s.pos || x.mxSd !== s.side) {
+  const fix = ENGINE2.pipeFix;
+  if (x.mxS !== s || x.mxP !== s.pos || x.mxSd !== s.side || (fix && x.mxV !== registryVersion())) {
     x.mxS = s; x.mxP = s.pos; x.mxSd = s.side;
-    x.mxPos = channel('slot', 'pos', x.p, s);
-    x.mxErr = channel('slot', 'err', x.p, s);
+    let c = s;
+    if (fix) {
+      // Krok 2: kontekst pełnego silnika (inMatch), żeby pole mode wpisów etapu slot działało jak w innych etapach
+      c = (x.mxC ??= { pos: null, side: null, prof: undefined, inMatch: true });
+      c.pos = s.pos; c.side = s.side;
+      x.mxV = registryVersion();
+    }
+    x.mxPos = channel('slot', 'pos', x.p, c);
+    x.mxErr = channel('slot', 'err', x.p, c);
   }
   return x;
 }
 
-/** Stan zawodnika na start meczu (etap player z dyspozycją dnia i WAZ): { total, parts }. */
-export function playerBase(p, rank, dayForm) {
-  return evaluate('player', p, { inMatch: true, rank, dayForm });
+/**
+ * Stan zawodnika na start meczu (etap player z dyspozycją dnia i stawką x WAZ): { total, parts }.
+ * t: kontekst drużyny w meczu { rank, tier, pressure } (krok 2: poziom ligi i presja tabeli).
+ */
+export function playerBase(p, t, dayForm) {
+  return evaluate('player', p, { inMatch: true, rank: t.rank, dayForm, tier: t.tier, pressure: t.pressure });
 }
 
 /** Wkłady etapu live zawodnika x w tej minucie do x.live (kolejno), x.liveN: ich liczba, x.liveIds: wpisy. */
@@ -202,8 +266,8 @@ const ACT = Object.keys(K.typeW).map((t) => [t, `act.${t}`]);
 const MU_TYPE = Object.freeze(Object.fromEntries(Object.keys(K.typeW).map((t) => [t, Object.freeze({ inMatch: true, type: t })])));
 function matchupCache(A, D) {
   const c = A.mu;
-  if (c.av !== A.zv || c.dv !== D.zv || c.s.D !== D) {
-    c.av = A.zv; c.dv = D.zv; c.s.A = A; c.s.D = D; c.w = null;
+  if (c.av !== A.zv || c.dv !== D.zv || c.s.D !== D || (ENGINE2.pipeFix && c.rv !== registryVersion())) {
+    c.av = A.zv; c.dv = D.zv; c.s.A = A; c.s.D = D; c.w = null; c.rv = registryVersion();
     for (const t in c.b) c.b[t] = undefined;
   }
   return c;
@@ -216,6 +280,21 @@ export function matchupWeights(A, D) {
     const w = {};
     for (const [t] of ACT) w[t] = 1;
     let any = false;
+    if (ENGINE2.pipeFix) {
+      // Krok 2: wszystkie wpisy z dowolnym kanałem act.*; wagi bazowe K.typeW, gdy nie działa wpis typeMix (który je zawiera)
+      let base = false;
+      for (const m of entriesFor('matchup', '*', true)) {
+        if (!m.channels.some((k) => k.startsWith('act.'))) continue;
+        if (m.enabled && !m.enabled(MU_MIX)) continue;
+        const r = m.apply(c.s, MU_MIX);
+        if (r === null || typeof r !== 'object') continue;
+        for (const [t, k] of ACT) w[t] *= r[k] ?? 1;
+        if (m.id === 'typeMix') base = true;
+      }
+      if (!base) for (const [t] of ACT) w[t] *= K.typeW[t];
+      c.w = w;
+      return c.w;
+    }
     for (const m of entriesFor('matchup', 'act.POZ', true)) {
       if (m.enabled && !m.enabled(MU_MIX)) continue;
       const r = m.apply(c.s, MU_MIX);
@@ -240,18 +319,41 @@ export const newMatchupCache = () => ({ av: -1, dv: -1, w: null, b: {}, s: { A: 
  * Warunki meczu (etap match) raz na mecz: wartości każdego wpisu pod nazwami, które czyta core.js, w tej samej
  * kolejności mnożenia co dawniej. Wyłączony wpis: wartość neutralna.
  */
-export function matchFactors(ctx) {
-  const ev = evaluate('match', ctx, ctx);
-  const P = ev.chParts;
+export function matchFactors(ctx, inMatch = true) {
+  const fix = ENGINE2.pipeFix;
+  // Krok 2 (pipeFix): kontekst z inMatch (pole mode wpisów działa jak w innych etapach); mecze w tle: inMatch false
+  const ev = fix ? evaluate('match', ctx, { ...ctx, inMatch }) : evaluate('match', ctx, ctx);
+  const P = ev.chParts; const ch = ev.ch;
+  const c = (k, d) => ch[k] ?? d;
+  // Kanały warunków dodanych w kroku 2 (suma kanału): różnica klas, rozrzut dyspozycji dnia, murawa
+  const extra = {
+    gap: c('gap', 1), dfMul: c('dfMul', 1), passAcc: c('passAcc', 0),
+    brk: { POZ: c('brk.POZ', 0), SKR: c('brk.SKR', 0), KON: c('brk.KON', 0), DYS: c('brk.DYS', 0) },
+  };
+  if (fix) {
+    // Silnik czyta sumę kanału (iloczyn wszystkich wpisów), więc nowy wpis warunków działa bez zmian w core.js.
+    // Mnożniki ułożone tak, że wzory w core.js (wFoul x rankFoul x refFoul) dają iloczyn kanału.
+    // penCard: szansa kartki za faul w polu karnym = 0,1 x kanał (sędzia zwraca surowość)
+    return {
+      wConv: c('conv', 1), wFoul: c('foul', 1), wFat: c('fat', 1), wInj: c('inj', 1), wAct: c('act', 1), wDys: c('dys', 1),
+      refFoul: 1, refCard: c('card', 1), refRed: c('red', 1), refPen: c('pen', 1),
+      refPenCard: 0.1 * c('penCard', 1), refTacCard: c('tacCard', 1),
+      rankFoul: 1, rankCard: 1,
+      hfa: c('hfa', 0), home: c('home', 0), foul: c('foul', 1), card: c('card', 1), red: c('red', 1), pen: c('pen', 1),
+      ...extra, ch, parts: P,
+    };
+  }
   const g = (id, k, d) => P[id]?.[k] ?? d;
   return {
     wConv: g('weather', 'conv', 1), wFoul: g('weather', 'foul', 1), wFat: g('weather', 'fat', 1), wInj: g('weather', 'inj', 1),
     wAct: g('weather', 'act', 1), wDys: g('weather', 'dys', 1),
     refFoul: g('referee', 'foul', 1), refCard: g('referee', 'card', 1), refRed: g('referee', 'red', 1), refPen: g('referee', 'pen', 1),
     refPenCard: g('referee', 'penCard', 0.1), refTacCard: g('referee', 'tacCard', 1),
-    rankFoul: g('rank', 'foul', 1), rankCard: g('rank', 'card', 1),
-    hfa: g('crowd', 'hfa', 0), home: g('crowd', 'home', 0),
-    ch: ev.ch, parts: P,
+    // Krok 2 bez pipeFix: derby i murawa dochodzą do mnożników rangi (faule, kartki)
+    rankFoul: g('rank', 'foul', 1) * g('derby', 'foul', 1) * g('pitch', 'foul', 1), rankCard: g('rank', 'card', 1) * g('derby', 'card', 1),
+    hfa: g('crowd', 'hfa', g('terrain', 'hfa', 0)), home: g('crowd', 'home', g('terrain', 'home', 0)),
+    foul: c('foul', 1), card: c('card', 1), red: c('red', 1), pen: c('pen', 1),
+    ...extra, ch, parts: P,
   };
 }
 
@@ -272,6 +374,7 @@ export function ledgerMinute(M, T, xs) {
   const lv = L.live;
   for (const x of xs) {
     x.lgMin = (x.lgMin ?? 0) + 1;
+    if (x.kPen) L.knock = (L.knock ?? 0) + x.kPen; // kara lekkiego urazu w meczu (krok 2, pipeFix)
     for (let i = 0; i < x.liveN; i++) lv[i] = (lv[i] ?? 0) + x.live[i];
     if (x.liveN > L.liveIds.length) L.liveIds = x.liveIds.slice(0, x.liveN);
   }
@@ -300,6 +403,7 @@ export function ledgerSummary(M) {
       for (const id in x.parts) pts[id] = (pts[id] ?? 0) + x.parts[id] * x.lgMin;
     }
     L.liveIds.forEach((id, i) => { pts[id] = (pts[id] ?? 0) + (L.live[i] ?? 0); });
+    if (L.knock) pts.knockInMatch = -L.knock;
     const per = (v, n) => (n ? v / n : 0);
     const perMinute = Object.fromEntries(L.teamIds.map((id, i) => [id, per(L.team[i] ?? 0, L.minutes)]));
     perMinute.captain = per(L.cap, L.minutes);
