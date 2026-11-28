@@ -42,7 +42,7 @@ registerModifier({
   apply: (p, ctx) => ctx.dayForm,
 });
 // Krok 2 (ENGINE2.conditions): stawka = max(ranga 2+, presja tabeli 0-1) x psychika (WAZ i opanowanie OPA), granica
-// +-0,4, x mnożnik ligi; ENGINE2.unify: także w meczach w tle (ranga z quickRank). Wyłączone: jak w kroku 1.
+// +-0,4 (krok 2: x mnożnik ligi, po QA bez: COND.stakes.tier); ENGINE2.unify: także w meczach w tle (ranga z quickRank). Wyłączone: jak w kroku 1.
 export function stakesTerm(p, ctx) {
   if (!ENGINE2.conditions) return ctx.rank >= 2 ? 0.04 * ((p.hidden?.WAZ ?? 10) - 10) : 0;
   const S = ctx.rank >= 2 ? 1 : ctx.pressure || 0;
@@ -50,7 +50,8 @@ export function stakesTerm(p, ctx) {
   const waz = p.hidden?.WAZ ?? 10;
   const C = COND.stakes;
   const opa = p.attr?.OPA ?? p.ovr ?? 10;
-  return clamp(S * (C.waz * (waz - 10) + C.opa * (opa - 10)), -C.cap, C.cap) * tierMul(ctx.tier);
+  const v = clamp(S * (C.waz * (waz - 10) + C.opa * (opa - 10)), -C.cap, C.cap);
+  return C.tier ? v * tierMul(ctx.tier) : v; // psychika bez mnożnika ligi (poprawka po QA; krok 2: x mnożnik)
 }
 registerModifier({
   id: 'waz', stage: 'player', group: 'psyche', label: 'Stawka meczu (ranga, presja tabeli) x WAZ i opanowanie', range: [-0.48, 0.48], order: 91,
@@ -143,12 +144,16 @@ registerModifier({
 });
 registerModifier({
   id: 'rank', stage: 'match', group: 'conditions', label: 'Ranga meczu (faule, kartki)', range: [1, 1.15], channels: ['foul', 'card'],
-  apply: (c) => ({ foul: c.rank >= 2 ? 1.1 : 1, card: c.rank >= 2 ? 1.15 : 1 }),
+  apply: (c) => {
+    // Poprawka po QA (COND.derby.rankOff): w derbach rangi 2 ranga wynika z samych derbów, faule i kartki liczy wpis derby
+    if (c.rank === 2 && c.derby > 0 && ENGINE2.conditions && COND.derby.rankOff) return { foul: 1, card: 1 };
+    return { foul: c.rank >= 2 ? 1.1 : 1, card: c.rank >= 2 ? 1.15 : 1 };
+  },
 });
 registerModifier({
   id: 'crowd', stage: 'match', group: 'conditions', label: 'Kibice i atut boiska', range: [0, 1], channels: ['hfa', 'home'],
   enabled: () => !ENGINE2.conditions, // krok 2: zastąpione wartością terenu (terrain)
-  apply: (c) => ({ hfa: c.neutral ? 0 : 0.7 + 0.3 * c.attendance, home: c.neutral ? 0 : 0.3 }),
+  apply: (c) => ({ hfa: c.neutral ? 0 : 0.7 + 0.3 * (c.attendance ?? 0.6), home: c.neutral ? 0 : 0.3 }), // brak frekwencji: 0,6 (bez NaN)
 });
 
 // Krok 2 (ENGINE2.conditions): warunki meczu. Kontekst c: attendance 0-1, travelKm (podróż gości), pitch (murawa
@@ -165,13 +170,16 @@ registerModifier({
   enabled: () => ENGINE2.conditions,
   apply: (c) => { const h = terrainHfa(c); return { hfa: h, home: COND.home * h / 0.88 }; },
 });
+/** Derby: mnożniki kanałów z intensywności v (1-3) i mnożnika ligi; każdy czynnik (a + b x v) x mnożnik (COND.derby). */
+export function derbyTerms(c) {
+  const v = Math.min(3, c.derby); const m = tierMul(c.tier); const D = COND.derby;
+  const k = (x) => (x[0] + x[1] * v) * m;
+  return { foul: 1 + k(D.foul), card: 1 + k(D.card), gap: 1 - k(D.gap), dfMul: 1 + k(D.dayForm), act: 1 - k(D.act) };
+}
 registerModifier({
-  id: 'derby', stage: 'match', group: 'conditions', label: 'Derby (faule, kartki, mniejsza różnica klas)', range: [0.78, 1.25],
-  channels: ['foul', 'card', 'gap', 'dfMul'], enabled: (c) => ENGINE2.conditions && c.derby > 0,
-  apply: (c) => {
-    const v = Math.min(3, c.derby) * tierMul(c.tier); const D = COND.derby;
-    return { foul: 1 + D.foul * v, card: 1 + D.card * v, gap: 1 - D.gap * v, dfMul: 1 + D.dayForm * v };
-  },
+  id: 'derby', stage: 'match', group: 'conditions', label: 'Derby (faule, kartki, mniejsza różnica klas, mniej sytuacji)', range: [0.78, 1.25],
+  channels: ['foul', 'card', 'gap', 'dfMul', 'act'], enabled: (c) => ENGINE2.conditions && c.derby > 0,
+  apply: (c) => derbyTerms(c),
 });
 registerModifier({
   id: 'pitch', stage: 'match', group: 'conditions', label: 'Murawa (technika, krótkie podania, walka)', range: [-0.14, 1.07],

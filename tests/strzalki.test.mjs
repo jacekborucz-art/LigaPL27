@@ -139,7 +139,8 @@ test('A/B każdego kierunku na każdej pozycji (300 meczów): jest zysk i mierza
       if (`${g}:${dir}` !== 'OP:b') assert.ok(cost(d), `${g}:${dir} bez kosztu: ${txt}`);
       // OP:fo i OP:o: zysk w szumie także w kroku 1 (OP:fo xG +0,031 przy progu 0,03; OP:o kluczowe podania +0,163 przy
       // progu 0,15); po kroku 2 Walki taktyk (Nov 28, 2026) OP:fo xG +0,017, OP:o kluczowe podania +0,127 i dośrodkowania
-      // +0,117 na tych samych ziarnach. Zysk strzałek ofensywnego pomocnika to sprawa kroku 3 (cechy taktyki)
+      // +0,117 na tych samych ziarnach. Zysk strzałek ofensywnego pomocnika to sprawa kroku 3 (cechy taktyki): w kroku 3
+      // OP:fo i OP:o wracają do sprawdzenia (zwolnienie do usunięcia, docs/walka-taktyk.md rozdz. 7.12)
       if (!['OP:fo', 'OP:o'].includes(`${g}:${dir}`)) assert.ok(gain(d), `${g}:${dir} bez zysku: ${txt}`);
     }
   }

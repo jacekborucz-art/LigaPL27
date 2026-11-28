@@ -229,8 +229,12 @@ function quickCoach(game, f, clubId, rank) {
 
 /** Mecz w tle (AI vs AI) szybką symulacją. */
 export function playQuick(game, f, rng, cache = new Map()) {
-  const home = { squad: squadFor(game, f.home, f.comp, f), tableTerm: tableTermFor(game, f.home, f.comp, cache) };
-  const away = { squad: squadFor(game, f.away, f.comp, f), tableTerm: tableTermFor(game, f.away, f.comp, cache) };
+  // Pewność siebie z tabeli: przy ENGINE2.unify wyłączona (wpis tableConfidence), więc bez liczenia (wydajność);
+  // tabela ligi i tak trafia do pamięci (czyta ją quickRank i fixtureConditions)
+  if (ENGINE2.unify && LEAGUE_COMPS.includes(f.comp) && !cache.has(f.comp)) cache.set(f.comp, standings(game.fixtures.filter((x) => x.comp === f.comp), compClubIds(f.comp)));
+  const tt = (id) => (ENGINE2.unify ? 0 : tableTermFor(game, id, f.comp, cache));
+  const home = { squad: squadFor(game, f.home, f.comp, f), tableTerm: tt(f.home) };
+  const away = { squad: squadFor(game, f.away, f.comp, f), tableTerm: tt(f.away) };
   const rank = quickRank(game, f, cache);
   home.coachTerm = quickCoach(game, f, f.home, rank);
   away.coachTerm = quickCoach(game, f, f.away, rank);
@@ -477,7 +481,8 @@ export function applyResult(game, f, res, rng) {
       }
       const x = played.get(p.id);
       const friendly = f.comp === 'friendly'; // sparing: bez statystyk sezonu, formy, kartek i pauz
-      if (x && p.rust) { if (p.rust.left > 1) p.rust.left--; else delete p.rust; } // powrót po kontuzji: kolejny mecz za nim
+      // Powrót po kontuzji: kolejny mecz za nim (licznik czasu bez meczu od nowa, STATE.rust.decayDays)
+      if (x && p.rust) { if (p.rust.left > 1) { p.rust.left--; p.rust.at = f.date; } else delete p.rust; }
       if (missed) { const s0 = (p.season ??= { apps: 0, subs: 0, min: 0, g: 0, a: 0, yc: 0, rc: 0, rating: 0, motm: 0, cs: 0 }); s0.miss = (s0.miss ?? 0) + 1; }
       if (!friendly) p.morale = applyMorale(p.morale ?? 12, afterMatchDelta({ result, tie, strengthDiff: diff, derby: f.derby, rival, lossStreak, played: !!x, rating: x?.rating, isRegular: (p.season?.apps ?? 0) >= 5, capE }));
       if (!x) continue;
@@ -729,6 +734,25 @@ export function thirdLeaguePlayoffResult(game) {
   return res.every((x) => x.winner) ? res : null;
 }
 
+/**
+ * Powrót po kontuzji (dzienna regeneracja, dzień wyleczenia). Po przerwie ponad 28 dni ostrość 30 (krok 1). Krok 2
+ * (ENGINE2.state): zamiast tego „rdza” (engine/modifiers.js rustOf) na 1-4 mecze zależnie od długości przerwy; bez state
+ * rdza nie powstaje (STATE.sharpReset true: obie kary, jak w kroku 2 przed poprawką po QA).
+ */
+export function injuryReturn(p, date) {
+  const L = p.injury?.days ?? 0;
+  if (L > 28 && (!ENGINE2.state || STATE.sharpReset)) p.sharp = 30;
+  if (ENGINE2.state && L >= STATE.rust.fromDays) { const n = L >= 60 ? 4 : L >= 28 ? 3 : L >= 14 ? 2 : 1; p.rust = { days: L, n, left: n, at: date }; }
+}
+
+/** Rdza po kontuzji (p.rust.at: powrót albo ostatni mecz): po STATE.rust.decayDays dniach bez meczu jeden mecz mniej. */
+export function rustDecay(p, date) {
+  const r = p.rust;
+  if (!r.at) { r.at = date; return; } // zapis sprzed poprawki: liczymy od dziś
+  if ((Date.parse(date) - Date.parse(r.at)) / 864e5 < STATE.rust.decayDays) return;
+  if (r.left > 1) { r.left--; r.at = date; } else delete p.rust;
+}
+
 /** Codzienna regeneracja: kontuzje, świeżość, ostrość; w poniedziałki dryf morale. */
 registerDailySystem({
   id: 'recovery', order: 90,
@@ -747,10 +771,7 @@ registerDailySystem({
       if (p.injuryDays > 0) {
         p.injuryDays--;
         if (p.injuryDays === 0) {
-          if ((p.injury?.days ?? 0) > 28) p.sharp = 30;
-          // Powrót po kontuzji (krok 2, engine/modifiers.js rustOf): „rdza” na kilka meczów zależnie od długości przerwy
-          const L = p.injury?.days ?? 0;
-          if (L >= STATE.rust.fromDays) { const n = L >= 60 ? 4 : L >= 28 ? 3 : L >= 14 ? 2 : 1; p.rust = { days: L, n, left: n }; }
+          injuryReturn(p, date);
           if (p.clubId === game.clubId && p.squad !== 'Y') messages.push(msg(date, ['info', `${p.name} wraca do gry`, `${p.name} jest już zdrowy i gotowy do gry.`], `back:${p.id}:${date}`));
           p.injury = null;
         }
@@ -763,6 +784,9 @@ registerDailySystem({
       p.fresh = Math.min(100 - debt, Math.round((p.fresh ?? 95) + 18 * (0.8 + 0.02 * wyt) * ((p.age ?? 25) >= 31 ? 0.85 : 1)));
       if (!p.lastMatch || p.lastMatch < sharpCut) p.sharp = Math.max(40, (p.sharp ?? 70) - 1);
       if (monday) {
+        // Rdza wygasa też z czasem: co STATE.rust.decayDays dni bez meczu jeden mecz mniej (przerwa letnia, program
+        // powrotu); sprawdzane w poniedziałki (wydajność: odczyt p.rust u 4000 zawodników co dzień kosztował ok. 1 % sezonu)
+        if (p.rust && ENGINE2.state && STATE.rust.decayDays > 0 && !(p.injuryDays > 0)) rustDecay(p, date);
         if (p.clubId && game.world.clubs[p.clubId]) recordMoraleWeek(p); // historia morale: kluby z kadrą w grze
         else if (p.moraleHist) delete p.moraleHist; // poza klubem w grze (wolny, zagranica): historia bez znaczenia
         p.morale = weeklyDrift(p.morale ?? 12, capE.get(p.clubId) ?? 0);

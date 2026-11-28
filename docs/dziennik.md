@@ -29,6 +29,39 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 28, 2026, agent silnika meczu (worktree, gałąź worktree-agent-a2dcc9ec768a8e3bf), poprawki po QA i znawcy, jeden commit bez pusha (v1.25.1 Beta, bez zmiany wersji)
+Zrobione:
+- Poprawki kroku 2 Walki taktyk po kontroli jakości i przeglądzie znawcy (`docs/walka-taktyk.md` rozdz. 7.12, tabela zmian
+  z wartościami kroku 2 i instrukcją cofnięcia). Nowy wyłącznik `ENGINE2.balance` i stałe `BAL` w `src/engine/engine2.js`;
+  zmiany stanu i warunków w `STATE` i `COND` z wartością kroku 2 w komentarzu. Wszystkie wyłączniki false: nadal bit w bit
+  krok 1 (`ENGINE2_OFF`, `tests/engine2.test.mjs`).
+- Derby bez podwójnej rangi (`COND.derby.rankOff`), nowe liczby derbów (faule +6 %, żółte +20 % wobec meczu rangi 0,
+  faworyt -0,10..-0,13 pkt/mecz, remisy równych drużyn +1 pp), mniej sytuacji w derbach także w tle.
+- Gra z urazem -0,30, psychika +0,6 / -0,9, mnożnik ligi tylko na ciało i aklimatyzację (także bez mnożnika stawki x WAZ).
+- Kartki: żółte ok. +20 % w obu silnikach (pełny 4,0-4,2 na mecz), czerwone w tle z drugimi żółtymi jak w pełnym silniku.
+- Ogon wyników u źródła: krótszy doliczony czas, słabszy przyrost akcji w końcówce, mocniejsze rozluźnienie przy
+  prowadzeniu 2+, przegrywający mocniej goni (więcej wyrównań). Ekstraklasa (pełny silnik): gole 2,84 -> 2,68-2,75,
+  6+ goli 7,1 -> 5,6-6,2 %, remisy 25,1 -> 26,3-27,1 %.
+- Zmęczenie w tle i w pełnym silniku bliżej siebie (świeżość 70: pełny -0,37 -> -0,28, w tle -0,20 -> -0,25 pkt/mecz).
+- Rdza po kontuzji zamiast ostrości 30, wygasa co 14 dni bez meczu (poniedziałki), nie powstaje bez `state`; `rustOf`
+  przy n = 0. Widok Trening pokazuje spójność startową 85. Frekwencja bez NaN, `TIER_MUL[6]`, `slotFit` z `inMatch`.
+- Wydajność: sezon +1,8 % wobec 12a5134 (było +7,6 %), matchday +6,8 % (było +16 %): pętle rejestru na wpisach
+  jednego kształtu, pamięć warunków meczu w tle i odległości, flagi wpisów stanu przy kompilacji listy.
+- Testy: stawka x WAZ i OPA (presja, granica, mnożnik), pewność z tabeli wyłączona przy unify, rdza (wygasanie, brak przy
+  state false, n = 0), derby bez podwójnej rangi, balance. Złote skróty kroku 2 zapisane od nowa (`tools/golden-save.mjs`).
+Decyzje i pułapki:
+- `BAL.qsGoals` 0,985 (mniej goli w tle) poprawiało polskie kluby w pucharach (ćwierćfinał w 37,5 % sezonów zamiast 25 %,
+  `tests/euroStrength.test.mjs`): zostaje 1.
+- Cel ogona 4 % nieosiągalny bez sztucznego sufitu przy średniej 2,75 (Poisson daje 6,1 %): decyzja właściciela.
+- Atut boiska przy małej frekwencji: QA zmierzyło szum (600 meczów); na 5000 różnica silników do 0,03, bez zmiany.
+- Test czasu `tests/uefa.test.mjs` (15 s na sezon) pada pod obciążeniem `npm test` także dla kodu sprzed kroku 2; osobno
+  na granicy (13,6-15,9 s).
+- Bierna gra: bierny gracz traci mniej (2 Liga -13,0, III liga -17,0 pkt/sezon wobec -15,1 i -23,6 w kroku 2):
+  psychika bez mnożnika ligi. Cel rundy 3 (ok. -20) na granicy, do decyzji właściciela.
+Zostało / dalej:
+- Decyzje właściciela: ogon wyników, żółte w tle (do 4?), gospodarze 41,5-43,4 %. Pakiet dla znawcy:
+  `scratchpad/krok2/review/przeglad-krok2b.md` (poza repozytorium). Test strzałek `OP:fo`, `OP:o` wraca w kroku 3.
+
 ## Nov 28, 2026, agent silnika meczu (worktree, gałąź worktree-agent-a2dcc9ec768a8e3bf), jeden commit bez pusha (v1.25.1 Beta, bez zmiany wersji)
 Zrobione:
 - Krok 2 projektu Walka taktyk (`docs/walka-taktyk.md` rozdz. 7), cztery wyłączniki w `src/engine/engine2.js`

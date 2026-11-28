@@ -45,7 +45,7 @@ const slotOf = (id, pid) => formationById(tac[id].formation).slots[tac[id].xi.in
 
 test('Złoty test: bez instrukcji indywidualnych dziennik zdarzeń i stan RNG jak przed zmianą (50 + 50 meczów)', () => {
   const keep = { ...ENGINE2 };
-  setEngine2({ pipeFix: false, state: false, conditions: false, unify: false });
+  setEngine2({ pipeFix: false, state: false, conditions: false, unify: false, balance: false });
   try {
     assert.deepEqual(goldenHashes('user'), GOLD.user, 'mecze bez AI, ze zmianą instrukcji drużyny w 30. min');
     AI_RULES.softTackleBooked = false; // reguła AI v1 to celowa zmiana zachowania trenera AI
@@ -282,7 +282,9 @@ test('Młody w konflikcie z planem lekko obniża zgranie drużyny; kapitan nie',
 
 test('AI v1: obrońca z żółtą kartką od 60. minuty gra łagodnie w odbiorze (ta sama ścieżka changeTactics)', () => {
   let individual = 0;
-  for (const seed of ['ai1', 'ai2', 'ai3', 'ai4', 'ai5', 'ai6']) {
+  // 10 ziaren: poprawki balansu po przeglądzie znawcy (Nov 28, 2026, ENGINE2.balance) zmieniły przebieg meczów, na 6 ziarnach
+  // instrukcja indywidualna trafiała się raz (zasada ta sama, mniej okazji: zawodnik z żółtą bywał zmieniany)
+  for (const seed of ['ai1', 'ai2', 'ai3', 'ai4', 'ai5', 'ai6', 'ai7', 'ai8', 'ai9', 'ai10']) {
     const M = createMatch({ seed, home: side('legia', { ai: true }), away: side('lech', { ai: true }) });
     while (M.minute < 58 && !M.ended) { if (M.phase === 'break') resume(M); else step(M); }
     const T = M.teams[0];

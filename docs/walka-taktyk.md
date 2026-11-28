@@ -269,6 +269,7 @@ Liczby stanu i warunków są w tym samym pliku (`STATE`, `COND`, `TIER_MUL`).
 | Stawka x WAZ w meczach w tle | wpis `waz` (dawniej `mode: 'match'`) | tylko pełny silnik | oba silniki (ranga z `quickRank`, presja z `fixtureConditions`) | unify |
 | Pewność siebie z tabeli | wpis `tableConfidence` | +-0,15 tylko w meczach w tle | wyłączona: pewność siebie liczy pula psychiki w obu silnikach (dublowała formę i morale) | unify |
 | Ten sam kontekst warunków | `match/matchday.js` `kickOff`, `season.js` `playQuick` | różne dane wejściowe | oba biorą `fixtureConditions` (podróż, derby, presja, poziom ligi); mecz w tle frekwencję z `quickFill` (jak studio bez nastroju kibiców i pogody) | conditions, unify |
+| Stan zawodnika raz na zawodnika przy wyborze jedenastki | `teamStrength.js` `pickXI`, `effective` | stan zawodnika (etap player) liczony od nowa dla każdej grupy pozycji | raz na zawodnika, wspólny dla grup (te same liczby, mniej obliczeń) | brak (bez zmiany wyników) |
 
 Sprawdzone i bez zmian (z uzasadnieniem):
 - Bramkarz z pola: pomiar [SYM] (300 meczów pełnego silnika, 3000 w tle): pełny silnik (połowa `goalMul` + niska ocena
@@ -291,6 +292,9 @@ podaje różnicę między sumą po granicach a sumą wkładów, więc rozbicie (
 wkłady i osobno „Granice stanu i poziom ligi”. Poza sumą: kondycja w meczu, gra z urazem, pozycja oraz trening,
 analiza rywala, autorytet trenera i głowa w transferze (osobne czynniki; autorytet ma własny mnożnik ligi z rundy 3
 biernej gry, więc nie wchodzi drugi raz w mnożnik stanu).
+
+Po poprawkach QA i znawcy (rozdz. 7.12): psychika +0,6 / -0,9, mnożnik ligi tylko na ciało i aklimatyzację (dolna granica
+sumy x mnożnik), gra z urazem -0,30, świeżość -0,038 za punkt, kondycja na start 95 - 0,05 x (95 - świeżość).
 
 ### 7.3 Warunki meczu
 
@@ -438,4 +442,211 @@ i presja nie istniały (różnice to sama forma albo szum).
    potem `npm run sw`. Pliki: `src/engine/engine2.js` (nowy), `src/season/conditions.js` (nowy), `src/engine/modifiers.js`,
    `src/engine/pipeline.js`, `src/engine/match/core.js`, `src/engine/match/teams.js`, `src/engine/quickSim.js`,
    `src/engine/teamStrength.js`, `src/season/season.js`, `src/match/matchday.js`, `src/training/cohesion.js`, testy
-   `tests/engine2.test.mjs`, `tests/modifiers.test.mjs`, `tests/fatigue.test.mjs`, złote skróty, `docs/`, `sw.js`.
+   `tests/engine2.test.mjs`, `tests/modifiers.test.mjs`, `tests/fatigue.test.mjs`, `tests/playerInstr.test.mjs`,
+   `tests/training.test.mjs`, `tests/friendlyUi.test.mjs`, `tests/strzalki.test.mjs`, `tests/enginePipeline.test.mjs`,
+   złote skróty (`tests/enginePipeline.golden.json`, `tests/enginePipeline.step1.golden.json`), `docs/`, `sw.js`.
+   Poprawki po QA i znawcy (rozdz. 7.12) cofa się osobno (rozdz. 7.12.4).
+
+### 7.12 Poprawki po QA i znawcy (Nov 28, 2026)
+
+Kontrola jakości (QA) i przegląd znawcy futbolu po kroku 2; właściciel zatwierdził poprawki. Każda zmiana ma wyłącznik
+albo stałą w `src/engine/engine2.js` z wartością kroku 2 w komentarzu („krok 2: ...”). Nowy wyłącznik `ENGINE2.balance`
+(kartki, ogon wyników, doliczony czas, mecze w tle). Przy wszystkich wyłącznikach `false` wyniki nadal bit w bit jak
+w kroku 1 (`tests/engine2.test.mjs`, `tests/enginePipeline.step1.golden.json`; stała `ENGINE2_OFF`).
+
+#### 7.12.1 Zmiany (zmiana, plik, stała, krok 2 -> teraz, wyłącznik)
+
+| Zmiana | Plik | Stała | Krok 2 | Teraz | Wyłącznik |
+|---|---|---|---|---|---|
+| Derby bez podwójnej rangi: w derbach rangi 2 wpis `rank` (faule x1,1, kartki x1,15) neutralny, faule i kartki liczy tylko wpis `derby` | `pipeline.js` wpis `rank` | `COND.derby.rankOff` | false | true | conditions |
+| Derby: każdy czynnik (a + b x v) x mnożnik ligi, v = 1-3 | `pipeline.js` `derbyTerms` | `COND.derby` foul, card, gap, dayForm, act | foul [0; 0,05], card [0; 0,07], gap [0; 0,06], dayForm [0; 0,1], act brak | foul [0,06; 0,015], card [0,12; 0,03], gap [0,02; 0,04], dayForm [0; 0,02], act [0,02; 0,01] | conditions |
+| Derby: mniej sytuacji (kanał `act`) także w meczu w tle | `quickSim.js` `expectedGoals` | `COND.derby.act` | brak | średnie goli x kanał act | balance |
+| Gra z urazem sprzed meczu | `modifiers.js` wpis `playingInjured` | `STATE.injuredPts` | 0,55 | 0,30 | state |
+| Pula psychiki (forma, morale, „na gazie”) | `modifiers.js` `statePoolTerm` | `STATE.psyche` | -0,8 / +0,7 | -0,9 / +0,6 | state |
+| Mnożnik ligi tylko na ciało i aklimatyzację (dolna granica sumy x mnożnik), psychika bez mnożnika | `modifiers.js` `statePoolTerm` | `STATE.tierPools` | 'all' (cała suma x mnożnik) | 'body' | state |
+| Stawka meczu x WAZ i opanowanie bez mnożnika ligi (psychika) | `pipeline.js` `stakesTerm` | `COND.stakes.tier` | true | false | conditions |
+| Żółte kartki pełnego silnika (za faul, inne, za faul taktyczny) | `match/core.js` (`M.yMul`) | `BAL.yellow` | 1 | 1,28 (ok. +20 % na mecz) | balance |
+| Żółte kartki w meczach w tle | `quickSim.js` `quickMatch` | `BAL.qsYellow` | 1 | 1,2 | balance |
+| Bezpośrednie czerwone w meczach w tle (razem z drugimi żółtymi z `playQuick` jak pełny silnik) | `quickSim.js` `quickMatch` | `BAL.qsRed` | 1 | 1,5 | balance |
+| Doliczony czas 2. połowy: wagi okien zmian i goli | `match/match.js` `addedTime` | `BAL.added` | base2 2,5, okna 0,4, gole 0,4 | 2,5, 0,25, 0,3 | balance |
+| Przyrost akcji w końcówce (od 55. minuty) | `match/core.js` `phaseAction` | `BAL.lateRamp` | 0,004 (`K.lateRamp`) | 0,002 | balance |
+| Stan meczu od 65. minuty i nasycenie golami | `match/core.js` `gameState`, `satAct` (`M.gs`) | `BAL.gs` | leadAct 0,85, leadD 0,3, trailAct 1,12, trailD -0,4, smax 0,40, trail 0,10 | 0,8, 0,3, 1,25, -0,2, 0,55, 0,2 | balance |
+| Średnia goli meczów w tle (sprawdzone, bez zmiany: 0,985 poprawiało polskie kluby w pucharach) | `quickSim.js` `expectedGoals` | `BAL.qsGoals` | 1 | 1 | balance |
+| Świeżość w puli ciała (oba silniki) | `modifiers.js` wpis `fresh` | `STATE.fresh.k` | 0,028 | 0,038 | state |
+| Kondycja na start meczu (pełny silnik) | `match/teams.js` `startCond` | `STATE.condStart` | 0,25 | 0,05 | state |
+| Rdza po kontuzji zamiast drugiej kary ostrości (ostrość 30 po przerwie ponad 28 dni tylko bez state) | `season.js` `injuryReturn` | `STATE.sharpReset` | true (obie kary) | false | state |
+| Rdza wygasa z czasem: co 14 dni bez meczu jeden mecz mniej (sprawdzane w poniedziałki, czyli po 14-20 dniach; przerwa letnia, program powrotu); bez state `p.rust` nie powstaje; `rustOf` przy n = 0 zwraca 0 | `season.js` `rustDecay`, `modifiers.js` `rustOf` | `STATE.rust.decayDays` | 0 (tylko z meczami) | 14 | state |
+| Spójność na start meczu w widoku Trening (85, której używa silnik) | `ui/trainingView.js` | `STATE.cohesionStart` | wzór sprzed kroku 2 | 85 przy state | state |
+| Frekwencja bez NaN w dawnym wpisie `crowd` | `pipeline.js` | brak | `c.attendance` (brak: NaN) | `c.attendance ?? 0,6` | bez (krok 1 bit w bit) |
+| Mnożnik ligi poziomu 6 | `engine2.js` | `TIER_MUL[6]` | brak (x1) | 1,2 | state, conditions |
+| `slotFit` z kontekstem pełnego silnika (jak `slotMx`) | `match/teams.js` | brak | slot bez `inMatch` | `{ pos, side, inMatch: true }` | pipeFix |
+| Wydajność: wpisy rejestru w jednym kształcie obiektu w pętlach `evaluate`, `channel`, `channelTerms` (`flatList`), wpisy stanu filtrowane wyłącznikiem przy kompilacji listy (`flag`), pamięć odległości na parę klubów, pamięć warunków meczu w tle wg klucza (sędzia, ranga, derby, frekwencja, podróż do 400 km, poziom, neutralny teren), granice stanu z rozbiciem tylko przy state, bez szukania poziomu ligi przy zerowych pulach, bez pewności z tabeli przy unify | `modifiers.js` `flatList`, `compiledFor`, `channel`, `statePoolTerm`, `conditions.js` `travelKm`, `quickSim.js` `quickFactors`, `season.js` `playQuick` | brak | liczone przy każdym meczu | w pamięci (te same liczby) | bez zmiany wyników |
+
+Bez zmian (pomiar): atut boiska przy małej frekwencji (QA: w tle +0,15, pełny +0,08 na 600 meczach). Na 5000 meczach
+pełnego silnika i 50 000 w tle różnica mieści się w 0,03 (rozdz. 7.12.3); pomiar QA był szumem.
+
+#### 7.12.2 Kalibracja lig [SYM]
+
+Ten sam skrypt i te same ziarna co w rozdz. 7.4 (6 sezonów, próbki pełnego silnika na każdym meczu ligowym). Czerwone
+w tle z gwiazdką: razem z drugimi żółtymi rozdzielanymi w `playQuick` (w rozdz. 7.4 w tle tylko bezpośrednie, stąd
+0,076; z drugimi żółtymi krok 2 dawał ok. 0,10).
+
+| Liga | Wariant | Silnik | Meczów | Gole/mecz | Gosp. : gość | Wygr. gosp. % | Remisy % | Wygr. gości % | Żółte/mecz | Czerwone/mecz | Faule/mecz | Odch. różnicy goli |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Ekstraklasa | krok 2 | pełny | 1836 | 2,84 | 1,56 : 1,28 | 43,4 | 25,1 | 31,5 | 3,35 | 0,154 | 28,0 | 1,77 |
+| Ekstraklasa | krok 2 | w tle | 1836 | 2,82 | 1,54 : 1,28 | 42,3 | 25,8 | 31,9 | 2,74 | 0,076 | - | 1,81 |
+| Ekstraklasa | po poprawkach | pełny | 1836 | 2,68 | 1,49 : 1,19 | 43,4 | 27,1 | 29,6 | 4,02 | 0,190 | 27,3 | 1,61 |
+| Ekstraklasa | po poprawkach | w tle | 1836 | 2,80 | 1,53 : 1,27 | 42,6 | 25,7 | 31,6 | 3,29 | 0,168* | - | 1,76 |
+| 1 Liga | krok 2 | pełny | 1836 | 2,78 | 1,54 : 1,24 | 44,2 | 24,6 | 31,3 | 3,26 | 0,136 | 27,9 | 1,71 |
+| 1 Liga | krok 2 | w tle | 1836 | 2,80 | 1,52 : 1,27 | 43,1 | 25,7 | 31,2 | 2,75 | 0,076 | - | 1,71 |
+| 1 Liga | po poprawkach | pełny | 1836 | 2,76 | 1,50 : 1,26 | 41,5 | 27,8 | 30,7 | 4,16 | 0,153 | 27,4 | 1,59 |
+| 1 Liga | po poprawkach | w tle | 1836 | 2,78 | 1,53 : 1,25 | 43,6 | 25,7 | 30,7 | 3,26 | 0,175* | - | 1,78 |
+| 2 Liga | krok 2 | pełny | 1836 | 2,83 | 1,59 : 1,24 | 45,0 | 24,7 | 30,2 | 3,29 | 0,131 | 27,9 | 1,75 |
+| 2 Liga | krok 2 | w tle | 1836 | 2,78 | 1,58 : 1,20 | 44,7 | 26,8 | 28,5 | 2,66 | 0,071 | - | 1,72 |
+| 2 Liga | po poprawkach | pełny | 1836 | 2,73 | 1,49 : 1,24 | 42,3 | 26,3 | 31,4 | 4,07 | 0,165 | 27,3 | 1,60 |
+| 2 Liga | po poprawkach | w tle | 1836 | 2,80 | 1,56 : 1,24 | 43,7 | 27,8 | 28,4 | 3,22 | 0,180* | - | 1,71 |
+| III liga | krok 2 | pełny | 7344 | 2,84 | 1,56 : 1,28 | 44,2 | 24,6 | 31,2 | 3,30 | 0,141 | 27,9 | 1,72 |
+| III liga | krok 2 | w tle | 7344 | 2,81 | 1,57 : 1,24 | 43,3 | 26,8 | 29,9 | 2,66 | 0,082 | - | 1,78 |
+| III liga | po poprawkach | pełny | 7344 | 2,79 | 1,52 : 1,27 | 42,8 | 26,5 | 30,6 | 4,07 | 0,155 | 27,4 | 1,61 |
+| III liga | po poprawkach | w tle | 7344 | 2,81 | 1,56 : 1,25 | 43,3 | 26,5 | 30,2 | 3,19 | 0,165* | - | 1,76 |
+
+*: w tle z drugimi żółtymi (season.js playQuick); bez gwiazdki w tle tylko bezpośrednie czerwone.
+
+| Liga | Wariant | Sezonów (tabel) | Mistrz pkt | 2. miejsce | Ostatni pkt | Odch. pkt w tabeli | Gole/mecz (sezony) |
+|---|---|---|---|---|---|---|---|
+| Ekstraklasa | krok 2 | 6 | 71,0 | 65,3 | 23,2 | 12,3 | 2,83 |
+| Ekstraklasa | po poprawkach | 6 | 71,8 | 69,0 | 22,8 | 13,1 | 2,89 |
+| 1 Liga | krok 2 | 6 | 69,5 | 61,3 | 26,7 | 11,5 | 2,77 |
+| 1 Liga | po poprawkach | 6 | 70,3 | 63,5 | 26,3 | 11,3 | 2,77 |
+| 2 Liga | krok 2 | 6 | 66,3 | 61,0 | 22,7 | 11,8 | 2,84 |
+| 2 Liga | po poprawkach | 6 | 66,0 | 62,3 | 25,5 | 11,0 | 2,83 |
+| III liga | krok 2 | 24 | 69,0 | 64,4 | 24,8 | 12,1 | 2,85 |
+| III liga | po poprawkach | 24 | 65,8 | 61,9 | 23,9 | 11,1 | 2,81 |
+
+| Wariant | Sezonów | Mecze polskich klubów w UEFA na sezon | W / R / P % | Pkt/mecz | Gole zdobyte : stracone na mecz |
+|---|---|---|---|---|---|
+| krok 2 | 6 | 51,7 | 37,7 / 23,5 / 38,7 | 1,37 | 1,41 : 1,35 |
+| po poprawkach | 6 | 52,0 | 38,8 / 19,2 / 42,0 | 1,36 | 1,41 : 1,46 |
+
+Ogon wyników (gole w meczu, % meczów):
+
+Pełny silnik:
+
+| Liga | Wariant | 0 | 1 | 2 | 3 | 4 | 5 | 6+ |
+|---|---|---|---|---|---|---|---|---|
+| Ekstraklasa | krok 2 | 6,6 | 16,7 | 22,6 | 21,4 | 16,6 | 9,1 | 7,1 |
+| Ekstraklasa | po | 7,3 | 17,3 | 26,0 | 22,1 | 13,8 | 7,3 | 6,2 |
+| III liga | krok 2 | 5,6 | 16,1 | 24,6 | 22,4 | 15,7 | 8,9 | 6,8 |
+| III liga | po | 6,2 | 16,6 | 25,0 | 21,1 | 16,2 | 8,4 | 6,5 |
+
+W tle:
+
+| Liga | Wariant | 0 | 1 | 2 | 3 | 4 | 5 | 6+ |
+|---|---|---|---|---|---|---|---|---|
+| Ekstraklasa | krok 2 | 7,2 | 14,9 | 23,0 | 22,7 | 17,0 | 8,9 | 6,3 |
+| Ekstraklasa | po | 7,8 | 15,0 | 23,5 | 22,0 | 15,7 | 9,5 | 6,5 |
+| III liga | krok 2 | 7,4 | 14,3 | 25,6 | 22,0 | 15,3 | 8,6 | 6,9 |
+| III liga | po | 7,6 | 14,8 | 24,6 | 22,1 | 15,1 | 9,0 | 6,9 |
+
+Wnioski: pełny silnik ma mniej goli (Ekstraklasa 2,84 -> 2,68; drugi przebieg z tym samym silnikiem 2,75, różnica to
+inne sezony meczów w tle; niższe ligi 2,73-2,79), mecze w tle bez zmiany średniej (2,78-2,81, `BAL.qsGoals` 1).
+Remisy w pełnym silniku 26,3-27,8 % (krok 2: 24,6-25,1), w tle 25,7-27,8 %. Żółte w pełnym silniku 4,0-4,2 na mecz
+(+20-28 %), w tle 3,2-3,3 (+20 %); czerwone w pełnym 0,15-0,19, w tle 0,17-0,18 (z drugimi żółtymi). Gospodarze w pełnym
+silniku 41,5-43,4 % (krok 2: 43,4-45,0): przegrywający częściej wyrównuje.
+Ogon: 6+ goli w Ekstraklasie (pełny silnik) 7,1 -> 6,2 % (drugi przebieg 5,6 %), 5 goli 9,1 -> 7,3 % (8,8 %); III liga
+6,8 -> 6,5 % (6,2 %). Na 5000 meczów Ekstraklasy z tymi samymi parami (skrypt `scratchpad/k2b/tail.mjs`): średnia 2,71 -> 2,63,
+6+ goli 6,0 -> 5,0 %, 5 goli 7,7 -> 7,2 %, remisy 24,3 -> 26,0 %. Mecze w tle: 6,3-6,9 % (sam model Poissona, bez zmian).
+Cel ok. 4 % nie jest osiągalny przy średniej 2,75 bez sztucznego sufitu: rozkład Poissona z tą średnią daje 6,1 %
+(rozdz. 7.12.5). Przyczyny sprawdzone [SYM] (5000 meczów Ekstraklasy, pełny silnik): mecze z czerwoną kartką nie są
+częstsze wśród meczów 6+ (11-15 % wobec 15 % wszystkich); doliczony czas 2. połowy średnio 5,8 min (do 10) z dodatnim
+sprzężeniem (każdy gol dokładał 0,4 min); przyrost akcji w końcówce; słabe rozluźnienie przy prowadzeniu 2+ (prowadzący +3
+strzelał 1,51 gola na 90 min, więcej niż przy remisie). Po poprawkach: doliczony czas 5,4 min, prowadzący +2 i +3 strzela
+1,15-1,24 gola na 90 min, przegrywający -1 1,27 (wyrównania), wyniki 5:1, 6:0, 7:x rzadsze o ok. 40 %; zostają mecze
+otwarte obu drużyn (4:2, 3:3, 4:3).
+Tabele: mistrz Ekstraklasy 71,8 pkt (krok 2 71,0). Puchary polskich klubów (mecze w tle): 1,36 pkt/mecz wobec 1,37
+w kroku 2 (bez poprawy). Średnia goli w tle x0,985 (`BAL.qsGoals`) dawała polskim klubom ćwierćfinał w 37,5 % sezonów
+zamiast 25 % (`tests/euroStrength.test.mjs`, 40 sezonów: mniej goli to więcej niespodzianek w dwumeczach), więc odrzucona.
+
+#### 7.12.3 Serie kontrolowane [SYM]
+
+Punkty na mecz drużyny A wobec bazy (ta sama seria bez zmiany), pełny silnik / w tle. Skrypty `scratchpad/k2b/series.mjs`,
+`derbycal.mjs`, `hfacal.mjs` (poza repozytorium); „krok 2” to kod commita kroku 2 na tych samych ziarnach. Błąd różnicy:
+serie stanu 1500 meczów pełnego silnika ok. +-0,05 (w tle 9000 meczów +-0,02), derby 2500 meczów +-0,04, atut boiska
+5000 meczów +-0,025.
+
+| Seria | Krok 2 (pełny / w tle) | Po poprawkach (pełny / w tle) | Cel |
+|---|---|---|---|
+| Derby 3 z rangą 2 (jak w grze), faworyt Legia z Wisłą Płock | -0,08 / -0,12 | -0,13 / -0,10 | ok. -0,10 do -0,12 |
+| Derby 3 z rangą 2, równe drużyny: faule, żółte wobec meczu rangi 0 | +21 %, +52 % | +6 %, +20 % | +6 %, +20 % |
+| Derby 2 z rangą 2, równe drużyny: faule, żółte | - | +6 %, +20 % | +6 %, +20 % |
+| Derby 3 z rangą 2, równe drużyny: remisy wobec meczu rangi 0 (pp) | -1,3 / +0,2 | +1,1 / +1,4 | nie mniej, najlepiej +2 |
+| 2 zawodników gra z urazem | -0,17 / -0,10 | -0,15 / -0,09 | mniej |
+| Dołek (morale 4, forma 5,8) | -0,18 / -0,24 | -0,20 / -0,23 | boli bardziej niż euforia pomaga |
+| Euforia (morale 19, forma 7,6) | +0,21 / +0,22 | +0,21 / +0,22 | |
+| Na gazie (3 świetne mecze) | +0,18 / +0,15 | +0,17 / +0,16 | |
+| Zmęczenie: cała kadra ze świeżością 70 (ten sam skład w obu silnikach) | -0,37 / -0,20 | -0,28 / -0,25 | pełny -0,25 do -0,30, w tle ok. -0,25 |
+| III liga: zmęczenie, świeżość 70 | -0,45 / -0,21 | -0,26 / -0,26 | |
+| III liga: dołek | -0,38 / -0,23 | -0,22 / -0,20 | psychika bez mnożnika ligi |
+| 4 zawodników po 60 dniach przerwy (ostrość 40, 1. mecz) | -0,13 / -0,13 | -0,13 / -0,12 | |
+| Zła murawa, silny z słabym (wobec dobrej murawy) | +0,05 / 0,00 | -0,02 / +0,01 | |
+| Atut boiska: frekwencja 20 %, podróż 10 km (wobec neutralnego) | +0,13 / +0,16 | +0,14 / +0,16 | różnica silników do 0,03 |
+| Atut boiska: frekwencja 60 %, podróż 300 km | +0,19 / +0,21 | +0,19 / +0,20 | |
+| Atut boiska: frekwencja 100 %, podróż 600 km | +0,24 / +0,24 | +0,24 / +0,23 | |
+
+Dołek i euforia w Ekstraklasie prawie bez zmian: w tych seriach pula psychiki mieści się w nowych granicach (-0,86, +0,6);
+granice działają przy skrajnych wartościach (morale 1-2 z formą poniżej 5, seria „na gazie” z euforią). W derbach
+pełny silnik daje mniej żółtych niż wzór (kapitan uspokaja przy stawce, mniej akcji), mecz w tle więcej (derby 2-3:
++27-33 %).
+
+#### 7.12.3a Wydajność
+
+`npm run perf -- widzew 5 2027-06-30`, 4 pary na przemian z kodem sprzed kroku 2 (12a5134), ten sam komputer: sezon razem
+średnio 14 720 ms przed i 14 987 ms po (+1,8 %; QA dla kroku 2: +7,6 %), system matchday 3001 ms przed i 3206 ms po
+(+6,8 %; krok 2: +16 %). Główne zyski: pętle rejestru na wpisach jednego kształtu (`evaluate` 0,93 -> 0,60 us na zawodnika,
+przed krokiem 2 0,43), pamięć warunków meczu w tle i odległości, rdza sprawdzana w poniedziałki. Test czasu sezonu z
+pucharami (`tests/uefa.test.mjs`, 15 s na sezon) jest na granicy także dla kodu sprzed kroku 2: pod obciążeniem `npm test`
+pada (lech 15,6-15,9 s; kod sprzed kroku 2 w tym samym układzie 13,6-15,5 s). Mecz w tle nadal ok. 10-20 % wolniejszy niż
+przed krokiem 2 (4 nowe wpisy stanu na zawodnika).
+
+#### 7.12.3b Bierna gra [SYM]
+
+Ten sam skrypt co w rozdz. 7.6 (32 kluby 2 Ligi i III ligi, ziarna 1-2, 2 sezony, bierny gracz wobec AI, punkty
+przeliczone na 34 mecze):
+
+| Liga | Runda 3 | Krok 2 | Po poprawkach |
+|---|---|---|---|
+| 2 Liga | -17,4 (błąd 2,8) | -15,1 (2,5) | -13,0 (3,0), zwolnieni 30 z 32 |
+| III liga | -22,4 (2,7) | -23,6 (2,1) | -17,0 (2,5), zwolnieni 26 z 28 |
+
+Bierny gracz traci mniej, w III lidze o 6,6 pkt (ok. 2 błędy różnicy): psychika bez mnożnika ligi (dołek drużyny biernego
+gracza kosztuje w III lidze x1,00 zamiast x1,15) i węższa pula psychiki od góry. Cel rundy 3 (ok. 20 pkt słabiej niż AI) jest
+teraz na granicy: do decyzji właściciela (np. `STATE.tierPools` 'all' przywraca mnożnik także psychice albo
+wzmocnienie biernej gry w `PASSIVE`). Pierwszy przebieg z `BAL.qsGoals` 0,985: -16,1 i -17,6.
+
+#### 7.12.4 Jak cofnąć poprawki po QA
+
+1. Całość: w `src/engine/engine2.js` `ENGINE2.balance = false` i wartości „krok 2” z komentarzy przy `STATE` (psyche,
+   tierPools, fresh.k, condStart, rust.decayDays, sharpReset, injuredPts), `COND.derby`, `COND.stakes.tier`, `TIER_MUL[6]`
+   (usunąć). Gra liczy wtedy jak w kroku 2 (poza poprawkami technicznymi bez wpływu na wynik).
+2. Pojedyncza poprawka: jedna stała z tabeli 7.12.1 na wartość z kolumny „krok 2”; `ENGINE2.balance = false` cofa
+   wszystkie stałe `BAL` naraz.
+3. Kod: `git revert` commita „... poprawki po kontroli jakości ...” (v1.25.1 Beta), potem `npm run sw`. Pliki:
+   `src/engine/engine2.js`, `src/engine/pipeline.js`, `src/engine/modifiers.js`, `src/engine/quickSim.js`,
+   `src/engine/match/core.js`, `src/engine/match/match.js`, `src/engine/match/teams.js`, `src/season/season.js`,
+   `src/season/conditions.js`, `src/ui/trainingView.js`, testy `tests/engine2.test.mjs`, `tests/matchEngine.test.mjs`,
+   `tests/modifiers.test.mjs`, `tests/playerInstr.test.mjs`, `tests/strzalki.test.mjs` (komentarz), złote skróty kroku 2
+   `tests/enginePipeline.golden.json`, `docs/`, `sw.js`.
+
+#### 7.12.5 Ryzyka i sprawy otwarte
+
+- Ogon wyników: 5,6-6,2 % meczów 6+ w Ekstraklasie (cel ok. 4 %). Dalsze obniżenie bez sztucznego sufitu wymaga decyzji
+  właściciela: niższa średnia goli (ok. 2,5) albo nowy mechanizm (np. drużyny uspokajają grę po 4+ golach w meczu)
+  [SZAC]. Mecze w tle mają ogon z samego modelu Poissona (6,3-6,9 %), bez nasycenia golami.
+- Żółte w tle 3,2-3,3 na mecz (+20 % jak w zatwierdzeniu), w pełnym silniku 4,0-4,2: do 4 w tle potrzebne `BAL.qsYellow`
+  ok. 1,5 (decyzja właściciela). W derbach mecz w tle daje więcej żółtych (+27-33 %) niż pełny silnik (+15-19 %),
+  bo nie ma w nim spokoju kapitana i mniejszej liczby akcji.
+- Gospodarze w pełnym silniku 41,5-43,4 % (krok 2: 43,4-45,0): przegrywający częściej wyrównuje. Cel 43-46 % na dolnej granicy albo tuż pod nią.
+- Remisy w pełnym silniku 26,3-27,8 % (cel 26-27 %; drugi przebieg w 1 Lidze 28,3 %).
+- Odchylenie różnicy goli w pełnym silniku 1,59-1,61 (krok 2 1,71-1,77), w tle 1,71-1,78: mniej wysokich zwycięstw w meczu gracza niż w tle.
+- Test strzałek `OP:fo` i `OP:o` (`tests/strzalki.test.mjs`) nadal zwolniony; wraca do sprawdzenia w kroku 3.
+- Bierna gra (rozdz. 7.12.3b): bierny gracz traci w III lidze 17 zamiast ok. 22-24 pkt na sezon.

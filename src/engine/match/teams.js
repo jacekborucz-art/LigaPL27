@@ -349,6 +349,10 @@ export function updateCondition(T, M) {
 /** Zawodnicy na boisku łącznie z opatrywanymi (bez wykluczonych i zmienionych). */
 export const fieldPlayers = (T) => T.players.filter((x) => x.on && !x.sentOff);
 
+// Kontekst etapu slot w meczu (inMatch, jak pipeline.js slotMx): jeden obiekt, wypełniany przed każdym odczytem
+const FIT_C = { pos: null, side: null, prof: undefined, inMatch: true };
+const fitCtx = (slot) => { FIT_C.pos = slot.pos; FIT_C.side = slot.side; return FIT_C; };
+
 /** Dopasowanie zawodnika do slotu: biegłość na pozycji razy jego siła w strefach tej roli. */
 export function slotFit(x, slot) {
   if (slot.pos === 'BR') return x.p.pos === 'BR' ? x.R.GK : 0.6 * x.R.GK;
@@ -358,7 +362,8 @@ export function slotFit(x, slot) {
   if (v !== v) { // NaN: jeszcze nie liczone
     const sh = ROLE_SHARE[slot.pos] ?? ROLE_SHARE.ŚP;
     const z = (sh.DEF * x.R.DEF + sh.MID * x.R.MID + sh.ATT * x.R.ATT) / (sh.DEF + sh.MID + sh.ATT);
-    v = fit[key] = slotEff(x.p, slot) * z; // skuteczność na slocie: etap slot (pipeline.js)
+    // skuteczność na slocie: etap slot (pipeline.js); krok 2 (pipeFix): ten sam kontekst pełnego silnika co slotMx
+    v = fit[key] = slotEff(x.p, ENGINE2.pipeFix ? fitCtx(slot) : slot) * z;
   }
   return v;
 }

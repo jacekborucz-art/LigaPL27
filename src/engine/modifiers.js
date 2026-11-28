@@ -108,14 +108,20 @@ export function getModifier(stage, id) {
  * po złożeniu (suma od 0 albo iloczyn od 1, w kolejności wpisów). chParts[id][kanał]: wkład wpisu w kanały inne
  * niż pts (wpis zwracający obiekt: także pts). Suma parts = total; złożenie chParts = ch.
  */
+// Skompilowana lista w jednym kształcie obiektu { id, apply, enabled, channel } (wydajność: wpisy rejestru mają różne
+// pola, więc odczyt m.apply i m.enabled w pętli był wolny); liczona raz na listę, nowa po każdej zmianie rejestru
+const flatList = (list) => (list.flat1 ??= list.map((m) => ({ id: m.id, apply: m.apply, enabled: m.enabled ?? null, channel: m.channel })));
+
 export function evaluate(stage, subject, ctx = {}) {
   let total = 0;
   const parts = {};
   let out = null; // { ch, chParts } dopiero przy pierwszym kanale innym niż pts
+  // Wpisy w jednym kształcie obiektu (wydajność: wpisy rejestru mają różne pola, odczyt pól w pętli był wolny)
   const list = compiledFor(stage, '*', ctx.inMatch);
-  for (let i = 0; i < list.length; i++) {
-    const m = list[i];
-    if (m.enabled && !m.enabled(ctx)) continue;
+  const L = flatList(list);
+  for (let i = 0; i < L.length; i++) {
+    const m = L[i];
+    if (m.enabled !== null && !m.enabled(ctx)) continue;
     const r = m.apply(subject, ctx, parts); // parts: wkłady wcześniejszych wpisów (granice pul stanu, krok 2)
     if (typeof r !== 'object' || r === null) {
       const v = Number(r) || 0;
@@ -157,7 +163,9 @@ function compiledFor(stage, ch, inMatch) {
   const byCh = (compiled[stage] ??= { match: {}, quick: {} })[mode];
   let list = byCh[ch];
   if (!list) {
-    list = byCh[ch] = registry[stage].filter((m) => !m.off && (!m.mode || m.mode === mode) && (ch === '*' || m.channels.includes(ch)));
+    // flag: wpis działa tylko przy wyłączniku ENGINE2 (filtr przy kompilacji listy, bez wywołania enabled w każdym meczu;
+    // setEngine2 unieważnia listy)
+    list = byCh[ch] = registry[stage].filter((m) => !m.off && (!m.mode || m.mode === mode) && (!m.flag || ENGINE2[m.flag]) && (ch === '*' || m.channels.includes(ch)));
     list.prod = channelKind(ch) === 'prod';
     list.needsParts = list.some((m) => m.needsParts); // wpis granic (krok 2) czyta wkłady wcześniejszych wpisów
   }
@@ -170,12 +178,13 @@ function compiledFor(stage, ch, inMatch) {
  */
 export function channel(stage, ch, subject, ctx = EMPTY) {
   const list = compiledFor(stage, ch, ctx.inMatch);
-  if (list.needsParts && ch === 'pts') return evaluate(stage, subject, ctx).total;
+  if (list.needsParts && ch === 'pts' && ENGINE2.state) return evaluate(stage, subject, ctx).total; // granice stanu tylko przy state
   const prod = list.prod;
   let acc = prod ? 1 : 0;
-  for (let i = 0; i < list.length; i++) {
-    const m = list[i];
-    if (m.enabled && !m.enabled(ctx)) continue;
+  const L = flatList(list);
+  for (let i = 0; i < L.length; i++) {
+    const m = L[i];
+    if (m.enabled !== null && !m.enabled(ctx)) continue;
     const r = m.apply(subject, ctx);
     const v = r !== null && typeof r === 'object' ? Number(r[ch]) : Number(r);
     if (prod) acc *= Number.isNaN(v) ? 1 : v; else acc += v || 0;
@@ -190,14 +199,15 @@ export function channel(stage, ch, subject, ctx = EMPTY) {
 export function channelTerms(stage, ch, subject, ctx, out, ids = null) {
   const list = compiledFor(stage, ch, ctx.inMatch);
   let n = 0;
-  if (list.needsParts && ch === 'pts') {
+  if (list.needsParts && ch === 'pts' && ENGINE2.state) {
     const { parts } = evaluate(stage, subject, ctx);
     for (const id in parts) { out[n] = parts[id]; if (ids) ids[n] = id; n++; }
     return n;
   }
-  for (let i = 0; i < list.length; i++) {
-    const m = list[i];
-    if (m.enabled && !m.enabled(ctx)) continue;
+  const L = flatList(list);
+  for (let i = 0; i < L.length; i++) {
+    const m = L[i];
+    if (m.enabled !== null && !m.enabled(ctx)) continue;
     const r = m.apply(subject, ctx);
     out[n] = (r !== null && typeof r === 'object' ? Number(r[ch]) : Number(r)) || 0;
     if (ids) ids[n] = m.id;
@@ -260,33 +270,43 @@ export function onFireOf(p) {
 /** Powrót po kontuzji (p.rust z dziennej regeneracji: { days, n, left }): kara maleje z każdym rozegranym meczem. */
 export function rustOf(p) {
   const r = p.rust;
-  if (!r || !(r.left > 0)) return 0;
+  if (!r || !(r.left > 0) || !(r.n > 0)) return 0;
   const R = STATE.rust;
   return -Math.min(R.max, R.base + R.perDay * r.days) * (r.left / r.n);
 }
 registerModifier({
   id: 'onFire', stage: 'player', group: 'psyche', label: 'Na gazie (seria dobrych meczów)', range: [0, 0.35],
-  enabled: () => ENGINE2.state, apply: (p) => onFireOf(p),
+  flag: 'state', apply: (p) => onFireOf(p),
 });
 registerModifier({
   id: 'rust', stage: 'player', group: 'body', label: 'Powrót po kontuzji', range: [-0.8, 0],
-  enabled: () => ENGINE2.state, apply: (p) => rustOf(p),
+  flag: 'state', apply: (p) => rustOf(p),
 });
 
 /** Wpisy pul stanu zawodnika (granice STATE w engine2.js). */
+// Te same identyfikatory rozpisane w statePoolTerm (zmiana listy: także tam)
 export const STATE_POOLS = { psyche: ['form', 'morale', 'onFire'], body: ['sharp', 'fresh', 'rust'], acclim: ['acclim'] };
-const poolSum = (parts, ids) => { let s = 0; for (const id of ids) s += parts[id] ?? 0; return s; };
 /**
- * Granice stanu: psychika +0,7 / -0,8, ciało 0 / -1,5, aklimatyzacja 0 / -0,6, suma +1,0 / -2,0, potem mnożnik
- * niższych lig (x1,00 ... x1,20). Wynik: poprawka do sumy wpisów pul (rozbicie pokazuje wkłady i tę poprawkę osobno).
+ * Granice stanu: psychika +0,6 / -0,9, ciało 0 / -1,5, aklimatyzacja 0 / -0,6, suma +1,0 / -2,0. Mnożnik niższych lig
+ * (x1,00 ... x1,20) tylko na ciało i aklimatyzację (STATE.tierPools 'body'; dolna granica sumy też x mnożnik), krok 2:
+ * cała suma x mnożnik ('all'). Wynik: poprawka do sumy wpisów pul (rozbicie pokazuje wkłady i tę poprawkę osobno).
  */
 export function statePoolTerm(p, ctx, parts) {
   if (!parts) return 0;
-  const ps = poolSum(parts, STATE_POOLS.psyche); const bo = poolSum(parts, STATE_POOLS.body); const ac = poolSum(parts, STATE_POOLS.acclim);
-  const t = clamp(clamp(ps, ...STATE.psyche) + clamp(bo, ...STATE.body) + clamp(ac, ...STATE.acclim), ...STATE.total) * tierMul(tierOf(ctx, p));
+  // Sumy pul jak poolSum(parts, STATE_POOLS.*), rozpisane (wydajność: wpis liczony dla każdego zawodnika w każdym meczu)
+  const ps = (parts.form ?? 0) + (parts.morale ?? 0) + (parts.onFire ?? 0);
+  const bo = (parts.sharp ?? 0) + (parts.fresh ?? 0) + (parts.rust ?? 0);
+  const ac = parts.acclim ?? 0;
+  if (!ps && !bo && !ac) return 0; // bez wkładów: bez szukania poziomu ligi (wydajność)
+  const ps1 = clamp(ps, ...STATE.psyche); const ba = clamp(bo, ...STATE.body) + clamp(ac, ...STATE.acclim);
+  // Ciało i aklimatyzacja nie są dodatnie: bez nich mnożnik ligi nie jest potrzebny
+  const m = STATE.tierPools === 'all' || ba ? tierMul(tierOf(ctx, p)) : 1;
+  const t = STATE.tierPools === 'all'
+    ? clamp(ps1 + ba, ...STATE.total) * m
+    : clamp(ps1 + ba * m, STATE.total[0] * m, STATE.total[1]);
   return t - (ps + bo + ac);
 }
 registerModifier({
   id: 'statePool', stage: 'player', group: 'limits', label: 'Granice stanu i poziom ligi', range: [-0.6, 2.4], order: 89, needsParts: true,
-  enabled: () => ENGINE2.state, apply: (p, ctx, parts) => statePoolTerm(p, ctx, parts),
+  flag: 'state', apply: (p, ctx, parts) => statePoolTerm(p, ctx, parts),
 });

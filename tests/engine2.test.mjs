@@ -3,12 +3,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { ENGINE2, setEngine2, STATE, COND, TIER_MUL } from '../src/engine/engine2.js';
+import { ENGINE2, ENGINE2_OFF, setEngine2, STATE, COND, TIER_MUL, BAL } from '../src/engine/engine2.js';
 import { evaluate, registerModifier, unregisterModifier, setModifierEnabled, onFireOf, rustOf, STATE_POOLS } from '../src/engine/modifiers.js';
 import { matchFactors, attrZones, terrainHfa, ledgerSummary } from '../src/engine/pipeline.js';
 import { createMatch, runToEnd, step } from '../src/engine/match/match.js';
 import { expectedGoals, quickMatch, QS } from '../src/engine/quickSim.js';
 import { tablePressure, travelKm, quickFill } from '../src/season/conditions.js';
+import { injuryReturn, rustDecay } from '../src/season/season.js';
+import { stakesTerm, derbyTerms } from '../src/engine/pipeline.js';
+import { teamRating } from '../src/engine/teamStrength.js';
 import { generateWorld, squadOf } from '../src/world/worldGen.js';
 import { createTactics } from '../src/engine/lineup.js';
 import { clubById } from '../src/data/clubs_pl.js';
@@ -17,8 +20,8 @@ import { goldenMatch, matchDigest, ratingDigests, quickDigests, seasonDigest, h3
 import '../src/training/index.js';
 import '../src/career/acclimatization.js';
 
-const ALL = { pipeFix: true, state: true, conditions: true, unify: true };
-const OFF = { pipeFix: false, state: false, conditions: false, unify: false };
+const ALL = { pipeFix: true, state: true, conditions: true, unify: true, balance: true };
+const OFF = { ...ENGINE2_OFF };
 function withFlags(flags, fn) {
   const keep = { ...ENGINE2 };
   setEngine2(flags);
@@ -49,7 +52,7 @@ test('Wszystkie wyłączniki false: złote skróty kroku 1 bit w bit (mecze, si�
   });
 });
 
-test('Stan zawodnika: pule psychiki, ciała, aklimatyzacji i suma mają granice (x mnożnik ligi)', () => {
+test('Stan zawodnika: pule psychiki, ciała, aklimatyzacji i suma mają granice (mnożnik ligi tylko na ciało i aklimatyzację)', () => {
   const rng = new Rng('granice');
   for (let i = 0; i < 400; i++) {
     const tier = 1 + (i % 5);
@@ -64,15 +67,22 @@ test('Stan zawodnika: pule psychiki, ciała, aklimatyzacji i suma mają granice 
       const raw = poolOf(r, [...STATE_POOLS.psyche, ...STATE_POOLS.body, ...STATE_POOLS.acclim]);
       const eff = raw + (r.parts.statePool ?? 0);
       const m = TIER_MUL[tier];
-      assert.ok(eff <= STATE.total[1] * m + 1e-9 && eff >= STATE.total[0] * m - 1e-9, `suma ${eff} (liga ${tier})`);
+      assert.ok(eff <= STATE.total[1] + 1e-9 && eff >= STATE.total[0] * m - 1e-9, `suma ${eff} (liga ${tier})`);
       assert.ok(r.parts.statePool !== undefined);
     }
   }
-  // Psychika: forma, morale i „na gazie” razem najwyżej +0,7 (Ekstraklasa)
+  // Psychika: forma, morale i „na gazie” razem najwyżej +0,6 (po QA; krok 2: +0,7), w każdej lidze bez mnożnika
   const hot = pl({ morale: 20, form: [9, 9, 9, 9, 9], fh: Array.from({ length: 10 }, (_, k) => [k >= 5 ? 9 : 6, 'd']) });
   const r = evaluate('player', hot, { tier: 1 });
   assert.ok(poolOf(r, STATE_POOLS.psyche) > 1, 'surowe wkłady psychiki ponad granicą');
-  assert.ok(Math.abs(poolOf(r, STATE_POOLS.psyche) + r.parts.statePool - 0.7) < 1e-9);
+  assert.ok(Math.abs(poolOf(r, STATE_POOLS.psyche) + r.parts.statePool - STATE.psyche[1]) < 1e-9);
+  const r4 = evaluate('player', hot, { tier: 4 });
+  assert.ok(Math.abs(poolOf(r4, STATE_POOLS.psyche) + r4.parts.statePool - STATE.psyche[1]) < 1e-9, 'psychika bez mnożnika ligi');
+  // Dołek (forma -0,5, morale -0,36): -0,86, poniżej granicy kroku 2 (-0,8), w IV lidze bez mnożnika
+  const low = pl({ morale: 1, form: [4, 4, 4, 4, 4] });
+  const l4 = evaluate('player', low, { tier: 5 });
+  const lowRaw = poolOf(l4, STATE_POOLS.psyche);
+  assert.ok(lowRaw < -0.8 && Math.abs(lowRaw + l4.parts.statePool - Math.max(lowRaw, STATE.psyche[0])) < 1e-9, 'dołek bez mnożnika ligi');
   // Ciało: bez ostrości, zmęczony i po długiej kontuzji najwyżej -1,5 (poza meczem)
   const sore = pl({ morale: 10, sharp: 30, fresh: 40, rust: { days: 90, n: 4, left: 4 } });
   const s = evaluate('player', sore, { tier: 1 });
@@ -166,8 +176,11 @@ test('Mecze w tle (unify): przy typowej wartości terenu te same średnie goli c
   const H = { zones: { ATT: 13, MID: 12, DEF: 12, GK: 12, FIN: 12 }, gkMods: { goalMul: 1 } };
   const A = { zones: { ATT: 11, MID: 11, DEF: 11, GK: 11, FIN: 11 }, gkMods: { goalMul: 1 } };
   const old = withFlags(OFF, () => expectedGoals(H, A, {}));
-  const ref = expectedGoals(H, A, { mx: { hfa: QS.HFA_REF, gap: 1, pen: 1 } });
+  const ref = withFlags({ balance: false }, () => expectedGoals(H, A, { mx: { hfa: QS.HFA_REF, gap: 1, pen: 1 } }));
   assert.ok(Math.abs(old.lH - ref.lH) < 1e-9 && Math.abs(old.lA - ref.lA) < 1e-9);
+  // balance: średnia goli meczu w tle x BAL.qsGoals (za pełnym silnikiem), derby x kanał act
+  const bal = expectedGoals(H, A, { mx: { hfa: QS.HFA_REF, gap: 1, pen: 1 } });
+  assert.ok(Math.abs(bal.lH - ref.lH * BAL.qsGoals) < 1e-9);
   const derby = expectedGoals(H, A, { mx: { hfa: QS.HFA_REF, gap: 0.82, pen: 1 } });
   assert.ok(derby.lH / derby.lA < ref.lH / ref.lA);
   const noFans = expectedGoals(H, A, { mx: { hfa: 0.6, gap: 1, pen: 1 } });
@@ -182,4 +195,84 @@ test('Mecze w tle (unify): przy typowej wartości terenu te same średnie goli c
   assert.ok(y2 > y0 * 1.1, `${y0} ${y2}`);
   assert.deepEqual(Object.keys(ALL), Object.keys(ENGINE2));
   assert.ok(COND.hfa.base > 0);
+});
+
+test('Poprawki po QA: stawka meczu x WAZ i opanowanie (presja, granica +-0,4, mnożnik ligi), bez pewności z tabeli przy unify', () => {
+  const p = (waz, opa) => pl({ hidden: { WAZ: waz }, attr: { OPA: opa } });
+  const C = COND.stakes;
+  // Presja tabeli 0,5 bez rangi: połowa stawki; ranga 2: pełna; bez stawki: 0
+  const full = stakesTerm(p(15, 14), { rank: 2, tier: 1 });
+  assert.ok(Math.abs(full - (C.waz * 5 + C.opa * 4)) < 1e-12, `pełna stawka ${full}`);
+  assert.ok(Math.abs(stakesTerm(p(15, 14), { rank: 0, pressure: 0.5, tier: 1 }) - full / 2) < 1e-12, 'presja 0,5');
+  assert.equal(stakesTerm(p(15, 14), { rank: 0, pressure: 0, tier: 1 }), 0);
+  // Granica +-0,4 przy skrajnych cechach
+  assert.equal(stakesTerm(p(20, 20), { rank: 2, tier: 1 }), C.cap);
+  assert.equal(stakesTerm(p(1, 1), { rank: 3, tier: 1 }), -C.cap);
+  // Mnożnik ligi: po QA psychika bez mnożnika (COND.stakes.tier false); krok 2: x mnożnik
+  assert.equal(stakesTerm(p(15, 14), { rank: 2, tier: 4 }), full);
+  C.tier = true;
+  try { assert.ok(Math.abs(stakesTerm(p(15, 14), { rank: 2, tier: 4 }) - full * TIER_MUL[4]) < 1e-12); } finally { C.tier = false; }
+  // Krok 1 (conditions false): tylko ranga 2+ x 0,04 x (WAZ - 10)
+  withFlags({ conditions: false }, () => {
+    assert.ok(Math.abs(stakesTerm(p(15, 14), { rank: 2 }) - 0.2) < 1e-12);
+    assert.equal(stakesTerm(p(15, 14), { rank: 0, pressure: 1 }), 0);
+  });
+  // Pewność siebie z tabeli: przy unify wyłączona (liczy ją pula psychiki), bez unify jak w kroku 1
+  const sq = squadOf(world, 'lech');
+  const withT = (on) => withFlags({ unify: on }, () => teamRating(sq, { tableTerm: 0.15 }).breakdown.table);
+  assert.equal(withT(true), 0);
+  assert.equal(withT(false), 0.15);
+});
+
+test('Poprawki po QA: rdza zamiast drugiej kary ostrości, wygasa z meczami i z czasem, nie powstaje bez state', () => {
+  const back = (days) => pl({ injury: { name: 'uraz', days }, injuryDays: 0, sharp: 55 });
+  // state: rdza bez ostrości 30
+  const a = back(40); injuryReturn(a, '2026-09-01');
+  assert.deepEqual(a.rust, { days: 40, n: 3, left: 3, at: '2026-09-01' });
+  assert.equal(a.sharp, 55, 'bez ostrości 30 przy state');
+  // state false: jak krok 1 (ostrość 30, bez rdzy)
+  const b = back(40);
+  withFlags({ state: false }, () => injuryReturn(b, '2026-09-01'));
+  assert.equal(b.rust, undefined); assert.equal(b.sharp, 30);
+  // Krótka przerwa: bez rdzy
+  const c = back(7); injuryReturn(c, '2026-09-01'); assert.equal(c.rust, undefined);
+  // Wygasanie z czasem: co STATE.rust.decayDays dni bez meczu jeden mecz mniej, potem koniec
+  const d = STATE.rust.decayDays;
+  const add = (iso, n) => new Date(Date.parse(iso) + n * 864e5).toISOString().slice(0, 10);
+  rustDecay(a, add('2026-09-01', d - 1)); assert.equal(a.rust.left, 3, 'przed terminem bez zmian');
+  rustDecay(a, add('2026-09-01', d)); assert.equal(a.rust.left, 2);
+  rustDecay(a, add('2026-09-01', 2 * d)); assert.equal(a.rust.left, 1);
+  rustDecay(a, add('2026-09-01', 3 * d)); assert.equal(a.rust, undefined, 'po ostatnim terminie rdza znika');
+  // Przerwa letnia (60 dni bez meczu): po 4 terminach nie zostaje nic
+  const e = back(90); injuryReturn(e, '2026-06-01');
+  for (let k = 1; k <= 60; k++) if (e.rust) rustDecay(e, add('2026-06-01', k));
+  assert.equal(e.rust, undefined);
+  // Zapis bez daty (sprzed poprawki): liczenie od dziś
+  const f = pl({ rust: { days: 30, n: 3, left: 2 } }); rustDecay(f, '2026-10-01'); assert.equal(f.rust.at, '2026-10-01');
+  // rustOf: n = 0 albo brak n bez kary (bez NaN)
+  assert.equal(rustOf(pl({ rust: { days: 60, n: 0, left: 2 } })), 0);
+  assert.equal(rustOf(pl({ rust: { days: 60, left: 2 } })), 0);
+});
+
+test('Poprawki po QA: derby bez podwójnej rangi, mnożnik ligi poziomu 6, frekwencja bez NaN, balance', () => {
+  const base = { neutral: false, refStrict: 1, attendance: 0.6, weather: {}, tier: 1 };
+  // Derby rangi 2: wpis rank neutralny (ranga wynika z derbów), faule i kartki tylko z wpisu derby
+  const d2 = matchFactors({ ...base, rank: 2, derby: 2 });
+  assert.deepEqual(d2.parts.rank, { foul: 1, card: 1 });
+  const t = derbyTerms({ derby: 2, tier: 1 });
+  assert.ok(Math.abs(d2.foul - t.foul) < 1e-12 && Math.abs(d2.card - t.card) < 1e-12);
+  assert.ok(t.act < 1 && t.gap < 1 && t.foul > 1 && t.card > t.foul);
+  // Ranga 2 bez derbów: jak dotąd
+  assert.deepEqual(matchFactors({ ...base, rank: 2 }).parts.rank, { foul: 1.1, card: 1.15 });
+  COND.derby.rankOff = false;
+  try { setEngine2({}); assert.deepEqual(matchFactors({ ...base, rank: 2, derby: 2 }).parts.rank, { foul: 1.1, card: 1.15 }); } finally { COND.derby.rankOff = true; setEngine2({}); }
+  assert.equal(TIER_MUL[6], 1.2);
+  withFlags({ conditions: false }, () => {
+    const mx = matchFactors({ neutral: false, refStrict: 1, rank: 0, weather: {} });
+    assert.ok(Number.isFinite(mx.hfa) && Math.abs(mx.hfa - (0.7 + 0.3 * 0.6)) < 1e-12, 'brak frekwencji: 0,6');
+  });
+  // balance: mnożniki pełnego silnika tylko przy wyłączniku
+  const mk = () => createMatch({ seed: 'bal', home: side('lech', 'h'), away: side('legia', 'a'), ctx: { refStrict: 1, attendance: 0.6 } });
+  assert.equal(mk().yMul, BAL.yellow);
+  withFlags({ balance: false }, () => { const M = mk(); assert.equal(M.yMul, 1); assert.equal(M.gs.smax, 0.4); });
 });

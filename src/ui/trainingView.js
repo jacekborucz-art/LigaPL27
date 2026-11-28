@@ -35,6 +35,7 @@ import { daysBetween } from '../training/state.js';
 import { REPORT_FREQS, ensureAssistantReport, setReportFreq, nextReportDate } from '../career/assistantReport.js';
 import { detectChance, shiftChance, delaySd } from '../career/weeklyTodo.js'; // kierownik drużyny: dokładność listy „Do zrobienia”
 import { renderStaff } from './staffView.js'; // Sztab: Mój sztab, Rynek sztabu, Oferty w toku (docs/sztab.md)
+import { ENGINE2, STATE } from '../engine/engine2.js'; // spójność na start meczu (krok 2 Walki taktyk)
 
 const WD = ['Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'So', 'Nd'];
 const TABS = [['pulpit', 'Pulpit'], ['tydzien', 'Tydzień'], ['obozy', 'Obozy'], ['sparingi', 'Sparingi'], ['zawodnicy', 'Zawodnicy'], ['obciazenia', 'Obciążenia'], ['sztab', 'Sztab'], ['rozwoj', 'Rozwój']];
@@ -635,7 +636,7 @@ function devTab(game, ui) {
         <div><dt>Instrukcje</dt><dd>${Math.round(coh.parts?.instr ?? 0)} / 100</dd></div>
         <div><dt>Znajomość systemu (jedenastka)</dt><dd>${Math.round(coh.parts?.know ?? 0)} / 100</dd></div>
         <div><dt>Rytm (stały skład)</dt><dd>${Math.round(coh.parts?.rhythm ?? 0)} / 100</dd></div>
-        <div><dt>Wpływ w meczu</dt><dd>${signed(coh.term ?? 0, 2)} pkt, spójność na start ${coh.sStart}</dd></div>
+        <div><dt>Wpływ w meczu</dt><dd>${signed(coh.term ?? 0, 2)} pkt, spójność na start ${ENGINE2.state ? STATE.cohesionStart : coh.sStart}</dd></div>
         <div><dt>Stałe fragmenty</dt><dd>${Math.round(c.sp)} / 100</dd></div>
         <div><dt>Analiza rywala</dt><dd>${c.prep && c.prep.date >= game.date ? `+${num(c.prep.v, 3)} pkt na mecz ${esc(fmtDate(c.prep.date))}` : 'brak'}</dd></div>
       </dl>

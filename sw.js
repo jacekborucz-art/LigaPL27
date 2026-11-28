@@ -2,7 +2,7 @@
 // Gra bierze pliki z pamięci urządzenia; serwer pyta tylko o sw.js (przeglądarka robi to sama przy otwarciu gry).
 // Nowa wersja: instalacja kopiuje niezmienione pliki ze starej pamięci, a z sieci pobiera tylko zmienione.
 // Strona po przejęciu przez nowy service worker przeładowuje się na ekranie startowym (src/app.js).
-const VERSION = 'v0.3-2f5fadd07d';
+const VERSION = 'v0.3-ef22c3f1fe';
 const CACHE = `manager-${VERSION}`;
 
 const FILES = [
@@ -301,22 +301,22 @@ const FILES = [
   ['./src/data/reprezentacje_swiat.json', '29c3c96adf'],
   ['./src/data/voivodeships.js', '81a698b873'],
   ['./src/engine/captain.js', '095508acb1'],
-  ['./src/engine/engine2.js', '65b794f162'],
+  ['./src/engine/engine2.js', '97efd6cbf7'],
   ['./src/engine/lineup.js', 'a49c69eeee'],
   ['./src/engine/match/coach.js', '194df3bbb1'],
   ['./src/engine/match/constants.js', '3fbe50a056'],
   ['./src/engine/match/control.js', 'cfc35b73b8'],
-  ['./src/engine/match/core.js', '4b062d9659'],
+  ['./src/engine/match/core.js', 'f09cd24cae'],
   ['./src/engine/match/factors.js', '79e52f133f'],
-  ['./src/engine/match/match.js', 'd1ed756f73'],
+  ['./src/engine/match/match.js', 'a3866e4f10'],
   ['./src/engine/match/playerInstr.js', '98cd40e95e'],
   ['./src/engine/match/rules.js', 'd5cc299ded'],
-  ['./src/engine/match/teams.js', 'db790d8460'],
+  ['./src/engine/match/teams.js', '2807599a3d'],
   ['./src/engine/matchStats.js', '71542c9b3b'],
-  ['./src/engine/modifiers.js', 'ad633b026a'],
-  ['./src/engine/pipeline.js', 'fd91f85f5c'],
+  ['./src/engine/modifiers.js', 'dc534b14d6'],
+  ['./src/engine/pipeline.js', 'a7d2f279cb'],
   ['./src/engine/positions.js', 'ee736ff7cc'],
-  ['./src/engine/quickSim.js', '57884c1527'],
+  ['./src/engine/quickSim.js', 'd7b0c0e9c5'],
   ['./src/engine/teamStrength.js', 'b11b894aa4'],
   ['./src/match/aiPlan.js', '2f958da775'],
   ['./src/match/briefings.js', '846691a006'],
@@ -324,7 +324,7 @@ const FILES = [
   ['./src/match/press.js', 'd373887c96'],
   ['./src/match/pressSystem.js', 'f08d4d2743'],
   ['./src/match/studio.js', 'b60a585197'],
-  ['./src/season/conditions.js', '147fe15c3c'],
+  ['./src/season/conditions.js', '8e73f3e002'],
   ['./src/season/cup.js', '830ec558a6'],
   ['./src/season/dailySystems.js', '612e5d4ef7'],
   ['./src/season/europe.js', 'fb7489f63d'],
@@ -343,7 +343,7 @@ const FILES = [
   ['./src/season/nationalSystem.js', '56b1056ddd'],
   ['./src/season/rollover.js', '1ac8f08706'],
   ['./src/season/schedule.js', 'a608f6730f'],
-  ['./src/season/season.js', '96ecd41024'],
+  ['./src/season/season.js', '045ec98abb'],
   ['./src/season/standings.js', '793971fcf3'],
   ['./src/season/superCupEU.js', 'f728d6d300'],
   ['./src/season/suspension.js', '7671748aa6'],
@@ -439,7 +439,7 @@ const FILES = [
   ['./src/ui/talksView.js', '4a00b34822'],
   ['./src/ui/teamReportView.js', 'c01abc57b6'],
   ['./src/ui/todoView.js', 'bd4d7aa1c4'],
-  ['./src/ui/trainingView.js', '07712373df'],
+  ['./src/ui/trainingView.js', '93004b4282'],
   ['./src/ui/transferDealsView.js', '7aadd7cfb8'],
   ['./src/ui/transfersView.js', '095c172472'],
   ['./src/world/ephemeral.js', '216b6bcdd9'],

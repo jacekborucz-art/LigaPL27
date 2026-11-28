@@ -20,7 +20,7 @@ import { ENGINE2, setEngine2 } from '../src/engine/engine2.js';
 /** Fragment testu z liczbami kroku 1 (wyłączniki kroku 2 na false), potem przywrócenie wyłączników. */
 function step1(fn) {
   const keep = { ...ENGINE2 };
-  setEngine2({ pipeFix: false, state: false, conditions: false, unify: false });
+  setEngine2({ pipeFix: false, state: false, conditions: false, unify: false, balance: false });
   try { return fn(); } finally { setEngine2(keep); }
 }
 

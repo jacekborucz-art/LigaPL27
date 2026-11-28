@@ -7,7 +7,7 @@ import { K, SHOOT_W, FOUL_W, INJURY_TYPES, RED_REASONS, KNOCK, FATIGUE, SAT } fr
 import { buildTeam, updateZones, updateCondition, onPitch, goalkeeper, fieldPlayers, slotFit, makeKnock, errFactor, updateCaptain } from './teams.js';
 import { matchFactors, matchupWeights, matchupBrk, liveAdd, hungerNow, newLedger, ledgerMinute, ledgerAction } from '../pipeline.js';
 import { registryVersion } from '../modifiers.js';
-import { ENGINE2, STATE } from '../engine2.js';
+import { ENGINE2, STATE, BAL } from '../engine2.js';
 import { CAPTAIN } from '../captain.js';
 import { matchRules, unlimitedSubs, UNLIMITED } from './rules.js';
 
@@ -41,6 +41,9 @@ export function createMatch(cfg) {
     halfCounts: freshCounts(), addedTimes: [], extraTime: false, shootout: null, ended: false,
     ai: 0, emptyNet: false, addedExtra: 0, abandoned: null,
     hfa: mx.hfa, mx, mxV: registryVersion(),
+    // Poprawki balansu po przeglądzie znawcy (ENGINE2.balance, engine2.js BAL): żółte kartki, przyrost akcji w końcówce
+    yMul: ENGINE2.balance ? BAL.yellow : 1, lateRamp: ENGINE2.balance ? BAL.lateRamp : K.lateRamp,
+    gs: ENGINE2.balance ? BAL.gs : GS0, // stan meczu od 65' i nasycenie golami (ogon wyników)
     rules: matchRules(ctx),
     ledger: newLedger(mx), // zrealizowany wkład wpisów potoku (raporty), bez wpływu na wynik
   };
@@ -76,11 +79,15 @@ export function emit(M, type, side, x, data = {}) {
 function pickWeighted(M, list, w) { return M.rng.weighted(list, w); }
 const centralMid = new Set(['DP', 'ŚP', 'OP']);
 
+// Stan meczu i nasycenie golami kroku 1 i 2 (K, SAT); ENGINE2.balance: BAL.gs (engine2.js, poprawka po przeglądzie znawcy)
+const GS0 = { leadAct: K.gsLeadAct, leadD: K.gsLeadD, trailAct: K.gsTrailAct, trailD: K.gsTrailD, smax: SAT.smax, trail: SAT.trail };
+
 function gameState(M, side) {
   const sat = satAct(M, side);
   if (M.minute < K.gsFrom || M.score[0] === M.score[1]) return { act: sat, D: 0 };
   const leading = M.score[side] > M.score[1 - side];
-  return leading ? { act: K.gsLeadAct * sat, D: K.gsLeadD } : { act: K.gsTrailAct * sat, D: K.gsTrailD };
+  const G = M.gs;
+  return leading ? { act: G.leadAct * sat, D: G.leadD } : { act: G.trailAct * sat, D: G.trailD };
 }
 
 /** Nasycenie golami: część rozluźnienia przy prowadzeniu 2+ działa na jakość wykończenia (SAT.xgShare). */
@@ -94,9 +101,9 @@ function satAct(M, side) {
   const diff = M.score[side] - M.score[1 - side];
   if (diff >= 2 && M.minute >= (diff >= 3 ? SAT.from3 : SAT.from2)) {
     const slack = diff >= 3 ? 1 : SAT.slack2;
-    return 1 - SAT.smax * slack * (1 - hungerNow(M.teams[side], M)); // głód goli: wpis 'hunger' etapu team
+    return 1 - M.gs.smax * slack * (1 - hungerNow(M.teams[side], M)); // głód goli: wpis 'hunger' etapu team
   }
-  if (diff <= -2 && M.minute >= SAT.trailFrom) return 1 - SAT.trail * (1 - hungerNow(M.teams[side], M));
+  if (diff <= -2 && M.minute >= SAT.trailFrom) return 1 - M.gs.trail * (1 - hungerNow(M.teams[side], M));
   return 1;
 }
 
@@ -178,7 +185,7 @@ function phaseFoul(M) {
     if (M.rng.next() < K.redPerFoul * cm * mx.refRed * ft.P.redPerFoul * ft.P.redMul * (x.pi?.rc ?? 1)) {
       straightRed(M, ft, x, M.rng.weighted(['sfp', 'violent', 'dogso'], (k) => ({ sfp: 0.6, violent: 0.15, dogso: 0.25 })[k]));
       carded = true;
-    } else if (M.rng.next() < K.yellowPerFoul * cm * ft.P.yellowPerFoul * (x.yc ? K.bookedYellowMul : 1) * (x.pi?.yc ?? 1)) {
+    } else if (M.rng.next() < K.yellowPerFoul * M.yMul * cm * ft.P.yellowPerFoul * (x.yc ? K.bookedYellowMul : 1) * (x.pi?.yc ?? 1)) {
       // VAR: rażący faul przeoczony przez sędziego (tylko przy żółtej, analiza przy monitorze)
       if (M.ctx.var && !x.yc && M.rng.next() < K.varRedAdd) {
         varReview(M, fi, x, 'redCard', 'Po analizie VAR sędzia zmienia żółtą kartkę na czerwoną.');
@@ -195,7 +202,7 @@ function phaseFoul(M) {
     if (fi !== ai && M.rng.next() < K.dangerFK) { at(M).threat += 2; setPiece(M, ai); }
   }
   for (const T of M.teams) {
-    if (M.rng.next() < K.otherYellowTick / 2 * cf[T.side] + (tw[T.side] ? T.P.yellowPerMin : 0)) {
+    if (M.rng.next() < K.otherYellowTick * M.yMul / 2 * cf[T.side] + (tw[T.side] ? T.P.yellowPerMin : 0)) {
       const xs = onPitch(T, M.minute);
       if (xs.length) {
         const x = M.rng.pick(xs);
@@ -357,7 +364,7 @@ function phaseAction(M) {
   const delta = ((0.55 * A.zones.ATT + 0.45 * A.zones.MID) - (0.65 * D.zones.DEF + 0.35 * D.zones.MID) - dD + paceTerm(M, ai, A, D)) * M.mx.gap;
   const mom = momentumAvg(M, ai);
   const pAct = K.pAction * (M.hfa ? (ai === 0 ? K.homeCreate : K.awayCreate) ** M.hfa : 1) * A.P.pActMul * D.P.oppPActMul
-    * gsA.act * (smA.actMul ?? 1) * (1 + K.lateRamp * Math.max(0, M.minute - 55)) * Math.exp(K.kCreate * delta)
+    * gsA.act * (smA.actMul ?? 1) * (1 + M.lateRamp * Math.max(0, M.minute - 55)) * Math.exp(K.kCreate * delta)
     * (1 + K.momentumAct * mom) * M.mx.wAct;
   if (M.rng.next() >= pAct) return;
   A.threat += 1;
@@ -440,7 +447,7 @@ function tacticalFoul(M, A, D) {
   emit(M, 'foul', D.side, x, { tactical: true });
   emit(M, 'freeKick', A.side, null);
   if (M.rng.next() < K.tacFoulDogso) straightRed(M, D, x, 'dogso');
-  else if (M.rng.next() < K.tacFoulYellow * M.mx.refTacCard * (1 - CAPTAIN.card * D.capES)) card(M, D, x, 'faul taktyczny, przerwanie kontry');
+  else if (M.rng.next() < K.tacFoulYellow * M.yMul * M.mx.refTacCard * (1 - CAPTAIN.card * D.capES)) card(M, D, x, 'faul taktyczny, przerwanie kontry');
   return true;
 }
 

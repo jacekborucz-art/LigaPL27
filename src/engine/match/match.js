@@ -11,6 +11,7 @@ import { goalkeeper, fieldPlayers, planShape, validateTacticPatch, knockEligible
 import { statsFromEvents } from '../matchStats.js';
 import { RATING, K, KNOCK } from './constants.js';
 import { clamp } from '../../core/rng.js';
+import { ENGINE2, BAL } from '../engine2.js'; // poprawki balansu po przeglądzie znawcy (doliczony czas)
 
 export { createMatch, substitute, changeTactics, shout, canSubstitute, canShout, minuteLabel, subsAvailable, assistantSuggest, applySuggestion, matchState };
 export { knockEligible };
@@ -18,14 +19,18 @@ export { DECIDERS, SUB_RULES, ROTATIONS, FRIENDLY_DEFAULTS, matchRules };
 
 const HALVES = { 1: 45, 2: 45, 3: 15, 4: 15 };
 
+const ADDED0 = { base2: 2.5, windows: 0.4, goals: 0.4 }; // krok 1 i 2
+
 /** Doliczony czas z tego, co się wydarzyło w połowie (sędzia, A5). */
 function addedTime(M) {
   const c = M.halfCounts;
   const twMul = M.teams.some((T) => T.P.timewasting && M.score[T.side] > M.score[1 - T.side]) ? 1.5 : 0;
-  const ev = 0.4 * c.goals + 0.4 * c.windows + 0.5 * c.injuries + 1.0 * c.var + 0.15 * c.cards + c.tw + twMul;
+  // Poprawka po przeglądzie znawcy (ENGINE2.balance, engine2.js BAL.added): wagi okien zmian i goli, podstawa 2. połowy
+  const A = ENGINE2.balance ? BAL.added : ADDED0;
+  const ev = A.goals * c.goals + A.windows * c.windows + 0.5 * c.injuries + 1.0 * c.var + 0.15 * c.cards + c.tw + twMul;
   const r = M.rng.int(0, 1);
   if (M.half === 1) return clamp(Math.round(1 + ev + r), 1, 8);
-  if (M.half === 2) return clamp(Math.round(2.5 + ev + r), 2, 10);
+  if (M.half === 2) return clamp(Math.round(A.base2 + ev + r), 2, 10);
   return clamp(Math.round(ev * 0.5 + r), 0, 3);
 }
 

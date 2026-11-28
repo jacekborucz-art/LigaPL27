@@ -21,6 +21,19 @@ const VOIV_XY = {
 };
 /** Podróż gości w km (drogą, ok. 1,2 x linia prosta): ten sam region 10, to samo województwo 60, zagranica 1000 [SZAC]. */
 export function travelKm(homeId, awayId) {
+  // Pamięć na parę klubów (wydajność: mecze w tle co kolejkę); dane klubów (region, województwo) stałe w sezonie
+  const key = `${homeId}|${awayId}`;
+  let km = KM.get(key);
+  if (km === undefined) {
+    km = travelKm0(homeId, awayId);
+    if (anyClub(homeId) && anyClub(awayId)) KM.set(key, km); // nieznany klub (jeszcze bez danych): bez zapamiętania
+  }
+  return km;
+}
+const KM = new Map();
+/** Czyści pamięć odległości (edytor klubów zmienia region albo województwo). */
+export const resetTravelKm = () => KM.clear();
+function travelKm0(homeId, awayId) {
   const H = anyClub(homeId); const A = anyClub(awayId);
   if (!H || !A || H.foreign || A.foreign || !clubById(homeId) || !clubById(awayId)) return 1000;
   if (H.region && H.region === A.region) return 10;

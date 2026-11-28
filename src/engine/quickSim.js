@@ -8,7 +8,8 @@
 import { clamp } from '../core/rng.js';
 import { teamRating } from './teamStrength.js';
 import { matchFactors } from './pipeline.js';
-import { ENGINE2 } from './engine2.js';
+import { registryVersion } from './modifiers.js';
+import { ENGINE2, BAL, COND } from './engine2.js';
 
 export const QS = {
   BETA: 0.225, MU_H: 1.50, MU_A: 1.19, MU_N: 1.34, RHO: -0.10,
@@ -50,8 +51,14 @@ export function expectedGoals(H, A, ctx = {}) {
       pen = 1 + QS.PEN_SHARE * ((mx?.pen ?? 1) - 1);
       gm = (m) => 1 + (m - 1) * QS.GK_SHARE;
     }
-    const lH = muH * Math.exp(QS.BETA_CLUB * eH) * (H.qsMul ?? 1) * gm(A.gkMods.goalMul) * pen;
-    const lA = muA * Math.exp(QS.BETA_CLUB * eA) * (A.qsMul ?? 1) * gm(H.gkMods.goalMul) * pen;
+    let lH = muH * Math.exp(QS.BETA_CLUB * eH) * (H.qsMul ?? 1) * gm(A.gkMods.goalMul) * pen;
+    let lA = muA * Math.exp(QS.BETA_CLUB * eA) * (A.qsMul ?? 1) * gm(H.gkMods.goalMul) * pen;
+    if (ENGINE2.balance) {
+      // Poprawka po przeglądzie znawcy: średnia goli za pełnym silnikiem (BAL.qsGoals) i mniej sytuacji w derbach
+      // (kanał act etapu match, jak liczba akcji w pełnym silniku)
+      const g = BAL.qsGoals * (mx?.ch?.act ?? 1);
+      lH *= g; lA *= g;
+    }
     return { lH, lA, dH, dA };
   }
   const muH = ctx.neutral ? QS.MU_N : QS.MU_H;
@@ -127,6 +134,20 @@ function pickScorers(team, goals, rng) {
   return out;
 }
 
+// Warunki meczu w tle (etap match) w pamięci według wszystkiego, co czytają wpisy etapu bez pogody i murawy (mecz w tle
+// ich nie losuje): sędzia, ranga, derby, frekwencja, podróż (do progu pełnej podróży), poziom ligi, neutralny teren.
+// Ten sam klucz = te same liczby (bez zaokrągleń). Pamięć czyszczona przy zmianie rejestru i po 4000 wpisach.
+const QF = new Map(); let qfV = -1;
+function quickFactors(ctx) {
+  if (ctx.weather || ctx.pitch) return matchFactors({ refStrict: 1, rank: 0, ...ctx }, false);
+  if (qfV !== registryVersion() || QF.size > 4000) { QF.clear(); qfV = registryVersion(); }
+  const km = ctx.travelKm == null ? 'x' : Math.min(ctx.travelKm, COND.hfa.travelKm);
+  const key = `${ctx.refStrict ?? 1}|${ctx.rank ?? 0}|${ctx.derby ?? 0}|${ctx.attendance}|${km}|${ctx.tier}|${ctx.neutral ? 1 : 0}`;
+  let mx = QF.get(key);
+  if (!mx) { mx = matchFactors({ refStrict: 1, rank: 0, ...ctx }, false); QF.set(key, mx); }
+  return mx;
+}
+
 /**
  * Jeden mecz w tle.
  * home/away: { squad, qsMul?, tableTerm?, coachTerm? (decyzje trenera, punkty atrybutu) }; ctx: { neutral, refStrict (0.7-1.4), aggression [h,a] }
@@ -136,7 +157,7 @@ export function quickMatch(home, away, ctx, rng) {
   // Krok 2: warunki meczu (etap match potoku, jak w pełnym silniku) i kontekst drużyny dla stanu zawodników:
   // ranga (stawka x WAZ), poziom ligi, presja tabeli. Bez wyłączników ENGINE2: jak w kroku 1.
   const k2 = ENGINE2.unify || ENGINE2.conditions;
-  if (k2 && !ctx.mx) ctx = { ...ctx, mx: matchFactors({ refStrict: 1, rank: 0, ...ctx }, false) };
+  if (k2 && !ctx.mx) ctx = { ...ctx, mx: quickFactors(ctx) };
   const tc = (s) => (k2 ? { tableTerm: s.tableTerm, coachTerm: s.coachTerm, rank: ctx.rank ?? 0, tier: s.tier, pressure: s.pressure ?? 0 } : { tableTerm: s.tableTerm, coachTerm: s.coachTerm });
   const H = { ...teamRating(home.squad, tc(home)), qsMul: home.qsMul };
   const A = { ...teamRating(away.squad, tc(away)), qsMul: away.qsMul };
@@ -153,8 +174,10 @@ export function quickMatch(home, away, ctx, rng) {
   const [agH, agA] = ctx.aggression ?? [1, 1];
   // Kartki (krok 2, unify): kanały fauli i kartek etapu match (sędzia, ranga, derby, murawa) jak w pełnym silniku
   const mx = ctx.mx;
-  const yMul = ENGINE2.unify && mx ? mx.foul * mx.card : ref;
-  const rMul = ENGINE2.unify && mx ? mx.foul * mx.card * mx.red : ref ** 1.5;
+  let yMul = ENGINE2.unify && mx ? mx.foul * mx.card : ref;
+  let rMul = ENGINE2.unify && mx ? mx.foul * mx.card * mx.red : ref ** 1.5;
+  // Poprawka po przeglądzie znawcy (BAL): żółte +20 %, czerwone (z drugimi żółtymi z playQuick) jak w pełnym silniku
+  if (ENGINE2.balance) { yMul *= BAL.qsYellow; rMul *= BAL.qsRed; }
 
   return {
     score: [gH, gA],

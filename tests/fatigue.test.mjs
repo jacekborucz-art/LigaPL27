@@ -5,7 +5,7 @@ import { generateWorld, squadOf } from '../src/world/worldGen.js';
 import { createTactics, assign } from '../src/engine/lineup.js';
 import { CLUBS_PL, clubById } from '../src/data/clubs_pl.js';
 import { createMatch, runToEnd } from '../src/engine/match/match.js';
-import { condSpeed, hungerOf, teamHunger, fatigueTolerance } from '../src/engine/match/teams.js';
+import { condSpeed, hungerOf, teamHunger, fatigueTolerance, startCond } from '../src/engine/match/teams.js';
 import { shout } from '../src/engine/match/match.js';
 import { SAT } from '../src/engine/match/constants.js';
 import { ENGINE2, setEngine2 } from '../src/engine/engine2.js';
@@ -59,7 +59,10 @@ test('Zmęczeni goście: więcej błędów w obronie, więcej fauli, częściej 
 test('Krok 2: zmęczeni goście słabną wcześniej w meczu, ale zmęczenie sprzed meczu ma granicę puli ciała (400 meczów)', () => {
   const fresh = series(400, 95);
   const tired = series(400, 62);
-  assert.ok(tired.err > fresh.err && tired.foulsAway > fresh.foulsAway, `błędy ${fresh.err} -> ${tired.err}, faule ${fresh.foulsAway} -> ${tired.foulsAway}`);
+  // Po przeglądzie znawcy (Nov 28, 2026, STATE.condStart 0,05 zamiast 0,25) zmęczenie sprzed meczu liczy prawie całe pula
+  // ciała, a kondycja startuje od 93: błędów obrony ze zmęczenia w meczu jest kilka na 400 meczów (szum), zostają faule
+  assert.ok(tired.foulsAway > fresh.foulsAway, `faule ${fresh.foulsAway} -> ${tired.foulsAway} (błędy ${fresh.err} -> ${tired.err})`);
+  assert.ok(startCond({ fresh: 62 }) < startCond({ fresh: 95 }), 'zmęczony zaczyna mecz z niższą kondycją');
   assert.ok(tired.homeW > fresh.homeW * 1.05 && tired.homeW < fresh.homeW * 1.6, `wygrane gospodarzy: ${fresh.homeW} -> ${tired.homeW}`);
 });
 
