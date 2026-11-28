@@ -29,6 +29,17 @@ Zostało / dalej:
 
 ## Wpisy
 
+## Nov 28, 2026, profil główny, scalenie kroku 2 Walki taktyk (d393224, ffffdee) z main (v1.25.1 Beta)
+Zrobione:
+- Krok 2 (stan zawodnika, warunki meczu, mecze w tle jak pełny silnik) i poprawki po QA i znawcy scalone z main.
+Decyzje właściciela (Nov 28, 2026):
+- Bierna gra po poprawkach: 2 Liga ok. -13, III liga ok. -17 pkt na sezon (runda 3 zakładała ok. -20). Zostaje tak
+  na czas testów właściciela. Właściciel da znać po testach; możliwa poprawka: mnożnik ligi tylko dla kar psychiki.
+- Ogon wyników (6+ goli ok. 6 % meczów Ekstraklasy zamiast ok. 4 %): zostaje bez zmian.
+- Test czasu sezonu z pucharami (`tests/uefa.test.mjs`, limit 15 s) na granicy na wolnym komputerze: limit bez zmian.
+Zostało / dalej:
+- Czekać na wynik testów właściciela (bierna gra, odczucie meczów). Potem krok 3 Walki taktyk (`docs/walka-taktyk.md`).
+
 ## Nov 28, 2026, agent silnika meczu (worktree, gałąź worktree-agent-a2dcc9ec768a8e3bf), poprawki po QA i znawcy, jeden commit bez pusha (v1.25.1 Beta, bez zmiany wersji)
 Zrobione:
 - Poprawki kroku 2 Walki taktyk po kontroli jakości i przeglądzie znawcy (`docs/walka-taktyk.md` rozdz. 7.12, tabela zmian
